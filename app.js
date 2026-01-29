@@ -26,8 +26,14 @@ const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+const adminSeed = {
+  full_name: process.env.ADMIN_NAME || 'Марченко Андрій',
+  role: 'admin',
+  password: process.env.ADMIN_PASS || 'admadm',
+};
+
 const userSeed = [
-  { full_name: 'Марченко Андрій', role: 'admin', password: 'admadm' },
+  adminSeed,
   { full_name: 'Test', role: 'student', password: 'kma' },
 ];
 
@@ -172,8 +178,9 @@ const db = {
 
 let usersHasIsActive = true;
 
-const ensureUser = async (fullName, role, password) => {
-  const existing = await db.get('SELECT id, password_hash FROM users WHERE full_name = ?', [fullName]);
+const ensureUser = async (fullName, role, password, options = {}) => {
+  const { forcePassword = false, forceRole = false } = options;
+  const existing = await db.get('SELECT id, password_hash, role FROM users WHERE full_name = ?', [fullName]);
   const hash = await bcrypt.hash(password, 10);
   if (!existing) {
     await db.run(
@@ -182,7 +189,7 @@ const ensureUser = async (fullName, role, password) => {
     );
     return;
   }
-  if (!existing.password_hash) {
+  if (forcePassword || !existing.password_hash) {
     await db.run('UPDATE users SET password_hash = ?, password = ?, is_active = 1 WHERE id = ?', [
       hash,
       password,
@@ -190,6 +197,9 @@ const ensureUser = async (fullName, role, password) => {
     ]);
   } else {
     await db.run('UPDATE users SET is_active = 1 WHERE id = ?', [existing.id]);
+  }
+  if (forceRole && existing.role !== role) {
+    await db.run('UPDATE users SET role = ? WHERE id = ?', [role, existing.id]);
   }
 };
 
@@ -360,7 +370,11 @@ const initDb = async () => {
   }
 
   for (const user of userSeed) {
-    await ensureUser(user.full_name, user.role, user.password);
+    const isAdmin = user.role === 'admin';
+    await ensureUser(user.full_name, user.role, user.password, {
+      forcePassword: isAdmin,
+      forceRole: isAdmin,
+    });
   }
 };
 
@@ -560,20 +574,25 @@ app.post('/register', async (req, res) => {
   }
 
   try {
+    const normalizedName = full_name.trim().replace(/\s+/g, ' ');
+    const existing = await db.get('SELECT id FROM users WHERE LOWER(full_name) = LOWER(?)', [normalizedName]);
+    if (existing) {
+      return res.redirect('/register?error=User%20already%20exists');
+    }
     const hash = await bcrypt.hash(password, 10);
     const row = await db.get(
       'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
-      [full_name.trim(), 'student', hash, password, 1, 'A']
+      [normalizedName, 'student', hash, password, 1, 'A']
     );
     if (!row || !row.id) {
-      return res.redirect('/register?error=User%20already%20exists');
+      return res.redirect('/register?error=Database%20error');
     }
     req.session.pendingUserId = row.id;
-    logAction(db, req, 'register_user', { user_id: row.id, full_name: full_name.trim() });
+    logAction(db, req, 'register_user', { user_id: row.id, full_name: normalizedName });
     broadcast('users_updated');
     return res.redirect('/register/subjects');
   } catch (err) {
-    return res.redirect('/register?error=User%20already%20exists');
+    return res.redirect('/register?error=Database%20error');
   }
 });
 
