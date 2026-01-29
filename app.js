@@ -27,7 +27,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const adminSeed = {
-  full_name: process.env.ADMIN_NAME || 'Марченко Андрій',
+  full_name: process.env.ADMIN_NAME || 'Марченко Андрій Юрійович',
   role: 'admin',
   password: process.env.ADMIN_PASS || 'admadm',
 };
@@ -378,6 +378,14 @@ const initDb = async () => {
   }
 };
 
+let initPromise;
+const ensureDbReady = async () => {
+  if (!initPromise) {
+    initPromise = initDb();
+  }
+  return initPromise;
+};
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, path.join(__dirname, 'uploads'));
@@ -519,16 +527,23 @@ app.get('/login', (req, res) => {
   res.render('login', { error: req.query.error === '1' });
 });
 
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   const { full_name, password } = req.body;
   if (!full_name || !password) {
     return res.redirect('/login?error=1');
   }
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    console.error('DB init failed', err);
+    return res.redirect('/login?error=1');
+  }
   ensureUsersSchema(() => {
+    const normalizedName = full_name.trim().replace(/\s+/g, ' ');
     const activeClause = usersHasIsActive ? ' AND is_active = 1' : '';
     db.get(
-      `SELECT id, full_name, role, password_hash, password, schedule_group FROM users WHERE full_name = ?${activeClause}`,
-      [full_name],
+      `SELECT id, full_name, role, password_hash, password, schedule_group FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
+      [normalizedName],
       (err, user) => {
         const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
         const validPlain = user && user.password && user.password === password;
@@ -574,6 +589,7 @@ app.post('/register', async (req, res) => {
   }
 
   try {
+    await ensureDbReady();
     const normalizedName = full_name.trim().replace(/\s+/g, ' ');
     const existing = await db.get('SELECT id FROM users WHERE LOWER(full_name) = LOWER(?)', [normalizedName]);
     if (existing) {
@@ -592,6 +608,7 @@ app.post('/register', async (req, res) => {
     broadcast('users_updated');
     return res.redirect('/register/subjects');
   } catch (err) {
+    console.error('Register failed', err);
     return res.redirect('/register?error=Database%20error');
   }
 });
@@ -600,6 +617,9 @@ app.get('/register/subjects', (req, res) => {
   if (!req.session.pendingUserId) {
     return res.redirect('/register');
   }
+  ensureDbReady().catch((err) => {
+    console.error('DB init failed', err);
+  });
   db.all('SELECT * FROM subjects ORDER BY name', (err, subjects) => {
     if (err) {
       return res.status(500).send('Database error');
