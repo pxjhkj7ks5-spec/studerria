@@ -2333,7 +2333,7 @@ app.post('/admin/group/remove', requireAdmin, (req, res) => {
 
 app.post('/admin/users/role', requireAdmin, (req, res) => {
   const { user_id, role } = req.body;
-  if (!user_id || !role || !['student', 'admin'].includes(role)) {
+  if (!user_id || !role || !['student', 'admin', 'starosta'].includes(role)) {
     return res.redirect('/admin?err=Invalid%20role');
   }
   const currentId = req.session.user.id;
@@ -2535,6 +2535,39 @@ app.post('/admin/users/activate', requireAdmin, (req, res) => {
     logAction(db, req, 'user_activate', { user_id });
     broadcast('users_updated');
     return res.json({ ok: true });
+  });
+});
+
+app.post('/admin/users/delete-permanent', requireAdmin, (req, res) => {
+  const { user_id } = req.body;
+  const userId = Number(user_id);
+  if (Number.isNaN(userId)) {
+    return res.redirect('/admin?err=Invalid%20user');
+  }
+  db.get('SELECT role FROM users WHERE id = ?', [userId], (err, user) => {
+    if (err || !user) {
+      return res.redirect('/admin?err=User%20not%20found');
+    }
+    if (user.role === 'admin') {
+      return res.redirect('/admin?err=Cannot%20delete%20admin');
+    }
+    db.serialize(() => {
+      db.run('DELETE FROM student_groups WHERE student_id = ?', [userId]);
+      db.run('DELETE FROM login_history WHERE user_id = ?', [userId]);
+      db.run('DELETE FROM message_reads WHERE user_id = ?', [userId]);
+      db.run('DELETE FROM message_targets WHERE user_id = ?', [userId]);
+      db.run('DELETE FROM teamwork_members WHERE user_id = ?', [userId]);
+      db.run('UPDATE homework SET created_by_id = NULL WHERE created_by_id = ?', [userId]);
+      db.run('UPDATE teamwork_groups SET leader_id = ? WHERE leader_id = ?', [req.session.user.id, userId]);
+      db.run('DELETE FROM users WHERE id = ?', [userId], (delErr) => {
+        if (delErr) {
+          return res.redirect('/admin?err=Database%20error');
+        }
+        logAction(db, req, 'user_delete_permanent', { user_id: userId });
+        broadcast('users_updated');
+        return res.redirect('/admin?ok=User%20deleted');
+      });
+    });
   });
 });
 

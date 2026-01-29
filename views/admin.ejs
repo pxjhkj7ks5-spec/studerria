@@ -1065,6 +1065,16 @@
 
             <button class="btn btn-outline-danger" type="button" id="uaDeleteBtn">Deactivate user</button>
             <button class="btn btn-outline-success ms-2" type="button" id="uaActivateBtn">Restore user</button>
+            <form method="POST" action="/admin/users/delete-permanent" class="mt-3" id="uaDeletePermanentForm">
+              <input type="hidden" name="user_id" id="uaDeleteUserId" />
+              <button
+                class="btn btn-outline-danger w-100"
+                type="submit"
+                onclick="return confirm('Permanently delete this user? This cannot be undone.');"
+              >
+                Delete permanently
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -1351,6 +1361,7 @@
             document.getElementById('uaRoleUserId').value = userId;
             document.getElementById('uaPassUserId').value = userId;
             document.getElementById('uaRoleSelect').value = userRole;
+            document.getElementById('uaDeleteUserId').value = userId;
 
             const modal = new bootstrap.Modal(document.getElementById('userActionsModal'));
             modal.show();
@@ -1381,6 +1392,11 @@
                 refreshUsers();
               }
             };
+
+            const permForm = document.getElementById('uaDeletePermanentForm');
+            if (permForm) {
+              permForm.style.display = userActive === 'Yes' ? 'none' : 'block';
+            }
 
             const historyList = document.getElementById('uaLoginHistory');
             historyList.innerHTML = '<li class="list-group-item text-muted">Loading…</li>';
