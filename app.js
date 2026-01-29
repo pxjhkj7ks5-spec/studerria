@@ -4,7 +4,7 @@ const session = require('express-session');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 const { WebSocketServer } = require('ws');
 const bcrypt = require('bcryptjs');
 const pkg = require('./package.json');
@@ -67,324 +67,302 @@ app.use(
   })
 );
 
-const dbFile = path.join(__dirname, 'database.db');
-const db = new sqlite3.Database(dbFile);
-let usersHasIsActive = false;
-
-db.serialize(() => {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      full_name TEXT NOT NULL UNIQUE,
-      role TEXT NOT NULL,
-      password_hash TEXT,
-      password TEXT,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      last_login_ip TEXT,
-      last_user_agent TEXT,
-      last_login_at TEXT,
-      schedule_group TEXT NOT NULL DEFAULT 'A'
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS subjects (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      group_count INTEGER NOT NULL DEFAULT 1,
-      default_group INTEGER NOT NULL DEFAULT 1,
-      show_in_teamwork INTEGER NOT NULL DEFAULT 1
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS student_groups (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      student_id INTEGER NOT NULL,
-      subject_id INTEGER NOT NULL,
-      group_number INTEGER NOT NULL,
-      UNIQUE(student_id, subject_id),
-      FOREIGN KEY(student_id) REFERENCES users(id),
-      FOREIGN KEY(subject_id) REFERENCES subjects(id)
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS schedule_entries (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      subject_id INTEGER NOT NULL,
-      group_number INTEGER NOT NULL,
-      day_of_week TEXT NOT NULL,
-      class_number INTEGER NOT NULL,
-      week_number INTEGER NOT NULL,
-      FOREIGN KEY(subject_id) REFERENCES subjects(id)
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS homework (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      group_name TEXT NOT NULL,
-      subject TEXT NOT NULL,
-      day TEXT NOT NULL,
-      time TEXT NOT NULL,
-      week_number INTEGER,
-      class_number INTEGER,
-      subject_id INTEGER,
-      group_number INTEGER,
-      day_of_week TEXT,
-      created_by_id INTEGER,
-      description TEXT NOT NULL,
-      class_date TEXT,
-      meeting_url TEXT,
-      link_url TEXT,
-      file_path TEXT,
-      file_name TEXT,
-      created_by TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS history_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      actor_id INTEGER,
-      actor_name TEXT,
-      action TEXT NOT NULL,
-      details TEXT,
-      created_at TEXT NOT NULL
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS login_history (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      full_name TEXT NOT NULL,
-      ip TEXT,
-      user_agent TEXT,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(user_id) REFERENCES users(id)
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS teamwork_tasks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      subject_id INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      created_by INTEGER NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(subject_id) REFERENCES subjects(id),
-      FOREIGN KEY(created_by) REFERENCES users(id)
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS teamwork_groups (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      task_id INTEGER NOT NULL,
-      name TEXT NOT NULL,
-      leader_id INTEGER NOT NULL,
-      max_members INTEGER,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(task_id) REFERENCES teamwork_tasks(id),
-      FOREIGN KEY(leader_id) REFERENCES users(id)
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS teamwork_members (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      task_id INTEGER NOT NULL,
-      group_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL,
-      joined_at TEXT NOT NULL,
-      UNIQUE(task_id, user_id),
-      FOREIGN KEY(task_id) REFERENCES teamwork_tasks(id),
-      FOREIGN KEY(group_id) REFERENCES teamwork_groups(id),
-      FOREIGN KEY(user_id) REFERENCES users(id)
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      subject_id INTEGER,
-      group_number INTEGER,
-      target_all INTEGER NOT NULL DEFAULT 0,
-      body TEXT NOT NULL,
-      created_by_id INTEGER NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(subject_id) REFERENCES subjects(id),
-      FOREIGN KEY(created_by_id) REFERENCES users(id)
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS message_targets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      message_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL,
-      FOREIGN KEY(message_id) REFERENCES messages(id),
-      FOREIGN KEY(user_id) REFERENCES users(id)
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS message_reads (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      message_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL,
-      read_at TEXT NOT NULL,
-      UNIQUE(message_id, user_id),
-      FOREIGN KEY(message_id) REFERENCES messages(id),
-      FOREIGN KEY(user_id) REFERENCES users(id)
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS subgroups (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      homework_id INTEGER NOT NULL,
-      name TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(homework_id) REFERENCES homework(id)
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS subgroup_members (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      subgroup_id INTEGER NOT NULL,
-      member_username TEXT NOT NULL,
-      joined_at TEXT NOT NULL,
-      UNIQUE(subgroup_id, member_username),
-      FOREIGN KEY(subgroup_id) REFERENCES subgroups(id)
-    )
-  `);
-
-  db.get('SELECT COUNT(*) AS count FROM users', (err, row) => {
-    if (err) {
-      return;
-    }
-    if (row.count === 0) {
-      const stmt = db.prepare(
-        'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group) VALUES (?, ?, ?, ?, ?, ?)'
-      );
-      userSeed.forEach((u) => {
-        const hash = bcrypt.hashSync(u.password, 10);
-        stmt.run(u.full_name, u.role, hash, u.password, 1, 'A');
-      });
-      stmt.finalize();
-    }
-  });
-
-  db.all('PRAGMA table_info(homework)', (err, columns) => {
-    if (err) {
-      return;
-    }
-    const names = new Set(columns.map((col) => col.name));
-    if (!names.has('week_number')) {
-      db.run('ALTER TABLE homework ADD COLUMN week_number INTEGER');
-    }
-    if (!names.has('class_number')) {
-      db.run('ALTER TABLE homework ADD COLUMN class_number INTEGER');
-    }
-    if (!names.has('subject_id')) {
-      db.run('ALTER TABLE homework ADD COLUMN subject_id INTEGER');
-    }
-    if (!names.has('group_number')) {
-      db.run('ALTER TABLE homework ADD COLUMN group_number INTEGER');
-    }
-    if (!names.has('day_of_week')) {
-      db.run('ALTER TABLE homework ADD COLUMN day_of_week TEXT');
-    }
-    if (!names.has('created_by_id')) {
-      db.run('ALTER TABLE homework ADD COLUMN created_by_id INTEGER');
-    }
-    if (!names.has('class_date')) {
-      db.run('ALTER TABLE homework ADD COLUMN class_date TEXT');
-    }
-    if (!names.has('meeting_url')) {
-      db.run('ALTER TABLE homework ADD COLUMN meeting_url TEXT');
-    }
-  });
-
-  db.all('PRAGMA table_info(users)', (err, columns) => {
-    if (err) {
-      return;
-    }
-    const names = new Set(columns.map((col) => col.name));
-    if (!names.has('password_hash')) {
-      db.run('ALTER TABLE users ADD COLUMN password_hash TEXT');
-    }
-    if (!names.has('password')) {
-      db.run('ALTER TABLE users ADD COLUMN password TEXT');
-    }
-    if (!names.has('is_active')) {
-      db.run('ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1');
-    } else {
-      usersHasIsActive = true;
-    }
-    if (!names.has('last_login_ip')) {
-      db.run('ALTER TABLE users ADD COLUMN last_login_ip TEXT');
-    }
-    if (!names.has('last_user_agent')) {
-      db.run('ALTER TABLE users ADD COLUMN last_user_agent TEXT');
-    }
-    if (!names.has('last_login_at')) {
-      db.run('ALTER TABLE users ADD COLUMN last_login_at TEXT');
-    }
-  });
-
-  db.all('PRAGMA table_info(subjects)', (err, columns) => {
-    if (err) {
-      return;
-    }
-    const names = new Set(columns.map((col) => col.name));
-    if (!names.has('show_in_teamwork')) {
-      db.run('ALTER TABLE subjects ADD COLUMN show_in_teamwork INTEGER NOT NULL DEFAULT 1');
-    }
-  });
-
-  db.all('PRAGMA table_info(subjects)', (err, columns) => {
-    if (err) {
-      return;
-    }
-    const names = new Set(columns.map((col) => col.name));
-    if (!names.has('default_group')) {
-      db.run('ALTER TABLE subjects ADD COLUMN default_group INTEGER DEFAULT 1');
-    }
-  });
-
-  db.all(
-    'SELECT id, password, password_hash FROM users WHERE password_hash IS NULL OR password_hash = \"\"',
-    (err, rows) => {
-      if (err) {
-        return;
-      }
-      rows.forEach((row) => {
-        if (row.password) {
-          const hash = bcrypt.hashSync(row.password, 10);
-          db.run('UPDATE users SET password_hash = ? WHERE id = ?', [hash, row.id]);
-        }
-      });
-    }
-  );
-
-  const ensureUser = (fullName, role, password) => {
-    db.get('SELECT id, password_hash FROM users WHERE full_name = ?', [fullName], (err, row) => {
-      if (err) return;
-      const hash = bcrypt.hashSync(password, 10);
-      if (!row) {
-        db.run(
-          'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group) VALUES (?, ?, ?, ?, ?, ?)',
-          [fullName, role, hash, password, 1, 'A']
-        );
-        return;
-      }
-      if (!row.password_hash) {
-        db.run('UPDATE users SET password_hash = ?, password = ?, is_active = 1 WHERE id = ?', [
-          hash,
-          password,
-          row.id,
-        ]);
-      } else {
-        db.run('UPDATE users SET is_active = 1 WHERE id = ?', [row.id]);
-      }
-    });
-  };
-
-  ensureUser('Марченко Андрій Юрійович', 'admin', 'admand');
-  ensureUser('Test User', 'student', 'kmapro1');
+const pool = new Pool({
+  host: process.env.DB_HOST || `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
+
+const convertPlaceholders = (sql) => {
+  let index = 0;
+  return sql.replace(/\?/g, () => {
+    index += 1;
+    return `$${index}`;
+  });
+};
+
+const normalizeArgs = (sql, params, cb) => {
+  let finalParams = params;
+  let callback = cb;
+  if (typeof params === 'function') {
+    callback = params;
+    finalParams = [];
+  }
+  return { sql, params: finalParams || [], cb: callback };
+};
+
+const db = {
+  async run(sql, params, cb) {
+    const { params: finalParams, cb: callback } = normalizeArgs(sql, params, cb);
+    const query = convertPlaceholders(sql);
+    try {
+      const result = await pool.query(query, finalParams);
+      const lastID = result.rows && result.rows[0] ? result.rows[0].id : undefined;
+      if (callback) {
+        callback.call({ lastID }, null);
+      }
+      return { changes: result.rowCount, lastID };
+    } catch (err) {
+      if (callback) {
+        callback(err);
+        return { changes: 0 };
+      }
+      throw err;
+    }
+  },
+  async get(sql, params, cb) {
+    const { params: finalParams, cb: callback } = normalizeArgs(sql, params, cb);
+    const query = convertPlaceholders(sql);
+    try {
+      const result = await pool.query(query, finalParams);
+      const row = result.rows[0];
+      if (callback) {
+        callback(null, row);
+      }
+      return row;
+    } catch (err) {
+      if (callback) {
+        callback(err);
+        return undefined;
+      }
+      throw err;
+    }
+  },
+  async all(sql, params, cb) {
+    const { params: finalParams, cb: callback } = normalizeArgs(sql, params, cb);
+    const query = convertPlaceholders(sql);
+    try {
+      const result = await pool.query(query, finalParams);
+      if (callback) {
+        callback(null, result.rows);
+      }
+      return result.rows;
+    } catch (err) {
+      if (callback) {
+        callback(err, []);
+        return [];
+      }
+      throw err;
+    }
+  },
+  prepare(sql) {
+    const pending = [];
+    return {
+      run: (...params) => {
+        const promise = db.run(sql, params);
+        pending.push(promise);
+        return promise;
+      },
+      get: (...params) => db.get(sql, params),
+      all: (...params) => db.all(sql, params),
+      finalize: async (cb) => {
+        try {
+          await Promise.all(pending);
+          if (cb) cb();
+        } catch (err) {
+          if (cb) cb(err);
+        }
+      },
+    };
+  },
+};
+
+let usersHasIsActive = true;
+
+const ensureUser = async (fullName, role, password) => {
+  const existing = await db.get('SELECT id, password_hash FROM users WHERE full_name = ?', [fullName]);
+  const hash = await bcrypt.hash(password, 10);
+  if (!existing) {
+    await db.run(
+      'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group) VALUES (?, ?, ?, ?, ?, ?)',
+      [fullName, role, hash, password, 1, 'A']
+    );
+    return;
+  }
+  if (!existing.password_hash) {
+    await db.run('UPDATE users SET password_hash = ?, password = ?, is_active = 1 WHERE id = ?', [
+      hash,
+      password,
+      existing.id,
+    ]);
+  } else {
+    await db.run('UPDATE users SET is_active = 1 WHERE id = ?', [existing.id]);
+  }
+};
+
+const initDb = async () => {
+  const ddl = [
+    `
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        full_name TEXT NOT NULL UNIQUE,
+        role TEXT NOT NULL,
+        password_hash TEXT,
+        password TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        last_login_ip TEXT,
+        last_user_agent TEXT,
+        last_login_at TEXT,
+        schedule_group TEXT NOT NULL DEFAULT 'A'
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS subjects (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        group_count INTEGER NOT NULL DEFAULT 1,
+        default_group INTEGER NOT NULL DEFAULT 1,
+        show_in_teamwork INTEGER NOT NULL DEFAULT 1
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS student_groups (
+        id SERIAL PRIMARY KEY,
+        student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        group_number INTEGER NOT NULL,
+        UNIQUE(student_id, subject_id)
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS schedule_entries (
+        id SERIAL PRIMARY KEY,
+        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        group_number INTEGER NOT NULL,
+        day_of_week TEXT NOT NULL,
+        class_number INTEGER NOT NULL,
+        week_number INTEGER NOT NULL
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS homework (
+        id SERIAL PRIMARY KEY,
+        group_name TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        day TEXT NOT NULL,
+        time TEXT NOT NULL,
+        week_number INTEGER,
+        class_number INTEGER,
+        subject_id INTEGER,
+        group_number INTEGER,
+        day_of_week TEXT,
+        created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        description TEXT NOT NULL,
+        class_date TEXT,
+        meeting_url TEXT,
+        link_url TEXT,
+        file_path TEXT,
+        file_name TEXT,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS history_log (
+        id SERIAL PRIMARY KEY,
+        actor_id INTEGER,
+        actor_name TEXT,
+        action TEXT NOT NULL,
+        details TEXT,
+        created_at TEXT NOT NULL
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS login_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        full_name TEXT NOT NULL,
+        ip TEXT,
+        user_agent TEXT,
+        created_at TEXT NOT NULL
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS teamwork_tasks (
+        id SERIAL PRIMARY KEY,
+        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        created_by INTEGER NOT NULL REFERENCES users(id),
+        created_at TEXT NOT NULL
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS teamwork_groups (
+        id SERIAL PRIMARY KEY,
+        task_id INTEGER NOT NULL REFERENCES teamwork_tasks(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        leader_id INTEGER NOT NULL REFERENCES users(id),
+        max_members INTEGER,
+        created_at TEXT NOT NULL
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS teamwork_members (
+        id SERIAL PRIMARY KEY,
+        task_id INTEGER NOT NULL REFERENCES teamwork_tasks(id) ON DELETE CASCADE,
+        group_id INTEGER NOT NULL REFERENCES teamwork_groups(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        joined_at TEXT NOT NULL,
+        UNIQUE(task_id, user_id)
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        subject_id INTEGER REFERENCES subjects(id) ON DELETE SET NULL,
+        group_number INTEGER,
+        target_all INTEGER NOT NULL DEFAULT 0,
+        body TEXT NOT NULL,
+        created_by_id INTEGER NOT NULL REFERENCES users(id),
+        created_at TEXT NOT NULL
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS message_targets (
+        id SERIAL PRIMARY KEY,
+        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS message_reads (
+        id SERIAL PRIMARY KEY,
+        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        read_at TEXT NOT NULL,
+        UNIQUE(message_id, user_id)
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS subgroups (
+        id SERIAL PRIMARY KEY,
+        homework_id INTEGER NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS subgroup_members (
+        id SERIAL PRIMARY KEY,
+        subgroup_id INTEGER NOT NULL REFERENCES subgroups(id) ON DELETE CASCADE,
+        member_username TEXT NOT NULL,
+        joined_at TEXT NOT NULL,
+        UNIQUE(subgroup_id, member_username)
+      )
+    `,
+  ];
+
+  for (const statement of ddl) {
+    await pool.query(statement);
+  }
+
+  for (const user of userSeed) {
+    await ensureUser(user.full_name, user.role, user.password);
+  }
+};
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -478,23 +456,8 @@ function logAction(dbRef, req, action, details) {
 }
 
 function ensureUsersSchema(cb) {
-  db.all('PRAGMA table_info(users)', (err, columns) => {
-    if (err) {
-      return cb(false);
-    }
-    const names = new Set(columns.map((col) => col.name));
-    if (names.has('is_active')) {
-      usersHasIsActive = true;
-      return cb(true);
-    }
-    db.run('ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1', (alterErr) => {
-      if (!alterErr) {
-        usersHasIsActive = true;
-        return cb(true);
-      }
-      return cb(false);
-    });
-  });
+  usersHasIsActive = true;
+  return cb(true);
 }
 
 function broadcast(type, payload) {
@@ -587,7 +550,7 @@ app.get('/register', (req, res) => {
   res.render('register', { error: req.query.error || '' });
 });
 
-app.post('/register', (req, res) => {
+app.post('/register', async (req, res) => {
   const { full_name, password, confirm_password, agree } = req.body;
   if (!full_name || !password || !confirm_password || !agree) {
     return res.redirect('/register?error=Missing%20fields');
@@ -596,20 +559,22 @@ app.post('/register', (req, res) => {
     return res.redirect('/register?error=Passwords%20do%20not%20match');
   }
 
-  const hash = bcrypt.hashSync(password, 10);
-  db.run(
-    'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group) VALUES (?, ?, ?, ?, ?, ?)',
-    [full_name.trim(), 'student', hash, password, 1, 'A'],
-    function (err) {
-      if (err) {
-        return res.redirect('/register?error=User%20already%20exists');
-      }
-      req.session.pendingUserId = this.lastID;
-      logAction(db, req, 'register_user', { user_id: this.lastID, full_name: full_name.trim() });
-      broadcast('users_updated');
-      return res.redirect('/register/subjects');
+  try {
+    const hash = await bcrypt.hash(password, 10);
+    const row = await db.get(
+      'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
+      [full_name.trim(), 'student', hash, password, 1, 'A']
+    );
+    if (!row || !row.id) {
+      return res.redirect('/register?error=User%20already%20exists');
     }
-  );
+    req.session.pendingUserId = row.id;
+    logAction(db, req, 'register_user', { user_id: row.id, full_name: full_name.trim() });
+    broadcast('users_updated');
+    return res.redirect('/register/subjects');
+  } catch (err) {
+    return res.redirect('/register?error=User%20already%20exists');
+  }
 });
 
 app.get('/register/subjects', (req, res) => {
@@ -1035,7 +1000,7 @@ app.get('/teamwork', requireLogin, (req, res) => {
   );
 });
 
-app.post('/teamwork/task/create', requireLogin, (req, res) => {
+app.post('/teamwork/task/create', requireLogin, async (req, res) => {
   const { title, subject_id } = req.body;
   const subjectId = Number(subject_id);
   if (!title || Number.isNaN(subjectId)) {
@@ -1043,34 +1008,32 @@ app.post('/teamwork/task/create', requireLogin, (req, res) => {
   }
   const { id: userId } = req.session.user;
   const createdAt = new Date().toISOString();
-  db.run(
-    'INSERT INTO teamwork_tasks (subject_id, title, created_by, created_at) VALUES (?, ?, ?, ?)',
-    [subjectId, title.trim(), userId, createdAt],
-    function (err) {
-      if (err) {
-        return res.redirect('/teamwork?err=Database%20error');
-      }
-      const taskId = this.lastID;
-      db.run(
-        'INSERT INTO teamwork_groups (task_id, name, leader_id, max_members, created_at) VALUES (?, ?, ?, ?, ?)',
-        [taskId, 'Команда 1', userId, null, createdAt],
-        function (groupErr) {
-          if (groupErr) {
-            return res.redirect(`/teamwork?subject_id=${subjectId}&err=Group%20create%20failed`);
-          }
-          const groupId = this.lastID;
-          db.run(
-            'INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)',
-            [taskId, groupId, userId, createdAt],
-            () => res.redirect(`/teamwork?subject_id=${subjectId}`)
-          );
-        }
-      );
+  try {
+    const taskRow = await db.get(
+      'INSERT INTO teamwork_tasks (subject_id, title, created_by, created_at) VALUES (?, ?, ?, ?) RETURNING id',
+      [subjectId, title.trim(), userId, createdAt]
+    );
+    if (!taskRow || !taskRow.id) {
+      return res.redirect('/teamwork?err=Database%20error');
     }
-  );
+    const groupRow = await db.get(
+      'INSERT INTO teamwork_groups (task_id, name, leader_id, max_members, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id',
+      [taskRow.id, 'Команда 1', userId, null, createdAt]
+    );
+    if (!groupRow || !groupRow.id) {
+      return res.redirect(`/teamwork?subject_id=${subjectId}&err=Group%20create%20failed`);
+    }
+    await db.run(
+      'INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)',
+      [taskRow.id, groupRow.id, userId, createdAt]
+    );
+    return res.redirect(`/teamwork?subject_id=${subjectId}`);
+  } catch (err) {
+    return res.redirect('/teamwork?err=Database%20error');
+  }
 });
 
-app.post('/teamwork/group/create', requireLogin, (req, res) => {
+app.post('/teamwork/group/create', requireLogin, async (req, res) => {
   const { task_id, name, max_members } = req.body;
   const taskId = Number(task_id);
   const maxMembers = max_members ? Number(max_members) : null;
@@ -1079,53 +1042,38 @@ app.post('/teamwork/group/create', requireLogin, (req, res) => {
   }
   const { id: userId } = req.session.user;
   const createdAt = new Date().toISOString();
-  db.get(
-    'SELECT subject_id FROM teamwork_tasks WHERE id = ?',
-    [taskId],
-    (taskErr, taskRow) => {
-      if (taskErr || !taskRow) {
-        return res.redirect('/teamwork?err=Task%20not%20found');
-      }
-      db.get(
-        'SELECT id FROM teamwork_members WHERE task_id = ? AND user_id = ?',
-        [taskId, userId],
-        (memErr, memRow) => {
-          if (memErr) {
-            return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Database%20error`);
-          }
-          if (memRow) {
-            return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Already%20in%20group`);
-          }
-          db.get(
-            'SELECT COUNT(*) AS cnt FROM teamwork_groups WHERE task_id = ?',
-            [taskId],
-            (countErr, countRow) => {
-              if (countErr) {
-                return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Database%20error`);
-              }
-              const nextIndex = (countRow && countRow.cnt ? countRow.cnt : 0) + 1;
-              const groupName = name && name.trim().length ? name.trim() : `Команда ${nextIndex}`;
-              db.run(
-                'INSERT INTO teamwork_groups (task_id, name, leader_id, max_members, created_at) VALUES (?, ?, ?, ?, ?)',
-                [taskId, groupName, userId, maxMembers, createdAt],
-                function (groupErr) {
-                  if (groupErr) {
-                    return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Group%20create%20failed`);
-                  }
-                  const groupId = this.lastID;
-                  db.run(
-                    'INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)',
-                    [taskId, groupId, userId, createdAt],
-                    () => res.redirect(`/teamwork?subject_id=${taskRow.subject_id}`)
-                  );
-                }
-              );
-            }
-          );
-        }
-      );
+  try {
+    const taskRow = await db.get('SELECT subject_id FROM teamwork_tasks WHERE id = ?', [taskId]);
+    if (!taskRow) {
+      return res.redirect('/teamwork?err=Task%20not%20found');
     }
-  );
+    const memRow = await db.get('SELECT id FROM teamwork_members WHERE task_id = ? AND user_id = ?', [
+      taskId,
+      userId,
+    ]);
+    if (memRow) {
+      return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Already%20in%20group`);
+    }
+    const countRow = await db.get('SELECT COUNT(*) AS cnt FROM teamwork_groups WHERE task_id = ?', [taskId]);
+    const nextIndex = (countRow && countRow.cnt ? Number(countRow.cnt) : 0) + 1;
+    const groupName = name && name.trim().length ? name.trim() : `Команда ${nextIndex}`;
+    const groupRow = await db.get(
+      'INSERT INTO teamwork_groups (task_id, name, leader_id, max_members, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id',
+      [taskId, groupName, userId, maxMembers, createdAt]
+    );
+    if (!groupRow || !groupRow.id) {
+      return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Group%20create%20failed`);
+    }
+    await db.run('INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)', [
+      taskId,
+      groupRow.id,
+      userId,
+      createdAt,
+    ]);
+    return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}`);
+  } catch (err) {
+    return res.redirect(`/teamwork?subject_id=${taskId}&err=Database%20error`);
+  }
 });
 
 app.post('/teamwork/group/join', requireLogin, (req, res) => {
@@ -1166,7 +1114,7 @@ app.post('/teamwork/group/join', requireLogin, (req, res) => {
                 if (cntErr) {
                   return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Database%20error`);
                 }
-                if (cntRow.cnt >= grpRow.max_members) {
+                if (Number(cntRow.cnt) >= grpRow.max_members) {
                   return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Group%20is%20full`);
                 }
                 db.run(
@@ -1299,7 +1247,7 @@ app.post('/admin/teamwork/delete/:id', requireStaff, (req, res) => {
   });
 });
 
-app.post('/admin/messages/send', requireStaff, (req, res) => {
+app.post('/admin/messages/send', requireStaff, async (req, res) => {
   const { target_type, target_all, subject_id, group_number, body, user_ids } = req.body;
   if (!body || !body.trim()) {
     return res.redirect('/admin?err=Message%20is%20empty');
@@ -1317,43 +1265,49 @@ app.post('/admin/messages/send', requireStaff, (req, res) => {
   if (target === 'users' && !users.length) {
     return res.redirect('/admin?err=Select%20users');
   }
-  db.run(
-    `
-      INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `,
-    [isAll || target === 'users' ? null : subjectId, isAll || target === 'users' ? null : groupNum, isAll ? 1 : 0, body.trim(), createdBy, createdAt],
-    function (err) {
-      if (err) {
-        return res.redirect('/admin?err=Database%20error');
-      }
-      const messageId = this.lastID;
-      if (target === 'users' && users.length) {
-        const stmt = db.prepare('INSERT INTO message_targets (message_id, user_id) VALUES (?, ?)');
-        users.forEach((id) => {
-          stmt.run(messageId, Number(id));
-        });
-        stmt.finalize(() => {
-          logAction(db, req, 'message_send', {
-            target_type: target,
-            target_all: isAll,
-            subject_id: subjectId,
-            group_number: groupNum,
-            user_ids: users,
-          });
-          return res.redirect('/admin?ok=Message%20sent');
-        });
-      } else {
-        logAction(db, req, 'message_send', {
-          target_type: target,
-          target_all: isAll,
-          subject_id: subjectId,
-          group_number: groupNum,
-        });
-        return res.redirect('/admin?ok=Message%20sent');
-      }
+  try {
+    const row = await db.get(
+      `
+        INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+      `,
+      [
+        isAll || target === 'users' ? null : subjectId,
+        isAll || target === 'users' ? null : groupNum,
+        isAll ? 1 : 0,
+        body.trim(),
+        createdBy,
+        createdAt,
+      ]
+    );
+    if (!row || !row.id) {
+      return res.redirect('/admin?err=Database%20error');
     }
-  );
+    const messageId = row.id;
+    if (target === 'users' && users.length) {
+      await Promise.all(users.map((id) => db.run('INSERT INTO message_targets (message_id, user_id) VALUES (?, ?)', [
+        messageId,
+        Number(id),
+      ])));
+      logAction(db, req, 'message_send', {
+        target_type: target,
+        target_all: isAll,
+        subject_id: subjectId,
+        group_number: groupNum,
+        user_ids: users,
+      });
+      return res.redirect('/admin?ok=Message%20sent');
+    }
+    logAction(db, req, 'message_send', {
+      target_type: target,
+      target_all: isAll,
+      subject_id: subjectId,
+      group_number: groupNum,
+    });
+    return res.redirect('/admin?ok=Message%20sent');
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
 });
 
 app.post('/admin/messages/delete/:id', requireStaff, (req, res) => {
@@ -1436,7 +1390,9 @@ app.post('/messages/read', requireLogin, (req, res) => {
     return res.json({ ok: true });
   }
   const readAt = new Date().toISOString();
-  const stmt = db.prepare('INSERT OR IGNORE INTO message_reads (message_id, user_id, read_at) VALUES (?, ?, ?)');
+  const stmt = db.prepare(
+    'INSERT INTO message_reads (message_id, user_id, read_at) VALUES (?, ?, ?) ON CONFLICT(message_id, user_id) DO NOTHING'
+  );
   ids.forEach((mid) => {
     stmt.run(Number(mid), userId, readAt);
   });
@@ -1939,7 +1895,7 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), (req, res) 
   });
 });
 
-app.post('/subgroup/create', requireLogin, (req, res) => {
+app.post('/subgroup/create', requireLogin, async (req, res) => {
   const { homework_id, name } = req.body;
   const { username } = req.session.user;
 
@@ -1947,46 +1903,36 @@ app.post('/subgroup/create', requireLogin, (req, res) => {
     return res.status(400).send('Missing fields');
   }
 
-  db.get(
-    `
-      SELECT sm.id
-      FROM subgroup_members sm
-      JOIN subgroups s ON s.id = sm.subgroup_id
-      WHERE s.homework_id = ? AND sm.member_username = ?
-      LIMIT 1
-    `,
-    [homework_id, username],
-    (existingErr, existing) => {
-      if (existingErr) {
-        return res.status(500).send('Database error');
-      }
-      if (existing) {
-        return res.redirect('/schedule?sg=exists');
-      }
-
-      const createdAt = new Date().toISOString();
-      db.run(
-        'INSERT INTO subgroups (homework_id, name, created_at) VALUES (?, ?, ?)',
-        [homework_id, name, createdAt],
-        function (err) {
-          if (err) {
-            return res.status(500).send('Database error');
-          }
-          const subgroupId = this.lastID;
-          db.run(
-            'INSERT OR IGNORE INTO subgroup_members (subgroup_id, member_username, joined_at) VALUES (?, ?, ?)',
-            [subgroupId, username, createdAt],
-            (memberErr) => {
-              if (memberErr) {
-                return res.status(500).send('Database error');
-              }
-              return res.redirect('/schedule');
-            }
-          );
-        }
-      );
+  try {
+    const existing = await db.get(
+      `
+        SELECT sm.id
+        FROM subgroup_members sm
+        JOIN subgroups s ON s.id = sm.subgroup_id
+        WHERE s.homework_id = ? AND sm.member_username = ?
+        LIMIT 1
+      `,
+      [homework_id, username]
+    );
+    if (existing) {
+      return res.redirect('/schedule?sg=exists');
     }
-  );
+    const createdAt = new Date().toISOString();
+    const row = await db.get(
+      'INSERT INTO subgroups (homework_id, name, created_at) VALUES (?, ?, ?) RETURNING id',
+      [homework_id, name, createdAt]
+    );
+    if (!row || !row.id) {
+      return res.status(500).send('Database error');
+    }
+    await db.run(
+      'INSERT INTO subgroup_members (subgroup_id, member_username, joined_at) VALUES (?, ?, ?) ON CONFLICT(subgroup_id, member_username) DO NOTHING',
+      [row.id, username, createdAt]
+    );
+    return res.redirect('/schedule');
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
 
 app.post('/subgroup/join', requireLogin, (req, res) => {
@@ -2027,7 +1973,7 @@ app.post('/subgroup/join', requireLogin, (req, res) => {
           }
           const joinedAt = new Date().toISOString();
           db.run(
-            'INSERT OR IGNORE INTO subgroup_members (subgroup_id, member_username, joined_at) VALUES (?, ?, ?)',
+            'INSERT INTO subgroup_members (subgroup_id, member_username, joined_at) VALUES (?, ?, ?) ON CONFLICT(subgroup_id, member_username) DO NOTHING',
             [subgroup_id, username, joinedAt],
             (err) => {
               if (err) {
@@ -2354,7 +2300,7 @@ app.post('/admin/users/role', requireAdmin, (req, res) => {
         if (countErr) {
           return res.redirect('/admin?err=Database%20error');
         }
-        if (row.count <= 1) {
+        if (Number(row.count) <= 1) {
           return res.redirect('/admin?err=At%20least%20one%20admin%20required');
         }
         db.run('UPDATE users SET role = ? WHERE id = ?', [role, user_id], (updErr) => {
@@ -2543,37 +2489,34 @@ app.post('/admin/users/activate', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/users/delete-permanent', requireAdmin, (req, res) => {
+app.post('/admin/users/delete-permanent', requireAdmin, async (req, res) => {
   const { user_id } = req.body;
   const userId = Number(user_id);
   if (Number.isNaN(userId)) {
     return res.redirect('/admin?err=Invalid%20user');
   }
-  db.get('SELECT role FROM users WHERE id = ?', [userId], (err, user) => {
-    if (err || !user) {
+  try {
+    const user = await db.get('SELECT role FROM users WHERE id = ?', [userId]);
+    if (!user) {
       return res.redirect('/admin?err=User%20not%20found');
     }
     if (user.role === 'admin') {
       return res.redirect('/admin?err=Cannot%20delete%20admin');
     }
-    db.serialize(() => {
-      db.run('DELETE FROM student_groups WHERE student_id = ?', [userId]);
-      db.run('DELETE FROM login_history WHERE user_id = ?', [userId]);
-      db.run('DELETE FROM message_reads WHERE user_id = ?', [userId]);
-      db.run('DELETE FROM message_targets WHERE user_id = ?', [userId]);
-      db.run('DELETE FROM teamwork_members WHERE user_id = ?', [userId]);
-      db.run('UPDATE homework SET created_by_id = NULL WHERE created_by_id = ?', [userId]);
-      db.run('UPDATE teamwork_groups SET leader_id = ? WHERE leader_id = ?', [req.session.user.id, userId]);
-      db.run('DELETE FROM users WHERE id = ?', [userId], (delErr) => {
-        if (delErr) {
-          return res.redirect('/admin?err=Database%20error');
-        }
-        logAction(db, req, 'user_delete_permanent', { user_id: userId });
-        broadcast('users_updated');
-        return res.redirect('/admin?ok=User%20deleted');
-      });
-    });
-  });
+    await db.run('DELETE FROM student_groups WHERE student_id = ?', [userId]);
+    await db.run('DELETE FROM login_history WHERE user_id = ?', [userId]);
+    await db.run('DELETE FROM message_reads WHERE user_id = ?', [userId]);
+    await db.run('DELETE FROM message_targets WHERE user_id = ?', [userId]);
+    await db.run('DELETE FROM teamwork_members WHERE user_id = ?', [userId]);
+    await db.run('UPDATE homework SET created_by_id = NULL WHERE created_by_id = ?', [userId]);
+    await db.run('UPDATE teamwork_groups SET leader_id = ? WHERE leader_id = ?', [req.session.user.id, userId]);
+    await db.run('DELETE FROM users WHERE id = ?', [userId]);
+    logAction(db, req, 'user_delete_permanent', { user_id: userId });
+    broadcast('users_updated');
+    return res.redirect('/admin?ok=User%20deleted');
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
 });
 
 app.post('/admin/switch-to-student', requireAdmin, (req, res) => {
@@ -2592,4 +2535,14 @@ app.post('/logout', (req, res) => {
   });
 });
 
-server.listen(PORT, () => console.log(`Listening on ${PORT}`));
+const startServer = async () => {
+  try {
+    await initDb();
+    server.listen(PORT, () => console.log(`Listening on ${PORT}`));
+  } catch (err) {
+    console.error('Failed to initialize database', err);
+    process.exit(1);
+  }
+};
+
+startServer();

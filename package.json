@@ -1,6 +1,6 @@
 {
   "name": "kma",
-  "version": "0.3.22",
+  "version": "0.3.23",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -19,7 +19,7 @@
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "multer": "^2.0.2",
-    "sqlite3": "^5.1.7",
+    "pg": "^8.17.2",
     "ws": "^8.19.0"
   }
 }
