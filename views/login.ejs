@@ -122,6 +122,9 @@
         border-color: rgba(59, 130, 246, 0.5);
         box-shadow: 0 6px 16px rgba(59, 130, 246, 0.18);
       }
+      .theme-toggle-btn {
+        border-radius: 999px;
+      }
       @media (max-width: 576px) {
         .login-card {
           border-radius: 16px;
@@ -191,7 +194,7 @@
             </div>
           </div>
           <div class="d-flex justify-content-center mt-3">
-            <button class="btn btn-outline-secondary btn-sm" type="button" id="themeToggle">Dark</button>
+            <button class="btn btn-outline-secondary btn-sm theme-toggle-btn" type="button" id="themeToggle">Dark</button>
           </div>
           <footer class="app-footer text-center mt-3">
             <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>

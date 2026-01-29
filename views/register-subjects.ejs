@@ -96,6 +96,48 @@
       body.theme-light .subject-card .fw-semibold {
         color: #0f172a;
       }
+      .group-buttons {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      }
+      .group-option {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 52px;
+        border-radius: 14px;
+        border: 1px solid rgba(15, 23, 42, 0.15);
+        background: rgba(255, 255, 255, 0.7);
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+      }
+      .group-option:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
+        border-color: rgba(59, 130, 246, 0.6);
+      }
+      .group-option input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .group-option.is-selected {
+        border-color: rgba(59, 130, 246, 0.9);
+        background: rgba(59, 130, 246, 0.12);
+        box-shadow: 0 10px 22px rgba(59, 130, 246, 0.2);
+      }
+      body.theme-dark .group-option {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.18);
+        color: #f8fafc;
+      }
+      body.theme-dark .group-option.is-selected {
+        background: rgba(59, 130, 246, 0.2);
+        border-color: rgba(59, 130, 246, 0.9);
+      }
       body.theme-dark .auth-card .border {
         border-color: rgba(255, 255, 255, 0.2) !important;
       }
@@ -114,6 +156,9 @@
         border-radius: 12px;
         padding: 0.75rem 1rem;
         font-weight: 600;
+      }
+      .theme-toggle-btn {
+        border-radius: 999px;
       }
       .btn {
         transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
@@ -157,21 +202,17 @@
                     <% if (s.group_count > 1) { %>
                     <div class="border rounded p-3 mb-3 subject-card">
                       <div class="fw-semibold mb-2"><%= s.name %></div>
-                      <div class="d-flex flex-wrap gap-2">
+                      <div class="group-buttons">
                         <% for (let g = 1; g <= s.group_count; g++) { %>
-                          <div class="form-check">
+                          <label class="group-option <%= s.default_group === g ? 'is-selected' : '' %>">
                             <input
-                              class="form-check-input"
                               type="radio"
                               name="subject_<%= s.id %>"
-                              id="subj-<%= s.id %>-g-<%= g %>"
                               value="<%= g %>"
                               <%= s.default_group === g ? 'checked' : '' %>
                             />
-                            <label class="form-check-label" for="subj-<%= s.id %>-g-<%= g %>">
-                              Group <%= g %>
-                            </label>
-                          </div>
+                            Group <%= g %>
+                          </label>
                         <% } %>
                       </div>
                     </div>
@@ -184,7 +225,7 @@
             </div>
           </div>
           <div class="d-flex justify-content-center mt-3">
-            <button class="btn btn-outline-secondary btn-sm" type="button" id="themeToggle">Dark</button>
+            <button class="btn btn-outline-secondary btn-sm theme-toggle-btn" type="button" id="themeToggle">Dark</button>
           </div>
           <footer class="app-footer text-center mt-3">
             <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
@@ -204,6 +245,15 @@
         document.body.classList.add(next);
         localStorage.setItem('ui-theme', next);
         themeToggle.textContent = next === 'theme-dark' ? 'Light' : 'Dark';
+      });
+
+      document.querySelectorAll('.group-buttons').forEach((group) => {
+        group.addEventListener('click', (event) => {
+          const label = event.target.closest('.group-option');
+          if (!label) return;
+          group.querySelectorAll('.group-option').forEach((el) => el.classList.remove('is-selected'));
+          label.classList.add('is-selected');
+        });
       });
     </script>
   </body>

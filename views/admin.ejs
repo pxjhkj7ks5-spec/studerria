@@ -636,7 +636,7 @@
                     data-user-login="<%= u.last_login_at || '' %>"
                   >
                     <td>
-                      <% if (u.role !== 'admin' && u.is_active === 1) { %>
+                      <% if (u.role !== 'admin') { %>
                         <input type="checkbox" name="delete_user_ids" value="<%= u.id %>" form="deleteUsersForm" />
                       <% } %>
                     </td>
@@ -1180,7 +1180,7 @@
         tbody.innerHTML = data.users
           .map((u) => {
             const isActive = typeof u.is_active === 'undefined' ? 1 : u.is_active;
-            const checkbox = u.role !== 'admin' && isActive === 1
+            const checkbox = u.role !== 'admin'
               ? `<input type="checkbox" name="delete_user_ids" value="${u.id}" form="deleteUsersForm" />`
               : '';
             const subjectList = groupMap[u.id]
