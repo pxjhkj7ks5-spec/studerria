@@ -2535,14 +2535,11 @@ app.post('/logout', (req, res) => {
   });
 });
 
-const startServer = async () => {
-  try {
-    await initDb();
-    server.listen(PORT, () => console.log(`Listening on ${PORT}`));
-  } catch (err) {
+const startServer = () => {
+  server.listen(PORT, () => console.log(`Listening on ${PORT}`));
+  initDb().catch((err) => {
     console.error('Failed to initialize database', err);
-    process.exit(1);
-  }
+  });
 };
 
 startServer();
