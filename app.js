@@ -2554,6 +2554,4 @@ app.post('/logout', (req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server started on http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`Listening on ${PORT}`));
