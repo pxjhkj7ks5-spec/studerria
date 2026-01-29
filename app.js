@@ -630,7 +630,7 @@ app.post('/register/subjects', (req, res) => {
     return res.redirect('/register');
   }
 
-  db.all('SELECT id, group_count FROM subjects', (err, subjects) => {
+  db.all('SELECT id, group_count, default_group FROM subjects', (err, subjects) => {
     if (err) {
       return res.status(500).send('Database error');
     }
@@ -644,7 +644,12 @@ app.post('/register/subjects', (req, res) => {
     );
     subjects.forEach((s) => {
       const value = req.body[`subject_${s.id}`];
-      if (!value) return;
+      if (!value) {
+        if (s.group_count === 1) {
+          stmt.run(userId, s.id, 1);
+        }
+        return;
+      }
       const groupNum = Number(value);
       if (groupNum >= 1 && groupNum <= s.group_count) {
         stmt.run(userId, s.id, groupNum);

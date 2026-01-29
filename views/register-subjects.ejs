@@ -204,12 +204,11 @@
                       <div class="fw-semibold mb-2"><%= s.name %></div>
                       <div class="group-buttons">
                         <% for (let g = 1; g <= s.group_count; g++) { %>
-                          <label class="group-option <%= s.default_group === g ? 'is-selected' : '' %>">
+                          <label class="group-option">
                             <input
                               type="radio"
                               name="subject_<%= s.id %>"
                               value="<%= g %>"
-                              <%= s.default_group === g ? 'checked' : '' %>
                             />
                             Group <%= g %>
                           </label>

@@ -66,6 +66,12 @@
       body.theme-light .hero-sub {
         color: rgba(15, 23, 42, 0.65);
       }
+      #daily-phrase {
+        transition: opacity 240ms ease;
+      }
+      #daily-phrase.fade-out {
+        opacity: 0;
+      }
       .glass {
         border-radius: var(--radius);
         backdrop-filter: blur(18px);
@@ -369,7 +375,7 @@
       <div class="d-flex flex-wrap align-items-end justify-content-between mb-4">
         <div>
           <h1 class="hero-title mb-1">Your Week ✨</h1>
-          <div class="hero-sub">Your rhythm, your focus — let’s make this week count.</div>
+          <div class="hero-sub" id="daily-phrase">Your rhythm, your focus — let’s make this week count.</div>
         </div>
         <span class="badge-glow">Week <%= currentWeek %></span>
       </div>
@@ -876,6 +882,78 @@
       }
 
       loadMessages();
+
+      const phrases = [
+        "Start fresh — today is full of potential.",
+        "Small steps, big progress.",
+        "Focus on now — the rest will follow.",
+        "One thing at a time — and that’s enough.",
+        "You’ve got more in you than you think.",
+        "Let clarity lead your day.",
+        "Stay present, stay steady.",
+        "Keep going — you’re getting closer.",
+        "Be kind to your focus.",
+        "Today is a great day to grow.",
+        "Balance over burnout.",
+        "Show up — even a little is progress.",
+        "A clear mind gets more done.",
+        "You set the tone — begin with calm.",
+        "Progress, not perfection.",
+        "Let effort be your win today.",
+        "This hour matters — make it count.",
+        "Energy follows attention.",
+        "You’re building momentum.",
+        "Stay grounded, keep moving.",
+        "Let your actions match your goals.",
+        "Your best today is enough.",
+        "Choose one goal, and give it space.",
+        "Rest is part of the rhythm.",
+        "Trust your pace — fast or slow.",
+        "You don’t need to rush to be great.",
+        "Small focus. Big ripple.",
+        "The day is yours — use it gently.",
+        "Notice what fuels you today.",
+        "Begin again — always welcome."
+      ];
+
+      function getKyivDayOfYear() {
+        const now = new Date();
+        const dateString = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
+        const [year, month, day] = dateString.split('-').map(Number);
+        const start = Date.UTC(year, 0, 1);
+        const current = Date.UTC(year, month - 1, day);
+        return Math.floor((current - start) / 86400000);
+      }
+
+      function updateDailyPhrase() {
+        const el = document.getElementById('daily-phrase');
+        if (!el) return;
+        const dayOfYear = getKyivDayOfYear();
+        const phrase = phrases[dayOfYear % phrases.length];
+        if (el.textContent === phrase) return;
+        el.classList.add('fade-out');
+        setTimeout(() => {
+          el.textContent = phrase;
+          el.classList.remove('fade-out');
+        }, 240);
+      }
+
+      function scheduleNextMidnight() {
+        const now = new Date();
+        const kyivNow = new Date(
+          now.toLocaleString('en-US', { timeZone: 'Europe/Kyiv' })
+        );
+        const nextMidnight = new Date(kyivNow);
+        nextMidnight.setHours(24, 0, 0, 0);
+        const ms = nextMidnight.getTime() - kyivNow.getTime();
+        setTimeout(() => {
+          updateDailyPhrase();
+          scheduleNextMidnight();
+        }, ms + 500);
+      }
+
+      updateDailyPhrase();
+      scheduleNextMidnight();
 
       const themeToggle = document.getElementById('themeToggle');
       const storedTheme = localStorage.getItem('ui-theme') || 'theme-light';
