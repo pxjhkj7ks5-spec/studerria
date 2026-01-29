@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Teamwork</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <style>
+      :root {
+        --accent: #3b82f6;
+        --accent-2: #8b5cf6;
+        --radius: 18px;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+          "Helvetica Neue", "Inter", Arial, sans-serif;
+        min-height: 100vh;
+        transition: background 200ms ease, color 200ms ease;
+      }
+      body.theme-dark {
+        background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.3), transparent 60%),
+          radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.25), transparent 60%),
+          linear-gradient(160deg, #050508 0%, #12061a 45%, #1b0f26 100%);
+        color: #f8fafc;
+      }
+      body.theme-light {
+        background: radial-gradient(1000px 700px at 20% 10%, rgba(191, 219, 254, 0.6), transparent 60%),
+          radial-gradient(900px 600px at 80% 20%, rgba(224, 231, 255, 0.6), transparent 60%),
+          linear-gradient(150deg, #f8fafc 0%, #eef2ff 45%, #e0f2fe 100%);
+        color: #0f172a;
+      }
+      .topbar {
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      body.theme-dark .topbar {
+        background: rgba(10, 10, 20, 0.5);
+      }
+      body.theme-light .topbar {
+        background: rgba(255, 255, 255, 0.75);
+      }
+      .glass {
+        border-radius: var(--radius);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.2);
+      }
+      body.theme-dark .glass {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      body.theme-light .glass {
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+      }
+      body.theme-light .text-muted {
+        color: rgba(15, 23, 42, 0.6) !important;
+      }
+      body.theme-light .list-group-item {
+        color: #0f172a;
+        border-color: rgba(15, 23, 42, 0.08);
+      }
+      body.theme-light .btn-outline-light {
+        color: #0f172a;
+        border-color: rgba(15, 23, 42, 0.2);
+      }
+      body.theme-light .btn-outline-light:hover {
+        background: rgba(15, 23, 42, 0.06);
+      }
+      body.theme-light .navbar-brand,
+      body.theme-light .topbar .text-white {
+        color: #0f172a !important;
+      }
+      .btn {
+        transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+      }
+      .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
+      }
+      body.theme-dark .btn:hover {
+        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45);
+      }
+      .btn:active {
+        transform: translateY(0);
+        box-shadow: none;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        border: none;
+        border-radius: 12px;
+      }
+      .btn-outline-light,
+      .btn-outline-primary,
+      .btn-outline-secondary {
+        border-radius: 999px;
+      }
+      body.theme-dark .form-control,
+      body.theme-dark .form-select {
+        background: rgba(255, 255, 255, 0.08);
+        color: #f8fafc;
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+      body.theme-dark .form-control::placeholder {
+        color: rgba(248, 250, 252, 0.6);
+      }
+      body.theme-dark .text-muted {
+        color: rgba(248, 250, 252, 0.65) !important;
+      }
+      body.theme-dark .list-group-item {
+        color: #f8fafc;
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+      .subject-pill {
+        border-radius: 999px;
+      }
+      .task-card h5 {
+        font-weight: 700;
+      }
+      .group-card {
+        border-radius: 14px;
+      }
+    </style>
+  </head>
+  <body class="theme-dark">
+    <nav class="navbar navbar-expand-lg topbar">
+      <div class="container">
+        <span class="navbar-brand text-white">Teamwork</span>
+        <div class="d-flex align-items-center">
+          <span class="me-3 text-muted">Студент: <%= username %></span>
+          <button class="btn btn-outline-light btn-sm me-2" id="themeToggle" type="button">Light</button>
+          <a class="btn btn-outline-light btn-sm" href="/schedule">Back to schedule</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-4">
+      <% if (messages && messages.error) { %>
+        <div class="alert alert-danger"><%= messages.error %></div>
+      <% } %>
+      <% if (messages && messages.success) { %>
+        <div class="alert alert-success"><%= messages.success %></div>
+      <% } %>
+
+      <div class="glass p-3 mb-4">
+        <h5 class="mb-3">Ваші предмети</h5>
+        <div class="d-flex flex-wrap gap-2">
+          <% if (!subjects.length) { %>
+            <span class="text-muted">Немає предметів для вибору</span>
+          <% } else { %>
+            <% subjects.forEach(function(s) { %>
+              <a
+                class="btn btn-sm <%= selectedSubjectId === s.subject_id ? 'btn-primary' : 'btn-outline-light' %> subject-pill"
+                href="/teamwork?subject_id=<%= s.subject_id %>"
+              >
+                <%= s.subject_name %>
+              </a>
+            <% }); %>
+          <% } %>
+        </div>
+      </div>
+
+      <% if (selectedSubjectId) { %>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="mb-0">Завдання по предмету</h4>
+          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createTaskModal">
+            Створити завдання
+          </button>
+        </div>
+
+        <% if (!tasks.length) { %>
+          <div class="glass p-4 text-center text-muted">Ще немає командних завдань</div>
+        <% } %>
+
+        <% tasks.forEach(function(task) { %>
+          <div class="glass p-4 mb-4 task-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h5 class="mb-1"><%= task.title %></h5>
+                <div class="text-muted">Предмет: <%= task.subject_name %></div>
+              </div>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-12 col-lg-8">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h6 class="mb-0">Підгрупи</h6>
+                  <form method="POST" action="/teamwork/group/create" class="d-flex gap-2">
+                    <input type="hidden" name="task_id" value="<%= task.id %>" />
+                    <input class="form-control form-control-sm" name="name" placeholder="Назва групи" />
+                    <input class="form-control form-control-sm" name="max_members" placeholder="Макс." type="number" min="1" />
+                    <button class="btn btn-outline-light btn-sm" type="submit">+ Нова</button>
+                  </form>
+                </div>
+
+                <% if (!task.groups.length) { %>
+                  <div class="text-muted">Груп ще немає.</div>
+                <% } %>
+
+                <div class="d-grid gap-3">
+                  <% task.groups.forEach(function(group) { %>
+                    <div class="glass p-3 group-card">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                          <strong><%= group.name %></strong>
+                          <span class="text-muted ms-2">Лідер: <%= group.leader_name %></span>
+                          <% if (group.max_members) { %>
+                            <span class="text-muted ms-2">Макс: <%= group.max_members %></span>
+                          <% } %>
+                        </div>
+                        <div class="d-flex gap-2">
+                          <% if (!group.is_member) { %>
+                            <form method="POST" action="/teamwork/group/join">
+                              <input type="hidden" name="group_id" value="<%= group.id %>" />
+                              <button class="btn btn-outline-light btn-sm" type="submit">Приєднатися</button>
+                            </form>
+                          <% } else { %>
+                            <form method="POST" action="/teamwork/group/leave">
+                              <input type="hidden" name="group_id" value="<%= group.id %>" />
+                              <button class="btn btn-outline-secondary btn-sm" type="submit">Вийти</button>
+                            </form>
+                          <% } %>
+                        </div>
+                      </div>
+                      <div class="small text-muted mb-2">
+                        Учасники: <%= group.members.map((m) => m.member_name).join(', ') || 'немає' %>
+                      </div>
+                      <% if (group.is_leader) { %>
+                        <form method="POST" action="/teamwork/group/update" class="row g-2 align-items-end">
+                          <input type="hidden" name="group_id" value="<%= group.id %>" />
+                          <div class="col-12 col-md-5">
+                            <label class="form-label">Назва</label>
+                            <input class="form-control form-control-sm" name="name" placeholder="<%= group.name %>" />
+                          </div>
+                          <div class="col-12 col-md-3">
+                            <label class="form-label">Макс. учасників</label>
+                            <input class="form-control form-control-sm" name="max_members" type="number" min="1" placeholder="без ліміту" />
+                          </div>
+                          <div class="col-12 col-md-4 d-flex gap-2">
+                            <button class="btn btn-outline-primary btn-sm" type="submit">Оновити</button>
+                          </div>
+                        </form>
+                        <form method="POST" action="/teamwork/group/disband" class="mt-2">
+                          <input type="hidden" name="group_id" value="<%= group.id %>" />
+                          <button class="btn btn-outline-danger btn-sm" type="submit">Розформувати</button>
+                        </form>
+                      <% } %>
+                    </div>
+                  <% }); %>
+                </div>
+              </div>
+
+              <div class="col-12 col-lg-4">
+                <div class="glass p-3">
+                  <h6>Можуть приєднатись</h6>
+                  <ul class="list-group list-group-flush mt-2">
+                    <% (freeStudents[task.id] || []).forEach(function(stu) { %>
+                      <li class="list-group-item bg-transparent"><%= stu.full_name %></li>
+                    <% }); %>
+                    <% if (!(freeStudents[task.id] || []).length) { %>
+                      <li class="list-group-item bg-transparent text-muted">Немає вільних студентів</li>
+                    <% } %>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      <% } %>
+    </main>
+
+    <div class="modal fade" id="createTaskModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content glass p-3">
+          <div class="modal-header">
+            <h5 class="modal-title">Нове завдання</h5>
+            <button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form method="POST" action="/teamwork/task/create">
+              <input type="hidden" name="subject_id" value="<%= selectedSubjectId %>" />
+              <div class="mb-3">
+                <label class="form-label">Назва завдання</label>
+                <input class="form-control" name="title" placeholder="Наприклад: Практика 1" required />
+              </div>
+              <button class="btn btn-primary w-100" type="submit">Створити</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      const themeToggle = document.getElementById('themeToggle');
+      const savedTheme = localStorage.getItem('ui-theme') || 'theme-dark';
+      document.body.classList.remove('theme-light', 'theme-dark');
+      document.body.classList.add(savedTheme);
+      themeToggle.textContent = savedTheme === 'theme-dark' ? 'Light' : 'Dark';
+      themeToggle.addEventListener('click', () => {
+        const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
+        document.body.classList.remove('theme-light', 'theme-dark');
+        document.body.classList.add(next);
+        localStorage.setItem('ui-theme', next);
+        themeToggle.textContent = next === 'theme-dark' ? 'Light' : 'Dark';
+      });
+    </script>
+  </body>
+</html>

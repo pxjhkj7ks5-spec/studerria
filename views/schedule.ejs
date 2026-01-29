@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>My Schedule</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <style>
+      :root {
+        --accent: #3b82f6;
+        --accent-2: #8b5cf6;
+        --accent-3: #22d3ee;
+        --radius: 18px;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+          "Helvetica Neue", "Inter", Arial, sans-serif;
+        min-height: 100vh;
+        transition: background 200ms ease, color 200ms ease;
+      }
+      body.theme-dark {
+        background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.3), transparent 60%),
+          radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.25), transparent 60%),
+          linear-gradient(160deg, #050508 0%, #12061a 45%, #1b0f26 100%);
+        color: #f8fafc;
+      }
+      body.theme-light {
+        background: radial-gradient(1000px 700px at 20% 10%, rgba(191, 219, 254, 0.6), transparent 60%),
+          radial-gradient(900px 600px at 80% 20%, rgba(224, 231, 255, 0.6), transparent 60%),
+          linear-gradient(150deg, #f8fafc 0%, #eef2ff 45%, #e0f2fe 100%);
+        color: #0f172a;
+      }
+      body.theme-light .text-white {
+        color: #0f172a !important;
+      }
+      body.theme-light .btn-outline-light {
+        color: #0f172a;
+        border-color: rgba(15, 23, 42, 0.2);
+      }
+      body.theme-light .btn-outline-light:hover {
+        background: rgba(15, 23, 42, 0.06);
+      }
+      .topbar {
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      body.theme-dark .topbar {
+        background: rgba(10, 10, 20, 0.5);
+      }
+      body.theme-light .topbar {
+        background: rgba(255, 255, 255, 0.75);
+      }
+      .hero-title {
+        font-size: clamp(2.2rem, 4vw, 3rem);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+      .hero-sub {
+        color: rgba(255, 255, 255, 0.7);
+      }
+      body.theme-light .hero-sub {
+        color: rgba(15, 23, 42, 0.65);
+      }
+      .glass {
+        border-radius: var(--radius);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.2);
+      }
+      body.theme-dark .glass {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 18px 45px rgba(8, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
+      }
+      body.theme-light .glass {
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+      }
+      .badge-glow {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #fff;
+        border: none;
+        padding: 0.45rem 0.9rem;
+        border-radius: 999px;
+        font-weight: 700;
+      }
+      .week-slider {
+        position: fixed;
+        left: 50%;
+        bottom: 18px;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 10px 16px;
+        border-radius: 999px;
+        backdrop-filter: blur(12px);
+        z-index: 1050;
+      }
+      body.theme-dark .week-slider {
+        background: rgba(10, 10, 20, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+      }
+      body.theme-light .week-slider {
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+      }
+      .week-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        border: none;
+        background: rgba(255, 255, 255, 0.4);
+        cursor: pointer;
+        transition: transform 220ms ease, background 220ms ease, width 260ms ease;
+      }
+      .week-dot:hover {
+        transform: scale(1.1);
+      }
+      .week-dot.active {
+        width: 24px;
+        background: #fff;
+      }
+      .week-dot.active {
+        transform: scale(1.05);
+      }
+      .week-nav-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 1px solid #5a5a5a;
+        background: #2a2a2a;
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+      }
+      .week-nav-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+      }
+      body.theme-light .week-nav-btn {
+        background: #f1f5f9;
+        border-color: #cbd5f5;
+        color: #0f172a;
+      }
+      .schedule-content {
+        transition: opacity 0.3s ease, transform 0.3s ease;
+      }
+      .schedule-content.enter {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      .schedule-content.enter-active {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      body.theme-light .week-dot {
+        background: rgba(15, 23, 42, 0.25);
+      }
+      body.theme-light .week-dot.active {
+        background: #0f172a;
+      }
+      .day-card .card-header {
+        background: transparent;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        font-weight: 700;
+      }
+      body.theme-light .day-card .card-header {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+      }
+      .list-group-item {
+        background: transparent;
+        border-color: rgba(255, 255, 255, 0.08);
+      }
+      body.theme-light .list-group-item {
+        border-color: rgba(15, 23, 42, 0.1);
+      }
+      .list-group-item-action:hover {
+        background: rgba(59, 130, 246, 0.14);
+      }
+      body.theme-light .list-group-item-action:hover {
+        background: rgba(59, 130, 246, 0.08);
+      }
+      body.theme-dark .list-group-item-action:focus,
+      body.theme-dark .list-group-item-action:active {
+        background: rgba(139, 92, 246, 0.22);
+        box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.25) inset;
+      }
+      .muted {
+        color: rgba(255, 255, 255, 0.7);
+      }
+      body.theme-light .muted {
+        color: rgba(15, 23, 42, 0.6);
+      }
+      body.theme-dark .list-group-item .fw-semibold {
+        color: #f8fafc;
+      }
+      body.theme-dark .day-card .card-header {
+        color: #f8fafc;
+      }
+      .modal-content {
+        border-radius: var(--radius);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(16px);
+      }
+      body.theme-dark .modal-content {
+        background: rgba(17, 17, 30, 0.92);
+        color: #f8fafc;
+      }
+      body.theme-light .modal-content {
+        background: rgba(255, 255, 255, 0.95);
+        color: #0f172a;
+      }
+      .form-control, .form-select {
+        border-radius: 12px;
+      }
+      body.theme-dark .form-control,
+      body.theme-dark .form-select {
+        background: rgba(255, 255, 255, 0.08);
+        color: #f8fafc;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+      }
+      body.theme-dark .form-select option {
+        background: #0f0f1a;
+        color: #f8fafc;
+      }
+      body.theme-light .form-select option {
+        background: #fff;
+        color: #0f172a;
+      }
+      body.theme-light .form-control,
+      body.theme-light .form-select {
+        background: rgba(255, 255, 255, 0.9);
+        color: #0f172a;
+        border: 1px solid rgba(15, 23, 42, 0.16);
+      }
+      .form-control:focus, .form-select:focus {
+        border-color: var(--accent-3);
+        box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2);
+      }
+      body.theme-dark .modal-content .list-group-item {
+        color: #f8fafc;
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+      body.theme-dark .modal-content .text-muted {
+        color: rgba(248, 250, 252, 0.65) !important;
+      }
+      body.theme-dark .modal-content .form-label {
+        color: rgba(248, 250, 252, 0.85);
+      }
+      body.theme-dark .modal-content ::placeholder {
+        color: rgba(248, 250, 252, 0.6);
+      }
+      body.theme-dark .modal-content a {
+        color: #93c5fd;
+      }
+      body.theme-dark .modal-content a:hover {
+        color: #bfdbfe;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        border: none;
+        border-radius: 12px;
+      }
+      .btn-outline-light,
+      .btn-outline-primary,
+      .btn-outline-secondary {
+        border-radius: 999px;
+      }
+      .btn {
+        transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+      }
+      .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
+      }
+      body.theme-dark .btn:hover {
+        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45);
+      }
+      .btn:active {
+        transform: translateY(0);
+        box-shadow: none;
+      }
+      .theme-toggle {
+        border-radius: 999px;
+      }
+      .msg-btn {
+        border-radius: 999px;
+        width: 36px;
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        position: relative;
+      }
+      .msg-badge {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        min-width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: #ef4444;
+        color: #fff;
+        font-size: 11px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 5px;
+      }
+      .app-footer {
+        font-size: 0.85rem;
+      }
+      body.theme-dark .app-footer {
+        color: rgba(255, 255, 255, 0.6);
+      }
+      body.theme-light .app-footer {
+        color: rgba(15, 23, 42, 0.6);
+      }
+    </style>
+  </head>
+  <body class="theme-dark">
+    <nav class="navbar navbar-expand-lg topbar">
+      <div class="container">
+        <span class="navbar-brand text-white">Student Portal</span>
+        <div class="d-flex align-items-center">
+          <span class="me-3 muted">
+            <% if (role === 'admin') { %>
+              Адмін: <%= username %>
+            <% } else if (role === 'starosta') { %>
+              Староста: <%= username %>
+            <% } else { %>
+              Студент: <%= username %>
+            <% } %>
+          </span>
+          <% if (role === 'admin') { %>
+            <form method="POST" action="/admin/switch-to-admin" class="me-2">
+              <button class="btn btn-outline-primary btn-sm" type="submit">Back to Admin</button>
+            </form>
+          <% } %>
+          <button class="btn btn-outline-light btn-sm me-2 theme-toggle" type="button" id="themeToggle">
+            Light
+          </button>
+          <button class="btn btn-outline-light btn-sm me-2 msg-btn" type="button" id="messagesBtn" aria-label="Messages">
+            💬
+            <span class="msg-badge d-none" id="messagesBadge">0</span>
+          </button>
+          <a class="btn btn-outline-light btn-sm me-2" href="/teamwork">Командна робота</a>
+          <a class="btn btn-outline-light btn-sm me-2" href="/profile">Profile</a>
+          <form method="POST" action="/logout">
+            <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>
+          </form>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-4 schedule-content enter">
+      <div class="d-flex flex-wrap align-items-end justify-content-between mb-4">
+        <div>
+          <h1 class="hero-title mb-1">Your Week ✨</h1>
+          <div class="hero-sub">Your rhythm, your focus — let’s make this week count.</div>
+        </div>
+        <span class="badge-glow">Week <%= currentWeek %></span>
+      </div>
+
+      <% if (role === 'admin') { %>
+        <div class="alert alert-info glass text-white border-0">
+          You are viewing the schedule as admin.
+        </div>
+      <% } %>
+
+      <% if (subgroupError === 'exists') { %>
+        <div class="alert alert-warning glass text-white border-0">
+          You are already in a subgroup for this homework.
+        </div>
+      <% } %>
+
+      <% daysOfWeek.forEach(function(day) { %>
+        <div class="card mb-3 glass day-card">
+          <div class="card-header fw-semibold text-white"><%= day %></div>
+          <div class="list-group list-group-flush">
+            <% if (!scheduleByDay[day] || scheduleByDay[day].length === 0) { %>
+              <div class="list-group-item muted">No classes</div>
+            <% } else { %>
+              <% scheduleByDay[day].forEach(function(cls) { %>
+                <% const slot = bellSchedule[cls.class_number]; %>
+                <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : ''; %>
+                <button
+                  class="list-group-item list-group-item-action"
+                  type="button"
+                  data-bs-toggle="modal"
+                  data-bs-target="#homeworkModal"
+                  data-class="<%= cls.subject_name %>"
+                  data-subjectid="<%= cls.subject_id %>"
+                  data-day="<%= cls.day_of_week %>"
+                  data-time="<%= timeLabel %>"
+                  data-classnum="<%= cls.class_number %>"
+                  data-groupnum="<%= cls.group_number %>"
+                  data-date="<%= cls.class_date %>"
+                >
+                  <div class="d-flex justify-content-between">
+                    <div>
+                      <div class="fw-semibold"><%= cls.subject_name %></div>
+                      <div class="small muted">Group <%= cls.group_number %> · Class <%= cls.class_number %></div>
+                    </div>
+                    <div class="muted small"><%= timeLabel %></div>
+                  </div>
+                </button>
+              <% }); %>
+            <% } %>
+          </div>
+        </div>
+      <% }); %>
+    </main>
+
+    <div class="week-slider" id="weekSlider">
+      <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
+      <% for (let w = 1; w <= 15; w++) { %>
+        <button
+          type="button"
+          class="week-dot <%= w === currentWeek ? 'active' : '' %>"
+          data-week="<%= w %>"
+          aria-label="Week <%= w %>"
+        ></button>
+      <% } %>
+      <button class="week-nav-btn" type="button" id="weekNext" aria-label="Next week">›</button>
+    </div>
+
+    <footer class="app-footer text-center py-4" style="padding-bottom: 90px;">
+      <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
+    </footer>
+    <footer class="app-footer text-center py-4">
+      <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
+    </footer>
+
+    <div class="modal fade" id="homeworkModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="homeworkModalTitle">Class details</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <strong>Selected class:</strong>
+              <span id="homeworkModalMeta" class="text-muted"></span>
+            </div>
+
+            <h6>Homework list</h6>
+            <ul id="homeworkList" class="list-group mb-4">
+              <li class="list-group-item text-muted">No assignments yet.</li>
+            </ul>
+
+            <div id="subgroupSection" class="mb-4 d-none">
+              <h6>Subgroups</h6>
+              <div id="subgroupList" class="list-group mb-3"></div>
+
+              <div class="card mb-3">
+                <div class="card-body">
+                  <form method="POST" action="/subgroup/create">
+                    <input type="hidden" id="subgroupHomeworkId" name="homework_id" />
+                    <div class="row g-2 align-items-end">
+                      <div class="col-12 col-md-8">
+                        <label for="subgroupName" class="form-label">Create new subgroup</label>
+                        <input id="subgroupName" name="name" class="form-control" placeholder="Group name" required />
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <button type="submit" class="btn btn-outline-primary w-100">Create</button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              <form method="POST" action="/subgroup/join">
+                <div class="row g-2 align-items-end">
+                  <div class="col-12 col-md-8">
+                    <label for="joinSubgroupId" class="form-label">Join existing subgroup</label>
+                    <select id="joinSubgroupId" name="subgroup_id" class="form-select" required>
+                      <option value="" disabled selected>Select subgroup</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <button type="submit" class="btn btn-outline-secondary w-100">Join</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <h6>Add homework</h6>
+            <form method="POST" action="/homework/add" enctype="multipart/form-data">
+              <div class="mb-3">
+                <label for="hwText" class="form-label">Description</label>
+                <textarea id="hwText" name="description" class="form-control" rows="3" required></textarea>
+              </div>
+              <div class="mb-3">
+                <label for="hwLink" class="form-label">Link (optional)</label>
+                <input id="hwLink" name="link_url" type="url" class="form-control" placeholder="https://example.com" />
+              </div>
+              <div class="mb-3">
+                <label for="hwMeeting" class="form-label">Online class link (Zoom/Teams)</label>
+                <input
+                  id="hwMeeting"
+                  name="meeting_url"
+                  type="url"
+                  class="form-control"
+                  placeholder="https://zoom.us/j/..."
+                />
+              </div>
+              <div class="mb-3">
+                <label for="hwFile" class="form-label">Attachment (optional)</label>
+                <input id="hwFile" name="attachment" type="file" class="form-control" />
+              </div>
+              <input type="hidden" id="hwSubjectId" name="subject_id" />
+              <input type="hidden" id="hwGroupNum" name="group_number" />
+              <input type="hidden" id="hwDay" name="day_of_week" />
+              <input type="hidden" id="hwTime" name="time" />
+              <input type="hidden" id="hwClassNum" name="class_number" />
+              <input type="hidden" id="hwDate" name="class_date" />
+              <button type="submit" class="btn btn-primary">Save homework</button>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="messagesModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Повідомлення</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Фільтр по предмету</label>
+              <select class="form-select" id="messagesSubjectFilter">
+                <option value="">Усі предмети</option>
+                <% (messageSubjects || []).forEach(function(s) { %>
+                  <option value="<%= s.subject_id %>"><%= s.subject_name %></option>
+                <% }); %>
+              </select>
+            </div>
+            <ul id="messagesList" class="list-group">
+              <li class="list-group-item text-muted">Завантаження...</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      const homeworkModal = document.getElementById('homeworkModal');
+      const homeworkData = <%- JSON.stringify(homework || []) %>;
+      const listEl = document.getElementById('homeworkList');
+      const subgroupSection = document.getElementById('subgroupSection');
+      const subgroupList = document.getElementById('subgroupList');
+      const subgroupHomeworkId = document.getElementById('subgroupHomeworkId');
+      const joinSubgroupId = document.getElementById('joinSubgroupId');
+      const currentUser = <%- JSON.stringify(username) %>;
+
+      function renderHomework(items) {
+        listEl.innerHTML = '';
+        if (!items.length) {
+          const empty = document.createElement('li');
+          empty.className = 'list-group-item text-muted';
+          empty.textContent = 'No assignments yet.';
+          listEl.appendChild(empty);
+          return;
+        }
+
+        items.forEach((item) => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item';
+
+          const title = document.createElement('div');
+          title.className = 'fw-semibold mb-1';
+          title.textContent = item.description;
+          li.appendChild(title);
+
+          const meta = document.createElement('div');
+          meta.className = 'text-muted small mb-2';
+          const created = new Date(item.created_at).toLocaleString();
+          meta.textContent = `${item.created_by} • ${created}`;
+          li.appendChild(meta);
+
+          if (item.link_url) {
+            const link = document.createElement('a');
+            link.href = item.link_url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.textContent = 'Open link';
+            link.className = 'me-3';
+            li.appendChild(link);
+          }
+          if (item.meeting_url) {
+            const meet = document.createElement('a');
+            meet.href = item.meeting_url;
+            meet.target = '_blank';
+            meet.rel = 'noopener';
+            meet.textContent = 'Online class';
+            meet.className = 'me-3';
+            li.appendChild(meet);
+          }
+
+          if (item.file_path) {
+            const fileLink = document.createElement('a');
+            fileLink.href = item.file_path;
+            fileLink.textContent = item.file_name || 'Download file';
+            fileLink.className = 'd-inline-block';
+            li.appendChild(fileLink);
+          }
+
+          listEl.appendChild(li);
+        });
+      }
+
+      function renderSubgroups(items) {
+        subgroupList.innerHTML = '';
+        joinSubgroupId.innerHTML = '<option value="" disabled selected>Select subgroup</option>';
+
+        if (!items.length) {
+          subgroupSection.classList.add('d-none');
+          return;
+        }
+
+        subgroupSection.classList.remove('d-none');
+
+        items.forEach((item) => {
+          const container = document.createElement('div');
+          container.className = 'list-group-item';
+
+          const title = document.createElement('div');
+          title.className = 'fw-semibold';
+          title.textContent = item.name;
+          container.appendChild(title);
+
+          const members = document.createElement('div');
+          members.className = 'small text-muted';
+          if (item.members.includes(currentUser)) {
+            members.textContent = `Members: ${item.members.join(', ')} (you)`;
+            container.classList.add('border', 'border-primary');
+          } else {
+            members.textContent = item.members.length ? item.members.join(', ') : 'No members yet';
+          }
+          container.appendChild(members);
+
+          subgroupList.appendChild(container);
+
+          const opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = item.name;
+          joinSubgroupId.appendChild(opt);
+        });
+      }
+
+      homeworkModal.addEventListener('show.bs.modal', (event) => {
+        const button = event.relatedTarget;
+        const subject = button.getAttribute('data-class');
+        const subjectId = Number(button.getAttribute('data-subjectid'));
+        const day = button.getAttribute('data-day');
+        const time = button.getAttribute('data-time');
+        const classNum = Number(button.getAttribute('data-classnum'));
+        const groupNum = Number(button.getAttribute('data-groupnum'));
+        const classDate = button.getAttribute('data-date');
+
+        document.getElementById('homeworkModalTitle').textContent = subject;
+        document.getElementById('homeworkModalMeta').textContent = `${day} · ${time}`;
+
+        document.getElementById('hwDay').value = day;
+        document.getElementById('hwTime').value = time;
+        document.getElementById('hwSubjectId').value = subjectId;
+        document.getElementById('hwGroupNum').value = groupNum;
+        document.getElementById('hwClassNum').value = classNum;
+        document.getElementById('hwDate').value = classDate || '';
+
+        const filtered = homeworkData.filter((item) => {
+          return (
+            Number(item.subject_id) === subjectId &&
+            Number(item.group_number) === groupNum &&
+            item.day === day &&
+            Number(item.class_number) === classNum &&
+            item.class_date === classDate
+          );
+        });
+        renderHomework(filtered);
+        const first = filtered[0];
+        if (first) {
+          subgroupHomeworkId.value = first.id;
+          renderSubgroups(first.subgroups || []);
+        } else {
+          subgroupSection.classList.add('d-none');
+        }
+        const hashValue = encodeURIComponent(`${subjectId}|${day}|${classNum}|${groupNum}`);
+        if (location.hash !== `#class=${hashValue}`) {
+          history.replaceState(null, '', `#class=${hashValue}`);
+        }
+      });
+
+      homeworkModal.addEventListener('hidden.bs.modal', () => {
+        if (location.hash.startsWith('#class=')) {
+          history.replaceState(null, '', location.pathname + location.search);
+        }
+      });
+
+      function openModalFromHash() {
+        if (!location.hash.startsWith('#class=')) return;
+        const payload = decodeURIComponent(location.hash.replace('#class=', ''));
+        const [subjectId, day, classNum, groupNum] = payload.split('|');
+        if (!subjectId || !day || !classNum || !groupNum) return;
+
+        const match = document.querySelector(
+          `[data-subjectid="${subjectId}"][data-day="${day}"][data-classnum="${classNum}"][data-groupnum="${groupNum}"]`
+        );
+        if (match) {
+          match.click();
+        }
+      }
+
+      window.addEventListener('hashchange', openModalFromHash);
+      window.addEventListener('load', openModalFromHash);
+
+      const weekSlider = document.getElementById('weekSlider');
+      const messagesBtn = document.getElementById('messagesBtn');
+      const messagesList = document.getElementById('messagesList');
+      const messagesBadge = document.getElementById('messagesBadge');
+      const messagesSubjectFilter = document.getElementById('messagesSubjectFilter');
+      const weekPrev = document.getElementById('weekPrev');
+      const weekNext = document.getElementById('weekNext');
+      const totalWeeks = 15;
+      let currentWeek = <%= currentWeek %>;
+      function updateSchedule(week) {
+        const safe = Math.max(1, Math.min(totalWeeks, week));
+        const params = new URLSearchParams(window.location.search);
+        params.set('week', safe);
+        window.location.search = params.toString();
+      }
+      function animateWeekChange(nextWeek) {
+        const safe = Math.max(1, Math.min(totalWeeks, nextWeek));
+        const active = weekSlider ? weekSlider.querySelector('.week-dot.active') : null;
+        const target = weekSlider
+          ? weekSlider.querySelector(`.week-dot[data-week="${safe}"]`)
+          : null;
+        if (active && target && active !== target) {
+          active.classList.remove('active');
+          target.classList.add('active');
+        }
+        setTimeout(() => updateSchedule(safe), 220);
+      }
+      if (weekSlider) {
+        weekSlider.addEventListener('click', (event) => {
+          const btn = event.target.closest('.week-dot');
+          if (!btn) return;
+          const week = Number(btn.dataset.week);
+          if (!Number.isNaN(week)) animateWeekChange(week);
+        });
+        if (weekPrev) {
+          weekPrev.addEventListener('click', () => animateWeekChange(currentWeek - 1));
+        }
+        if (weekNext) {
+          weekNext.addEventListener('click', () => animateWeekChange(currentWeek + 1));
+        }
+
+        let startX = 0;
+        weekSlider.addEventListener('touchstart', (event) => {
+          startX = event.touches[0].clientX;
+        }, { passive: true });
+        weekSlider.addEventListener('touchend', (event) => {
+          const endX = event.changedTouches[0].clientX;
+          const delta = endX - startX;
+          if (Math.abs(delta) < 40) return;
+          if (delta < 0) animateWeekChange(currentWeek + 1);
+          if (delta > 0) animateWeekChange(currentWeek - 1);
+        });
+      }
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight') {
+          animateWeekChange(currentWeek + 1);
+        }
+        if (event.key === 'ArrowLeft') {
+          animateWeekChange(currentWeek - 1);
+        }
+      });
+
+      window.addEventListener('load', () => {
+        const content = document.querySelector('.schedule-content');
+        if (!content) return;
+        requestAnimationFrame(() => {
+          content.classList.add('enter-active');
+          content.classList.remove('enter');
+        });
+      });
+
+      async function loadMessages() {
+        if (!messagesList) return;
+        messagesList.innerHTML = '<li class="list-group-item text-muted">Завантаження...</li>';
+        try {
+          const subjectId = messagesSubjectFilter && messagesSubjectFilter.value
+            ? `?subject_id=${encodeURIComponent(messagesSubjectFilter.value)}`
+            : '';
+          const res = await fetch(`/messages.json${subjectId}`);
+          if (!res.ok) throw new Error('bad');
+          const data = await res.json();
+          if (!data.messages || !data.messages.length) {
+            messagesList.innerHTML = '<li class="list-group-item text-muted">Немає повідомлень</li>';
+            if (messagesBadge) {
+              messagesBadge.classList.add('d-none');
+            }
+            return;
+          }
+          messagesList.innerHTML = data.messages
+            .map((m) => {
+              const meta = m.target_all
+                ? 'Всі студенти'
+                : `${m.subject_name || 'Предмет'} · Group ${m.group_number}`;
+              const unreadClass = m.read_id ? '' : 'fw-semibold';
+              return `
+                <li class="list-group-item">
+                  <div class="${unreadClass} mb-1">${m.body}</div>
+                  <div class="text-muted small">${meta} · ${m.created_by || 'Admin'} · ${new Date(m.created_at).toLocaleString()}</div>
+                </li>
+              `;
+            })
+            .join('');
+          if (messagesBadge) {
+            const unread = data.unread_count || 0;
+            if (unread > 0) {
+              messagesBadge.textContent = unread > 99 ? '99+' : String(unread);
+              messagesBadge.classList.remove('d-none');
+            } else {
+              messagesBadge.classList.add('d-none');
+            }
+          }
+          const unreadIds = data.messages.filter((m) => !m.read_id).map((m) => m.id);
+          if (unreadIds.length) {
+            fetch('/messages/read', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message_ids: unreadIds }),
+            });
+          }
+        } catch (err) {
+          messagesList.innerHTML = '<li class="list-group-item text-muted">Помилка завантаження</li>';
+        }
+      }
+
+      if (messagesBtn) {
+        messagesBtn.addEventListener('click', () => {
+          const modal = new bootstrap.Modal(document.getElementById('messagesModal'));
+          modal.show();
+          loadMessages();
+        });
+      }
+      if (messagesSubjectFilter) {
+        messagesSubjectFilter.addEventListener('change', loadMessages);
+      }
+
+      loadMessages();
+
+      const themeToggle = document.getElementById('themeToggle');
+      const storedTheme = localStorage.getItem('ui-theme') || 'theme-light';
+      document.body.classList.remove('theme-dark', 'theme-light');
+      document.body.classList.add(storedTheme);
+      themeToggle.textContent = storedTheme === 'theme-dark' ? 'Light' : 'Dark';
+      themeToggle.addEventListener('click', () => {
+        const isDark = document.body.classList.contains('theme-dark');
+        const next = isDark ? 'theme-light' : 'theme-dark';
+        document.body.classList.remove('theme-dark', 'theme-light');
+        document.body.classList.add(next);
+        localStorage.setItem('ui-theme', next);
+        themeToggle.textContent = next === 'theme-dark' ? 'Light' : 'Dark';
+      });
+    </script>
+  </body>
+</html>
