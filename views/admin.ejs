@@ -686,6 +686,18 @@
                     </td>
                     <td>
                       <button class="btn btn-sm btn-outline-primary user-manage-btn" type="button">Manage</button>
+                      <% if (u.role !== 'admin' && u.is_active === 0) { %>
+                        <form method="POST" action="/admin/users/delete-permanent" class="d-inline">
+                          <input type="hidden" name="user_id" value="<%= u.id %>" />
+                          <button
+                            class="btn btn-sm btn-outline-danger ms-2"
+                            type="submit"
+                            onclick="return confirm('Permanently delete this user? This cannot be undone.');"
+                          >
+                            Delete permanently
+                          </button>
+                        </form>
+                      <% } %>
                     </td>
                   </tr>
                 <% }); %>
@@ -1255,6 +1267,15 @@
                 </td>
                 <td>
                   <button class="btn btn-sm btn-outline-primary user-manage-btn" type="button">Manage</button>
+                  ${u.role !== 'admin' && isActive === 0 ? `
+                    <form method="POST" action="/admin/users/delete-permanent" class="d-inline">
+                      <input type="hidden" name="user_id" value="${u.id}">
+                      <button class="btn btn-sm btn-outline-danger ms-2" type="submit"
+                        onclick="return confirm('Permanently delete this user? This cannot be undone.');">
+                        Delete permanently
+                      </button>
+                    </form>
+                  ` : ''}
                 </td>
               </tr>
             `;
