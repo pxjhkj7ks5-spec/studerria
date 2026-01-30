@@ -818,6 +818,14 @@ app.get('/_health', (req, res) => {
   });
 });
 
+app.get('/__version', (req, res) => {
+  res.json({
+    version: appVersion,
+    buildStamp,
+    node: process.version,
+  });
+});
+
 app.post('/_bootstrap', async (req, res) => {
   const token = process.env.BOOTSTRAP_TOKEN;
   const provided = req.get('x-bootstrap-token') || req.query.token || '';
