@@ -26,16 +26,15 @@ const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-const adminSeed = {
-  full_name: process.env.ADMIN_NAME || 'Марченко Андрій Юрійович',
-  role: 'admin',
-  password: process.env.ADMIN_PASS || 'admadm',
-};
+const adminSeed = process.env.ADMIN_HASHED_PASS
+  ? {
+      full_name: process.env.ADMIN_NAME || 'Марченко Андрій Юрійович',
+      role: 'admin',
+      password_hash: process.env.ADMIN_HASHED_PASS,
+    }
+  : null;
 
-const userSeed = [
-  adminSeed,
-  { full_name: 'Test', role: 'student', password: 'kma' },
-];
+const userSeed = adminSeed ? [adminSeed] : [];
 
 const bellSchedule = {
   1: { start: '08:30', end: '09:50' },
@@ -178,22 +177,23 @@ const db = {
 
 let usersHasIsActive = true;
 
-const ensureUser = async (fullName, role, password, options = {}) => {
+const ensureUser = async (fullName, role, passwordHash, options = {}) => {
   const { courseId = 1 } = options;
   const { forcePassword = false, forceRole = false } = options;
+  if (!passwordHash) {
+    return;
+  }
   const existing = await db.get('SELECT id, password_hash, role FROM users WHERE full_name = ?', [fullName]);
-  const hash = await bcrypt.hash(password, 10);
   if (!existing) {
     await db.run(
-      'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group, course_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [fullName, role, hash, password, 1, 'A', courseId]
+      'INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [fullName, role, passwordHash, 1, 'A', courseId]
     );
     return;
   }
   if (forcePassword || !existing.password_hash) {
-    await db.run('UPDATE users SET password_hash = ?, password = ?, is_active = 1 WHERE id = ?', [
-      hash,
-      password,
+    await db.run('UPDATE users SET password_hash = ?, is_active = 1 WHERE id = ?', [
+      passwordHash,
       existing.id,
     ]);
   } else {
@@ -414,10 +414,11 @@ const initDb = async () => {
   await pool.query('UPDATE login_history SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE teamwork_tasks SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE messages SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query('UPDATE users SET password = NULL WHERE password IS NOT NULL');
 
   for (const user of userSeed) {
     const isAdmin = user.role === 'admin';
-    await ensureUser(user.full_name, user.role, user.password, {
+    await ensureUser(user.full_name, user.role, user.password_hash, {
       forcePassword: isAdmin,
       forceRole: isAdmin,
     });
@@ -662,12 +663,11 @@ app.post('/login', async (req, res) => {
     const normalizedName = full_name.trim().replace(/\s+/g, ' ');
     const activeClause = usersHasIsActive ? ' AND is_active = 1' : '';
     db.get(
-      `SELECT id, full_name, role, password_hash, password, schedule_group, course_id FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
+      `SELECT id, full_name, role, password_hash, schedule_group, course_id FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
       [normalizedName],
       (err, user) => {
         const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
-        const validPlain = user && user.password && user.password === password;
-        if (err || !user || (!validHash && !validPlain)) {
+        if (err || !user || !validHash) {
           return res.redirect('/login?error=1');
         }
         const loginAt = new Date().toISOString();
@@ -718,8 +718,8 @@ app.post('/register', async (req, res) => {
     }
     const hash = await bcrypt.hash(password, 10);
     const row = await db.get(
-      'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group, course_id) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
-      [normalizedName, 'student', hash, password, 1, 'A', null]
+      'INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
+      [normalizedName, 'student', hash, 1, 'A', null]
     );
     if (!row || !row.id) {
       return res.redirect('/register?error=Database%20error');
@@ -2644,8 +2644,8 @@ app.post('/admin/users/reset-password', requireAdmin, (req, res) => {
   }
   const hash = bcrypt.hashSync(new_password, 10);
   db.run(
-    'UPDATE users SET password_hash = ?, password = ? WHERE id = ?',
-    [hash, new_password, user_id],
+    'UPDATE users SET password_hash = ? WHERE id = ?',
+    [hash, user_id],
     (err) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
