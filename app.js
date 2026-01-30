@@ -2064,54 +2064,109 @@ app.get('/admin', requireAdmin, async (req, res) => {
                               if (msgErr) {
                                 return handleDbError(res, msgErr, 'admin.messages');
                               }
-                              res.render('admin', {
-                                username: req.session.user.username,
-                                userId: req.session.user.id,
-                                role: req.session.role,
-                                schedule,
-                                homework,
-                                users,
-                                subjects,
-                                studentGroups,
-                                logs,
-                                activityLogs,
-                                activityTop,
-                                teamworkTasks,
-                                adminMessages: messages,
-                                courses,
-                                semesters,
-                                activeSemester,
-                                selectedCourseId: courseId,
-                                limitedStaffView: false,
-                                filters: {
-                                  group_number: group_number || '',
-                                  day: day || '',
-                                  subject: subject || '',
-                                  q: q || '',
-                                },
-                                usersStatus: users_status || 'active',
-                                sorts: {
-                                  schedule: sort_schedule || '',
-                                  homework: sort_homework || '',
-                                },
-                                historyFilters: {
-                                  actor: history_actor || '',
-                                  action: history_action || '',
-                                  q: history_q || '',
-                                  from: history_from || '',
-                                  to: history_to || '',
-                                },
-                                activityFilters: {
-                                  user: req.query.activity_user || '',
-                                  action: req.query.activity_action || '',
-                                  from: req.query.activity_from || '',
-                                  to: req.query.activity_to || '',
-                                },
-                                messages: {
-                                  error: req.query.err || '',
-                                  success: req.query.ok || '',
-                                },
-                              });
+                              const statsParams = activeSemester ? [courseId, activeSemester.id] : [courseId];
+                              (async () => {
+                                try {
+                                  const [
+                                    usersRow,
+                                    subjectsRow,
+                                    homeworkRow,
+                                    teamworkTasksRow,
+                                    teamworkGroupsRow,
+                                    teamworkMembersRow,
+                                  ] = await Promise.all([
+                                    db.get('SELECT COUNT(*) AS count FROM users WHERE course_id = ?', [courseId]),
+                                    db.get('SELECT COUNT(*) AS count FROM subjects WHERE course_id = ?', [courseId]),
+                                    db.get(
+                                      `SELECT COUNT(*) AS count FROM homework WHERE course_id = ?${
+                                        activeSemester ? ' AND semester_id = ?' : ''
+                                      }`,
+                                      statsParams
+                                    ),
+                                    db.get(
+                                      `SELECT COUNT(*) AS count FROM teamwork_tasks WHERE course_id = ?${
+                                        activeSemester ? ' AND semester_id = ?' : ''
+                                      }`,
+                                      statsParams
+                                    ),
+                                    db.get(
+                                      `SELECT COUNT(*) AS count
+                                       FROM teamwork_groups g
+                                       JOIN teamwork_tasks t ON t.id = g.task_id
+                                       WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
+                                      statsParams
+                                    ),
+                                    db.get(
+                                      `SELECT COUNT(*) AS count
+                                       FROM teamwork_members m
+                                       JOIN teamwork_tasks t ON t.id = m.task_id
+                                       WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
+                                      statsParams
+                                    ),
+                                  ]);
+
+                                  const dashboardStats = {
+                                    users: Number(usersRow?.count || 0),
+                                    subjects: Number(subjectsRow?.count || 0),
+                                    homework: Number(homeworkRow?.count || 0),
+                                    teamworkTasks: Number(teamworkTasksRow?.count || 0),
+                                    teamworkGroups: Number(teamworkGroupsRow?.count || 0),
+                                    teamworkMembers: Number(teamworkMembersRow?.count || 0),
+                                  };
+
+                                  res.render('admin', {
+                                    username: req.session.user.username,
+                                    userId: req.session.user.id,
+                                    role: req.session.role,
+                                    schedule,
+                                    homework,
+                                    users,
+                                    subjects,
+                                    studentGroups,
+                                    logs,
+                                    activityLogs,
+                                    activityTop,
+                                    dashboardStats,
+                                    teamworkTasks,
+                                    adminMessages: messages,
+                                    courses,
+                                    semesters,
+                                    activeSemester,
+                                    selectedCourseId: courseId,
+                                    limitedStaffView: false,
+                                    filters: {
+                                      group_number: group_number || '',
+                                      day: day || '',
+                                      subject: subject || '',
+                                      q: q || '',
+                                    },
+                                    usersStatus: users_status || 'active',
+                                    sorts: {
+                                      schedule: sort_schedule || '',
+                                      homework: sort_homework || '',
+                                    },
+                                    historyFilters: {
+                                      actor: history_actor || '',
+                                      action: history_action || '',
+                                      q: history_q || '',
+                                      from: history_from || '',
+                                      to: history_to || '',
+                                    },
+                                    activityFilters: {
+                                      user: req.query.activity_user || '',
+                                      action: req.query.activity_action || '',
+                                      from: req.query.activity_from || '',
+                                      to: req.query.activity_to || '',
+                                    },
+                                    messages: {
+                                      error: req.query.err || '',
+                                      success: req.query.ok || '',
+                                    },
+                                  });
+                                } catch (statsErr) {
+                                  return handleDbError(res, statsErr, 'admin.dashboard');
+                                }
+                              })();
                             }
                           );
                         }

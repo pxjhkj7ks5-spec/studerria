@@ -287,6 +287,74 @@
         <div class="mb-3 text-muted">Course: <%= courseMap[selectedCourseId] || ('Course ' + selectedCourseId) %></div>
       <% } %>
 
+      <% const stats = dashboardStats || { users: 0, subjects: 0, homework: 0, teamworkTasks: 0, teamworkGroups: 0, teamworkMembers: 0 }; %>
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+            <div>
+              <h5 class="mb-1">Dashboard overview</h5>
+              <div class="text-muted small">Live stats for the selected course and active semester.</div>
+            </div>
+          </div>
+          <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-2">
+              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+                <div class="text-muted small">Users</div>
+                <div class="h4 mb-0"><%= stats.users %></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-2">
+              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+                <div class="text-muted small">Subjects</div>
+                <div class="h4 mb-0"><%= stats.subjects %></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-2">
+              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+                <div class="text-muted small">Homework</div>
+                <div class="h4 mb-0"><%= stats.homework %></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-2">
+              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+                <div class="text-muted small">Teamwork tasks</div>
+                <div class="h4 mb-0"><%= stats.teamworkTasks %></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-2">
+              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+                <div class="text-muted small">Teams</div>
+                <div class="h4 mb-0"><%= stats.teamworkGroups %></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-2">
+              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+                <div class="text-muted small">Members</div>
+                <div class="h4 mb-0"><%= stats.teamworkMembers %></div>
+              </div>
+            </div>
+          </div>
+          <div class="row g-4">
+            <div class="col-12 col-lg-7">
+              <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                  <h6 class="mb-3">Platform activity</h6>
+                  <canvas id="adminStatsChart" height="160"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-lg-5">
+              <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                  <h6 class="mb-3">Teamwork distribution</h6>
+                  <canvas id="adminTeamworkChart" height="160"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <% const groupMap = {}; %>
       <% (studentGroups || []).forEach(function(g) { %>
         <% if (!groupMap[g.student_id]) { groupMap[g.student_id] = {}; } %>
@@ -1494,6 +1562,7 @@
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script>
       const themeToggle = document.getElementById('themeToggle');
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
@@ -1978,6 +2047,64 @@
         return section.offsetParent !== null;
       }
 
+      function renderAdminCharts() {
+        if (!window.Chart) return;
+        const stats = {
+          users: <%= stats.users %>,
+          subjects: <%= stats.subjects %>,
+          homework: <%= stats.homework %>,
+          teamworkTasks: <%= stats.teamworkTasks %>,
+          teamworkGroups: <%= stats.teamworkGroups %>,
+          teamworkMembers: <%= stats.teamworkMembers %>,
+        };
+        const isDark = document.body.classList.contains('theme-dark');
+        Chart.defaults.color = isDark ? '#e2e8f0' : '#1f2937';
+        Chart.defaults.borderColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.08)';
+
+        const barCtx = document.getElementById('adminStatsChart');
+        if (barCtx) {
+          new Chart(barCtx, {
+            type: 'bar',
+            data: {
+              labels: ['Users', 'Subjects', 'Homework'],
+              datasets: [
+                {
+                  data: [stats.users, stats.subjects, stats.homework],
+                  backgroundColor: ['#60a5fa', '#a78bfa', '#f472b6'],
+                  borderRadius: 10,
+                },
+              ],
+            },
+            options: {
+              plugins: { legend: { display: false } },
+              scales: {
+                y: { beginAtZero: true, ticks: { precision: 0 } },
+              },
+            },
+          });
+        }
+
+        const doughnutCtx = document.getElementById('adminTeamworkChart');
+        if (doughnutCtx) {
+          new Chart(doughnutCtx, {
+            type: 'doughnut',
+            data: {
+              labels: ['Tasks', 'Teams', 'Members'],
+              datasets: [
+                {
+                  data: [stats.teamworkTasks, stats.teamworkGroups, stats.teamworkMembers],
+                  backgroundColor: ['#38bdf8', '#22c55e', '#f97316'],
+                },
+              ],
+            },
+            options: {
+              plugins: { legend: { position: 'bottom' } },
+              cutout: '65%',
+            },
+          });
+        }
+      }
+
       async function saveAllForms() {
         const forms = Array.from(document.querySelectorAll('form[data-save-all="true"]'))
           .filter(formIsVisible)
@@ -2006,6 +2133,7 @@
       }
 
       initInputTracking();
+      renderAdminCharts();
     </script>
   </body>
 </html>
