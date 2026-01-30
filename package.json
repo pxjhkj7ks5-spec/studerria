@@ -1,6 +1,6 @@
 {
   "name": "kma",
-  "version": "0.5.35",
+  "version": "0.5.36",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

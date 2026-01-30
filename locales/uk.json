@@ -9,6 +9,7 @@
   "login.passwordPlaceholder": "Введіть пароль",
   "login.show": "Показати",
   "login.helper": "Використайте пароль від акаунта для входу.",
+  "login.forgot": "Якщо забули пароль — зверніться до адміністратора напряму або через старосту.",
   "login.signIn": "Увійти",
   "login.createAccount": "Створити акаунт",
   "register.title": "Реєстрація",

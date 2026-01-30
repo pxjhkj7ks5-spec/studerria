@@ -9,6 +9,7 @@
   "login.passwordPlaceholder": "Enter password",
   "login.show": "Show",
   "login.helper": "Use your account password to sign in.",
+  "login.forgot": "If you forgot your password, contact the administrator directly or via the starosta.",
   "login.signIn": "Sign in",
   "login.createAccount": "Create new account",
   "register.title": "Register",
