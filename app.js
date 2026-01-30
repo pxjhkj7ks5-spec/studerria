@@ -2762,6 +2762,76 @@ app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
   });
 });
 
+app.post('/admin/courses/add', requireAdmin, (req, res) => {
+  const { id, name } = req.body;
+  const courseId = Number(id);
+  if (Number.isNaN(courseId) || courseId < 1 || !name || !name.trim()) {
+    return res.redirect('/admin?err=Invalid%20course');
+  }
+  db.run('INSERT INTO courses (id, name) VALUES (?, ?)', [courseId, name.trim()], (err) => {
+    if (err) {
+      return res.redirect('/admin?err=Database%20error');
+    }
+    logAction(db, req, 'course_add', { id: courseId, name: name.trim() });
+    return res.redirect('/admin?ok=Course%20created');
+  });
+});
+
+app.post('/admin/courses/edit/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+  const courseId = Number(id);
+  if (Number.isNaN(courseId) || !name || !name.trim()) {
+    return res.redirect('/admin?err=Invalid%20course');
+  }
+  db.run('UPDATE courses SET name = ? WHERE id = ?', [name.trim(), courseId], (err) => {
+    if (err) {
+      return res.redirect('/admin?err=Database%20error');
+    }
+    logAction(db, req, 'course_edit', { id: courseId, name: name.trim() });
+    return res.redirect('/admin?ok=Course%20updated');
+  });
+});
+
+app.post('/admin/courses/delete/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const courseId = Number(id);
+  if (Number.isNaN(courseId)) {
+    return res.redirect('/admin?err=Invalid%20course');
+  }
+  db.get('SELECT COUNT(*) AS cnt FROM users WHERE course_id = ?', [courseId], (userErr, userRow) => {
+    if (userErr) {
+      return res.redirect('/admin?err=Database%20error');
+    }
+    if (Number(userRow.cnt) > 0) {
+      return res.redirect('/admin?err=Course%20has%20users');
+    }
+    db.get('SELECT COUNT(*) AS cnt FROM subjects WHERE course_id = ?', [courseId], (subErr, subRow) => {
+      if (subErr) {
+        return res.redirect('/admin?err=Database%20error');
+      }
+      if (Number(subRow.cnt) > 0) {
+        return res.redirect('/admin?err=Course%20has%20subjects');
+      }
+      db.get('SELECT COUNT(*) AS cnt FROM semesters WHERE course_id = ?', [courseId], (semErr, semRow) => {
+        if (semErr) {
+          return res.redirect('/admin?err=Database%20error');
+        }
+        if (Number(semRow.cnt) > 0) {
+          return res.redirect('/admin?err=Course%20has%20semesters');
+        }
+        db.run('DELETE FROM courses WHERE id = ?', [courseId], (err) => {
+          if (err) {
+            return res.redirect('/admin?err=Database%20error');
+          }
+          logAction(db, req, 'course_delete', { id: courseId });
+          return res.redirect('/admin?ok=Course%20deleted');
+        });
+      });
+    });
+  });
+});
+
 app.post('/admin/semesters/add', requireAdmin, (req, res) => {
   const { title, start_date, weeks_count, is_active } = req.body;
   const courseId = getAdminCourse(req);
