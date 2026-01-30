@@ -177,6 +177,34 @@
       body.theme-dark .btn-outline-danger:hover {
         background: rgba(255, 255, 255, 0.08);
       }
+      .flash-alert {
+        border-radius: 14px;
+        padding: 0.5rem 0.9rem;
+        font-size: 0.9rem;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.7);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+        backdrop-filter: blur(10px);
+      }
+      body.theme-dark .flash-alert {
+        background: rgba(17, 17, 30, 0.7);
+        border-color: rgba(255, 255, 255, 0.12);
+        color: #f8fafc;
+      }
+      .flash-alert.alert-danger {
+        border-color: rgba(239, 68, 68, 0.45);
+        color: #b91c1c;
+      }
+      body.theme-dark .flash-alert.alert-danger {
+        color: #fca5a5;
+      }
+      .flash-alert.alert-success {
+        border-color: rgba(34, 197, 94, 0.45);
+        color: #166534;
+      }
+      body.theme-dark .flash-alert.alert-success {
+        color: #86efac;
+      }
       .app-footer {
         font-size: 0.8rem;
       }
@@ -233,10 +261,10 @@
 
       <% const msg = typeof messages !== 'undefined' && messages ? messages : (typeof locals !== 'undefined' ? locals.messages : {}); %>
       <% if (msg && msg.error) { %>
-        <div class="alert alert-danger"><%= msg.error %></div>
+        <div class="alert alert-danger flash-alert"><%= msg.error %></div>
       <% } %>
       <% if (msg && msg.success) { %>
-        <div class="alert alert-success"><%= msg.success %></div>
+        <div class="alert alert-success flash-alert"><%= msg.success %></div>
       <% } %>
 
       <% const courseMap = {}; %>
