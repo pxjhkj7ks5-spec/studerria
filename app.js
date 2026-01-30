@@ -479,6 +479,12 @@ const initDb = async () => {
   const alters = [
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS language TEXT',
+    'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS title TEXT',
+    'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS start_date TEXT',
+    'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS weeks_count INTEGER',
+    'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS is_active INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS is_archived INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
@@ -2713,7 +2719,12 @@ app.get('/starosta', requireStaff, async (req, res) => {
   }
 
   const courseId = req.session.user.course_id || 1;
-  const activeSemester = await getActiveSemester(courseId);
+  let activeSemester = null;
+  try {
+    activeSemester = await getActiveSemester(courseId);
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.activeSemester');
+  }
   db.all('SELECT id, name FROM courses WHERE id = ?', [courseId], (courseErr, courses) => {
     if (courseErr) {
       return handleDbError(res, courseErr, 'starosta.courses');
