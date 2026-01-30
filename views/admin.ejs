@@ -224,11 +224,26 @@
         <div class="alert alert-success"><%= msg.success %></div>
       <% } %>
 
+      <form class="mb-3" method="GET" action="/admin">
+        <div class="d-flex align-items-center gap-2">
+          <label class="form-label mb-0">Course</label>
+          <select name="course" class="form-select w-auto" onchange="this.form.submit()">
+            <% (courses || []).forEach(function(c) { %>
+              <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
+                <%= c.name %>
+              </option>
+            <% }); %>
+          </select>
+        </div>
+      </form>
+
       <% const groupMap = {}; %>
       <% (studentGroups || []).forEach(function(g) { %>
         <% if (!groupMap[g.student_id]) { groupMap[g.student_id] = {}; } %>
         <% groupMap[g.student_id][g.subject_id] = g.group_number; %>
       <% }); %>
+      <% const courseMap = {}; %>
+      <% (courses || []).forEach(function(c) { courseMap[c.id] = c.name; }); %>
 
       <div class="d-flex flex-wrap gap-2 mb-3">
         <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-schedule')">
@@ -611,6 +626,7 @@
                   <th><input type="checkbox" id="selectAllUsers" /></th>
                   <th>Name</th>
                   <th>Role</th>
+                  <th>Course</th>
                   <th>Schedule Group</th>
                   <th>Subject Group</th>
                   <th>Set Group</th>
@@ -622,6 +638,7 @@
                 data-current-user-id="<%= typeof userId !== 'undefined' ? userId : '' %>"
                 data-status="<%= usersStatus || 'active' %>"
                 data-role-filter="all"
+                data-course-id="<%= selectedCourseId || 1 %>"
               >
                 <% (users || []).forEach(function(u) { %>
                   <tr
@@ -630,6 +647,8 @@
                     data-user-name="<%= u.full_name %>"
                     data-user-role="<%= u.role %>"
                     data-user-group="<%= u.schedule_group %>"
+                    data-user-course="<%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %>"
+                    data-user-course-id="<%= u.course_id || 1 %>"
                     data-user-active="<%= u.is_active %>"
                     data-user-ip="<%= u.last_login_ip || '' %>"
                     data-user-agent="<%= u.last_user_agent || '' %>"
@@ -642,6 +661,7 @@
                     </td>
                     <td><%= u.full_name %></td>
                     <td><span class="badge text-bg-<%= u.role === 'admin' ? 'primary' : (u.role === 'starosta' ? 'warning' : 'secondary') %>"><%= u.role %></span></td>
+                    <td><%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %></td>
                     <td><%= u.schedule_group %></td>
                     <td>
                       <% 
@@ -1045,6 +1065,7 @@
             <div class="mb-2"><strong>Role:</strong> <span id="uaRole"></span></div>
             <div class="mb-2"><strong>Active:</strong> <span id="uaActive"></span></div>
             <div class="mb-2"><strong>Schedule Group:</strong> <span id="uaGroup"></span></div>
+            <div class="mb-2"><strong>Course:</strong> <span id="uaCourse"></span></div>
             <div class="mb-2"><strong>Last Login IP:</strong> <span id="uaIp"></span></div>
             <div class="mb-2"><strong>Device:</strong> <span id="uaAgent"></span></div>
             <div class="mb-3"><strong>Last Login:</strong> <span id="uaLoginAt"></span></div>
@@ -1061,6 +1082,19 @@
                   <option value="student">student</option>
                   <option value="starosta">starosta</option>
                   <option value="admin">admin</option>
+                </select>
+                <button class="btn btn-outline-primary" type="submit">Save</button>
+              </div>
+            </form>
+
+            <form method="POST" action="/admin/users/course" class="mb-3">
+              <input type="hidden" name="user_id" id="uaCourseUserId" />
+              <label class="form-label">Change course</label>
+              <div class="d-flex gap-2">
+                <select class="form-select" name="course_id" id="uaCourseSelect" required>
+                  <% (courses || []).forEach(function(c) { %>
+                    <option value="<%= c.id %>"><%= c.name %></option>
+                  <% }); %>
                 </select>
                 <button class="btn btn-outline-primary" type="submit">Save</button>
               </div>
@@ -1183,6 +1217,8 @@
         const status = tbody.dataset.status || 'active';
         const subjectMap = new Map();
         data.subjects.forEach((s) => subjectMap.set(String(s.id), s));
+        const courseMap = new Map();
+        (data.courses || []).forEach((c) => courseMap.set(String(c.id), c.name));
         const groupMap = {};
         data.studentGroups.forEach((g) => {
           if (!groupMap[g.student_id]) groupMap[g.student_id] = {};
@@ -1239,6 +1275,8 @@
                   data-user-name="${u.full_name}"
                   data-user-role="${u.role}"
                   data-user-group="${u.schedule_group}"
+                  data-user-course="${courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}"
+                  data-user-course-id="${u.course_id || 1}"
                   data-user-active="${isActive}"
                   data-user-ip="${u.last_login_ip || ''}"
                   data-user-agent="${(u.last_user_agent || '').replace(/\"/g, '&quot;')}"
@@ -1246,6 +1284,7 @@
                 <td>${checkbox}</td>
                 <td>${u.full_name}</td>
                 <td><span class="badge text-bg-${u.role === 'admin' ? 'primary' : (u.role === 'starosta' ? 'warning' : 'secondary')}">${u.role}</span></td>
+                <td>${courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}</td>
                 <td>${u.schedule_group}</td>
                 <td>${subjectsBtn}</td>
                 <td>
@@ -1286,7 +1325,8 @@
       async function refreshUsers() {
         try {
           const status = document.getElementById('usersTableBody').dataset.status || 'active';
-          const res = await fetch(`/admin/users.json?status=${encodeURIComponent(status)}`);
+          const courseId = document.getElementById('usersTableBody').dataset.courseId || '1';
+          const res = await fetch(`/admin/users.json?status=${encodeURIComponent(status)}&course=${encodeURIComponent(courseId)}`);
           if (!res.ok) return;
           const data = await res.json();
           const roleFilter = document.getElementById('usersTableBody').dataset.roleFilter || 'all';
@@ -1368,6 +1408,7 @@
             const userRole = row.dataset.userRole;
             const userGroup = row.dataset.userGroup;
             const userActive = row.dataset.userActive === '1' ? 'Yes' : 'No';
+            const userCourse = row.dataset.userCourse || '';
             const userIp = row.dataset.userIp || '-';
             const userAgent = row.dataset.userAgent || '-';
             const userLogin = row.dataset.userLogin || '-';
@@ -1376,6 +1417,7 @@
             document.getElementById('uaRole').textContent = userRole;
             document.getElementById('uaGroup').textContent = userGroup;
             document.getElementById('uaActive').textContent = userActive;
+            document.getElementById('uaCourse').textContent = userCourse;
             document.getElementById('uaIp').textContent = userIp;
             document.getElementById('uaAgent').textContent = userAgent;
             document.getElementById('uaLoginAt').textContent = userLogin;
@@ -1383,6 +1425,10 @@
             document.getElementById('uaPassUserId').value = userId;
             document.getElementById('uaRoleSelect').value = userRole;
             document.getElementById('uaDeleteUserId').value = userId;
+            document.getElementById('uaCourseUserId').value = userId;
+            if (document.getElementById('uaCourseSelect')) {
+              document.getElementById('uaCourseSelect').value = row.dataset.userCourseId || '';
+            }
 
             const modal = new bootstrap.Modal(document.getElementById('userActionsModal'));
             modal.show();

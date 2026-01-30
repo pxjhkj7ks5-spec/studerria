@@ -179,13 +179,14 @@ const db = {
 let usersHasIsActive = true;
 
 const ensureUser = async (fullName, role, password, options = {}) => {
+  const { courseId = 1 } = options;
   const { forcePassword = false, forceRole = false } = options;
   const existing = await db.get('SELECT id, password_hash, role FROM users WHERE full_name = ?', [fullName]);
   const hash = await bcrypt.hash(password, 10);
   if (!existing) {
     await db.run(
-      'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group) VALUES (?, ?, ?, ?, ?, ?)',
-      [fullName, role, hash, password, 1, 'A']
+      'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group, course_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [fullName, role, hash, password, 1, 'A', courseId]
     );
     return;
   }
@@ -206,6 +207,12 @@ const ensureUser = async (fullName, role, password, options = {}) => {
 const initDb = async () => {
   const ddl = [
     `
+      CREATE TABLE IF NOT EXISTS courses (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE
+      )
+    `,
+    `
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         full_name TEXT NOT NULL UNIQUE,
@@ -216,7 +223,8 @@ const initDb = async () => {
         last_login_ip TEXT,
         last_user_agent TEXT,
         last_login_at TEXT,
-        schedule_group TEXT NOT NULL DEFAULT 'A'
+        schedule_group TEXT NOT NULL DEFAULT 'A',
+        course_id INTEGER REFERENCES courses(id)
       )
     `,
     `
@@ -225,7 +233,8 @@ const initDb = async () => {
         name TEXT NOT NULL UNIQUE,
         group_count INTEGER NOT NULL DEFAULT 1,
         default_group INTEGER NOT NULL DEFAULT 1,
-        show_in_teamwork INTEGER NOT NULL DEFAULT 1
+        show_in_teamwork INTEGER NOT NULL DEFAULT 1,
+        course_id INTEGER REFERENCES courses(id)
       )
     `,
     `
@@ -244,7 +253,8 @@ const initDb = async () => {
         group_number INTEGER NOT NULL,
         day_of_week TEXT NOT NULL,
         class_number INTEGER NOT NULL,
-        week_number INTEGER NOT NULL
+        week_number INTEGER NOT NULL,
+        course_id INTEGER REFERENCES courses(id)
       )
     `,
     `
@@ -267,7 +277,8 @@ const initDb = async () => {
         file_path TEXT,
         file_name TEXT,
         created_by TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        course_id INTEGER REFERENCES courses(id)
       )
     `,
     `
@@ -277,7 +288,8 @@ const initDb = async () => {
         actor_name TEXT,
         action TEXT NOT NULL,
         details TEXT,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        course_id INTEGER REFERENCES courses(id)
       )
     `,
     `
@@ -287,7 +299,8 @@ const initDb = async () => {
         full_name TEXT NOT NULL,
         ip TEXT,
         user_agent TEXT,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        course_id INTEGER REFERENCES courses(id)
       )
     `,
     `
@@ -296,7 +309,8 @@ const initDb = async () => {
         subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
         title TEXT NOT NULL,
         created_by INTEGER NOT NULL REFERENCES users(id),
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        course_id INTEGER REFERENCES courses(id)
       )
     `,
     `
@@ -327,7 +341,8 @@ const initDb = async () => {
         target_all INTEGER NOT NULL DEFAULT 0,
         body TEXT NOT NULL,
         created_by_id INTEGER NOT NULL REFERENCES users(id),
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        course_id INTEGER REFERENCES courses(id)
       )
     `,
     `
@@ -368,6 +383,37 @@ const initDb = async () => {
   for (const statement of ddl) {
     await pool.query(statement);
   }
+
+  await pool.query(
+    `
+      INSERT INTO courses (id, name)
+      VALUES (1, '1 курс'), (2, '2 курс')
+      ON CONFLICT (id) DO NOTHING
+    `
+  );
+
+  const alters = [
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE homework ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE history_log ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE login_history ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE messages ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+  ];
+  for (const statement of alters) {
+    await pool.query(statement);
+  }
+
+  await pool.query('UPDATE users SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query('UPDATE subjects SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query('UPDATE schedule_entries SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query('UPDATE homework SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query('UPDATE history_log SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query('UPDATE login_history SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query('UPDATE teamwork_tasks SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query('UPDATE messages SET course_id = 1 WHERE course_id IS NULL');
 
   for (const user of userSeed) {
     const isAdmin = user.role === 'admin';
@@ -497,10 +543,15 @@ function getDateForWeekDay(weekNumber, dayName) {
 function logAction(dbRef, req, action, details) {
   const actorId = req.session.user ? req.session.user.id : null;
   const actorName = req.session.user ? req.session.user.username : null;
+  const courseId = req.session && req.session.adminCourse
+    ? Number(req.session.adminCourse)
+    : req.session && req.session.user
+    ? req.session.user.course_id || 1
+    : null;
   const createdAt = new Date().toISOString();
   dbRef.run(
-    'INSERT INTO history_log (actor_id, actor_name, action, details, created_at) VALUES (?, ?, ?, ?, ?)',
-    [actorId, actorName, action, details ? JSON.stringify(details) : null, createdAt]
+    'INSERT INTO history_log (actor_id, actor_name, action, details, created_at, course_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [actorId, actorName, action, details ? JSON.stringify(details) : null, createdAt, courseId]
   );
   broadcast('history_updated');
 }
@@ -516,6 +567,15 @@ function handleDbError(res, err, label) {
 function ensureUsersSchema(cb) {
   usersHasIsActive = true;
   return cb(true);
+}
+
+function getAdminCourse(req) {
+  const queryCourse = Number(req.query.course);
+  if (!Number.isNaN(queryCourse)) {
+    req.session.adminCourse = queryCourse;
+  }
+  const sessionCourse = Number(req.session.adminCourse);
+  return Number.isNaN(sessionCourse) ? 1 : sessionCourse;
 }
 
 function broadcast(type, payload) {
@@ -602,7 +662,7 @@ app.post('/login', async (req, res) => {
     const normalizedName = full_name.trim().replace(/\s+/g, ' ');
     const activeClause = usersHasIsActive ? ' AND is_active = 1' : '';
     db.get(
-      `SELECT id, full_name, role, password_hash, password, schedule_group FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
+      `SELECT id, full_name, role, password_hash, password, schedule_group, course_id FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
       [normalizedName],
       (err, user) => {
         const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
@@ -616,13 +676,14 @@ app.post('/login', async (req, res) => {
           [req.ip, req.headers['user-agent'] || null, loginAt, user.id]
         );
         db.run(
-          'INSERT INTO login_history (user_id, full_name, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?)',
-          [user.id, user.full_name, req.ip, req.headers['user-agent'] || null, loginAt]
+          'INSERT INTO login_history (user_id, full_name, ip, user_agent, created_at, course_id) VALUES (?, ?, ?, ?, ?, ?)',
+          [user.id, user.full_name, req.ip, req.headers['user-agent'] || null, loginAt, user.course_id || 1]
         );
         req.session.user = {
           id: user.id,
           username: user.full_name,
           schedule_group: user.schedule_group,
+          course_id: user.course_id || 1,
         };
         req.session.role = user.role;
 
@@ -657,8 +718,8 @@ app.post('/register', async (req, res) => {
     }
     const hash = await bcrypt.hash(password, 10);
     const row = await db.get(
-      'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
-      [normalizedName, 'student', hash, password, 1, 'A']
+      'INSERT INTO users (full_name, role, password_hash, password, is_active, schedule_group, course_id) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
+      [normalizedName, 'student', hash, password, 1, 'A', null]
     );
     if (!row || !row.id) {
       return res.redirect('/register?error=Database%20error');
@@ -666,11 +727,48 @@ app.post('/register', async (req, res) => {
     req.session.pendingUserId = row.id;
     logAction(db, req, 'register_user', { user_id: row.id, full_name: normalizedName });
     broadcast('users_updated');
-    return res.redirect('/register/subjects');
+    return res.redirect('/register/course');
   } catch (err) {
     console.error('Register failed', err);
     return res.redirect('/register?error=Database%20error');
   }
+});
+
+app.get('/register/course', (req, res) => {
+  if (!req.session.pendingUserId) {
+    return res.redirect('/register');
+  }
+  ensureDbReady().catch((err) => {
+    console.error('DB init failed', err);
+  });
+  db.all('SELECT id, name FROM courses ORDER BY id', (err, courses) => {
+    if (err) {
+      return res.status(500).send('Database error');
+    }
+    res.render('register-course', { courses, error: req.query.error || '' });
+  });
+});
+
+app.post('/register/course', (req, res) => {
+  const userId = req.session.pendingUserId;
+  if (!userId) {
+    return res.redirect('/register');
+  }
+  const courseId = Number(req.body.course_id);
+  if (Number.isNaN(courseId)) {
+    return res.redirect('/register/course?error=Select%20course');
+  }
+  db.get('SELECT id FROM courses WHERE id = ?', [courseId], (err, course) => {
+    if (err || !course) {
+      return res.redirect('/register/course?error=Invalid%20course');
+    }
+    db.run('UPDATE users SET course_id = ? WHERE id = ?', [courseId, userId], (updErr) => {
+      if (updErr) {
+        return res.redirect('/register/course?error=Database%20error');
+      }
+      return res.redirect('/register/subjects');
+    });
+  });
 });
 
 app.get('/register/subjects', (req, res) => {
@@ -680,11 +778,16 @@ app.get('/register/subjects', (req, res) => {
   ensureDbReady().catch((err) => {
     console.error('DB init failed', err);
   });
-  db.all('SELECT * FROM subjects ORDER BY name', (err, subjects) => {
-    if (err) {
-      return res.status(500).send('Database error');
+  db.get('SELECT course_id FROM users WHERE id = ?', [req.session.pendingUserId], (uErr, user) => {
+    if (uErr || !user || !user.course_id) {
+      return res.redirect('/register/course');
     }
-    res.render('register-subjects', { subjects });
+    db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [user.course_id], (err, subjects) => {
+      if (err) {
+        return res.status(500).send('Database error');
+      }
+      res.render('register-subjects', { subjects });
+    });
   });
 });
 
@@ -694,46 +797,52 @@ app.post('/register/subjects', (req, res) => {
     return res.redirect('/register');
   }
 
-  db.all('SELECT id, group_count, default_group FROM subjects', (err, subjects) => {
-    if (err) {
-      return res.status(500).send('Database error');
+  db.get('SELECT course_id FROM users WHERE id = ?', [userId], (uErr, userRow) => {
+    if (uErr || !userRow || !userRow.course_id) {
+      return res.redirect('/register/course');
     }
-    const stmt = db.prepare(
-      `
-        INSERT INTO student_groups (student_id, subject_id, group_number)
-        VALUES (?, ?, ?)
-        ON CONFLICT(student_id, subject_id)
-        DO UPDATE SET group_number = excluded.group_number
-      `
-    );
-    subjects.forEach((s) => {
-      const value = req.body[`subject_${s.id}`];
-      if (!value) {
-        if (s.group_count === 1) {
-          stmt.run(userId, s.id, 1);
-        }
-        return;
+    db.all('SELECT id, group_count, default_group FROM subjects WHERE course_id = ?', [userRow.course_id], (err, subjects) => {
+      if (err) {
+        return res.status(500).send('Database error');
       }
-      const groupNum = Number(value);
-      if (groupNum >= 1 && groupNum <= s.group_count) {
-        stmt.run(userId, s.id, groupNum);
-      }
-    });
-    stmt.finalize(() => {
-      db.get('SELECT id, full_name, role, schedule_group FROM users WHERE id = ?', [userId], (uErr, user) => {
-        if (uErr || !user) {
-          return res.redirect('/login');
+      const stmt = db.prepare(
+        `
+          INSERT INTO student_groups (student_id, subject_id, group_number)
+          VALUES (?, ?, ?)
+          ON CONFLICT(student_id, subject_id)
+          DO UPDATE SET group_number = excluded.group_number
+        `
+      );
+      subjects.forEach((s) => {
+        const value = req.body[`subject_${s.id}`];
+        if (!value) {
+          if (s.group_count === 1) {
+            stmt.run(userId, s.id, 1);
+          }
+          return;
         }
-        req.session.user = {
-          id: user.id,
-          username: user.full_name,
-          schedule_group: user.schedule_group,
-        };
-        req.session.role = user.role;
-        req.session.pendingUserId = null;
-        logAction(db, req, 'register_subjects', { user_id: user.id });
-        broadcast('users_updated');
-        return res.redirect('/schedule');
+        const groupNum = Number(value);
+        if (groupNum >= 1 && groupNum <= s.group_count) {
+          stmt.run(userId, s.id, groupNum);
+        }
+      });
+      stmt.finalize(() => {
+        db.get('SELECT id, full_name, role, schedule_group, course_id FROM users WHERE id = ?', [userId], (uErr2, user) => {
+          if (uErr2 || !user) {
+            return res.redirect('/login');
+          }
+          req.session.user = {
+            id: user.id,
+            username: user.full_name,
+            schedule_group: user.schedule_group,
+            course_id: user.course_id || 1,
+          };
+          req.session.role = user.role;
+          req.session.pendingUserId = null;
+          logAction(db, req, 'register_subjects', { user_id: user.id });
+          broadcast('users_updated');
+          return res.redirect('/schedule');
+        });
       });
     });
   });
@@ -783,7 +892,7 @@ app.post('/profile', requireLogin, (req, res) => {
 });
 
 app.get('/schedule', requireLogin, (req, res) => {
-  const { id: userId, schedule_group: group, username } = req.session.user;
+  const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
   let selectedWeek = parseInt(req.query.week, 10);
   if (Number.isNaN(selectedWeek)) {
     selectedWeek = getAcademicWeek(new Date());
@@ -796,9 +905,9 @@ app.get('/schedule', requireLogin, (req, res) => {
       SELECT sg.subject_id, sg.group_number, s.name AS subject_name
       FROM student_groups sg
       JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ?
+      WHERE sg.student_id = ? AND s.course_id = ?
     `,
-    [userId],
+    [userId, courseId || 1],
     (groupErr, studentGroups) => {
       if (groupErr) {
         return res.status(500).send('Database error');
@@ -841,10 +950,10 @@ app.get('/schedule', requireLogin, (req, res) => {
             JOIN subjects subj ON subj.id = h.subject_id
             LEFT JOIN subgroups s ON s.homework_id = h.id
             LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
-            WHERE ${hwConditions}
+            WHERE (${hwConditions}) AND h.course_id = ?
             ORDER BY h.created_at DESC
           `,
-          hwParams,
+          [...hwParams, courseId || 1],
           (err, rows) => {
             if (err) {
               return res.status(500).send('Database error');
@@ -915,7 +1024,7 @@ app.get('/schedule', requireLogin, (req, res) => {
       const conditions = studentGroups
         .map(() => '(se.subject_id = ? AND se.group_number = ?)')
         .join(' OR ');
-      const params = [selectedWeek];
+      const params = [selectedWeek, courseId || 1];
       studentGroups.forEach((sg) => {
         params.push(sg.subject_id, sg.group_number);
       });
@@ -924,7 +1033,7 @@ app.get('/schedule', requireLogin, (req, res) => {
         SELECT se.*, s.name AS subject_name
         FROM schedule_entries se
         JOIN subjects s ON s.id = se.subject_id
-        WHERE se.week_number = ? AND (${conditions})
+        WHERE se.week_number = ? AND se.course_id = ? AND (${conditions})
       `;
 
       db.all(sql, params, (scheduleErr, rows) => {
@@ -947,17 +1056,17 @@ app.get('/schedule', requireLogin, (req, res) => {
 });
 
 app.get('/teamwork', requireLogin, (req, res) => {
-  const { id: userId, username } = req.session.user;
+  const { id: userId, username, course_id: courseId } = req.session.user;
   const selectedSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
   db.all(
     `
       SELECT sg.subject_id, s.name AS subject_name
       FROM student_groups sg
       JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ? AND s.show_in_teamwork = 1
+      WHERE sg.student_id = ? AND s.show_in_teamwork = 1 AND s.course_id = ?
       ORDER BY s.name ASC
     `,
-    [userId],
+    [userId, courseId || 1],
     (err, subjects) => {
       if (err) {
         return res.status(500).send('Database error');
@@ -979,10 +1088,10 @@ app.get('/teamwork', requireLogin, (req, res) => {
           SELECT t.*, s.name AS subject_name
           FROM teamwork_tasks t
           JOIN subjects s ON s.id = t.subject_id
-          WHERE t.subject_id = ?
+          WHERE t.subject_id = ? AND t.course_id = ?
           ORDER BY t.created_at DESC
         `,
-        [selectedSubjectId],
+        [selectedSubjectId, courseId || 1],
         (taskErr, tasks) => {
           if (taskErr) {
             return res.status(500).send('Database error');
@@ -1058,10 +1167,10 @@ app.get('/teamwork', requireLogin, (req, res) => {
                       SELECT u.id, u.full_name
                       FROM users u
                       JOIN student_groups sg ON sg.student_id = u.id
-                      WHERE sg.subject_id = ?
+                      WHERE sg.subject_id = ? AND u.course_id = ?
                       ORDER BY u.full_name ASC
                     `,
-                    [selectedSubjectId],
+                    [selectedSubjectId, courseId || 1],
                     (stuErr, students) => {
                       if (stuErr) {
                         return res.status(500).send('Database error');
@@ -1105,12 +1214,12 @@ app.post('/teamwork/task/create', requireLogin, async (req, res) => {
   if (!title || Number.isNaN(subjectId)) {
     return res.redirect('/teamwork?err=Missing%20fields');
   }
-  const { id: userId } = req.session.user;
+  const { id: userId, course_id: courseId } = req.session.user;
   const createdAt = new Date().toISOString();
   try {
     const taskRow = await db.get(
-      'INSERT INTO teamwork_tasks (subject_id, title, created_by, created_at) VALUES (?, ?, ?, ?) RETURNING id',
-      [subjectId, title.trim(), userId, createdAt]
+      'INSERT INTO teamwork_tasks (subject_id, title, created_by, created_at, course_id) VALUES (?, ?, ?, ?, ?) RETURNING id',
+      [subjectId, title.trim(), userId, createdAt, courseId || 1]
     );
     if (!taskRow || !taskRow.id) {
       return res.redirect('/teamwork?err=Database%20error');
@@ -1353,6 +1462,7 @@ app.post('/admin/messages/send', requireStaff, async (req, res) => {
   }
   const createdAt = new Date().toISOString();
   const createdBy = req.session.user.id;
+  const courseId = getAdminCourse(req);
   const target = target_type || (String(target_all) === '1' ? 'all' : 'subject');
   const isAll = target === 'all';
   const subjectId = subject_id ? Number(subject_id) : null;
@@ -1367,8 +1477,8 @@ app.post('/admin/messages/send', requireStaff, async (req, res) => {
   try {
     const row = await db.get(
       `
-        INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at)
-        VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+        INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at, course_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
       `,
       [
         isAll || target === 'users' ? null : subjectId,
@@ -1377,6 +1487,7 @@ app.post('/admin/messages/send', requireStaff, async (req, res) => {
         body.trim(),
         createdBy,
         createdAt,
+        courseId,
       ]
     );
     if (!row || !row.id) {
@@ -1428,15 +1539,16 @@ app.post('/admin/messages/delete/:id', requireStaff, (req, res) => {
 });
 
 app.get('/messages.json', requireLogin, (req, res) => {
-  const { id: userId } = req.session.user;
+  const { id: userId, course_id: courseId } = req.session.user;
   const filterSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
   db.all(
     `
       SELECT sg.subject_id, sg.group_number
       FROM student_groups sg
-      WHERE sg.student_id = ?
+      JOIN subjects s ON s.id = sg.subject_id
+      WHERE sg.student_id = ? AND s.course_id = ?
     `,
-    [userId],
+    [userId, courseId || 1],
     (sgErr, groups) => {
       if (sgErr) {
         return res.status(500).json({ error: 'Database error' });
@@ -1452,9 +1564,11 @@ app.get('/messages.json', requireLogin, (req, res) => {
       conditions.push('mt.user_id = ?');
       params.push(userId);
       const baseWhere = conditions.length ? `WHERE ${conditions.map((c) => `(${c})`).join(' OR ')}` : '';
+      const courseFilter = ' AND m.course_id = ?';
       const subjectFilter = !Number.isNaN(filterSubjectId) ? ' AND m.subject_id = ?' : '';
+      const finalParams = [...params, courseId || 1];
       if (!Number.isNaN(filterSubjectId)) {
-        params.push(filterSubjectId);
+        finalParams.push(filterSubjectId);
       }
       db.all(
         `
@@ -1464,11 +1578,11 @@ app.get('/messages.json', requireLogin, (req, res) => {
           LEFT JOIN users u ON u.id = m.created_by_id
           LEFT JOIN message_reads mr ON mr.message_id = m.id AND mr.user_id = ?
           LEFT JOIN message_targets mt ON mt.message_id = m.id
-          ${baseWhere}${subjectFilter}
+          ${baseWhere}${courseFilter}${subjectFilter}
           ORDER BY m.created_at DESC
           LIMIT 50
         `,
-        [userId, ...params],
+        [userId, ...finalParams],
         (msgErr, rows) => {
           if (msgErr) {
             return res.status(500).json({ error: 'Database error' });
@@ -1504,6 +1618,7 @@ app.get('/admin', requireAdmin, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'init');
   }
+  const courseId = getAdminCourse(req);
   const {
     group_number,
     day,
@@ -1520,6 +1635,9 @@ app.get('/admin', requireAdmin, async (req, res) => {
   } = req.query;
   const scheduleFilters = [];
   const scheduleParams = [];
+
+  scheduleFilters.push('se.course_id = ?');
+  scheduleParams.push(courseId);
 
   if (group_number) {
     scheduleFilters.push('se.group_number = ?');
@@ -1543,7 +1661,11 @@ app.get('/admin', requireAdmin, async (req, res) => {
     ORDER BY se.week_number, se.day_of_week, se.class_number
   `;
 
-  db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
+  db.all('SELECT id, name FROM courses ORDER BY id', (courseErr, courses) => {
+    if (courseErr) {
+      return handleDbError(res, courseErr, 'admin.courses');
+    }
+    db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
     if (scheduleErr) {
       return handleDbError(res, scheduleErr, 'admin.schedule');
     }
@@ -1551,6 +1673,8 @@ app.get('/admin', requireAdmin, async (req, res) => {
 
     const homeworkFilters = [];
     const homeworkParams = [];
+    homeworkFilters.push('course_id = ?');
+    homeworkParams.push(courseId);
     if (group_number) {
       homeworkFilters.push('group_number = ?');
       homeworkParams.push(group_number);
@@ -1587,13 +1711,15 @@ app.get('/admin', requireAdmin, async (req, res) => {
             : usersHasIsActive
             ? 'WHERE is_active = 1'
             : '';
+        const courseFilter = userFilter ? `${userFilter} AND course_id = ?` : 'WHERE course_id = ?';
         db.all(
-          `SELECT id, full_name, role, schedule_group, ${usersHasIsActive ? 'is_active,' : ''} last_login_ip, last_user_agent, last_login_at FROM users ${userFilter} ORDER BY full_name`,
+          `SELECT id, full_name, role, schedule_group, course_id, ${usersHasIsActive ? 'is_active,' : ''} last_login_ip, last_user_agent, last_login_at FROM users ${courseFilter} ORDER BY full_name`,
+          [courseId],
           (userErr, users) => {
             if (userErr) {
               return handleDbError(res, userErr, 'admin.users');
             }
-            db.all('SELECT * FROM subjects ORDER BY name', (subjectErr, subjects) => {
+            db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
               if (subjectErr) {
                 return handleDbError(res, subjectErr, 'admin.subjects');
               }
@@ -1602,13 +1728,17 @@ app.get('/admin', requireAdmin, async (req, res) => {
                   SELECT sg.student_id, sg.subject_id, sg.group_number, s.name AS subject_name
                   FROM student_groups sg
                   JOIN subjects s ON s.id = sg.subject_id
+                  WHERE s.course_id = ?
                 `,
+                [courseId],
                 (sgErr, studentGroups) => {
                   if (sgErr) {
                     return handleDbError(res, sgErr, 'admin.studentGroups');
                   }
                   const historyFilters = [];
                   const historyParams = [];
+                  historyFilters.push('course_id = ?');
+                  historyParams.push(courseId);
                   if (history_actor) {
                     historyFilters.push('actor_name LIKE ?');
                     historyParams.push(`%${history_actor}%`);
@@ -1648,10 +1778,11 @@ app.get('/admin', requireAdmin, async (req, res) => {
                           JOIN subjects s ON s.id = t.subject_id
                           LEFT JOIN teamwork_groups g ON g.task_id = t.id
                           LEFT JOIN teamwork_members m ON m.task_id = t.id
+                          WHERE t.course_id = ?
                           GROUP BY t.id, t.title, t.created_at, s.name
                           ORDER BY t.created_at DESC
                         `,
-                        [],
+                        [courseId],
                         (taskErr, teamworkTasks) => {
                           if (taskErr) {
                             return handleDbError(res, taskErr, 'admin.teamwork');
@@ -1662,10 +1793,11 @@ app.get('/admin', requireAdmin, async (req, res) => {
                               FROM messages m
                               LEFT JOIN subjects s ON s.id = m.subject_id
                               LEFT JOIN users u ON u.id = m.created_by_id
+                              WHERE m.course_id = ?
                               ORDER BY m.created_at DESC
                               LIMIT 200
                             `,
-                            [],
+                            [courseId],
                             (msgErr, messages) => {
                               if (msgErr) {
                                 return handleDbError(res, msgErr, 'admin.messages');
@@ -1681,6 +1813,8 @@ app.get('/admin', requireAdmin, async (req, res) => {
                                 logs,
                                 teamworkTasks,
                                 adminMessages: messages,
+                                courses,
+                                selectedCourseId: courseId,
                                 filters: {
                                   group_number: group_number || '',
                                   day: day || '',
@@ -1717,6 +1851,7 @@ app.get('/admin', requireAdmin, async (req, res) => {
         );
       });
     });
+    });
   });
 });
 
@@ -1727,6 +1862,7 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
     return res.status(500).json({ error: 'Database error' });
   }
   const status = req.query.status;
+  const courseId = getAdminCourse(req);
   ensureUsersSchema(() => {
     const userFilter =
       status === 'inactive'
@@ -1736,30 +1872,44 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
         : usersHasIsActive
         ? 'WHERE is_active = 1'
         : '';
+    const courseFilter = userFilter ? `${userFilter} AND course_id = ?` : 'WHERE course_id = ?';
     const cols = usersHasIsActive ? 'id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at'
       : 'id, full_name, role, schedule_group, last_login_ip, last_user_agent, last_login_at';
     db.all(
-      `SELECT ${cols} FROM users ${userFilter} ORDER BY full_name`,
+      `SELECT ${cols}, course_id FROM users ${courseFilter} ORDER BY full_name`,
+      [courseId],
       (userErr, users) => {
         if (userErr) {
           console.error('Database error (admin.users.json.users)', userErr);
           return res.status(500).json({ error: 'Database error' });
         }
-        db.all('SELECT * FROM subjects ORDER BY name', (subjectErr, subjects) => {
+        db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
           if (subjectErr) {
             console.error('Database error (admin.users.json.subjects)', subjectErr);
             return res.status(500).json({ error: 'Database error' });
           }
-          db.all(
-            'SELECT student_id, subject_id, group_number FROM student_groups',
-            (sgErr, studentGroups) => {
-              if (sgErr) {
-                console.error('Database error (admin.users.json.studentGroups)', sgErr);
-                return res.status(500).json({ error: 'Database error' });
-              }
-              res.json({ users, subjects, studentGroups });
+          db.all('SELECT id, name FROM courses ORDER BY id', (courseErr, courses) => {
+            if (courseErr) {
+              console.error('Database error (admin.users.json.courses)', courseErr);
+              return res.status(500).json({ error: 'Database error' });
             }
-          );
+            db.all(
+              `
+                SELECT sg.student_id, sg.subject_id, sg.group_number
+                FROM student_groups sg
+                JOIN subjects s ON s.id = sg.subject_id
+                WHERE s.course_id = ?
+              `,
+              [courseId],
+              (sgErr, studentGroups) => {
+                if (sgErr) {
+                  console.error('Database error (admin.users.json.studentGroups)', sgErr);
+                  return res.status(500).json({ error: 'Database error' });
+                }
+                res.json({ users, subjects, studentGroups, courses, selectedCourseId: courseId });
+              }
+            );
+          });
         });
       }
     );
@@ -1767,13 +1917,16 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
 });
 
 app.get('/admin/export/schedule.csv', requireAdmin, (req, res) => {
+  const courseId = getAdminCourse(req);
   db.all(
     `
       SELECT se.id, s.name AS subject, se.group_number, se.day_of_week, se.class_number, se.week_number
       FROM schedule_entries se
       JOIN subjects s ON s.id = se.subject_id
+      WHERE se.course_id = ?
       ORDER BY se.week_number, se.day_of_week, se.class_number
     `,
+    [courseId],
     (err, rows) => {
       if (err) {
         return res.status(500).send('Database error');
@@ -1792,13 +1945,14 @@ app.get('/admin/export/schedule.csv', requireAdmin, (req, res) => {
 });
 
 app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
-  db.all('SELECT id, full_name, role, schedule_group, is_active FROM users ORDER BY full_name', (err, rows) => {
+  const courseId = getAdminCourse(req);
+  db.all('SELECT id, full_name, role, schedule_group, is_active, course_id FROM users WHERE course_id = ? ORDER BY full_name', [courseId], (err, rows) => {
     if (err) {
       return res.status(500).send('Database error');
     }
-    const header = 'id,full_name,role,schedule_group,is_active';
+    const header = 'id,full_name,role,schedule_group,is_active,course_id';
     const lines = rows.map((r) =>
-      [r.id, r.full_name, r.role, r.schedule_group, r.is_active]
+      [r.id, r.full_name, r.role, r.schedule_group, r.is_active, r.course_id]
         .map((v) => `"${String(v ?? '').replace(/\"/g, '""')}"`)
         .join(',')
     );
@@ -1809,7 +1963,8 @@ app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
 });
 
 app.get('/admin/export/subjects.csv', requireAdmin, (req, res) => {
-  db.all('SELECT id, name, group_count, default_group FROM subjects ORDER BY name', (err, rows) => {
+  const courseId = getAdminCourse(req);
+  db.all('SELECT id, name, group_count, default_group FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (err, rows) => {
     if (err) {
       return res.status(500).send('Database error');
     }
@@ -1958,11 +2113,11 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), (req, res) 
     return res.status(400).send('Invalid data');
   }
 
-  const { schedule_group: group, username, id: userId } = req.session.user;
+  const { schedule_group: group, username, id: userId, course_id: courseId } = req.session.user;
   const createdAt = new Date().toISOString();
 
-  db.get('SELECT name FROM subjects WHERE id = ?', [subjectId], (subErr, subjectRow) => {
-    if (subErr || !subjectRow) {
+  db.get('SELECT name, course_id FROM subjects WHERE id = ?', [subjectId], (subErr, subjectRow) => {
+    if (subErr || !subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
       if (req.file) {
         fs.unlink(req.file.path, () => {});
       }
@@ -1972,8 +2127,8 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), (req, res) 
     db.run(
       `
         INSERT INTO homework
-        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         group,
@@ -1993,6 +2148,7 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), (req, res) 
         fileName,
         username,
         createdAt,
+        courseId || 1,
       ],
       (err) => {
         if (err) {
@@ -2104,6 +2260,7 @@ app.post('/admin/schedule/add', requireAdmin, (req, res) => {
   const { subject_id, group_number, day_of_week, class_number, week_numbers } = req.body;
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
+  const courseId = getAdminCourse(req);
 
   if (!subject_id || !day_of_week || !week_numbers || Number.isNaN(groupNum) || Number.isNaN(classNum)) {
     return res.redirect('/admin?err=Missing%20fields');
@@ -2125,10 +2282,10 @@ app.post('/admin/schedule/add', requireAdmin, (req, res) => {
   }
 
   const stmt = db.prepare(
-    'INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id) VALUES (?, ?, ?, ?, ?, ?)'
   );
   uniqueWeeks.forEach((week) => {
-    stmt.run(subject_id, groupNum, day_of_week, classNum, week);
+    stmt.run(subject_id, groupNum, day_of_week, classNum, week, courseId);
   });
   stmt.finalize((err) => {
     if (err) {
@@ -2151,6 +2308,7 @@ app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
   const weekNum = Number(week_number);
+  const courseId = getAdminCourse(req);
 
   if (!subject_id || !day_of_week || Number.isNaN(groupNum) || Number.isNaN(classNum) || Number.isNaN(weekNum)) {
     return res.redirect('/admin?err=Missing%20fields');
@@ -2166,9 +2324,9 @@ app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
     `
       UPDATE schedule_entries
       SET subject_id = ?, group_number = ?, day_of_week = ?, class_number = ?, week_number = ?
-      WHERE id = ?
+      WHERE id = ? AND course_id = ?
     `,
-    [subject_id, groupNum, day_of_week, classNum, weekNum, id],
+    [subject_id, groupNum, day_of_week, classNum, weekNum, id, courseId],
     (err) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
@@ -2181,7 +2339,8 @@ app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
 
 app.post('/admin/schedule/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  db.run('DELETE FROM schedule_entries WHERE id = ?', [id], (err) => {
+  const courseId = getAdminCourse(req);
+  db.run('DELETE FROM schedule_entries WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -2197,7 +2356,8 @@ app.post('/admin/schedule/delete-multiple', requireAdmin, (req, res) => {
   }
   const list = Array.isArray(ids) ? ids : [ids];
   const placeholders = list.map(() => '?').join(',');
-  db.run(`DELETE FROM schedule_entries WHERE id IN (${placeholders})`, list, (err) => {
+  const courseId = getAdminCourse(req);
+  db.run(`DELETE FROM schedule_entries WHERE course_id = ? AND id IN (${placeholders})`, [courseId, ...list], (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -2207,7 +2367,8 @@ app.post('/admin/schedule/delete-multiple', requireAdmin, (req, res) => {
 });
 
 app.post('/admin/schedule/clear-all', requireAdmin, (req, res) => {
-  db.run('DELETE FROM schedule_entries', (err) => {
+  const courseId = getAdminCourse(req);
+  db.run('DELETE FROM schedule_entries WHERE course_id = ?', [courseId], (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -2282,6 +2443,7 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
   const count = Number(group_count);
   const def = Number(default_group);
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
+  const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
   }
@@ -2289,8 +2451,8 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
   db.run(
-    'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork) VALUES (?, ?, ?, ?)',
-    [name, count, def, teamworkFlag],
+    'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, course_id) VALUES (?, ?, ?, ?, ?)',
+    [name, count, def, teamworkFlag, courseId],
     (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
@@ -2307,6 +2469,7 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
   const count = Number(group_count);
   const def = Number(default_group);
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
+  const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
   }
@@ -2314,8 +2477,8 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
   db.run(
-    'UPDATE subjects SET name = ?, group_count = ?, default_group = ?, show_in_teamwork = ? WHERE id = ?',
-    [name, count, def, teamworkFlag, id],
+    'UPDATE subjects SET name = ?, group_count = ?, default_group = ?, show_in_teamwork = ? WHERE id = ? AND course_id = ?',
+    [name, count, def, teamworkFlag, id, courseId],
     (err) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
@@ -2328,11 +2491,12 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
 
 app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
+  const courseId = getAdminCourse(req);
   db.run('DELETE FROM student_groups WHERE subject_id = ?', [id], (delErr) => {
     if (delErr) {
       return res.redirect('/admin?err=Database%20error');
     }
-    db.run('DELETE FROM subjects WHERE id = ?', [id], (err) => {
+    db.run('DELETE FROM subjects WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
       }
@@ -2345,10 +2509,11 @@ app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
 app.post('/admin/student-groups/set', requireAdmin, (req, res) => {
   const { student_id, subject_id, group_number } = req.body;
   const groupNum = Number(group_number);
+  const courseId = getAdminCourse(req);
   if (!student_id || !subject_id || Number.isNaN(groupNum)) {
     return res.redirect('/admin?err=Invalid%20group%20assignment');
   }
-  db.get('SELECT group_count FROM subjects WHERE id = ?', [subject_id], (err, subject) => {
+  db.get('SELECT group_count FROM subjects WHERE id = ? AND course_id = ?', [subject_id, courseId], (err, subject) => {
     if (err || !subject) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -2396,6 +2561,7 @@ app.post('/admin/group/remove', requireAdmin, (req, res) => {
 
 app.post('/admin/users/role', requireAdmin, (req, res) => {
   const { user_id, role } = req.body;
+  const courseId = getAdminCourse(req);
   if (!user_id || !role || !['student', 'admin', 'starosta'].includes(role)) {
     return res.redirect('/admin?err=Invalid%20role');
   }
@@ -2403,7 +2569,7 @@ app.post('/admin/users/role', requireAdmin, (req, res) => {
   if (Number(user_id) === Number(currentId)) {
     return res.redirect('/admin?err=Cannot%20change%20your%20own%20role');
   }
-  db.get('SELECT role FROM users WHERE id = ?', [user_id], (err, user) => {
+  db.get('SELECT role FROM users WHERE id = ? AND course_id = ?', [user_id, courseId], (err, user) => {
     if (err || !user) {
       return res.redirect('/admin?err=User%20not%20found');
     }
@@ -2433,6 +2599,37 @@ app.post('/admin/users/role', requireAdmin, (req, res) => {
       logAction(db, req, 'user_role_change', { user_id, role });
       broadcast('users_updated');
       return res.redirect('/admin?ok=Role%20updated');
+    });
+  });
+});
+
+app.post('/admin/users/course', requireAdmin, (req, res) => {
+  const { user_id, course_id } = req.body;
+  const userId = Number(user_id);
+  const courseId = Number(course_id);
+  const currentCourse = getAdminCourse(req);
+  if (Number.isNaN(userId) || Number.isNaN(courseId)) {
+    return res.redirect('/admin?err=Invalid%20course');
+  }
+  db.get('SELECT id FROM courses WHERE id = ?', [courseId], (courseErr, courseRow) => {
+    if (courseErr || !courseRow) {
+      return res.redirect('/admin?err=Invalid%20course');
+    }
+    db.get('SELECT role FROM users WHERE id = ? AND course_id = ?', [userId, currentCourse], (err, user) => {
+      if (err || !user) {
+        return res.redirect('/admin?err=User%20not%20found');
+      }
+      if (user.role === 'admin') {
+        return res.redirect('/admin?err=Cannot%20change%20admin%20course');
+      }
+      db.run('UPDATE users SET course_id = ? WHERE id = ?', [courseId, userId], (updErr) => {
+        if (updErr) {
+          return res.redirect('/admin?err=Database%20error');
+        }
+        logAction(db, req, 'user_course_change', { user_id: userId, course_id: courseId });
+        broadcast('users_updated');
+        return res.redirect(`/admin?course=${currentCourse}&ok=Course%20updated`);
+      });
     });
   });
 });
@@ -2513,14 +2710,15 @@ app.post('/admin/homework/migrate', requireAdmin, (req, res) => {
 
 app.post('/admin/users/delete-multiple', requireAdmin, (req, res) => {
   const ids = req.body.delete_user_ids;
+  const courseId = getAdminCourse(req);
   if (!ids) {
     return res.redirect('/admin?err=No%20users%20selected');
   }
   const list = Array.isArray(ids) ? ids : [ids];
   const placeholders = list.map(() => '?').join(',');
   db.all(
-    `SELECT id, role FROM users WHERE id IN (${placeholders})`,
-    list,
+    `SELECT id, role FROM users WHERE course_id = ? AND id IN (${placeholders})`,
+    [courseId, ...list],
     (err, rows) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
@@ -2543,7 +2741,8 @@ app.post('/admin/users/delete-multiple', requireAdmin, (req, res) => {
 });
 
 app.post('/admin/users/clear-all', requireAdmin, (req, res) => {
-  db.all('SELECT id FROM users WHERE role != ?', ['admin'], (err, rows) => {
+  const courseId = getAdminCourse(req);
+  db.all('SELECT id FROM users WHERE role != ? AND course_id = ?', ['admin', courseId], (err, rows) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -2565,10 +2764,11 @@ app.post('/admin/users/clear-all', requireAdmin, (req, res) => {
 
 app.post('/admin/users/deactivate', requireAdmin, (req, res) => {
   const { user_id } = req.body;
+  const courseId = getAdminCourse(req);
   if (!user_id) {
     return res.status(400).json({ error: 'Missing user_id' });
   }
-  db.get('SELECT role, full_name FROM users WHERE id = ?', [user_id], (err, user) => {
+  db.get('SELECT role, full_name FROM users WHERE id = ? AND course_id = ?', [user_id, courseId], (err, user) => {
     if (err || !user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -2588,10 +2788,11 @@ app.post('/admin/users/deactivate', requireAdmin, (req, res) => {
 
 app.post('/admin/users/activate', requireAdmin, (req, res) => {
   const { user_id } = req.body;
+  const courseId = getAdminCourse(req);
   if (!user_id) {
     return res.status(400).json({ error: 'Missing user_id' });
   }
-  db.run('UPDATE users SET is_active = 1 WHERE id = ?', [user_id], (updErr) => {
+  db.run('UPDATE users SET is_active = 1 WHERE id = ? AND course_id = ?', [user_id, courseId], (updErr) => {
     if (updErr) {
       return res.status(500).json({ error: 'Database error' });
     }
@@ -2604,11 +2805,12 @@ app.post('/admin/users/activate', requireAdmin, (req, res) => {
 app.post('/admin/users/delete-permanent', requireAdmin, async (req, res) => {
   const { user_id } = req.body;
   const userId = Number(user_id);
+  const courseId = getAdminCourse(req);
   if (Number.isNaN(userId)) {
     return res.redirect('/admin?err=Invalid%20user');
   }
   try {
-    const user = await db.get('SELECT role FROM users WHERE id = ?', [userId]);
+    const user = await db.get('SELECT role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
     if (!user) {
       return res.redirect('/admin?err=User%20not%20found');
     }
