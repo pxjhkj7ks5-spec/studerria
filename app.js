@@ -213,6 +213,17 @@ const initDb = async () => {
       )
     `,
     `
+      CREATE TABLE IF NOT EXISTS semesters (
+        id SERIAL PRIMARY KEY,
+        course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        weeks_count INTEGER NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 0,
+        is_archived INTEGER NOT NULL DEFAULT 0
+      )
+    `,
+    `
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         full_name TEXT NOT NULL UNIQUE,
@@ -254,7 +265,8 @@ const initDb = async () => {
         day_of_week TEXT NOT NULL,
         class_number INTEGER NOT NULL,
         week_number INTEGER NOT NULL,
-        course_id INTEGER REFERENCES courses(id)
+        course_id INTEGER REFERENCES courses(id),
+        semester_id INTEGER REFERENCES semesters(id)
       )
     `,
     `
@@ -278,7 +290,8 @@ const initDb = async () => {
         file_name TEXT,
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        course_id INTEGER REFERENCES courses(id)
+        course_id INTEGER REFERENCES courses(id),
+        semester_id INTEGER REFERENCES semesters(id)
       )
     `,
     `
@@ -310,7 +323,8 @@ const initDb = async () => {
         title TEXT NOT NULL,
         created_by INTEGER NOT NULL REFERENCES users(id),
         created_at TEXT NOT NULL,
-        course_id INTEGER REFERENCES courses(id)
+        course_id INTEGER REFERENCES courses(id),
+        semester_id INTEGER REFERENCES semesters(id)
       )
     `,
     `
@@ -342,7 +356,8 @@ const initDb = async () => {
         body TEXT NOT NULL,
         created_by_id INTEGER NOT NULL REFERENCES users(id),
         created_at TEXT NOT NULL,
-        course_id INTEGER REFERENCES courses(id)
+        course_id INTEGER REFERENCES courses(id),
+        semester_id INTEGER REFERENCES semesters(id)
       )
     `,
     `
@@ -396,11 +411,15 @@ const initDb = async () => {
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE homework ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE history_log ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE login_history ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE messages ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE messages ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
   ];
   for (const statement of alters) {
     await pool.query(statement);
@@ -415,6 +434,46 @@ const initDb = async () => {
   await pool.query('UPDATE teamwork_tasks SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE messages SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE users SET password = NULL WHERE password IS NOT NULL');
+
+  const courseRows = await pool.query('SELECT id, name FROM courses ORDER BY id');
+  for (const course of courseRows.rows) {
+    const activeRow = await pool.query(
+      'SELECT id, is_active FROM semesters WHERE course_id = $1 ORDER BY is_active DESC, id ASC LIMIT 1',
+      [course.id]
+    );
+    if (!activeRow.rows.length) {
+      await pool.query(
+        'INSERT INTO semesters (course_id, title, start_date, weeks_count, is_active, is_archived) VALUES ($1, $2, $3, $4, 1, 0)',
+        [course.id, `${course.name} семестр`, '2026-01-19', 15]
+      );
+    } else if (activeRow.rows[0].is_active !== 1) {
+      await pool.query('UPDATE semesters SET is_active = 1 WHERE id = $1', [activeRow.rows[0].id]);
+    }
+
+    const currentActive = await pool.query(
+      'SELECT id FROM semesters WHERE course_id = $1 AND is_active = 1 ORDER BY id ASC LIMIT 1',
+      [course.id]
+    );
+    if (currentActive.rows.length) {
+      const semesterId = currentActive.rows[0].id;
+      await pool.query('UPDATE schedule_entries SET semester_id = $1 WHERE semester_id IS NULL AND course_id = $2', [
+        semesterId,
+        course.id,
+      ]);
+      await pool.query('UPDATE homework SET semester_id = $1 WHERE semester_id IS NULL AND course_id = $2', [
+        semesterId,
+        course.id,
+      ]);
+      await pool.query('UPDATE teamwork_tasks SET semester_id = $1 WHERE semester_id IS NULL AND course_id = $2', [
+        semesterId,
+        course.id,
+      ]);
+      await pool.query('UPDATE messages SET semester_id = $1 WHERE semester_id IS NULL AND course_id = $2', [
+        semesterId,
+        course.id,
+      ]);
+    }
+  }
 
   for (const user of userSeed) {
     const isAdmin = user.role === 'admin';
@@ -521,21 +580,32 @@ function requireStaff(req, res, next) {
 
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-function getAcademicWeek(date) {
-  const startUTC = Date.UTC(2026, 0, 19);
+function parseDateUTC(dateStr) {
+  if (!dateStr) return null;
+  const [y, m, d] = dateStr.split('-').map((n) => Number(n));
+  if (!y || !m || !d) return null;
+  return Date.UTC(y, m - 1, d);
+}
+
+function getAcademicWeekForSemester(date, semester) {
+  if (!semester || !semester.start_date) return 1;
+  const startUTC = parseDateUTC(semester.start_date);
+  if (!startUTC) return 1;
   const currentUTC = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
   const diffDays = Math.floor((currentUTC - startUTC) / (1000 * 60 * 60 * 24));
   let week = Math.floor(diffDays / 7) + 1;
   if (diffDays < 0) week = 1;
   if (week < 1) week = 1;
-  if (week > 15) week = 15;
+  if (semester.weeks_count && week > Number(semester.weeks_count)) {
+    week = Number(semester.weeks_count);
+  }
   return week;
 }
 
-function getDateForWeekDay(weekNumber, dayName) {
+function getDateForWeekDay(weekNumber, dayName, semesterStart) {
   const dayIndex = daysOfWeek.indexOf(dayName);
   if (dayIndex === -1) return null;
-  const startUTC = Date.UTC(2026, 0, 19);
+  const startUTC = parseDateUTC(semesterStart) ?? Date.UTC(2026, 0, 19);
   const dateUTC =
     startUTC + (Number(weekNumber) - 1) * 7 * 24 * 60 * 60 * 1000 + dayIndex * 24 * 60 * 60 * 1000;
   return new Date(dateUTC).toISOString().slice(0, 10);
@@ -577,6 +647,14 @@ function getAdminCourse(req) {
   }
   const sessionCourse = Number(req.session.adminCourse);
   return Number.isNaN(sessionCourse) ? 1 : sessionCourse;
+}
+
+async function getActiveSemester(courseId) {
+  const row = await db.get(
+    'SELECT id, title, start_date, weeks_count, is_active, is_archived FROM semesters WHERE course_id = ? AND is_active = 1 ORDER BY id DESC LIMIT 1',
+    [courseId]
+  );
+  return row || null;
 }
 
 function broadcast(type, payload) {
@@ -891,14 +969,17 @@ app.post('/profile', requireLogin, (req, res) => {
   });
 });
 
-app.get('/schedule', requireLogin, (req, res) => {
+app.get('/schedule', requireLogin, async (req, res) => {
   const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
+  const activeSemester = await getActiveSemester(courseId || 1);
+  const totalWeeks = activeSemester && activeSemester.weeks_count ? Number(activeSemester.weeks_count) : 15;
   let selectedWeek = parseInt(req.query.week, 10);
   if (Number.isNaN(selectedWeek)) {
-    selectedWeek = getAcademicWeek(new Date());
+    selectedWeek = getAcademicWeekForSemester(new Date(), activeSemester);
   }
   if (selectedWeek < 1) selectedWeek = 1;
-  if (selectedWeek > 15) selectedWeek = 15;
+  if (selectedWeek < 1) selectedWeek = 1;
+  if (selectedWeek > totalWeeks) selectedWeek = totalWeeks;
 
   db.all(
     `
@@ -924,6 +1005,8 @@ app.get('/schedule', requireLogin, (req, res) => {
             scheduleByDay,
             daysOfWeek,
             currentWeek: selectedWeek,
+            totalWeeks,
+            semester: activeSemester,
             bellSchedule,
             group: group || 'A',
             username,
@@ -950,10 +1033,10 @@ app.get('/schedule', requireLogin, (req, res) => {
             JOIN subjects subj ON subj.id = h.subject_id
             LEFT JOIN subgroups s ON s.homework_id = h.id
             LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
-            WHERE (${hwConditions}) AND h.course_id = ?
+            WHERE (${hwConditions}) AND h.course_id = ? AND h.semester_id = ?
             ORDER BY h.created_at DESC
           `,
-          [...hwParams, courseId || 1],
+          [...hwParams, courseId || 1, activeSemester ? activeSemester.id : null],
           (err, rows) => {
             if (err) {
               return res.status(500).send('Database error');
@@ -1004,6 +1087,8 @@ app.get('/schedule', requireLogin, (req, res) => {
               scheduleByDay,
               daysOfWeek,
               currentWeek: selectedWeek,
+              totalWeeks,
+              semester: activeSemester,
               bellSchedule,
               group: group || 'A',
               username,
@@ -1024,7 +1109,7 @@ app.get('/schedule', requireLogin, (req, res) => {
       const conditions = studentGroups
         .map(() => '(se.subject_id = ? AND se.group_number = ?)')
         .join(' OR ');
-      const params = [selectedWeek, courseId || 1];
+      const params = [selectedWeek, courseId || 1, activeSemester ? activeSemester.id : null];
       studentGroups.forEach((sg) => {
         params.push(sg.subject_id, sg.group_number);
       });
@@ -1033,7 +1118,7 @@ app.get('/schedule', requireLogin, (req, res) => {
         SELECT se.*, s.name AS subject_name
         FROM schedule_entries se
         JOIN subjects s ON s.id = se.subject_id
-        WHERE se.week_number = ? AND se.course_id = ? AND (${conditions})
+        WHERE se.week_number = ? AND se.course_id = ? AND se.semester_id = ? AND (${conditions})
       `;
 
       db.all(sql, params, (scheduleErr, rows) => {
@@ -1041,7 +1126,7 @@ app.get('/schedule', requireLogin, (req, res) => {
           return res.status(500).send('Database error');
         }
         rows.forEach((row) => {
-          row.class_date = getDateForWeekDay(selectedWeek, row.day_of_week);
+          row.class_date = getDateForWeekDay(selectedWeek, row.day_of_week, activeSemester ? activeSemester.start_date : null);
           if (scheduleByDay[row.day_of_week]) {
             scheduleByDay[row.day_of_week].push(row);
           }
@@ -1055,8 +1140,9 @@ app.get('/schedule', requireLogin, (req, res) => {
   );
 });
 
-app.get('/teamwork', requireLogin, (req, res) => {
+app.get('/teamwork', requireLogin, async (req, res) => {
   const { id: userId, username, course_id: courseId } = req.session.user;
+  const activeSemester = await getActiveSemester(courseId || 1);
   const selectedSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
   db.all(
     `
@@ -1088,10 +1174,10 @@ app.get('/teamwork', requireLogin, (req, res) => {
           SELECT t.*, s.name AS subject_name
           FROM teamwork_tasks t
           JOIN subjects s ON s.id = t.subject_id
-          WHERE t.subject_id = ? AND t.course_id = ?
+          WHERE t.subject_id = ? AND t.course_id = ? AND t.semester_id = ?
           ORDER BY t.created_at DESC
         `,
-        [selectedSubjectId, courseId || 1],
+        [selectedSubjectId, courseId || 1, activeSemester ? activeSemester.id : null],
         (taskErr, tasks) => {
           if (taskErr) {
             return res.status(500).send('Database error');
@@ -1217,9 +1303,13 @@ app.post('/teamwork/task/create', requireLogin, async (req, res) => {
   const { id: userId, course_id: courseId } = req.session.user;
   const createdAt = new Date().toISOString();
   try {
+    const activeSemester = await getActiveSemester(courseId || 1);
+    if (!activeSemester) {
+      return res.redirect('/teamwork?err=No%20active%20semester');
+    }
     const taskRow = await db.get(
-      'INSERT INTO teamwork_tasks (subject_id, title, created_by, created_at, course_id) VALUES (?, ?, ?, ?, ?) RETURNING id',
-      [subjectId, title.trim(), userId, createdAt, courseId || 1]
+      'INSERT INTO teamwork_tasks (subject_id, title, created_by, created_at, course_id, semester_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
+      [subjectId, title.trim(), userId, createdAt, courseId || 1, activeSemester.id]
     );
     if (!taskRow || !taskRow.id) {
       return res.redirect('/teamwork?err=Database%20error');
@@ -1463,6 +1553,7 @@ app.post('/admin/messages/send', requireStaff, async (req, res) => {
   const createdAt = new Date().toISOString();
   const createdBy = req.session.user.id;
   const courseId = getAdminCourse(req);
+  const activeSemester = await getActiveSemester(courseId);
   const target = target_type || (String(target_all) === '1' ? 'all' : 'subject');
   const isAll = target === 'all';
   const subjectId = subject_id ? Number(subject_id) : null;
@@ -1477,8 +1568,8 @@ app.post('/admin/messages/send', requireStaff, async (req, res) => {
   try {
     const row = await db.get(
       `
-        INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at, course_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
+        INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
       `,
       [
         isAll || target === 'users' ? null : subjectId,
@@ -1488,6 +1579,7 @@ app.post('/admin/messages/send', requireStaff, async (req, res) => {
         createdBy,
         createdAt,
         courseId,
+        activeSemester ? activeSemester.id : null,
       ]
     );
     if (!row || !row.id) {
@@ -1538,8 +1630,9 @@ app.post('/admin/messages/delete/:id', requireStaff, (req, res) => {
   });
 });
 
-app.get('/messages.json', requireLogin, (req, res) => {
+app.get('/messages.json', requireLogin, async (req, res) => {
   const { id: userId, course_id: courseId } = req.session.user;
+  const activeSemester = await getActiveSemester(courseId || 1);
   const filterSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
   db.all(
     `
@@ -1565,8 +1658,12 @@ app.get('/messages.json', requireLogin, (req, res) => {
       params.push(userId);
       const baseWhere = conditions.length ? `WHERE ${conditions.map((c) => `(${c})`).join(' OR ')}` : '';
       const courseFilter = ' AND m.course_id = ?';
+      const semesterFilter = activeSemester ? ' AND m.semester_id = ?' : '';
       const subjectFilter = !Number.isNaN(filterSubjectId) ? ' AND m.subject_id = ?' : '';
       const finalParams = [...params, courseId || 1];
+      if (activeSemester) {
+        finalParams.push(activeSemester.id);
+      }
       if (!Number.isNaN(filterSubjectId)) {
         finalParams.push(filterSubjectId);
       }
@@ -1578,7 +1675,7 @@ app.get('/messages.json', requireLogin, (req, res) => {
           LEFT JOIN users u ON u.id = m.created_by_id
           LEFT JOIN message_reads mr ON mr.message_id = m.id AND mr.user_id = ?
           LEFT JOIN message_targets mt ON mt.message_id = m.id
-          ${baseWhere}${courseFilter}${subjectFilter}
+          ${baseWhere}${courseFilter}${semesterFilter}${subjectFilter}
           ORDER BY m.created_at DESC
           LIMIT 50
         `,
@@ -1635,9 +1732,14 @@ app.get('/admin', requireAdmin, async (req, res) => {
   } = req.query;
   const scheduleFilters = [];
   const scheduleParams = [];
+  const activeSemester = await getActiveSemester(courseId);
 
   scheduleFilters.push('se.course_id = ?');
   scheduleParams.push(courseId);
+  if (activeSemester) {
+    scheduleFilters.push('se.semester_id = ?');
+    scheduleParams.push(activeSemester.id);
+  }
 
   if (group_number) {
     scheduleFilters.push('se.group_number = ?');
@@ -1665,6 +1767,13 @@ app.get('/admin', requireAdmin, async (req, res) => {
     if (courseErr) {
       return handleDbError(res, courseErr, 'admin.courses');
     }
+    db.all(
+      'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
+      [courseId],
+      (semErr, semesters) => {
+        if (semErr) {
+          return handleDbError(res, semErr, 'admin.semesters');
+        }
     db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
     if (scheduleErr) {
       return handleDbError(res, scheduleErr, 'admin.schedule');
@@ -1675,6 +1784,10 @@ app.get('/admin', requireAdmin, async (req, res) => {
     const homeworkParams = [];
     homeworkFilters.push('h.course_id = ?');
     homeworkParams.push(courseId);
+    if (activeSemester) {
+      homeworkFilters.push('h.semester_id = ?');
+      homeworkParams.push(activeSemester.id);
+    }
     if (group_number) {
       homeworkFilters.push('h.group_number = ?');
       homeworkParams.push(group_number);
@@ -1778,11 +1891,11 @@ app.get('/admin', requireAdmin, async (req, res) => {
                           JOIN subjects s ON s.id = t.subject_id
                           LEFT JOIN teamwork_groups g ON g.task_id = t.id
                           LEFT JOIN teamwork_members m ON m.task_id = t.id
-                          WHERE t.course_id = ?
+                          WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}
                           GROUP BY t.id, t.title, t.created_at, s.name
                           ORDER BY t.created_at DESC
                         `,
-                        [courseId],
+                        activeSemester ? [courseId, activeSemester.id] : [courseId],
                         (taskErr, teamworkTasks) => {
                           if (taskErr) {
                             return handleDbError(res, taskErr, 'admin.teamwork');
@@ -1793,11 +1906,11 @@ app.get('/admin', requireAdmin, async (req, res) => {
                               FROM messages m
                               LEFT JOIN subjects s ON s.id = m.subject_id
                               LEFT JOIN users u ON u.id = m.created_by_id
-                              WHERE m.course_id = ?
+                              WHERE m.course_id = ?${activeSemester ? ' AND m.semester_id = ?' : ''}
                               ORDER BY m.created_at DESC
                               LIMIT 200
                             `,
-                            [courseId],
+                            activeSemester ? [courseId, activeSemester.id] : [courseId],
                             (msgErr, messages) => {
                               if (msgErr) {
                                 return handleDbError(res, msgErr, 'admin.messages');
@@ -1815,6 +1928,8 @@ app.get('/admin', requireAdmin, async (req, res) => {
                                 teamworkTasks,
                                 adminMessages: messages,
                                 courses,
+                                semesters,
+                                activeSemester,
                                 selectedCourseId: courseId,
                                 limitedStaffView: false,
                                 filters: {
@@ -1854,6 +1969,8 @@ app.get('/admin', requireAdmin, async (req, res) => {
       });
     });
     });
+      }
+    );
   });
 });
 
@@ -1918,17 +2035,18 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
   });
 });
 
-app.get('/admin/export/schedule.csv', requireAdmin, (req, res) => {
+app.get('/admin/export/schedule.csv', requireAdmin, async (req, res) => {
   const courseId = getAdminCourse(req);
+  const activeSemester = await getActiveSemester(courseId);
   db.all(
     `
       SELECT se.id, s.name AS subject, se.group_number, se.day_of_week, se.class_number, se.week_number
       FROM schedule_entries se
       JOIN subjects s ON s.id = se.subject_id
-      WHERE se.course_id = ?
+      WHERE se.course_id = ?${activeSemester ? ' AND se.semester_id = ?' : ''}
       ORDER BY se.week_number, se.day_of_week, se.class_number
     `,
-    [courseId],
+    activeSemester ? [courseId, activeSemester.id] : [courseId],
     (err, rows) => {
       if (err) {
         return res.status(500).send('Database error');
@@ -2077,7 +2195,7 @@ app.get('/admin/user-logins.json', requireAdmin, (req, res) => {
   );
 });
 
-app.post('/homework/add', requireLogin, upload.single('attachment'), (req, res) => {
+app.post('/homework/add', requireLogin, upload.single('attachment'), async (req, res) => {
   const {
     description,
     link_url,
@@ -2117,6 +2235,7 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), (req, res) 
 
   const { schedule_group: group, username, id: userId, course_id: courseId } = req.session.user;
   const createdAt = new Date().toISOString();
+  const activeSemester = await getActiveSemester(courseId || 1);
 
   db.get('SELECT name, course_id FROM subjects WHERE id = ?', [subjectId], (subErr, subjectRow) => {
     if (subErr || !subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
@@ -2129,8 +2248,8 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), (req, res) 
     db.run(
       `
         INSERT INTO homework
-        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         group,
@@ -2151,6 +2270,7 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), (req, res) 
         username,
         createdAt,
         courseId || 1,
+        activeSemester ? activeSemester.id : null,
       ],
       (err) => {
         if (err) {
@@ -2213,10 +2333,18 @@ app.get('/starosta', requireStaff, async (req, res) => {
   }
 
   const courseId = req.session.user.course_id || 1;
+  const activeSemester = await getActiveSemester(courseId);
   db.all('SELECT id, name FROM courses WHERE id = ?', [courseId], (courseErr, courses) => {
     if (courseErr) {
       return handleDbError(res, courseErr, 'starosta.courses');
     }
+    db.all(
+      'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
+      [courseId],
+      (semErr, semesters) => {
+        if (semErr) {
+          return handleDbError(res, semErr, 'starosta.semesters');
+        }
     db.all(
       'SELECT id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at, course_id FROM users WHERE course_id = ? ORDER BY full_name',
       [courseId],
@@ -2237,11 +2365,11 @@ app.get('/starosta', requireStaff, async (req, res) => {
               JOIN subjects s ON s.id = t.subject_id
               LEFT JOIN teamwork_groups g ON g.task_id = t.id
               LEFT JOIN teamwork_members m ON m.task_id = t.id
-              WHERE t.course_id = ?
+              WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}
               GROUP BY t.id, t.title, t.created_at, s.name
               ORDER BY t.created_at DESC
             `,
-            [courseId],
+            activeSemester ? [courseId, activeSemester.id] : [courseId],
             (taskErr, teamworkTasks) => {
               if (taskErr) {
                 return handleDbError(res, taskErr, 'starosta.teamwork');
@@ -2252,11 +2380,11 @@ app.get('/starosta', requireStaff, async (req, res) => {
                   FROM messages m
                   LEFT JOIN subjects s ON s.id = m.subject_id
                   LEFT JOIN users u ON u.id = m.created_by_id
-                  WHERE m.course_id = ?
+                  WHERE m.course_id = ?${activeSemester ? ' AND m.semester_id = ?' : ''}
                   ORDER BY m.created_at DESC
                   LIMIT 200
                 `,
-                [courseId],
+                activeSemester ? [courseId, activeSemester.id] : [courseId],
                 (msgErr, messages) => {
                   if (msgErr) {
                     return handleDbError(res, msgErr, 'starosta.messages');
@@ -2274,6 +2402,8 @@ app.get('/starosta', requireStaff, async (req, res) => {
                     teamworkTasks,
                     adminMessages: messages,
                     courses,
+                    semesters,
+                    activeSemester,
                     selectedCourseId: courseId,
                     limitedStaffView: true,
                     filters: {
@@ -2293,6 +2423,8 @@ app.get('/starosta', requireStaff, async (req, res) => {
             }
           );
         });
+      }
+    );
       }
     );
   });
@@ -2352,12 +2484,13 @@ app.post('/subgroup/join', requireLogin, (req, res) => {
 });
 
 app.post('/admin/schedule/add', requireAdmin, (req, res) => {
-  const { subject_id, group_number, day_of_week, class_number, week_numbers } = req.body;
+  const { subject_id, group_number, day_of_week, class_number, week_numbers, semester_id } = req.body;
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
   const courseId = getAdminCourse(req);
+  const semesterId = Number(semester_id);
 
-  if (!subject_id || !day_of_week || !week_numbers || Number.isNaN(groupNum) || Number.isNaN(classNum)) {
+  if (!subject_id || !day_of_week || !week_numbers || Number.isNaN(groupNum) || Number.isNaN(classNum) || Number.isNaN(semesterId)) {
     return res.redirect('/admin?err=Missing%20fields');
   }
   if (!daysOfWeek.includes(day_of_week)) {
@@ -2367,69 +2500,86 @@ app.post('/admin/schedule/add', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20class%20number');
   }
 
-  const weeks = week_numbers
-    .split(',')
-    .map((w) => Number(w.trim()))
-    .filter((w) => !Number.isNaN(w) && w >= 1 && w <= 15);
-  const uniqueWeeks = Array.from(new Set(weeks));
-  if (!uniqueWeeks.length) {
-    return res.redirect('/admin?err=Invalid%20weeks');
-  }
-
-  const stmt = db.prepare(
-    'INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id) VALUES (?, ?, ?, ?, ?, ?)'
-  );
-  uniqueWeeks.forEach((week) => {
-    stmt.run(subject_id, groupNum, day_of_week, classNum, week, courseId);
-  });
-  stmt.finalize((err) => {
-    if (err) {
-      return res.redirect('/admin?err=Database%20error');
+  db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId], (semErr, semRow) => {
+    if (semErr || !semRow) {
+      return res.redirect('/admin?err=Invalid%20semester');
     }
-    logAction(db, req, 'schedule_add', {
-      subject_id,
-      group_number: groupNum,
-      day_of_week,
-      class_number: classNum,
-      weeks: uniqueWeeks,
+    const maxWeeks = Number(semRow.weeks_count) || 15;
+    const weeks = week_numbers
+      .split(',')
+      .map((w) => Number(w.trim()))
+      .filter((w) => !Number.isNaN(w) && w >= 1 && w <= maxWeeks);
+    const uniqueWeeks = Array.from(new Set(weeks));
+    if (!uniqueWeeks.length) {
+      return res.redirect('/admin?err=Invalid%20weeks');
+    }
+
+    const stmt = db.prepare(
+      'INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    );
+    uniqueWeeks.forEach((week) => {
+      stmt.run(subject_id, groupNum, day_of_week, classNum, week, courseId, semesterId);
     });
-    return res.redirect('/admin?ok=Class%20added');
+    stmt.finalize((err) => {
+      if (err) {
+        return res.redirect('/admin?err=Database%20error');
+      }
+      logAction(db, req, 'schedule_add', {
+        subject_id,
+        group_number: groupNum,
+        day_of_week,
+        class_number: classNum,
+        weeks: uniqueWeeks,
+        semester_id: semesterId,
+      });
+      return res.redirect('/admin?ok=Class%20added');
+    });
   });
 });
 
 app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { subject_id, group_number, day_of_week, class_number, week_number } = req.body;
+  const { subject_id, group_number, day_of_week, class_number, week_number, semester_id } = req.body;
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
   const weekNum = Number(week_number);
   const courseId = getAdminCourse(req);
+  const semesterId = Number(semester_id);
 
-  if (!subject_id || !day_of_week || Number.isNaN(groupNum) || Number.isNaN(classNum) || Number.isNaN(weekNum)) {
+  if (!subject_id || !day_of_week || Number.isNaN(groupNum) || Number.isNaN(classNum) || Number.isNaN(weekNum) || Number.isNaN(semesterId)) {
     return res.redirect('/admin?err=Missing%20fields');
   }
   if (!daysOfWeek.includes(day_of_week)) {
     return res.redirect('/admin?err=Invalid%20day');
   }
-  if (classNum < 1 || classNum > 7 || weekNum < 1 || weekNum > 15) {
+  if (classNum < 1 || classNum > 7) {
     return res.redirect('/admin?err=Invalid%20class%20or%20week');
   }
 
-  db.run(
-    `
-      UPDATE schedule_entries
-      SET subject_id = ?, group_number = ?, day_of_week = ?, class_number = ?, week_number = ?
-      WHERE id = ? AND course_id = ?
-    `,
-    [subject_id, groupNum, day_of_week, classNum, weekNum, id, courseId],
-    (err) => {
-      if (err) {
-        return res.redirect('/admin?err=Database%20error');
-      }
-      logAction(db, req, 'schedule_edit', { id, subject_id, group_number: groupNum, day_of_week, class_number: classNum, week_number: weekNum });
-      return res.redirect('/admin?ok=Class%20updated');
+  db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId], (semErr, semRow) => {
+    if (semErr || !semRow) {
+      return res.redirect('/admin?err=Invalid%20semester');
     }
-  );
+    const maxWeeks = Number(semRow.weeks_count) || 15;
+    if (weekNum < 1 || weekNum > maxWeeks) {
+      return res.redirect('/admin?err=Invalid%20class%20or%20week');
+    }
+    db.run(
+      `
+        UPDATE schedule_entries
+        SET subject_id = ?, group_number = ?, day_of_week = ?, class_number = ?, week_number = ?, semester_id = ?
+        WHERE id = ? AND course_id = ?
+      `,
+      [subject_id, groupNum, day_of_week, classNum, weekNum, semesterId, id, courseId],
+      (err) => {
+        if (err) {
+          return res.redirect('/admin?err=Database%20error');
+        }
+        logAction(db, req, 'schedule_edit', { id, subject_id, group_number: groupNum, day_of_week, class_number: classNum, week_number: weekNum, semester_id: semesterId });
+        return res.redirect('/admin?ok=Class%20updated');
+      }
+    );
+  });
 });
 
 app.post('/admin/schedule/delete/:id', requireAdmin, (req, res) => {
@@ -2597,6 +2747,129 @@ app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
       }
       logAction(db, req, 'subject_delete', { id });
       return res.redirect('/admin?ok=Subject%20deleted');
+    });
+  });
+});
+
+app.post('/admin/semesters/add', requireAdmin, (req, res) => {
+  const { title, start_date, weeks_count, is_active } = req.body;
+  const courseId = getAdminCourse(req);
+  const weeks = Number(weeks_count);
+  const active = String(is_active) === '1' ? 1 : 0;
+  if (!title || !start_date || Number.isNaN(weeks) || weeks < 1 || weeks > 30) {
+    return res.redirect('/admin?err=Invalid%20semester');
+  }
+  const create = () => {
+    db.run(
+      'INSERT INTO semesters (course_id, title, start_date, weeks_count, is_active, is_archived) VALUES (?, ?, ?, ?, ?, 0)',
+      [courseId, title.trim(), start_date, weeks, active],
+      (err) => {
+        if (err) {
+          return res.redirect('/admin?err=Database%20error');
+        }
+        logAction(db, req, 'semester_add', { title, start_date, weeks_count: weeks, is_active: active });
+        return res.redirect('/admin?ok=Semester%20created');
+      }
+    );
+  };
+  if (active) {
+    db.run('UPDATE semesters SET is_active = 0 WHERE course_id = ?', [courseId], (err) => {
+      if (err) {
+        return res.redirect('/admin?err=Database%20error');
+      }
+      create();
+    });
+  } else {
+    create();
+  }
+});
+
+app.post('/admin/semesters/edit/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { title, start_date, weeks_count } = req.body;
+  const courseId = getAdminCourse(req);
+  const weeks = Number(weeks_count);
+  if (!title || !start_date || Number.isNaN(weeks) || weeks < 1 || weeks > 30) {
+    return res.redirect('/admin?err=Invalid%20semester');
+  }
+  db.run(
+    'UPDATE semesters SET title = ?, start_date = ?, weeks_count = ? WHERE id = ? AND course_id = ?',
+    [title.trim(), start_date, weeks, id, courseId],
+    (err) => {
+      if (err) {
+        return res.redirect('/admin?err=Database%20error');
+      }
+      logAction(db, req, 'semester_edit', { id, title, start_date, weeks_count: weeks });
+      return res.redirect('/admin?ok=Semester%20updated');
+    }
+  );
+});
+
+app.post('/admin/semesters/set-active/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const courseId = getAdminCourse(req);
+  db.run('UPDATE semesters SET is_active = 0 WHERE course_id = ?', [courseId], (err) => {
+    if (err) {
+      return res.redirect('/admin?err=Database%20error');
+    }
+    db.run('UPDATE semesters SET is_active = 1, is_archived = 0 WHERE id = ? AND course_id = ?', [id, courseId], (err2) => {
+      if (err2) {
+        return res.redirect('/admin?err=Database%20error');
+      }
+      logAction(db, req, 'semester_set_active', { id });
+      return res.redirect('/admin?ok=Semester%20activated');
+    });
+  });
+});
+
+app.post('/admin/semesters/archive/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const courseId = getAdminCourse(req);
+  db.run('UPDATE semesters SET is_archived = 1, is_active = 0 WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
+    if (err) {
+      return res.redirect('/admin?err=Database%20error');
+    }
+    logAction(db, req, 'semester_archive', { id });
+    return res.redirect('/admin?ok=Semester%20archived');
+  });
+});
+
+app.post('/admin/semesters/restore/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const courseId = getAdminCourse(req);
+  db.run('UPDATE semesters SET is_archived = 0 WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
+    if (err) {
+      return res.redirect('/admin?err=Database%20error');
+    }
+    logAction(db, req, 'semester_restore', { id });
+    return res.redirect('/admin?ok=Semester%20restored');
+  });
+});
+
+app.post('/admin/semesters/delete/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const courseId = getAdminCourse(req);
+  db.get('SELECT is_active FROM semesters WHERE id = ? AND course_id = ?', [id, courseId], (semErr, semRow) => {
+    if (semErr || !semRow) {
+      return res.redirect('/admin?err=Semester%20not%20found');
+    }
+    if (semRow.is_active === 1) {
+      return res.redirect('/admin?err=Cannot%20delete%20active%20semester');
+    }
+    db.get('SELECT COUNT(*) AS cnt FROM schedule_entries WHERE semester_id = ?', [id], (cntErr, cntRow) => {
+      if (cntErr) {
+        return res.redirect('/admin?err=Database%20error');
+      }
+      if (Number(cntRow.cnt) > 0) {
+        return res.redirect('/admin?err=Semester%20in%20use');
+      }
+      db.run('DELETE FROM semesters WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
+        if (err) {
+          return res.redirect('/admin?err=Database%20error');
+        }
+        logAction(db, req, 'semester_delete', { id });
+        return res.redirect('/admin?ok=Semester%20deleted');
+      });
     });
   });
 });

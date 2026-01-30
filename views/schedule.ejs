@@ -437,7 +437,7 @@
 
     <div class="week-slider" id="weekSlider">
       <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
-      <% for (let w = 1; w <= 15; w++) { %>
+      <% for (let w = 1; w <= (totalWeeks || 15); w++) { %>
         <button
           type="button"
           class="week-dot <%= w === currentWeek ? 'active' : '' %>"
@@ -757,7 +757,7 @@
       const messagesSubjectFilter = document.getElementById('messagesSubjectFilter');
       const weekPrev = document.getElementById('weekPrev');
       const weekNext = document.getElementById('weekNext');
-      const totalWeeks = 15;
+      const totalWeeks = <%= totalWeeks || 15 %>;
       let currentWeek = <%= currentWeek %>;
       function updateSchedule(week) {
         const safe = Math.max(1, Math.min(totalWeeks, week));

@@ -278,6 +278,9 @@
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-subjects')">
             Subjects
           </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-semesters')">
+            Semesters
+          </button>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-history')">
             History
           </button>
@@ -371,6 +374,16 @@
                     </select>
                   </div>
                   <div class="col-12 col-md-2">
+                    <select class="form-select" name="semester_id" required>
+                      <option value="" disabled selected>Semester</option>
+                      <% (semesters || []).forEach(function(sem) { %>
+                        <option value="<%= sem.id %>" <%= activeSemester && sem.id === activeSemester.id ? 'selected' : '' %>>
+                          <%= sem.title %>
+                        </option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-2">
                     <select class="form-select" name="day_of_week" required>
                       <option value="" disabled selected>Day</option>
                       <% ['Monday','Tuesday','Wednesday','Thursday','Friday'].forEach(function(d) { %>
@@ -387,7 +400,12 @@
                     </select>
                   </div>
                   <div class="col-12 col-md-2">
-                    <input class="form-control" name="week_numbers" placeholder="Weeks: 1,2,3" required />
+                    <input
+                      class="form-control"
+                      name="week_numbers"
+                      placeholder="Weeks: 1,2,3"
+                      required
+                    />
                   </div>
                   <div class="col-12 col-md-2 d-grid">
                     <button class="btn btn-primary" type="submit">Add</button>
@@ -418,6 +436,7 @@
                   <th>Subject</th>
                   <th>Group #</th>
                   <th>Day</th>
+                  <th>Semester</th>
                   <th>Class #</th>
                   <th>Week</th>
                   <th>Actions</th>
@@ -459,6 +478,13 @@
                       </select>
                     </td>
                     <td>
+                      <select class="form-select form-select-sm" name="semester_id" form="edit-<%= item.id %>" required>
+                        <% (semesters || []).forEach(function(sem) { %>
+                          <option value="<%= sem.id %>" <%= item.semester_id === sem.id ? 'selected' : '' %>><%= sem.title %></option>
+                        <% }); %>
+                      </select>
+                    </td>
+                    <td>
                       <select class="form-select form-select-sm" name="class_number" form="edit-<%= item.id %>" required>
                         <% [1,2,3,4,5,6,7].forEach(function(n) { %>
                           <option value="<%= n %>" <%= item.class_number === n ? 'selected' : '' %>><%= n %></option>
@@ -473,7 +499,7 @@
                         value="<%= item.week_number %>"
                         type="number"
                         min="1"
-                        max="15"
+                        max="<%= activeSemester && activeSemester.weeks_count ? activeSemester.weeks_count : 15 %>"
                         required
                       />
                     </td>
@@ -853,6 +879,105 @@
           </div>
         </div>
 
+        <div id="admin-semesters">
+          <div class="card mb-4">
+            <div class="card-body">
+              <h5 class="card-title mb-3">Create semester</h5>
+              <form method="POST" action="/admin/semesters/add">
+                <div class="row g-2">
+                  <div class="col-12 col-md-3">
+                    <input class="form-control" name="title" placeholder="Semester title" required />
+                  </div>
+                  <div class="col-12 col-md-3">
+                    <input class="form-control" type="date" name="start_date" required />
+                  </div>
+                  <div class="col-12 col-md-2">
+                    <input class="form-control" type="number" name="weeks_count" min="1" max="30" value="15" required />
+                  </div>
+                  <div class="col-12 col-md-2">
+                    <select class="form-select" name="is_active">
+                      <option value="1">Active</option>
+                      <option value="0" selected>Inactive</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-2 d-grid">
+                    <button class="btn btn-primary" type="submit">Create</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="card-body">
+              <h5 class="card-title mb-3">Semesters</h5>
+              <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Start date</th>
+                      <th>Weeks</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% (semesters || []).forEach(function(sem) { %>
+                      <tr>
+                        <td>
+                          <input class="form-control form-control-sm" name="title" form="semester-<%= sem.id %>" value="<%= sem.title %>" required />
+                        </td>
+                        <td>
+                          <input class="form-control form-control-sm" type="date" name="start_date" form="semester-<%= sem.id %>" value="<%= sem.start_date %>" required />
+                        </td>
+                        <td>
+                          <input class="form-control form-control-sm" type="number" min="1" max="30" name="weeks_count" form="semester-<%= sem.id %>" value="<%= sem.weeks_count %>" required />
+                        </td>
+                        <td>
+                          <% if (sem.is_active === 1) { %>
+                            <span class="badge text-bg-success">Active</span>
+                          <% } else if (sem.is_archived === 1) { %>
+                            <span class="badge text-bg-secondary">Archived</span>
+                          <% } else { %>
+                            <span class="badge text-bg-light text-dark">Inactive</span>
+                          <% } %>
+                        </td>
+                        <td class="d-flex flex-wrap gap-2">
+                          <form id="semester-<%= sem.id %>" method="POST" action="/admin/semesters/edit/<%= sem.id %>" data-save-all="true"></form>
+                          <button class="btn btn-sm btn-outline-secondary" type="submit" form="semester-<%= sem.id %>">Save</button>
+                          <% if (!sem.is_active) { %>
+                            <form method="POST" action="/admin/semesters/set-active/<%= sem.id %>">
+                              <button class="btn btn-sm btn-outline-primary" type="submit">Set active</button>
+                            </form>
+                          <% } %>
+                          <% if (sem.is_archived) { %>
+                            <form method="POST" action="/admin/semesters/restore/<%= sem.id %>">
+                              <button class="btn btn-sm btn-outline-secondary" type="submit">Restore</button>
+                            </form>
+                          <% } else { %>
+                            <form method="POST" action="/admin/semesters/archive/<%= sem.id %>">
+                              <button class="btn btn-sm btn-outline-warning" type="submit">Archive</button>
+                            </form>
+                          <% } %>
+                          <form method="POST" action="/admin/semesters/delete/<%= sem.id %>">
+                            <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete this semester?');">Delete</button>
+                          </form>
+                        </td>
+                      </tr>
+                    <% }); %>
+                    <% if (!(semesters || []).length) { %>
+                      <tr>
+                        <td colspan="5" class="text-muted">No semesters yet.</td>
+                      </tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div id="admin-history">
           <div class="card mb-4">
             <div class="card-body">
@@ -1189,7 +1314,7 @@
       const limitedStaffView = <%= isLimitedView ? 'true' : 'false' %>;
       const adminSections = limitedStaffView
         ? ['admin-teamwork', 'admin-messages']
-        : ['admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-history', 'admin-teamwork', 'admin-messages'];
+        : ['admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-semesters', 'admin-history', 'admin-teamwork', 'admin-messages'];
 
       function toggleSection(id) {
         const el = document.getElementById(id);
