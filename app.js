@@ -1673,18 +1673,18 @@ app.get('/admin', requireAdmin, async (req, res) => {
 
     const homeworkFilters = [];
     const homeworkParams = [];
-    homeworkFilters.push('course_id = ?');
+    homeworkFilters.push('h.course_id = ?');
     homeworkParams.push(courseId);
     if (group_number) {
-      homeworkFilters.push('group_number = ?');
+      homeworkFilters.push('h.group_number = ?');
       homeworkParams.push(group_number);
     }
     if (subject) {
-      homeworkFilters.push('subject LIKE ?');
+      homeworkFilters.push('h.subject LIKE ?');
       homeworkParams.push(`%${subject}%`);
     }
     if (q) {
-      homeworkFilters.push('(description LIKE ? OR created_by LIKE ?)');
+      homeworkFilters.push('(h.description LIKE ? OR h.created_by LIKE ?)');
       homeworkParams.push(`%${q}%`, `%${q}%`);
     }
 
