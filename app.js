@@ -868,6 +868,22 @@ app.post('/login', async (req, res) => {
   ensureUsersSchema(() => {
     const normalizedName = full_name.trim().replace(/\s+/g, ' ');
     const activeClause = usersHasIsActive ? ' AND is_active = 1' : '';
+    const normalizeRole = (rawRole) => {
+      const normalized = String(rawRole || 'student').trim().toLowerCase();
+      const map = {
+        admin: 'admin',
+        administrator: 'admin',
+        адмін: 'admin',
+        администратор: 'admin',
+        starosta: 'starosta',
+        староста: 'starosta',
+        deanery: 'deanery',
+        деканат: 'deanery',
+        student: 'student',
+        студент: 'student',
+      };
+      return map[normalized] || 'student';
+    };
     db.get(
       `SELECT id, full_name, role, password_hash, schedule_group, course_id, language FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
       [normalizedName],
@@ -875,6 +891,10 @@ app.post('/login', async (req, res) => {
         const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
         if (err || !user || !validHash) {
           return res.redirect('/login?error=1');
+        }
+        const role = normalizeRole(user.role);
+        if (role !== user.role) {
+          db.run('UPDATE users SET role = ? WHERE id = ?', [role, user.id]);
         }
         const loginAt = new Date().toISOString();
         db.run(
@@ -892,9 +912,9 @@ app.post('/login', async (req, res) => {
           course_id: user.course_id || 1,
           language: user.language || getPreferredLang(req),
         };
-        req.session.role = user.role;
+        req.session.role = role;
 
-        if (user.role === 'admin') {
+        if (role === 'admin') {
           return res.redirect('/admin');
         }
         return res.redirect('/schedule');
@@ -1917,7 +1937,12 @@ app.get('/admin', requireAdmin, async (req, res) => {
   } = req.query;
   const scheduleFilters = [];
   const scheduleParams = [];
-  const activeSemester = await getActiveSemester(courseId);
+  let activeSemester = null;
+  try {
+    activeSemester = await getActiveSemester(courseId);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.semester');
+  }
 
   scheduleFilters.push('se.course_id = ?');
   scheduleParams.push(courseId);
