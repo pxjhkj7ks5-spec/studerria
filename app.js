@@ -65,9 +65,17 @@ const translate = (lang, key) => {
 };
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection:', err);
+});
 
 const adminSeed = process.env.ADMIN_HASHED_PASS
   ? {
@@ -3690,7 +3698,12 @@ app.post('/logout', (req, res) => {
 });
 
 const startServer = () => {
-  server.listen(PORT, () => console.log(`Listening on ${PORT}`));
+  console.log('Starting server', {
+    port: PORT,
+    node: process.version,
+    env: process.env.NODE_ENV || 'unknown',
+  });
+  server.listen(PORT, '0.0.0.0', () => console.log(`Listening on ${PORT}`));
   ensureDbReady().catch((err) => {
     console.error('Failed to initialize database', err);
   });
