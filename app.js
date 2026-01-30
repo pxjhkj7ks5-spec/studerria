@@ -3272,6 +3272,8 @@ app.post('/admin/users/delete-permanent', requireAdmin, async (req, res) => {
     await db.run('DELETE FROM message_targets WHERE user_id = ?', [userId]);
     await db.run('DELETE FROM teamwork_members WHERE user_id = ?', [userId]);
     await db.run('UPDATE homework SET created_by_id = NULL WHERE created_by_id = ?', [userId]);
+    await db.run('UPDATE messages SET created_by_id = ? WHERE created_by_id = ?', [req.session.user.id, userId]);
+    await db.run('UPDATE teamwork_tasks SET created_by = ? WHERE created_by = ?', [req.session.user.id, userId]);
     await db.run('UPDATE teamwork_groups SET leader_id = ? WHERE leader_id = ?', [req.session.user.id, userId]);
     await db.run('DELETE FROM users WHERE id = ?', [userId]);
     logAction(db, req, 'user_delete_permanent', { user_id: userId });
