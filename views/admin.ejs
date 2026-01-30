@@ -178,6 +178,10 @@
       body.theme-dark .btn-outline-danger:hover {
         background: rgba(255, 255, 255, 0.08);
       }
+      .select-locked {
+        pointer-events: none;
+        opacity: 0.75;
+      }
       .flash-alert {
         border-radius: 14px;
         padding: 0.5rem 0.9rem;
@@ -2121,9 +2125,9 @@
         const groupCount = Number(selected.dataset.groupCount || 3);
         if (groupCount <= 1) {
           addGroupSelect.value = '1';
-          addGroupSelect.disabled = true;
+          addGroupSelect.classList.add('select-locked');
         } else {
-          addGroupSelect.disabled = false;
+          addGroupSelect.classList.remove('select-locked');
         }
       }
 
