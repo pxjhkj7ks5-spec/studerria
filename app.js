@@ -505,6 +505,14 @@ function logAction(dbRef, req, action, details) {
   broadcast('history_updated');
 }
 
+function handleDbError(res, err, label) {
+  console.error(`Database error (${label})`, err);
+  if (process.env.DB_DEBUG === 'true') {
+    return res.status(500).send(`Database error (${label})`);
+  }
+  return res.status(500).send('Database error');
+}
+
 function ensureUsersSchema(cb) {
   usersHasIsActive = true;
   return cb(true);
@@ -1490,7 +1498,12 @@ app.post('/messages/read', requireLogin, (req, res) => {
   stmt.finalize(() => res.json({ ok: true }));
 });
 
-app.get('/admin', requireAdmin, (req, res) => {
+app.get('/admin', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'init');
+  }
   const {
     group_number,
     day,
@@ -1532,7 +1545,7 @@ app.get('/admin', requireAdmin, (req, res) => {
 
   db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
     if (scheduleErr) {
-      return res.status(500).send('Database error');
+      return handleDbError(res, scheduleErr, 'admin.schedule');
     }
     const schedule = sortSchedule(scheduleRows, sort_schedule);
 
@@ -1562,7 +1575,7 @@ app.get('/admin', requireAdmin, (req, res) => {
 
     db.all(homeworkSql, homeworkParams, (homeworkErr, homeworkRows) => {
       if (homeworkErr) {
-        return res.status(500).send('Database error');
+        return handleDbError(res, homeworkErr, 'admin.homework');
       }
       const homework = sortHomework(homeworkRows, sort_homework);
       ensureUsersSchema(() => {
@@ -1578,11 +1591,11 @@ app.get('/admin', requireAdmin, (req, res) => {
           `SELECT id, full_name, role, schedule_group, ${usersHasIsActive ? 'is_active,' : ''} last_login_ip, last_user_agent, last_login_at FROM users ${userFilter} ORDER BY full_name`,
           (userErr, users) => {
             if (userErr) {
-              return res.status(500).send('Database error');
+              return handleDbError(res, userErr, 'admin.users');
             }
             db.all('SELECT * FROM subjects ORDER BY name', (subjectErr, subjects) => {
               if (subjectErr) {
-                return res.status(500).send('Database error');
+                return handleDbError(res, subjectErr, 'admin.subjects');
               }
               db.all(
                 `
@@ -1592,7 +1605,7 @@ app.get('/admin', requireAdmin, (req, res) => {
                 `,
                 (sgErr, studentGroups) => {
                   if (sgErr) {
-                    return res.status(500).send('Database error');
+                    return handleDbError(res, sgErr, 'admin.studentGroups');
                   }
                   const historyFilters = [];
                   const historyParams = [];
@@ -1624,7 +1637,7 @@ app.get('/admin', requireAdmin, (req, res) => {
                     historyParams,
                     (logErr, logs) => {
                       if (logErr) {
-                        return res.status(500).send('Database error');
+                        return handleDbError(res, logErr, 'admin.history');
                       }
                       db.all(
                         `
@@ -1641,7 +1654,7 @@ app.get('/admin', requireAdmin, (req, res) => {
                         [],
                         (taskErr, teamworkTasks) => {
                           if (taskErr) {
-                            return res.status(500).send('Database error');
+                            return handleDbError(res, taskErr, 'admin.teamwork');
                           }
                           db.all(
                             `
@@ -1655,7 +1668,7 @@ app.get('/admin', requireAdmin, (req, res) => {
                             [],
                             (msgErr, messages) => {
                               if (msgErr) {
-                                return res.status(500).send('Database error');
+                                return handleDbError(res, msgErr, 'admin.messages');
                               }
                               res.render('admin', {
                                 username: req.session.user.username,
@@ -1707,7 +1720,12 @@ app.get('/admin', requireAdmin, (req, res) => {
   });
 });
 
-app.get('/admin/users.json', requireAdmin, (req, res) => {
+app.get('/admin/users.json', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
   const status = req.query.status;
   ensureUsersSchema(() => {
     const userFilter =
@@ -1724,16 +1742,19 @@ app.get('/admin/users.json', requireAdmin, (req, res) => {
       `SELECT ${cols} FROM users ${userFilter} ORDER BY full_name`,
       (userErr, users) => {
         if (userErr) {
+          console.error('Database error (admin.users.json.users)', userErr);
           return res.status(500).json({ error: 'Database error' });
         }
         db.all('SELECT * FROM subjects ORDER BY name', (subjectErr, subjects) => {
           if (subjectErr) {
+            console.error('Database error (admin.users.json.subjects)', subjectErr);
             return res.status(500).json({ error: 'Database error' });
           }
           db.all(
             'SELECT student_id, subject_id, group_number FROM student_groups',
             (sgErr, studentGroups) => {
               if (sgErr) {
+                console.error('Database error (admin.users.json.studentGroups)', sgErr);
                 return res.status(500).json({ error: 'Database error' });
               }
               res.json({ users, subjects, studentGroups });
