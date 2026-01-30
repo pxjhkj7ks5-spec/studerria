@@ -379,6 +379,8 @@ const initDb = async () => {
 };
 
 let initPromise;
+let initStatus = 'pending';
+let initError = null;
 const ensureDbReady = async () => {
   if (initPromise) {
     return initPromise;
@@ -388,10 +390,15 @@ const ensureDbReady = async () => {
     let lastError;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
+        initStatus = 'pending';
         await initDb();
+        initStatus = 'ok';
+        initError = null;
         return true;
       } catch (err) {
         lastError = err;
+        initStatus = 'error';
+        initError = err;
         const delay = Math.min(1000 * 2 ** (attempt - 1), 15000);
         console.error(`DB init attempt ${attempt} failed, retrying in ${delay}ms`, err);
         await new Promise((resolve) => setTimeout(resolve, delay));
@@ -546,6 +553,30 @@ app.get('/', (req, res) => {
 
 app.get('/login', (req, res) => {
   res.render('login', { error: req.query.error === '1' });
+});
+
+app.get('/_health', (req, res) => {
+  res.json({
+    status: 'ok',
+    db: {
+      initStatus,
+      error: initError ? String(initError.message || initError) : null,
+    },
+  });
+});
+
+app.post('/_bootstrap', async (req, res) => {
+  const token = process.env.BOOTSTRAP_TOKEN;
+  const provided = req.get('x-bootstrap-token') || req.query.token || '';
+  if (!token || provided !== token) {
+    return res.status(403).json({ ok: false, error: 'Forbidden' });
+  }
+  try {
+    await ensureDbReady();
+    return res.json({ ok: true, initStatus });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: String(err.message || err) });
+  }
 });
 
 app.post('/login', async (req, res) => {
