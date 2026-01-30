@@ -1648,7 +1648,7 @@ app.get('/admin', requireAdmin, async (req, res) => {
                           JOIN subjects s ON s.id = t.subject_id
                           LEFT JOIN teamwork_groups g ON g.task_id = t.id
                           LEFT JOIN teamwork_members m ON m.task_id = t.id
-                          GROUP BY t.id
+                          GROUP BY t.id, t.title, t.created_at, s.name
                           ORDER BY t.created_at DESC
                         `,
                         [],
