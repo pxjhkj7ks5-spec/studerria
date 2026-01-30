@@ -346,6 +346,8 @@
               Адмін: <%= username %>
             <% } else if (role === 'starosta') { %>
               Староста: <%= username %>
+            <% } else if (role === 'deanery') { %>
+              Деканат: <%= username %>
             <% } else { %>
               Студент: <%= username %>
             <% } %>
@@ -354,6 +356,9 @@
             <form method="POST" action="/admin/switch-to-admin" class="me-2">
               <button class="btn btn-outline-primary btn-sm" type="submit">Back to Admin</button>
             </form>
+          <% } %>
+          <% if (role === 'starosta') { %>
+            <a class="btn btn-outline-primary btn-sm me-2" href="/starosta">Меню старости</a>
           <% } %>
           <button class="btn btn-outline-light btn-sm me-2 theme-toggle" type="button" id="themeToggle">
             Light

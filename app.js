@@ -1805,6 +1805,7 @@ app.get('/admin', requireAdmin, async (req, res) => {
                               res.render('admin', {
                                 username: req.session.user.username,
                                 userId: req.session.user.id,
+                                role: req.session.role,
                                 schedule,
                                 homework,
                                 users,
@@ -1815,6 +1816,7 @@ app.get('/admin', requireAdmin, async (req, res) => {
                                 adminMessages: messages,
                                 courses,
                                 selectedCourseId: courseId,
+                                limitedStaffView: false,
                                 filters: {
                                   group_number: group_number || '',
                                   day: day || '',
@@ -2203,6 +2205,99 @@ app.post('/subgroup/create', requireLogin, async (req, res) => {
   }
 });
 
+app.get('/starosta', requireStaff, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.init');
+  }
+
+  const courseId = req.session.user.course_id || 1;
+  db.all('SELECT id, name FROM courses WHERE id = ?', [courseId], (courseErr, courses) => {
+    if (courseErr) {
+      return handleDbError(res, courseErr, 'starosta.courses');
+    }
+    db.all(
+      'SELECT id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at, course_id FROM users WHERE course_id = ? ORDER BY full_name',
+      [courseId],
+      (userErr, users) => {
+        if (userErr) {
+          return handleDbError(res, userErr, 'starosta.users');
+        }
+        db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
+          if (subjectErr) {
+            return handleDbError(res, subjectErr, 'starosta.subjects');
+          }
+          db.all(
+            `
+              SELECT t.id, t.title, t.created_at, s.name AS subject_name,
+                     COUNT(DISTINCT g.id) AS group_count,
+                     COUNT(DISTINCT m.user_id) AS member_count
+              FROM teamwork_tasks t
+              JOIN subjects s ON s.id = t.subject_id
+              LEFT JOIN teamwork_groups g ON g.task_id = t.id
+              LEFT JOIN teamwork_members m ON m.task_id = t.id
+              WHERE t.course_id = ?
+              GROUP BY t.id, t.title, t.created_at, s.name
+              ORDER BY t.created_at DESC
+            `,
+            [courseId],
+            (taskErr, teamworkTasks) => {
+              if (taskErr) {
+                return handleDbError(res, taskErr, 'starosta.teamwork');
+              }
+              db.all(
+                `
+                  SELECT m.*, s.name AS subject_name, u.full_name AS created_by
+                  FROM messages m
+                  LEFT JOIN subjects s ON s.id = m.subject_id
+                  LEFT JOIN users u ON u.id = m.created_by_id
+                  WHERE m.course_id = ?
+                  ORDER BY m.created_at DESC
+                  LIMIT 200
+                `,
+                [courseId],
+                (msgErr, messages) => {
+                  if (msgErr) {
+                    return handleDbError(res, msgErr, 'starosta.messages');
+                  }
+                  return res.render('admin', {
+                    username: req.session.user.username,
+                    userId: req.session.user.id,
+                    role: req.session.role,
+                    schedule: [],
+                    homework: [],
+                    users,
+                    subjects,
+                    studentGroups: [],
+                    logs: [],
+                    teamworkTasks,
+                    adminMessages: messages,
+                    courses,
+                    selectedCourseId: courseId,
+                    limitedStaffView: true,
+                    filters: {
+                      group_number: '',
+                      day: '',
+                      subject: '',
+                      q: '',
+                    },
+                    usersStatus: 'active',
+                    sorts: {
+                      schedule: '',
+                      homework: '',
+                    },
+                  });
+                }
+              );
+            }
+          );
+        });
+      }
+    );
+  });
+});
+
 app.post('/subgroup/join', requireLogin, (req, res) => {
   const { subgroup_id } = req.body;
   const { username } = req.session.user;
@@ -2562,7 +2657,7 @@ app.post('/admin/group/remove', requireAdmin, (req, res) => {
 app.post('/admin/users/role', requireAdmin, (req, res) => {
   const { user_id, role } = req.body;
   const courseId = getAdminCourse(req);
-  if (!user_id || !role || !['student', 'admin', 'starosta'].includes(role)) {
+  if (!user_id || !role || !['student', 'admin', 'starosta', 'deanery'].includes(role)) {
     return res.redirect('/admin?err=Invalid%20role');
   }
   const currentId = req.session.user.id;
@@ -2573,7 +2668,7 @@ app.post('/admin/users/role', requireAdmin, (req, res) => {
     if (err || !user) {
       return res.redirect('/admin?err=User%20not%20found');
     }
-    if (user.role === 'admin' && role === 'student') {
+    if (user.role === 'admin' && role !== 'admin') {
       db.get('SELECT COUNT(*) AS count FROM users WHERE role = ?', ['admin'], (countErr, row) => {
         if (countErr) {
           return res.redirect('/admin?err=Database%20error');

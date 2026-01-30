@@ -197,15 +197,30 @@
     </style>
   </head>
   <body class="theme-light">
+    <% const isLimitedView = typeof limitedStaffView !== 'undefined' && limitedStaffView; %>
     <nav class="navbar navbar-expand-lg admin-nav">
       <div class="container">
-        <span class="navbar-brand">Admin Panel</span>
+        <span class="navbar-brand"><%= isLimitedView ? 'Starosta Panel' : 'Admin Panel' %></span>
         <div class="d-flex align-items-center">
-          <span class="me-3 text-muted">Admin: <%= username %></span>
+          <span class="me-3 text-muted">
+            <% if (role === 'admin') { %>
+              Адмін: <%= username %>
+            <% } else if (role === 'starosta') { %>
+              Староста: <%= username %>
+            <% } else if (role === 'deanery') { %>
+              Деканат: <%= username %>
+            <% } else { %>
+              Користувач: <%= username %>
+            <% } %>
+          </span>
           <button class="btn btn-outline-secondary btn-sm me-2" type="button" id="themeToggle">Dark</button>
-          <form method="POST" action="/admin/switch-to-student" class="me-2">
-            <button class="btn btn-outline-primary btn-sm" type="submit">View as Student</button>
-          </form>
+          <% if (!isLimitedView) { %>
+            <form method="POST" action="/admin/switch-to-student" class="me-2">
+              <button class="btn btn-outline-primary btn-sm" type="submit">View as Student</button>
+            </form>
+          <% } else { %>
+            <a class="btn btn-outline-primary btn-sm me-2" href="/schedule">Back to Schedule</a>
+          <% } %>
           <form method="POST" action="/logout">
             <button class="btn btn-outline-secondary btn-sm" type="submit">Logout</button>
           </form>
@@ -224,18 +239,22 @@
         <div class="alert alert-success"><%= msg.success %></div>
       <% } %>
 
-      <form class="mb-3" method="GET" action="/admin">
-        <div class="d-flex align-items-center gap-2">
-          <label class="form-label mb-0">Course</label>
-          <select name="course" class="form-select w-auto" onchange="this.form.submit()">
-            <% (courses || []).forEach(function(c) { %>
-              <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
-                <%= c.name %>
-              </option>
-            <% }); %>
-          </select>
-        </div>
-      </form>
+      <% if (!isLimitedView) { %>
+        <form class="mb-3" method="GET" action="/admin">
+          <div class="d-flex align-items-center gap-2">
+            <label class="form-label mb-0">Course</label>
+            <select name="course" class="form-select w-auto" onchange="this.form.submit()">
+              <% (courses || []).forEach(function(c) { %>
+                <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
+                  <%= c.name %>
+                </option>
+              <% }); %>
+            </select>
+          </div>
+        </form>
+      <% } else { %>
+        <div class="mb-3 text-muted">Course: <%= courseMap[selectedCourseId] || ('Course ' + selectedCourseId) %></div>
+      <% } %>
 
       <% const groupMap = {}; %>
       <% (studentGroups || []).forEach(function(g) { %>
@@ -246,21 +265,23 @@
       <% (courses || []).forEach(function(c) { courseMap[c.id] = c.name; }); %>
 
       <div class="d-flex flex-wrap gap-2 mb-3">
-        <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-schedule')">
-          Schedule
-        </button>
-        <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-homework')">
-          Homework
-        </button>
-        <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-users')">
-          Users
-        </button>
-        <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-subjects')">
-          Subjects
-        </button>
-        <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-history')">
-          History
-        </button>
+        <% if (!isLimitedView) { %>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-schedule')">
+            Schedule
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-homework')">
+            Homework
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-users')">
+            Users
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-subjects')">
+            Subjects
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-history')">
+            History
+          </button>
+        <% } %>
         <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-teamwork')">
           Teamwork
         </button>
@@ -273,6 +294,7 @@
       </div>
 
       <div class="tab-content">
+        <% if (!isLimitedView) { %>
         <div id="admin-schedule">
           <div class="card mb-4">
             <div class="card-body">
@@ -616,6 +638,7 @@
               <button class="btn btn-outline-primary" type="button" data-role-filter="all">All Roles</button>
               <button class="btn btn-outline-primary" type="button" data-role-filter="admin">Admins</button>
               <button class="btn btn-outline-primary" type="button" data-role-filter="starosta">Starosta</button>
+              <button class="btn btn-outline-primary" type="button" data-role-filter="deanery">Deanery</button>
               <button class="btn btn-outline-primary" type="button" data-role-filter="student">Students</button>
             </div>
           </div>
@@ -660,7 +683,7 @@
                       <% } %>
                     </td>
                     <td><%= u.full_name %></td>
-                    <td><span class="badge text-bg-<%= u.role === 'admin' ? 'primary' : (u.role === 'starosta' ? 'warning' : 'secondary') %>"><%= u.role %></span></td>
+                    <td><span class="badge text-bg-<%= u.role === 'admin' ? 'primary' : (u.role === 'starosta' ? 'warning' : (u.role === 'deanery' ? 'info' : 'secondary')) %>"><%= u.role %></span></td>
                     <td><%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %></td>
                     <td><%= u.schedule_group %></td>
                     <td>
@@ -891,6 +914,7 @@
             </table>
           </div>
         </div>
+        <% } %>
 
         <div id="admin-teamwork">
           <div class="card mb-4">
@@ -1051,7 +1075,9 @@
     <footer class="app-footer text-center py-4">
       <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
     </footer>
-    <button class="btn btn-primary save-all-btn" type="button">Зберегти все</button>
+    <% if (!isLimitedView) { %>
+      <button class="btn btn-primary save-all-btn" type="button">Зберегти все</button>
+    <% } %>
 
     <div class="modal fade" id="userActionsModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog">
@@ -1081,6 +1107,7 @@
                 <select class="form-select" name="role" id="uaRoleSelect" required>
                   <option value="student">student</option>
                   <option value="starosta">starosta</option>
+                  <option value="deanery">deanery</option>
                   <option value="admin">admin</option>
                 </select>
                 <button class="btn btn-outline-primary" type="submit">Save</button>
@@ -1159,7 +1186,10 @@
         themeToggle.textContent = next === 'theme-dark' ? 'Light' : 'Dark';
       });
 
-      const adminSections = ['admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-history', 'admin-teamwork', 'admin-messages'];
+      const limitedStaffView = <%= isLimitedView ? 'true' : 'false' %>;
+      const adminSections = limitedStaffView
+        ? ['admin-teamwork', 'admin-messages']
+        : ['admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-history', 'admin-teamwork', 'admin-messages'];
 
       function toggleSection(id) {
         const el = document.getElementById(id);
@@ -1263,6 +1293,7 @@
                     <select class="form-select form-select-sm" name="role" required>
                       <option value="student" ${u.role === 'student' ? 'selected' : ''}>student</option>
                       <option value="starosta" ${u.role === 'starosta' ? 'selected' : ''}>starosta</option>
+                      <option value="deanery" ${u.role === 'deanery' ? 'selected' : ''}>deanery</option>
                       <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
                     </select>
                     <button class="btn btn-sm btn-outline-primary" type="submit">Save</button>
@@ -1283,7 +1314,7 @@
                   data-user-login="${u.last_login_at || ''}">
                 <td>${checkbox}</td>
                 <td>${u.full_name}</td>
-                <td><span class="badge text-bg-${u.role === 'admin' ? 'primary' : (u.role === 'starosta' ? 'warning' : 'secondary')}">${u.role}</span></td>
+                <td><span class="badge text-bg-${u.role === 'admin' ? 'primary' : (u.role === 'starosta' ? 'warning' : (u.role === 'deanery' ? 'info' : 'secondary'))}">${u.role}</span></td>
                 <td>${courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}</td>
                 <td>${u.schedule_group}</td>
                 <td>${subjectsBtn}</td>
@@ -1324,12 +1355,14 @@
 
       async function refreshUsers() {
         try {
-          const status = document.getElementById('usersTableBody').dataset.status || 'active';
-          const courseId = document.getElementById('usersTableBody').dataset.courseId || '1';
+          const tbodyEl = document.getElementById('usersTableBody');
+          if (!tbodyEl) return;
+          const status = tbodyEl.dataset.status || 'active';
+          const courseId = tbodyEl.dataset.courseId || '1';
           const res = await fetch(`/admin/users.json?status=${encodeURIComponent(status)}&course=${encodeURIComponent(courseId)}`);
           if (!res.ok) return;
           const data = await res.json();
-          const roleFilter = document.getElementById('usersTableBody').dataset.roleFilter || 'all';
+          const roleFilter = tbodyEl.dataset.roleFilter || 'all';
           const filtered = roleFilter === 'all'
             ? data
             : { ...data, users: data.users.filter((u) => u.role === roleFilter) };
@@ -1362,7 +1395,9 @@
         });
       }
 
-      connectUserSocket();
+      if (document.getElementById('usersTableBody')) {
+        connectUserSocket();
+      }
 
       const historyForm = document.querySelector('#admin-history form');
       if (historyForm) {
@@ -1533,6 +1568,7 @@
         btn.addEventListener('click', () => {
           const status = btn.dataset.status;
           const tbody = document.getElementById('usersTableBody');
+          if (!tbody) return;
           tbody.dataset.status = status;
           refreshUsers();
         });
@@ -1542,6 +1578,7 @@
         btn.addEventListener('click', () => {
           const roleFilter = btn.dataset.roleFilter;
           const tbody = document.getElementById('usersTableBody');
+          if (!tbody) return;
           tbody.dataset.roleFilter = roleFilter;
           refreshUsers();
         });
