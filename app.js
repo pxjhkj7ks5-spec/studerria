@@ -2338,6 +2338,78 @@ app.get('/admin', requireAdmin, async (req, res) => {
 });
 });
 
+app.get('/admin/overview', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.overview.init');
+  }
+  const courseId = getAdminCourse(req);
+  let activeSemester = null;
+  try {
+    activeSemester = await getActiveSemester(courseId);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.overview.semester');
+  }
+  try {
+    const courses = await db.all('SELECT id, name FROM courses ORDER BY id');
+    const statsParams = activeSemester ? [courseId, activeSemester.id] : [courseId];
+    const [
+      usersRow,
+      subjectsRow,
+      homeworkRow,
+      teamworkTasksRow,
+      teamworkGroupsRow,
+      teamworkMembersRow,
+    ] = await Promise.all([
+      db.get('SELECT COUNT(*) AS count FROM users WHERE course_id = ?', [courseId]),
+      db.get('SELECT COUNT(*) AS count FROM subjects WHERE course_id = ?', [courseId]),
+      db.get(
+        `SELECT COUNT(*) AS count FROM homework WHERE course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
+        statsParams
+      ),
+      db.get(
+        `SELECT COUNT(*) AS count FROM teamwork_tasks WHERE course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
+        statsParams
+      ),
+      db.get(
+        `SELECT COUNT(*) AS count
+         FROM teamwork_groups g
+         JOIN teamwork_tasks t ON t.id = g.task_id
+         WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
+        statsParams
+      ),
+      db.get(
+        `SELECT COUNT(*) AS count
+         FROM teamwork_members m
+         JOIN teamwork_tasks t ON t.id = m.task_id
+         WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
+        statsParams
+      ),
+    ]);
+
+    const dashboardStats = {
+      users: Number(usersRow?.count || 0),
+      subjects: Number(subjectsRow?.count || 0),
+      homework: Number(homeworkRow?.count || 0),
+      teamworkTasks: Number(teamworkTasksRow?.count || 0),
+      teamworkGroups: Number(teamworkGroupsRow?.count || 0),
+      teamworkMembers: Number(teamworkMembersRow?.count || 0),
+    };
+
+    return res.render('admin-overview', {
+      username: req.session.user.username,
+      role: req.session.role,
+      courses,
+      selectedCourseId: courseId,
+      dashboardStats,
+      limitedStaffView: false,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.overview.stats');
+  }
+});
+
 app.get('/admin/users.json', requireAdmin, async (req, res) => {
   try {
     await ensureDbReady();
