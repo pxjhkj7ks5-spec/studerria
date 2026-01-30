@@ -885,13 +885,13 @@
           <div class="card mb-4">
             <div class="card-body">
               <h5 class="card-title mb-3">Add subject</h5>
-              <form method="POST" action="/admin/subjects/add">
+              <form method="POST" action="/admin/subjects/add" novalidate>
                 <div class="row g-2">
                   <div class="col-12 col-md-5">
-                    <input class="form-control" name="name" placeholder="Subject name" required />
+                    <input class="form-control" name="name" placeholder="Subject name" />
                   </div>
                   <div class="col-12 col-md-2">
-                    <select class="form-select" name="group_count" required>
+                    <select class="form-select" name="group_count">
                       <option value="" disabled selected>Groups</option>
                       <option value="1">1</option>
                       <option value="2">2</option>
@@ -899,14 +899,14 @@
                     </select>
                   </div>
                   <div class="col-12 col-md-2">
-                    <select class="form-select" name="default_group" required>
+                    <select class="form-select" name="default_group">
                       <option value="1" selected>1</option>
                       <option value="2">2</option>
                       <option value="3">3</option>
                     </select>
                   </div>
                   <div class="col-12 col-md-2">
-                    <select class="form-select" name="show_in_teamwork" required>
+                    <select class="form-select" name="show_in_teamwork">
                       <option value="1" selected>Teamwork: Yes</option>
                       <option value="0">Teamwork: No</option>
                     </select>
