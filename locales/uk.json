@@ -62,6 +62,7 @@
   "profile.language": "Мова",
   "language.uk": "Українська",
   "language.en": "English",
+  "auth.remember": "Запам’ятати мене (2 тижні)",
   "role.user": "Студент",
   "admin.title": "Адмін-панель",
   "admin.overview": "Огляд",

@@ -869,7 +869,7 @@ app.post('/_bootstrap', async (req, res) => {
 });
 
 app.post('/login', async (req, res) => {
-  const { full_name, password } = req.body;
+  const { full_name, password, remember_me } = req.body;
   if (!full_name || !password) {
     return res.redirect('/login?error=1');
   }
@@ -927,6 +927,9 @@ app.post('/login', async (req, res) => {
           language: user.language || getPreferredLang(req),
         };
         req.session.role = role;
+        const remember = remember_me === 'on';
+        req.session.rememberMe = remember;
+        req.session.cookie.maxAge = remember ? 14 * 24 * 60 * 60 * 1000 : null;
 
         if (role === 'admin') {
           return res.redirect('/admin');
@@ -942,7 +945,7 @@ app.get('/register', (req, res) => {
 });
 
 app.post('/register', async (req, res) => {
-  const { full_name, password, confirm_password, agree } = req.body;
+  const { full_name, password, confirm_password, agree, remember_me } = req.body;
   if (!full_name || !password || !confirm_password || !agree) {
     return res.redirect('/register?error=Missing%20fields');
   }
@@ -967,6 +970,7 @@ app.post('/register', async (req, res) => {
       return res.redirect('/register?error=Database%20error');
     }
     req.session.pendingUserId = row.id;
+    req.session.rememberMe = remember_me === 'on';
     logAction(db, req, 'register_user', { user_id: row.id, full_name: normalizedName });
     broadcast('users_updated');
     return res.redirect('/register/course');
@@ -1081,7 +1085,13 @@ app.post('/register/subjects', (req, res) => {
             language: user.language || getPreferredLang(req),
           };
           req.session.role = user.role;
+          if (req.session.rememberMe) {
+            req.session.cookie.maxAge = 14 * 24 * 60 * 60 * 1000;
+          } else {
+            req.session.cookie.maxAge = null;
+          }
           req.session.pendingUserId = null;
+          req.session.rememberMe = null;
           logAction(db, req, 'register_subjects', { user_id: user.id });
           broadcast('users_updated');
           return res.redirect('/schedule');

@@ -62,6 +62,7 @@
   "profile.language": "Language",
   "language.uk": "Ukrainian",
   "language.en": "English",
+  "auth.remember": "Remember me (2 weeks)",
   "role.user": "Student",
   "admin.title": "Admin Panel",
   "admin.overview": "Overview",
