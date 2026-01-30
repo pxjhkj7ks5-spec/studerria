@@ -1062,6 +1062,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             group: group || 'A',
             username,
             homework: [],
+            homeworkMeta: {},
             subgroupError: req.query.sg || null,
             role: req.session.role,
             viewAs: req.session.viewAs || null,
@@ -1133,6 +1134,17 @@ app.get('/schedule', requireLogin, async (req, res) => {
               ...hw,
               subgroups: Object.values(hw.subgroups),
             }));
+            const homeworkMeta = {};
+            homework.forEach((hw) => {
+              const key = `${hw.subject_id}|${hw.group_number}|${hw.day}|${hw.class_number}`;
+              if (!homeworkMeta[key]) {
+                homeworkMeta[key] = { count: 0, preview: [] };
+              }
+              homeworkMeta[key].count += 1;
+              if (hw.description && homeworkMeta[key].preview.length < 2) {
+                homeworkMeta[key].preview.push(hw.description);
+              }
+            });
 
             res.render('schedule', {
               scheduleByDay,
@@ -1144,6 +1156,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               group: group || 'A',
               username,
               homework,
+              homeworkMeta,
               subgroupError: req.query.sg || null,
               role: req.session.role,
               viewAs: req.session.viewAs || null,

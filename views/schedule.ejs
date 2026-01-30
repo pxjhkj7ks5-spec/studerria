@@ -94,6 +94,22 @@
         border-radius: 999px;
         font-weight: 700;
       }
+      .hw-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        background: rgba(59, 130, 246, 0.18);
+        border: 1px solid rgba(59, 130, 246, 0.35);
+        color: #dbeafe;
+      }
+      body.theme-light .hw-chip {
+        background: rgba(59, 130, 246, 0.12);
+        color: #1e3a8a;
+      }
       .week-slider {
         position: fixed;
         left: 50%;
@@ -410,6 +426,8 @@
               <% scheduleByDay[day].forEach(function(cls) { %>
                 <% const slot = bellSchedule[cls.class_number]; %>
                 <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : ''; %>
+                <% const hwKey = `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}`; %>
+                <% const hwMeta = homeworkMeta ? homeworkMeta[hwKey] : null; %>
                 <button
                   class="list-group-item list-group-item-action"
                   type="button"
@@ -422,13 +440,23 @@
                   data-classnum="<%= cls.class_number %>"
                   data-groupnum="<%= cls.group_number %>"
                   data-date="<%= cls.class_date %>"
+                  <% if (hwMeta) { %>
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="<%= hwMeta.preview.join(' • ') %>"
+                  <% } %>
                 >
                   <div class="d-flex justify-content-between">
                     <div>
                       <div class="fw-semibold"><%= cls.subject_name %></div>
                       <div class="small muted">Group <%= cls.group_number %> · Class <%= cls.class_number %></div>
                     </div>
-                    <div class="muted small"><%= timeLabel %></div>
+                    <div class="d-flex align-items-center gap-2">
+                      <% if (hwMeta) { %>
+                        <span class="hw-chip">ДЗ <%= hwMeta.count %></span>
+                      <% } %>
+                      <div class="muted small"><%= timeLabel %></div>
+                    </div>
                   </div>
                 </button>
               <% }); %>
@@ -823,6 +851,11 @@
           content.classList.add('enter-active');
           content.classList.remove('enter');
         });
+      });
+
+      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      tooltipTriggerList.forEach((el) => {
+        new bootstrap.Tooltip(el);
       });
 
       async function loadMessages() {
