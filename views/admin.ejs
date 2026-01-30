@@ -676,6 +676,24 @@
                   </div>
                 </div>
                 <div class="row g-2 mt-2">
+                  <div class="col-12 col-md-3">
+                    <input
+                      class="form-control"
+                      type="date"
+                      name="homework_from"
+                      value="<%= (filters && filters.homework_from) || '' %>"
+                    />
+                  </div>
+                  <div class="col-12 col-md-3">
+                    <input
+                      class="form-control"
+                      type="date"
+                      name="homework_to"
+                      value="<%= (filters && filters.homework_to) || '' %>"
+                    />
+                  </div>
+                </div>
+                <div class="row g-2 mt-2">
                   <div class="col-12 col-md-4">
                     <select class="form-select" name="sort_homework">
                       <option value="">Sort homework</option>
@@ -747,6 +765,35 @@
         </div>
 
         <div id="admin-users">
+          <div class="card mb-3">
+            <div class="card-body">
+              <form method="GET" action="/admin">
+                <div class="row g-2 align-items-end">
+                  <div class="col-12 col-md-5">
+                    <label class="form-label">Search by name</label>
+                    <input
+                      class="form-control"
+                      name="users_q"
+                      placeholder="Start typing a name..."
+                      value="<%= (filters && filters.users_q) || '' %>"
+                    />
+                  </div>
+                  <div class="col-12 col-md-3">
+                    <label class="form-label">Schedule group</label>
+                    <input
+                      class="form-control"
+                      name="users_group"
+                      placeholder="A, B, ..."
+                      value="<%= (filters && filters.users_group) || '' %>"
+                    />
+                  </div>
+                  <div class="col-12 col-md-2 d-grid">
+                    <button class="btn btn-outline-primary" type="submit">Filter</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
           <div class="d-flex flex-wrap gap-2 mb-2">
             <button class="btn btn-outline-danger btn-sm" type="submit" form="deleteUsersForm">Delete Selected</button>
             <button
@@ -791,6 +838,8 @@
                 data-status="<%= usersStatus || 'active' %>"
                 data-role-filter="all"
                 data-course-id="<%= selectedCourseId || 1 %>"
+                data-search="<%= (filters && filters.users_q) || '' %>"
+                data-group="<%= (filters && filters.users_group) || '' %>"
               >
                 <% (users || []).forEach(function(u) { %>
                   <tr
@@ -1310,6 +1359,40 @@
           <div class="card mb-4">
             <div class="card-body">
               <h5 class="card-title mb-3">Teamwork tasks</h5>
+              <form method="GET" action="/admin">
+                <div class="row g-2 align-items-end mb-3">
+                  <div class="col-12 col-md-4">
+                    <label class="form-label">Subject</label>
+                    <input
+                      class="form-control"
+                      name="teamwork_subject"
+                      placeholder="Subject name"
+                      value="<%= (filters && filters.teamwork_subject) || '' %>"
+                    />
+                  </div>
+                  <div class="col-12 col-md-3">
+                    <label class="form-label">From</label>
+                    <input
+                      class="form-control"
+                      type="date"
+                      name="teamwork_from"
+                      value="<%= (filters && filters.teamwork_from) || '' %>"
+                    />
+                  </div>
+                  <div class="col-12 col-md-3">
+                    <label class="form-label">To</label>
+                    <input
+                      class="form-control"
+                      type="date"
+                      name="teamwork_to"
+                      value="<%= (filters && filters.teamwork_to) || '' %>"
+                    />
+                  </div>
+                  <div class="col-12 col-md-2 d-grid">
+                    <button class="btn btn-outline-primary" type="submit">Filter</button>
+                  </div>
+                </div>
+              </form>
               <div class="table-responsive">
                 <table class="table table-striped align-middle">
                   <thead>
@@ -1750,7 +1833,13 @@
           if (!tbodyEl) return;
           const status = tbodyEl.dataset.status || 'active';
           const courseId = tbodyEl.dataset.courseId || '1';
-          const res = await fetch(`/admin/users.json?status=${encodeURIComponent(status)}&course=${encodeURIComponent(courseId)}`);
+          const q = tbodyEl.dataset.search || '';
+          const group = tbodyEl.dataset.group || '';
+          const res = await fetch(
+            `/admin/users.json?status=${encodeURIComponent(status)}&course=${encodeURIComponent(courseId)}&q=${encodeURIComponent(
+              q
+            )}&group=${encodeURIComponent(group)}`
+          );
           if (!res.ok) return;
           const data = await res.json();
           const roleFilter = tbodyEl.dataset.roleFilter || 'all';

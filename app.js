@@ -1824,6 +1824,13 @@ app.get('/admin', requireAdmin, async (req, res) => {
     history_from,
     history_to,
     users_status,
+    users_q,
+    users_group,
+    homework_from,
+    homework_to,
+    teamwork_subject,
+    teamwork_from,
+    teamwork_to,
   } = req.query;
   const scheduleFilters = [];
   const scheduleParams = [];
@@ -1895,6 +1902,22 @@ app.get('/admin', requireAdmin, async (req, res) => {
       homeworkFilters.push('(h.description LIKE ? OR h.created_by LIKE ?)');
       homeworkParams.push(`%${q}%`, `%${q}%`);
     }
+    if (homework_from) {
+      const start = new Date(homework_from);
+      if (!Number.isNaN(start.getTime())) {
+        start.setHours(0, 0, 0, 0);
+        homeworkFilters.push('h.created_at >= ?');
+        homeworkParams.push(start.toISOString());
+      }
+    }
+    if (homework_to) {
+      const end = new Date(homework_to);
+      if (!Number.isNaN(end.getTime())) {
+        end.setHours(23, 59, 59, 999);
+        homeworkFilters.push('h.created_at <= ?');
+        homeworkParams.push(end.toISOString());
+      }
+    }
 
     const homeworkWhere = homeworkFilters.length ? `WHERE ${homeworkFilters.join(' AND ')}` : '';
     const homeworkSql = `
@@ -1911,18 +1934,27 @@ app.get('/admin', requireAdmin, async (req, res) => {
       }
       const homework = sortHomework(homeworkRows, sort_homework);
       ensureUsersSchema(() => {
-        const userFilter =
-          users_status === 'inactive'
-            ? 'WHERE is_active = 0'
-            : users_status === 'all'
-            ? ''
-            : usersHasIsActive
-            ? 'WHERE is_active = 1'
-            : '';
-        const courseFilter = userFilter ? `${userFilter} AND course_id = ?` : 'WHERE course_id = ?';
+        const userFilters = ['course_id = ?'];
+        const userParams = [courseId];
+        if (usersHasIsActive) {
+          if (users_status === 'inactive') {
+            userFilters.push('is_active = 0');
+          } else if (users_status !== 'all') {
+            userFilters.push('is_active = 1');
+          }
+        }
+        if (users_q) {
+          userFilters.push('full_name ILIKE ?');
+          userParams.push(`%${users_q}%`);
+        }
+        if (users_group) {
+          userFilters.push('schedule_group = ?');
+          userParams.push(users_group);
+        }
+        const userWhere = userFilters.length ? `WHERE ${userFilters.join(' AND ')}` : '';
         db.all(
-          `SELECT id, full_name, role, schedule_group, course_id, ${usersHasIsActive ? 'is_active,' : ''} last_login_ip, last_user_agent, last_login_at FROM users ${courseFilter} ORDER BY full_name`,
-          [courseId],
+          `SELECT id, full_name, role, schedule_group, course_id, ${usersHasIsActive ? 'is_active,' : ''} last_login_ip, last_user_agent, last_login_at FROM users ${userWhere} ORDER BY full_name`,
+          userParams,
           (userErr, users) => {
             if (userErr) {
               return handleDbError(res, userErr, 'admin.users');
@@ -2031,7 +2063,34 @@ app.get('/admin', requireAdmin, async (req, res) => {
               if (topErr) {
                 return handleDbError(res, topErr, 'admin.activityTop');
               }
-              db.all(
+          const teamworkFilters = ['t.course_id = ?'];
+          const teamworkParams = [courseId];
+          if (activeSemester) {
+            teamworkFilters.push('t.semester_id = ?');
+            teamworkParams.push(activeSemester.id);
+          }
+          if (teamwork_subject) {
+            teamworkFilters.push('s.name ILIKE ?');
+            teamworkParams.push(`%${teamwork_subject}%`);
+          }
+          if (teamwork_from) {
+            const start = new Date(teamwork_from);
+            if (!Number.isNaN(start.getTime())) {
+              start.setHours(0, 0, 0, 0);
+              teamworkFilters.push('t.created_at >= ?');
+              teamworkParams.push(start.toISOString());
+            }
+          }
+          if (teamwork_to) {
+            const end = new Date(teamwork_to);
+            if (!Number.isNaN(end.getTime())) {
+              end.setHours(23, 59, 59, 999);
+              teamworkFilters.push('t.created_at <= ?');
+              teamworkParams.push(end.toISOString());
+            }
+          }
+          const teamworkWhere = teamworkFilters.length ? `WHERE ${teamworkFilters.join(' AND ')}` : '';
+          db.all(
                         `
                           SELECT t.id, t.title, t.created_at, s.name AS subject_name,
                                  COUNT(DISTINCT g.id) AS group_count,
@@ -2040,11 +2099,11 @@ app.get('/admin', requireAdmin, async (req, res) => {
                           JOIN subjects s ON s.id = t.subject_id
                           LEFT JOIN teamwork_groups g ON g.task_id = t.id
                           LEFT JOIN teamwork_members m ON m.task_id = t.id
-                          WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}
+                          ${teamworkWhere}
                           GROUP BY t.id, t.title, t.created_at, s.name
                           ORDER BY t.created_at DESC
                         `,
-                        activeSemester ? [courseId, activeSemester.id] : [courseId],
+                        teamworkParams,
                         (taskErr, teamworkTasks) => {
                           if (taskErr) {
                             return handleDbError(res, taskErr, 'admin.teamwork');
@@ -2134,12 +2193,19 @@ app.get('/admin', requireAdmin, async (req, res) => {
                                     activeSemester,
                                     selectedCourseId: courseId,
                                     limitedStaffView: false,
-                                    filters: {
-                                      group_number: group_number || '',
-                                      day: day || '',
-                                      subject: subject || '',
-                                      q: q || '',
-                                    },
+                                filters: {
+                                  group_number: group_number || '',
+                                  day: day || '',
+                                  subject: subject || '',
+                                  q: q || '',
+                                  homework_from: homework_from || '',
+                                  homework_to: homework_to || '',
+                                  users_q: users_q || '',
+                                  users_group: users_group || '',
+                                  teamwork_subject: teamwork_subject || '',
+                                  teamwork_from: teamwork_from || '',
+                                  teamwork_to: teamwork_to || '',
+                                },
                                     usersStatus: users_status || 'active',
                                     sorts: {
                                       schedule: sort_schedule || '',
@@ -2195,22 +2261,33 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
     return res.status(500).json({ error: 'Database error' });
   }
   const status = req.query.status;
+  const q = req.query.q;
+  const group = req.query.group;
   const courseId = getAdminCourse(req);
   ensureUsersSchema(() => {
-    const userFilter =
-      status === 'inactive'
-        ? 'WHERE is_active = 0'
-        : status === 'all'
-        ? ''
-        : usersHasIsActive
-        ? 'WHERE is_active = 1'
-        : '';
-    const courseFilter = userFilter ? `${userFilter} AND course_id = ?` : 'WHERE course_id = ?';
+    const userFilters = ['course_id = ?'];
+    const userParams = [courseId];
+    if (usersHasIsActive) {
+      if (status === 'inactive') {
+        userFilters.push('is_active = 0');
+      } else if (status !== 'all') {
+        userFilters.push('is_active = 1');
+      }
+    }
+    if (q) {
+      userFilters.push('full_name ILIKE ?');
+      userParams.push(`%${q}%`);
+    }
+    if (group) {
+      userFilters.push('schedule_group = ?');
+      userParams.push(group);
+    }
+    const userWhere = userFilters.length ? `WHERE ${userFilters.join(' AND ')}` : '';
     const cols = usersHasIsActive ? 'id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at'
       : 'id, full_name, role, schedule_group, last_login_ip, last_user_agent, last_login_at';
     db.all(
-      `SELECT ${cols}, course_id FROM users ${courseFilter} ORDER BY full_name`,
-      [courseId],
+      `SELECT ${cols}, course_id FROM users ${userWhere} ORDER BY full_name`,
+      userParams,
       (userErr, users) => {
         if (userErr) {
           console.error('Database error (admin.users.json.users)', userErr);
