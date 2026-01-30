@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="<%= lang %>">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Admin Panel</title>
+    <title><%= t('admin.title') %></title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -228,36 +228,44 @@
     <% const isLimitedView = typeof limitedStaffView !== 'undefined' && limitedStaffView; %>
     <nav class="navbar navbar-expand-lg admin-nav">
       <div class="container">
-        <span class="navbar-brand"><%= isLimitedView ? 'Starosta Panel' : 'Admin Panel' %></span>
+        <span class="navbar-brand"><%= isLimitedView ? t('admin.starostaPanel') : t('admin.title') %></span>
         <div class="d-flex align-items-center">
           <span class="me-3 text-muted">
             <% if (role === 'admin') { %>
-              Адмін: <%= username %>
+              <%= t('role.admin') %>: <%= username %>
             <% } else if (role === 'starosta') { %>
-              Староста: <%= username %>
+              <%= t('role.starosta') %>: <%= username %>
             <% } else if (role === 'deanery') { %>
-              Деканат: <%= username %>
+              <%= t('role.deanery') %>: <%= username %>
             <% } else { %>
-              Користувач: <%= username %>
+              <%= t('role.user') %>: <%= username %>
             <% } %>
           </span>
-          <button class="btn btn-outline-secondary btn-sm me-2" type="button" id="themeToggle">Dark</button>
+          <button
+            class="btn btn-outline-secondary btn-sm me-2"
+            type="button"
+            id="themeToggle"
+            data-light-label="<%= t('theme.light') %>"
+            data-dark-label="<%= t('theme.dark') %>"
+          >
+            <%= t('theme.dark') %>
+          </button>
           <% if (!isLimitedView) { %>
             <form method="POST" action="/admin/switch-to-student" class="me-2">
-              <button class="btn btn-outline-primary btn-sm" type="submit">View as Student</button>
+              <button class="btn btn-outline-primary btn-sm" type="submit"><%= t('admin.viewAsStudent') %></button>
             </form>
           <% } else { %>
-            <a class="btn btn-outline-primary btn-sm me-2" href="/schedule">Back to Schedule</a>
+            <a class="btn btn-outline-primary btn-sm me-2" href="/schedule"><%= t('admin.backToSchedule') %></a>
           <% } %>
           <form method="POST" action="/logout">
-            <button class="btn btn-outline-secondary btn-sm" type="submit">Logout</button>
+            <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
           </form>
         </div>
       </div>
     </nav>
 
     <main class="container py-4">
-      <h1 class="h3 mb-3">Dashboard</h1>
+      <h1 class="h3 mb-3"><%= t('admin.dashboard') %></h1>
 
       <% const msg = typeof messages !== 'undefined' && messages ? messages : (typeof locals !== 'undefined' ? locals.messages : {}); %>
       <% if (msg && msg.error) { %>
@@ -273,7 +281,7 @@
       <% if (!isLimitedView) { %>
         <form class="mb-3" method="GET" action="/admin">
           <div class="d-flex align-items-center gap-2">
-            <label class="form-label mb-0">Course</label>
+            <label class="form-label mb-0"><%= t('admin.course') %></label>
             <select name="course" class="form-select w-auto" onchange="this.form.submit()">
               <% (courses || []).forEach(function(c) { %>
                 <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
@@ -284,7 +292,7 @@
           </div>
         </form>
       <% } else { %>
-        <div class="mb-3 text-muted">Course: <%= courseMap[selectedCourseId] || ('Course ' + selectedCourseId) %></div>
+        <div class="mb-3 text-muted"><%= t('admin.course') %>: <%= courseMap[selectedCourseId] || ('Course ' + selectedCourseId) %></div>
       <% } %>
 
       <% const stats = dashboardStats || { users: 0, subjects: 0, homework: 0, teamworkTasks: 0, teamworkGroups: 0, teamworkMembers: 0 }; %>
@@ -292,44 +300,44 @@
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
             <div>
-              <h5 class="mb-1">Dashboard overview</h5>
-              <div class="text-muted small">Live stats for the selected course and active semester.</div>
+              <h5 class="mb-1"><%= t('admin.dashboardOverview') %></h5>
+              <div class="text-muted small"><%= t('admin.dashboardSubtitle') %></div>
             </div>
           </div>
           <div class="row g-3 mb-4">
             <div class="col-6 col-lg-2">
               <div class="p-3 rounded-4 border bg-white bg-opacity-75">
-                <div class="text-muted small">Users</div>
+                <div class="text-muted small"><%= t('admin.users') %></div>
                 <div class="h4 mb-0"><%= stats.users %></div>
               </div>
             </div>
             <div class="col-6 col-lg-2">
               <div class="p-3 rounded-4 border bg-white bg-opacity-75">
-                <div class="text-muted small">Subjects</div>
+                <div class="text-muted small"><%= t('admin.subjects') %></div>
                 <div class="h4 mb-0"><%= stats.subjects %></div>
               </div>
             </div>
             <div class="col-6 col-lg-2">
               <div class="p-3 rounded-4 border bg-white bg-opacity-75">
-                <div class="text-muted small">Homework</div>
+                <div class="text-muted small"><%= t('admin.homework') %></div>
                 <div class="h4 mb-0"><%= stats.homework %></div>
               </div>
             </div>
             <div class="col-6 col-lg-2">
               <div class="p-3 rounded-4 border bg-white bg-opacity-75">
-                <div class="text-muted small">Teamwork tasks</div>
+                <div class="text-muted small"><%= t('admin.teamworkTasks') %></div>
                 <div class="h4 mb-0"><%= stats.teamworkTasks %></div>
               </div>
             </div>
             <div class="col-6 col-lg-2">
               <div class="p-3 rounded-4 border bg-white bg-opacity-75">
-                <div class="text-muted small">Teams</div>
+                <div class="text-muted small"><%= t('admin.teamworkGroups') %></div>
                 <div class="h4 mb-0"><%= stats.teamworkGroups %></div>
               </div>
             </div>
             <div class="col-6 col-lg-2">
               <div class="p-3 rounded-4 border bg-white bg-opacity-75">
-                <div class="text-muted small">Members</div>
+                <div class="text-muted small"><%= t('admin.teamworkMembers') %></div>
                 <div class="h4 mb-0"><%= stats.teamworkMembers %></div>
               </div>
             </div>
@@ -338,7 +346,7 @@
             <div class="col-12 col-lg-7">
               <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                  <h6 class="mb-3">Platform activity</h6>
+                  <h6 class="mb-3"><%= t('admin.platformActivity') %></h6>
                   <canvas id="adminStatsChart" height="160"></canvas>
                 </div>
               </div>
@@ -346,7 +354,7 @@
             <div class="col-12 col-lg-5">
               <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                  <h6 class="mb-3">Teamwork distribution</h6>
+                  <h6 class="mb-3"><%= t('admin.teamworkDistribution') %></h6>
                   <canvas id="adminTeamworkChart" height="160"></canvas>
                 </div>
               </div>
@@ -364,38 +372,38 @@
       <div class="d-flex flex-wrap gap-2 mb-3">
         <% if (!isLimitedView) { %>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-schedule')">
-            Schedule
+            <%= t('admin.schedule') %>
           </button>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-homework')">
-            Homework
+            <%= t('admin.homework') %>
           </button>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-users')">
-            Users
+            <%= t('admin.users') %>
           </button>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-subjects')">
-            Subjects
+            <%= t('admin.subjects') %>
           </button>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-semesters')">
-            Semesters
+            <%= t('admin.semesters') %>
           </button>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-courses')">
-            Courses
+            <%= t('admin.courses') %>
           </button>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-history')">
-            History
+            <%= t('admin.history') %>
           </button>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-activity')">
-            Activity
+            <%= t('admin.activity') %>
           </button>
         <% } %>
         <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-teamwork')">
-          Teamwork
+          <%= t('admin.teamwork') %>
         </button>
         <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-messages')">
-          Messages
+          <%= t('admin.messages') %>
         </button>
         <button class="btn btn-outline-secondary btn-sm" type="button" onclick="toggleAllSections()">
-          Show/Hide All
+          <%= t('admin.showHideAll') %>
         </button>
       </div>
 
@@ -404,7 +412,7 @@
         <div id="admin-schedule">
           <div class="card mb-4">
             <div class="card-body">
-              <h5 class="card-title mb-3">Filters</h5>
+              <h5 class="card-title mb-3"><%= t('admin.filters') %></h5>
               <form method="GET" action="/admin">
                 <div class="row g-2">
                   <div class="col-12 col-md-3">
@@ -432,20 +440,20 @@
                     />
                   </div>
                   <div class="col-12 col-md-3 d-grid">
-                    <button class="btn btn-outline-primary" type="submit">Apply</button>
+                    <button class="btn btn-outline-primary" type="submit"><%= t('admin.apply') %></button>
                   </div>
                 </div>
                 <div class="row g-2 mt-2">
                   <div class="col-12 col-md-3">
                     <select class="form-select" name="sort_schedule">
-                      <option value="">Sort schedule</option>
-                      <option value="group" <%= sorts && sorts.schedule === 'group' ? 'selected' : '' %>>Group</option>
-                      <option value="day" <%= sorts && sorts.schedule === 'day' ? 'selected' : '' %>>Day</option>
-                      <option value="time" <%= sorts && sorts.schedule === 'time' ? 'selected' : '' %>>Time</option>
+                      <option value=""><%= t('admin.sortSchedule') %></option>
+                      <option value="group" <%= sorts && sorts.schedule === 'group' ? 'selected' : '' %>><%= t('admin.sortGroup') %></option>
+                      <option value="day" <%= sorts && sorts.schedule === 'day' ? 'selected' : '' %>><%= t('admin.sortDay') %></option>
+                      <option value="time" <%= sorts && sorts.schedule === 'time' ? 'selected' : '' %>><%= t('admin.sortTime') %></option>
                     </select>
                   </div>
                   <div class="col-12 col-md-3 d-grid">
-                    <button class="btn btn-outline-secondary" type="submit">Apply sort</button>
+                    <button class="btn btn-outline-secondary" type="submit"><%= t('admin.applySort') %></button>
                   </div>
                 </div>
               </form>
@@ -640,9 +648,9 @@
           <div class="card mb-4">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="card-title mb-0">Search homework</h5>
+                <h5 class="card-title mb-0"><%= t('admin.searchHomework') %></h5>
                 <form method="POST" action="/admin/homework/migrate">
-                  <button class="btn btn-outline-secondary btn-sm" type="submit">Migrate legacy homework</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.migrateLegacyHomework') %></button>
                 </form>
               </div>
               <form method="GET" action="/admin">
@@ -651,7 +659,7 @@
                     <input
                       class="form-control"
                       name="group_number"
-                      placeholder="Group number"
+                      placeholder="<%= t('admin.groupNumber') %>"
                       value="<%= (filters && filters.group_number) || '' %>"
                     />
                   </div>
@@ -659,7 +667,7 @@
                     <input
                       class="form-control"
                       name="subject"
-                      placeholder="Subject"
+                      placeholder="<%= t('admin.subject') %>"
                       value="<%= (filters && filters.subject) || '' %>"
                     />
                   </div>
@@ -667,12 +675,12 @@
                     <input
                       class="form-control"
                       name="q"
-                      placeholder="Search description or author"
+                      placeholder="<%= t('admin.searchDescAuthor') %>"
                       value="<%= (filters && filters.q) || '' %>"
                     />
                   </div>
                   <div class="col-12 col-md-2 d-grid">
-                    <button class="btn btn-outline-primary" type="submit">Search</button>
+                    <button class="btn btn-outline-primary" type="submit"><%= t('admin.search') %></button>
                   </div>
                 </div>
                 <div class="row g-2 mt-2">
@@ -696,17 +704,17 @@
                 <div class="row g-2 mt-2">
                   <div class="col-12 col-md-4">
                     <select class="form-select" name="sort_homework">
-                      <option value="">Sort homework</option>
+                      <option value=""><%= t('admin.sortHomework') %></option>
                       <option value="created" <%= sorts && sorts.homework === 'created' ? 'selected' : '' %>>
-                        Newest first
+                        <%= t('admin.sortNewest') %>
                       </option>
                       <option value="subject" <%= sorts && sorts.homework === 'subject' ? 'selected' : '' %>>
-                        Subject A-Z
+                        <%= t('admin.sortSubject') %>
                       </option>
                     </select>
                   </div>
                   <div class="col-12 col-md-2 d-grid">
-                    <button class="btn btn-outline-secondary" type="submit">Apply sort</button>
+                    <button class="btn btn-outline-secondary" type="submit"><%= t('admin.applySort') %></button>
                   </div>
                 </div>
               </form>
@@ -717,12 +725,12 @@
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Group #</th>
-                  <th>Class</th>
-                  <th>Description</th>
-                  <th>Day/Class</th>
-                  <th>Created By</th>
-                  <th>Attachment</th>
+                  <th><%= t('admin.groupNumber') %></th>
+                  <th><%= t('admin.classNumber') %></th>
+                  <th><%= t('admin.description') %></th>
+                  <th><%= t('admin.dayClass') %></th>
+                  <th><%= t('admin.createdBy') %></th>
+                  <th><%= t('admin.attachment') %></th>
                   <th></th>
                 </tr>
               </thead>
@@ -753,7 +761,7 @@
                           type="submit"
                           onclick="return confirm('Delete this homework item?');"
                         >
-                          Delete
+                          <%= t('admin.delete') %>
                         </button>
                       </form>
                     </td>
@@ -770,52 +778,52 @@
               <form method="GET" action="/admin">
                 <div class="row g-2 align-items-end">
                   <div class="col-12 col-md-5">
-                    <label class="form-label">Search by name</label>
+                    <label class="form-label"><%= t('admin.searchByName') %></label>
                     <input
                       class="form-control"
                       name="users_q"
-                      placeholder="Start typing a name..."
+                      placeholder="<%= t('admin.searchByNamePlaceholder') %>"
                       value="<%= (filters && filters.users_q) || '' %>"
                     />
                   </div>
                   <div class="col-12 col-md-3">
-                    <label class="form-label">Schedule group</label>
+                    <label class="form-label"><%= t('admin.scheduleGroup') %></label>
                     <input
                       class="form-control"
                       name="users_group"
-                      placeholder="A, B, ..."
+                      placeholder="<%= t('admin.scheduleGroupPlaceholder') %>"
                       value="<%= (filters && filters.users_group) || '' %>"
                     />
                   </div>
                   <div class="col-12 col-md-2 d-grid">
-                    <button class="btn btn-outline-primary" type="submit">Filter</button>
+                    <button class="btn btn-outline-primary" type="submit"><%= t('admin.filter') %></button>
                   </div>
                 </div>
               </form>
             </div>
           </div>
           <div class="d-flex flex-wrap gap-2 mb-2">
-            <button class="btn btn-outline-danger btn-sm" type="submit" form="deleteUsersForm">Delete Selected</button>
+            <button class="btn btn-outline-danger btn-sm" type="submit" form="deleteUsersForm"><%= t('admin.deleteSelected') %></button>
             <button
               class="btn btn-danger btn-sm"
               type="submit"
               form="clearUsersForm"
-              onclick="return confirm('Delete ALL students?');"
+              onclick="return confirm('<%= t('admin.deleteAllConfirm') %>');"
             >
-              Delete All Students
+              <%= t('admin.deleteAllStudents') %>
             </button>
-            <a class="btn btn-outline-secondary btn-sm" href="/admin/export/users.csv">Export Users CSV</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/admin/export/users.csv"><%= t('admin.exportUsers') %></a>
             <div class="btn-group btn-group-sm" role="group">
-              <button class="btn btn-outline-primary" type="button" data-status="active">Active</button>
-              <button class="btn btn-outline-primary" type="button" data-status="inactive">Inactive</button>
-              <button class="btn btn-outline-primary" type="button" data-status="all">All</button>
+              <button class="btn btn-outline-primary" type="button" data-status="active"><%= t('admin.active') %></button>
+              <button class="btn btn-outline-primary" type="button" data-status="inactive"><%= t('admin.inactive') %></button>
+              <button class="btn btn-outline-primary" type="button" data-status="all"><%= t('admin.all') %></button>
             </div>
             <div class="btn-group btn-group-sm" role="group">
-              <button class="btn btn-outline-primary" type="button" data-role-filter="all">All Roles</button>
-              <button class="btn btn-outline-primary" type="button" data-role-filter="admin">Admins</button>
-              <button class="btn btn-outline-primary" type="button" data-role-filter="starosta">Starosta</button>
-              <button class="btn btn-outline-primary" type="button" data-role-filter="deanery">Deanery</button>
-              <button class="btn btn-outline-primary" type="button" data-role-filter="student">Students</button>
+              <button class="btn btn-outline-primary" type="button" data-role-filter="all"><%= t('admin.allRoles') %></button>
+              <button class="btn btn-outline-primary" type="button" data-role-filter="admin"><%= t('admin.admins') %></button>
+              <button class="btn btn-outline-primary" type="button" data-role-filter="starosta"><%= t('admin.starosta') %></button>
+              <button class="btn btn-outline-primary" type="button" data-role-filter="deanery"><%= t('admin.deanery') %></button>
+              <button class="btn btn-outline-primary" type="button" data-role-filter="student"><%= t('admin.students') %></button>
             </div>
           </div>
           <div class="table-responsive">
@@ -823,13 +831,13 @@
               <thead>
                 <tr>
                   <th><input type="checkbox" id="selectAllUsers" /></th>
-                  <th>Name</th>
-                  <th>Role</th>
-                  <th>Course</th>
-                  <th>Schedule Group</th>
-                  <th>Subject Group</th>
-                  <th>Set Group</th>
-                  <th>Actions</th>
+                  <th><%= t('admin.name') %></th>
+                  <th><%= t('admin.role') %></th>
+                  <th><%= t('admin.course') %></th>
+                  <th><%= t('admin.scheduleGroup') %></th>
+                  <th><%= t('admin.subjectGroup') %></th>
+                  <th><%= t('admin.setGroup') %></th>
+                  <th><%= t('admin.actions') %></th>
                 </tr>
               </thead>
               <tbody
@@ -883,7 +891,7 @@
                         data-user-name="<%= u.full_name %>"
                         data-subjects='<%- JSON.stringify(subjectList) %>'
                       >
-                        Subjects (<%= subjectList.length %>)
+                        <%= t('admin.subjects') %> (<%= subjectList.length %>)
                       </button>
                     </td>
                     <td>
@@ -891,7 +899,7 @@
                         <input type="hidden" name="student_id" value="<%= u.id %>" />
                         <div class="col-12 col-md-6">
                           <select class="form-select form-select-sm" name="subject_id" required>
-                            <option value="" disabled selected>Subject</option>
+                            <option value="" disabled selected><%= t('admin.subject') %></option>
                             <% (subjects || []).forEach(function(s) { %>
                               <option value="<%= s.id %>"><%= s.name %> (1–<%= s.group_count %>)</option>
                             <% }); %>
@@ -901,21 +909,21 @@
                           <input class="form-control form-control-sm" name="group_number" type="number" min="1" max="3" required />
                         </div>
                         <div class="col-12 col-md-3 d-grid">
-                          <button class="btn btn-sm btn-outline-primary" type="submit">Save</button>
+                          <button class="btn btn-sm btn-outline-primary" type="submit"><%= t('admin.save') %></button>
                         </div>
                       </form>
                     </td>
                     <td>
-                      <button class="btn btn-sm btn-outline-primary user-manage-btn" type="button">Manage</button>
+                      <button class="btn btn-sm btn-outline-primary user-manage-btn" type="button"><%= t('admin.manage') %></button>
                       <% if (u.role !== 'admin' && u.is_active === 0) { %>
                         <form method="POST" action="/admin/users/delete-permanent" class="d-inline">
                           <input type="hidden" name="user_id" value="<%= u.id %>" />
                           <button
                             class="btn btn-sm btn-outline-danger ms-2"
                             type="submit"
-                            onclick="return confirm('Permanently delete this user? This cannot be undone.');"
+                            onclick="return confirm('<%= t('admin.deletePermanentConfirm') %>');"
                           >
-                            Delete permanently
+                            <%= t('admin.deletePermanent') %>
                           </button>
                         </form>
                       <% } %>
@@ -1180,7 +1188,7 @@
                     <% }); %>
                     <% if (!(courses || []).length) { %>
                       <tr>
-                        <td colspan="3" class="text-muted">No courses yet.</td>
+                        <td colspan="3" class="text-muted"><%= t('admin.noCourses') %></td>
                       </tr>
                     <% } %>
                   </tbody>
@@ -1193,17 +1201,17 @@
         <div id="admin-history">
           <div class="card mb-4">
             <div class="card-body">
-              <h5 class="card-title mb-3">History filters</h5>
+              <h5 class="card-title mb-3"><%= t('admin.historyFilters') %></h5>
               <form method="GET" action="/admin">
                 <div class="row g-2">
                   <div class="col-12 col-md-3">
-                    <input class="form-control" name="history_actor" placeholder="Actor" value="<%= historyFilters && historyFilters.actor || '' %>" />
+                    <input class="form-control" name="history_actor" placeholder="<%= t('admin.actor') %>" value="<%= historyFilters && historyFilters.actor || '' %>" />
                   </div>
                   <div class="col-12 col-md-3">
-                    <input class="form-control" name="history_action" placeholder="Action" value="<%= historyFilters && historyFilters.action || '' %>" />
+                    <input class="form-control" name="history_action" placeholder="<%= t('admin.action') %>" value="<%= historyFilters && historyFilters.action || '' %>" />
                   </div>
                   <div class="col-12 col-md-3">
-                    <input class="form-control" name="history_q" placeholder="Details contains" value="<%= historyFilters && historyFilters.q || '' %>" />
+                    <input class="form-control" name="history_q" placeholder="<%= t('admin.detailsContains') %>" value="<%= historyFilters && historyFilters.q || '' %>" />
                   </div>
                   <div class="col-6 col-md-1">
                     <input class="form-control" type="date" name="history_from" value="<%= historyFilters && historyFilters.from || '' %>" />
@@ -1212,7 +1220,7 @@
                     <input class="form-control" type="date" name="history_to" value="<%= historyFilters && historyFilters.to || '' %>" />
                   </div>
                   <div class="col-12 col-md-1 d-grid">
-                    <button class="btn btn-outline-primary" type="submit">Filter</button>
+                    <button class="btn btn-outline-primary" type="submit"><%= t('admin.filter') %></button>
                   </div>
                 </div>
               </form>
@@ -1221,7 +1229,7 @@
                   class="btn btn-outline-secondary btn-sm"
                   href="/admin/history.csv?history_actor=<%= encodeURIComponent(historyFilters && historyFilters.actor || '') %>&history_action=<%= encodeURIComponent(historyFilters && historyFilters.action || '') %>&history_q=<%= encodeURIComponent(historyFilters && historyFilters.q || '') %>&history_from=<%= encodeURIComponent(historyFilters && historyFilters.from || '') %>&history_to=<%= encodeURIComponent(historyFilters && historyFilters.to || '') %>"
                 >
-                  Export History CSV
+                  <%= t('admin.exportHistory') %>
                 </a>
               </div>
             </div>
@@ -1231,10 +1239,10 @@
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Actor</th>
-                  <th>Action</th>
-                  <th>Details</th>
-                  <th>Time</th>
+                  <th><%= t('admin.actor') %></th>
+                  <th><%= t('admin.action') %></th>
+                  <th><%= t('admin.details') %></th>
+                  <th><%= t('admin.time') %></th>
                 </tr>
               </thead>
               <tbody id="historyTableBody">
@@ -1256,27 +1264,27 @@
         <div id="admin-activity">
           <div class="card mb-4">
             <div class="card-body">
-              <h5 class="card-title mb-3">Activity log</h5>
+              <h5 class="card-title mb-3"><%= t('admin.activityLog') %></h5>
               <form method="GET" action="/admin">
                 <div class="row g-2 align-items-end">
                   <div class="col-12 col-md-3">
-                    <label class="form-label">User</label>
-                    <input class="form-control" name="activity_user" placeholder="User name" value="<%= activityFilters && activityFilters.user ? activityFilters.user : '' %>" />
+                    <label class="form-label"><%= t('admin.user') %></label>
+                    <input class="form-control" name="activity_user" placeholder="<%= t('admin.userName') %>" value="<%= activityFilters && activityFilters.user ? activityFilters.user : '' %>" />
                   </div>
                   <div class="col-12 col-md-3">
-                    <label class="form-label">Action</label>
-                    <input class="form-control" name="activity_action" placeholder="e.g. homework_create" value="<%= activityFilters && activityFilters.action ? activityFilters.action : '' %>" />
+                    <label class="form-label"><%= t('admin.action') %></label>
+                    <input class="form-control" name="activity_action" placeholder="<%= t('admin.actionPlaceholder') %>" value="<%= activityFilters && activityFilters.action ? activityFilters.action : '' %>" />
                   </div>
                   <div class="col-12 col-md-2">
-                    <label class="form-label">From</label>
+                    <label class="form-label"><%= t('admin.from') %></label>
                     <input class="form-control" type="date" name="activity_from" value="<%= activityFilters && activityFilters.from ? activityFilters.from : '' %>" />
                   </div>
                   <div class="col-12 col-md-2">
-                    <label class="form-label">To</label>
+                    <label class="form-label"><%= t('admin.to') %></label>
                     <input class="form-control" type="date" name="activity_to" value="<%= activityFilters && activityFilters.to ? activityFilters.to : '' %>" />
                   </div>
                   <div class="col-12 col-md-2 d-grid">
-                    <button class="btn btn-outline-primary" type="submit">Filter</button>
+                    <button class="btn btn-outline-primary" type="submit"><%= t('admin.filter') %></button>
                   </div>
                 </div>
               </form>
@@ -1285,15 +1293,15 @@
 
           <div class="card mb-4">
             <div class="card-body">
-              <h6 class="mb-3">Top active students (this semester)</h6>
+              <h6 class="mb-3"><%= t('admin.topActive') %></h6>
               <div class="table-responsive">
                 <table class="table table-sm align-middle">
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>User</th>
-                      <th>Points</th>
-                      <th>Actions</th>
+                      <th><%= t('admin.user') %></th>
+                      <th><%= t('admin.points') %></th>
+                      <th><%= t('admin.actions') %></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1307,7 +1315,7 @@
                     <% }); %>
                     <% if (!(activityTop || []).length) { %>
                       <tr>
-                        <td colspan="4" class="text-muted">No activity points yet.</td>
+                        <td colspan="4" class="text-muted"><%= t('admin.noActivity') %></td>
                       </tr>
                     <% } %>
                   </tbody>
@@ -1323,11 +1331,11 @@
                   <thead>
                     <tr>
                       <th>ID</th>
-                      <th>User</th>
-                      <th>Action</th>
-                      <th>Target</th>
-                      <th>Details</th>
-                      <th>Created</th>
+                      <th><%= t('admin.user') %></th>
+                      <th><%= t('admin.action') %></th>
+                      <th><%= t('admin.target') %></th>
+                      <th><%= t('admin.details') %></th>
+                      <th><%= t('admin.created') %></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1343,7 +1351,7 @@
                     <% }); %>
                     <% if (!(activityLogs || []).length) { %>
                       <tr>
-                        <td colspan="6" class="text-muted">No activity yet.</td>
+                        <td colspan="6" class="text-muted"><%= t('admin.noActivityLog') %></td>
                       </tr>
                     <% } %>
                   </tbody>
@@ -1358,20 +1366,20 @@
         <div id="admin-teamwork">
           <div class="card mb-4">
             <div class="card-body">
-              <h5 class="card-title mb-3">Teamwork tasks</h5>
+              <h5 class="card-title mb-3"><%= t('admin.teamworkTasks') %></h5>
               <form method="GET" action="/admin">
                 <div class="row g-2 align-items-end mb-3">
                   <div class="col-12 col-md-4">
-                    <label class="form-label">Subject</label>
+                    <label class="form-label"><%= t('admin.subject') %></label>
                     <input
                       class="form-control"
                       name="teamwork_subject"
-                      placeholder="Subject name"
+                      placeholder="<%= t('admin.subjectPlaceholder') %>"
                       value="<%= (filters && filters.teamwork_subject) || '' %>"
                     />
                   </div>
                   <div class="col-12 col-md-3">
-                    <label class="form-label">From</label>
+                    <label class="form-label"><%= t('admin.from') %></label>
                     <input
                       class="form-control"
                       type="date"
@@ -1380,7 +1388,7 @@
                     />
                   </div>
                   <div class="col-12 col-md-3">
-                    <label class="form-label">To</label>
+                    <label class="form-label"><%= t('admin.to') %></label>
                     <input
                       class="form-control"
                       type="date"
@@ -1389,7 +1397,7 @@
                     />
                   </div>
                   <div class="col-12 col-md-2 d-grid">
-                    <button class="btn btn-outline-primary" type="submit">Filter</button>
+                    <button class="btn btn-outline-primary" type="submit"><%= t('admin.filter') %></button>
                   </div>
                 </div>
               </form>
@@ -1398,11 +1406,11 @@
                   <thead>
                     <tr>
                       <th>ID</th>
-                      <th>Subject</th>
-                      <th>Title</th>
-                      <th>Groups</th>
-                      <th>Members</th>
-                      <th>Created</th>
+                      <th><%= t('admin.subject') %></th>
+                      <th><%= t('admin.titleLabel') %></th>
+                      <th><%= t('admin.groups') %></th>
+                      <th><%= t('admin.members') %></th>
+                      <th><%= t('admin.created') %></th>
                       <th></th>
                     </tr>
                   </thead>
@@ -1422,7 +1430,7 @@
                               type="submit"
                               onclick="return confirm('Delete this teamwork task?');"
                             >
-                              Delete
+                              <%= t('admin.delete') %>
                             </button>
                           </form>
                         </td>
@@ -1430,7 +1438,7 @@
                     <% }); %>
                     <% if (!(teamworkTasks || []).length) { %>
                       <tr>
-                        <td colspan="7" class="text-muted">No teamwork tasks yet.</td>
+                        <td colspan="7" class="text-muted"><%= t('admin.noTeamwork') %></td>
                       </tr>
                     <% } %>
                   </tbody>
@@ -1443,37 +1451,37 @@
         <div id="admin-messages">
           <div class="card mb-4">
             <div class="card-body">
-              <h5 class="card-title mb-3">Send message</h5>
+              <h5 class="card-title mb-3"><%= t('admin.sendMessage') %></h5>
               <form method="POST" action="/admin/messages/send">
                 <div class="row g-2 mb-2">
                   <div class="col-12">
-                    <textarea class="form-control" name="body" rows="3" placeholder="Message text" required></textarea>
+                    <textarea class="form-control" name="body" rows="3" placeholder="<%= t('admin.messagePlaceholder') %>" required></textarea>
                   </div>
                 </div>
                 <div class="row g-2 align-items-end">
                   <div class="col-12 col-md-4">
-                    <label class="form-label">Target</label>
+                    <label class="form-label"><%= t('admin.target') %></label>
                     <select class="form-select" name="target_type" id="messageTargetType">
-                      <option value="all">All students</option>
-                      <option value="subject">Specific subject group</option>
-                      <option value="users">Specific users</option>
+                      <option value="all"><%= t('admin.targetAll') %></option>
+                      <option value="subject"><%= t('admin.targetSubjectGroup') %></option>
+                      <option value="users"><%= t('admin.targetUsers') %></option>
                     </select>
                   </div>
                   <div class="col-12 col-md-4">
-                    <label class="form-label">Subject</label>
+                    <label class="form-label"><%= t('admin.subject') %></label>
                     <select class="form-select" name="subject_id" id="messageSubjectSelect">
-                      <option value="" disabled selected>Select subject</option>
+                      <option value="" disabled selected><%= t('admin.selectSubject') %></option>
                       <% (subjects || []).forEach(function(s) { %>
                         <option value="<%= s.id %>"><%= s.name %></option>
                       <% }); %>
                     </select>
                   </div>
                   <div class="col-12 col-md-2">
-                    <label class="form-label">Group</label>
+                    <label class="form-label"><%= t('admin.group') %></label>
                     <input class="form-control" type="number" min="1" max="3" name="group_number" id="messageGroupInput" placeholder="1-3" />
                   </div>
                   <div class="col-12 col-md-2 d-grid">
-                    <button class="btn btn-primary" type="submit">Send</button>
+                    <button class="btn btn-primary" type="submit"><%= t('admin.send') %></button>
                   </div>
                 </div>
                 <div class="row g-2 mt-2">
@@ -1649,15 +1657,17 @@
     <script>
       const themeToggle = document.getElementById('themeToggle');
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
+      const labelLight = themeToggle.dataset.lightLabel || 'Light';
+      const labelDark = themeToggle.dataset.darkLabel || 'Dark';
       document.body.classList.remove('theme-light', 'theme-dark');
       document.body.classList.add(savedTheme);
-      themeToggle.textContent = savedTheme === 'theme-dark' ? 'Light' : 'Dark';
+      themeToggle.textContent = savedTheme === 'theme-dark' ? labelLight : labelDark;
       themeToggle.addEventListener('click', () => {
         const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
         document.body.classList.remove('theme-light', 'theme-dark');
         document.body.classList.add(next);
         localStorage.setItem('ui-theme', next);
-        themeToggle.textContent = next === 'theme-dark' ? 'Light' : 'Dark';
+        themeToggle.textContent = next === 'theme-dark' ? labelLight : labelDark;
       });
 
       const limitedStaffView = <%= isLimitedView ? 'true' : 'false' %>;
