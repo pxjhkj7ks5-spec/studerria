@@ -380,10 +380,31 @@ const initDb = async () => {
 
 let initPromise;
 const ensureDbReady = async () => {
-  if (!initPromise) {
-    initPromise = initDb();
+  if (initPromise) {
+    return initPromise;
   }
-  return initPromise;
+  initPromise = (async () => {
+    const maxAttempts = 8;
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        await initDb();
+        return true;
+      } catch (err) {
+        lastError = err;
+        const delay = Math.min(1000 * 2 ** (attempt - 1), 15000);
+        console.error(`DB init attempt ${attempt} failed, retrying in ${delay}ms`, err);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+    throw lastError;
+  })();
+  try {
+    return await initPromise;
+  } catch (err) {
+    initPromise = null;
+    throw err;
+  }
 };
 
 const storage = multer.diskStorage({
@@ -2576,7 +2597,7 @@ app.post('/logout', (req, res) => {
 
 const startServer = () => {
   server.listen(PORT, () => console.log(`Listening on ${PORT}`));
-  initDb().catch((err) => {
+  ensureDbReady().catch((err) => {
     console.error('Failed to initialize database', err);
   });
 };
