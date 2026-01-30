@@ -423,8 +423,14 @@
       <% } %>
 
       <% daysOfWeek.forEach(function(day) { %>
+        <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString('uk-UA') : ''; %>
         <div class="card mb-3 glass day-card">
-          <div class="card-header fw-semibold text-white"><%= day %></div>
+          <div class="card-header fw-semibold text-white d-flex justify-content-between align-items-center">
+            <span><%= day %></span>
+            <% if (dateLabel) { %>
+              <span class="small muted"><%= dateLabel %></span>
+            <% } %>
+          </div>
           <div class="list-group list-group-flush">
             <% if (!scheduleByDay[day] || scheduleByDay[day].length === 0) { %>
               <div class="list-group-item muted">No classes</div>

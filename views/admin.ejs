@@ -374,11 +374,19 @@
                       value="<%= (filters && filters.subject) || '' %>"
                     />
                   </div>
-                  <div class="col-12 col-md-3 d-grid">
-                    <button class="btn btn-outline-primary" type="submit"><%= t('admin.apply') %></button>
+                  <div class="col-12 col-md-3">
+                    <input
+                      class="form-control"
+                      type="date"
+                      name="schedule_date"
+                      value="<%= (filters && filters.schedule_date) || '' %>"
+                    />
                   </div>
                 </div>
                 <div class="row g-2 mt-2">
+                  <div class="col-12 col-md-3 d-grid">
+                    <button class="btn btn-outline-primary" type="submit"><%= t('admin.apply') %></button>
+                  </div>
                   <div class="col-12 col-md-3">
                     <select class="form-select" name="sort_schedule">
                       <option value=""><%= t('admin.sortSchedule') %></option>
@@ -404,15 +412,15 @@
               <form method="POST" action="/admin/schedule/add">
                 <div class="row g-2">
                   <div class="col-12 col-md-3">
-                    <select class="form-select" name="subject_id" required>
+                    <select class="form-select" id="addSubjectSelect" name="subject_id" required>
                       <option value="" disabled selected>Subject</option>
                       <% (subjects || []).forEach(function(s) { %>
-                        <option value="<%= s.id %>"><%= s.name %> (1–<%= s.group_count %>)</option>
+                        <option value="<%= s.id %>" data-group-count="<%= s.group_count %>"><%= s.name %> (1–<%= s.group_count %>)</option>
                       <% }); %>
                     </select>
                   </div>
                   <div class="col-12 col-md-2">
-                    <select class="form-select" name="group_number" required>
+                    <select class="form-select" id="addGroupSelect" name="group_number" required>
                       <option value="" disabled selected>Group #</option>
                       <option value="1">1</option>
                       <option value="2">2</option>
@@ -2101,6 +2109,27 @@
         }
         if (button) button.disabled = false;
         window.location.reload();
+      }
+
+      const addSubjectSelect = document.getElementById('addSubjectSelect');
+      const addGroupSelect = document.getElementById('addGroupSelect');
+
+      function syncAddGroupSelect() {
+        if (!addSubjectSelect || !addGroupSelect) return;
+        const selected = addSubjectSelect.options[addSubjectSelect.selectedIndex];
+        if (!selected) return;
+        const groupCount = Number(selected.dataset.groupCount || 3);
+        if (groupCount <= 1) {
+          addGroupSelect.value = '1';
+          addGroupSelect.disabled = true;
+        } else {
+          addGroupSelect.disabled = false;
+        }
+      }
+
+      if (addSubjectSelect && addGroupSelect) {
+        addSubjectSelect.addEventListener('change', syncAddGroupSelect);
+        syncAddGroupSelect();
       }
 
       const saveAllBtn = document.querySelector('.save-all-btn');

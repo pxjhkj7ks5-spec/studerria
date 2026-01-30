@@ -673,6 +673,20 @@ function parseDateUTC(dateStr) {
   return Date.UTC(y, m - 1, d);
 }
 
+function getWeekDayForDate(dateStr, semesterStart) {
+  if (!dateStr || !semesterStart) return null;
+  const targetUTC = parseDateUTC(dateStr);
+  const startUTC = parseDateUTC(semesterStart);
+  if (targetUTC === null || startUTC === null) return null;
+  const diffDays = Math.floor((targetUTC - startUTC) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return null;
+  const weekNumber = Math.floor(diffDays / 7) + 1;
+  const dayIndex = diffDays % 7;
+  const dayName = daysOfWeek[dayIndex];
+  if (!dayName) return null;
+  return { weekNumber, dayName };
+}
+
 function getAcademicWeekForSemester(date, semester) {
   if (!semester || !semester.start_date) return 1;
   const startUTC = parseDateUTC(semester.start_date);
@@ -1181,12 +1195,21 @@ app.get('/schedule', requireLogin, async (req, res) => {
       daysOfWeek.forEach((day) => {
         scheduleByDay[day] = [];
       });
+      const dayDates = {};
+      daysOfWeek.forEach((day) => {
+        dayDates[day] = getDateForWeekDay(
+          selectedWeek,
+          day,
+          activeSemester ? activeSemester.start_date : null
+        );
+      });
 
       const loadHomework = () => {
         if (!studentGroups.length) {
           return res.render('schedule', {
             scheduleByDay,
             daysOfWeek,
+            dayDates,
             currentWeek: selectedWeek,
             totalWeeks,
             semester: activeSemester,
@@ -1281,6 +1304,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             res.render('schedule', {
               scheduleByDay,
               daysOfWeek,
+              dayDates,
               currentWeek: selectedWeek,
               totalWeeks,
               semester: activeSemester,
@@ -1934,6 +1958,7 @@ app.get('/admin', requireAdmin, async (req, res) => {
     teamwork_subject,
     teamwork_from,
     teamwork_to,
+    schedule_date,
   } = req.query;
   const scheduleFilters = [];
   const scheduleParams = [];
@@ -1962,6 +1987,15 @@ app.get('/admin', requireAdmin, async (req, res) => {
   if (subject) {
     scheduleFilters.push('s.name LIKE ?');
     scheduleParams.push(`%${subject}%`);
+  }
+  if (schedule_date && activeSemester && activeSemester.start_date) {
+    const mapped = getWeekDayForDate(schedule_date, activeSemester.start_date);
+    if (mapped) {
+      scheduleFilters.push('se.week_number = ?');
+      scheduleParams.push(mapped.weekNumber);
+      scheduleFilters.push('se.day_of_week = ?');
+      scheduleParams.push(mapped.dayName);
+    }
   }
 
   const scheduleWhere = scheduleFilters.length ? `WHERE ${scheduleFilters.join(' AND ')}` : '';
@@ -2306,6 +2340,7 @@ app.get('/admin', requireAdmin, async (req, res) => {
                                   day: day || '',
                                   subject: subject || '',
                                   q: q || '',
+                                  schedule_date: schedule_date || '',
                                   homework_from: homework_from || '',
                                   homework_to: homework_to || '',
                                   users_q: users_q || '',
