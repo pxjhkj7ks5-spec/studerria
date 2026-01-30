@@ -1,10 +1,11 @@
 {
   "name": "kma",
-  "version": "0.5.34",
+  "version": "0.5.35",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node app.js",
+    "lint": "eslint .",
     "version:patch": "node scripts/version.js patch",
     "version:minor": "node scripts/version.js minor",
     "version:release": "node scripts/version.js release"
@@ -21,5 +22,8 @@
     "multer": "^2.0.2",
     "pg": "^8.17.2",
     "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.9.0"
   }
 }
