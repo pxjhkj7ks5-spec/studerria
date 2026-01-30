@@ -2330,6 +2330,7 @@ app.get('/admin', requireAdmin, async (req, res) => {
     );
   });
 });
+});
 
 app.get('/admin/users.json', requireAdmin, async (req, res) => {
   try {
