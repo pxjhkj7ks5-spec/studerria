@@ -20,6 +20,49 @@ try {
   // keep package.json version as fallback
 }
 const buildStamp = new Date().toISOString();
+const localesDir = path.join(__dirname, 'locales');
+const locales = {};
+['en', 'uk'].forEach((code) => {
+  try {
+    const raw = fs.readFileSync(path.join(localesDir, `${code}.json`), 'utf8');
+    locales[code] = JSON.parse(raw);
+  } catch (err) {
+    locales[code] = {};
+  }
+});
+
+const getPreferredLang = (req) => {
+  const queryLang = typeof req.query.lang === 'string' ? req.query.lang.toLowerCase() : '';
+  if (queryLang && locales[queryLang]) {
+    req.session.lang = queryLang;
+    return queryLang;
+  }
+  if (req.session && req.session.user && req.session.user.language && locales[req.session.user.language]) {
+    return req.session.user.language;
+  }
+  if (req.session && req.session.lang && locales[req.session.lang]) {
+    return req.session.lang;
+  }
+  const header = req.headers['accept-language'];
+  if (typeof header === 'string' && header.length) {
+    const preferred = header.split(',')[0].trim().slice(0, 2).toLowerCase();
+    if (locales[preferred]) return preferred;
+  }
+  return locales.uk ? 'uk' : 'en';
+};
+
+const translate = (lang, key) => {
+  if (!key) return '';
+  const dict = locales[lang] || {};
+  if (dict && Object.prototype.hasOwnProperty.call(dict, key)) {
+    return dict[key];
+  }
+  const fallback = locales.en || {};
+  if (fallback && Object.prototype.hasOwnProperty.call(fallback, key)) {
+    return fallback[key];
+  }
+  return key;
+};
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -53,17 +96,6 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
-app.use((req, res, next) => {
-  res.locals.messages = {
-    error: req.query && req.query.err ? req.query.err : '',
-    success: req.query && req.query.ok ? req.query.ok : '',
-  };
-  res.locals.appVersion = appVersion;
-  res.locals.buildStamp = buildStamp;
-  res.locals.authorName = 'Andrii Marchenko';
-  next();
-});
-
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
@@ -71,6 +103,20 @@ app.use(
     saveUninitialized: false,
   })
 );
+
+app.use((req, res, next) => {
+  const lang = getPreferredLang(req);
+  res.locals.messages = {
+    error: req.query && req.query.err ? req.query.err : '',
+    success: req.query && req.query.ok ? req.query.ok : '',
+  };
+  res.locals.appVersion = appVersion;
+  res.locals.buildStamp = buildStamp;
+  res.locals.authorName = 'Andrii Marchenko';
+  res.locals.lang = lang;
+  res.locals.t = (key) => translate(lang, key);
+  next();
+});
 
 const pool = new Pool({
   host: process.env.DB_HOST || `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
@@ -186,8 +232,8 @@ const ensureUser = async (fullName, role, passwordHash, options = {}) => {
   const existing = await db.get('SELECT id, password_hash, role FROM users WHERE full_name = ?', [fullName]);
   if (!existing) {
     await db.run(
-      'INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [fullName, role, passwordHash, 1, 'A', courseId]
+      'INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id, language) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [fullName, role, passwordHash, 1, 'A', courseId, 'uk']
     );
     return;
   }
@@ -235,7 +281,8 @@ const initDb = async () => {
         last_user_agent TEXT,
         last_login_at TEXT,
         schedule_group TEXT NOT NULL DEFAULT 'A',
-        course_id INTEGER REFERENCES courses(id)
+        course_id INTEGER REFERENCES courses(id),
+        language TEXT
       )
     `,
     `
@@ -423,6 +470,7 @@ const initDb = async () => {
 
   const alters = [
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS language TEXT',
     'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
@@ -442,6 +490,7 @@ const initDb = async () => {
   }
 
   await pool.query('UPDATE users SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query("UPDATE users SET language = 'uk' WHERE language IS NULL");
   await pool.query('UPDATE subjects SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE schedule_entries SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE homework SET course_id = 1 WHERE course_id IS NULL');
@@ -798,7 +847,7 @@ app.post('/login', async (req, res) => {
     const normalizedName = full_name.trim().replace(/\s+/g, ' ');
     const activeClause = usersHasIsActive ? ' AND is_active = 1' : '';
     db.get(
-      `SELECT id, full_name, role, password_hash, schedule_group, course_id FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
+      `SELECT id, full_name, role, password_hash, schedule_group, course_id, language FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
       [normalizedName],
       (err, user) => {
         const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
@@ -819,6 +868,7 @@ app.post('/login', async (req, res) => {
           username: user.full_name,
           schedule_group: user.schedule_group,
           course_id: user.course_id || 1,
+          language: user.language || getPreferredLang(req),
         };
         req.session.role = user.role;
 
@@ -852,9 +902,10 @@ app.post('/register', async (req, res) => {
       return res.redirect('/register?error=User%20already%20exists');
     }
     const hash = await bcrypt.hash(password, 10);
+    const preferredLang = getPreferredLang(req);
     const row = await db.get(
-      'INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
-      [normalizedName, 'student', hash, 1, 'A', null]
+      'INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id, language) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
+      [normalizedName, 'student', hash, 1, 'A', null, preferredLang]
     );
     if (!row || !row.id) {
       return res.redirect('/register?error=Database%20error');
@@ -962,7 +1013,7 @@ app.post('/register/subjects', (req, res) => {
         }
       });
       stmt.finalize(() => {
-        db.get('SELECT id, full_name, role, schedule_group, course_id FROM users WHERE id = ?', [userId], (uErr2, user) => {
+        db.get('SELECT id, full_name, role, schedule_group, course_id, language FROM users WHERE id = ?', [userId], (uErr2, user) => {
           if (uErr2 || !user) {
             return res.redirect('/login');
           }
@@ -971,6 +1022,7 @@ app.post('/register/subjects', (req, res) => {
             username: user.full_name,
             schedule_group: user.schedule_group,
             course_id: user.course_id || 1,
+            language: user.language || getPreferredLang(req),
           };
           req.session.role = user.role;
           req.session.pendingUserId = null;
@@ -991,7 +1043,7 @@ app.get('/profile', requireLogin, async (req, res) => {
   }
   const { id } = req.session.user;
   try {
-    const user = await db.get('SELECT id, full_name, course_id FROM users WHERE id = ?', [id]);
+    const user = await db.get('SELECT id, full_name, course_id, language FROM users WHERE id = ?', [id]);
     if (!user) {
       return res.status(500).send('Database error');
     }
@@ -1017,7 +1069,7 @@ app.get('/profile', requireLogin, async (req, res) => {
 });
 
 app.post('/profile', requireLogin, (req, res) => {
-  const { full_name, password, confirm_password } = req.body;
+  const { full_name, password, confirm_password, language } = req.body;
   const { id } = req.session.user;
   if (!full_name) {
     return res.redirect('/profile?error=Full%20name%20required');
@@ -1037,12 +1089,21 @@ app.post('/profile', requireLogin, (req, res) => {
     params.push(hash);
   }
 
+  if (language && ['uk', 'en'].includes(language)) {
+    updates.push('language = ?');
+    params.push(language);
+  }
+
   params.push(id);
   db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params, (err) => {
     if (err) {
       return res.redirect('/profile?error=Name%20already%20exists');
     }
     req.session.user.username = full_name.trim();
+    if (language && ['uk', 'en'].includes(language)) {
+      req.session.user.language = language;
+      req.session.lang = language;
+    }
     logAction(db, req, 'update_profile', { user_id: id });
     broadcast('users_updated');
     return res.redirect('/profile?ok=Profile%20updated');

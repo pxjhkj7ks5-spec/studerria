@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="<%= lang %>">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Edit Profile</title>
+    <title><%= t('profile.title') %></title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -128,7 +128,7 @@
         <div class="col-12 col-md-6">
           <div class="card auth-card">
             <div class="card-body p-4">
-              <h1 class="h4 mb-3">Edit Profile</h1>
+              <h1 class="h4 mb-3"><%= t('profile.title') %></h1>
 
               <% if (error) { %>
                 <div class="alert alert-danger"><%= error %></div>
@@ -138,32 +138,47 @@
               <% } %>
 
               <div class="d-flex align-items-center justify-content-between mb-3">
-                <div class="text-muted small">Activity points (this semester)</div>
+                <div class="text-muted small"><%= t('profile.activity') %></div>
                 <span class="activity-badge"><%= typeof activityPoints !== 'undefined' ? activityPoints : 0 %></span>
               </div>
 
               <form method="POST" action="/profile">
                 <div class="mb-3">
-                  <label for="full_name" class="form-label">Full Name</label>
+                  <label for="full_name" class="form-label"><%= t('profile.fullName') %></label>
                   <input id="full_name" name="full_name" class="form-control" value="<%= user.full_name %>" required />
                 </div>
                 <div class="mb-3">
-                  <label for="password" class="form-label">New Password</label>
+                  <label for="password" class="form-label"><%= t('profile.newPassword') %></label>
                   <input id="password" name="password" type="password" class="form-control" />
                 </div>
                 <div class="mb-3">
-                  <label for="confirm_password" class="form-label">Confirm New Password</label>
+                  <label for="confirm_password" class="form-label"><%= t('profile.confirmPassword') %></label>
                   <input id="confirm_password" name="confirm_password" type="password" class="form-control" />
                 </div>
+                <div class="mb-3">
+                  <label for="language" class="form-label"><%= t('profile.language') %></label>
+                  <select id="language" name="language" class="form-select">
+                    <option value="uk" <%= (user.language || 'uk') === 'uk' ? 'selected' : '' %>><%= t('language.uk') %></option>
+                    <option value="en" <%= (user.language || 'uk') === 'en' ? 'selected' : '' %>><%= t('language.en') %></option>
+                  </select>
+                </div>
                 <div class="d-grid gap-2">
-                  <button class="btn btn-primary" type="submit">Save changes</button>
-                  <a href="/schedule" class="btn btn-outline-secondary">Back to schedule</a>
+                  <button class="btn btn-primary" type="submit"><%= t('profile.save') %></button>
+                  <a href="/schedule" class="btn btn-outline-secondary"><%= t('profile.back') %></a>
                 </div>
               </form>
             </div>
           </div>
           <div class="d-flex justify-content-center mt-3">
-            <button class="btn btn-outline-secondary btn-sm" type="button" id="themeToggle">Dark</button>
+            <button
+              class="btn btn-outline-secondary btn-sm"
+              type="button"
+              id="themeToggle"
+              data-light-label="<%= t('theme.light') %>"
+              data-dark-label="<%= t('theme.dark') %>"
+            >
+              <%= t('theme.dark') %>
+            </button>
           </div>
           <footer class="app-footer text-center mt-3">
             <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
@@ -176,13 +191,13 @@
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
       document.body.classList.remove('theme-light', 'theme-dark');
       document.body.classList.add(savedTheme);
-      themeToggle.textContent = savedTheme === 'theme-dark' ? 'Light' : 'Dark';
+      themeToggle.textContent = savedTheme === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
       themeToggle.addEventListener('click', () => {
         const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
         document.body.classList.remove('theme-light', 'theme-dark');
         document.body.classList.add(next);
         localStorage.setItem('ui-theme', next);
-        themeToggle.textContent = next === 'theme-dark' ? 'Light' : 'Dark';
+        themeToggle.textContent = next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
       });
     </script>
   </body>

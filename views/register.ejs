@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="<%= lang %>">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Register</title>
+    <title><%= t('register.title') %></title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -125,7 +125,7 @@
         <div class="col-11 col-sm-8 col-md-6 col-lg-4">
           <div class="card auth-card">
             <div class="card-body p-4">
-              <h1 class="h4 mb-3 text-center">Register</h1>
+              <h1 class="h4 mb-3 text-center"><%= t('register.title') %></h1>
 
               <% if (error) { %>
               <div class="alert alert-danger" role="alert"><%= error %></div>
@@ -133,41 +133,49 @@
 
               <form id="registerForm" method="POST" action="/register">
                 <div class="mb-3">
-                  <label for="full_name" class="form-label">Full Name</label>
-                  <input id="full_name" name="full_name" class="form-control" placeholder="Enter your full name" required />
+                  <label for="full_name" class="form-label"><%= t('register.fullName') %></label>
+                  <input id="full_name" name="full_name" class="form-control" placeholder="<%= t('register.fullNamePlaceholder') %>" required />
                 </div>
                 <div class="mb-3">
-                  <label for="password" class="form-label">Password</label>
-                  <input id="password" name="password" type="password" class="form-control" placeholder="Create a password" required />
+                  <label for="password" class="form-label"><%= t('register.password') %></label>
+                  <input id="password" name="password" type="password" class="form-control" placeholder="<%= t('register.passwordPlaceholder') %>" required />
                 </div>
                 <div class="mb-3">
-                  <label for="confirm_password" class="form-label">Confirm Password</label>
-                  <input id="confirm_password" name="confirm_password" type="password" class="form-control" placeholder="Repeat your password" required />
+                  <label for="confirm_password" class="form-label"><%= t('register.confirmPassword') %></label>
+                  <input id="confirm_password" name="confirm_password" type="password" class="form-control" placeholder="<%= t('register.confirmPasswordPlaceholder') %>" required />
                 </div>
           <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" id="agree" name="agree" required />
             <label class="form-check-label" for="agree">
-              Я погоджуюсь на обробку моїх персональних даних відповідно до умов, викладених нижче.
+              <%= t('register.agree') %>
               <button
                 type="button"
                 class="btn btn-link btn-sm p-0 align-baseline ms-1"
                 data-bs-toggle="modal"
                 data-bs-target="#privacyModal"
               >
-                Докладніше
+                <%= t('register.more') %>
               </button>
             </label>
           </div>
-                <button type="submit" class="btn btn-primary w-100">Continue</button>
+                <button type="submit" class="btn btn-primary w-100"><%= t('register.continue') %></button>
               </form>
 
               <div class="text-center mt-3">
-                <a href="/login">Already have an account? Login</a>
+                <a href="/login"><%= t('register.haveAccount') %></a>
               </div>
             </div>
           </div>
           <div class="d-flex justify-content-center mt-3">
-            <button class="btn btn-outline-secondary btn-sm theme-toggle-btn" type="button" id="themeToggle">Dark</button>
+            <button
+              class="btn btn-outline-secondary btn-sm theme-toggle-btn"
+              type="button"
+              id="themeToggle"
+              data-light-label="<%= t('theme.light') %>"
+              data-dark-label="<%= t('theme.dark') %>"
+            >
+              <%= t('theme.dark') %>
+            </button>
           </div>
           <footer class="app-footer text-center mt-3">
             <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
@@ -179,25 +187,21 @@
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Згода на обробку персональних даних</h5>
+            <h5 class="modal-title"><%= t('register.modalTitle') %></h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <p>Я, користувач, надаю згоду адміністрації платформи на обробку моїх персональних даних, зокрема:</p>
+            <p><%= t('register.modalIntro') %></p>
             <ul>
-              <li>ПІБ;</li>
-              <li>логін та пароль (в зашифрованому вигляді);</li>
-              <li>обрана навчальна група та курс;</li>
-              <li>активність на платформі (розклад, командна робота, повідомлення тощо).</li>
+              <li><%= t('register.modalItem1') %></li>
+              <li><%= t('register.modalItem2') %></li>
+              <li><%= t('register.modalItem3') %></li>
+              <li><%= t('register.modalItem4') %></li>
             </ul>
-            <p>
-              Дані обробляються виключно з метою надання доступу до функцій навчального порталу та не
-              передаються третім особам. Згода діє протягом усього періоду використання сервісу та може
-              бути відкликана за запитом.
-            </p>
+            <p><%= t('register.modalOutro') %></p>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Закрити</button>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><%= t('register.modalClose') %></button>
           </div>
         </div>
       </div>
@@ -216,13 +220,13 @@
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
       document.body.classList.remove('theme-light', 'theme-dark');
       document.body.classList.add(savedTheme);
-      themeToggle.textContent = savedTheme === 'theme-dark' ? 'Light' : 'Dark';
+      themeToggle.textContent = savedTheme === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
       themeToggle.addEventListener('click', () => {
         const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
         document.body.classList.remove('theme-light', 'theme-dark');
         document.body.classList.add(next);
         localStorage.setItem('ui-theme', next);
-        themeToggle.textContent = next === 'theme-dark' ? 'Light' : 'Dark';
+        themeToggle.textContent = next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
       });
     </script>
   </body>
