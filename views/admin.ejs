@@ -239,6 +239,9 @@
         <div class="alert alert-success"><%= msg.success %></div>
       <% } %>
 
+      <% const courseMap = {}; %>
+      <% (courses || []).forEach(function(c) { courseMap[c.id] = c.name; }); %>
+
       <% if (!isLimitedView) { %>
         <form class="mb-3" method="GET" action="/admin">
           <div class="d-flex align-items-center gap-2">
@@ -261,8 +264,6 @@
         <% if (!groupMap[g.student_id]) { groupMap[g.student_id] = {}; } %>
         <% groupMap[g.student_id][g.subject_id] = g.group_number; %>
       <% }); %>
-      <% const courseMap = {}; %>
-      <% (courses || []).forEach(function(c) { courseMap[c.id] = c.name; }); %>
 
       <div class="d-flex flex-wrap gap-2 mb-3">
         <% if (!isLimitedView) { %>

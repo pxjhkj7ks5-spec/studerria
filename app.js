@@ -578,6 +578,13 @@ function requireStaff(req, res, next) {
   return next();
 }
 
+function requireDeanery(req, res, next) {
+  if (!req.session.user || req.session.role !== 'deanery') {
+    return res.redirect('/schedule');
+  }
+  return next();
+}
+
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 function parseDateUTC(dateStr) {
@@ -2428,6 +2435,10 @@ app.get('/starosta', requireStaff, async (req, res) => {
       }
     );
   });
+});
+
+app.get('/deanery', requireDeanery, (req, res) => {
+  res.render('deanery', { username: req.session.user.username });
 });
 
 app.post('/subgroup/join', requireLogin, (req, res) => {
