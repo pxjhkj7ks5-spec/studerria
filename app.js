@@ -306,6 +306,20 @@ const initDb = async () => {
       )
     `,
     `
+      CREATE TABLE IF NOT EXISTS activity_log (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER,
+        user_name TEXT,
+        action_type TEXT NOT NULL,
+        target_type TEXT,
+        target_id INTEGER,
+        details TEXT,
+        created_at TEXT NOT NULL,
+        course_id INTEGER REFERENCES courses(id),
+        semester_id INTEGER REFERENCES semesters(id)
+      )
+    `,
+    `
       CREATE TABLE IF NOT EXISTS login_history (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -420,6 +434,8 @@ const initDb = async () => {
     'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE messages ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE messages ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
+    'ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
   ];
   for (const statement of alters) {
     await pool.query(statement);
@@ -632,6 +648,34 @@ function logAction(dbRef, req, action, details) {
     [actorId, actorName, action, details ? JSON.stringify(details) : null, createdAt, courseId]
   );
   broadcast('history_updated');
+}
+
+function logActivity(dbRef, req, actionType, targetType, targetId, details, courseIdOverride, semesterIdOverride) {
+  const userId = req.session.user ? req.session.user.id : null;
+  const userName = req.session.user ? req.session.user.username : null;
+  const courseId = Number.isFinite(courseIdOverride)
+    ? courseIdOverride
+    : req.session && req.session.adminCourse
+    ? Number(req.session.adminCourse)
+    : req.session && req.session.user
+    ? req.session.user.course_id || 1
+    : null;
+  const semesterId = Number.isFinite(semesterIdOverride) ? semesterIdOverride : null;
+  const createdAt = new Date().toISOString();
+  dbRef.run(
+    'INSERT INTO activity_log (user_id, user_name, action_type, target_type, target_id, details, created_at, course_id, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      userId,
+      userName,
+      actionType,
+      targetType,
+      targetId,
+      details ? JSON.stringify(details) : null,
+      createdAt,
+      courseId,
+      semesterId,
+    ]
+  );
 }
 
 function handleDbError(res, err, label) {
@@ -1328,6 +1372,8 @@ app.post('/teamwork/task/create', requireLogin, async (req, res) => {
     if (!groupRow || !groupRow.id) {
       return res.redirect(`/teamwork?subject_id=${subjectId}&err=Group%20create%20failed`);
     }
+    logActivity(db, req, 'teamwork_task_create', 'teamwork_task', taskRow.id, { subject_id: subjectId }, courseId || 1, activeSemester.id);
+    logActivity(db, req, 'teamwork_group_create', 'teamwork_group', groupRow.id, { task_id: taskRow.id }, courseId || 1, activeSemester.id);
     await db.run(
       'INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)',
       [taskRow.id, groupRow.id, userId, createdAt]
@@ -1791,10 +1837,10 @@ app.get('/admin', requireAdmin, async (req, res) => {
     const homeworkParams = [];
     homeworkFilters.push('h.course_id = ?');
     homeworkParams.push(courseId);
-    if (activeSemester) {
-      homeworkFilters.push('h.semester_id = ?');
-      homeworkParams.push(activeSemester.id);
-    }
+  if (activeSemester) {
+    homeworkFilters.push('h.semester_id = ?');
+    homeworkParams.push(activeSemester.id);
+  }
     if (group_number) {
       homeworkFilters.push('h.group_number = ?');
       homeworkParams.push(group_number);
@@ -1882,14 +1928,50 @@ app.get('/admin', requireAdmin, async (req, res) => {
                     historyParams.push(end.toISOString());
                   }
                   const historyWhere = historyFilters.length ? `WHERE ${historyFilters.join(' AND ')}` : '';
-                  db.all(
-                    `SELECT * FROM history_log ${historyWhere} ORDER BY created_at DESC LIMIT 500`,
-                    historyParams,
-                    (logErr, logs) => {
-                      if (logErr) {
-                        return handleDbError(res, logErr, 'admin.history');
-                      }
-                      db.all(
+  db.all(
+    `SELECT * FROM history_log ${historyWhere} ORDER BY created_at DESC LIMIT 500`,
+    historyParams,
+    (logErr, logs) => {
+      if (logErr) {
+        return handleDbError(res, logErr, 'admin.history');
+      }
+      const activityFilters = [];
+      const activityParams = [];
+      activityFilters.push('course_id = ?');
+      activityParams.push(courseId);
+      if (req.query.activity_user) {
+        activityFilters.push('user_name ILIKE ?');
+        activityParams.push(`%${req.query.activity_user}%`);
+      }
+      if (req.query.activity_action) {
+        activityFilters.push('action_type = ?');
+        activityParams.push(req.query.activity_action);
+      }
+      if (req.query.activity_from) {
+        const start = new Date(req.query.activity_from);
+        start.setHours(0, 0, 0, 0);
+        activityFilters.push('created_at >= ?');
+        activityParams.push(start.toISOString());
+      }
+      if (req.query.activity_to) {
+        const end = new Date(req.query.activity_to);
+        end.setHours(23, 59, 59, 999);
+        activityFilters.push('created_at <= ?');
+        activityParams.push(end.toISOString());
+      }
+      if (activeSemester) {
+        activityFilters.push('semester_id = ?');
+        activityParams.push(activeSemester.id);
+      }
+      const activityWhere = activityFilters.length ? `WHERE ${activityFilters.join(' AND ')}` : '';
+      db.all(
+        `SELECT * FROM activity_log ${activityWhere} ORDER BY created_at DESC LIMIT 500`,
+        activityParams,
+        (actErr, activityLogs) => {
+          if (actErr) {
+            return handleDbError(res, actErr, 'admin.activity');
+          }
+          db.all(
                         `
                           SELECT t.id, t.title, t.created_at, s.name AS subject_name,
                                  COUNT(DISTINCT g.id) AS group_count,
@@ -1932,6 +2014,7 @@ app.get('/admin', requireAdmin, async (req, res) => {
                                 subjects,
                                 studentGroups,
                                 logs,
+                                activityLogs,
                                 teamworkTasks,
                                 adminMessages: messages,
                                 courses,
@@ -1956,6 +2039,12 @@ app.get('/admin', requireAdmin, async (req, res) => {
                                   q: history_q || '',
                                   from: history_from || '',
                                   to: history_to || '',
+                                },
+                                activityFilters: {
+                                  user: req.query.activity_user || '',
+                                  action: req.query.activity_action || '',
+                                  from: req.query.activity_from || '',
+                                  to: req.query.activity_to || '',
                                 },
                                 messages: {
                                   error: req.query.err || '',
@@ -2252,11 +2341,12 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), async (req,
       return res.status(400).send('Invalid subject');
     }
 
-    db.run(
+    db.get(
       `
         INSERT INTO homework
         (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
       `,
       [
         group,
@@ -2279,13 +2369,23 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), async (req,
         courseId || 1,
         activeSemester ? activeSemester.id : null,
       ],
-      (err) => {
+      (err, row) => {
         if (err) {
           if (req.file) {
             fs.unlink(req.file.path, () => {});
           }
           return res.status(500).send('Database error');
         }
+        logActivity(
+          db,
+          req,
+          'homework_create',
+          'homework',
+          row && row.id ? row.id : null,
+          { subject_id: subjectId, group_number: groupNum, day_of_week, class_number: classNum },
+          courseId || 1,
+          activeSemester ? activeSemester.id : null
+        );
         return res.redirect('/schedule');
       }
     );
@@ -2543,6 +2643,14 @@ app.post('/admin/schedule/add', requireAdmin, (req, res) => {
         weeks: uniqueWeeks,
         semester_id: semesterId,
       });
+      logActivity(db, req, 'schedule_add', 'schedule', null, {
+        subject_id,
+        group_number: groupNum,
+        day_of_week,
+        class_number: classNum,
+        weeks: uniqueWeeks,
+        semester_id: semesterId,
+      });
       return res.redirect('/admin?ok=Class%20added');
     });
   });
@@ -2587,6 +2695,14 @@ app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
           return res.redirect('/admin?err=Database%20error');
         }
         logAction(db, req, 'schedule_edit', { id, subject_id, group_number: groupNum, day_of_week, class_number: classNum, week_number: weekNum, semester_id: semesterId });
+        logActivity(db, req, 'schedule_edit', 'schedule', Number(id) || null, {
+          subject_id,
+          group_number: groupNum,
+          day_of_week,
+          class_number: classNum,
+          week_number: weekNum,
+          semester_id: semesterId,
+        });
         return res.redirect('/admin?ok=Class%20updated');
       }
     );
@@ -2600,6 +2716,7 @@ app.post('/admin/schedule/delete/:id', requireAdmin, (req, res) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
+    logActivity(db, req, 'schedule_delete', 'schedule', Number(id) || null, null, courseId);
     logAction(db, req, 'schedule_delete', { id });
     return res.redirect('/admin?ok=Class%20deleted');
   });
@@ -2617,6 +2734,7 @@ app.post('/admin/schedule/delete-multiple', requireAdmin, (req, res) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
+    logActivity(db, req, 'schedule_delete_multiple', 'schedule', null, { ids: list }, courseId);
     logAction(db, req, 'schedule_delete_multiple', { ids: list });
     return res.redirect('/admin?ok=Selected%20classes%20deleted');
   });
@@ -2628,6 +2746,7 @@ app.post('/admin/schedule/clear-all', requireAdmin, (req, res) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
+    logActivity(db, req, 'schedule_clear_all', 'schedule', null, null, courseId);
     logAction(db, req, 'schedule_clear_all');
     return res.redirect('/admin?ok=Schedule%20cleared');
   });
@@ -2663,6 +2782,7 @@ app.post('/admin/homework/delete/:id', requireAdmin, (req, res) => {
               const absPath = path.join(__dirname, relativePath);
               fs.unlink(absPath, () => {});
             }
+            logActivity(db, req, 'homework_delete', 'homework', Number(id) || null, null);
             logAction(db, req, 'homework_delete', { id });
             return res.redirect('/admin?ok=Homework%20deleted');
           });
@@ -2714,6 +2834,7 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
       return res.redirect('/admin?err=Database%20error');
     }
     logAction(db, req, 'subject_add', { name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag });
+    logActivity(db, req, 'subject_add', 'subject', null, { name, group_count: count, default_group: def }, courseId);
     return res.redirect('/admin?ok=Subject%20added');
     }
   );
@@ -2740,6 +2861,7 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
         return res.redirect('/admin?err=Database%20error');
       }
       logAction(db, req, 'subject_edit', { id, name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag });
+      logActivity(db, req, 'subject_edit', 'subject', Number(id) || null, { name, group_count: count, default_group: def }, courseId);
       return res.redirect('/admin?ok=Subject%20updated');
     }
   );
@@ -2757,6 +2879,7 @@ app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
         return res.redirect('/admin?err=Database%20error');
       }
       logAction(db, req, 'subject_delete', { id });
+      logActivity(db, req, 'subject_delete', 'subject', Number(id) || null, null, courseId);
       return res.redirect('/admin?ok=Subject%20deleted');
     });
   });
@@ -2982,6 +3105,7 @@ app.post('/admin/student-groups/set', requireAdmin, (req, res) => {
           return res.redirect('/admin?err=Database%20error');
         }
         logAction(db, req, 'student_group_set', { student_id, subject_id, group_number: groupNum });
+        logActivity(db, req, 'group_set', 'student_group', null, { student_id, subject_id, group_number: groupNum }, courseId);
         broadcast('users_updated');
         return res.redirect('/admin?ok=Group%20updated');
       }
@@ -3002,6 +3126,7 @@ app.post('/admin/group/remove', requireAdmin, (req, res) => {
       return res.redirect('/admin?err=Database%20error');
     }
     logAction(db, req, 'student_group_remove', { student_id, subject_id });
+    logActivity(db, req, 'group_remove', 'student_group', null, { student_id, subject_id }, getAdminCourse(req));
     broadcast('users_updated');
     return res.redirect('/admin?ok=Subject%20removed');
   }

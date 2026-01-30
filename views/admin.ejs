@@ -316,6 +316,9 @@
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-history')">
             History
           </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-activity')">
+            Activity
+          </button>
         <% } %>
         <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-teamwork')">
           Teamwork
@@ -1131,6 +1134,75 @@
             </table>
           </div>
         </div>
+
+        <% if (!isLimitedView) { %>
+        <div id="admin-activity">
+          <div class="card mb-4">
+            <div class="card-body">
+              <h5 class="card-title mb-3">Activity log</h5>
+              <form method="GET" action="/admin">
+                <div class="row g-2 align-items-end">
+                  <div class="col-12 col-md-3">
+                    <label class="form-label">User</label>
+                    <input class="form-control" name="activity_user" placeholder="User name" value="<%= activityFilters && activityFilters.user ? activityFilters.user : '' %>" />
+                  </div>
+                  <div class="col-12 col-md-3">
+                    <label class="form-label">Action</label>
+                    <input class="form-control" name="activity_action" placeholder="e.g. homework_create" value="<%= activityFilters && activityFilters.action ? activityFilters.action : '' %>" />
+                  </div>
+                  <div class="col-12 col-md-2">
+                    <label class="form-label">From</label>
+                    <input class="form-control" type="date" name="activity_from" value="<%= activityFilters && activityFilters.from ? activityFilters.from : '' %>" />
+                  </div>
+                  <div class="col-12 col-md-2">
+                    <label class="form-label">To</label>
+                    <input class="form-control" type="date" name="activity_to" value="<%= activityFilters && activityFilters.to ? activityFilters.to : '' %>" />
+                  </div>
+                  <div class="col-12 col-md-2 d-grid">
+                    <button class="btn btn-outline-primary" type="submit">Filter</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>User</th>
+                      <th>Action</th>
+                      <th>Target</th>
+                      <th>Details</th>
+                      <th>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% (activityLogs || []).forEach(function(a) { %>
+                      <tr>
+                        <td><%= a.id %></td>
+                        <td><%= a.user_name || '-' %></td>
+                        <td><%= a.action_type %></td>
+                        <td><%= a.target_type || '-' %> <%= a.target_id ? '#' + a.target_id : '' %></td>
+                        <td><%= a.details || '-' %></td>
+                        <td><%= a.created_at %></td>
+                      </tr>
+                    <% }); %>
+                    <% if (!(activityLogs || []).length) { %>
+                      <tr>
+                        <td colspan="6" class="text-muted">No activity yet.</td>
+                      </tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <% } %>
         <% } %>
 
         <div id="admin-teamwork">
@@ -1406,7 +1478,7 @@
       const limitedStaffView = <%= isLimitedView ? 'true' : 'false' %>;
       const adminSections = limitedStaffView
         ? ['admin-teamwork', 'admin-messages']
-        : ['admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-history', 'admin-teamwork', 'admin-messages'];
+        : ['admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-history', 'admin-activity', 'admin-teamwork', 'admin-messages'];
 
       function toggleSection(id) {
         const el = document.getElementById(id);
