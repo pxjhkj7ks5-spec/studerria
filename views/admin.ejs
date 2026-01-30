@@ -1168,6 +1168,39 @@
 
           <div class="card mb-4">
             <div class="card-body">
+              <h6 class="mb-3">Top active students (this semester)</h6>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>User</th>
+                      <th>Points</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% (activityTop || []).forEach(function(row, idx) { %>
+                      <tr>
+                        <td><%= idx + 1 %></td>
+                        <td><%= row.user_name || '-' %></td>
+                        <td><%= row.points || 0 %></td>
+                        <td><%= row.actions_count || 0 %></td>
+                      </tr>
+                    <% }); %>
+                    <% if (!(activityTop || []).length) { %>
+                      <tr>
+                        <td colspan="4" class="text-muted">No activity points yet.</td>
+                      </tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="card-body">
               <div class="table-responsive">
                 <table class="table table-striped align-middle">
                   <thead>

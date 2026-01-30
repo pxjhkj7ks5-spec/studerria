@@ -95,6 +95,22 @@
         transform: translateY(0);
         box-shadow: none;
       }
+      .activity-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        font-weight: 600;
+        background: rgba(59, 130, 246, 0.15);
+        color: #1d4ed8;
+        border: 1px solid rgba(59, 130, 246, 0.35);
+      }
+      body.theme-dark .activity-badge {
+        background: rgba(59, 130, 246, 0.2);
+        color: #e2e8f0;
+        border-color: rgba(255, 255, 255, 0.2);
+      }
       .app-footer {
         font-size: 0.8rem;
       }
@@ -120,6 +136,11 @@
               <% if (success) { %>
                 <div class="alert alert-success"><%= success %></div>
               <% } %>
+
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="text-muted small">Activity points (this semester)</div>
+                <span class="activity-badge"><%= typeof activityPoints !== 'undefined' ? activityPoints : 0 %></span>
+              </div>
 
               <form method="POST" action="/profile">
                 <div class="mb-3">

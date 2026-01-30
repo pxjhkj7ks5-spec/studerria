@@ -678,6 +678,12 @@ function logActivity(dbRef, req, actionType, targetType, targetId, details, cour
   );
 }
 
+const ACTIVITY_POINTS_CASE =
+  "CASE WHEN action_type = 'homework_create' THEN 1 " +
+  "WHEN action_type = 'teamwork_task_create' THEN 2 " +
+  "WHEN action_type = 'teamwork_group_create' THEN 1 " +
+  "ELSE 0 END";
+
 function handleDbError(res, err, label) {
   console.error(`Database error (${label})`, err);
   if (process.env.DB_DEBUG === 'true') {
@@ -977,14 +983,37 @@ app.post('/register/subjects', (req, res) => {
   });
 });
 
-app.get('/profile', requireLogin, (req, res) => {
+app.get('/profile', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'profile.init');
+  }
   const { id } = req.session.user;
-  db.get('SELECT id, full_name FROM users WHERE id = ?', [id], (err, user) => {
-    if (err || !user) {
+  try {
+    const user = await db.get('SELECT id, full_name, course_id FROM users WHERE id = ?', [id]);
+    if (!user) {
       return res.status(500).send('Database error');
     }
-    res.render('profile', { user, error: req.query.error || '', success: req.query.ok || '' });
-  });
+    const activeSemester = await getActiveSemester(user.course_id || 1);
+    const pointsRow = await db.get(
+      `
+        SELECT COALESCE(SUM(${ACTIVITY_POINTS_CASE}), 0) AS points
+        FROM activity_log
+        WHERE user_id = ?${activeSemester ? ' AND semester_id = ?' : ''}
+      `,
+      activeSemester ? [id, activeSemester.id] : [id]
+    );
+    const activityPoints = pointsRow ? Number(pointsRow.points || 0) : 0;
+    res.render('profile', {
+      user,
+      activityPoints,
+      error: req.query.error || '',
+      success: req.query.ok || '',
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'profile');
+  }
 });
 
 app.post('/profile', requireLogin, (req, res) => {
@@ -1984,7 +2013,25 @@ app.get('/admin', requireAdmin, async (req, res) => {
           if (actErr) {
             return handleDbError(res, actErr, 'admin.activity');
           }
+          const topParams = activeSemester ? [courseId, activeSemester.id] : [courseId];
           db.all(
+            `
+              SELECT user_id, user_name,
+                     SUM(${ACTIVITY_POINTS_CASE}) AS points,
+                     COUNT(*) AS actions_count
+              FROM activity_log
+              WHERE course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}
+              GROUP BY user_id, user_name
+              HAVING SUM(${ACTIVITY_POINTS_CASE}) > 0
+              ORDER BY points DESC, actions_count DESC, user_name ASC
+              LIMIT 5
+            `,
+            topParams,
+            (topErr, activityTop) => {
+              if (topErr) {
+                return handleDbError(res, topErr, 'admin.activityTop');
+              }
+              db.all(
                         `
                           SELECT t.id, t.title, t.created_at, s.name AS subject_name,
                                  COUNT(DISTINCT g.id) AS group_count,
@@ -2028,6 +2075,7 @@ app.get('/admin', requireAdmin, async (req, res) => {
                                 studentGroups,
                                 logs,
                                 activityLogs,
+                                activityTop,
                                 teamworkTasks,
                                 adminMessages: messages,
                                 courses,
@@ -2068,6 +2116,8 @@ app.get('/admin', requireAdmin, async (req, res) => {
                           );
                         }
                       );
+            }
+          );
                     }
                   );
                 }
