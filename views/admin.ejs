@@ -1358,16 +1358,16 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <% (teamworkTasks || []).forEach(function(t) { %>
+                    <% (teamworkTasks || []).forEach(function(task) { %>
                       <tr>
-                        <td><%= t.id %></td>
-                        <td><%= t.subject_name %></td>
-                        <td><%= t.title %></td>
-                        <td><%= t.group_count %></td>
-                        <td><%= t.member_count %></td>
-                        <td><%= t.created_at %></td>
+                        <td><%= task.id %></td>
+                        <td><%= task.subject_name %></td>
+                        <td><%= task.title %></td>
+                        <td><%= task.group_count %></td>
+                        <td><%= task.member_count %></td>
+                        <td><%= task.created_at %></td>
                         <td>
-                          <form method="POST" action="/admin/teamwork/delete/<%= t.id %>">
+                          <form method="POST" action="/admin/teamwork/delete/<%= task.id %>">
                             <button
                               class="btn btn-sm btn-outline-danger"
                               type="submit"
