@@ -181,6 +181,50 @@
         background: rgba(59, 130, 246, 0.15);
         color: #0f172a;
       }
+      .custom-tooltip {
+        position: fixed;
+        z-index: 2000;
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.08);
+        color: #f8fafc;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+        line-height: 1.4;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        max-width: 300px;
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity 220ms ease, transform 220ms ease;
+      }
+      .custom-tooltip.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .custom-tooltip::before {
+        content: '';
+        position: absolute;
+        top: -6px;
+        left: 20px;
+        border: 6px solid transparent;
+        border-bottom-color: rgba(255, 255, 255, 0.08);
+      }
+      .custom-tooltip.below::before {
+        top: auto;
+        bottom: -6px;
+        border-bottom-color: transparent;
+        border-top-color: rgba(255, 255, 255, 0.08);
+      }
+      body.theme-light .custom-tooltip {
+        background: rgba(255, 255, 255, 0.85);
+        color: #0f172a;
+      }
+      body.theme-light .custom-tooltip::before {
+        border-bottom-color: rgba(255, 255, 255, 0.85);
+      }
+      body.theme-light .custom-tooltip.below::before {
+        border-top-color: rgba(255, 255, 255, 0.85);
+      }
       body.theme-dark .table {
         color: #f8fafc;
       }
@@ -408,6 +452,56 @@
       }
 
       wireSelectOpenState();
+
+      function showCustomTooltip(el, message) {
+        const existing = document.querySelector(`.custom-tooltip[data-for="${el.id}"]`);
+        if (existing) existing.remove();
+        const tip = document.createElement('div');
+        tip.className = 'custom-tooltip';
+        tip.textContent = message || 'Перевірте поле';
+        if (el.id) tip.dataset.for = el.id;
+        document.body.appendChild(tip);
+
+        const rect = el.getBoundingClientRect();
+        const tipRect = tip.getBoundingClientRect();
+        const margin = 8;
+        let top = rect.top - tipRect.height - margin;
+        let left = rect.left + 12;
+        let placeBelow = false;
+        if (top < 8) {
+          top = rect.bottom + margin;
+          placeBelow = true;
+        }
+        if (left + tipRect.width > window.innerWidth - 8) {
+          left = window.innerWidth - tipRect.width - 8;
+        }
+        tip.style.top = `${Math.max(8, top)}px`;
+        tip.style.left = `${Math.max(8, left)}px`;
+        if (placeBelow) tip.classList.add('below');
+        requestAnimationFrame(() => tip.classList.add('show'));
+        const remove = () => tip.remove();
+        tip.addEventListener('click', remove);
+        setTimeout(remove, 3500);
+      }
+
+      function attachValidationTooltips(root = document) {
+        root.querySelectorAll('input, select, textarea').forEach((el) => {
+          el.addEventListener('invalid', (event) => {
+            event.preventDefault();
+            showCustomTooltip(el, el.validationMessage);
+          });
+          el.addEventListener('input', () => {
+            const existing = document.querySelector(`.custom-tooltip[data-for="${el.id}"]`);
+            if (existing) existing.remove();
+          });
+          el.addEventListener('blur', () => {
+            const existing = document.querySelector(`.custom-tooltip[data-for="${el.id}"]`);
+            if (existing) existing.remove();
+          });
+        });
+      }
+
+      attachValidationTooltips();
 
       const themeToggle = document.getElementById('themeToggle');
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
