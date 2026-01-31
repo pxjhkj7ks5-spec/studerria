@@ -27,15 +27,15 @@
         min-height: 100vh;
       }
       body.theme-light {
-        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.25), transparent 60%),
-          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.25), transparent 60%),
-          linear-gradient(135deg, #eef2ff 0%, #f0f9ff 50%, #fdf4ff 100%);
+        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.18), transparent 60%),
+          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.18), transparent 60%),
+          linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
         color: #0f172a;
       }
       body.theme-dark {
-        background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.25), transparent 60%),
-          radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.2), transparent 60%),
-          linear-gradient(160deg, #050508 0%, #12061a 45%, #1b0f26 100%);
+        background: radial-gradient(1200px 800px at 15% 10%, rgba(59, 130, 246, 0.22), transparent 60%),
+          radial-gradient(1000px 700px at 80% 20%, rgba(14, 165, 233, 0.18), transparent 60%),
+          linear-gradient(160deg, #0b0f1a 0%, #141b30 100%);
         color: #f8fafc;
       }
       body.theme-dark .text-dark {
@@ -57,18 +57,84 @@
         backdrop-filter: blur(20px);
         transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
       }
-      body.theme-dark .card,
-      body.theme-dark .modal-content {
+      body.theme-dark .card {
         background: var(--glass-bg-dark);
         color: #f8fafc;
         border-color: var(--glass-border-dark);
         box-shadow: 0 18px 45px rgba(8, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
       }
-      body.theme-light .card,
-      body.theme-light .modal-content {
+      body.theme-light .card {
         background: var(--glass-bg-light);
         border-color: var(--glass-border-light);
         box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+      }
+      body.modal-open {
+        overflow: hidden;
+      }
+      .modal-backdrop {
+        backdrop-filter: blur(12px);
+        background-color: rgba(0, 0, 0, 0.3);
+        transition: opacity 0.3s ease-in-out;
+      }
+      body.theme-dark .modal-backdrop {
+        background-color: rgba(20, 20, 20, 0.5);
+        backdrop-filter: blur(16px);
+      }
+      body.theme-light .modal-backdrop {
+        background-color: rgba(255, 255, 255, 0.4);
+        backdrop-filter: blur(8px);
+      }
+      .modal.fade .modal-dialog {
+        transform: scale(0.98);
+        transition: transform 240ms ease, opacity 240ms ease;
+        opacity: 0;
+      }
+      .modal.show .modal-dialog {
+        transform: scale(1);
+        opacity: 1;
+      }
+      .modal-content {
+        border-radius: 16px;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      body.theme-dark .modal-content {
+        background: rgba(30, 30, 30, 0.5);
+        color: #f8fafc;
+      }
+      body.theme-light .modal-content {
+        background: rgba(255, 255, 255, 0.75);
+        color: #0f172a;
+        border-color: rgba(15, 23, 42, 0.12);
+        box-shadow: 0 0 24px rgba(15, 23, 42, 0.18);
+      }
+      select.form-select {
+        appearance: none;
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+        padding: 10px 38px 10px 14px;
+        border: none;
+        color: inherit;
+        transition: box-shadow 0.2s ease, background 0.2s ease;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        background-size: 16px;
+      }
+      body.theme-light select.form-select {
+        background: rgba(15, 23, 42, 0.05);
+        color: #0f172a;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      }
+      select.form-select:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
+      }
+      body.theme-light select.form-select:focus {
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.2);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
       }
       body.theme-dark .table {
         color: #f8fafc;

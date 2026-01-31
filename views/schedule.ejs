@@ -29,15 +29,15 @@
         transition: background 200ms ease, color 200ms ease;
       }
       body.theme-dark {
-        background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.3), transparent 60%),
-          radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.25), transparent 60%),
-          linear-gradient(160deg, #050508 0%, #12061a 45%, #1b0f26 100%);
+        background: radial-gradient(1200px 800px at 15% 10%, rgba(59, 130, 246, 0.22), transparent 60%),
+          radial-gradient(1000px 700px at 80% 20%, rgba(14, 165, 233, 0.18), transparent 60%),
+          linear-gradient(160deg, #0b0f1a 0%, #141b30 100%);
         color: #f8fafc;
       }
       body.theme-light {
         background: radial-gradient(1000px 700px at 20% 10%, rgba(191, 219, 254, 0.6), transparent 60%),
           radial-gradient(900px 600px at 80% 20%, rgba(224, 231, 255, 0.6), transparent 60%),
-          linear-gradient(150deg, #f8fafc 0%, #eef2ff 45%, #e0f2fe 100%);
+          linear-gradient(150deg, #f8fafc 0%, #f1f5f9 45%, #e2e8f0 100%);
         color: #0f172a;
       }
       body.theme-light .text-white {
@@ -195,19 +195,19 @@
         justify-content: center;
         gap: 12px;
         padding: 10px 16px;
-        border-radius: 999px;
-        backdrop-filter: blur(12px);
+        border-radius: 20px;
+        backdrop-filter: blur(8px);
         z-index: 1050;
       }
       body.theme-dark .week-slider {
-        background: rgba(10, 10, 20, 0.55);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
       }
       body.theme-light .week-slider {
-        background: rgba(255, 255, 255, 0.8);
-        border: 1px solid rgba(15, 23, 42, 0.1);
-        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.6);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
       }
       @media (max-width: 576px) {
         .week-slider {
@@ -215,24 +215,139 @@
         }
       }
       .week-dot {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
         border-radius: 999px;
         border: none;
         background: rgba(255, 255, 255, 0.4);
+        opacity: 0.3;
         cursor: pointer;
         transition: transform 220ms ease, background 220ms ease, width 260ms ease, box-shadow 260ms ease;
       }
       .week-dot:hover {
-        transform: scale(1.1);
+        transform: scale(1.15);
+        opacity: 0.6;
       }
       .week-dot.active {
-        width: 24px;
-        background: linear-gradient(135deg, #a3bfff, #d7e6ff);
-        box-shadow: 0 8px 18px rgba(99, 102, 241, 0.35);
+        width: 28px;
+        height: 8px;
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.85);
+        box-shadow: 0 8px 18px rgba(148, 163, 184, 0.35);
       }
       .week-dot.active {
         transform: scale(1.05);
+      }
+      body.theme-light .week-dot {
+        background: rgba(15, 23, 42, 0.4);
+      }
+      body.theme-light .week-dot.active {
+        background: rgba(15, 23, 42, 0.85);
+      }
+      body.modal-open {
+        overflow: hidden;
+      }
+      .modal-backdrop {
+        backdrop-filter: blur(12px);
+        background-color: rgba(0, 0, 0, 0.3);
+        transition: opacity 0.3s ease-in-out;
+      }
+      body.theme-dark .modal-backdrop {
+        background-color: rgba(20, 20, 20, 0.5);
+        backdrop-filter: blur(16px);
+      }
+      body.theme-light .modal-backdrop {
+        background-color: rgba(255, 255, 255, 0.4);
+        backdrop-filter: blur(8px);
+      }
+      .modal.fade .modal-dialog {
+        transform: scale(0.98);
+        transition: transform 240ms ease, opacity 240ms ease;
+        opacity: 0;
+      }
+      .modal.show .modal-dialog {
+        transform: scale(1);
+        opacity: 1;
+      }
+      .modal-content {
+        border-radius: 16px;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        animation: modalIn 260ms ease;
+      }
+      body.theme-dark .modal-content {
+        background: rgba(30, 30, 30, 0.5);
+        color: #f8fafc;
+      }
+      body.theme-light .modal-content {
+        background: rgba(255, 255, 255, 0.75);
+        color: #0f172a;
+        border-color: rgba(15, 23, 42, 0.12);
+        box-shadow: 0 0 24px rgba(15, 23, 42, 0.18);
+      }
+      @keyframes modalIn {
+        from {
+          transform: scale(0.98);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      button.glass {
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(8px);
+        border-radius: 12px;
+        padding: 10px 20px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+      }
+      body.theme-light button.glass {
+        background: rgba(15, 23, 42, 0.06);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      button.glass:hover {
+        transform: scale(1.02);
+        box-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
+      }
+      select.form-select {
+        appearance: none;
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+        border-radius: 12px;
+        padding: 12px 40px 12px 16px;
+        border: none;
+        color: inherit;
+        font-size: 0.95rem;
+        transition: box-shadow 0.2s ease, background 0.2s ease;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+        background-size: 16px;
+      }
+      body.theme-light select.form-select {
+        background: rgba(15, 23, 42, 0.05);
+        color: #0f172a;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      }
+      select.form-select:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
+      }
+      body.theme-light select.form-select:focus {
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.2);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
+      }
+      select.form-select option {
+        background: rgba(15, 23, 42, 0.9);
+        color: #f8fafc;
+      }
+      body.theme-light select.form-select option {
+        background: #fff;
+        color: #0f172a;
       }
       .week-nav-btn {
         width: 40px;
@@ -268,12 +383,6 @@
         opacity: 1;
         transform: translateY(0);
       }
-      body.theme-light .week-dot {
-        background: rgba(15, 23, 42, 0.25);
-      }
-      body.theme-light .week-dot.active {
-        background: #0f172a;
-      }
       .day-card .card-header {
         background: transparent;
         border-bottom: 1px solid rgba(255, 255, 255, 0.16);
@@ -283,11 +392,16 @@
         border-bottom: 1px solid rgba(15, 23, 42, 0.08);
       }
       .list-group-item {
-        background: transparent;
+        background: rgba(255, 255, 255, 0.05);
         border-color: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(8px);
+        border-radius: 12px;
+        margin: 6px 8px;
+        padding: 16px;
         transition: background 200ms ease, box-shadow 200ms ease, transform 200ms ease;
       }
       body.theme-light .list-group-item {
+        background: rgba(15, 23, 42, 0.04);
         border-color: rgba(15, 23, 42, 0.1);
       }
       .list-group-item-action:hover {
@@ -315,38 +429,15 @@
       body.theme-dark .day-card .card-header {
         color: #f8fafc;
       }
-      .modal-content {
-        border-radius: var(--radius);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(16px);
-      }
-      body.theme-dark .modal-content {
-        background: rgba(17, 17, 30, 0.92);
-        color: #f8fafc;
-      }
-      body.theme-light .modal-content {
-        background: rgba(255, 255, 255, 0.95);
-        color: #0f172a;
-      }
-      .form-control, .form-select {
+      .form-control {
         border-radius: 12px;
       }
-      body.theme-dark .form-control,
-      body.theme-dark .form-select {
+      body.theme-dark .form-control {
         background: rgba(255, 255, 255, 0.08);
         color: #f8fafc;
         border: 1px solid rgba(255, 255, 255, 0.18);
       }
-      body.theme-dark .form-select option {
-        background: #0f0f1a;
-        color: #f8fafc;
-      }
-      body.theme-light .form-select option {
-        background: #fff;
-        color: #0f172a;
-      }
-      body.theme-light .form-control,
-      body.theme-light .form-select {
+      body.theme-light .form-control {
         background: rgba(255, 255, 255, 0.9);
         color: #0f172a;
         border: 1px solid rgba(15, 23, 42, 0.16);
@@ -440,7 +531,7 @@
   <body class="theme-dark">
     <nav class="navbar navbar-expand-lg topbar">
       <div class="container">
-        <span class="navbar-brand text-white">Student Portal</span>
+        <span class="navbar-brand text-white">Studerria</span>
         <div class="d-flex align-items-center">
           <span class="me-3 muted">
             <% if (role === 'admin') { %>
@@ -621,7 +712,7 @@
                         <input id="subgroupName" name="name" class="form-control" placeholder="Group name" required />
                       </div>
                       <div class="col-12 col-md-4">
-                        <button type="submit" class="btn btn-outline-primary w-100">Create</button>
+                        <button type="submit" class="btn btn-outline-primary w-100 glass">Create</button>
                       </div>
                     </div>
                   </form>
@@ -637,7 +728,7 @@
                     </select>
                   </div>
                   <div class="col-12 col-md-4">
-                    <button type="submit" class="btn btn-outline-secondary w-100">Join</button>
+                    <button type="submit" class="btn btn-outline-secondary w-100 glass">Join</button>
                   </div>
                 </div>
               </form>
@@ -684,7 +775,7 @@
               <input type="hidden" id="hwTime" name="time" />
               <input type="hidden" id="hwClassNum" name="class_number" />
               <input type="hidden" id="hwDate" name="class_date" />
-              <button type="submit" class="btn btn-primary">Save homework</button>
+              <button type="submit" class="btn btn-primary glass">Save homework</button>
             </form>
             <datalist id="homeworkTagsList">
               <% (homeworkTags || []).forEach(function(tag) { %>
@@ -693,7 +784,7 @@
             </datalist>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
           </div>
         </div>
       </div>

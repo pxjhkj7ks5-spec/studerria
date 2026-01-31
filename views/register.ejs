@@ -28,15 +28,15 @@
         min-height: 100vh;
       }
       body.theme-light {
-        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.35), transparent 60%),
-          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.35), transparent 60%),
-          linear-gradient(135deg, #eef2ff 0%, #f0f9ff 50%, #fdf4ff 100%);
+        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.22), transparent 60%),
+          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.22), transparent 60%),
+          linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
         color: #0f172a;
       }
       body.theme-dark {
-        background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.3), transparent 60%),
-          radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.25), transparent 60%),
-          linear-gradient(160deg, #050508 0%, #12061a 45%, #1b0f26 100%);
+        background: radial-gradient(1200px 800px at 15% 10%, rgba(59, 130, 246, 0.22), transparent 60%),
+          radial-gradient(1000px 700px at 80% 20%, rgba(14, 165, 233, 0.18), transparent 60%),
+          linear-gradient(160deg, #0b0f1a 0%, #141b30 100%);
         color: #f8fafc;
       }
       .glass {
@@ -113,6 +113,63 @@
       .btn:active {
         transform: translateY(0);
         box-shadow: none;
+      }
+      body.modal-open {
+        overflow: hidden;
+      }
+      .modal-backdrop {
+        backdrop-filter: blur(12px);
+        background-color: rgba(0, 0, 0, 0.3);
+        transition: opacity 0.3s ease-in-out;
+      }
+      body.theme-dark .modal-backdrop {
+        background-color: rgba(20, 20, 20, 0.5);
+        backdrop-filter: blur(16px);
+      }
+      body.theme-light .modal-backdrop {
+        background-color: rgba(255, 255, 255, 0.4);
+        backdrop-filter: blur(8px);
+      }
+      .modal.fade .modal-dialog {
+        transform: scale(0.98);
+        transition: transform 240ms ease, opacity 240ms ease;
+        opacity: 0;
+      }
+      .modal.show .modal-dialog {
+        transform: scale(1);
+        opacity: 1;
+      }
+      .modal-content {
+        border-radius: 16px;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      body.theme-dark .modal-content {
+        background: rgba(30, 30, 30, 0.5);
+        color: #f8fafc;
+      }
+      body.theme-light .modal-content {
+        background: rgba(255, 255, 255, 0.75);
+        color: #0f172a;
+        border-color: rgba(15, 23, 42, 0.12);
+        box-shadow: 0 0 24px rgba(15, 23, 42, 0.18);
+      }
+      button.glass {
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(8px);
+        border-radius: 12px;
+        padding: 10px 20px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+      }
+      body.theme-light button.glass {
+        background: rgba(15, 23, 42, 0.06);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      button.glass:hover {
+        transform: scale(1.02);
+        box-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
       }
       @media (max-width: 576px) {
         .auth-card {
@@ -216,7 +273,7 @@
             <p><%= t('register.modalOutro') %></p>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><%= t('register.modalClose') %></button>
+            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal"><%= t('register.modalClose') %></button>
           </div>
         </div>
       </div>
