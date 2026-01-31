@@ -327,6 +327,16 @@
       attachValidationTooltips();
 
       const loginForm = document.getElementById('loginForm');
+      const nameInput = document.getElementById('full_name');
+      const pwdInput = document.getElementById('password');
+      if (nameInput && pwdInput) {
+        nameInput.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            pwdInput.focus();
+          }
+        });
+      }
       if (loginForm) {
         loginForm.addEventListener('keydown', (event) => {
           if (event.key === 'Enter') {
