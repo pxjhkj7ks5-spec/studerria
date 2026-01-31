@@ -693,9 +693,21 @@ const ensureDbReady = async () => {
   }
 };
 
+const uploadsDir = path.join(__dirname, 'uploads');
+try {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+} catch (err) {
+  console.error('Failed to ensure uploads directory', err);
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, 'uploads'));
+    try {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    } catch (err) {
+      return cb(err);
+    }
+    return cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
