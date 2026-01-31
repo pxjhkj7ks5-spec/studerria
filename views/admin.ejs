@@ -2621,7 +2621,38 @@
         daySelect.innerHTML = options.join('');
       }
 
+      async function refreshStudyDaySelects(courseId) {
+        const selects = Array.from(document.querySelectorAll('select[name="day_of_week"]'));
+        if (!selects.length) return;
+        const res = await fetch(`/admin/api/courses/${courseId}/study-days`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const days = (data.days || data).filter((d) => d.is_active);
+        const dayOptions = days
+          .map((day) => {
+            const label = day.label || day.day_name || day.weekday;
+            const value = day.day_name || '';
+            if (!value) return '';
+            return `<option value="${value}">${label}</option>`;
+          })
+          .filter(Boolean)
+          .join('');
+        selects.forEach((select) => {
+          const current = select.value;
+          const hasCurrent = days.some((d) => d.day_name === current);
+          const currentOption = hasCurrent || !current
+            ? ''
+            : `<option value="${current}" selected>${current} (inactive)</option>`;
+          const placeholder = select.required ? '<option value="" disabled>Day</option>' : '';
+          select.innerHTML = `${placeholder}${currentOption}${dayOptions}`;
+          if (hasCurrent) {
+            select.value = current;
+          }
+        });
+      }
+
       refreshScheduleDayOptions(<%= selectedCourseId || 1 %>, '<%= (filters && filters.day) || '' %>');
+      refreshStudyDaySelects(<%= selectedCourseId || 1 %>);
 
       const studyDaysModal = document.getElementById('studyDaysModal');
       const studyDaysBody = document.getElementById('studyDaysBody');
@@ -2676,6 +2707,8 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ is_active: event.target.checked }),
             });
+            await refreshScheduleDayOptions(courseId, '<%= (filters && filters.day) || '' %>');
+            await refreshStudyDaySelects(courseId);
           });
         });
 
