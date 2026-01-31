@@ -1,7 +1,10 @@
 substitutions:
   _SERVICE_NAME: studerria
   _REGION: europe-west1
+  _AR_REPO: studerria
+  _AR_LOCATION: europe-west1
   _INSTANCE_CONNECTION_NAME: ""
+  _IMAGE: "europe-west1-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:$SHORT_SHA"
 
 steps:
   - id: Build
@@ -10,7 +13,7 @@ steps:
     args:
       [
         "build",
-        "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$SHORT_SHA",
+        "$_IMAGE",
         "--builder",
         "gcr.io/buildpacks/builder:latest",
         "--trust-builder",
@@ -25,7 +28,7 @@ steps:
         "deploy",
         "$_SERVICE_NAME",
         "--image",
-        "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$SHORT_SHA",
+        "$_IMAGE",
         "--region",
         "$_REGION",
         "--platform",
@@ -36,7 +39,7 @@ steps:
       ]
 
 images:
-  - "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$SHORT_SHA"
+  - "$_IMAGE"
 
 options:
   logging: CLOUD_LOGGING_ONLY
