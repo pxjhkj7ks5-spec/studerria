@@ -17,9 +17,9 @@
         --accent-dark: #2563eb;
         --card-radius: 20px;
         --glass-border-dark: rgba(255, 255, 255, 0.14);
-        --glass-border-light: rgba(15, 23, 42, 0.08);
+        --glass-border-light: rgba(15, 23, 42, 0.12);
         --glass-bg-dark: rgba(255, 255, 255, 0.06);
-        --glass-bg-light: rgba(255, 255, 255, 0.7);
+        --glass-bg-light: rgba(255, 255, 255, 0.35);
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
@@ -27,9 +27,9 @@
         min-height: 100vh;
       }
       body.theme-light {
-        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.35), transparent 60%),
-          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.35), transparent 60%),
-          linear-gradient(135deg, #eef2ff 0%, #f0f9ff 50%, #fdf4ff 100%);
+        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.22), transparent 60%),
+          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.22), transparent 60%),
+          linear-gradient(135deg, #e6eef8 0%, #e9f0fb 45%, #eef2ff 100%);
         color: #0f172a;
       }
       body.theme-dark {
@@ -51,7 +51,7 @@
       body.theme-light .glass {
         background: var(--glass-bg-light);
         border: 1px solid var(--glass-border-light);
-        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
       }
       .auth-card .form-control {
         border-radius: 12px;
@@ -87,7 +87,7 @@
         color: rgba(248, 250, 252, 0.92);
       }
       body.theme-dark .text-muted {
-        color: rgba(255, 255, 255, 0.7) !important;
+        color: rgba(255, 255, 255, 0.35) !important;
       }
       .auth-card .form-control:focus {
         border-color: var(--accent);
@@ -242,8 +242,8 @@
       }
       .stat-tile {
         border-radius: 14px;
-        border: 1px solid rgba(15, 23, 42, 0.08);
-        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.35);
       }
       body.theme-dark .stat-tile {
         background: rgba(255, 255, 255, 0.08);

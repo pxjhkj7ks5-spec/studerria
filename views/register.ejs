@@ -18,9 +18,9 @@
         --text-muted: #6b7280;
         --card-radius: 20px;
         --glass-border-dark: rgba(255, 255, 255, 0.14);
-        --glass-border-light: rgba(15, 23, 42, 0.08);
+        --glass-border-light: rgba(15, 23, 42, 0.12);
         --glass-bg-dark: rgba(255, 255, 255, 0.06);
-        --glass-bg-light: rgba(255, 255, 255, 0.7);
+        --glass-bg-light: rgba(255, 255, 255, 0.35);
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
@@ -30,7 +30,7 @@
       body.theme-light {
         background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.22), transparent 60%),
           radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.22), transparent 60%),
-          linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+          linear-gradient(135deg, #e6eef8 0%, #e9f0fb 45%, #eef2ff 100%);
         color: #0f172a;
       }
       body.theme-dark {
@@ -52,7 +52,7 @@
       body.theme-light .glass {
         background: var(--glass-bg-light);
         border: 1px solid var(--glass-border-light);
-        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
       }
       .auth-card .form-control {
         border-radius: 12px;

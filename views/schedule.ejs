@@ -18,9 +18,9 @@
         --accent-3: #22d3ee;
         --radius: 18px;
         --glass-border-dark: rgba(255, 255, 255, 0.14);
-        --glass-border-light: rgba(15, 23, 42, 0.08);
+        --glass-border-light: rgba(15, 23, 42, 0.12);
         --glass-bg-dark: rgba(255, 255, 255, 0.06);
-        --glass-bg-light: rgba(255, 255, 255, 0.7);
+        --glass-bg-light: rgba(255, 255, 255, 0.35);
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
@@ -35,9 +35,9 @@
         color: #f8fafc;
       }
       body.theme-light {
-        background: radial-gradient(1000px 700px at 20% 10%, rgba(191, 219, 254, 0.6), transparent 60%),
-          radial-gradient(900px 600px at 80% 20%, rgba(224, 231, 255, 0.6), transparent 60%),
-          linear-gradient(150deg, #f8fafc 0%, #f1f5f9 45%, #e2e8f0 100%);
+        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.22), transparent 60%),
+          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.22), transparent 60%),
+          linear-gradient(135deg, #e6eef8 0%, #e9f0fb 45%, #eef2ff 100%);
         color: #0f172a;
       }
       body.theme-light .text-white {
@@ -66,7 +66,7 @@
         letter-spacing: -0.02em;
       }
       .hero-sub {
-        color: rgba(255, 255, 255, 0.7);
+        color: rgba(255, 255, 255, 0.35);
       }
       body.theme-light .hero-sub {
         color: rgba(15, 23, 42, 0.65);
@@ -90,7 +90,7 @@
       body.theme-light .glass {
         background: var(--glass-bg-light);
         border: 1px solid var(--glass-border-light);
-        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
       }
       .week-hero {
         padding: 22px 26px;
@@ -145,11 +145,11 @@
       body.theme-light .badge-glow {
         color: #0f172a;
         background: linear-gradient(135deg, rgba(147, 197, 253, 0.55), rgba(196, 181, 253, 0.45));
-        border-color: rgba(15, 23, 42, 0.08);
+        border-color: rgba(15, 23, 42, 0.12);
       }
       body.theme-light .btn-glass {
         color: #0f172a;
-        background: rgba(255, 255, 255, 0.7);
+        background: rgba(255, 255, 255, 0.35);
         border-color: rgba(15, 23, 42, 0.15);
       }
       body.theme-light .btn-glass:hover {
@@ -243,7 +243,7 @@
       }
       body.theme-light .week-slider {
         background: rgba(255, 255, 255, 0.6);
-        border: 1px solid rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(15, 23, 42, 0.12);
         box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
       }
       @media (max-width: 576px) {
@@ -574,7 +574,7 @@
         font-weight: 700;
       }
       body.theme-light .day-card .card-header {
-        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        border-bottom: 1px solid rgba(15, 23, 42, 0.12);
       }
       .list-group-item {
         background: rgba(255, 255, 255, 0.05);
@@ -589,7 +589,7 @@
       }
       body.theme-light .list-group-item {
         background: rgba(15, 23, 42, 0.04);
-        border-color: rgba(15, 23, 42, 0.1);
+        border-color: rgba(15, 23, 42, 0.18);
       }
       .deadline-block {
         background: rgba(250, 204, 21, 0.12);
@@ -654,7 +654,7 @@
         box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.25) inset;
       }
       .muted {
-        color: rgba(255, 255, 255, 0.7);
+        color: rgba(255, 255, 255, 0.35);
       }
       body.theme-light .muted {
         color: rgba(15, 23, 42, 0.6);
