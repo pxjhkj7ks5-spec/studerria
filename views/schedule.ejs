@@ -759,6 +759,55 @@
         justify-content: center;
         padding: 0 5px;
       }
+      .mobile-menu-btn {
+        border-radius: 999px;
+        width: 38px;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+      }
+      @media (max-width: 768px) {
+        .topbar-actions .desktop-only {
+          display: none !important;
+        }
+        .topbar-actions .mobile-menu-btn {
+          display: inline-flex !important;
+        }
+        .topbar-actions {
+          gap: 8px;
+        }
+        .week-slider {
+          gap: 10px;
+          padding: 8px 12px;
+        }
+        .week-nav-btn {
+          width: 46px;
+          height: 46px;
+          font-size: 18px;
+        }
+        .week-dot.hidden-mobile {
+          display: none !important;
+        }
+        .schedule-content {
+          padding-left: 12px;
+          padding-right: 12px;
+        }
+        .week-hero {
+          padding: 16px 18px;
+        }
+        .hero-title {
+          font-size: 1.9rem;
+        }
+        body {
+          font-size: 0.95rem;
+        }
+        .btn,
+        .btn-glass {
+          min-height: 38px;
+        }
+      }
       .app-footer {
         font-size: 0.85rem;
         padding-bottom: 90px;
@@ -775,8 +824,8 @@
     <nav class="navbar navbar-expand-lg topbar">
       <div class="container">
         <span class="navbar-brand text-white">Studerria</span>
-        <div class="d-flex align-items-center">
-          <span class="me-3 muted">
+        <div class="d-flex align-items-center topbar-actions">
+          <span class="me-3 muted desktop-only">
             <% if (role === 'admin') { %>
               <%= t('role.admin') %>: <%= username %>
             <% } else if (role === 'starosta') { %>
@@ -788,18 +837,18 @@
             <% } %>
           </span>
           <% if (role === 'admin') { %>
-            <form method="POST" action="/admin/switch-to-admin" class="me-2">
+            <form method="POST" action="/admin/switch-to-admin" class="me-2 desktop-only">
               <button class="btn btn-outline-primary btn-sm" type="submit"><%= t('schedule.backToAdmin') %></button>
             </form>
           <% } %>
           <% if (role === 'starosta') { %>
-            <a class="btn btn-outline-primary btn-sm me-2" href="/starosta"><%= t('menu.starosta') %></a>
+            <a class="btn btn-outline-primary btn-sm me-2 desktop-only" href="/starosta"><%= t('menu.starosta') %></a>
           <% } %>
           <% if (role === 'deanery') { %>
-            <a class="btn btn-outline-primary btn-sm me-2" href="/deanery"><%= t('menu.deanery') %></a>
+            <a class="btn btn-outline-primary btn-sm me-2 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
           <% } %>
           <button
-            class="btn btn-outline-light btn-sm me-2 theme-toggle"
+            class="btn btn-outline-light btn-sm me-2 theme-toggle desktop-only"
             type="button"
             id="themeToggle"
             data-light-label="<%= t('theme.light') %>"
@@ -807,15 +856,24 @@
           >
             <%= t('theme.light') %>
           </button>
-          <button class="btn btn-outline-light btn-sm me-2 msg-btn" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">
+          <button class="btn btn-outline-light btn-sm me-2 msg-btn desktop-only" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">
             💬
             <span class="msg-badge d-none" id="messagesBadge">0</span>
           </button>
-          <a class="btn btn-outline-light btn-sm me-2" href="/teamwork"><%= t('menu.teamwork') %></a>
-          <a class="btn btn-outline-light btn-sm me-2" href="/profile"><%= t('schedule.profile') %></a>
-          <form method="POST" action="/logout">
+          <a class="btn btn-outline-light btn-sm me-2 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
+          <a class="btn btn-outline-light btn-sm me-2 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
+          <form method="POST" action="/logout" class="desktop-only">
             <button class="btn btn-outline-light btn-sm" type="submit"><%= t('schedule.logout') %></button>
           </form>
+          <button
+            class="btn btn-outline-light btn-sm mobile-menu-btn"
+            type="button"
+            data-bs-toggle="modal"
+            data-bs-target="#mobileMenuModal"
+            aria-label="Menu"
+          >
+            ☰
+          </button>
         </div>
       </div>
     </nav>
@@ -1151,6 +1209,45 @@
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="mobileMenuModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Меню</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="d-grid gap-2">
+              <% if (role === 'admin') { %>
+                <form method="POST" action="/admin/switch-to-admin">
+                  <button class="btn btn-outline-primary w-100 glass" type="submit"><%= t('schedule.backToAdmin') %></button>
+                </form>
+              <% } %>
+              <% if (role === 'starosta') { %>
+                <a class="btn btn-outline-primary w-100 glass" href="/starosta"><%= t('menu.starosta') %></a>
+              <% } %>
+              <% if (role === 'deanery') { %>
+                <a class="btn btn-outline-primary w-100 glass" href="/deanery"><%= t('menu.deanery') %></a>
+              <% } %>
+              <button
+                class="btn btn-outline-light w-100 glass theme-toggle"
+                type="button"
+                data-light-label="<%= t('theme.light') %>"
+                data-dark-label="<%= t('theme.dark') %>"
+              >
+                <%= t('theme.light') %>
+              </button>
+              <a class="btn btn-outline-light w-100 glass" href="/teamwork"><%= t('menu.teamwork') %></a>
+              <a class="btn btn-outline-light w-100 glass" href="/profile"><%= t('schedule.profile') %></a>
+              <form method="POST" action="/logout">
+                <button class="btn btn-outline-light w-100 glass" type="submit"><%= t('schedule.logout') %></button>
+              </form>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1567,6 +1664,19 @@
       const weekNext = document.getElementById('weekNext');
       const totalWeeks = <%= totalWeeks || 15 %>;
       let currentWeek = <%= currentWeek %>;
+      function updateMobileWeekDots() {
+        if (!weekSlider) return;
+        const dots = weekSlider.querySelectorAll('.week-dot');
+        if (window.innerWidth > 768) {
+          dots.forEach((dot) => dot.classList.remove('hidden-mobile'));
+          return;
+        }
+        dots.forEach((dot) => {
+          const week = Number(dot.dataset.week);
+          const visible = week === currentWeek || week === currentWeek - 1 || week === currentWeek + 1;
+          dot.classList.toggle('hidden-mobile', !visible);
+        });
+      }
       function updateSchedule(week) {
         const safe = Math.max(1, Math.min(totalWeeks, week));
         const params = new URLSearchParams(window.location.search);
@@ -1583,6 +1693,8 @@
           active.classList.remove('active');
           target.classList.add('active');
         }
+        currentWeek = safe;
+        updateMobileWeekDots();
         setTimeout(() => updateSchedule(safe), 220);
       }
       if (weekSlider) {
@@ -1609,6 +1721,29 @@
           if (Math.abs(delta) < 40) return;
           if (delta < 0) animateWeekChange(currentWeek + 1);
           if (delta > 0) animateWeekChange(currentWeek - 1);
+        });
+      }
+      updateMobileWeekDots();
+      window.addEventListener('resize', updateMobileWeekDots);
+
+      const scheduleContent = document.querySelector('.schedule-content');
+      if (scheduleContent) {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        scheduleContent.addEventListener('touchstart', (event) => {
+          if (document.body.classList.contains('modal-open')) return;
+          const t = event.touches[0];
+          touchStartX = t.clientX;
+          touchStartY = t.clientY;
+        }, { passive: true });
+        scheduleContent.addEventListener('touchend', (event) => {
+          if (document.body.classList.contains('modal-open')) return;
+          const t = event.changedTouches[0];
+          const dx = t.clientX - touchStartX;
+          const dy = t.clientY - touchStartY;
+          if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+          if (dx < 0) animateWeekChange(currentWeek + 1);
+          if (dx > 0) animateWeekChange(currentWeek - 1);
         });
       }
 
@@ -1808,19 +1943,22 @@
       updateDailyPhrase();
       scheduleNextMidnight();
 
-      const themeToggle = document.getElementById('themeToggle');
+      const themeToggles = document.querySelectorAll('.theme-toggle');
       const storedTheme = localStorage.getItem('ui-theme') || 'theme-light';
       document.body.classList.remove('theme-dark', 'theme-light');
       document.body.classList.add(storedTheme);
-      themeToggle.textContent =
-        storedTheme === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
-      themeToggle.addEventListener('click', () => {
-        const isDark = document.body.classList.contains('theme-dark');
-        const next = isDark ? 'theme-light' : 'theme-dark';
-        document.body.classList.remove('theme-dark', 'theme-light');
-        document.body.classList.add(next);
-        localStorage.setItem('ui-theme', next);
-        themeToggle.textContent = next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
+      themeToggles.forEach((btn) => {
+        btn.textContent = storedTheme === 'theme-dark' ? btn.dataset.lightLabel : btn.dataset.darkLabel;
+        btn.addEventListener('click', () => {
+          const isDark = document.body.classList.contains('theme-dark');
+          const next = isDark ? 'theme-light' : 'theme-dark';
+          document.body.classList.remove('theme-dark', 'theme-light');
+          document.body.classList.add(next);
+          localStorage.setItem('ui-theme', next);
+          themeToggles.forEach((b) => {
+            b.textContent = next === 'theme-dark' ? b.dataset.lightLabel : b.dataset.darkLabel;
+          });
+        });
       });
     </script>
   </body>
