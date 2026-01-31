@@ -17,6 +17,10 @@
         --accent-2: #8b5cf6;
         --accent-3: #22d3ee;
         --radius: 18px;
+        --glass-border-dark: rgba(255, 255, 255, 0.14);
+        --glass-border-light: rgba(15, 23, 42, 0.08);
+        --glass-bg-dark: rgba(255, 255, 255, 0.06);
+        --glass-bg-light: rgba(255, 255, 255, 0.7);
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
@@ -75,25 +79,45 @@
       }
       .glass {
         border-radius: var(--radius);
-        backdrop-filter: blur(18px);
-        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(20px);
+        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
       }
       body.theme-dark .glass {
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: var(--glass-bg-dark);
+        border: 1px solid var(--glass-border-dark);
         box-shadow: 0 18px 45px rgba(8, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
       }
       body.theme-light .glass {
-        background: rgba(255, 255, 255, 0.7);
-        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: var(--glass-bg-light);
+        border: 1px solid var(--glass-border-light);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+      }
+      .week-hero {
+        padding: 22px 26px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+      }
+      @media (max-width: 768px) {
+        .week-hero {
+          flex-direction: column;
+          align-items: flex-start;
+        }
       }
       .badge-glow {
-        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        background: linear-gradient(135deg, #93c5fd, #c4b5fd);
         color: #fff;
-        border: none;
+        border: 1px solid rgba(255, 255, 255, 0.35);
         padding: 0.45rem 0.9rem;
         border-radius: 999px;
         font-weight: 700;
+        box-shadow: 0 8px 18px rgba(59, 130, 246, 0.22);
+      }
+      body.theme-light .badge-glow {
+        color: #0f172a;
+        background: linear-gradient(135deg, rgba(147, 197, 253, 0.55), rgba(196, 181, 253, 0.45));
+        border-color: rgba(15, 23, 42, 0.08);
       }
       .hw-chip {
         display: inline-flex;
@@ -147,14 +171,15 @@
         border: none;
         background: rgba(255, 255, 255, 0.4);
         cursor: pointer;
-        transition: transform 220ms ease, background 220ms ease, width 260ms ease;
+        transition: transform 220ms ease, background 220ms ease, width 260ms ease, box-shadow 260ms ease;
       }
       .week-dot:hover {
         transform: scale(1.1);
       }
       .week-dot.active {
         width: 24px;
-        background: #fff;
+        background: linear-gradient(135deg, #a3bfff, #d7e6ff);
+        box-shadow: 0 8px 18px rgba(99, 102, 241, 0.35);
       }
       .week-dot.active {
         transform: scale(1.05);
@@ -163,22 +188,23 @@
         width: 40px;
         height: 40px;
         border-radius: 50%;
-        border: 1px solid #5a5a5a;
-        background: #2a2a2a;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(20, 20, 30, 0.8);
         color: #fff;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         font-size: 16px;
-        transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+        transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
       }
       .week-nav-btn:hover {
         transform: translateY(-1px);
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.5);
+        border-color: rgba(147, 197, 253, 0.7);
       }
       body.theme-light .week-nav-btn {
-        background: #f1f5f9;
-        border-color: #cbd5f5;
+        background: rgba(255, 255, 255, 0.85);
+        border-color: rgba(15, 23, 42, 0.18);
         color: #0f172a;
       }
       .schedule-content {
@@ -200,7 +226,7 @@
       }
       .day-card .card-header {
         background: transparent;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.16);
         font-weight: 700;
       }
       body.theme-light .day-card .card-header {
@@ -209,12 +235,15 @@
       .list-group-item {
         background: transparent;
         border-color: rgba(255, 255, 255, 0.08);
+        transition: background 200ms ease, box-shadow 200ms ease, transform 200ms ease;
       }
       body.theme-light .list-group-item {
         border-color: rgba(15, 23, 42, 0.1);
       }
       .list-group-item-action:hover {
-        background: rgba(59, 130, 246, 0.14);
+        background: rgba(99, 102, 241, 0.18);
+        box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.2);
+        transform: translateY(-1px);
       }
       body.theme-light .list-group-item-action:hover {
         background: rgba(59, 130, 246, 0.08);
@@ -408,7 +437,7 @@
     </nav>
 
     <main class="container py-4 schedule-content enter">
-      <div class="d-flex flex-wrap align-items-end justify-content-between mb-4">
+      <div class="glass week-hero mb-4">
         <div>
           <h1 class="hero-title mb-1"><%= t('schedule.header') %></h1>
           <div class="hero-sub" id="daily-phrase">Your rhythm, your focus — let’s make this week count.</div>
