@@ -1441,7 +1441,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
             }));
             const homeworkMeta = {};
             homework.forEach((hw) => {
-              const key = `${hw.subject_id}|${hw.group_number}|${hw.day}|${hw.class_number}`;
+              const legacyKey = `${hw.subject_id}|${hw.group_number}|${hw.day}|${hw.class_number}`;
+              const key = hw.class_date ? `${legacyKey}|${hw.class_date}` : legacyKey;
               if (!homeworkMeta[key]) {
                 homeworkMeta[key] = { count: 0, preview: [] };
               }

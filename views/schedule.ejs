@@ -770,8 +770,9 @@
               <% scheduleByDay[day].forEach(function(cls) { %>
                 <% const slot = bellSchedule[cls.class_number]; %>
                 <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : ''; %>
-                <% const hwKey = `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}`; %>
-                <% const hwMeta = homeworkMeta ? homeworkMeta[hwKey] : null; %>
+                <% const legacyKey = `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}`; %>
+                <% const datedKey = cls.class_date ? `${legacyKey}|${cls.class_date}` : null; %>
+                <% const hwMeta = homeworkMeta ? (datedKey ? homeworkMeta[datedKey] : homeworkMeta[legacyKey]) : null; %>
                 <button
                   class="list-group-item list-group-item-action"
                   type="button"
