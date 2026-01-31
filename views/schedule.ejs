@@ -409,7 +409,7 @@
         background: rgba(255, 255, 255, 0.05);
         border-color: rgba(255, 255, 255, 0.08);
         backdrop-filter: blur(8px);
-        border-radius: 12px;
+        border-radius: 14px;
         margin: 6px 0;
         padding: 16px;
         width: 100%;
@@ -444,6 +444,18 @@
       }
       body.theme-dark .day-card .card-header {
         color: #f8fafc;
+      }
+      .day-card .list-group {
+        padding: 10px 12px 12px;
+      }
+      @media (max-width: 768px) {
+        .day-card .list-group {
+          padding: 8px 10px 10px;
+        }
+        .list-group-item {
+          padding: 14px;
+          border-radius: 12px;
+        }
       }
       .form-control {
         border-radius: 12px;
