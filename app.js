@@ -810,6 +810,13 @@ function requireAdminOrDeanery(req, res, next) {
   return next();
 }
 
+function requireHomeworkBulkAccess(req, res, next) {
+  if (!req.session.user || !['admin', 'deanery', 'starosta'].includes(req.session.role)) {
+    return res.status(403).send('Forbidden');
+  }
+  return next();
+}
+
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const fullWeekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const studyDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
@@ -4755,6 +4762,148 @@ app.delete('/admin/api/courses/:courseId/study-days/:weekday/subjects/:subjectId
       [dayRow.id, subjectId]
     );
     return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/admin/api/homework/bulk', requireHomeworkBulkAccess, async (req, res) => {
+  const { ids, action, payload } = req.body || {};
+  const list = Array.isArray(ids) ? ids.map((id) => Number(id)).filter((id) => Number.isFinite(id)) : [];
+  if (!list.length || !action) {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+  const role = req.session.role;
+  const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  let activeSemester = null;
+  try {
+    activeSemester = await getActiveSemester(courseId);
+  } catch (err) {
+    return res.status(500).json({ error: 'Semester error' });
+  }
+  const placeholders = list.map(() => '?').join(',');
+  const scoped = await db.all(
+    `SELECT id, day_of_week, class_date, custom_due_date, week_number FROM homework
+     WHERE id IN (${placeholders}) AND course_id = ? AND semester_id = ?`,
+    [...list, courseId, activeSemester ? activeSemester.id : null]
+  );
+  const scopedIds = scoped.map((row) => row.id);
+  if (!scopedIds.length) {
+    return res.status(404).json({ error: 'No items found' });
+  }
+  const scopedPlaceholders = scopedIds.map(() => '?').join(',');
+
+  try {
+    if (action === 'add_tags' || action === 'remove_tags') {
+      const tagNames = Array.isArray(payload?.tags) ? payload.tags.map((t) => String(t).trim()).filter(Boolean) : [];
+      if (!tagNames.length) return res.status(400).json({ error: 'No tags' });
+      const tagIds = [];
+      for (const name of tagNames) {
+        const row = await db.get(
+          'INSERT INTO homework_tags (name) VALUES (?) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id',
+          [name]
+        );
+        if (row && row.id) tagIds.push(row.id);
+      }
+      if (action === 'add_tags') {
+        for (const hwId of scopedIds) {
+          for (const tagId of tagIds) {
+            await db.run(
+              'INSERT INTO homework_tag_map (homework_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+              [hwId, tagId]
+            );
+          }
+        }
+      } else {
+        const tagPlaceholders = tagIds.map(() => '?').join(',');
+        await db.run(
+          `DELETE FROM homework_tag_map WHERE homework_id IN (${scopedPlaceholders}) AND tag_id IN (${tagPlaceholders})`,
+          [...scopedIds, ...tagIds]
+        );
+      }
+      return res.json({ ok: true });
+    }
+
+    if (action === 'set_deadline') {
+      const deadline = payload?.deadline ? String(payload.deadline).slice(0, 10) : '';
+      if (!deadline) return res.status(400).json({ error: 'Invalid deadline' });
+      await db.run(
+        `UPDATE homework SET custom_due_date = ?, is_custom_deadline = 1 WHERE id IN (${scopedPlaceholders})`,
+        [deadline, ...scopedIds]
+      );
+      return res.json({ ok: true });
+    }
+
+    if (action === 'shift_deadline') {
+      const daysShift = Number(payload?.days || 0);
+      if (!Number.isFinite(daysShift) || daysShift === 0) {
+        return res.status(400).json({ error: 'Invalid shift' });
+      }
+      for (const row of scoped) {
+        const base = row.custom_due_date || row.class_date;
+        if (!base) continue;
+        const d = new Date(`${base}T00:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + daysShift);
+        const newDate = d.toISOString().slice(0, 10);
+        await db.run('UPDATE homework SET custom_due_date = ?, is_custom_deadline = 1 WHERE id = ?', [newDate, row.id]);
+      }
+      return res.json({ ok: true });
+    }
+
+    if (action === 'move_to_week') {
+      const targetWeek = Number(payload?.week || 0);
+      if (!Number.isFinite(targetWeek) || targetWeek < 1) {
+        return res.status(400).json({ error: 'Invalid week' });
+      }
+      for (const row of scoped) {
+        if (!row.day_of_week) continue;
+        const newDate = getDateForWeekDay(targetWeek, row.day_of_week, activeSemester ? activeSemester.start_date : null);
+        await db.run(
+          'UPDATE homework SET class_date = ?, week_number = ?, custom_due_date = NULL, is_custom_deadline = 0 WHERE id = ?',
+          [newDate, targetWeek, row.id]
+        );
+      }
+      return res.json({ ok: true });
+    }
+
+    if (action === 'delete') {
+      await db.run(`DELETE FROM homework WHERE id IN (${scopedPlaceholders})`, scopedIds);
+      return res.json({ ok: true });
+    }
+
+    if (action === 'export_csv') {
+      const rows = await db.all(
+        `SELECT h.id, h.description, h.group_number, h.custom_due_date, h.class_date, h.created_by, h.created_at,
+                s.name AS subject_name
+         FROM homework h
+         LEFT JOIN subjects s ON s.id = h.subject_id
+         WHERE h.id IN (${scopedPlaceholders})
+         ORDER BY h.id`,
+        scopedIds
+      );
+      const header = ['id','title','subject','group','deadline','is_weird','created_by','created_at'];
+      const csv = [header.join(',')];
+      rows.forEach((r) => {
+        const deadline = r.custom_due_date || r.class_date || '';
+        const isWeird = r.custom_due_date && r.custom_due_date !== r.class_date ? '1' : '0';
+        const line = [
+          r.id,
+          JSON.stringify(r.description || '').slice(1, -1),
+          JSON.stringify(r.subject_name || '').slice(1, -1),
+          r.group_number || '',
+          deadline,
+          isWeird,
+          JSON.stringify(r.created_by || '').slice(1, -1),
+          r.created_at || '',
+        ].join(',');
+        csv.push(line);
+      });
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename=\"homework_export.csv\"');
+      return res.send(csv.join('\n'));
+    }
+
+    return res.status(400).json({ error: 'Unknown action' });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
   }

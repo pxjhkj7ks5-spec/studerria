@@ -397,6 +397,21 @@
       body.theme-light .app-footer {
         color: rgba(15, 23, 42, 0.6);
       }
+      .bulk-bar {
+        position: sticky;
+        top: 80px;
+        z-index: 20;
+        padding: 10px 12px;
+        border-radius: 14px;
+        margin-bottom: 12px;
+        backdrop-filter: blur(12px);
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      body.theme-light .bulk-bar {
+        background: rgba(255, 255, 255, 0.7);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
       .study-day-row {
         border: 1px solid rgba(148, 163, 184, 0.25);
         border-radius: 14px;
@@ -985,10 +1000,31 @@
               </form>
             </div>
           </div>
+          <div class="bulk-bar d-none" id="homeworkBulkBar">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <span class="text-muted">Selected: <span id="homeworkSelectedCount">0</span></span>
+              <select class="form-select form-select-sm w-auto" id="homeworkBulkAction">
+                <option value="">Bulk action</option>
+                <option value="add_tags">Add tags</option>
+                <option value="remove_tags">Remove tags</option>
+                <option value="set_deadline">Set deadline</option>
+                <option value="shift_deadline">Shift deadline (days)</option>
+                <option value="move_to_week">Move to week</option>
+                <option value="delete">Delete</option>
+                <option value="export_csv">Export CSV</option>
+              </select>
+              <input class="form-control form-control-sm w-auto d-none" id="bulkTags" placeholder="tag1, tag2" />
+              <input class="form-control form-control-sm w-auto d-none" id="bulkDeadline" type="date" />
+              <input class="form-control form-control-sm w-auto d-none" id="bulkShift" type="number" placeholder="+/- days" />
+              <input class="form-control form-control-sm w-auto d-none" id="bulkWeek" type="number" min="1" max="15" placeholder="Week #" />
+              <button class="btn btn-sm btn-outline-primary" type="button" id="bulkApplyBtn">Apply</button>
+            </div>
+          </div>
           <div class="table-responsive">
             <table class="table table-striped align-middle">
               <thead>
                 <tr>
+                  <th><input type="checkbox" id="selectAllHomework" /></th>
                   <th>ID</th>
                   <th><%= t('admin.groupNumber') %></th>
                   <th><%= t('admin.classNumber') %></th>
@@ -1003,6 +1039,7 @@
               <tbody>
                 <% homework.forEach(function(item) { %>
                   <tr>
+                    <td><input type="checkbox" class="homework-select" value="<%= item.id %>" /></td>
                     <td><%= item.id %></td>
                     <td><%= item.group_number %></td>
                     <td><%= item.subject_name || item.subject %> (<%= item.day_of_week || item.day %>)</td>
@@ -2600,6 +2637,97 @@
       const saveAllBtn = document.querySelector('.save-all-btn');
       if (saveAllBtn) {
         saveAllBtn.addEventListener('click', saveAllForms);
+      }
+
+      const homeworkBulkBar = document.getElementById('homeworkBulkBar');
+      const homeworkSelectedCount = document.getElementById('homeworkSelectedCount');
+      const homeworkBulkAction = document.getElementById('homeworkBulkAction');
+      const bulkApplyBtn = document.getElementById('bulkApplyBtn');
+      const bulkTags = document.getElementById('bulkTags');
+      const bulkDeadline = document.getElementById('bulkDeadline');
+      const bulkShift = document.getElementById('bulkShift');
+      const bulkWeek = document.getElementById('bulkWeek');
+      const selectAllHomework = document.getElementById('selectAllHomework');
+
+      function getSelectedHomeworkIds() {
+        return Array.from(document.querySelectorAll('.homework-select:checked')).map((el) => Number(el.value));
+      }
+
+      function updateBulkBar() {
+        if (!homeworkSelectedCount || !homeworkBulkBar) return;
+        const count = getSelectedHomeworkIds().length;
+        homeworkSelectedCount.textContent = String(count);
+        homeworkBulkBar.classList.toggle('d-none', count === 0);
+      }
+
+      function resetBulkInputs() {
+        [bulkTags, bulkDeadline, bulkShift, bulkWeek].forEach((el) => {
+          if (el) el.classList.add('d-none');
+        });
+      }
+
+      if (homeworkBulkAction) {
+        homeworkBulkAction.addEventListener('change', () => {
+          resetBulkInputs();
+          const action = homeworkBulkAction.value;
+          if (action === 'add_tags' || action === 'remove_tags') bulkTags.classList.remove('d-none');
+          if (action === 'set_deadline') bulkDeadline.classList.remove('d-none');
+          if (action === 'shift_deadline') bulkShift.classList.remove('d-none');
+          if (action === 'move_to_week') bulkWeek.classList.remove('d-none');
+        });
+      }
+
+      if (selectAllHomework) {
+        selectAllHomework.addEventListener('change', () => {
+          document.querySelectorAll('.homework-select').forEach((el) => {
+            el.checked = selectAllHomework.checked;
+          });
+          updateBulkBar();
+        });
+      }
+
+      document.querySelectorAll('.homework-select').forEach((el) => {
+        el.addEventListener('change', updateBulkBar);
+      });
+
+      if (bulkApplyBtn) {
+        bulkApplyBtn.addEventListener('click', async () => {
+          const ids = getSelectedHomeworkIds();
+          if (!ids.length) return;
+          const action = homeworkBulkAction.value;
+          if (!action) return;
+          const payload = {};
+          if (action === 'add_tags' || action === 'remove_tags') {
+            payload.tags = (bulkTags.value || '').split(',').map((t) => t.trim()).filter(Boolean);
+          }
+          if (action === 'set_deadline') payload.deadline = bulkDeadline.value;
+          if (action === 'shift_deadline') payload.days = Number(bulkShift.value || 0);
+          if (action === 'move_to_week') payload.week = Number(bulkWeek.value || 0);
+          if (action === 'delete' && !confirm('Delete selected homework?')) return;
+
+          const res = await fetch('/admin/api/homework/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, action, payload }),
+          });
+          if (!res.ok) {
+            alert('Помилка виконання');
+            return;
+          }
+          if (action === 'export_csv') {
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'homework_export.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            return;
+          }
+          window.location.reload();
+        });
       }
 
       async function refreshScheduleDayOptions(courseId, selectedValue = '') {
