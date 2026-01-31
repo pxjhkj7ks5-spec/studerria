@@ -714,6 +714,7 @@
                       class="form-control"
                       name="homework_tag"
                       placeholder="<%= t('admin.tag') %>"
+                      list="adminHomeworkTags"
                       value="<%= (filters && filters.homework_tag) || '' %>"
                     />
                   </div>
@@ -734,6 +735,11 @@
                     <button class="btn btn-outline-secondary" type="submit"><%= t('admin.applySort') %></button>
                   </div>
                 </div>
+                <datalist id="adminHomeworkTags">
+                  <% (homeworkTags || []).forEach(function(tag) { %>
+                    <option value="<%= tag %>"></option>
+                  <% }); %>
+                </datalist>
               </form>
             </div>
           </div>
@@ -745,6 +751,7 @@
                   <th><%= t('admin.groupNumber') %></th>
                   <th><%= t('admin.classNumber') %></th>
                   <th><%= t('admin.description') %></th>
+                  <th><%= t('admin.tag') %></th>
                   <th><%= t('admin.dayClass') %></th>
                   <th><%= t('admin.createdBy') %></th>
                   <th><%= t('admin.attachment') %></th>
@@ -758,6 +765,13 @@
                     <td><%= item.group_number %></td>
                     <td><%= item.subject_name || item.subject %> (<%= item.day_of_week || item.day %>)</td>
                     <td><%= item.description %></td>
+                    <td>
+                      <% if (item.tags && item.tags.length) { %>
+                        <%= item.tags.join(', ') %>
+                      <% } else { %>
+                        <span class="text-muted">—</span>
+                      <% } %>
+                    </td>
                     <td><%= item.day_of_week || item.day %> · #<%= item.class_number || '-' %></td>
                     <td><%= item.created_by %></td>
                     <td>

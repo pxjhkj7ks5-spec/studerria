@@ -2500,9 +2500,16 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
 
     const homeworkWhere = homeworkFilters.length ? `WHERE ${homeworkFilters.join(' AND ')}` : '';
     const homeworkSql = `
-      SELECT h.*, subj.name AS subject_name
+      SELECT h.*, subj.name AS subject_name,
+             COALESCE(taglist.tags, ARRAY[]::text[]) AS tags
       FROM homework h
       JOIN subjects subj ON subj.id = h.subject_id
+      LEFT JOIN LATERAL (
+        SELECT array_agg(t.name ORDER BY t.name) AS tags
+        FROM homework_tag_map ht
+        JOIN homework_tags t ON t.id = ht.tag_id
+        WHERE ht.homework_id = h.id
+      ) taglist ON true
       ${homeworkWhere}
       ORDER BY h.created_at DESC
     `;
@@ -2512,7 +2519,12 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         return handleDbError(res, homeworkErr, 'admin.homework');
       }
       const homework = sortHomework(homeworkRows, sort_homework);
-      ensureUsersSchema(() => {
+      db.all('SELECT name FROM homework_tags ORDER BY name', (tagErr, tagRows) => {
+        if (tagErr) {
+          return handleDbError(res, tagErr, 'admin.homework.tags');
+        }
+        const homeworkTags = (tagRows || []).map((row) => row.name);
+        ensureUsersSchema(() => {
         const userFilters = ['course_id = ?'];
         const userParams = [courseId];
         if (usersHasIsActive) {
@@ -2838,6 +2850,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         role: req.session.role,
                                       schedule,
                                       homework,
+                                      homeworkTags,
                                       users,
                                       subjects,
                                       studentGroups,
@@ -2914,9 +2927,10 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                 }
               );
             });
-          }
-        );
-      });
+          });
+        }
+      );
+    });
     });
     });
       }
