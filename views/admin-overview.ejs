@@ -116,7 +116,7 @@
         padding: 10px 38px 10px 14px;
         border: none;
         color: inherit;
-        transition: box-shadow 0.2s ease, background 0.2s ease;
+        transition: background-image 160ms ease, box-shadow 0.2s ease, background 0.2s ease;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
         background-position: right 12px center;
@@ -127,14 +127,18 @@
         color: #0f172a;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
       }
+      select.form-select.select-open {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
+      }
+      body.theme-light select.form-select.select-open {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
+      }
       select.form-select:focus {
         outline: none;
         box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
       }
       body.theme-light select.form-select:focus {
         box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.2);
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
       }
       body.theme-dark .table {
         color: #f8fafc;
@@ -322,6 +326,27 @@
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script>
+      function wireSelectOpenState(root = document) {
+        root.querySelectorAll('select.form-select').forEach((select) => {
+          select.addEventListener('pointerdown', () => {
+            select.classList.add('select-open');
+          });
+          select.addEventListener('keydown', (event) => {
+            if ([' ', 'Enter', 'ArrowDown'].includes(event.key)) {
+              select.classList.add('select-open');
+            }
+          });
+          select.addEventListener('change', () => {
+            select.classList.remove('select-open');
+          });
+          select.addEventListener('blur', () => {
+            select.classList.remove('select-open');
+          });
+        });
+      }
+
+      wireSelectOpenState();
+
       const themeToggle = document.getElementById('themeToggle');
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
       const labelLight = themeToggle.dataset.lightLabel || 'Light';
