@@ -317,7 +317,7 @@
           >
             <%= t('theme.dark') %>
           </button>
-          <a class="btn btn-outline-primary btn-sm" href="/admin?course=<%= selectedCourseId %>"><%= t('admin.backToAdmin') %></a>
+          <a class="btn btn-outline-primary btn-sm" href="<%= backLink || ('/admin?course=' + selectedCourseId) %>"><%= t('admin.backToAdmin') %></a>
         </div>
       </div>
     </nav>
@@ -329,7 +329,8 @@
 
       <% const courseMap = {}; %>
       <% (courses || []).forEach(function(c) { courseMap[c.id] = c.name; }); %>
-      <% if (!limitedStaffView) { %>
+      <% const canSwitchCourse = typeof allowCourseSelect !== 'undefined' ? allowCourseSelect : !limitedStaffView; %>
+      <% if (canSwitchCourse) { %>
         <form method="GET" action="/admin/overview" class="mb-3">
           <div class="d-flex flex-wrap align-items-center gap-2">
             <label class="form-label mb-0"><%= t('admin.course') %></label>

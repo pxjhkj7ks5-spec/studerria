@@ -452,7 +452,9 @@
     <main class="container py-4">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <h1 class="h3 mb-0"><%= t('admin.dashboard') %></h1>
-        <a class="btn btn-outline-primary btn-sm" href="/admin/overview?course=<%= selectedCourseId %>"><%= t('admin.openOverview') %></a>
+        <% if (sectionAllowed('admin-overview')) { %>
+          <a class="btn btn-outline-primary btn-sm" href="/admin/overview?course=<%= selectedCourseId %>"><%= t('admin.openOverview') %></a>
+        <% } %>
       </div>
 
       <% const msg = typeof messages !== 'undefined' && messages ? messages : (typeof locals !== 'undefined' ? locals.messages : {}); %>
@@ -466,8 +468,8 @@
       <% const courseMap = {}; %>
       <% (courses || []).forEach(function(c) { courseMap[c.id] = c.name; }); %>
 
-      <% if (!isLimitedView) { %>
-        <form class="mb-3" method="GET" action="/admin">
+      <% if (!isLimitedView || role === 'deanery') { %>
+        <form class="mb-3" method="GET" action="<%= role === 'deanery' ? '/deanery' : '/admin' %>">
           <div class="d-flex align-items-center gap-2">
             <label class="form-label mb-0"><%= t('admin.course') %></label>
             <select name="course" class="form-select w-auto" onchange="this.form.submit()">

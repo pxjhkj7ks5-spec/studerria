@@ -763,6 +763,13 @@ function requireStaff(req, res, next) {
   return next();
 }
 
+function requireOverviewAccess(req, res, next) {
+  if (!req.session.user || !['admin', 'starosta', 'deanery'].includes(req.session.role)) {
+    return res.status(403).send('Forbidden');
+  }
+  return next();
+}
+
 function requireDeanery(req, res, next) {
   if (!req.session.user || req.session.role !== 'deanery') {
     return res.redirect('/schedule');
@@ -2984,13 +2991,32 @@ app.post('/admin/settings', requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/admin/overview', requireAdmin, async (req, res) => {
+app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.init');
   }
-  const courseId = getAdminCourse(req);
+  const role = req.session.role;
+  const isAdmin = role === 'admin';
+  const isDeanery = role === 'deanery';
+  const isStarosta = role === 'starosta';
+  let courses = [];
+  try {
+    courses = await db.all('SELECT id, name FROM courses ORDER BY id');
+  } catch (err) {
+    return handleDbError(res, err, 'admin.overview.courses');
+  }
+  let courseId = isAdmin ? getAdminCourse(req) : Number(req.session.user.course_id || 1);
+  if (isDeanery) {
+    const requested = Number(req.query.course);
+    if (!Number.isNaN(requested)) {
+      courseId = requested;
+    }
+  }
+  if (courses.length && !courses.some((c) => Number(c.id) === Number(courseId))) {
+    courseId = courses[0].id;
+  }
   let activeSemester = null;
   try {
     activeSemester = await getActiveSemester(courseId);
@@ -2998,7 +3024,6 @@ app.get('/admin/overview', requireAdmin, async (req, res) => {
     return handleDbError(res, err, 'admin.overview.semester');
   }
   try {
-    const courses = await db.all('SELECT id, name FROM courses ORDER BY id');
     const statsParams = activeSemester ? [courseId, activeSemester.id] : [courseId];
     const [
       usersRow,
@@ -3132,7 +3157,9 @@ app.get('/admin/overview', requireAdmin, async (req, res) => {
       weeklyTeamwork,
       weeklyUserRoles,
       weeklyUserSeries,
-      limitedStaffView: false,
+      limitedStaffView: isStarosta,
+      allowCourseSelect: isAdmin || isDeanery,
+      backLink: isAdmin ? `/admin?course=${courseId}` : (isDeanery ? `/deanery?course=${courseId}` : '/starosta'),
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.stats');
@@ -3739,7 +3766,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
                       activeSemester,
                       selectedCourseId: courseId,
                       limitedStaffView: true,
-                      allowedSections: ['admin-homework', 'admin-teamwork', 'admin-messages'],
+                      allowedSections: ['admin-homework', 'admin-teamwork', 'admin-messages', 'admin-overview'],
                       filters: {
                         group_number: group_number || '',
                         day: '',
@@ -3779,7 +3806,7 @@ app.get('/deanery', requireDeanery, (req, res) => {
     } catch (err) {
       return handleDbError(res, err, 'deanery.init');
     }
-    const courseId = req.session.user.course_id || 1;
+    const courseId = Number(req.query.course || req.session.user.course_id || 1);
     const { group_number, day, subject, sort_schedule, schedule_date } = req.query;
     let activeSemester = null;
     try {
@@ -3824,7 +3851,7 @@ app.get('/deanery', requireDeanery, (req, res) => {
       ${scheduleWhere}
       ORDER BY se.week_number, se.day_of_week, se.class_number
     `;
-    db.all('SELECT id, name FROM courses WHERE id = ?', [courseId], (courseErr, courses) => {
+    db.all('SELECT id, name FROM courses ORDER BY id', [], (courseErr, courses) => {
       if (courseErr) {
         return handleDbError(res, courseErr, 'deanery.courses');
       }
@@ -3862,7 +3889,7 @@ app.get('/deanery', requireDeanery, (req, res) => {
                   activeSemester,
                   selectedCourseId: courseId,
                   limitedStaffView: true,
-                  allowedSections: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses'],
+                  allowedSections: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-overview'],
                   filters: {
                     group_number: group_number || '',
                     day: day || '',
