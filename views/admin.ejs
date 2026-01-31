@@ -397,7 +397,55 @@
         <div class="mb-3 text-muted"><%= t('admin.course') %>: <%= courseMap[selectedCourseId] || ('Course ' + selectedCourseId) %></div>
       <% } %>
 
-      <% if (!isLimitedView) { %>
+      <% const groupMap = {}; %>
+      <% (studentGroups || []).forEach(function(g) { %>
+        <% if (!groupMap[g.student_id]) { groupMap[g.student_id] = {}; } %>
+        <% groupMap[g.student_id][g.subject_id] = g.group_number; %>
+      <% }); %>
+
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <% if (!isLimitedView) { %>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-settings')">
+            <%= t('admin.settings') %>
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-schedule')">
+            <%= t('admin.schedule') %>
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-homework')">
+            <%= t('admin.homework') %>
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-users')">
+            <%= t('admin.users') %>
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-subjects')">
+            <%= t('admin.subjects') %>
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-semesters')">
+            <%= t('admin.semesters') %>
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-courses')">
+            <%= t('admin.courses') %>
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-history')">
+            <%= t('admin.history') %>
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-activity')">
+            <%= t('admin.activity') %>
+          </button>
+        <% } %>
+        <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-teamwork')">
+          <%= t('admin.teamwork') %>
+        </button>
+        <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-messages')">
+          <%= t('admin.messages') %>
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" type="button" onclick="toggleAllSections()">
+          <%= t('admin.showHideAll') %>
+        </button>
+      </div>
+
+      <div class="tab-content">
+        <% if (!isLimitedView) { %>
         <div id="admin-settings" class="card mb-3">
           <div class="card-body">
             <h5 class="mb-3"><%= t('admin.settings') %></h5>
@@ -448,54 +496,7 @@
             </form>
           </div>
         </div>
-      <% } %>
 
-      <% const groupMap = {}; %>
-      <% (studentGroups || []).forEach(function(g) { %>
-        <% if (!groupMap[g.student_id]) { groupMap[g.student_id] = {}; } %>
-        <% groupMap[g.student_id][g.subject_id] = g.group_number; %>
-      <% }); %>
-
-      <div class="d-flex flex-wrap gap-2 mb-3">
-        <% if (!isLimitedView) { %>
-          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-schedule')">
-            <%= t('admin.schedule') %>
-          </button>
-          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-homework')">
-            <%= t('admin.homework') %>
-          </button>
-          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-users')">
-            <%= t('admin.users') %>
-          </button>
-          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-subjects')">
-            <%= t('admin.subjects') %>
-          </button>
-          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-semesters')">
-            <%= t('admin.semesters') %>
-          </button>
-          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-courses')">
-            <%= t('admin.courses') %>
-          </button>
-          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-history')">
-            <%= t('admin.history') %>
-          </button>
-          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-activity')">
-            <%= t('admin.activity') %>
-          </button>
-        <% } %>
-        <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-teamwork')">
-          <%= t('admin.teamwork') %>
-        </button>
-        <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-messages')">
-          <%= t('admin.messages') %>
-        </button>
-        <button class="btn btn-outline-secondary btn-sm" type="button" onclick="toggleAllSections()">
-          <%= t('admin.showHideAll') %>
-        </button>
-      </div>
-
-      <div class="tab-content">
-        <% if (!isLimitedView) { %>
         <div id="admin-schedule">
           <div class="card mb-4">
             <div class="card-body">
@@ -1826,7 +1827,7 @@
       const limitedStaffView = <%= isLimitedView ? 'true' : 'false' %>;
       const adminSections = limitedStaffView
         ? ['admin-teamwork', 'admin-messages']
-        : ['admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-history', 'admin-activity', 'admin-teamwork', 'admin-messages'];
+        : ['admin-settings', 'admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-history', 'admin-activity', 'admin-teamwork', 'admin-messages'];
 
       function toggleSection(id) {
         const el = document.getElementById(id);
