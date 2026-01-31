@@ -856,6 +856,11 @@
           <% if (role === 'deanery') { %>
             <a class="btn btn-outline-primary btn-sm me-2 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
           <% } %>
+          <button class="btn btn-outline-light btn-sm me-2 msg-btn desktop-only" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">
+            💬
+            <span class="msg-badge d-none" id="messagesBadge">0</span>
+          </button>
+          <a class="btn btn-outline-light btn-sm me-2 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
           <button
             class="btn btn-outline-light btn-sm me-2 theme-toggle desktop-only"
             type="button"
@@ -865,11 +870,6 @@
           >
             <%= t('theme.light') %>
           </button>
-          <button class="btn btn-outline-light btn-sm me-2 msg-btn desktop-only" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">
-            💬
-            <span class="msg-badge d-none" id="messagesBadge">0</span>
-          </button>
-          <a class="btn btn-outline-light btn-sm me-2 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
           <a class="btn btn-outline-light btn-sm me-2 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
           <form method="POST" action="/logout" class="desktop-only">
             <button class="btn btn-outline-light btn-sm" type="submit"><%= t('schedule.logout') %></button>
@@ -1242,6 +1242,10 @@
               <% if (role === 'deanery') { %>
                 <a class="btn btn-outline-primary w-100 glass" href="/deanery"><%= t('menu.deanery') %></a>
               <% } %>
+              <button class="btn btn-outline-light w-100 glass msg-btn" type="button" id="messagesBtnMobile" aria-label="<%= t('messages.aria') %>">
+                💬 <%= t('messages.title') %>
+              </button>
+              <a class="btn btn-outline-light w-100 glass" href="/teamwork"><%= t('menu.teamwork') %></a>
               <button
                 class="btn btn-outline-light w-100 glass theme-toggle"
                 type="button"
@@ -1250,7 +1254,6 @@
               >
                 <%= t('theme.light') %>
               </button>
-              <a class="btn btn-outline-light w-100 glass" href="/teamwork"><%= t('menu.teamwork') %></a>
               <a class="btn btn-outline-light w-100 glass" href="/profile"><%= t('schedule.profile') %></a>
               <form method="POST" action="/logout">
                 <button class="btn btn-outline-light w-100 glass" type="submit"><%= t('schedule.logout') %></button>
@@ -1666,6 +1669,7 @@
 
       const weekSlider = document.getElementById('weekSlider');
       const messagesBtn = document.getElementById('messagesBtn');
+      const messagesBtnMobile = document.getElementById('messagesBtnMobile');
       const messagesList = document.getElementById('messagesList');
       const messagesBadge = document.getElementById('messagesBadge');
       const messagesSubjectFilter = document.getElementById('messagesSubjectFilter');
@@ -1730,6 +1734,18 @@
           if (Math.abs(delta) < 40) return;
           if (delta < 0) animateWeekChange(currentWeek + 1);
           if (delta > 0) animateWeekChange(currentWeek - 1);
+        });
+      }
+
+      if (messagesBtnMobile) {
+        messagesBtnMobile.addEventListener('click', () => {
+          const mobileMenu = document.getElementById('mobileMenuModal');
+          if (mobileMenu) {
+            const menuInstance = bootstrap.Modal.getInstance(mobileMenu) || new bootstrap.Modal(mobileMenu);
+            menuInstance.hide();
+          }
+          const modal = new bootstrap.Modal(document.getElementById('messagesModal'));
+          modal.show();
         });
       }
       updateMobileWeekDots();
