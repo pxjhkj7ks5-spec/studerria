@@ -783,6 +783,8 @@
         background: rgba(255, 255, 255, 0.08);
         color: rgba(255, 255, 255, 0.92);
         text-align: left;
+        font-size: 0.95rem;
+        padding: 12px 14px;
       }
       .mobile-menu-action:hover {
         background: rgba(255, 255, 255, 0.14);
@@ -796,6 +798,35 @@
       body.theme-light .mobile-menu-action:hover {
         background: rgba(255, 255, 255, 0.8);
         border-color: rgba(15, 23, 42, 0.18);
+      }
+      #mobileMenuModal .modal-content {
+        border-radius: 18px;
+        background: rgba(20, 24, 36, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      body.theme-light #mobileMenuModal .modal-content {
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(15, 23, 42, 0.1);
+      }
+      #mobileMenuModal .modal-header {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 14px 16px;
+      }
+      body.theme-light #mobileMenuModal .modal-header {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.12);
+      }
+      #mobileMenuModal .modal-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+      }
+      #mobileMenuModal .modal-body {
+        padding: 12px 16px 16px;
+      }
+      #mobileMenuModal .btn-close {
+        filter: brightness(1.1);
+      }
+      body.theme-light #mobileMenuModal .btn-close {
+        filter: none;
       }
       @media (max-width: 768px) {
         .topbar-actions .desktop-only {
@@ -1263,7 +1294,7 @@
                 <a class="btn w-100 glass mobile-menu-action" href="/deanery"><%= t('menu.deanery') %></a>
               <% } %>
               <button class="btn w-100 glass mobile-menu-action" type="button" id="messagesBtnMobile" aria-label="<%= t('messages.aria') %>">
-                💬 <%= t('messages.title') %>
+                💬 Повідомлення
               </button>
               <a class="btn w-100 glass mobile-menu-action" href="/teamwork"><%= t('menu.teamwork') %></a>
               <button
