@@ -160,6 +160,27 @@
       body.theme-dark .table thead th {
         color: rgba(248, 250, 252, 0.92);
       }
+      .stat-tile {
+        border-radius: 16px;
+        border: 1px solid transparent;
+        padding: 0.75rem;
+        transition: background 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+      }
+      body.theme-dark .stat-tile {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.14);
+        color: #f8fafc;
+        box-shadow: 0 12px 30px rgba(8, 8, 20, 0.4);
+      }
+      body.theme-dark .stat-tile .text-muted {
+        color: rgba(226, 232, 240, 0.7) !important;
+      }
+      body.theme-light .stat-tile {
+        background: rgba(255, 255, 255, 0.75);
+        border-color: rgba(15, 23, 42, 0.08);
+        color: #0f172a;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+      }
       body.theme-dark h1,
       body.theme-dark h2,
       body.theme-dark h3,
@@ -252,37 +273,37 @@
         <div class="card-body">
           <div class="row g-3 mb-4">
             <div class="col-6 col-lg-2">
-              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+              <div class="stat-tile">
                 <div class="text-muted small"><%= t('admin.users') %></div>
                 <div class="h4 mb-0"><%= stats.users %></div>
               </div>
             </div>
             <div class="col-6 col-lg-2">
-              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+              <div class="stat-tile">
                 <div class="text-muted small"><%= t('admin.subjects') %></div>
                 <div class="h4 mb-0"><%= stats.subjects %></div>
               </div>
             </div>
             <div class="col-6 col-lg-2">
-              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+              <div class="stat-tile">
                 <div class="text-muted small"><%= t('admin.homework') %></div>
                 <div class="h4 mb-0"><%= stats.homework %></div>
               </div>
             </div>
             <div class="col-6 col-lg-2">
-              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+              <div class="stat-tile">
                 <div class="text-muted small"><%= t('admin.teamworkTasks') %></div>
                 <div class="h4 mb-0"><%= stats.teamworkTasks %></div>
               </div>
             </div>
             <div class="col-6 col-lg-2">
-              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+              <div class="stat-tile">
                 <div class="text-muted small"><%= t('admin.teamworkGroups') %></div>
                 <div class="h4 mb-0"><%= stats.teamworkGroups %></div>
               </div>
             </div>
             <div class="col-6 col-lg-2">
-              <div class="p-3 rounded-4 border bg-white bg-opacity-75">
+              <div class="stat-tile">
                 <div class="text-muted small"><%= t('admin.teamworkMembers') %></div>
                 <div class="h4 mb-0"><%= stats.teamworkMembers %></div>
               </div>
