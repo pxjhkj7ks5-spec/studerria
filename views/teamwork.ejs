@@ -131,6 +131,22 @@
       .group-card {
         border-radius: 14px;
       }
+      .react-btn {
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 12px;
+        line-height: 1.2;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .react-btn.active {
+        background: rgba(59, 130, 246, 0.2);
+        border-color: rgba(59, 130, 246, 0.5);
+      }
+      body.theme-light .react-btn.active {
+        background: rgba(59, 130, 246, 0.16);
+      }
     </style>
   </head>
   <body class="theme-dark">
@@ -189,6 +205,28 @@
               <div>
                 <h5 class="mb-1"><%= task.title %></h5>
                 <div class="text-muted">Предмет: <%= task.subject_name %></div>
+                <div class="d-flex gap-2 mt-2 task-reactions">
+                  <% const reactMap = task.reactions || {}; %>
+                  <% const reactedMap = task.reacted || {}; %>
+                  <button
+                    class="btn btn-outline-light btn-sm react-btn <%= reactedMap['🔥'] ? 'active' : '' %>"
+                    data-task-id="<%= task.id %>"
+                    data-emoji="🔥"
+                    type="button"
+                  >
+                    <span>🔥</span>
+                    <span class="react-count"><%= reactMap['🔥'] || 0 %></span>
+                  </button>
+                  <button
+                    class="btn btn-outline-light btn-sm react-btn <%= reactedMap['👍'] ? 'active' : '' %>"
+                    data-task-id="<%= task.id %>"
+                    data-emoji="👍"
+                    type="button"
+                  >
+                    <span>👍</span>
+                    <span class="react-count"><%= reactMap['👍'] || 0 %></span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -318,6 +356,43 @@
         document.body.classList.add(next);
         localStorage.setItem('ui-theme', next);
         themeToggle.textContent = next === 'theme-dark' ? 'Light' : 'Dark';
+      });
+
+      function updateReactionButtons(container, reactions, reacted) {
+        const buttons = container.querySelectorAll('.react-btn');
+        buttons.forEach((btn) => {
+          const emoji = btn.dataset.emoji;
+          const count = reactions && reactions[emoji] ? reactions[emoji] : 0;
+          const countEl = btn.querySelector('.react-count');
+          if (countEl) countEl.textContent = count;
+          if (reacted && reacted[emoji]) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      }
+
+      document.querySelectorAll('.task-reactions .react-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const taskId = Number(btn.dataset.taskId);
+          const emoji = btn.dataset.emoji;
+          if (Number.isNaN(taskId) || !emoji) return;
+          try {
+            const res = await fetch('/teamwork/react', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ task_id: taskId, emoji }),
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const container = btn.closest('.task-reactions');
+            if (!container) return;
+            updateReactionButtons(container, data.reactions, data.reacted);
+          } catch (err) {
+            console.error(err);
+          }
+        });
       });
     </script>
   </body>

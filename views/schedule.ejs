@@ -135,6 +135,44 @@
         background: rgba(59, 130, 246, 0.12);
         color: #1e3a8a;
       }
+      .tag-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        color: rgba(248, 250, 252, 0.85);
+      }
+      body.theme-light .tag-pill {
+        background: rgba(15, 23, 42, 0.06);
+        border-color: rgba(15, 23, 42, 0.12);
+        color: #0f172a;
+      }
+      .react-btn {
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 12px;
+        line-height: 1.2;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .react-btn.active {
+        background: rgba(59, 130, 246, 0.2);
+        border-color: rgba(59, 130, 246, 0.5);
+      }
+      body.theme-light .react-btn.active {
+        background: rgba(59, 130, 246, 0.16);
+      }
+      .hw-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
       .week-slider {
         position: fixed;
         left: 50%;
@@ -544,6 +582,15 @@
             </div>
 
             <h6>Homework list</h6>
+            <div class="mb-2">
+              <label class="form-label">Filter by tag</label>
+              <input
+                id="homeworkTagFilter"
+                class="form-control"
+                list="homeworkTagsList"
+                placeholder="#тест або #онлайн"
+              />
+            </div>
             <ul id="homeworkList" class="list-group mb-4">
               <li class="list-group-item text-muted">No assignments yet.</li>
             </ul>
@@ -605,6 +652,17 @@
                 />
               </div>
               <div class="mb-3">
+                <label for="hwTags" class="form-label">Tags (comma separated)</label>
+                <input
+                  id="hwTags"
+                  name="tags"
+                  type="text"
+                  class="form-control"
+                  list="homeworkTagsList"
+                  placeholder="#тест, #лекція"
+                />
+              </div>
+              <div class="mb-3">
                 <label for="hwFile" class="form-label">Attachment (optional)</label>
                 <input id="hwFile" name="attachment" type="file" class="form-control" />
               </div>
@@ -616,6 +674,11 @@
               <input type="hidden" id="hwDate" name="class_date" />
               <button type="submit" class="btn btn-primary">Save homework</button>
             </form>
+            <datalist id="homeworkTagsList">
+              <% (homeworkTags || []).forEach(function(tag) { %>
+                <option value="<%= tag %>"></option>
+              <% }); %>
+            </datalist>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
@@ -663,6 +726,40 @@
       const subgroupHomeworkId = document.getElementById('subgroupHomeworkId');
       const joinSubgroupId = document.getElementById('joinSubgroupId');
       const currentUser = <%- JSON.stringify(username) %>;
+      const homeworkTagFilter = document.getElementById('homeworkTagFilter');
+      const currentUserId = <%- JSON.stringify(userId || null) %>;
+      let currentHomeworkItems = [];
+
+      function updateReactionButtons(container, reactions, reacted) {
+        const buttons = container.querySelectorAll('.react-btn');
+        buttons.forEach((btn) => {
+          const emoji = btn.dataset.emoji;
+          const count = reactions && reactions[emoji] ? reactions[emoji] : 0;
+          const countEl = btn.querySelector('.react-count');
+          if (countEl) countEl.textContent = count;
+          if (reacted && reacted[emoji]) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      }
+
+      async function toggleHomeworkReaction(homeworkId, emoji, container) {
+        if (!currentUserId) return;
+        try {
+          const res = await fetch('/homework/react', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ homework_id: homeworkId, emoji }),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          updateReactionButtons(container, data.reactions, data.reacted);
+        } catch (err) {
+          console.error(err);
+        }
+      }
 
       function renderHomework(items) {
         listEl.innerHTML = '';
@@ -688,6 +785,18 @@
           const created = new Date(item.created_at).toLocaleString();
           meta.textContent = `${item.created_by} • ${created}`;
           li.appendChild(meta);
+
+          if (item.tags && item.tags.length) {
+            const tagWrap = document.createElement('div');
+            tagWrap.className = 'hw-tags mb-2';
+            item.tags.forEach((tag) => {
+              const tagEl = document.createElement('span');
+              tagEl.className = 'tag-pill';
+              tagEl.textContent = tag;
+              tagWrap.appendChild(tagEl);
+            });
+            li.appendChild(tagWrap);
+          }
 
           if (item.link_url) {
             const link = document.createElement('a');
@@ -715,6 +824,24 @@
             fileLink.className = 'd-inline-block';
             li.appendChild(fileLink);
           }
+
+          const reactWrap = document.createElement('div');
+          reactWrap.className = 'd-flex gap-2 mt-2';
+          ['🔥', '👍'].forEach((emoji) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-outline-secondary react-btn';
+            btn.dataset.emoji = emoji;
+            btn.dataset.homeworkId = item.id;
+            const count = item.reactions && item.reactions[emoji] ? item.reactions[emoji] : 0;
+            btn.innerHTML = `<span>${emoji}</span><span class="react-count">${count}</span>`;
+            if (item.reacted && item.reacted[emoji]) {
+              btn.classList.add('active');
+            }
+            btn.addEventListener('click', () => toggleHomeworkReaction(item.id, emoji, reactWrap));
+            reactWrap.appendChild(btn);
+          });
+          li.appendChild(reactWrap);
 
           listEl.appendChild(li);
         });
@@ -788,6 +915,10 @@
             item.class_date === classDate
           );
         });
+        currentHomeworkItems = filtered;
+        if (homeworkTagFilter) {
+          homeworkTagFilter.value = '';
+        }
         renderHomework(filtered);
         const first = filtered[0];
         if (first) {
@@ -807,6 +938,21 @@
           history.replaceState(null, '', location.pathname + location.search);
         }
       });
+
+      if (homeworkTagFilter) {
+        homeworkTagFilter.addEventListener('input', () => {
+          const tag = homeworkTagFilter.value.trim().toLowerCase();
+          if (!tag) {
+            renderHomework(currentHomeworkItems);
+            return;
+          }
+          const filtered = currentHomeworkItems.filter((item) => {
+            const tags = item.tags || [];
+            return tags.some((t) => t.toLowerCase() === tag);
+          });
+          renderHomework(filtered);
+        });
+      }
 
       function openModalFromHash() {
         if (!location.hash.startsWith('#class=')) return;
@@ -925,10 +1071,23 @@
                 ? 'Всі студенти'
                 : `${m.subject_name || 'Предмет'} · Group ${m.group_number}`;
               const unreadClass = m.read_id ? '' : 'fw-semibold';
+              const reactions = m.reactions || {};
+              const reacted = m.reacted || {};
+              const makeBtn = (emoji) => {
+                const count = reactions[emoji] || 0;
+                const active = reacted[emoji] ? 'active' : '';
+                return `<button class="btn btn-sm btn-outline-secondary react-btn ${active}" data-message-id="${m.id}" data-emoji="${emoji}">
+                  <span>${emoji}</span><span class="react-count">${count}</span>
+                </button>`;
+              };
               return `
                 <li class="list-group-item">
                   <div class="${unreadClass} mb-1">${m.body}</div>
                   <div class="text-muted small">${meta} · ${m.created_by || 'Admin'} · ${new Date(m.created_at).toLocaleString()}</div>
+                  <div class="d-flex gap-2 mt-2 msg-reactions">
+                    ${makeBtn('🔥')}
+                    ${makeBtn('👍')}
+                  </div>
                 </li>
               `;
             })
@@ -950,6 +1109,28 @@
               body: JSON.stringify({ message_ids: unreadIds }),
             });
           }
+          const reactionButtons = messagesList.querySelectorAll('.msg-reactions .react-btn');
+          reactionButtons.forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              const messageId = Number(btn.dataset.messageId);
+              const emoji = btn.dataset.emoji;
+              if (Number.isNaN(messageId) || !emoji) return;
+              try {
+                const res = await fetch('/messages/react', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ message_id: messageId, emoji }),
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                const container = btn.closest('.msg-reactions');
+                if (!container) return;
+                updateReactionButtons(container, data.reactions, data.reacted);
+              } catch (err) {
+                console.error(err);
+              }
+            });
+          });
         } catch (err) {
           messagesList.innerHTML = '<li class="list-group-item text-muted">Помилка завантаження</li>';
         }

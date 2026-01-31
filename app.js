@@ -387,6 +387,28 @@ const initDb = async () => {
       )
     `,
     `
+      CREATE TABLE IF NOT EXISTS homework_tags (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS homework_tag_map (
+        homework_id INTEGER NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        tag_id INTEGER NOT NULL REFERENCES homework_tags(id) ON DELETE CASCADE,
+        UNIQUE(homework_id, tag_id)
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS homework_reactions (
+        homework_id INTEGER NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        emoji TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(homework_id, user_id, emoji)
+      )
+    `,
+    `
       CREATE TABLE IF NOT EXISTS history_log (
         id SERIAL PRIMARY KEY,
         actor_id INTEGER,
@@ -454,6 +476,15 @@ const initDb = async () => {
       )
     `,
     `
+      CREATE TABLE IF NOT EXISTS teamwork_reactions (
+        task_id INTEGER NOT NULL REFERENCES teamwork_tasks(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        emoji TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(task_id, user_id, emoji)
+      )
+    `,
+    `
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
         subject_id INTEGER REFERENCES subjects(id) ON DELETE SET NULL,
@@ -464,6 +495,15 @@ const initDb = async () => {
         created_at TEXT NOT NULL,
         course_id INTEGER REFERENCES courses(id),
         semester_id INTEGER REFERENCES semesters(id)
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS message_reactions (
+        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        emoji TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(message_id, user_id, emoji)
       )
     `,
     `
@@ -1314,10 +1354,12 @@ app.get('/schedule', requireLogin, async (req, res) => {
             username,
             homework: [],
             homeworkMeta: {},
+            homeworkTags: [],
             subgroupError: req.query.sg || null,
             role: req.session.role,
             viewAs: req.session.viewAs || null,
             messageSubjects: studentGroups || [],
+            userId,
           });
         }
 
@@ -1397,23 +1439,91 @@ app.get('/schedule', requireLogin, async (req, res) => {
               }
             });
 
-            res.render('schedule', {
-              scheduleByDay,
-              daysOfWeek,
-              dayDates,
-              currentWeek: selectedWeek,
-              totalWeeks,
-              semester: activeSemester,
-              bellSchedule,
-              group: group || 'A',
-              username,
-              homework,
-              homeworkMeta,
-              subgroupError: req.query.sg || null,
-              role: req.session.role,
-              viewAs: req.session.viewAs || null,
-              messageSubjects: studentGroups || [],
-            });
+            const homeworkIds = homework.map((h) => h.id);
+            const finalizeRender = (tagOptions = []) => {
+              res.render('schedule', {
+                scheduleByDay,
+                daysOfWeek,
+                dayDates,
+                currentWeek: selectedWeek,
+                totalWeeks,
+                semester: activeSemester,
+                bellSchedule,
+                group: group || 'A',
+                username,
+                homework,
+                homeworkMeta,
+                homeworkTags: tagOptions,
+                subgroupError: req.query.sg || null,
+                role: req.session.role,
+                viewAs: req.session.viewAs || null,
+                messageSubjects: studentGroups || [],
+                userId,
+              });
+            };
+
+            if (!homeworkIds.length) {
+              return finalizeRender([]);
+            }
+            const placeholders = homeworkIds.map(() => '?').join(',');
+            db.all(
+              `SELECT ht.homework_id, t.name
+               FROM homework_tag_map ht
+               JOIN homework_tags t ON t.id = ht.tag_id
+               WHERE ht.homework_id IN (${placeholders})`,
+              homeworkIds,
+              (tagErr, tagRows) => {
+                if (!tagErr && tagRows) {
+                  const tagMap = {};
+                  tagRows.forEach((row) => {
+                    if (!tagMap[row.homework_id]) tagMap[row.homework_id] = [];
+                    tagMap[row.homework_id].push(row.name);
+                  });
+                  homework.forEach((hw) => {
+                    hw.tags = tagMap[hw.id] || [];
+                  });
+                }
+                db.all('SELECT name FROM homework_tags ORDER BY name', (tagListErr, tagList) => {
+                  const tagOptions = !tagListErr && tagList ? tagList.map((t) => t.name) : [];
+                  db.all(
+                    `SELECT homework_id, emoji, COUNT(*) AS count
+                     FROM homework_reactions
+                     WHERE homework_id IN (${placeholders})
+                     GROUP BY homework_id, emoji`,
+                    homeworkIds,
+                    (reactErr, reactRows) => {
+                      const reactionMap = {};
+                      if (!reactErr && reactRows) {
+                        reactRows.forEach((row) => {
+                          if (!reactionMap[row.homework_id]) reactionMap[row.homework_id] = {};
+                          reactionMap[row.homework_id][row.emoji] = Number(row.count || 0);
+                        });
+                      }
+                      db.all(
+                        `SELECT homework_id, emoji
+                         FROM homework_reactions
+                         WHERE homework_id IN (${placeholders}) AND user_id = ?`,
+                        [...homeworkIds, userId],
+                        (myErr, myRows) => {
+                          const reactedMap = {};
+                          if (!myErr && myRows) {
+                            myRows.forEach((row) => {
+                              if (!reactedMap[row.homework_id]) reactedMap[row.homework_id] = {};
+                              reactedMap[row.homework_id][row.emoji] = true;
+                            });
+                          }
+                          homework.forEach((hw) => {
+                            hw.reactions = reactionMap[hw.id] || {};
+                            hw.reacted = reactedMap[hw.id] || {};
+                          });
+                          finalizeRender(tagOptions);
+                        }
+                      );
+                    }
+                  );
+                });
+              }
+            );
           }
         );
       };
@@ -1566,38 +1676,77 @@ app.get('/teamwork', requireLogin, async (req, res) => {
 
                   db.all(
                     `
-                      SELECT u.id, u.full_name
-                      FROM users u
-                      JOIN student_groups sg ON sg.student_id = u.id
-                      WHERE sg.subject_id = ? AND u.course_id = ?
-                      ORDER BY u.full_name ASC
+                      SELECT task_id, emoji, COUNT(*) AS count
+                      FROM teamwork_reactions
+                      WHERE task_id IN (${placeholders})
+                      GROUP BY task_id, emoji
                     `,
-                    [selectedSubjectId, courseId || 1],
-                    (stuErr, students) => {
-                      if (stuErr) {
-                        return res.status(500).send('Database error');
+                    taskIds,
+                    (reactErr, reactRows) => {
+                      const reactionMap = {};
+                      if (!reactErr && reactRows) {
+                        reactRows.forEach((row) => {
+                          if (!reactionMap[row.task_id]) reactionMap[row.task_id] = {};
+                          reactionMap[row.task_id][row.emoji] = Number(row.count || 0);
+                        });
                       }
+                      db.all(
+                        `
+                          SELECT task_id, emoji
+                          FROM teamwork_reactions
+                          WHERE task_id IN (${placeholders}) AND user_id = ?
+                        `,
+                        [...taskIds, userId],
+                        (myErr, myRows) => {
+                          const reactedMap = {};
+                          if (!myErr && myRows) {
+                            myRows.forEach((row) => {
+                              if (!reactedMap[row.task_id]) reactedMap[row.task_id] = {};
+                              reactedMap[row.task_id][row.emoji] = true;
+                            });
+                          }
+                          taskData.forEach((task) => {
+                            task.reactions = reactionMap[task.id] || {};
+                            task.reacted = reactedMap[task.id] || {};
+                          });
+                          db.all(
+                            `
+                              SELECT u.id, u.full_name
+                              FROM users u
+                              JOIN student_groups sg ON sg.student_id = u.id
+                              WHERE sg.subject_id = ? AND u.course_id = ?
+                              ORDER BY u.full_name ASC
+                            `,
+                            [selectedSubjectId, courseId || 1],
+                            (stuErr, students) => {
+                              if (stuErr) {
+                                return res.status(500).send('Database error');
+                              }
 
-                      const membersByTask = {};
-                      members.forEach((m) => {
-                        if (!membersByTask[m.task_id]) membersByTask[m.task_id] = new Set();
-                        membersByTask[m.task_id].add(m.user_id);
-                      });
+                              const membersByTask = {};
+                              members.forEach((m) => {
+                                if (!membersByTask[m.task_id]) membersByTask[m.task_id] = new Set();
+                                membersByTask[m.task_id].add(m.user_id);
+                              });
 
-                      const freeStudents = tasks.reduce((acc, task) => {
-                        const used = membersByTask[task.id] || new Set();
-                        acc[task.id] = students.filter((s) => !used.has(s.id));
-                        return acc;
-                      }, {});
+                              const freeStudents = tasks.reduce((acc, task) => {
+                                const used = membersByTask[task.id] || new Set();
+                                acc[task.id] = students.filter((s) => !used.has(s.id));
+                                return acc;
+                              }, {});
 
-                      return res.render('teamwork', {
-                        subjects,
-                        selectedSubjectId,
-                        tasks: taskData,
-                        freeStudents,
-                        messages: res.locals.messages,
-                        username,
-                      });
+                              return res.render('teamwork', {
+                                subjects,
+                                selectedSubjectId,
+                                tasks: taskData,
+                                freeStudents,
+                                messages: res.locals.messages,
+                                username,
+                              });
+                            }
+                          );
+                        }
+                      );
                     }
                   );
                 }
@@ -2003,7 +2152,47 @@ app.get('/messages.json', requireLogin, async (req, res) => {
             return res.status(500).json({ error: 'Database error' });
           }
           const unreadCount = rows.filter((r) => !r.read_id).length;
-          return res.json({ messages: rows, unread_count: unreadCount });
+          if (!rows.length) {
+            return res.json({ messages: rows, unread_count: unreadCount });
+          }
+          const messageIds = rows.map((r) => r.id);
+          const placeholders = messageIds.map(() => '?').join(',');
+          db.all(
+            `SELECT message_id, emoji, COUNT(*) AS count
+             FROM message_reactions
+             WHERE message_id IN (${placeholders})
+             GROUP BY message_id, emoji`,
+            messageIds,
+            (reactErr, reactRows) => {
+              const reactionMap = {};
+              if (!reactErr && reactRows) {
+                reactRows.forEach((row) => {
+                  if (!reactionMap[row.message_id]) reactionMap[row.message_id] = {};
+                  reactionMap[row.message_id][row.emoji] = Number(row.count || 0);
+                });
+              }
+              db.all(
+                `SELECT message_id, emoji
+                 FROM message_reactions
+                 WHERE message_id IN (${placeholders}) AND user_id = ?`,
+                [...messageIds, userId],
+                (myErr, myRows) => {
+                  const reactedMap = {};
+                  if (!myErr && myRows) {
+                    myRows.forEach((row) => {
+                      if (!reactedMap[row.message_id]) reactedMap[row.message_id] = {};
+                      reactedMap[row.message_id][row.emoji] = true;
+                    });
+                  }
+                  rows.forEach((row) => {
+                    row.reactions = reactionMap[row.id] || {};
+                    row.reacted = reactedMap[row.id] || {};
+                  });
+                  return res.json({ messages: rows, unread_count: unreadCount });
+                }
+              );
+            }
+          );
         }
       );
     }
@@ -2025,6 +2214,146 @@ app.post('/messages/read', requireLogin, (req, res) => {
     stmt.run(Number(mid), userId, readAt);
   });
   stmt.finalize(() => res.json({ ok: true }));
+});
+
+const allowedReactions = new Set(['🔥', '👍']);
+
+app.post('/homework/react', requireLogin, async (req, res) => {
+  const homeworkId = Number(req.body.homework_id);
+  const emoji = req.body.emoji;
+  const { id: userId } = req.session.user;
+  if (Number.isNaN(homeworkId) || !allowedReactions.has(emoji)) {
+    return res.status(400).json({ error: 'Invalid data' });
+  }
+  try {
+    const existing = await db.get(
+      'SELECT 1 FROM homework_reactions WHERE homework_id = ? AND user_id = ? AND emoji = ?',
+      [homeworkId, userId, emoji]
+    );
+    if (existing) {
+      await db.run('DELETE FROM homework_reactions WHERE homework_id = ? AND user_id = ? AND emoji = ?', [
+        homeworkId,
+        userId,
+        emoji,
+      ]);
+    } else {
+      await db.run(
+        'INSERT INTO homework_reactions (homework_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?)',
+        [homeworkId, userId, emoji, new Date().toISOString()]
+      );
+    }
+    const reactionRows = await db.all(
+      'SELECT emoji, COUNT(*) AS count FROM homework_reactions WHERE homework_id = ? GROUP BY emoji',
+      [homeworkId]
+    );
+    const reactedRows = await db.all(
+      'SELECT emoji FROM homework_reactions WHERE homework_id = ? AND user_id = ?',
+      [homeworkId, userId]
+    );
+    const reactions = {};
+    reactionRows.forEach((row) => {
+      reactions[row.emoji] = Number(row.count || 0);
+    });
+    const reacted = {};
+    reactedRows.forEach((row) => {
+      reacted[row.emoji] = true;
+    });
+    return res.json({ ok: true, reactions, reacted });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/messages/react', requireLogin, async (req, res) => {
+  const messageId = Number(req.body.message_id);
+  const emoji = req.body.emoji;
+  const { id: userId } = req.session.user;
+  if (Number.isNaN(messageId) || !allowedReactions.has(emoji)) {
+    return res.status(400).json({ error: 'Invalid data' });
+  }
+  try {
+    const existing = await db.get(
+      'SELECT 1 FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?',
+      [messageId, userId, emoji]
+    );
+    if (existing) {
+      await db.run('DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?', [
+        messageId,
+        userId,
+        emoji,
+      ]);
+    } else {
+      await db.run(
+        'INSERT INTO message_reactions (message_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?)',
+        [messageId, userId, emoji, new Date().toISOString()]
+      );
+    }
+    const reactionRows = await db.all(
+      'SELECT emoji, COUNT(*) AS count FROM message_reactions WHERE message_id = ? GROUP BY emoji',
+      [messageId]
+    );
+    const reactedRows = await db.all(
+      'SELECT emoji FROM message_reactions WHERE message_id = ? AND user_id = ?',
+      [messageId, userId]
+    );
+    const reactions = {};
+    reactionRows.forEach((row) => {
+      reactions[row.emoji] = Number(row.count || 0);
+    });
+    const reacted = {};
+    reactedRows.forEach((row) => {
+      reacted[row.emoji] = true;
+    });
+    return res.json({ ok: true, reactions, reacted });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/teamwork/react', requireLogin, async (req, res) => {
+  const taskId = Number(req.body.task_id);
+  const emoji = req.body.emoji;
+  const { id: userId } = req.session.user;
+  if (Number.isNaN(taskId) || !allowedReactions.has(emoji)) {
+    return res.status(400).json({ error: 'Invalid data' });
+  }
+  try {
+    const existing = await db.get(
+      'SELECT 1 FROM teamwork_reactions WHERE task_id = ? AND user_id = ? AND emoji = ?',
+      [taskId, userId, emoji]
+    );
+    if (existing) {
+      await db.run('DELETE FROM teamwork_reactions WHERE task_id = ? AND user_id = ? AND emoji = ?', [
+        taskId,
+        userId,
+        emoji,
+      ]);
+    } else {
+      await db.run(
+        'INSERT INTO teamwork_reactions (task_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?)',
+        [taskId, userId, emoji, new Date().toISOString()]
+      );
+    }
+    const reactionRows = await db.all(
+      'SELECT emoji, COUNT(*) AS count FROM teamwork_reactions WHERE task_id = ? GROUP BY emoji',
+      [taskId]
+    );
+    const reactedRows = await db.all(
+      'SELECT emoji FROM teamwork_reactions WHERE task_id = ? AND user_id = ?',
+      [taskId, userId]
+    );
+    const reactions = {};
+    reactionRows.forEach((row) => {
+      reactions[row.emoji] = Number(row.count || 0);
+    });
+    const reacted = {};
+    reactedRows.forEach((row) => {
+      reacted[row.emoji] = true;
+    });
+    return res.json({ ok: true, reactions, reacted });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 app.get('/admin', requireAdmin, async (req, res, next) => {
@@ -2051,6 +2380,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     users_group,
     homework_from,
     homework_to,
+    homework_tag,
     teamwork_subject,
     teamwork_from,
     teamwork_to,
@@ -2155,6 +2485,17 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         homeworkFilters.push('h.created_at <= ?');
         homeworkParams.push(end.toISOString());
       }
+    }
+    if (homework_tag) {
+      homeworkFilters.push(
+        `EXISTS (
+          SELECT 1
+          FROM homework_tag_map ht
+          JOIN homework_tags t ON t.id = ht.tag_id
+          WHERE ht.homework_id = h.id AND t.name = ?
+        )`
+      );
+      homeworkParams.push(homework_tag);
     }
 
     const homeworkWhere = homeworkFilters.length ? `WHERE ${homeworkFilters.join(' AND ')}` : '';
@@ -2523,10 +2864,11 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
           subject: subject || '',
                                         q: q || '',
                                         schedule_date: schedule_date || '',
-                                        homework_from: homework_from || '',
-                                        homework_to: homework_to || '',
-                                        users_q: users_q || '',
-                                        users_group: users_group || '',
+                                      homework_from: homework_from || '',
+                                      homework_to: homework_to || '',
+                                      homework_tag: homework_tag || '',
+                                      users_q: users_q || '',
+                                      users_group: users_group || '',
                                         teamwork_subject: teamwork_subject || '',
                                         teamwork_from: teamwork_from || '',
                                         teamwork_to: teamwork_to || '',
@@ -3036,6 +3378,7 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), async (req,
     description,
     link_url,
     meeting_url,
+    tags,
     subject_id,
     group_number,
     day_of_week,
@@ -3079,15 +3422,16 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), async (req,
     return res.status(403).send('Homework disabled');
   }
 
-  db.get('SELECT name, course_id FROM subjects WHERE id = ?', [subjectId], (subErr, subjectRow) => {
-    if (subErr || !subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
+  try {
+    const subjectRow = await db.get('SELECT name, course_id FROM subjects WHERE id = ?', [subjectId]);
+    if (!subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
       if (req.file) {
         fs.unlink(req.file.path, () => {});
       }
       return res.status(400).send('Invalid subject');
     }
 
-    db.get(
+    const row = await db.get(
       `
         INSERT INTO homework
         (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id)
@@ -3114,28 +3458,49 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), async (req,
         createdAt,
         courseId || 1,
         activeSemester ? activeSemester.id : null,
-      ],
-      (err, row) => {
-        if (err) {
-          if (req.file) {
-            fs.unlink(req.file.path, () => {});
-          }
-          return res.status(500).send('Database error');
-        }
-        logActivity(
-          db,
-          req,
-          'homework_create',
-          'homework',
-          row && row.id ? row.id : null,
-          { subject_id: subjectId, group_number: groupNum, day_of_week, class_number: classNum },
-          courseId || 1,
-          activeSemester ? activeSemester.id : null
-        );
-        return res.redirect('/schedule');
-      }
+      ]
     );
-  });
+    if (!row || !row.id) {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      return res.status(500).send('Database error');
+    }
+
+    const tagList = String(tags || '')
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length);
+    for (const tag of tagList) {
+      const tagRow = await db.get(
+        'INSERT INTO homework_tags (name) VALUES (?) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id',
+        [tag]
+      );
+      if (tagRow && tagRow.id) {
+        await db.run(
+          'INSERT INTO homework_tag_map (homework_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+          [row.id, tagRow.id]
+        );
+      }
+    }
+
+    logActivity(
+      db,
+      req,
+      'homework_create',
+      'homework',
+      row.id,
+      { subject_id: subjectId, group_number: groupNum, day_of_week, class_number: classNum, tags: tagList },
+      courseId || 1,
+      activeSemester ? activeSemester.id : null
+    );
+    return res.redirect('/schedule');
+  } catch (err) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.status(500).send('Database error');
+  }
 });
 
 app.post('/subgroup/create', requireLogin, async (req, res) => {
