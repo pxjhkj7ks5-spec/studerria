@@ -1080,6 +1080,7 @@
 
       attachValidationTooltips();
 
+      const currentUserId = <%- JSON.stringify(userId || null) %>;
       const welcomeModalEl = document.getElementById('welcomeModal');
       if (welcomeModalEl) {
         const params = new URLSearchParams(window.location.search);
@@ -1092,12 +1093,18 @@
           document.body.classList.add('welcome-open');
           if (window.history && window.history.replaceState) {
             params.delete('welcome');
-            const nextUrl = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`;
+            const query = params.toString();
+            const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
             window.history.replaceState({}, document.title, nextUrl);
           }
           welcomeModalEl.addEventListener('hidden.bs.modal', () => {
             document.body.classList.remove('welcome-open');
           });
+        } else if (shouldWelcome && window.history && window.history.replaceState) {
+          params.delete('welcome');
+          const query = params.toString();
+          const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
+          window.history.replaceState({}, document.title, nextUrl);
         }
       }
 
@@ -1110,7 +1117,6 @@
       const joinSubgroupId = document.getElementById('joinSubgroupId');
       const currentUser = <%- JSON.stringify(username) %>;
       const homeworkTagFilter = document.getElementById('homeworkTagFilter');
-      const currentUserId = <%- JSON.stringify(userId || null) %>;
       let currentHomeworkItems = [];
 
       function updateReactionButtons(container, reactions, reacted) {
