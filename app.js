@@ -991,6 +991,7 @@ async function getCourseStudyDays(courseId) {
       map.set(row.weekday, {
         weekday: row.weekday,
         label: studyDayLabels[row.weekday - 1] || String(row.weekday),
+        day_name: fullWeekDays[row.weekday - 1],
         is_active: !!row.is_active,
         subjects: [],
       });

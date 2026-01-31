@@ -2602,6 +2602,27 @@
         saveAllBtn.addEventListener('click', saveAllForms);
       }
 
+      async function refreshScheduleDayOptions(courseId, selectedValue = '') {
+        const daySelect = document.querySelector('select[name="day"]');
+        if (!daySelect) return;
+        const res = await fetch(`/admin/api/courses/${courseId}/study-days`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const days = (data.days || data).filter((d) => d.is_active);
+        const options = ['<option value="">All days</option>'];
+        days.forEach((day) => {
+          const label = day.label || day.day_name || day.weekday;
+          const value = day.day_name || '';
+          if (!value) return;
+          options.push(
+            `<option value="${value}" ${selectedValue === value ? 'selected' : ''}>${label}</option>`
+          );
+        });
+        daySelect.innerHTML = options.join('');
+      }
+
+      refreshScheduleDayOptions(<%= selectedCourseId || 1 %>, '<%= (filters && filters.day) || '' %>');
+
       const studyDaysModal = document.getElementById('studyDaysModal');
       const studyDaysBody = document.getElementById('studyDaysBody');
       const studyDaysTitle = document.getElementById('studyDaysTitle');
@@ -2616,7 +2637,7 @@
           return;
         }
         const data = await res.json();
-        const days = data.days || data;
+            const days = data.days || data;
         const subjects = data.subjects || [];
         if (studyDaysTitle) {
           studyDaysTitle.textContent = courseName ? `Дні навчання — ${courseName}` : 'Дні навчання';
@@ -2625,11 +2646,6 @@
           .map((day) => {
             const active = day.is_active;
             const assigned = day.subjects || [];
-            const assignedIds = new Set(assigned.map((s) => String(s.id)));
-            const available = subjects.filter((s) => !assignedIds.has(String(s.id)));
-            const subjectOptions = available
-              .map((s) => `<option value="${s.id}">${s.name}</option>`)
-              .join('');
             const chips = assigned.length
               ? assigned
                   .map(
@@ -2647,15 +2663,6 @@
                   </div>
                 </div>
                 <div class="study-day-subjects">${chips}</div>
-                <div class="d-flex gap-2">
-                  <select class="form-select form-select-sm study-day-select" ${!available.length ? 'disabled' : ''}>
-                    <option value="" disabled selected>Оберіть предмет</option>
-                    ${subjectOptions}
-                  </select>
-                  <button class="btn btn-sm btn-outline-primary study-day-add" type="button" data-weekday="${day.weekday}" ${!available.length ? 'disabled' : ''}>
-                    + Додати предмет
-                  </button>
-                </div>
               </div>
             `;
           })
@@ -2669,21 +2676,6 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ is_active: event.target.checked }),
             });
-          });
-        });
-
-        studyDaysBody.querySelectorAll('.study-day-add').forEach((btn) => {
-          btn.addEventListener('click', async () => {
-            const weekday = btn.dataset.weekday;
-            const row = btn.closest('.study-day-row');
-            const select = row ? row.querySelector('.study-day-select') : null;
-            if (!select || !select.value) return;
-            await fetch(`/admin/api/courses/${courseId}/study-days/${weekday}/subjects`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ subject_id: Number(select.value) }),
-            });
-            await loadStudyDays(courseId, courseName);
           });
         });
 
