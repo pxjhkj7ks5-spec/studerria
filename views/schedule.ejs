@@ -509,10 +509,17 @@
       .schedule-content.enter {
         opacity: 0;
         transform: translateY(12px);
+        animation: scheduleIn 320ms ease forwards;
       }
       .schedule-content.enter-active {
         opacity: 1;
         transform: translateY(0);
+      }
+      @keyframes scheduleIn {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
       body.welcome-open .schedule-content,
       body.welcome-open .topbar,
@@ -520,6 +527,9 @@
       body.welcome-open .app-footer {
         filter: blur(8px);
         transition: filter 200ms ease;
+      }
+      body.welcome-open .schedule-content {
+        pointer-events: none;
       }
       .day-card .card-header {
         background: transparent;
