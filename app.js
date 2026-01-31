@@ -4909,6 +4909,126 @@ app.post('/admin/api/homework/bulk', requireHomeworkBulkAccess, async (req, res)
   }
 });
 
+app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) => {
+  const role = req.session.role;
+  const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  let activeSemester = null;
+  try {
+    activeSemester = await getActiveSemester(courseId);
+  } catch (err) {
+    return res.status(500).json({ error: 'Semester error' });
+  }
+  const week = req.query.week ? Number(req.query.week) : null;
+  if (req.query.week && (Number.isNaN(week) || week < 1)) {
+    return res.status(400).json({ error: 'Invalid week' });
+  }
+  const filters = ['se.course_id = ?', 'se.semester_id = ?'];
+  const params = [courseId, activeSemester ? activeSemester.id : null];
+  if (week) {
+    filters.push('se.week_number = ?');
+    params.push(week);
+  }
+  const where = `WHERE ${filters.join(' AND ')}`;
+  try {
+    const studyDays = await getCourseStudyDays(courseId);
+    const activeDaySet = new Set(
+      (studyDays || []).filter((d) => d.is_active).map((d) => d.day_name)
+    );
+    const subjects = await db.all('SELECT id, name, group_count FROM subjects WHERE course_id = ?', [courseId]);
+    const subjectMap = new Map((subjects || []).map((s) => [s.id, s]));
+    const rows = await db.all(
+      `SELECT se.*
+       FROM schedule_entries se
+       ${where}`,
+      params
+    );
+
+    const issues = [];
+    const collisionMap = new Map();
+    (rows || []).forEach((row) => {
+      const key = `${row.week_number}|${row.day_of_week}|${row.class_number}|${row.group_number}`;
+      if (!collisionMap.has(key)) collisionMap.set(key, []);
+      collisionMap.get(key).push(row);
+
+      if (!Number.isFinite(Number(row.class_number)) || row.class_number < 1 || row.class_number > 7) {
+        issues.push({
+          type: 'invalid_class_number',
+          severity: 'error',
+          message: 'Невірний номер пари',
+          context: {
+            week: row.week_number,
+            day_of_week: row.day_of_week,
+            class_number: row.class_number,
+            group: row.group_number,
+            schedule_ids: [row.id],
+          },
+          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
+        });
+      }
+
+      if (activeDaySet.size && !activeDaySet.has(row.day_of_week)) {
+        issues.push({
+          type: 'day_disabled',
+          severity: 'warning',
+          message: 'Пара на вимкнений день',
+          context: {
+            week: row.week_number,
+            day_of_week: row.day_of_week,
+            class_number: row.class_number,
+            group: row.group_number,
+            schedule_ids: [row.id],
+          },
+          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
+        });
+      }
+
+      const subject = subjectMap.get(row.subject_id);
+      if (subject && subject.group_count && row.group_number > subject.group_count) {
+        issues.push({
+          type: 'subject_group_missing',
+          severity: 'warning',
+          message: 'Група не відповідає предмету',
+          context: {
+            week: row.week_number,
+            day_of_week: row.day_of_week,
+            class_number: row.class_number,
+            group: row.group_number,
+            schedule_ids: [row.id],
+          },
+          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
+        });
+      }
+    });
+
+    collisionMap.forEach((list, key) => {
+      if (list.length > 1) {
+        const sample = list[0];
+        issues.push({
+          type: 'collision',
+          severity: 'error',
+          message: 'Конфлікт пар в одному слоті',
+          context: {
+            week: sample.week_number,
+            day_of_week: sample.day_of_week,
+            class_number: sample.class_number,
+            group: sample.group_number,
+            schedule_ids: list.map((r) => r.id),
+          },
+          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(sample.day_of_week)}&group_number=${sample.group_number}`,
+        });
+      }
+    });
+
+    const summary = {
+      errors: issues.filter((i) => i.severity === 'error').length,
+      warnings: issues.filter((i) => i.severity === 'warning').length,
+    };
+    return res.json({ issues, summary });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
 app.post('/admin/semesters/add', requireAdmin, (req, res) => {
   const { title, start_date, weeks_count, is_active } = req.body;
   const courseId = getAdminCourse(req);
