@@ -57,6 +57,7 @@
         color: #f8fafc;
       }
       .course-option {
+        position: relative;
         border: 1px solid rgba(148, 163, 184, 0.45);
         border-radius: 14px;
         padding: 0.85rem 1rem;
@@ -64,11 +65,21 @@
         transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
       }
       .course-option input {
-        margin-right: 0.75rem;
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .course-option span {
+        font-weight: 600;
       }
       .course-option:hover {
         transform: translateY(-1px);
         box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+      }
+      .course-option.is-selected {
+        border-color: rgba(59, 130, 246, 0.9);
+        background: rgba(59, 130, 246, 0.12);
+        box-shadow: 0 10px 22px rgba(59, 130, 246, 0.2);
       }
       body.theme-dark .course-option {
         border-color: rgba(255, 255, 255, 0.15);
@@ -76,6 +87,10 @@
       }
       body.theme-dark .course-option span {
         color: #f8fafc;
+      }
+      body.theme-dark .course-option.is-selected {
+        background: rgba(59, 130, 246, 0.2);
+        border-color: rgba(59, 130, 246, 0.9);
       }
       .btn-primary {
         background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
@@ -149,6 +164,14 @@
       </div>
     </div>
     <script>
+      document.querySelectorAll('.course-option').forEach((option) => {
+        const input = option.querySelector('input[type="radio"]');
+        if (input && input.checked) option.classList.add('is-selected');
+        option.addEventListener('click', () => {
+          document.querySelectorAll('.course-option').forEach((el) => el.classList.remove('is-selected'));
+          option.classList.add('is-selected');
+        });
+      });
       const themeToggle = document.getElementById('themeToggle');
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
       document.body.classList.remove('theme-light', 'theme-dark');
