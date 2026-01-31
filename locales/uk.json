@@ -34,7 +34,7 @@
   "registerCourse.title": "Вибір курсу",
   "registerCourse.continue": "Продовжити",
   "registerSubjects.title": "Вибір груп по предметах",
-  "registerSubjects.subtitle": "Оберіть групу для кожного предмету (необовʼязково, якщо не потрібно).",
+  "registerSubjects.subtitle": "Оберіть групу для кожного предмету з поділом на групи.",
   "registerSubjects.noSubjects": "Поки що немає доступних предметів.",
   "registerSubjects.group": "Група",
   "registerSubjects.finish": "Завершити реєстрацію",
