@@ -52,6 +52,11 @@
       body.theme-dark .admin-nav {
         background: rgba(10, 10, 20, 0.6);
       }
+      body.theme-dark .admin-nav .navbar-brand,
+      body.theme-dark .admin-nav .nav-link,
+      body.theme-dark .admin-nav .text-muted {
+        color: rgba(248, 250, 252, 0.9) !important;
+      }
       .card {
         border-radius: var(--radius);
         backdrop-filter: blur(20px);
@@ -148,6 +153,24 @@
       }
       body.theme-light select.form-select:focus {
         box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.2);
+      }
+      body.theme-dark select.form-select option {
+        background: #0f172a;
+        color: #f8fafc;
+      }
+      body.theme-light select.form-select option {
+        background: #ffffff;
+        color: #0f172a;
+      }
+      body.theme-dark select.form-select option:checked,
+      body.theme-dark select.form-select option:hover {
+        background: rgba(59, 130, 246, 0.6);
+        color: #fff;
+      }
+      body.theme-light select.form-select option:checked,
+      body.theme-light select.form-select option:hover {
+        background: rgba(59, 130, 246, 0.15);
+        color: #0f172a;
       }
       body.theme-dark .table {
         color: #f8fafc;
