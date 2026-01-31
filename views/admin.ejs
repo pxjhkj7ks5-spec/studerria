@@ -397,6 +397,48 @@
       body.theme-light .app-footer {
         color: rgba(15, 23, 42, 0.6);
       }
+      .study-day-row {
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .study-day-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .study-day-label {
+        font-weight: 700;
+      }
+      .study-day-subjects {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      .study-day-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(59, 130, 246, 0.15);
+        border: 1px solid rgba(59, 130, 246, 0.35);
+        color: inherit;
+        font-size: 0.85rem;
+      }
+      .study-day-chip button {
+        border: none;
+        background: transparent;
+        color: inherit;
+      }
+      body.theme-light .study-day-row {
+        background: rgba(255, 255, 255, 0.7);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
       .save-all-btn {
         position: fixed;
         right: 24px;
@@ -1438,6 +1480,14 @@
                         <td class="d-flex gap-2">
                           <form id="course-<%= c.id %>" method="POST" action="/admin/courses/edit/<%= c.id %>" data-save-all="true"></form>
                           <button class="btn btn-sm btn-outline-secondary" type="submit" form="course-<%= c.id %>">Save</button>
+                          <button
+                            class="btn btn-sm btn-outline-primary study-days-btn"
+                            type="button"
+                            data-course-id="<%= c.id %>"
+                            data-course-name="<%= c.name %>"
+                          >
+                            Дні навчання
+                          </button>
                           <form method="POST" action="/admin/courses/delete/<%= c.id %>">
                             <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete this course?');">Delete</button>
                           </form>
@@ -1910,6 +1960,23 @@
           </div>
           <div class="modal-body">
             <div id="subjectGroupsList" class="list-group"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="studyDaysModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="studyDaysTitle">Дні навчання</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="studyDaysBody" class="d-grid gap-3"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
           </div>
         </div>
       </div>
@@ -2534,6 +2601,114 @@
       if (saveAllBtn) {
         saveAllBtn.addEventListener('click', saveAllForms);
       }
+
+      const studyDaysModal = document.getElementById('studyDaysModal');
+      const studyDaysBody = document.getElementById('studyDaysBody');
+      const studyDaysTitle = document.getElementById('studyDaysTitle');
+      const studyDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+
+      async function loadStudyDays(courseId, courseName) {
+        if (!studyDaysBody) return;
+        studyDaysBody.innerHTML = '<div class="text-muted">Завантаження...</div>';
+        const res = await fetch(`/admin/api/courses/${courseId}/study-days`);
+        if (!res.ok) {
+          studyDaysBody.innerHTML = '<div class="text-danger">Помилка завантаження</div>';
+          return;
+        }
+        const data = await res.json();
+        const days = data.days || data;
+        const subjects = data.subjects || [];
+        if (studyDaysTitle) {
+          studyDaysTitle.textContent = courseName ? `Дні навчання — ${courseName}` : 'Дні навчання';
+        }
+        studyDaysBody.innerHTML = days
+          .map((day) => {
+            const active = day.is_active;
+            const assigned = day.subjects || [];
+            const assignedIds = new Set(assigned.map((s) => String(s.id)));
+            const available = subjects.filter((s) => !assignedIds.has(String(s.id)));
+            const subjectOptions = available
+              .map((s) => `<option value="${s.id}">${s.name}</option>`)
+              .join('');
+            const chips = assigned.length
+              ? assigned
+                  .map(
+                    (s) =>
+                      `<span class="study-day-chip">${s.name}<button type="button" data-subject-id="${s.id}" data-weekday="${day.weekday}" class="study-day-remove">×</button></span>`
+                  )
+                  .join('')
+              : '<span class="text-muted">Немає предметів</span>';
+            return `
+              <div class="study-day-row" data-weekday="${day.weekday}">
+                <div class="study-day-header">
+                  <div class="study-day-label">${day.label || studyDayLabels[day.weekday - 1]}</div>
+                  <div class="form-check form-switch m-0">
+                    <input class="form-check-input study-day-toggle" type="checkbox" ${active ? 'checked' : ''} data-weekday="${day.weekday}">
+                  </div>
+                </div>
+                <div class="study-day-subjects">${chips}</div>
+                <div class="d-flex gap-2">
+                  <select class="form-select form-select-sm study-day-select" ${!available.length ? 'disabled' : ''}>
+                    <option value="" disabled selected>Оберіть предмет</option>
+                    ${subjectOptions}
+                  </select>
+                  <button class="btn btn-sm btn-outline-primary study-day-add" type="button" data-weekday="${day.weekday}" ${!available.length ? 'disabled' : ''}>
+                    + Додати предмет
+                  </button>
+                </div>
+              </div>
+            `;
+          })
+          .join('');
+
+        studyDaysBody.querySelectorAll('.study-day-toggle').forEach((toggle) => {
+          toggle.addEventListener('change', async (event) => {
+            const weekday = event.target.dataset.weekday;
+            await fetch(`/admin/api/courses/${courseId}/study-days/${weekday}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ is_active: event.target.checked }),
+            });
+          });
+        });
+
+        studyDaysBody.querySelectorAll('.study-day-add').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const weekday = btn.dataset.weekday;
+            const row = btn.closest('.study-day-row');
+            const select = row ? row.querySelector('.study-day-select') : null;
+            if (!select || !select.value) return;
+            await fetch(`/admin/api/courses/${courseId}/study-days/${weekday}/subjects`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ subject_id: Number(select.value) }),
+            });
+            await loadStudyDays(courseId, courseName);
+          });
+        });
+
+        studyDaysBody.querySelectorAll('.study-day-remove').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const weekday = btn.dataset.weekday;
+            const subjectId = btn.dataset.subjectId;
+            await fetch(`/admin/api/courses/${courseId}/study-days/${weekday}/subjects/${subjectId}`, {
+              method: 'DELETE',
+            });
+            await loadStudyDays(courseId, courseName);
+          });
+        });
+      }
+
+      document.querySelectorAll('.study-days-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const courseId = btn.dataset.courseId;
+          const courseName = btn.dataset.courseName;
+          if (!courseId || !studyDaysModal) return;
+          await loadStudyDays(courseId, courseName);
+          const modal = new bootstrap.Modal(studyDaysModal);
+          modal.show();
+        });
+      });
 
       initInputTracking();
     </script>

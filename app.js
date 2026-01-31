@@ -341,6 +341,28 @@ const initDb = async () => {
       )
     `,
     `
+      CREATE TABLE IF NOT EXISTS course_study_days (
+        id SERIAL PRIMARY KEY,
+        course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        weekday SMALLINT NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(course_id, weekday),
+        CHECK (weekday BETWEEN 1 AND 7)
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS course_day_subjects (
+        id SERIAL PRIMARY KEY,
+        course_study_day_id INTEGER NOT NULL REFERENCES course_study_days(id) ON DELETE CASCADE,
+        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        sort_order INT DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(course_study_day_id, subject_id)
+      )
+    `,
+    `
       CREATE TABLE IF NOT EXISTS student_groups (
         id SERIAL PRIMARY KEY,
         student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -781,8 +803,16 @@ function requireDeanery(req, res, next) {
   return next();
 }
 
+function requireAdminOrDeanery(req, res, next) {
+  if (!req.session.user || !['admin', 'deanery'].includes(req.session.role)) {
+    return res.status(403).send('Forbidden');
+  }
+  return next();
+}
+
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const fullWeekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const studyDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
 function parseDateUTC(dateStr) {
   if (!dateStr) return null;
@@ -924,6 +954,52 @@ async function getActiveSemester(courseId) {
     [courseId]
   );
   return row || null;
+}
+
+async function ensureCourseStudyDays(courseId) {
+  const existing = await db.get('SELECT COUNT(*) AS count FROM course_study_days WHERE course_id = ?', [courseId]);
+  if (existing && Number(existing.count) > 0) return;
+  const now = new Date().toISOString();
+  const inserts = [];
+  for (let i = 1; i <= 7; i += 1) {
+    const isActive = i <= 5 ? 1 : 0;
+    inserts.push(
+      db.run(
+        `INSERT INTO course_study_days (course_id, weekday, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?) ON CONFLICT(course_id, weekday) DO NOTHING`,
+        [courseId, i, isActive, now, now]
+      )
+    );
+  }
+  await Promise.all(inserts);
+}
+
+async function getCourseStudyDays(courseId) {
+  await ensureCourseStudyDays(courseId);
+  const rows = await db.all(
+    `SELECT d.id, d.weekday, d.is_active, s.id AS subject_id, s.name AS subject_name
+     FROM course_study_days d
+     LEFT JOIN course_day_subjects cds ON cds.course_study_day_id = d.id
+     LEFT JOIN subjects s ON s.id = cds.subject_id
+     WHERE d.course_id = ?
+     ORDER BY d.weekday, cds.sort_order, s.name`,
+    [courseId]
+  );
+  const map = new Map();
+  (rows || []).forEach((row) => {
+    if (!map.has(row.weekday)) {
+      map.set(row.weekday, {
+        weekday: row.weekday,
+        label: studyDayLabels[row.weekday - 1] || String(row.weekday),
+        is_active: !!row.is_active,
+        subjects: [],
+      });
+    }
+    if (row.subject_id) {
+      map.get(row.weekday).subjects.push({ id: row.subject_id, name: row.subject_name });
+    }
+  });
+  return Array.from(map.values()).sort((a, b) => a.weekday - b.weekday);
 }
 
 function broadcast(type, payload) {
@@ -1354,6 +1430,14 @@ app.get('/schedule', requireLogin, async (req, res) => {
   if (selectedWeek < 1) selectedWeek = 1;
   if (selectedWeek < 1) selectedWeek = 1;
   if (selectedWeek > totalWeeks) selectedWeek = totalWeeks;
+  const studyDays = await getCourseStudyDays(courseId || 1);
+  let activeDays = studyDays
+    .filter((day) => day.is_active)
+    .map((day) => fullWeekDays[day.weekday - 1])
+    .filter(Boolean);
+  if (!activeDays.length) {
+    activeDays = [...daysOfWeek];
+  }
   const weekDates = fullWeekDays.map((_, idx) =>
     getDateForWeekIndex(selectedWeek, idx, activeSemester ? activeSemester.start_date : null)
   );
@@ -1374,11 +1458,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
       }
 
       const scheduleByDay = {};
-      daysOfWeek.forEach((day) => {
+      activeDays.forEach((day) => {
         scheduleByDay[day] = [];
       });
       const dayDates = {};
-      daysOfWeek.forEach((day) => {
+      activeDays.forEach((day) => {
         const idx = fullWeekDays.indexOf(day);
         dayDates[day] = idx >= 0 ? weekDates[idx] : null;
       });
@@ -1485,9 +1569,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
         if (!studentGroups.length) {
           return loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
             res.render('schedule', {
-              scheduleByDay,
-              daysOfWeek,
-              dayDates,
+            scheduleByDay,
+            daysOfWeek: activeDays,
+            dayDates,
               currentWeek: selectedWeek,
               totalWeeks,
               semester: activeSemester,
@@ -1594,7 +1678,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             const finalizeRender = (tagOptions = [], customDeadlinesByDate = {}, weekendDeadlineCards = [], customDeadlineItems = []) => {
               res.render('schedule', {
                 scheduleByDay,
-                daysOfWeek,
+                daysOfWeek: activeDays,
                 dayDates,
                 currentWeek: selectedWeek,
                 totalWeeks,
@@ -1716,7 +1800,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             scheduleByDay[row.day_of_week].push(row);
           }
         });
-        daysOfWeek.forEach((day) => {
+        activeDays.forEach((day) => {
           scheduleByDay[day].sort((a, b) => a.class_number - b.class_number);
         });
         return loadHomework();
@@ -4570,6 +4654,109 @@ app.post('/admin/courses/delete/:id', requireAdmin, (req, res) => {
       });
     });
   });
+});
+
+app.get('/admin/api/courses/:courseId/study-days', requireAdminOrDeanery, async (req, res) => {
+  const courseId = Number(req.params.courseId);
+  if (Number.isNaN(courseId) || courseId < 1) {
+    return res.status(400).json({ error: 'Invalid course' });
+  }
+  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const course = await db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+    const studyDays = await getCourseStudyDays(courseId);
+    const subjects = await db.all('SELECT id, name FROM subjects WHERE course_id = ? ORDER BY name', [courseId]);
+    return res.json({ days: studyDays, subjects: subjects || [] });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.patch('/admin/api/courses/:courseId/study-days/:weekday', requireAdminOrDeanery, async (req, res) => {
+  const courseId = Number(req.params.courseId);
+  const weekday = Number(req.params.weekday);
+  const { is_active } = req.body || {};
+  if (Number.isNaN(courseId) || courseId < 1 || Number.isNaN(weekday) || weekday < 1 || weekday > 7) {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const course = await db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+    await ensureCourseStudyDays(courseId);
+    const updatedAt = new Date().toISOString();
+    await db.run(
+      'UPDATE course_study_days SET is_active = ?, updated_at = ? WHERE course_id = ? AND weekday = ?',
+      [is_active ? 1 : 0, updatedAt, courseId, weekday]
+    );
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/admin/api/courses/:courseId/study-days/:weekday/subjects', requireAdminOrDeanery, async (req, res) => {
+  const courseId = Number(req.params.courseId);
+  const weekday = Number(req.params.weekday);
+  const subjectId = Number(req.body?.subject_id);
+  if (Number.isNaN(courseId) || Number.isNaN(weekday) || Number.isNaN(subjectId) || weekday < 1 || weekday > 7) {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const course = await db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+    const subject = await db.get('SELECT id, course_id FROM subjects WHERE id = ?', [subjectId]);
+    if (!subject || Number(subject.course_id) !== courseId) {
+      return res.status(400).json({ error: 'Invalid subject' });
+    }
+    await ensureCourseStudyDays(courseId);
+    const dayRow = await db.get(
+      'SELECT id FROM course_study_days WHERE course_id = ? AND weekday = ?',
+      [courseId, weekday]
+    );
+    if (!dayRow) return res.status(404).json({ error: 'Day not found' });
+    await db.run(
+      'INSERT INTO course_day_subjects (course_study_day_id, subject_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+      [dayRow.id, subjectId]
+    );
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.delete('/admin/api/courses/:courseId/study-days/:weekday/subjects/:subjectId', requireAdminOrDeanery, async (req, res) => {
+  const courseId = Number(req.params.courseId);
+  const weekday = Number(req.params.weekday);
+  const subjectId = Number(req.params.subjectId);
+  if (Number.isNaN(courseId) || Number.isNaN(weekday) || Number.isNaN(subjectId) || weekday < 1 || weekday > 7) {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const dayRow = await db.get(
+      'SELECT id FROM course_study_days WHERE course_id = ? AND weekday = ?',
+      [courseId, weekday]
+    );
+    if (!dayRow) return res.status(404).json({ error: 'Day not found' });
+    await db.run(
+      'DELETE FROM course_day_subjects WHERE course_study_day_id = ? AND subject_id = ?',
+      [dayRow.id, subjectId]
+    );
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 app.post('/admin/semesters/add', requireAdmin, (req, res) => {

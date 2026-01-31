@@ -1054,8 +1054,10 @@ body.theme-light .mobile-menu-action {
           <% } %>
         </div>
       <% }); %>
+      <% const activeDaySet = new Set(daysOfWeek || []); %>
       <% if (weekendDeadlineCards && weekendDeadlineCards.length) { %>
         <% weekendDeadlineCards.forEach(function(card) { %>
+          <% if (activeDaySet.has(card.day)) { return; } %>
           <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString('uk-UA') : ''; %>
           <div class="card mb-3 glass day-card">
             <div class="card-header fw-semibold text-white d-flex justify-content-between align-items-center">
