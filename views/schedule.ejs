@@ -777,6 +777,26 @@
         justify-content: center;
         padding: 0;
       }
+      .mobile-menu-action {
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.92);
+        text-align: left;
+      }
+      .mobile-menu-action:hover {
+        background: rgba(255, 255, 255, 0.14);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+      body.theme-light .mobile-menu-action {
+        background: rgba(255, 255, 255, 0.6);
+        border-color: rgba(15, 23, 42, 0.12);
+        color: #0f172a;
+      }
+      body.theme-light .mobile-menu-action:hover {
+        background: rgba(255, 255, 255, 0.8);
+        border-color: rgba(15, 23, 42, 0.18);
+      }
       @media (max-width: 768px) {
         .topbar-actions .desktop-only {
           display: none !important;
@@ -1233,30 +1253,30 @@
             <div class="d-grid gap-2">
               <% if (role === 'admin') { %>
                 <form method="POST" action="/admin/switch-to-admin">
-                  <button class="btn btn-outline-primary w-100 glass" type="submit"><%= t('schedule.backToAdmin') %></button>
+                  <button class="btn w-100 glass mobile-menu-action" type="submit"><%= t('schedule.backToAdmin') %></button>
                 </form>
               <% } %>
               <% if (role === 'starosta') { %>
-                <a class="btn btn-outline-primary w-100 glass" href="/starosta"><%= t('menu.starosta') %></a>
+                <a class="btn w-100 glass mobile-menu-action" href="/starosta"><%= t('menu.starosta') %></a>
               <% } %>
               <% if (role === 'deanery') { %>
-                <a class="btn btn-outline-primary w-100 glass" href="/deanery"><%= t('menu.deanery') %></a>
+                <a class="btn w-100 glass mobile-menu-action" href="/deanery"><%= t('menu.deanery') %></a>
               <% } %>
-              <button class="btn btn-outline-light w-100 glass msg-btn" type="button" id="messagesBtnMobile" aria-label="<%= t('messages.aria') %>">
+              <button class="btn w-100 glass mobile-menu-action" type="button" id="messagesBtnMobile" aria-label="<%= t('messages.aria') %>">
                 💬 <%= t('messages.title') %>
               </button>
-              <a class="btn btn-outline-light w-100 glass" href="/teamwork"><%= t('menu.teamwork') %></a>
+              <a class="btn w-100 glass mobile-menu-action" href="/teamwork"><%= t('menu.teamwork') %></a>
               <button
-                class="btn btn-outline-light w-100 glass theme-toggle"
+                class="btn w-100 glass mobile-menu-action theme-toggle"
                 type="button"
                 data-light-label="<%= t('theme.light') %>"
                 data-dark-label="<%= t('theme.dark') %>"
               >
                 <%= t('theme.light') %>
               </button>
-              <a class="btn btn-outline-light w-100 glass" href="/profile"><%= t('schedule.profile') %></a>
+              <a class="btn w-100 glass mobile-menu-action" href="/profile"><%= t('schedule.profile') %></a>
               <form method="POST" action="/logout">
-                <button class="btn btn-outline-light w-100 glass" type="submit"><%= t('schedule.logout') %></button>
+                <button class="btn w-100 glass mobile-menu-action" type="submit"><%= t('schedule.logout') %></button>
               </form>
             </div>
           </div>
