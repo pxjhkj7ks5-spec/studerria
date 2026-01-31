@@ -383,7 +383,9 @@ const initDb = async () => {
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
         course_id INTEGER REFERENCES courses(id),
-        semester_id INTEGER REFERENCES semesters(id)
+        semester_id INTEGER REFERENCES semesters(id),
+        is_custom_deadline INTEGER NOT NULL DEFAULT 0,
+        custom_due_date TEXT
       )
     `,
     `
@@ -580,6 +582,8 @@ const initDb = async () => {
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
+    'ALTER TABLE homework ADD COLUMN IF NOT EXISTS is_custom_deadline INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE homework ADD COLUMN IF NOT EXISTS custom_due_date TEXT',
     'ALTER TABLE history_log ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE login_history ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
@@ -778,6 +782,7 @@ function requireDeanery(req, res, next) {
 }
 
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const fullWeekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 function parseDateUTC(dateStr) {
   if (!dateStr) return null;
@@ -822,6 +827,23 @@ function getDateForWeekDay(weekNumber, dayName, semesterStart) {
   const dateUTC =
     startUTC + (Number(weekNumber) - 1) * 7 * 24 * 60 * 60 * 1000 + dayIndex * 24 * 60 * 60 * 1000;
   return new Date(dateUTC).toISOString().slice(0, 10);
+}
+
+function getDateForWeekIndex(weekNumber, dayIndex, semesterStart) {
+  if (dayIndex < 0 || dayIndex > 6) return null;
+  const startUTC = parseDateUTC(semesterStart) ?? Date.UTC(2026, 0, 19);
+  const dateUTC =
+    startUTC + (Number(weekNumber) - 1) * 7 * 24 * 60 * 60 * 1000 + dayIndex * 24 * 60 * 60 * 1000;
+  return new Date(dateUTC).toISOString().slice(0, 10);
+}
+
+function getDayNameFromDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  const idx = d.getUTCDay();
+  const map = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return map[idx] || null;
 }
 
 function logAction(dbRef, req, action, details) {
@@ -1332,6 +1354,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
   if (selectedWeek < 1) selectedWeek = 1;
   if (selectedWeek < 1) selectedWeek = 1;
   if (selectedWeek > totalWeeks) selectedWeek = totalWeeks;
+  const weekDates = fullWeekDays.map((_, idx) =>
+    getDateForWeekIndex(selectedWeek, idx, activeSemester ? activeSemester.start_date : null)
+  );
+  const weekStartDate = weekDates[0];
+  const weekEndDate = weekDates[6];
 
   db.all(
     `
@@ -1352,34 +1379,93 @@ app.get('/schedule', requireLogin, async (req, res) => {
       });
       const dayDates = {};
       daysOfWeek.forEach((day) => {
-        dayDates[day] = getDateForWeekDay(
-          selectedWeek,
-          day,
-          activeSemester ? activeSemester.start_date : null
-        );
+        const idx = fullWeekDays.indexOf(day);
+        dayDates[day] = idx >= 0 ? weekDates[idx] : null;
       });
+      const customDeadlineSubjects = [];
+      const subjectSeen = new Set();
+      studentGroups.forEach((sg) => {
+        if (!subjectSeen.has(sg.subject_id)) {
+          subjectSeen.add(sg.subject_id);
+          customDeadlineSubjects.push({ id: sg.subject_id, name: sg.subject_name });
+        }
+      });
+
+      const loadCustomDeadlines = (cb) => {
+        if (!studentGroups.length || !weekStartDate || !weekEndDate) {
+          return cb({}, []);
+        }
+        const conditions = studentGroups
+          .map(() => '(h.subject_id = ? AND h.group_number = ?)')
+          .join(' OR ');
+        const params = [];
+        studentGroups.forEach((sg) => {
+          params.push(sg.subject_id, sg.group_number);
+        });
+        params.push(courseId || 1, activeSemester ? activeSemester.id : null, weekStartDate, weekEndDate);
+        const sql = `
+          SELECT h.*, subj.name AS subject_name
+          FROM homework h
+          JOIN subjects subj ON subj.id = h.subject_id
+          WHERE (${conditions})
+            AND h.course_id = ?
+            AND h.semester_id = ?
+            AND h.is_custom_deadline = 1
+            AND h.custom_due_date IS NOT NULL
+            AND h.custom_due_date >= ?
+            AND h.custom_due_date <= ?
+          ORDER BY h.custom_due_date ASC, h.created_at DESC
+        `;
+        db.all(sql, params, (err, rows) => {
+          if (err) {
+            return cb({}, []);
+          }
+          const byDate = {};
+          (rows || []).forEach((row) => {
+            const key = row.custom_due_date;
+            if (!byDate[key]) byDate[key] = [];
+            byDate[key].push(row);
+          });
+          const weekendCards = [];
+          ['Saturday', 'Sunday'].forEach((day) => {
+            const idx = fullWeekDays.indexOf(day);
+            const date = idx >= 0 ? weekDates[idx] : null;
+            if (!date) return;
+            const items = byDate[date] || [];
+            if (items.length) {
+              weekendCards.push({ day, date, items });
+            }
+          });
+          return cb(byDate, weekendCards);
+        });
+      };
 
       const loadHomework = () => {
         if (!studentGroups.length) {
-          return res.render('schedule', {
-            scheduleByDay,
-            daysOfWeek,
-            dayDates,
-            currentWeek: selectedWeek,
-            totalWeeks,
-            semester: activeSemester,
-            bellSchedule,
-            group: group || 'A',
-            username,
-            homework: [],
-            homeworkMeta: {},
-            homeworkTags: [],
-            subgroupError: req.query.sg || null,
-            role: req.session.role,
-            viewAs: req.session.viewAs || null,
-            messageSubjects: studentGroups || [],
-            userId,
-          });
+          return loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards) =>
+            res.render('schedule', {
+              scheduleByDay,
+              daysOfWeek,
+              dayDates,
+              currentWeek: selectedWeek,
+              totalWeeks,
+              semester: activeSemester,
+              bellSchedule,
+              group: group || 'A',
+              username,
+              homework: [],
+              homeworkMeta: {},
+              homeworkTags: [],
+              customDeadlinesByDate,
+              weekendDeadlineCards,
+              customDeadlineSubjects,
+              subgroupError: req.query.sg || null,
+              role: req.session.role,
+              viewAs: req.session.viewAs || null,
+              messageSubjects: studentGroups || [],
+              userId,
+            })
+          );
         }
 
         const hwConditions = studentGroups
@@ -1397,7 +1483,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
             JOIN subjects subj ON subj.id = h.subject_id
             LEFT JOIN subgroups s ON s.homework_id = h.id
             LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
-            WHERE (${hwConditions}) AND h.course_id = ? AND h.semester_id = ?
+            WHERE (${hwConditions})
+              AND h.course_id = ?
+              AND h.semester_id = ?
+              AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
             ORDER BY h.created_at DESC
           `,
           [...hwParams, courseId || 1, activeSemester ? activeSemester.id : null],
@@ -1460,7 +1549,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             });
 
             const homeworkIds = homework.map((h) => h.id);
-            const finalizeRender = (tagOptions = []) => {
+            const finalizeRender = (tagOptions = [], customDeadlinesByDate = {}, weekendDeadlineCards = []) => {
               res.render('schedule', {
                 scheduleByDay,
                 daysOfWeek,
@@ -1474,6 +1563,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 homework,
                 homeworkMeta,
                 homeworkTags: tagOptions,
+                customDeadlinesByDate,
+                weekendDeadlineCards,
+                customDeadlineSubjects,
                 subgroupError: req.query.sg || null,
                 role: req.session.role,
                 viewAs: req.session.viewAs || null,
@@ -1483,7 +1575,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
             };
 
             if (!homeworkIds.length) {
-              return finalizeRender([]);
+              return loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards) =>
+                finalizeRender([], customDeadlinesByDate, weekendDeadlineCards)
+              );
             }
             const placeholders = homeworkIds.map(() => '?').join(',');
             db.all(
@@ -1536,7 +1630,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
                             hw.reactions = reactionMap[hw.id] || {};
                             hw.reacted = reactedMap[hw.id] || {};
                           });
-                          finalizeRender(tagOptions);
+                          loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards) =>
+                            finalizeRender(tagOptions, customDeadlinesByDate, weekendDeadlineCards)
+                          );
                         }
                       );
                     }
@@ -3545,6 +3641,110 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), async (req,
       'homework',
       row.id,
       { subject_id: subjectId, group_number: groupNum, day_of_week, class_number: classNum, tags: tagList },
+      courseId || 1,
+      activeSemester ? activeSemester.id : null
+    );
+    return res.redirect('/schedule');
+  } catch (err) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.status(500).send('Database error');
+  }
+});
+
+app.post('/homework/custom', requireLogin, upload.single('attachment'), async (req, res) => {
+  const { description, link_url, meeting_url, subject_id, custom_due_date } = req.body;
+  const filePath = req.file ? `/uploads/${req.file.filename}` : null;
+  const fileName = req.file ? req.file.originalname : null;
+  const subjectId = Number(subject_id);
+  const dueDate = String(custom_due_date || '').slice(0, 10);
+  if (!description || Number.isNaN(subjectId) || !dueDate) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.status(400).send('Missing fields');
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.status(400).send('Invalid date');
+  }
+
+  const { schedule_group: group, username, id: userId, course_id: courseId } = req.session.user;
+  const createdAt = new Date().toISOString();
+  const activeSemester = await getActiveSemester(courseId || 1);
+  if (!settingsCache.allow_homework_creation && req.session.role !== 'admin') {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.status(403).send('Homework disabled');
+  }
+
+  try {
+    const subjectRow = await db.get('SELECT name, course_id FROM subjects WHERE id = ?', [subjectId]);
+    if (!subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      return res.status(400).send('Invalid subject');
+    }
+    const groupRow = await db.get(
+      'SELECT group_number FROM student_groups WHERE student_id = ? AND subject_id = ?',
+      [userId, subjectId]
+    );
+    if (!groupRow) {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      return res.status(400).send('Invalid group');
+    }
+    const dayName = getDayNameFromDate(dueDate);
+    const row = await db.get(
+      `
+        INSERT INTO homework
+        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, is_custom_deadline, custom_due_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
+      `,
+      [
+        group,
+        subjectRow.name,
+        dayName || 'Deadline',
+        'Deadline',
+        null,
+        subjectId,
+        groupRow.group_number,
+        dayName,
+        userId,
+        description,
+        null,
+        meeting_url || null,
+        link_url || null,
+        filePath,
+        fileName,
+        username,
+        createdAt,
+        courseId || 1,
+        activeSemester ? activeSemester.id : null,
+        1,
+        dueDate,
+      ]
+    );
+    if (!row || !row.id) {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      return res.status(500).send('Database error');
+    }
+    logActivity(
+      db,
+      req,
+      'homework_create',
+      'homework',
+      row.id,
+      { subject_id: subjectId, custom_due_date: dueDate, is_custom_deadline: true },
       courseId || 1,
       activeSemester ? activeSemester.id : null
     );

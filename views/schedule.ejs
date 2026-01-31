@@ -114,10 +114,41 @@
         font-weight: 700;
         box-shadow: 0 8px 18px rgba(59, 130, 246, 0.22);
       }
+      .hero-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .btn-glass {
+        border-radius: 999px;
+        padding: 0.42rem 0.9rem;
+        font-weight: 600;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(12px);
+        transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
+      }
+      .btn-glass:hover {
+        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.35);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+      }
       body.theme-light .badge-glow {
         color: #0f172a;
         background: linear-gradient(135deg, rgba(147, 197, 253, 0.55), rgba(196, 181, 253, 0.45));
         border-color: rgba(15, 23, 42, 0.08);
+      }
+      body.theme-light .btn-glass {
+        color: #0f172a;
+        background: rgba(255, 255, 255, 0.7);
+        border-color: rgba(15, 23, 42, 0.15);
+      }
+      body.theme-light .btn-glass:hover {
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
       }
       .hw-chip {
         display: inline-flex;
@@ -554,6 +585,52 @@
         background: rgba(15, 23, 42, 0.04);
         border-color: rgba(15, 23, 42, 0.1);
       }
+      .deadline-block {
+        background: rgba(250, 204, 21, 0.12);
+        border: 1px solid rgba(250, 204, 21, 0.35);
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin: 10px 0;
+      }
+      .deadline-title {
+        font-weight: 700;
+        color: #fde68a;
+        margin-bottom: 8px;
+      }
+      .deadline-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: rgba(15, 23, 42, 0.2);
+        transition: background 160ms ease, transform 160ms ease;
+      }
+      .deadline-item + .deadline-item {
+        margin-top: 6px;
+      }
+      .deadline-item:hover {
+        transform: translateY(-1px);
+        background: rgba(250, 204, 21, 0.18);
+      }
+      .deadline-meta {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.75);
+      }
+      body.theme-light .deadline-block {
+        background: rgba(250, 204, 21, 0.18);
+        border-color: rgba(250, 204, 21, 0.35);
+      }
+      body.theme-light .deadline-title {
+        color: #92400e;
+      }
+      body.theme-light .deadline-item {
+        background: rgba(255, 255, 255, 0.8);
+      }
+      body.theme-light .deadline-meta {
+        color: rgba(15, 23, 42, 0.7);
+      }
       .list-group-item-action:hover {
         background: rgba(99, 102, 241, 0.18);
         box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.2);
@@ -749,7 +826,14 @@
           <h1 class="hero-title mb-1"><%= t('schedule.header') %></h1>
           <div class="hero-sub" id="daily-phrase">Your rhythm, your focus — let’s make this week count.</div>
         </div>
-        <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
+        <div class="hero-actions">
+          <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
+          <% if (role === 'student' || role === 'starosta' || viewAs === 'student') { %>
+            <button class="btn btn-glass btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
+              🪄 Дивні дедлайни
+            </button>
+          <% } %>
+        </div>
       </div>
 
       <% if (role === 'admin') { %>
@@ -817,8 +901,67 @@
               <% }); %>
             <% } %>
           </div>
+          <% const dateKey = dayDates && dayDates[day] ? dayDates[day] : null; %>
+          <% const customItems = dateKey && customDeadlinesByDate ? customDeadlinesByDate[dateKey] : null; %>
+          <% if (customItems && customItems.length) { %>
+            <div class="deadline-block">
+              <div class="deadline-title">🪄 Дивні дедлайни</div>
+              <% customItems.forEach(function(item) { %>
+                <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
+                <% const details = [item.description]; %>
+                <% if (item.link_url) { details.push(`Посилання: ${item.link_url}`); } %>
+                <% if (item.meeting_url) { details.push(`Зустріч: ${item.meeting_url}`); } %>
+                <% if (item.file_name) { details.push(`Файл: ${item.file_name}`); } %>
+                <div
+                  class="deadline-item"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  title="<%= details.join(' • ') %>"
+                >
+                  <div>
+                    <div class="fw-semibold"><%= item.subject_name %></div>
+                    <div class="deadline-meta">Дедлайн: <%= dueLabel %></div>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
         </div>
       <% }); %>
+      <% if (weekendDeadlineCards && weekendDeadlineCards.length) { %>
+        <% weekendDeadlineCards.forEach(function(card) { %>
+          <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString('uk-UA') : ''; %>
+          <div class="card mb-3 glass day-card">
+            <div class="card-header fw-semibold text-white d-flex justify-content-between align-items-center">
+              <span><%= card.day %></span>
+              <% if (dateLabel) { %>
+                <span class="small muted"><%= dateLabel %></span>
+              <% } %>
+            </div>
+            <div class="deadline-block">
+              <div class="deadline-title">🪄 Дивні дедлайни</div>
+              <% card.items.forEach(function(item) { %>
+                <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
+                <% const details = [item.description]; %>
+                <% if (item.link_url) { details.push(`Посилання: ${item.link_url}`); } %>
+                <% if (item.meeting_url) { details.push(`Зустріч: ${item.meeting_url}`); } %>
+                <% if (item.file_name) { details.push(`Файл: ${item.file_name}`); } %>
+                <div
+                  class="deadline-item"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  title="<%= details.join(' • ') %>"
+                >
+                  <div>
+                    <div class="fw-semibold"><%= item.subject_name %></div>
+                    <div class="deadline-meta">Дедлайн: <%= dueLabel %></div>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        <% }); %>
+      <% } %>
     </main>
 
     <div class="week-slider" id="weekSlider">
@@ -953,6 +1096,61 @@
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="customDeadlineModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <form method="POST" action="/homework/custom" enctype="multipart/form-data">
+            <div class="modal-header">
+              <h5 class="modal-title">🪄 Дивні дедлайни</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <% if (!customDeadlineSubjects || !customDeadlineSubjects.length) { %>
+                <div class="alert alert-warning">Спочатку оберіть предмети у профілі, щоб додати дедлайн.</div>
+              <% } %>
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Предмет</label>
+                  <select class="form-select" name="subject_id" <%= (!customDeadlineSubjects || !customDeadlineSubjects.length) ? 'disabled' : '' %> required>
+                    <option value="" disabled selected>Оберіть предмет</option>
+                    <% (customDeadlineSubjects || []).forEach(function(subj) { %>
+                      <option value="<%= subj.id %>"><%= subj.name %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Дедлайн</label>
+                  <input type="date" class="form-control" name="custom_due_date" required />
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Опис</label>
+                  <textarea class="form-control" name="description" rows="3" required></textarea>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Посилання (опц.)</label>
+                  <input type="url" class="form-control" name="link_url" placeholder="https://example.com" />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Онлайн-зустріч (опц.)</label>
+                  <input type="url" class="form-control" name="meeting_url" placeholder="https://zoom.us/j/..." />
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Файл (опц.)</label>
+                  <input type="file" class="form-control" name="attachment" />
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Закрити</button>
+              <button type="submit" class="btn btn-primary glass" <%= (!customDeadlineSubjects || !customDeadlineSubjects.length) ? 'disabled' : '' %>>
+                Зберегти
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
