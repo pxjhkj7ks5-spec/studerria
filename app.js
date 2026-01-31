@@ -2417,64 +2417,74 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
       d.setDate(weekStart.getDate() + i);
       weeklyLabels.push(d.toISOString().slice(0, 10));
     }
-    const weeklyParams = activeSemester ? [courseId, weekStart.toISOString(), activeSemester.id] : [courseId, weekStart.toISOString()];
-    const [weeklyHomeworkRows, weeklyTeamworkRows, weeklyUsersRows] = await Promise.all([
-      db.all(
-        `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
-         FROM homework
-         WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-         GROUP BY day
-         ORDER BY day`,
-        weeklyParams
-      ),
-      db.all(
-        `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
-         FROM teamwork_tasks
-         WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-         GROUP BY day
-         ORDER BY day`,
-        weeklyParams
-      ),
-      db.all(
-        `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
-         FROM users
-         WHERE course_id = ? AND created_at >= ?
-         GROUP BY day, role
-         ORDER BY day`,
-        [courseId, weekStart.toISOString()]
-      ),
-    ]);
+    let weeklyHomework = weeklyLabels.map(() => 0);
+    let weeklyTeamwork = weeklyLabels.map(() => 0);
+    let weeklyUserRoles = ['student', 'starosta', 'deanery', 'admin'];
+    let weeklyUserSeries = weeklyUserRoles.map(() => weeklyLabels.map(() => 0));
+    try {
+      const weeklyParams = activeSemester
+        ? [courseId, weekStart.toISOString(), activeSemester.id]
+        : [courseId, weekStart.toISOString()];
+      const [weeklyHomeworkRows, weeklyTeamworkRows, weeklyUsersRows] = await Promise.all([
+        db.all(
+          `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
+           FROM homework
+           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+           GROUP BY day
+           ORDER BY day`,
+          weeklyParams
+        ),
+        db.all(
+          `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
+           FROM teamwork_tasks
+           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+           GROUP BY day
+           ORDER BY day`,
+          weeklyParams
+        ),
+        db.all(
+          `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
+           FROM users
+           WHERE course_id = ? AND created_at >= ?
+           GROUP BY day, role
+           ORDER BY day`,
+          [courseId, weekStart.toISOString()]
+        ),
+      ]);
 
-    const homeworkMap = {};
-    (weeklyHomeworkRows || []).forEach((row) => {
-      const key = String(row.day);
-      homeworkMap[key] = Number(row.count || 0);
-    });
-    const teamworkMap = {};
-    (weeklyTeamworkRows || []).forEach((row) => {
-      const key = String(row.day);
-      teamworkMap[key] = Number(row.count || 0);
-    });
+      const homeworkMap = {};
+      (weeklyHomeworkRows || []).forEach((row) => {
+        const key = String(row.day);
+        homeworkMap[key] = Number(row.count || 0);
+      });
+      const teamworkMap = {};
+      (weeklyTeamworkRows || []).forEach((row) => {
+        const key = String(row.day);
+        teamworkMap[key] = Number(row.count || 0);
+      });
 
-    const weeklyHomework = weeklyLabels.map((key) => homeworkMap[key] || 0);
-    const weeklyTeamwork = weeklyLabels.map((key) => teamworkMap[key] || 0);
+      weeklyHomework = weeklyLabels.map((key) => homeworkMap[key] || 0);
+      weeklyTeamwork = weeklyLabels.map((key) => teamworkMap[key] || 0);
 
-    const roleOrder = ['student', 'starosta', 'deanery', 'admin'];
-    const roleMap = {};
-    (weeklyUsersRows || []).forEach((row) => {
-      const key = String(row.day);
-      if (!roleMap[row.role]) {
-        roleMap[row.role] = {};
+      const roleOrder = ['student', 'starosta', 'deanery', 'admin'];
+      const roleMap = {};
+      (weeklyUsersRows || []).forEach((row) => {
+        const key = String(row.day);
+        if (!roleMap[row.role]) {
+          roleMap[row.role] = {};
+        }
+        roleMap[row.role][key] = Number(row.count || 0);
+      });
+      weeklyUserRoles = roleOrder.filter((role) => roleMap[role]);
+      if (!weeklyUserRoles.length) {
+        weeklyUserRoles.push(...roleOrder);
       }
-      roleMap[row.role][key] = Number(row.count || 0);
-    });
-    const weeklyUserRoles = roleOrder.filter((role) => roleMap[role]);
-    if (!weeklyUserRoles.length) {
-      weeklyUserRoles.push(...roleOrder);
+      weeklyUserSeries = weeklyUserRoles.map((role) =>
+        weeklyLabels.map((key) => (roleMap[role] && roleMap[role][key]) || 0)
+      );
+    } catch (weeklyErr) {
+      console.error('Database error (admin.overview.weekly)', weeklyErr);
     }
-    const weeklyUserSeries = weeklyUserRoles.map((role) =>
-      weeklyLabels.map((key) => (roleMap[role] && roleMap[role][key]) || 0)
-    );
 
     try {
       res.render('admin', {
@@ -2616,7 +2626,7 @@ app.get('/admin/overview', requireAdmin, async (req, res) => {
          WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
         statsParams
       ),
-    ]);
+                                  ]);
 
     const dashboardStats = {
       users: Number(usersRow?.count || 0),
@@ -2637,63 +2647,73 @@ app.get('/admin/overview', requireAdmin, async (req, res) => {
       d.setDate(weekStart.getDate() + i);
       weeklyLabels.push(d.toISOString().slice(0, 10));
     }
-    const weeklyParams = activeSemester ? [courseId, weekStart.toISOString(), activeSemester.id] : [courseId, weekStart.toISOString()];
-    const [weeklyHomeworkRows, weeklyTeamworkRows, weeklyUsersRows] = await Promise.all([
-      db.all(
-        `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
-         FROM homework
-         WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-         GROUP BY day
-         ORDER BY day`,
-        weeklyParams
-      ),
-      db.all(
-        `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
-         FROM teamwork_tasks
-         WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-         GROUP BY day
-         ORDER BY day`,
-        weeklyParams
-      ),
-      db.all(
-        `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
-         FROM users
-         WHERE course_id = ? AND created_at >= ?
-         GROUP BY day, role
-         ORDER BY day`,
-        [courseId, weekStart.toISOString()]
-      ),
-    ]);
+    let weeklyHomework = weeklyLabels.map(() => 0);
+    let weeklyTeamwork = weeklyLabels.map(() => 0);
+    let weeklyUserRoles = ['student', 'starosta', 'deanery', 'admin'];
+    let weeklyUserSeries = weeklyUserRoles.map(() => weeklyLabels.map(() => 0));
+    try {
+      const weeklyParams = activeSemester
+        ? [courseId, weekStart.toISOString(), activeSemester.id]
+        : [courseId, weekStart.toISOString()];
+      const [weeklyHomeworkRows, weeklyTeamworkRows, weeklyUsersRows] = await Promise.all([
+        db.all(
+          `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
+           FROM homework
+           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+           GROUP BY day
+           ORDER BY day`,
+          weeklyParams
+        ),
+        db.all(
+          `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
+           FROM teamwork_tasks
+           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+           GROUP BY day
+           ORDER BY day`,
+          weeklyParams
+        ),
+        db.all(
+          `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
+           FROM users
+           WHERE course_id = ? AND created_at >= ?
+           GROUP BY day, role
+           ORDER BY day`,
+          [courseId, weekStart.toISOString()]
+        ),
+      ]);
 
-    const homeworkMap = {};
-    (weeklyHomeworkRows || []).forEach((row) => {
-      const key = String(row.day);
-      homeworkMap[key] = Number(row.count || 0);
-    });
-    const teamworkMap = {};
-    (weeklyTeamworkRows || []).forEach((row) => {
-      const key = String(row.day);
-      teamworkMap[key] = Number(row.count || 0);
-    });
-    const weeklyHomework = weeklyLabels.map((key) => homeworkMap[key] || 0);
-    const weeklyTeamwork = weeklyLabels.map((key) => teamworkMap[key] || 0);
+      const homeworkMap = {};
+      (weeklyHomeworkRows || []).forEach((row) => {
+        const key = String(row.day);
+        homeworkMap[key] = Number(row.count || 0);
+      });
+      const teamworkMap = {};
+      (weeklyTeamworkRows || []).forEach((row) => {
+        const key = String(row.day);
+        teamworkMap[key] = Number(row.count || 0);
+      });
+      weeklyHomework = weeklyLabels.map((key) => homeworkMap[key] || 0);
+      weeklyTeamwork = weeklyLabels.map((key) => teamworkMap[key] || 0);
 
-    const roleOrder = ['student', 'starosta', 'deanery', 'admin'];
-    const roleMap = {};
-    (weeklyUsersRows || []).forEach((row) => {
-      const key = String(row.day);
-      if (!roleMap[row.role]) {
-        roleMap[row.role] = {};
+      const roleOrder = ['student', 'starosta', 'deanery', 'admin'];
+      const roleMap = {};
+      (weeklyUsersRows || []).forEach((row) => {
+        const key = String(row.day);
+        if (!roleMap[row.role]) {
+          roleMap[row.role] = {};
+        }
+        roleMap[row.role][key] = Number(row.count || 0);
+      });
+      weeklyUserRoles = roleOrder.filter((role) => roleMap[role]);
+      if (!weeklyUserRoles.length) {
+        weeklyUserRoles.push(...roleOrder);
       }
-      roleMap[row.role][key] = Number(row.count || 0);
-    });
-    const weeklyUserRoles = roleOrder.filter((role) => roleMap[role]);
-    if (!weeklyUserRoles.length) {
-      weeklyUserRoles.push(...roleOrder);
+      weeklyUserSeries = weeklyUserRoles.map((role) =>
+        weeklyLabels.map((key) => (roleMap[role] && roleMap[role][key]) || 0)
+      );
+    } catch (weeklyErr) {
+      console.error('Database error (admin.dashboard.weekly)', weeklyErr);
     }
-    const weeklyUserSeries = weeklyUserRoles.map((role) =>
-      weeklyLabels.map((key) => (roleMap[role] && roleMap[role][key]) || 0)
-    );
 
     return res.render('admin-overview', {
       username: req.session.user.username,
