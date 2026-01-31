@@ -480,7 +480,7 @@
         height: 40px;
         border-radius: 50%;
         border: 1px solid rgba(255, 255, 255, 0.25);
-        background: rgba(20, 20, 30, 0.8);
+        background: rgba(255, 255, 255, 0.08);
         color: rgba(255, 255, 255, 0.92);
         display: inline-flex;
         align-items: center;
@@ -492,6 +492,7 @@
         transform: translateY(-1px);
         box-shadow: 0 10px 22px rgba(0, 0, 0, 0.5);
         border-color: rgba(147, 197, 253, 0.7);
+        background: rgba(255, 255, 255, 0.14);
       }
       .week-nav-btn:focus-visible {
         outline: none;
@@ -1017,19 +1018,20 @@
       wireSelectOpenState();
 
       function showCustomTooltip(el, message) {
-        const existing = document.querySelector(`.custom-tooltip[data-for="${el.id}"]`);
-        if (existing) existing.remove();
+        document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
+        const anchor = el.closest('.form-check') || el.closest('.input-group') || el;
+        const key = el.id || el.name || anchor.id || '';
         const tip = document.createElement('div');
         tip.className = 'custom-tooltip';
         tip.textContent = message || 'Перевірте поле';
-        if (el.id) tip.dataset.for = el.id;
+        if (key) tip.dataset.for = key;
         document.body.appendChild(tip);
 
-        const rect = el.getBoundingClientRect();
+        const rect = anchor.getBoundingClientRect();
         const tipRect = tip.getBoundingClientRect();
-        const margin = 8;
+        const margin = 10;
         let top = rect.top - tipRect.height - margin;
-        let left = rect.left + 12;
+        let left = rect.left;
         let placeBelow = false;
         if (top < 8) {
           top = rect.bottom + margin;
@@ -1038,8 +1040,9 @@
         if (left + tipRect.width > window.innerWidth - 8) {
           left = window.innerWidth - tipRect.width - 8;
         }
-        tip.style.top = `${Math.max(8, top)}px`;
-        tip.style.left = `${Math.max(8, left)}px`;
+        if (left < 8) left = 8;
+        tip.style.top = `${Math.round(top)}px`;
+        tip.style.left = `${Math.round(left)}px`;
         if (placeBelow) tip.classList.add('below');
         requestAnimationFrame(() => tip.classList.add('show'));
         const remove = () => tip.remove();
