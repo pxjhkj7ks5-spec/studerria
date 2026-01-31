@@ -37,8 +37,5 @@ steps:
         "$_INSTANCE_CONNECTION_NAME"
       ]
 
-images:
-  - "europe-west1-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:$SHORT_SHA"
-
 options:
   logging: CLOUD_LOGGING_ONLY
