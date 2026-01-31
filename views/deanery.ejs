@@ -16,6 +16,10 @@
         --accent: #3b82f6;
         --accent-dark: #2563eb;
         --card-radius: 20px;
+        --glass-border-dark: rgba(255, 255, 255, 0.14);
+        --glass-border-light: rgba(15, 23, 42, 0.08);
+        --glass-bg-dark: rgba(255, 255, 255, 0.06);
+        --glass-bg-light: rgba(255, 255, 255, 0.7);
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
@@ -36,13 +40,19 @@
       }
       .card-shell {
         border-radius: var(--card-radius);
-        border: 1px solid rgba(15, 23, 42, 0.08);
-        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+        backdrop-filter: blur(20px);
+        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
         padding: 2rem;
       }
       body.theme-dark .card-shell {
-        background: rgba(17, 17, 30, 0.9);
-        border-color: rgba(255, 255, 255, 0.12);
+        background: var(--glass-bg-dark);
+        border: 1px solid var(--glass-border-dark);
+        box-shadow: 0 18px 45px rgba(8, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
+      }
+      body.theme-light .card-shell {
+        background: var(--glass-bg-light);
+        border: 1px solid var(--glass-border-light);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
       }
       .btn-primary {
         background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);

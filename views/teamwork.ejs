@@ -16,6 +16,10 @@
         --accent: #3b82f6;
         --accent-2: #8b5cf6;
         --radius: 18px;
+        --glass-border-dark: rgba(255, 255, 255, 0.14);
+        --glass-border-light: rgba(15, 23, 42, 0.08);
+        --glass-bg-dark: rgba(255, 255, 255, 0.06);
+        --glass-bg-light: rgba(255, 255, 255, 0.7);
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
@@ -47,16 +51,18 @@
       }
       .glass {
         border-radius: var(--radius);
-        backdrop-filter: blur(18px);
-        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(20px);
+        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
       }
       body.theme-dark .glass {
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: var(--glass-bg-dark);
+        border: 1px solid var(--glass-border-dark);
+        box-shadow: 0 18px 45px rgba(8, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
       }
       body.theme-light .glass {
-        background: rgba(255, 255, 255, 0.7);
-        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: var(--glass-bg-light);
+        border: 1px solid var(--glass-border-light);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
       }
       body.theme-light .text-muted {
         color: rgba(15, 23, 42, 0.6) !important;
