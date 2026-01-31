@@ -1031,12 +1031,12 @@
         const rect = anchor.getBoundingClientRect();
         const tipRect = tip.getBoundingClientRect();
         const margin = 10;
-        let top = rect.top - tipRect.height - margin;
+        let top = rect.bottom + margin;
         let left = rect.left;
-        let placeBelow = false;
-        if (top < 8) {
-          top = rect.bottom + margin;
-          placeBelow = true;
+        let placeBelow = true;
+        if (top + tipRect.height > window.innerHeight - 8) {
+          top = rect.top - tipRect.height - margin;
+          placeBelow = false;
         }
         if (left + tipRect.width > window.innerWidth - 8) {
           left = window.innerWidth - tipRect.width - 8;
