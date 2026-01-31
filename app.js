@@ -3577,6 +3577,15 @@ app.get('/starosta', requireStaff, async (req, res) => {
   }
 
   const courseId = req.session.user.course_id || 1;
+  const {
+    group_number,
+    subject,
+    q,
+    sort_homework,
+    homework_from,
+    homework_to,
+    homework_tag,
+  } = req.query;
   let activeSemester = null;
   try {
     activeSemester = await getActiveSemester(courseId);
@@ -3605,6 +3614,78 @@ app.get('/starosta', requireStaff, async (req, res) => {
           if (subjectErr) {
             return handleDbError(res, subjectErr, 'starosta.subjects');
           }
+          const homeworkFilters = [];
+          const homeworkParams = [];
+          homeworkFilters.push('h.course_id = ?');
+          homeworkParams.push(courseId);
+          if (activeSemester) {
+            homeworkFilters.push('h.semester_id = ?');
+            homeworkParams.push(activeSemester.id);
+          }
+          if (group_number) {
+            homeworkFilters.push('h.group_number = ?');
+            homeworkParams.push(group_number);
+          }
+          if (subject) {
+            homeworkFilters.push('h.subject LIKE ?');
+            homeworkParams.push(`%${subject}%`);
+          }
+          if (q) {
+            homeworkFilters.push('(h.description LIKE ? OR h.created_by LIKE ?)');
+            homeworkParams.push(`%${q}%`, `%${q}%`);
+          }
+          if (homework_from) {
+            const start = new Date(homework_from);
+            if (!Number.isNaN(start.getTime())) {
+              start.setHours(0, 0, 0, 0);
+              homeworkFilters.push('h.created_at >= ?');
+              homeworkParams.push(start.toISOString());
+            }
+          }
+          if (homework_to) {
+            const end = new Date(homework_to);
+            if (!Number.isNaN(end.getTime())) {
+              end.setHours(23, 59, 59, 999);
+              homeworkFilters.push('h.created_at <= ?');
+              homeworkParams.push(end.toISOString());
+            }
+          }
+          if (homework_tag) {
+            homeworkFilters.push(
+              `EXISTS (
+                SELECT 1
+                FROM homework_tag_map ht
+                JOIN homework_tags t ON t.id = ht.tag_id
+                WHERE ht.homework_id = h.id AND t.name = ?
+              )`
+            );
+            homeworkParams.push(homework_tag);
+          }
+          const homeworkWhere = homeworkFilters.length ? `WHERE ${homeworkFilters.join(' AND ')}` : '';
+          const homeworkSql = `
+            SELECT h.*, subj.name AS subject_name,
+                   COALESCE(taglist.tags, ARRAY[]::text[]) AS tags
+            FROM homework h
+            JOIN subjects subj ON subj.id = h.subject_id
+            LEFT JOIN LATERAL (
+              SELECT array_agg(t.name ORDER BY t.name) AS tags
+              FROM homework_tag_map ht
+              JOIN homework_tags t ON t.id = ht.tag_id
+              WHERE ht.homework_id = h.id
+            ) taglist ON true
+            ${homeworkWhere}
+            ORDER BY h.created_at DESC
+          `;
+          db.all(homeworkSql, homeworkParams, (homeworkErr, homeworkRows) => {
+            if (homeworkErr) {
+              return handleDbError(res, homeworkErr, 'starosta.homework');
+            }
+            const homework = sortHomework(homeworkRows, sort_homework);
+            db.all('SELECT name FROM homework_tags ORDER BY name', (tagErr, tagRows) => {
+              if (tagErr) {
+                return handleDbError(res, tagErr, 'starosta.homework.tags');
+              }
+              const homeworkTags = (tagRows || []).map((row) => row.name);
           db.all(
             `
               SELECT t.id, t.title, t.created_at, s.name AS subject_name,
@@ -3644,7 +3725,8 @@ app.get('/starosta', requireStaff, async (req, res) => {
                       userId: req.session.user.id,
                       role: req.session.role,
                       schedule: [],
-                      homework: [],
+                      homework,
+                      homeworkTags,
                       users,
                       subjects,
                       studentGroups: [],
@@ -3656,16 +3738,20 @@ app.get('/starosta', requireStaff, async (req, res) => {
                       activeSemester,
                       selectedCourseId: courseId,
                       limitedStaffView: true,
+                      allowedSections: ['admin-homework', 'admin-teamwork', 'admin-messages'],
                       filters: {
-                        group_number: '',
+                        group_number: group_number || '',
                         day: '',
-                        subject: '',
-                        q: '',
+                        subject: subject || '',
+                        q: q || '',
+                        homework_from: homework_from || '',
+                        homework_to: homework_to || '',
+                        homework_tag: homework_tag || '',
                       },
                       usersStatus: 'active',
                       sorts: {
                         schedule: '',
-                        homework: '',
+                        homework: sort_homework || '',
                       },
                     });
                   } catch (renderErr) {
@@ -3675,6 +3761,8 @@ app.get('/starosta', requireStaff, async (req, res) => {
               );
             }
           );
+            });
+          });
         });
       }
     );
@@ -3684,7 +3772,117 @@ app.get('/starosta', requireStaff, async (req, res) => {
 });
 
 app.get('/deanery', requireDeanery, (req, res) => {
-  res.render('deanery', { username: req.session.user.username });
+  (async () => {
+    try {
+      await ensureDbReady();
+    } catch (err) {
+      return handleDbError(res, err, 'deanery.init');
+    }
+    const courseId = req.session.user.course_id || 1;
+    const { group_number, day, subject, sort_schedule, schedule_date } = req.query;
+    let activeSemester = null;
+    try {
+      activeSemester = await getActiveSemester(courseId);
+    } catch (err) {
+      return handleDbError(res, err, 'deanery.activeSemester');
+    }
+    const scheduleFilters = [];
+    const scheduleParams = [];
+    scheduleFilters.push('se.course_id = ?');
+    scheduleParams.push(courseId);
+    if (activeSemester) {
+      scheduleFilters.push('se.semester_id = ?');
+      scheduleParams.push(activeSemester.id);
+    }
+    if (group_number) {
+      scheduleFilters.push('se.group_number = ?');
+      scheduleParams.push(group_number);
+    }
+    if (day) {
+      scheduleFilters.push('se.day_of_week = ?');
+      scheduleParams.push(day);
+    }
+    if (subject) {
+      scheduleFilters.push('s.name LIKE ?');
+      scheduleParams.push(`%${subject}%`);
+    }
+    if (schedule_date && activeSemester && activeSemester.start_date) {
+      const mapped = getWeekDayForDate(schedule_date, activeSemester.start_date);
+      if (mapped) {
+        scheduleFilters.push('se.week_number = ?');
+        scheduleParams.push(mapped.weekNumber);
+        scheduleFilters.push('se.day_of_week = ?');
+        scheduleParams.push(mapped.dayName);
+      }
+    }
+    const scheduleWhere = scheduleFilters.length ? `WHERE ${scheduleFilters.join(' AND ')}` : '';
+    const scheduleSql = `
+      SELECT se.*, s.name AS subject_name
+      FROM schedule_entries se
+      JOIN subjects s ON s.id = se.subject_id
+      ${scheduleWhere}
+      ORDER BY se.week_number, se.day_of_week, se.class_number
+    `;
+    db.all('SELECT id, name FROM courses WHERE id = ?', [courseId], (courseErr, courses) => {
+      if (courseErr) {
+        return handleDbError(res, courseErr, 'deanery.courses');
+      }
+      db.all(
+        'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
+        [courseId],
+        (semErr, semesters) => {
+          if (semErr) {
+            return handleDbError(res, semErr, 'deanery.semesters');
+          }
+          db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
+            if (subjectErr) {
+              return handleDbError(res, subjectErr, 'deanery.subjects');
+            }
+            db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
+              if (scheduleErr) {
+                return handleDbError(res, scheduleErr, 'deanery.schedule');
+              }
+              const schedule = sortSchedule(scheduleRows, sort_schedule);
+              try {
+                return res.render('admin', {
+                  username: req.session.user.username,
+                  userId: req.session.user.id,
+                  role: req.session.role,
+                  schedule,
+                  homework: [],
+                  users: [],
+                  subjects,
+                  studentGroups: [],
+                  logs: [],
+                  teamworkTasks: [],
+                  adminMessages: [],
+                  courses,
+                  semesters,
+                  activeSemester,
+                  selectedCourseId: courseId,
+                  limitedStaffView: true,
+                  allowedSections: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses'],
+                  filters: {
+                    group_number: group_number || '',
+                    day: day || '',
+                    subject: subject || '',
+                    schedule_date: schedule_date || '',
+                  },
+                  usersStatus: 'active',
+                  sorts: {
+                    schedule: sort_schedule || '',
+                    homework: '',
+                  },
+                });
+              } catch (renderErr) {
+                return handleDbError(res, renderErr, 'deanery.render');
+              }
+            });
+          });
+        }
+      );
+    });
+  })();
 });
 
 app.post('/subgroup/join', requireLogin, (req, res) => {

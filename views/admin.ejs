@@ -409,9 +409,11 @@
   </head>
   <body class="theme-light">
     <% const isLimitedView = typeof limitedStaffView !== 'undefined' && limitedStaffView; %>
+    <% const allowedSections = typeof allowedSections !== 'undefined' ? allowedSections : null; %>
+    <% const sectionAllowed = (id) => !allowedSections || allowedSections.includes(id); %>
     <nav class="navbar navbar-expand-lg admin-nav">
       <div class="container">
-        <span class="navbar-brand"><%= isLimitedView ? t('admin.starostaPanel') : t('admin.title') %></span>
+        <span class="navbar-brand"><%= isLimitedView && role === 'starosta' ? t('admin.starostaPanel') : t('admin.title') %></span>
         <div class="d-flex align-items-center">
           <span class="me-3 text-muted">
             <% if (role === 'admin') { %>
@@ -488,48 +490,68 @@
       <% }); %>
 
       <div class="d-flex flex-wrap gap-2 mb-3">
-        <% if (!isLimitedView) { %>
+        <% if (sectionAllowed('admin-settings')) { %>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-settings')">
             <%= t('admin.settings') %>
           </button>
+        <% } %>
+        <% if (sectionAllowed('admin-schedule')) { %>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-schedule')">
             <%= t('admin.schedule') %>
           </button>
+        <% } %>
+        <% if (sectionAllowed('admin-homework')) { %>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-homework')">
             <%= t('admin.homework') %>
           </button>
+        <% } %>
+        <% if (sectionAllowed('admin-users')) { %>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-users')">
             <%= t('admin.users') %>
           </button>
+        <% } %>
+        <% if (sectionAllowed('admin-subjects')) { %>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-subjects')">
             <%= t('admin.subjects') %>
           </button>
+        <% } %>
+        <% if (sectionAllowed('admin-semesters')) { %>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-semesters')">
             <%= t('admin.semesters') %>
           </button>
+        <% } %>
+        <% if (sectionAllowed('admin-courses')) { %>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-courses')">
             <%= t('admin.courses') %>
           </button>
+        <% } %>
+        <% if (sectionAllowed('admin-history')) { %>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-history')">
             <%= t('admin.history') %>
           </button>
+        <% } %>
+        <% if (sectionAllowed('admin-activity')) { %>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-activity')">
             <%= t('admin.activity') %>
           </button>
         <% } %>
-        <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-teamwork')">
-          <%= t('admin.teamwork') %>
-        </button>
-        <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-messages')">
-          <%= t('admin.messages') %>
-        </button>
+        <% if (sectionAllowed('admin-teamwork')) { %>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-teamwork')">
+            <%= t('admin.teamwork') %>
+          </button>
+        <% } %>
+        <% if (sectionAllowed('admin-messages')) { %>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-messages')">
+            <%= t('admin.messages') %>
+          </button>
+        <% } %>
         <button class="btn btn-outline-secondary btn-sm" type="button" onclick="toggleAllSections()">
           <%= t('admin.showHideAll') %>
         </button>
       </div>
 
       <div class="tab-content">
-        <% if (!isLimitedView) { %>
+        <% if (sectionAllowed('admin-settings')) { %>
         <div id="admin-settings" class="card mb-3">
           <div class="card-body">
             <h5 class="mb-3"><%= t('admin.settings') %></h5>
@@ -580,7 +602,9 @@
             </form>
           </div>
         </div>
+        <% } %>
 
+        <% if (sectionAllowed('admin-schedule')) { %>
         <div id="admin-schedule">
           <div class="card mb-4">
             <div class="card-body">
@@ -824,6 +848,9 @@
           <form id="clearScheduleForm" method="POST" action="/admin/schedule/clear-all"></form>
         </div>
 
+        <% } %>
+
+        <% if (sectionAllowed('admin-homework')) { %>
         <div id="admin-homework">
           <div class="card mb-4">
             <div class="card-body">
@@ -974,6 +1001,9 @@
           </div>
         </div>
 
+        <% } %>
+
+        <% if (sectionAllowed('admin-users')) { %>
         <div id="admin-users">
           <div class="card mb-3">
             <div class="card-body">
@@ -1142,6 +1172,9 @@
           <form id="clearUsersForm" method="POST" action="/admin/users/clear-all"></form>
         </div>
 
+        <% } %>
+
+        <% if (sectionAllowed('admin-subjects')) { %>
         <div id="admin-subjects">
           <div class="card mb-4">
             <div class="card-body">
@@ -1256,6 +1289,9 @@
           </div>
         </div>
 
+        <% } %>
+
+        <% if (sectionAllowed('admin-semesters')) { %>
         <div id="admin-semesters">
           <div class="card mb-4">
             <div class="card-body">
@@ -1355,6 +1391,9 @@
           </div>
         </div>
 
+        <% } %>
+
+        <% if (sectionAllowed('admin-courses')) { %>
         <div id="admin-courses">
           <div class="card mb-4">
             <div class="card-body">
@@ -1415,6 +1454,9 @@
           </div>
         </div>
 
+        <% } %>
+
+        <% if (sectionAllowed('admin-history')) { %>
         <div id="admin-history">
           <div class="card mb-4">
             <div class="card-body">
@@ -1477,7 +1519,9 @@
           </div>
         </div>
 
-        <% if (!isLimitedView) { %>
+        <% } %>
+
+        <% if (sectionAllowed('admin-activity')) { %>
         <div id="admin-activity">
           <div class="card mb-4">
             <div class="card-body">
@@ -1578,8 +1622,8 @@
           </div>
         </div>
         <% } %>
-        <% } %>
 
+        <% if (sectionAllowed('admin-teamwork')) { %>
         <div id="admin-teamwork">
           <div class="card mb-4">
             <div class="card-body">
@@ -1665,6 +1709,9 @@
           </div>
         </div>
 
+        <% } %>
+
+        <% if (sectionAllowed('admin-messages')) { %>
         <div id="admin-messages">
           <div class="card mb-4">
             <div class="card-body">
@@ -1769,6 +1816,7 @@
           </div>
         </div>
       </div>
+      <% } %>
     </main>
     <footer class="app-footer text-center py-4">
       <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
@@ -1959,8 +2007,9 @@
       });
 
       const limitedStaffView = <%= isLimitedView ? 'true' : 'false' %>;
-      const adminSections = limitedStaffView
-        ? ['admin-teamwork', 'admin-messages']
+      const allowedSections = <%- JSON.stringify(allowedSections || []) %>;
+      const adminSections = allowedSections.length
+        ? allowedSections
         : ['admin-settings', 'admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-history', 'admin-activity', 'admin-teamwork', 'admin-messages'];
 
       function toggleSection(id) {
