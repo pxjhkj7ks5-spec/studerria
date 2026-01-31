@@ -372,26 +372,26 @@
       .custom-tooltip::before {
         content: '';
         position: absolute;
-        top: -6px;
+        bottom: -6px;
         left: 20px;
         border: 6px solid transparent;
-        border-bottom-color: rgba(255, 255, 255, 0.08);
+        border-top-color: rgba(255, 255, 255, 0.08);
       }
       .custom-tooltip.below::before {
-        top: auto;
-        bottom: -6px;
-        border-bottom-color: transparent;
-        border-top-color: rgba(255, 255, 255, 0.08);
+        top: -6px;
+        bottom: auto;
+        border-top-color: transparent;
+        border-bottom-color: rgba(255, 255, 255, 0.08);
       }
       body.theme-light .custom-tooltip {
         background: rgba(255, 255, 255, 0.85);
         color: #0f172a;
       }
       body.theme-light .custom-tooltip::before {
-        border-bottom-color: rgba(255, 255, 255, 0.85);
+        border-top-color: rgba(255, 255, 255, 0.85);
       }
       body.theme-light .custom-tooltip.below::before {
-        border-top-color: rgba(255, 255, 255, 0.85);
+        border-bottom-color: rgba(255, 255, 255, 0.85);
       }
       .tooltip .tooltip-inner {
         backdrop-filter: blur(10px);
