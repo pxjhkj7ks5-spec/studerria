@@ -1854,6 +1854,20 @@
                   </div>
                 </div>
                 <div class="row g-2 mt-2">
+                  <div class="col-12 col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="status" id="messageStatusSelect">
+                      <option value="published" selected>Publish now</option>
+                      <option value="scheduled">Schedule</option>
+                      <option value="draft">Draft</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label class="form-label">Publish at</label>
+                    <input class="form-control" type="datetime-local" name="scheduled_at" id="messageScheduledAt" />
+                  </div>
+                </div>
+                <div class="row g-2 mt-2">
                   <div class="col-12">
                     <label class="form-label">Specific users</label>
                     <select class="form-select" name="user_ids" id="messageUsersSelect" multiple size="5">
@@ -1878,6 +1892,8 @@
                       <th>Body</th>
                       <th>Target</th>
                       <th>Created</th>
+                      <th>Status</th>
+                      <th>Schedule</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -1897,6 +1913,12 @@
                         </td>
                         <td><%= m.created_at %></td>
                         <td>
+                          <span class="badge <%= m.status === 'draft' ? 'bg-secondary' : (m.status === 'scheduled' ? 'bg-warning text-dark' : 'bg-success') %>">
+                            <%= m.status || 'published' %>
+                          </span>
+                        </td>
+                        <td><%= m.scheduled_at || '—' %></td>
+                        <td>
                           <form method="POST" action="/admin/messages/delete/<%= m.id %>">
                             <button
                               class="btn btn-sm btn-outline-danger"
@@ -1911,7 +1933,7 @@
                     <% }); %>
                     <% if (!(adminMessages || []).length) { %>
                       <tr>
-                        <td colspan="5" class="text-muted">No messages yet.</td>
+                        <td colspan="7" class="text-muted">No messages yet.</td>
                       </tr>
                     <% } %>
                   </tbody>
@@ -2677,10 +2699,28 @@
         }
       }
 
+      function updateMessageScheduleFields() {
+        const status = document.getElementById('messageStatusSelect');
+        const schedule = document.getElementById('messageScheduledAt');
+        if (!status || !schedule) return;
+        const isScheduled = status.value === 'scheduled';
+        schedule.disabled = !isScheduled;
+        schedule.required = isScheduled;
+        if (!isScheduled) {
+          schedule.value = '';
+        }
+      }
+
       const messageTarget = document.getElementById('messageTargetType');
       if (messageTarget) {
         messageTarget.addEventListener('change', updateMessageTargetFields);
         updateMessageTargetFields();
+      }
+
+      const messageStatus = document.getElementById('messageStatusSelect');
+      if (messageStatus) {
+        messageStatus.addEventListener('change', updateMessageScheduleFields);
+        updateMessageScheduleFields();
       }
 
       bindUserRowClicks();

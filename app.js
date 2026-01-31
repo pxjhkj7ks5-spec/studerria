@@ -606,12 +606,18 @@ const initDb = async () => {
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS is_custom_deadline INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS custom_due_date TEXT',
+    "ALTER TABLE homework ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published'",
+    'ALTER TABLE homework ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ',
+    'ALTER TABLE homework ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ',
     'ALTER TABLE history_log ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE login_history ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE messages ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE messages ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
+    "ALTER TABLE messages ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published'",
+    'ALTER TABLE messages ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ',
+    'ALTER TABLE messages ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ',
     'ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
   ];
@@ -626,10 +632,12 @@ const initDb = async () => {
   await pool.query('UPDATE subjects SET visible = 1 WHERE visible IS NULL');
   await pool.query('UPDATE schedule_entries SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE homework SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query("UPDATE homework SET status = 'published' WHERE status IS NULL");
   await pool.query('UPDATE history_log SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE login_history SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE teamwork_tasks SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE messages SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query("UPDATE messages SET status = 'published' WHERE status IS NULL");
   await pool.query('UPDATE users SET password = NULL WHERE password IS NOT NULL');
 
   const courseRows = await pool.query('SELECT id, name FROM courses ORDER BY id');
@@ -1451,6 +1459,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
   );
   const weekStartDate = weekDates[0];
   const weekEndDate = weekDates[6];
+  const nowIso = new Date().toISOString();
 
   db.all(
     `
@@ -1494,7 +1503,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         studentGroups.forEach((sg) => {
           params.push(sg.subject_id, sg.group_number);
         });
-        params.push(courseId || 1, activeSemester ? activeSemester.id : null, weekStartDate, weekEndDate);
+        params.push(courseId || 1, activeSemester ? activeSemester.id : null, nowIso, weekStartDate, weekEndDate);
         const sql = `
           SELECT h.*, subj.name AS subject_name
           FROM homework h
@@ -1502,6 +1511,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
           WHERE (${conditions})
             AND h.course_id = ?
             AND h.semester_id = ?
+            AND COALESCE(h.status, 'published') = 'published'
+            AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
             AND h.is_custom_deadline = 1
             AND h.custom_due_date IS NOT NULL
             AND h.custom_due_date >= ?
@@ -1620,10 +1631,12 @@ app.get('/schedule', requireLogin, async (req, res) => {
             WHERE (${hwConditions})
               AND h.course_id = ?
               AND h.semester_id = ?
+              AND COALESCE(h.status, 'published') = 'published'
+              AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
               AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
             ORDER BY h.created_at DESC
           `,
-          [...hwParams, courseId || 1, activeSemester ? activeSemester.id : null],
+          [...hwParams, courseId || 1, activeSemester ? activeSemester.id : null, nowIso],
           (err, rows) => {
             if (err) {
               return res.status(500).send('Database error');
@@ -2264,7 +2277,7 @@ app.post('/admin/teamwork/delete/:id', requireStaff, (req, res) => {
 });
 
 app.post('/admin/messages/send', requireStaff, async (req, res) => {
-  const { target_type, target_all, subject_id, group_number, body, user_ids } = req.body;
+  const { target_type, target_all, subject_id, group_number, body, user_ids, status, scheduled_at } = req.body;
   if (!body || !body.trim()) {
     return res.redirect('/admin?err=Message%20is%20empty');
   }
@@ -2274,6 +2287,23 @@ app.post('/admin/messages/send', requireStaff, async (req, res) => {
   const activeSemester = await getActiveSemester(courseId);
   const target = target_type || (String(target_all) === '1' ? 'all' : 'subject');
   const isAll = target === 'all';
+  let messageStatus = (status || 'published').toLowerCase();
+  if (!['draft', 'scheduled', 'published'].includes(messageStatus)) {
+    messageStatus = 'published';
+  }
+  let scheduledAt = null;
+  let publishedAt = createdAt;
+  if (messageStatus === 'scheduled') {
+    const parsed = scheduled_at ? new Date(scheduled_at) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+      return res.redirect('/admin?err=Schedule%20date%20required');
+    }
+    scheduledAt = parsed.toISOString();
+    publishedAt = null;
+  }
+  if (messageStatus === 'draft') {
+    publishedAt = null;
+  }
   const subjectId = subject_id ? Number(subject_id) : null;
   const groupNum = group_number ? Number(group_number) : null;
   const users = Array.isArray(user_ids) ? user_ids : user_ids ? [user_ids] : [];
@@ -2286,8 +2316,8 @@ app.post('/admin/messages/send', requireStaff, async (req, res) => {
   try {
     const row = await db.get(
       `
-        INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+        INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
       `,
       [
         isAll || target === 'users' ? null : subjectId,
@@ -2298,6 +2328,9 @@ app.post('/admin/messages/send', requireStaff, async (req, res) => {
         createdAt,
         courseId,
         activeSemester ? activeSemester.id : null,
+        messageStatus,
+        scheduledAt,
+        publishedAt,
       ]
     );
     if (!row || !row.id) {
@@ -2377,6 +2410,7 @@ app.get('/messages.json', requireLogin, async (req, res) => {
       const baseWhere = conditions.length ? `WHERE ${conditions.map((c) => `(${c})`).join(' OR ')}` : '';
       const courseFilter = ' AND m.course_id = ?';
       const semesterFilter = activeSemester ? ' AND m.semester_id = ?' : '';
+      const statusFilter = " AND COALESCE(m.status, 'published') = 'published' AND (m.scheduled_at IS NULL OR m.scheduled_at <= ?)";
       const subjectFilter = !Number.isNaN(filterSubjectId) ? ' AND m.subject_id = ?' : '';
       const finalParams = [...params, courseId || 1];
       if (activeSemester) {
@@ -2385,6 +2419,7 @@ app.get('/messages.json', requireLogin, async (req, res) => {
       if (!Number.isNaN(filterSubjectId)) {
         finalParams.push(filterSubjectId);
       }
+      finalParams.push(new Date().toISOString());
       db.all(
         `
           SELECT m.*, s.name AS subject_name, u.full_name AS created_by, mr.id AS read_id
@@ -2393,7 +2428,7 @@ app.get('/messages.json', requireLogin, async (req, res) => {
           LEFT JOIN users u ON u.id = m.created_by_id
           LEFT JOIN message_reads mr ON mr.message_id = m.id AND mr.user_id = ?
           LEFT JOIN message_targets mt ON mt.message_id = m.id
-          ${baseWhere}${courseFilter}${semesterFilter}${subjectFilter}
+          ${baseWhere}${courseFilter}${semesterFilter}${subjectFilter}${statusFilter}
           ORDER BY m.created_at DESC
           LIMIT 50
         `,
@@ -3182,8 +3217,52 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         }
       );
     });
-    });
-    });
+  });
+});
+
+let schedulerRunning = false;
+const publishScheduledItems = async () => {
+  if (schedulerRunning) {
+    return { messages: 0, homework: 0, skipped: true };
+  }
+  schedulerRunning = true;
+  try {
+    await ensureDbReady();
+    const nowIso = new Date().toISOString();
+    const msgResult = await db.run(
+      `UPDATE messages
+       SET status = 'published', published_at = ?
+       WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ?`,
+      [nowIso, nowIso]
+    );
+    const hwResult = await db.run(
+      `UPDATE homework
+       SET status = 'published', published_at = ?
+       WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ?`,
+      [nowIso, nowIso]
+    );
+    const messages = Number(msgResult?.changes || 0);
+    const homework = Number(hwResult?.changes || 0);
+    if (messages) {
+      broadcast('messages_updated');
+    }
+    if (homework) {
+      broadcast('homework_updated');
+    }
+    return { messages, homework };
+  } finally {
+    schedulerRunning = false;
+  }
+};
+
+app.post('/admin/api/scheduler/run', requireAdmin, async (req, res) => {
+  try {
+    const result = await publishScheduledItems();
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
       }
     );
   });
@@ -3700,6 +3779,27 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), async (req,
   const { schedule_group: group, username, id: userId, course_id: courseId } = req.session.user;
   const createdAt = new Date().toISOString();
   const activeSemester = await getActiveSemester(courseId || 1);
+  const isStaff = ['admin', 'deanery', 'starosta'].includes(req.session.role);
+  let homeworkStatus = isStaff ? String(req.body.status || 'published').toLowerCase() : 'published';
+  if (!['draft', 'scheduled', 'published'].includes(homeworkStatus)) {
+    homeworkStatus = 'published';
+  }
+  let scheduledAt = null;
+  let publishedAt = createdAt;
+  if (homeworkStatus === 'scheduled') {
+    const parsed = req.body.scheduled_at ? new Date(req.body.scheduled_at) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      return res.status(400).send('Schedule date required');
+    }
+    scheduledAt = parsed.toISOString();
+    publishedAt = null;
+  }
+  if (homeworkStatus === 'draft') {
+    publishedAt = null;
+  }
   if (!settingsCache.allow_homework_creation && req.session.role !== 'admin') {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
@@ -3719,8 +3819,8 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), async (req,
     const row = await db.get(
       `
         INSERT INTO homework
-        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, status, scheduled_at, published_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `,
       [
@@ -3743,6 +3843,9 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), async (req,
         createdAt,
         courseId || 1,
         activeSemester ? activeSemester.id : null,
+        homeworkStatus,
+        scheduledAt,
+        publishedAt,
       ]
     );
     if (!row || !row.id) {
@@ -3810,6 +3913,27 @@ app.post('/homework/custom', requireLogin, upload.single('attachment'), async (r
   const { schedule_group: group, username, id: userId, course_id: courseId } = req.session.user;
   const createdAt = new Date().toISOString();
   const activeSemester = await getActiveSemester(courseId || 1);
+  const isStaff = ['admin', 'deanery', 'starosta'].includes(req.session.role);
+  let homeworkStatus = isStaff ? String(req.body.status || 'published').toLowerCase() : 'published';
+  if (!['draft', 'scheduled', 'published'].includes(homeworkStatus)) {
+    homeworkStatus = 'published';
+  }
+  let scheduledAt = null;
+  let publishedAt = createdAt;
+  if (homeworkStatus === 'scheduled') {
+    const parsed = req.body.scheduled_at ? new Date(req.body.scheduled_at) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      return res.status(400).send('Schedule date required');
+    }
+    scheduledAt = parsed.toISOString();
+    publishedAt = null;
+  }
+  if (homeworkStatus === 'draft') {
+    publishedAt = null;
+  }
   if (!settingsCache.allow_homework_creation && req.session.role !== 'admin') {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
@@ -3839,8 +3963,8 @@ app.post('/homework/custom', requireLogin, upload.single('attachment'), async (r
     const row = await db.get(
       `
         INSERT INTO homework
-        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, is_custom_deadline, custom_due_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `,
       [
@@ -3865,6 +3989,9 @@ app.post('/homework/custom', requireLogin, upload.single('attachment'), async (r
         activeSemester ? activeSemester.id : null,
         1,
         dueDate,
+        homeworkStatus,
+        scheduledAt,
+        publishedAt,
       ]
     );
     if (!row || !row.id) {
@@ -4711,8 +4838,8 @@ app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkBulkAccess, asy
       `INSERT INTO homework
        (group_name, subject, day, time, week_number, class_number, subject_id, group_number, day_of_week,
         created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at,
-        course_id, semester_id, is_custom_deadline, custom_due_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        course_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING id`,
       [
         hw.group_name,
@@ -4737,6 +4864,9 @@ app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkBulkAccess, asy
         activeSemester ? activeSemester.id : null,
         isCustom,
         customDue,
+        'published',
+        null,
+        createdAt,
       ]
     );
     return res.json({ ok: true, id: row?.id });
@@ -5668,6 +5798,18 @@ app.post('/logout', (req, res) => {
   });
 });
 
+const startScheduler = () => {
+  const intervalMs = Number(process.env.SCHEDULER_INTERVAL_MS || 60000);
+  if (!Number.isFinite(intervalMs) || intervalMs < 10000) {
+    return;
+  }
+  setInterval(() => {
+    publishScheduledItems().catch((err) => {
+      console.error('Scheduler error', err);
+    });
+  }, intervalMs);
+};
+
 const startServer = () => {
   console.log('Starting server', {
     port: PORT,
@@ -5678,6 +5820,7 @@ const startServer = () => {
   ensureDbReady().catch((err) => {
     console.error('Failed to initialize database', err);
   });
+  startScheduler();
 };
 
 app.use((err, req, res, next) => {

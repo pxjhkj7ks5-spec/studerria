@@ -1206,6 +1206,22 @@ body.theme-light .mobile-menu-action {
                 <label for="hwFile" class="form-label">Attachment (optional)</label>
                 <input id="hwFile" name="attachment" type="file" class="form-control" />
               </div>
+              <% if (role && role !== 'student') { %>
+                <div class="row g-2 mb-3">
+                  <div class="col-12 col-md-4">
+                    <label for="hwStatus" class="form-label">Publication</label>
+                    <select id="hwStatus" name="status" class="form-select">
+                      <option value="published" selected>Publish now</option>
+                      <option value="scheduled">Schedule</option>
+                      <option value="draft">Draft</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-5">
+                    <label for="hwScheduledAt" class="form-label">Publish at</label>
+                    <input id="hwScheduledAt" name="scheduled_at" type="datetime-local" class="form-control" />
+                  </div>
+                </div>
+              <% } %>
               <input type="hidden" id="hwSubjectId" name="subject_id" />
               <input type="hidden" id="hwGroupNum" name="group_number" />
               <input type="hidden" id="hwDay" name="day_of_week" />
@@ -1253,6 +1269,20 @@ body.theme-light .mobile-menu-action {
                   <label class="form-label">Дедлайн</label>
                   <input type="date" class="form-control" name="custom_due_date" required />
                 </div>
+                <% if (role && role !== 'student') { %>
+                  <div class="col-12 col-md-4">
+                    <label class="form-label">Publication</label>
+                    <select id="customHwStatus" name="status" class="form-select">
+                      <option value="published" selected>Publish now</option>
+                      <option value="scheduled">Schedule</option>
+                      <option value="draft">Draft</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-5">
+                    <label class="form-label">Publish at</label>
+                    <input id="customHwScheduledAt" name="scheduled_at" type="datetime-local" class="form-control" />
+                  </div>
+                <% } %>
                 <div class="col-12">
                   <label class="form-label">Опис</label>
                   <textarea class="form-control" name="description" rows="3" required></textarea>
@@ -1472,6 +1502,25 @@ body.theme-light .mobile-menu-action {
       }
 
       attachValidationTooltips();
+
+      function bindScheduleStatus(selectId, inputId) {
+        const statusSelect = document.getElementById(selectId);
+        const scheduleInput = document.getElementById(inputId);
+        if (!statusSelect || !scheduleInput) return;
+        const sync = () => {
+          const isScheduled = statusSelect.value === 'scheduled';
+          scheduleInput.disabled = !isScheduled;
+          scheduleInput.required = isScheduled;
+          if (!isScheduled) {
+            scheduleInput.value = '';
+          }
+        };
+        statusSelect.addEventListener('change', sync);
+        sync();
+      }
+
+      bindScheduleStatus('hwStatus', 'hwScheduledAt');
+      bindScheduleStatus('customHwStatus', 'customHwScheduledAt');
 
       const currentUserId = <%- JSON.stringify(userId || null) %>;
       const welcomeModalEl = document.getElementById('welcomeModal');
