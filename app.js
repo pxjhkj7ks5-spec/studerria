@@ -239,6 +239,27 @@ const db = {
 
 let usersHasIsActive = true;
 
+const refreshSettingsCache = async () => {
+  const settingsRows = await pool.query('SELECT key, value FROM settings');
+  const parsed = { ...DEFAULT_SETTINGS };
+  for (const row of settingsRows.rows) {
+    if (!row || !row.key) continue;
+    if (row.key === 'session_duration_days') {
+      const n = Number(row.value);
+      if (!Number.isNaN(n) && n > 0) parsed.session_duration_days = n;
+    } else if (row.key === 'max_file_size_mb') {
+      const n = Number(row.value);
+      if (!Number.isNaN(n) && n > 0) parsed.max_file_size_mb = n;
+    } else if (row.key === 'allow_homework_creation') {
+      parsed.allow_homework_creation = String(row.value).toLowerCase() === 'true';
+    } else if (row.key === 'min_team_members') {
+      const n = Number(row.value);
+      if (!Number.isNaN(n) && n > 0) parsed.min_team_members = n;
+    }
+  }
+  settingsCache = parsed;
+};
+
 const ensureUser = async (fullName, role, passwordHash, options = {}) => {
   const { courseId = 1 } = options;
   const { forcePassword = false, forceRole = false } = options;
@@ -593,24 +614,7 @@ const initDb = async () => {
     });
   }
 
-  const settingsRows = await pool.query('SELECT key, value FROM settings');
-  const parsed = { ...DEFAULT_SETTINGS };
-  for (const row of settingsRows.rows) {
-    if (!row || !row.key) continue;
-    if (row.key === 'session_duration_days') {
-      const n = Number(row.value);
-      if (!Number.isNaN(n) && n > 0) parsed.session_duration_days = n;
-    } else if (row.key === 'max_file_size_mb') {
-      const n = Number(row.value);
-      if (!Number.isNaN(n) && n > 0) parsed.max_file_size_mb = n;
-    } else if (row.key === 'allow_homework_creation') {
-      parsed.allow_homework_creation = String(row.value).toLowerCase() === 'true';
-    } else if (row.key === 'min_team_members') {
-      const n = Number(row.value);
-      if (!Number.isNaN(n) && n > 0) parsed.min_team_members = n;
-    }
-  }
-  settingsCache = parsed;
+  await refreshSettingsCache();
 };
 
 let initPromise;
@@ -2512,6 +2516,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         weeklyTeamwork,
         weeklyUserRoles,
         weeklyUserSeries,
+        settings: settingsCache,
         filters: {
           group_number: group_number || '',
           day: day || '',
@@ -2576,6 +2581,38 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     );
   });
 });
+});
+
+app.post('/admin/settings', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.settings.init');
+  }
+  const sessionDays = Number(req.body.session_duration_days);
+  const maxFileSize = Number(req.body.max_file_size_mb);
+  const minTeamMembers = Number(req.body.min_team_members);
+  const allowHomework = String(req.body.allow_homework_creation).toLowerCase() === 'true';
+  if (
+    Number.isNaN(sessionDays) || sessionDays <= 0 ||
+    Number.isNaN(maxFileSize) || maxFileSize <= 0 ||
+    Number.isNaN(minTeamMembers) || minTeamMembers <= 0
+  ) {
+    return res.redirect('/admin?err=Invalid%20settings');
+  }
+  try {
+    const stmt = db.prepare(
+      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value'
+    );
+    stmt.run('session_duration_days', String(sessionDays));
+    stmt.run('max_file_size_mb', String(maxFileSize));
+    stmt.run('allow_homework_creation', allowHomework ? 'true' : 'false');
+    stmt.run('min_team_members', String(minTeamMembers));
+    await refreshSettingsCache();
+    return res.redirect('/admin?ok=Settings%20saved');
+  } catch (err) {
+    return handleDbError(res, err, 'admin.settings.save');
+  }
 });
 
 app.get('/admin/overview', requireAdmin, async (req, res) => {
