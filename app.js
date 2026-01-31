@@ -87,6 +87,14 @@ const adminSeed = process.env.ADMIN_HASHED_PASS
 
 const userSeed = adminSeed ? [adminSeed] : [];
 
+const DEFAULT_SETTINGS = {
+  session_duration_days: 14,
+  max_file_size_mb: 20,
+  allow_homework_creation: true,
+  min_team_members: 2,
+};
+let settingsCache = { ...DEFAULT_SETTINGS };
+
 const bellSchedule = {
   1: { start: '08:30', end: '09:50' },
   2: { start: '10:00', end: '11:20' },
@@ -261,6 +269,12 @@ const ensureUser = async (fullName, role, passwordHash, options = {}) => {
 const initDb = async () => {
   const ddl = [
     `
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    `,
+    `
       CREATE TABLE IF NOT EXISTS courses (
         id INTEGER PRIMARY KEY,
         name TEXT NOT NULL UNIQUE
@@ -300,6 +314,7 @@ const initDb = async () => {
         group_count INTEGER NOT NULL DEFAULT 1,
         default_group INTEGER NOT NULL DEFAULT 1,
         show_in_teamwork INTEGER NOT NULL DEFAULT 1,
+        visible INTEGER NOT NULL DEFAULT 1,
         course_id INTEGER REFERENCES courses(id)
       )
     `,
@@ -476,6 +491,17 @@ const initDb = async () => {
     `
   );
 
+  await pool.query(
+    `
+      INSERT INTO settings (key, value) VALUES
+      ('session_duration_days', '14'),
+      ('max_file_size_mb', '20'),
+      ('allow_homework_creation', 'true'),
+      ('min_team_members', '2')
+      ON CONFLICT (key) DO NOTHING
+    `
+  );
+
   const alters = [
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS language TEXT',
@@ -486,6 +512,7 @@ const initDb = async () => {
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS is_active INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS is_archived INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
+    'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS visible INTEGER NOT NULL DEFAULT 1',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
@@ -506,6 +533,7 @@ const initDb = async () => {
   await pool.query('UPDATE users SET course_id = 1 WHERE course_id IS NULL');
   await pool.query("UPDATE users SET language = 'uk' WHERE language IS NULL");
   await pool.query('UPDATE subjects SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query('UPDATE subjects SET visible = 1 WHERE visible IS NULL');
   await pool.query('UPDATE schedule_entries SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE homework SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE history_log SET course_id = 1 WHERE course_id IS NULL');
@@ -561,6 +589,25 @@ const initDb = async () => {
       forceRole: isAdmin,
     });
   }
+
+  const settingsRows = await pool.query('SELECT key, value FROM settings');
+  const parsed = { ...DEFAULT_SETTINGS };
+  for (const row of settingsRows.rows) {
+    if (!row || !row.key) continue;
+    if (row.key === 'session_duration_days') {
+      const n = Number(row.value);
+      if (!Number.isNaN(n) && n > 0) parsed.session_duration_days = n;
+    } else if (row.key === 'max_file_size_mb') {
+      const n = Number(row.value);
+      if (!Number.isNaN(n) && n > 0) parsed.max_file_size_mb = n;
+    } else if (row.key === 'allow_homework_creation') {
+      parsed.allow_homework_creation = String(row.value).toLowerCase() === 'true';
+    } else if (row.key === 'min_team_members') {
+      const n = Number(row.value);
+      if (!Number.isNaN(n) && n > 0) parsed.min_team_members = n;
+    }
+  }
+  settingsCache = parsed;
 };
 
 let initPromise;
@@ -627,7 +674,7 @@ const allowedTypes = new Set([
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: (settingsCache.max_file_size_mb || 20) * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (!allowedTypes.has(file.mimetype)) {
       return cb(new Error('Invalid file type'));
@@ -929,7 +976,7 @@ app.post('/login', async (req, res) => {
         req.session.role = role;
         const remember = remember_me === 'on';
         req.session.rememberMe = remember;
-        req.session.cookie.maxAge = remember ? 14 * 24 * 60 * 60 * 1000 : null;
+        req.session.cookie.maxAge = remember ? (settingsCache.session_duration_days || 14) * 24 * 60 * 60 * 1000 : null;
 
         if (role === 'admin') {
           return res.redirect('/admin');
@@ -1028,7 +1075,7 @@ app.get('/register/subjects', (req, res) => {
     if (uErr || !user || !user.course_id) {
       return res.redirect('/register/course');
     }
-    db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [user.course_id], (err, subjects) => {
+    db.all('SELECT * FROM subjects WHERE course_id = ? AND visible = 1 ORDER BY name', [user.course_id], (err, subjects) => {
       if (err) {
         return res.status(500).send('Database error');
       }
@@ -1047,7 +1094,7 @@ app.post('/register/subjects', (req, res) => {
     if (uErr || !userRow || !userRow.course_id) {
       return res.redirect('/register/course');
     }
-    db.all('SELECT id, group_count, default_group FROM subjects WHERE course_id = ?', [userRow.course_id], (err, subjects) => {
+    db.all('SELECT id, group_count, default_group FROM subjects WHERE course_id = ? AND visible = 1', [userRow.course_id], (err, subjects) => {
       if (err) {
         return res.status(500).send('Database error');
       }
@@ -1086,7 +1133,7 @@ app.post('/register/subjects', (req, res) => {
           };
           req.session.role = user.role;
           if (req.session.rememberMe) {
-            req.session.cookie.maxAge = 14 * 24 * 60 * 60 * 1000;
+            req.session.cookie.maxAge = (settingsCache.session_duration_days || 14) * 24 * 60 * 60 * 1000;
           } else {
             req.session.cookie.maxAge = null;
           }
@@ -1193,7 +1240,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
       SELECT sg.subject_id, sg.group_number, s.name AS subject_name
       FROM student_groups sg
       JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ? AND s.course_id = ?
+      WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
     `,
     [userId, courseId || 1],
     (groupErr, studentGroups) => {
@@ -1348,7 +1395,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         SELECT se.*, s.name AS subject_name
         FROM schedule_entries se
         JOIN subjects s ON s.id = se.subject_id
-        WHERE se.week_number = ? AND se.course_id = ? AND se.semester_id = ? AND (${conditions})
+        WHERE se.week_number = ? AND se.course_id = ? AND se.semester_id = ? AND s.visible = 1 AND (${conditions})
       `;
 
       db.all(sql, params, (scheduleErr, rows) => {
@@ -1379,7 +1426,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
       SELECT sg.subject_id, s.name AS subject_name
       FROM student_groups sg
       JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ? AND s.show_in_teamwork = 1 AND s.course_id = ?
+      WHERE sg.student_id = ? AND s.show_in_teamwork = 1 AND s.visible = 1 AND s.course_id = ?
       ORDER BY s.name ASC
     `,
     [userId, courseId || 1],
@@ -2757,6 +2804,12 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), async (req,
   const { schedule_group: group, username, id: userId, course_id: courseId } = req.session.user;
   const createdAt = new Date().toISOString();
   const activeSemester = await getActiveSemester(courseId || 1);
+  if (!settingsCache.allow_homework_creation && req.session.role !== 'admin') {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.status(403).send('Homework disabled');
+  }
 
   db.get('SELECT name, course_id FROM subjects WHERE id = ?', [subjectId], (subErr, subjectRow) => {
     if (subErr || !subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
@@ -3249,10 +3302,11 @@ app.post('/admin/homework/delete/:id', requireAdmin, (req, res) => {
 });
 
 app.post('/admin/subjects/add', requireAdmin, (req, res) => {
-  const { name, group_count, default_group, show_in_teamwork } = req.body;
+  const { name, group_count, default_group, show_in_teamwork, visible } = req.body;
   const count = Number(group_count);
   const def = Number(default_group);
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
+  const visibleFlag = String(visible) === '0' ? 0 : 1;
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
@@ -3261,14 +3315,14 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
   db.run(
-    'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, course_id) VALUES (?, ?, ?, ?, ?)',
-    [name, count, def, teamworkFlag, courseId],
+    'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [name, count, def, teamworkFlag, visibleFlag, courseId],
     (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
-    logAction(db, req, 'subject_add', { name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag });
-    logActivity(db, req, 'subject_add', 'subject', null, { name, group_count: count, default_group: def }, courseId);
+    logAction(db, req, 'subject_add', { name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag });
+    logActivity(db, req, 'subject_add', 'subject', null, { name, group_count: count, default_group: def, visible: visibleFlag }, courseId);
     return res.redirect('/admin?ok=Subject%20added');
     }
   );
@@ -3276,10 +3330,11 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
 
 app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { name, group_count, default_group, show_in_teamwork } = req.body;
+  const { name, group_count, default_group, show_in_teamwork, visible } = req.body;
   const count = Number(group_count);
   const def = Number(default_group);
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
+  const visibleFlag = String(visible) === '0' ? 0 : 1;
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
@@ -3288,14 +3343,14 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
   db.run(
-    'UPDATE subjects SET name = ?, group_count = ?, default_group = ?, show_in_teamwork = ? WHERE id = ? AND course_id = ?',
-    [name, count, def, teamworkFlag, id, courseId],
+    'UPDATE subjects SET name = ?, group_count = ?, default_group = ?, show_in_teamwork = ?, visible = ? WHERE id = ? AND course_id = ?',
+    [name, count, def, teamworkFlag, visibleFlag, id, courseId],
     (err) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
       }
-      logAction(db, req, 'subject_edit', { id, name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag });
-      logActivity(db, req, 'subject_edit', 'subject', Number(id) || null, { name, group_count: count, default_group: def }, courseId);
+      logAction(db, req, 'subject_edit', { id, name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag });
+      logActivity(db, req, 'subject_edit', 'subject', Number(id) || null, { name, group_count: count, default_group: def, visible: visibleFlag }, courseId);
       return res.redirect('/admin?ok=Subject%20updated');
     }
   );

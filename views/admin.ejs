@@ -923,6 +923,12 @@
                       <option value="0">Teamwork: No</option>
                     </select>
                   </div>
+                  <div class="col-12 col-md-2">
+                    <select class="form-select" name="visible">
+                      <option value="1" selected>Visible: Yes</option>
+                      <option value="0">Visible: No</option>
+                    </select>
+                  </div>
                   <div class="col-12 col-md-3 d-grid">
                     <button class="btn btn-primary" type="submit">Add</button>
                   </div>
@@ -944,6 +950,7 @@
                   <th>Groups</th>
                   <th>Default</th>
                   <th>Teamwork</th>
+                  <th>Visible</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -972,6 +979,12 @@
                       <select class="form-select form-select-sm" name="show_in_teamwork" form="subject-<%= s.id %>" required>
                         <option value="1" <%= s.show_in_teamwork === 1 ? 'selected' : '' %>>Yes</option>
                         <option value="0" <%= s.show_in_teamwork === 0 ? 'selected' : '' %>>No</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select class="form-select form-select-sm" name="visible" form="subject-<%= s.id %>" required>
+                        <option value="1" <%= s.visible !== 0 ? 'selected' : '' %>>Yes</option>
+                        <option value="0" <%= s.visible === 0 ? 'selected' : '' %>>No</option>
                       </select>
                     </td>
                     <td class="d-flex gap-2">
