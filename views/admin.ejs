@@ -1077,15 +1077,18 @@
                       <% } %>
                     </td>
                     <td>
-                      <form method="POST" action="/admin/homework/delete/<%= item.id %>">
-                        <button
-                          class="btn btn-sm btn-outline-danger"
-                          type="submit"
-                          onclick="return confirm('Delete this homework item?');"
-                        >
-                          <%= t('admin.delete') %>
-                        </button>
-                      </form>
+                      <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-primary homework-clone-btn" type="button" data-homework-id="<%= item.id %>">Clone</button>
+                        <form method="POST" action="/admin/homework/delete/<%= item.id %>">
+                          <button
+                            class="btn btn-sm btn-outline-danger"
+                            type="submit"
+                            onclick="return confirm('Delete this homework item?');"
+                          >
+                            <%= t('admin.delete') %>
+                          </button>
+                        </form>
+                      </div>
                     </td>
                   </tr>
                 <% }); %>
@@ -1365,6 +1368,7 @@
                     <td class="d-flex gap-2">
                       <form id="subject-<%= s.id %>" method="POST" action="/admin/subjects/edit/<%= s.id %>" data-save-all="true"></form>
                       <button class="btn btn-sm btn-outline-secondary" type="submit" form="subject-<%= s.id %>">Save</button>
+                      <button class="btn btn-sm btn-outline-primary subject-clone-btn" type="button" data-subject-id="<%= s.id %>" data-subject-name="<%= s.name %>">Clone</button>
                       <form method="POST" action="/admin/subjects/delete/<%= s.id %>">
                         <button
                           class="btn btn-sm btn-outline-danger"
@@ -2050,6 +2054,103 @@
               </div>
             </div>
             <div id="validateIssues" class="list-group"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="subjectCloneModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Clone subject</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="cloneSubjectId" />
+            <div class="mb-3">
+              <label class="form-label">New name</label>
+              <input class="form-control" id="cloneSubjectName" />
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="cloneSubjectSettings" checked />
+              <label class="form-check-label" for="cloneSubjectSettings">Copy settings</label>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary glass" id="cloneSubjectSubmit">Clone</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="scheduleCloneModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Clone week</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label">Source week</label>
+                <input class="form-control" type="number" min="1" max="15" id="cloneWeekSource" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Target week</label>
+                <input class="form-control" type="number" min="1" max="15" id="cloneWeekTarget" />
+              </div>
+              <div class="col-12">
+                <select class="form-select" id="cloneWeekMode">
+                  <option value="skip_conflicts">Skip conflicts</option>
+                  <option value="overwrite">Overwrite</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary glass" id="cloneWeekSubmit">Clone</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="homeworkCloneModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Clone homework</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="cloneHomeworkId" />
+            <div class="row g-2">
+              <div class="col-12">
+                <select class="form-select" id="cloneHomeworkTargetType">
+                  <option value="week">Target week</option>
+                  <option value="date">Class date</option>
+                  <option value="deadline">Deadline</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <input class="form-control" id="cloneHomeworkTargetValue" />
+              </div>
+              <div class="col-12 form-check">
+                <input class="form-check-input" type="checkbox" id="cloneHomeworkAttachments" checked />
+                <label class="form-check-label" for="cloneHomeworkAttachments">Copy attachments</label>
+              </div>
+              <div class="col-12 form-check">
+                <input class="form-check-input" type="checkbox" id="cloneHomeworkLinks" checked />
+                <label class="form-check-label" for="cloneHomeworkLinks">Copy links</label>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary glass" id="cloneHomeworkSubmit">Clone</button>
           </div>
         </div>
       </div>
@@ -2828,6 +2929,108 @@
       }
       if (runValidateBtn) {
         runValidateBtn.addEventListener('click', runScheduleValidation);
+      }
+
+      const subjectCloneModal = document.getElementById('subjectCloneModal');
+      const cloneSubjectId = document.getElementById('cloneSubjectId');
+      const cloneSubjectName = document.getElementById('cloneSubjectName');
+      const cloneSubjectSettings = document.getElementById('cloneSubjectSettings');
+      const cloneSubjectSubmit = document.getElementById('cloneSubjectSubmit');
+
+      document.querySelectorAll('.subject-clone-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (!subjectCloneModal) return;
+          cloneSubjectId.value = btn.dataset.subjectId;
+          cloneSubjectName.value = `${btn.dataset.subjectName} (Copy)`;
+          const modal = new bootstrap.Modal(subjectCloneModal);
+          modal.show();
+        });
+      });
+      if (cloneSubjectSubmit) {
+        cloneSubjectSubmit.addEventListener('click', async () => {
+          const res = await fetch(`/admin/api/subjects/${cloneSubjectId.value}/clone`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              new_name: cloneSubjectName.value,
+              copy_settings: cloneSubjectSettings.checked,
+            }),
+          });
+          if (!res.ok) return alert('Помилка клонування');
+          window.location.reload();
+        });
+      }
+
+      const scheduleCloneModal = document.getElementById('scheduleCloneModal');
+      const cloneWeekSubmit = document.getElementById('cloneWeekSubmit');
+      const cloneWeekSource = document.getElementById('cloneWeekSource');
+      const cloneWeekTarget = document.getElementById('cloneWeekTarget');
+      const cloneWeekMode = document.getElementById('cloneWeekMode');
+      const validateScheduleBtnEl = document.getElementById('validateScheduleBtn');
+      if (validateScheduleBtnEl && scheduleCloneModal) {
+        const cloneBtn = document.createElement('button');
+        cloneBtn.type = 'button';
+        cloneBtn.className = 'btn btn-outline-primary btn-sm';
+        cloneBtn.textContent = 'Clone week';
+        validateScheduleBtnEl.parentElement.insertBefore(cloneBtn, validateScheduleBtnEl);
+        cloneBtn.addEventListener('click', () => {
+          const modal = new bootstrap.Modal(scheduleCloneModal);
+          modal.show();
+        });
+      }
+      if (cloneWeekSubmit) {
+        cloneWeekSubmit.addEventListener('click', async () => {
+          const res = await fetch('/admin/api/schedule/weeks/clone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              source_week: Number(cloneWeekSource.value || 0),
+              target_week: Number(cloneWeekTarget.value || 0),
+              mode: cloneWeekMode.value,
+            }),
+          });
+          if (!res.ok) return alert('Помилка клонування тижня');
+          window.location.reload();
+        });
+      }
+
+      const homeworkCloneModal = document.getElementById('homeworkCloneModal');
+      const cloneHomeworkId = document.getElementById('cloneHomeworkId');
+      const cloneHomeworkTargetType = document.getElementById('cloneHomeworkTargetType');
+      const cloneHomeworkTargetValue = document.getElementById('cloneHomeworkTargetValue');
+      const cloneHomeworkAttachments = document.getElementById('cloneHomeworkAttachments');
+      const cloneHomeworkLinks = document.getElementById('cloneHomeworkLinks');
+      const cloneHomeworkSubmit = document.getElementById('cloneHomeworkSubmit');
+
+      document.querySelectorAll('.homework-clone-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (!homeworkCloneModal) return;
+          cloneHomeworkId.value = btn.dataset.homeworkId;
+          cloneHomeworkTargetValue.value = '';
+          const modal = new bootstrap.Modal(homeworkCloneModal);
+          modal.show();
+        });
+      });
+      if (cloneHomeworkSubmit) {
+        cloneHomeworkSubmit.addEventListener('click', async () => {
+          const targetType = cloneHomeworkTargetType.value;
+          const value = cloneHomeworkTargetValue.value;
+          const target = {};
+          if (targetType === 'week') target.week = Number(value || 0);
+          if (targetType === 'date') target.class_date = value;
+          if (targetType === 'deadline') target.deadline = value;
+          const res = await fetch(`/admin/api/homework/${cloneHomeworkId.value}/clone`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              target,
+              copy_attachments: cloneHomeworkAttachments.checked,
+              copy_links: cloneHomeworkLinks.checked,
+            }),
+          });
+          if (!res.ok) return alert('Помилка клонування ДЗ');
+          window.location.reload();
+        });
       }
 
       async function refreshScheduleDayOptions(courseId, selectedValue = '') {

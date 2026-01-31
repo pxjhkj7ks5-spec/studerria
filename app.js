@@ -4576,6 +4576,175 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
   );
 });
 
+app.post('/admin/api/subjects/:subjectId/clone', requireAdminOrDeanery, async (req, res) => {
+  const subjectId = Number(req.params.subjectId);
+  const { new_name, copy_settings } = req.body || {};
+  if (Number.isNaN(subjectId) || !new_name || !new_name.trim()) {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+  const role = req.session.role;
+  const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  try {
+    const subject = await db.get('SELECT * FROM subjects WHERE id = ? AND course_id = ?', [subjectId, courseId]);
+    if (!subject) return res.status(404).json({ error: 'Subject not found' });
+    const copySettings = copy_settings !== false;
+    const row = await db.get(
+      `INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id)
+       VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+      [
+        new_name.trim(),
+        copySettings ? subject.group_count : 1,
+        copySettings ? subject.default_group : 1,
+        copySettings ? subject.show_in_teamwork : 1,
+        copySettings ? subject.visible : 1,
+        courseId,
+      ]
+    );
+    return res.json({ ok: true, id: row?.id });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/admin/api/schedule/weeks/clone', requireAdminOrDeanery, async (req, res) => {
+  const { source_week, target_week, mode } = req.body || {};
+  const srcWeek = Number(source_week);
+  const tgtWeek = Number(target_week);
+  if (Number.isNaN(srcWeek) || Number.isNaN(tgtWeek) || srcWeek < 1 || tgtWeek < 1) {
+    return res.status(400).json({ error: 'Invalid week' });
+  }
+  const role = req.session.role;
+  const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  let activeSemester = null;
+  try {
+    activeSemester = await getActiveSemester(courseId);
+  } catch (err) {
+    return res.status(500).json({ error: 'Semester error' });
+  }
+  try {
+    const studyDays = await getCourseStudyDays(courseId);
+    const activeDaySet = new Set((studyDays || []).filter((d) => d.is_active).map((d) => d.day_name));
+    const rows = await db.all(
+      `SELECT * FROM schedule_entries
+       WHERE course_id = ? AND semester_id = ? AND week_number = ?`,
+      [courseId, activeSemester ? activeSemester.id : null, srcWeek]
+    );
+    let inserted = 0;
+    for (const row of rows) {
+      if (activeDaySet.size && !activeDaySet.has(row.day_of_week)) continue;
+      const conflict = await db.get(
+        `SELECT id FROM schedule_entries
+         WHERE course_id = ? AND semester_id = ? AND week_number = ?
+           AND day_of_week = ? AND class_number = ? AND group_number = ?`,
+        [courseId, activeSemester ? activeSemester.id : null, tgtWeek, row.day_of_week, row.class_number, row.group_number]
+      );
+      if (conflict && mode !== 'overwrite') {
+        continue;
+      }
+      if (conflict && mode === 'overwrite') {
+        await db.run('DELETE FROM schedule_entries WHERE id = ?', [conflict.id]);
+      }
+      await db.run(
+        `INSERT INTO schedule_entries
+         (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          row.subject_id,
+          row.group_number,
+          row.day_of_week,
+          row.class_number,
+          tgtWeek,
+          courseId,
+          activeSemester ? activeSemester.id : null,
+        ]
+      );
+      inserted += 1;
+    }
+    return res.json({ ok: true, inserted });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkBulkAccess, async (req, res) => {
+  const homeworkId = Number(req.params.homeworkId);
+  if (Number.isNaN(homeworkId)) return res.status(400).json({ error: 'Invalid homework' });
+  const role = req.session.role;
+  const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  let activeSemester = null;
+  try {
+    activeSemester = await getActiveSemester(courseId);
+  } catch (err) {
+    return res.status(500).json({ error: 'Semester error' });
+  }
+  const { target = {}, copy_attachments = true, copy_links = true } = req.body || {};
+  try {
+    const hw = await db.get(
+      `SELECT * FROM homework WHERE id = ? AND course_id = ? AND semester_id = ?`,
+      [homeworkId, courseId, activeSemester ? activeSemester.id : null]
+    );
+    if (!hw) return res.status(404).json({ error: 'Not found' });
+    const createdAt = new Date().toISOString();
+    let classDate = null;
+    let customDue = null;
+    let isCustom = 0;
+    let weekNumber = hw.week_number || null;
+    let dayOfWeek = hw.day_of_week;
+    if (target.week) {
+      const w = Number(target.week);
+      if (Number.isFinite(w) && w > 0 && dayOfWeek) {
+        classDate = getDateForWeekDay(w, dayOfWeek, activeSemester ? activeSemester.start_date : null);
+        weekNumber = w;
+      }
+    } else if (target.class_date) {
+      classDate = String(target.class_date).slice(0, 10);
+      const mapped = getWeekDayForDate(classDate, activeSemester ? activeSemester.start_date : null);
+      if (mapped) {
+        weekNumber = mapped.weekNumber;
+        dayOfWeek = mapped.dayName;
+      }
+    } else if (target.deadline) {
+      customDue = String(target.deadline).slice(0, 10);
+      isCustom = 1;
+    }
+    const row = await db.get(
+      `INSERT INTO homework
+       (group_name, subject, day, time, week_number, class_number, subject_id, group_number, day_of_week,
+        created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at,
+        course_id, semester_id, is_custom_deadline, custom_due_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING id`,
+      [
+        hw.group_name,
+        hw.subject,
+        hw.day,
+        hw.time,
+        weekNumber,
+        hw.class_number,
+        hw.subject_id,
+        hw.group_number,
+        dayOfWeek,
+        hw.created_by_id,
+        hw.description,
+        classDate || hw.class_date,
+        copy_links ? hw.meeting_url : null,
+        copy_links ? hw.link_url : null,
+        copy_attachments ? hw.file_path : null,
+        copy_attachments ? hw.file_name : null,
+        hw.created_by,
+        createdAt,
+        courseId,
+        activeSemester ? activeSemester.id : null,
+        isCustom,
+        customDue,
+      ]
+    );
+    return res.json({ ok: true, id: row?.id });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
 app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
