@@ -227,6 +227,24 @@
               </div>
             </div>
           </div>
+          <div class="row g-4 mt-1">
+            <div class="col-12 col-lg-7">
+              <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                  <h6 class="mb-3"><%= t('admin.weeklyActivity') %></h6>
+                  <canvas id="weeklyActivityChart" height="160"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-lg-5">
+              <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                  <h6 class="mb-3"><%= t('admin.weeklyNewUsers') %></h6>
+                  <canvas id="weeklyUsersChart" height="160"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -264,6 +282,11 @@
           teamworkGroups: <%= stats.teamworkGroups %>,
           teamworkMembers: <%= stats.teamworkMembers %>,
         };
+        const weeklyLabels = <%- JSON.stringify(weeklyLabels || []) %>;
+        const weeklyHomework = <%- JSON.stringify(weeklyHomework || []) %>;
+        const weeklyTeamwork = <%- JSON.stringify(weeklyTeamwork || []) %>;
+        const weeklyUserRoles = <%- JSON.stringify(weeklyUserRoles || []) %>;
+        const weeklyUserSeries = <%- JSON.stringify(weeklyUserSeries || []) %>;
         const isDark = document.body.classList.contains('theme-dark');
         Chart.defaults.color = isDark ? '#e2e8f0' : '#1f2937';
         Chart.defaults.borderColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.08)';
@@ -311,6 +334,64 @@
             options: {
               plugins: { legend: { position: 'bottom' } },
               cutout: '65%',
+            },
+          });
+        }
+
+        const weeklyActivityCtx = document.getElementById('weeklyActivityChart');
+        if (weeklyActivityCtx) {
+          new Chart(weeklyActivityCtx, {
+            type: 'line',
+            data: {
+              labels: weeklyLabels,
+              datasets: [
+                {
+                  label: '<%= t('admin.homework') %>',
+                  data: weeklyHomework,
+                  borderColor: '#60a5fa',
+                  backgroundColor: 'rgba(96, 165, 250, 0.25)',
+                  tension: 0.35,
+                  fill: true,
+                },
+                {
+                  label: '<%= t('admin.teamworkTasks') %>',
+                  data: weeklyTeamwork,
+                  borderColor: '#f472b6',
+                  backgroundColor: 'rgba(244, 114, 182, 0.25)',
+                  tension: 0.35,
+                  fill: true,
+                },
+              ],
+            },
+            options: {
+              plugins: { legend: { position: 'bottom' } },
+              scales: {
+                y: { beginAtZero: true, ticks: { precision: 0 } },
+              },
+            },
+          });
+        }
+
+        const weeklyUsersCtx = document.getElementById('weeklyUsersChart');
+        if (weeklyUsersCtx) {
+          const palette = ['#38bdf8', '#22c55e', '#f97316', '#a78bfa'];
+          const datasets = weeklyUserRoles.map((role, idx) => ({
+            label: role,
+            data: weeklyUserSeries[idx] || [],
+            backgroundColor: palette[idx % palette.length],
+            borderRadius: 8,
+          }));
+          new Chart(weeklyUsersCtx, {
+            type: 'bar',
+            data: {
+              labels: weeklyLabels,
+              datasets,
+            },
+            options: {
+              plugins: { legend: { position: 'bottom' } },
+              scales: {
+                y: { beginAtZero: true, ticks: { precision: 0 } },
+              },
             },
           });
         }

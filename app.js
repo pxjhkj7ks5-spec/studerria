@@ -304,7 +304,8 @@ const initDb = async () => {
         last_login_at TEXT,
         schedule_group TEXT NOT NULL DEFAULT 'A',
         course_id INTEGER REFERENCES courses(id),
-        language TEXT
+        language TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `,
     `
@@ -505,6 +506,7 @@ const initDb = async () => {
   const alters = [
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS language TEXT',
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW()',
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS title TEXT',
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS start_date TEXT',
@@ -532,6 +534,7 @@ const initDb = async () => {
 
   await pool.query('UPDATE users SET course_id = 1 WHERE course_id IS NULL');
   await pool.query("UPDATE users SET language = 'uk' WHERE language IS NULL");
+  await pool.query('UPDATE users SET created_at = NOW() WHERE created_at IS NULL');
   await pool.query('UPDATE subjects SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE subjects SET visible = 1 WHERE visible IS NULL');
   await pool.query('UPDATE schedule_entries SET course_id = 1 WHERE course_id IS NULL');
@@ -1170,9 +1173,41 @@ app.get('/profile', requireLogin, async (req, res) => {
       activeSemester ? [id, activeSemester.id] : [id]
     );
     const activityPoints = pointsRow ? Number(pointsRow.points || 0) : 0;
+    const analyticsParams = activeSemester ? [id, user.course_id || 1, activeSemester.id] : [id, user.course_id || 1];
+    const [
+      homeworkCreatedRow,
+      teamworkCreatedRow,
+      teamworkJoinedRow,
+    ] = await Promise.all([
+      db.get(
+        `SELECT COUNT(*) AS count
+         FROM homework
+         WHERE created_by_id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
+        analyticsParams
+      ),
+      db.get(
+        `SELECT COUNT(*) AS count
+         FROM teamwork_tasks
+         WHERE created_by = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
+        analyticsParams
+      ),
+      db.get(
+        `SELECT COUNT(*) AS count
+         FROM teamwork_members m
+         JOIN teamwork_tasks t ON t.id = m.task_id
+         WHERE m.user_id = ? AND t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
+        analyticsParams
+      ),
+    ]);
+    const profileStats = {
+      homeworkCreated: Number(homeworkCreatedRow?.count || 0),
+      teamworkCreated: Number(teamworkCreatedRow?.count || 0),
+      teamworkJoined: Number(teamworkJoinedRow?.count || 0),
+    };
     res.render('profile', {
       user,
       activityPoints,
+      profileStats,
       error: req.query.error || '',
       success: req.query.ok || '',
     });
@@ -2363,20 +2398,89 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                     ),
                                   ]);
 
-                                  const dashboardStats = {
-                                    users: Number(usersRow?.count || 0),
-                                    subjects: Number(subjectsRow?.count || 0),
-                                    homework: Number(homeworkRow?.count || 0),
-                                    teamworkTasks: Number(teamworkTasksRow?.count || 0),
-                                    teamworkGroups: Number(teamworkGroupsRow?.count || 0),
-                                    teamworkMembers: Number(teamworkMembersRow?.count || 0),
-                                  };
+    const dashboardStats = {
+      users: Number(usersRow?.count || 0),
+      subjects: Number(subjectsRow?.count || 0),
+      homework: Number(homeworkRow?.count || 0),
+      teamworkTasks: Number(teamworkTasksRow?.count || 0),
+      teamworkGroups: Number(teamworkGroupsRow?.count || 0),
+      teamworkMembers: Number(teamworkMembersRow?.count || 0),
+    };
 
-                                  try {
-                                    res.render('admin', {
-                                      username: req.session.user.username,
-                                      userId: req.session.user.id,
-                                      role: req.session.role,
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - 6);
+    const weeklyLabels = [];
+    for (let i = 0; i < 7; i += 1) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      weeklyLabels.push(d.toISOString().slice(0, 10));
+    }
+    const weeklyParams = activeSemester ? [courseId, weekStart.toISOString(), activeSemester.id] : [courseId, weekStart.toISOString()];
+    const [weeklyHomeworkRows, weeklyTeamworkRows, weeklyUsersRows] = await Promise.all([
+      db.all(
+        `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
+         FROM homework
+         WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+         GROUP BY day
+         ORDER BY day`,
+        weeklyParams
+      ),
+      db.all(
+        `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
+         FROM teamwork_tasks
+         WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+         GROUP BY day
+         ORDER BY day`,
+        weeklyParams
+      ),
+      db.all(
+        `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
+         FROM users
+         WHERE course_id = ? AND created_at >= ?
+         GROUP BY day, role
+         ORDER BY day`,
+        [courseId, weekStart.toISOString()]
+      ),
+    ]);
+
+    const homeworkMap = {};
+    (weeklyHomeworkRows || []).forEach((row) => {
+      const key = String(row.day);
+      homeworkMap[key] = Number(row.count || 0);
+    });
+    const teamworkMap = {};
+    (weeklyTeamworkRows || []).forEach((row) => {
+      const key = String(row.day);
+      teamworkMap[key] = Number(row.count || 0);
+    });
+
+    const weeklyHomework = weeklyLabels.map((key) => homeworkMap[key] || 0);
+    const weeklyTeamwork = weeklyLabels.map((key) => teamworkMap[key] || 0);
+
+    const roleOrder = ['student', 'starosta', 'deanery', 'admin'];
+    const roleMap = {};
+    (weeklyUsersRows || []).forEach((row) => {
+      const key = String(row.day);
+      if (!roleMap[row.role]) {
+        roleMap[row.role] = {};
+      }
+      roleMap[row.role][key] = Number(row.count || 0);
+    });
+    const weeklyUserRoles = roleOrder.filter((role) => roleMap[role]);
+    if (!weeklyUserRoles.length) {
+      weeklyUserRoles.push(...roleOrder);
+    }
+    const weeklyUserSeries = weeklyUserRoles.map((role) =>
+      weeklyLabels.map((key) => (roleMap[role] && roleMap[role][key]) || 0)
+    );
+
+    try {
+      res.render('admin', {
+        username: req.session.user.username,
+        userId: req.session.user.id,
+        role: req.session.role,
                                       schedule,
                                       homework,
                                       users,
@@ -2389,14 +2493,19 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                       teamworkTasks,
                                       adminMessages: messages,
                                       courses,
-                                      semesters,
-                                      activeSemester,
-                                      selectedCourseId: courseId,
-                                      limitedStaffView: false,
-                                      filters: {
-                                        group_number: group_number || '',
-                                        day: day || '',
-                                        subject: subject || '',
+        semesters,
+        activeSemester,
+        selectedCourseId: courseId,
+        limitedStaffView: false,
+        weeklyLabels,
+        weeklyHomework,
+        weeklyTeamwork,
+        weeklyUserRoles,
+        weeklyUserSeries,
+        filters: {
+          group_number: group_number || '',
+          day: day || '',
+          subject: subject || '',
                                         q: q || '',
                                         schedule_date: schedule_date || '',
                                         homework_from: homework_from || '',
@@ -2518,12 +2627,85 @@ app.get('/admin/overview', requireAdmin, async (req, res) => {
       teamworkMembers: Number(teamworkMembersRow?.count || 0),
     };
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - 6);
+    const weeklyLabels = [];
+    for (let i = 0; i < 7; i += 1) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      weeklyLabels.push(d.toISOString().slice(0, 10));
+    }
+    const weeklyParams = activeSemester ? [courseId, weekStart.toISOString(), activeSemester.id] : [courseId, weekStart.toISOString()];
+    const [weeklyHomeworkRows, weeklyTeamworkRows, weeklyUsersRows] = await Promise.all([
+      db.all(
+        `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
+         FROM homework
+         WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+         GROUP BY day
+         ORDER BY day`,
+        weeklyParams
+      ),
+      db.all(
+        `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
+         FROM teamwork_tasks
+         WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+         GROUP BY day
+         ORDER BY day`,
+        weeklyParams
+      ),
+      db.all(
+        `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
+         FROM users
+         WHERE course_id = ? AND created_at >= ?
+         GROUP BY day, role
+         ORDER BY day`,
+        [courseId, weekStart.toISOString()]
+      ),
+    ]);
+
+    const homeworkMap = {};
+    (weeklyHomeworkRows || []).forEach((row) => {
+      const key = String(row.day);
+      homeworkMap[key] = Number(row.count || 0);
+    });
+    const teamworkMap = {};
+    (weeklyTeamworkRows || []).forEach((row) => {
+      const key = String(row.day);
+      teamworkMap[key] = Number(row.count || 0);
+    });
+    const weeklyHomework = weeklyLabels.map((key) => homeworkMap[key] || 0);
+    const weeklyTeamwork = weeklyLabels.map((key) => teamworkMap[key] || 0);
+
+    const roleOrder = ['student', 'starosta', 'deanery', 'admin'];
+    const roleMap = {};
+    (weeklyUsersRows || []).forEach((row) => {
+      const key = String(row.day);
+      if (!roleMap[row.role]) {
+        roleMap[row.role] = {};
+      }
+      roleMap[row.role][key] = Number(row.count || 0);
+    });
+    const weeklyUserRoles = roleOrder.filter((role) => roleMap[role]);
+    if (!weeklyUserRoles.length) {
+      weeklyUserRoles.push(...roleOrder);
+    }
+    const weeklyUserSeries = weeklyUserRoles.map((role) =>
+      weeklyLabels.map((key) => (roleMap[role] && roleMap[role][key]) || 0)
+    );
+
     return res.render('admin-overview', {
       username: req.session.user.username,
       role: req.session.role,
       courses,
       selectedCourseId: courseId,
       dashboardStats,
+      weeklyLabels,
+      weeklyHomework,
+      weeklyTeamwork,
+      weeklyUserRoles,
+      weeklyUserSeries,
       limitedStaffView: false,
     });
   } catch (err) {
@@ -2633,8 +2815,37 @@ app.get('/admin/export/schedule.csv', requireAdmin, async (req, res) => {
 });
 
 app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
-  const courseId = getAdminCourse(req);
-  db.all('SELECT id, full_name, role, schedule_group, is_active, course_id FROM users WHERE course_id = ? ORDER BY full_name', [courseId], (err, rows) => {
+  const courseId = Number(req.query.course || getAdminCourse(req));
+  const semesterId = req.query.semester_id ? Number(req.query.semester_id) : null;
+  const group = req.query.group;
+  const filters = ['u.course_id = ?'];
+  const params = [courseId];
+  if (group) {
+    filters.push('u.schedule_group = ?');
+    params.push(group);
+  }
+  if (semesterId) {
+    filters.push(
+      `EXISTS (
+        SELECT 1
+        FROM student_groups sg
+        JOIN schedule_entries se
+          ON se.subject_id = sg.subject_id
+         AND se.group_number = sg.group_number
+         AND se.semester_id = ?
+        WHERE sg.student_id = u.id
+      )`
+    );
+    params.push(semesterId);
+  }
+  const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+  db.all(
+    `SELECT u.id, u.full_name, u.role, u.schedule_group, u.is_active, u.course_id
+     FROM users u
+     ${where}
+     ORDER BY u.full_name`,
+    params,
+    (err, rows) => {
     if (err) {
       return res.status(500).send('Database error');
     }

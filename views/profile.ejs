@@ -122,6 +122,15 @@
         color: #e2e8f0;
         border-color: rgba(255, 255, 255, 0.2);
       }
+      .stat-tile {
+        border-radius: 14px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: rgba(255, 255, 255, 0.7);
+      }
+      body.theme-dark .stat-tile {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.16);
+      }
       .app-footer {
         font-size: 0.8rem;
       }
@@ -151,6 +160,26 @@
               <div class="d-flex align-items-center justify-content-between mb-3">
                 <div class="text-muted small"><%= t('profile.activity') %></div>
                 <span class="activity-badge"><%= typeof activityPoints !== 'undefined' ? activityPoints : 0 %></span>
+              </div>
+              <div class="row g-2 mb-4">
+                <div class="col-4">
+                  <div class="p-2 stat-tile text-center">
+                    <div class="text-muted small"><%= t('profile.homeworkCount') %></div>
+                    <div class="fw-semibold"><%= (profileStats && profileStats.homeworkCreated) || 0 %></div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="p-2 stat-tile text-center">
+                    <div class="text-muted small"><%= t('profile.teamworkCreated') %></div>
+                    <div class="fw-semibold"><%= (profileStats && profileStats.teamworkCreated) || 0 %></div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="p-2 stat-tile text-center">
+                    <div class="text-muted small"><%= t('profile.teamworkJoined') %></div>
+                    <div class="fw-semibold"><%= (profileStats && profileStats.teamworkJoined) || 0 %></div>
+                  </div>
+                </div>
               </div>
 
               <form method="POST" action="/profile">

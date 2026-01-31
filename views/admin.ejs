@@ -768,7 +768,10 @@
             >
               <%= t('admin.deleteAllStudents') %>
             </button>
-            <a class="btn btn-outline-secondary btn-sm" href="/admin/export/users.csv"><%= t('admin.exportUsers') %></a>
+            <a
+              class="btn btn-outline-secondary btn-sm"
+              href="/admin/export/users.csv?course=<%= selectedCourseId || 1 %><%= activeSemester ? '&semester_id=' + activeSemester.id : '' %><%= (filters && filters.users_group) ? '&group=' + encodeURIComponent(filters.users_group) : '' %>"
+            ><%= t('admin.exportUsers') %></a>
             <div class="btn-group btn-group-sm" role="group">
               <button class="btn btn-outline-primary" type="button" data-status="active"><%= t('admin.active') %></button>
               <button class="btn btn-outline-primary" type="button" data-status="inactive"><%= t('admin.inactive') %></button>
