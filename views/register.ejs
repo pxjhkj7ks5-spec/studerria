@@ -158,6 +158,10 @@
       body.theme-light .custom-tooltip.below::before {
         border-top-color: rgba(255, 255, 255, 0.85);
       }
+      .field-invalid {
+        border-color: rgba(239, 68, 68, 0.55) !important;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.18);
+      }
       body.modal-open {
         overflow: hidden;
       }
@@ -361,31 +365,74 @@
         setTimeout(remove, 3500);
       }
 
-      function attachValidationTooltips(root = document) {
-        root.querySelectorAll('input, select, textarea').forEach((el) => {
-          el.addEventListener('invalid', (event) => {
-            event.preventDefault();
-            showCustomTooltip(el, el.validationMessage);
-          });
-          el.addEventListener('input', () => {
-            const existing = document.querySelector(`.custom-tooltip[data-for="${el.id}"]`);
-            if (existing) existing.remove();
-          });
-          el.addEventListener('blur', () => {
-            const existing = document.querySelector(`.custom-tooltip[data-for="${el.id}"]`);
-            if (existing) existing.remove();
-          });
-        });
+      const registerForm = document.getElementById('registerForm');
+      const nameInput = document.getElementById('full_name');
+      const passwordInput = document.getElementById('password');
+      const confirmInput = document.getElementById('confirm_password');
+      const agreeInput = document.getElementById('agree');
+
+      function clearInvalidState() {
+        document.querySelectorAll('.field-invalid').forEach((el) => el.classList.remove('field-invalid'));
+        document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
       }
 
-      attachValidationTooltips();
+      function markInvalid(el, message) {
+        clearInvalidState();
+        el.classList.add('field-invalid');
+        showCustomTooltip(el, message);
+        el.focus({ preventScroll: true });
+      }
 
-      const registerForm = document.getElementById('registerForm');
+      function validateRegister(showTip = false) {
+        if (nameInput && !nameInput.value.trim()) {
+          if (showTip) markInvalid(nameInput, nameInput.validationMessage || 'Заповніть імʼя');
+          return false;
+        }
+        if (passwordInput && !passwordInput.value) {
+          if (showTip) markInvalid(passwordInput, passwordInput.validationMessage || 'Вкажіть пароль');
+          return false;
+        }
+        if (confirmInput && !confirmInput.value) {
+          if (showTip) markInvalid(confirmInput, confirmInput.validationMessage || 'Підтвердіть пароль');
+          return false;
+        }
+        if (confirmInput && passwordInput && confirmInput.value !== passwordInput.value) {
+          if (showTip) markInvalid(confirmInput, 'Паролі не співпадають');
+          return false;
+        }
+        if (agreeInput && !agreeInput.checked) {
+          if (showTip) markInvalid(agreeInput, 'Поставте прапорець згоди');
+          return false;
+        }
+        clearInvalidState();
+        return true;
+      }
+
+      [nameInput, passwordInput, confirmInput, agreeInput].forEach((el) => {
+        if (!el) return;
+        el.addEventListener('blur', () => {
+          validateRegister(true);
+        });
+        el.addEventListener('input', () => {
+          el.classList.remove('field-invalid');
+          document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
+        });
+        el.addEventListener('change', () => {
+          el.classList.remove('field-invalid');
+          document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
+        });
+      });
+
       if (registerForm) {
         registerForm.addEventListener('keydown', (event) => {
           if (event.key === 'Enter') {
             event.preventDefault();
             registerForm.requestSubmit();
+          }
+        });
+        registerForm.addEventListener('submit', (event) => {
+          if (!validateRegister(true)) {
+            event.preventDefault();
           }
         });
       }
