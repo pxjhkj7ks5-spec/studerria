@@ -114,7 +114,7 @@
       .week-slider {
         position: fixed;
         left: 50%;
-        bottom: 18px;
+        bottom: 80px;
         transform: translateX(-50%);
         display: flex;
         align-items: center;
@@ -134,6 +134,11 @@
         background: rgba(255, 255, 255, 0.8);
         border: 1px solid rgba(15, 23, 42, 0.1);
         box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+      }
+      @media (max-width: 576px) {
+        .week-slider {
+          bottom: 70px;
+        }
       }
       .week-dot {
         width: 8px;
@@ -492,7 +497,7 @@
       <button class="week-nav-btn" type="button" id="weekNext" aria-label="Next week">›</button>
     </div>
 
-    <footer class="app-footer text-center py-4" style="padding-bottom: 90px;">
+    <footer class="app-footer text-center py-4">
       <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
     </footer>
 
