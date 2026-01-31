@@ -1200,7 +1200,7 @@ app.post('/register/subjects', (req, res) => {
           req.session.rememberMe = null;
           logAction(db, req, 'register_subjects', { user_id: user.id });
           broadcast('users_updated');
-          return res.redirect('/schedule');
+          return res.redirect('/schedule?welcome=1');
         });
       });
     });

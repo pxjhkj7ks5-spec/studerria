@@ -978,12 +978,12 @@
           <div class="modal-body text-center">
             <div class="welcome-title mb-2">👋 Ласкаво просимо до Studerria!</div>
             <div class="welcome-subtitle mb-3">
-              із задоволенням презентуємо платформу <strong>Studerria</strong>, створену двома студентами — для всіх інших.
+              із задоволенням презентуємо платформу <strong>Studerria</strong>, створену студентом - для студентів.
             </div>
             <div class="small mb-4">
               🎯 Організовуйте пари, домашні завдання та командну роботу з єдиного зручного простору.
               <br />
-              ⚙️ Усі зауваження, баги чи пропозиції — надсилайте напряму адміністратору системи через "Профіль → Повідомлення".
+              ⚙️ Усі зауваження, баги чи пропозиції — надсилайте напряму адміністратору системи.
             </div>
             <button type="button" class="btn btn-primary glass" data-bs-dismiss="modal">Почати користування</button>
           </div>
@@ -1070,16 +1070,25 @@
 
       attachValidationTooltips();
 
-      const welcomeKey = `studerria:welcome:${<%- JSON.stringify(appVersion) %>}`;
       const welcomeModalEl = document.getElementById('welcomeModal');
-      if (welcomeModalEl && !localStorage.getItem(welcomeKey)) {
-        const welcomeModal = new bootstrap.Modal(welcomeModalEl, { backdrop: true });
-        welcomeModal.show();
-        localStorage.setItem(welcomeKey, '1');
-        document.body.classList.add('welcome-open');
-        welcomeModalEl.addEventListener('hidden.bs.modal', () => {
-          document.body.classList.remove('welcome-open');
-        });
+      if (welcomeModalEl) {
+        const params = new URLSearchParams(window.location.search);
+        const shouldWelcome = params.get('welcome') === '1';
+        const welcomeKey = `studerria:welcome:registered:${currentUserId || 'guest'}`;
+        if (shouldWelcome && !localStorage.getItem(welcomeKey)) {
+          const welcomeModal = new bootstrap.Modal(welcomeModalEl, { backdrop: true });
+          welcomeModal.show();
+          localStorage.setItem(welcomeKey, '1');
+          document.body.classList.add('welcome-open');
+          if (window.history && window.history.replaceState) {
+            params.delete('welcome');
+            const nextUrl = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`;
+            window.history.replaceState({}, document.title, nextUrl);
+          }
+          welcomeModalEl.addEventListener('hidden.bs.modal', () => {
+            document.body.classList.remove('welcome-open');
+          });
+        }
       }
 
       const homeworkModal = document.getElementById('homeworkModal');
