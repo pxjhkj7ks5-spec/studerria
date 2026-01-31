@@ -13,7 +13,8 @@ steps:
         "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$SHORT_SHA",
         "--builder",
         "gcr.io/buildpacks/builder:latest",
-        "--trust-builder"
+        "--trust-builder",
+        "--publish"
       ]
   - id: Deploy
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
