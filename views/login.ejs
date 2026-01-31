@@ -17,6 +17,10 @@
         --accent-dark: #2563eb;
         --text-muted: #6b7280;
         --card-radius: 20px;
+        --glass-border-dark: rgba(255, 255, 255, 0.14);
+        --glass-border-light: rgba(15, 23, 42, 0.08);
+        --glass-bg-dark: rgba(255, 255, 255, 0.06);
+        --glass-bg-light: rgba(255, 255, 255, 0.7);
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
@@ -35,16 +39,22 @@
           linear-gradient(160deg, #050508 0%, #12061a 45%, #1b0f26 100%);
         color: #f8fafc;
       }
-      .login-card {
+      .glass {
         border-radius: var(--card-radius);
-        border: 1px solid rgba(15, 23, 42, 0.08);
-        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+        backdrop-filter: blur(20px);
+        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
       }
-      body.theme-dark .login-card {
-        background: rgba(17, 17, 30, 0.9);
-        border-color: rgba(255, 255, 255, 0.12);
+      body.theme-dark .glass {
+        background: var(--glass-bg-dark);
+        border: 1px solid var(--glass-border-dark);
+        box-shadow: 0 18px 45px rgba(8, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
       }
-      body.theme-dark .login-card {
+      body.theme-light .glass {
+        background: var(--glass-bg-light);
+        border: 1px solid var(--glass-border-light);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+      }
+      body.theme-dark .glass {
         color: #f8fafc;
       }
       .login-card .form-control {
@@ -146,7 +156,7 @@
     <div class="container">
       <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
         <div class="col-11 col-sm-8 col-md-6 col-lg-4">
-          <div class="card login-card">
+          <div class="card login-card glass">
             <div class="card-body p-4">
               <h1 class="h4 mb-3 text-center"><%= t('login.title') %></h1>
 
