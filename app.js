@@ -1393,7 +1393,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
 
       const loadCustomDeadlines = (cb) => {
         if (!studentGroups.length || !weekStartDate || !weekEndDate) {
-          return cb({}, []);
+          return cb({}, [], []);
         }
         const conditions = studentGroups
           .map(() => '(h.subject_id = ? AND h.group_number = ?)')
@@ -1418,10 +1418,12 @@ app.get('/schedule', requireLogin, async (req, res) => {
         `;
         db.all(sql, params, (err, rows) => {
           if (err) {
-            return cb({}, []);
+            return cb({}, [], []);
           }
+          const rowsList = rows || [];
+          const ids = rowsList.map((row) => row.id);
           const byDate = {};
-          (rows || []).forEach((row) => {
+          rowsList.forEach((row) => {
             const key = row.custom_due_date;
             if (!byDate[key]) byDate[key] = [];
             byDate[key].push(row);
@@ -1436,13 +1438,52 @@ app.get('/schedule', requireLogin, async (req, res) => {
               weekendCards.push({ day, date, items });
             }
           });
-          return cb(byDate, weekendCards);
+          if (!ids.length) {
+            return cb(byDate, weekendCards, rowsList);
+          }
+          const placeholders = ids.map(() => '?').join(',');
+          db.all(
+            `SELECT homework_id, emoji, COUNT(*) AS count
+             FROM homework_reactions
+             WHERE homework_id IN (${placeholders})
+             GROUP BY homework_id, emoji`,
+            ids,
+            (reactErr, reactRows) => {
+              const reactionMap = {};
+              if (!reactErr && reactRows) {
+                reactRows.forEach((row) => {
+                  if (!reactionMap[row.homework_id]) reactionMap[row.homework_id] = {};
+                  reactionMap[row.homework_id][row.emoji] = Number(row.count || 0);
+                });
+              }
+              db.all(
+                `SELECT homework_id, emoji
+                 FROM homework_reactions
+                 WHERE homework_id IN (${placeholders}) AND user_id = ?`,
+                [...ids, userId],
+                (myErr, myRows) => {
+                  const reactedMap = {};
+                  if (!myErr && myRows) {
+                    myRows.forEach((row) => {
+                      if (!reactedMap[row.homework_id]) reactedMap[row.homework_id] = {};
+                      reactedMap[row.homework_id][row.emoji] = true;
+                    });
+                  }
+                  rowsList.forEach((row) => {
+                    row.reactions = reactionMap[row.id] || {};
+                    row.reacted = reactedMap[row.id] || {};
+                  });
+                  return cb(byDate, weekendCards, rowsList);
+                }
+              );
+            }
+          );
         });
       };
 
       const loadHomework = () => {
         if (!studentGroups.length) {
-          return loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards) =>
+          return loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
             res.render('schedule', {
               scheduleByDay,
               daysOfWeek,
@@ -1458,6 +1499,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               homeworkTags: [],
               customDeadlinesByDate,
               weekendDeadlineCards,
+              customDeadlineItems,
               customDeadlineSubjects,
               subgroupError: req.query.sg || null,
               role: req.session.role,
@@ -1549,7 +1591,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             });
 
             const homeworkIds = homework.map((h) => h.id);
-            const finalizeRender = (tagOptions = [], customDeadlinesByDate = {}, weekendDeadlineCards = []) => {
+            const finalizeRender = (tagOptions = [], customDeadlinesByDate = {}, weekendDeadlineCards = [], customDeadlineItems = []) => {
               res.render('schedule', {
                 scheduleByDay,
                 daysOfWeek,
@@ -1565,6 +1607,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 homeworkTags: tagOptions,
                 customDeadlinesByDate,
                 weekendDeadlineCards,
+                customDeadlineItems,
                 customDeadlineSubjects,
                 subgroupError: req.query.sg || null,
                 role: req.session.role,
@@ -1575,8 +1618,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
             };
 
             if (!homeworkIds.length) {
-              return loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards) =>
-                finalizeRender([], customDeadlinesByDate, weekendDeadlineCards)
+              return loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
+                finalizeRender([], customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems)
               );
             }
             const placeholders = homeworkIds.map(() => '?').join(',');
@@ -1630,8 +1673,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
                             hw.reactions = reactionMap[hw.id] || {};
                             hw.reacted = reactedMap[hw.id] || {};
                           });
-                          loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards) =>
-                            finalizeRender(tagOptions, customDeadlinesByDate, weekendDeadlineCards)
+                          loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
+                            finalizeRender(tagOptions, customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems)
                           );
                         }
                       );

@@ -1036,15 +1036,13 @@ body.theme-light .mobile-menu-action {
               <div class="deadline-title">🪄 Дивні дедлайни</div>
               <% customItems.forEach(function(item) { %>
                 <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
-                <% const details = [item.description]; %>
-                <% if (item.link_url) { details.push(`Посилання: ${item.link_url}`); } %>
-                <% if (item.meeting_url) { details.push(`Зустріч: ${item.meeting_url}`); } %>
-                <% if (item.file_name) { details.push(`Файл: ${item.file_name}`); } %>
+                <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
                 <div
                   class="deadline-item"
+                  data-custom-id="<%= item.id %>"
                   data-bs-toggle="tooltip"
                   data-bs-placement="top"
-                  title="<%= details.join(' • ') %>"
+                  title="<%= shortDesc %>"
                 >
                   <div>
                     <div class="fw-semibold"><%= item.subject_name %></div>
@@ -1070,15 +1068,13 @@ body.theme-light .mobile-menu-action {
               <div class="deadline-title">🪄 Дивні дедлайни</div>
               <% card.items.forEach(function(item) { %>
                 <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
-                <% const details = [item.description]; %>
-                <% if (item.link_url) { details.push(`Посилання: ${item.link_url}`); } %>
-                <% if (item.meeting_url) { details.push(`Зустріч: ${item.meeting_url}`); } %>
-                <% if (item.file_name) { details.push(`Файл: ${item.file_name}`); } %>
+                <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
                 <div
                   class="deadline-item"
+                  data-custom-id="<%= item.id %>"
                   data-bs-toggle="tooltip"
                   data-bs-placement="top"
-                  title="<%= details.join(' • ') %>"
+                  title="<%= shortDesc %>"
                 >
                   <div>
                     <div class="fw-semibold"><%= item.subject_name %></div>
@@ -1284,6 +1280,32 @@ body.theme-light .mobile-menu-action {
       </div>
     </div>
 
+    <div class="modal fade" id="customDeadlineViewModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">🪄 Дивні дедлайни</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-2">
+              <div class="fw-semibold" id="customDeadlineSubject"></div>
+              <div class="text-muted" id="customDeadlineDue"></div>
+            </div>
+            <div class="mb-3" id="customDeadlineDescription"></div>
+            <div class="mb-2" id="customDeadlineLinks"></div>
+            <div class="d-flex align-items-center gap-2" id="customDeadlineReactions">
+              <button class="react-btn" type="button" data-emoji="🔥">🔥 <span class="react-count">0</span></button>
+              <button class="react-btn" type="button" data-emoji="👍">👍 <span class="react-count">0</span></button>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="mobileMenuModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -1479,6 +1501,7 @@ body.theme-light .mobile-menu-action {
 
       const homeworkModal = document.getElementById('homeworkModal');
       const homeworkData = <%- JSON.stringify(homework || []) %>;
+      const customDeadlineItems = <%- JSON.stringify(customDeadlineItems || []) %>;
       const listEl = document.getElementById('homeworkList');
       const subgroupSection = document.getElementById('subgroupSection');
       const subgroupList = document.getElementById('subgroupList');
@@ -1808,6 +1831,60 @@ body.theme-light .mobile-menu-action {
           }
           const modal = new bootstrap.Modal(document.getElementById('messagesModal'));
           modal.show();
+        });
+      }
+
+      const customDeadlineModal = document.getElementById('customDeadlineViewModal');
+      const customDeadlineSubject = document.getElementById('customDeadlineSubject');
+      const customDeadlineDue = document.getElementById('customDeadlineDue');
+      const customDeadlineDescription = document.getElementById('customDeadlineDescription');
+      const customDeadlineLinks = document.getElementById('customDeadlineLinks');
+      const customDeadlineReactions = document.getElementById('customDeadlineReactions');
+
+      function renderCustomDeadline(item) {
+        if (!item) return;
+        if (customDeadlineSubject) customDeadlineSubject.textContent = item.subject_name || '';
+        if (customDeadlineDue) {
+          const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : '';
+          customDeadlineDue.textContent = dueLabel ? `Дедлайн: ${dueLabel}` : '';
+        }
+        if (customDeadlineDescription) {
+          customDeadlineDescription.textContent = item.description || '';
+        }
+        if (customDeadlineLinks) {
+          customDeadlineLinks.innerHTML = '';
+          const links = [];
+          if (item.link_url) {
+            links.push(`<a href="${item.link_url}" target="_blank" rel="noopener">Посилання</a>`);
+          }
+          if (item.meeting_url) {
+            links.push(`<a href="${item.meeting_url}" target="_blank" rel="noopener">Онлайн-зустріч</a>`);
+          }
+          if (item.file_path) {
+            links.push(`<a href="${item.file_path}" target="_blank" rel="noopener">${item.file_name || 'Файл'}</a>`);
+          }
+          if (links.length) {
+            customDeadlineLinks.innerHTML = links.join(' · ');
+          }
+        }
+        if (customDeadlineReactions) {
+          updateReactionButtons(customDeadlineReactions, item.reactions || {}, item.reacted || {});
+          customDeadlineReactions.querySelectorAll('.react-btn').forEach((btn) => {
+            btn.onclick = () => toggleHomeworkReaction(item.id, btn.dataset.emoji, customDeadlineReactions);
+          });
+        }
+      }
+
+      if (customDeadlineItems && customDeadlineItems.length) {
+        const customMap = new Map(customDeadlineItems.map((item) => [String(item.id), item]));
+        document.querySelectorAll('.deadline-item[data-custom-id]').forEach((el) => {
+          el.addEventListener('click', () => {
+            const item = customMap.get(String(el.dataset.customId));
+            if (!item || !customDeadlineModal) return;
+            renderCustomDeadline(item);
+            const modal = new bootstrap.Modal(customDeadlineModal);
+            modal.show();
+          });
         });
       }
       updateMobileWeekDots();
