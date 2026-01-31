@@ -247,7 +247,7 @@
               <div class="alert alert-danger" role="alert"><%= error %></div>
               <% } %>
 
-              <form id="registerForm" method="POST" action="/register">
+              <form id="registerForm" method="POST" action="/register" novalidate>
                 <div class="mb-3">
                   <label for="full_name" class="form-label"><%= t('register.fullName') %></label>
                   <input id="full_name" name="full_name" class="form-control" placeholder="<%= t('register.fullNamePlaceholder') %>" required />
