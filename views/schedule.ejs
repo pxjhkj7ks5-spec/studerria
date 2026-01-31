@@ -1173,14 +1173,14 @@ body.theme-light .mobile-menu-action {
             </div>
 
             <h6>Add homework</h6>
-            <form method="POST" action="/homework/add" enctype="multipart/form-data">
+            <form method="POST" action="/homework/add" enctype="multipart/form-data" autocomplete="off">
               <div class="mb-3">
                 <label for="hwText" class="form-label">Description</label>
                 <textarea id="hwText" name="description" class="form-control" rows="3" required></textarea>
               </div>
               <div class="mb-3">
                 <label for="hwLink" class="form-label">Link (optional)</label>
-                <input id="hwLink" name="link_url" type="url" class="form-control" placeholder="https://example.com" />
+                <input id="hwLink" name="link_url" type="url" class="form-control" placeholder="https://example.com" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="hwMeeting" class="form-label">Online class link (Zoom/Teams)</label>
@@ -1190,6 +1190,7 @@ body.theme-light .mobile-menu-action {
                   type="url"
                   class="form-control"
                   placeholder="https://zoom.us/j/..."
+                  autocomplete="off"
                 />
               </div>
               <div class="mb-3">
@@ -1231,7 +1232,7 @@ body.theme-light .mobile-menu-action {
     <div class="modal fade" id="customDeadlineModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
-          <form method="POST" action="/homework/custom" enctype="multipart/form-data">
+          <form method="POST" action="/homework/custom" enctype="multipart/form-data" autocomplete="off">
             <div class="modal-header">
               <h5 class="modal-title">🪄 Дивні дедлайни</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -1260,11 +1261,11 @@ body.theme-light .mobile-menu-action {
                 </div>
                 <div class="col-12 col-md-6">
                   <label class="form-label">Посилання (опц.)</label>
-                  <input type="url" class="form-control" name="link_url" placeholder="https://example.com" />
+                  <input type="url" class="form-control" name="link_url" placeholder="https://example.com" autocomplete="off" />
                 </div>
                 <div class="col-12 col-md-6">
                   <label class="form-label">Онлайн-зустріч (опц.)</label>
-                  <input type="url" class="form-control" name="meeting_url" placeholder="https://zoom.us/j/..." />
+                  <input type="url" class="form-control" name="meeting_url" placeholder="https://zoom.us/j/..." autocomplete="off" />
                 </div>
                 <div class="col-12">
                   <label class="form-label">Файл (опц.)</label>
