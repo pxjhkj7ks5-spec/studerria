@@ -1029,10 +1029,21 @@ body.theme-light .mobile-menu-action {
         background: rgba(255, 255, 255, 0.08);
         color: var(--text-primary);
         backdrop-filter: blur(10px);
+        transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
+      }
+      .theme-toggle-min:hover {
+        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.35);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
       }
       body.theme-light .theme-toggle-min {
         border-color: rgba(15, 23, 42, 0.12);
         background: rgba(255, 255, 255, 0.7);
+      }
+      body.theme-light .theme-toggle-min:hover {
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
       }
       .modal-backdrop.show {
         opacity: 0.48;
