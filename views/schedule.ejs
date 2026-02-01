@@ -107,7 +107,6 @@
       }
       .glass {
         border-radius: var(--radius);
-        backdrop-filter: blur(20px);
         transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
       }
       body.theme-dark .glass {
@@ -1109,10 +1108,6 @@ body.theme-light .mobile-menu-action {
       .week-hero.glass,
       .alert.glass {
         transition: none;
-      }
-      .week-hero,
-      .alert.glass {
-        transform: translateZ(0);
       }
       .file-name {
         color: var(--text-muted);
