@@ -433,6 +433,15 @@ const initDb = async () => {
       )
     `,
     `
+      CREATE TABLE IF NOT EXISTS homework_completions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        homework_id INTEGER NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        done_at TEXT NOT NULL,
+        UNIQUE(user_id, homework_id)
+      )
+    `,
+    `
       CREATE TABLE IF NOT EXISTS history_log (
         id SERIAL PRIMARY KEY,
         actor_id INTEGER,
@@ -475,6 +484,7 @@ const initDb = async () => {
         title TEXT NOT NULL,
         created_by INTEGER NOT NULL REFERENCES users(id),
         created_at TEXT NOT NULL,
+        due_date TEXT,
         course_id INTEGER REFERENCES courses(id),
         semester_id INTEGER REFERENCES semesters(id)
       )
@@ -613,6 +623,7 @@ const initDb = async () => {
     'ALTER TABLE login_history ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
+    'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS due_date TEXT',
     'ALTER TABLE messages ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE messages ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     "ALTER TABLE messages ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published'",
@@ -889,6 +900,17 @@ function getDayNameFromDate(dateStr) {
   const idx = d.getUTCDay();
   const map = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   return map[idx] || null;
+}
+
+function formatLocalDate(date) {
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function addDays(date, days) {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
 }
 
 function logAction(dbRef, req, action, details) {
@@ -1433,6 +1455,270 @@ app.post('/profile', requireLogin, (req, res) => {
     broadcast('users_updated');
     return res.redirect('/profile?ok=Profile%20updated');
   });
+});
+
+async function buildMyDayData(user) {
+  const courseId = user.course_id || 1;
+  const activeSemester = await getActiveSemester(courseId);
+  const now = new Date();
+  const todayStr = formatLocalDate(now);
+  const tomorrowStr = formatLocalDate(addDays(now, 1));
+  const dayName = getDayNameFromDate(todayStr);
+  const weekNumber = getAcademicWeekForSemester(now, activeSemester);
+  const nowIso = new Date().toISOString();
+
+  const studentGroups = await db.all(
+    `
+      SELECT sg.subject_id, sg.group_number, s.name AS subject_name
+      FROM student_groups sg
+      JOIN subjects s ON s.id = sg.subject_id
+      WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
+    `,
+    [user.id, courseId]
+  );
+
+  let classesToday = [];
+  if (studentGroups.length && dayName) {
+    const conditions = studentGroups.map(() => '(se.subject_id = ? AND se.group_number = ?)').join(' OR ');
+    const params = [weekNumber, courseId, activeSemester ? activeSemester.id : null, dayName];
+    studentGroups.forEach((sg) => params.push(sg.subject_id, sg.group_number));
+    const rows = await db.all(
+      `
+        SELECT se.*, s.name AS subject_name
+        FROM schedule_entries se
+        JOIN subjects s ON s.id = se.subject_id
+        WHERE se.week_number = ?
+          AND se.course_id = ?
+          AND se.semester_id = ?
+          AND se.day_of_week = ?
+          AND s.visible = 1
+          AND (${conditions})
+        ORDER BY se.class_number ASC
+      `,
+      params
+    );
+    classesToday = (rows || []).map((row) => {
+      const slot = bellSchedule[row.class_number] || {};
+      return {
+        id: row.id,
+        subject_id: row.subject_id,
+        subject_name: row.subject_name,
+        class_number: row.class_number,
+        group_number: row.group_number,
+        day_of_week: row.day_of_week,
+        start: slot.start || '',
+        end: slot.end || '',
+      };
+    });
+  }
+
+  let currentClass = null;
+  let nextClass = null;
+  const nowMs = now.getTime();
+  classesToday.forEach((cls) => {
+    if (!cls.start || !cls.end) return;
+    const startAt = new Date(`${todayStr}T${cls.start}:00`);
+    const endAt = new Date(`${todayStr}T${cls.end}:00`);
+    if (nowMs >= startAt.getTime() && nowMs <= endAt.getTime()) {
+      currentClass = { ...cls, startAt: startAt.toISOString(), endAt: endAt.toISOString() };
+    } else if (nowMs < startAt.getTime() && !nextClass) {
+      nextClass = { ...cls, startAt: startAt.toISOString(), endAt: endAt.toISOString() };
+    }
+  });
+
+  let homeworkItems = [];
+  if (studentGroups.length) {
+    const conditions = studentGroups.map(() => '(h.subject_id = ? AND h.group_number = ?)').join(' OR ');
+    const params = [user.id];
+    studentGroups.forEach((sg) => params.push(sg.subject_id, sg.group_number));
+    params.push(courseId, activeSemester ? activeSemester.id : null, nowIso);
+    const rows = await db.all(
+      `
+        SELECT h.id, h.description, h.custom_due_date, h.class_date, h.subject_id, h.group_number,
+               h.created_by, h.created_at, subj.name AS subject_name, hc.id AS completion_id
+        FROM homework h
+        JOIN subjects subj ON subj.id = h.subject_id
+        LEFT JOIN homework_completions hc ON hc.homework_id = h.id AND hc.user_id = ?
+        WHERE (${conditions})
+          AND h.course_id = ?
+          AND h.semester_id = ?
+          AND COALESCE(h.status, 'published') = 'published'
+          AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
+          AND (h.custom_due_date IS NOT NULL OR h.class_date IS NOT NULL)
+        ORDER BY COALESCE(h.custom_due_date, h.class_date) ASC, h.created_at DESC
+      `,
+      params
+    );
+    homeworkItems = (rows || []).map((row) => {
+      const deadline = row.custom_due_date || row.class_date;
+      return {
+        id: row.id,
+        description: row.description,
+        subject_id: row.subject_id,
+        subject_name: row.subject_name,
+        group_number: row.group_number,
+        deadline_date: deadline,
+        created_by: row.created_by,
+        created_at: row.created_at,
+        completed: Boolean(row.completion_id),
+      };
+    });
+  }
+
+  const homeworkDeadlines = homeworkItems
+    .filter((item) => item.deadline_date === todayStr || item.deadline_date === tomorrowStr)
+    .map((item) => ({ ...item, type: 'homework' }));
+
+  let teamworkDeadlines = [];
+  if (studentGroups.length) {
+    const subjectIds = Array.from(new Set(studentGroups.map((sg) => sg.subject_id)));
+    if (subjectIds.length) {
+      const placeholders = subjectIds.map(() => '?').join(',');
+      const params = [courseId, activeSemester ? activeSemester.id : null, todayStr, tomorrowStr, ...subjectIds];
+      const rows = await db.all(
+        `
+          SELECT t.id, t.title, t.due_date, t.subject_id, s.name AS subject_name
+          FROM teamwork_tasks t
+          JOIN subjects s ON s.id = t.subject_id
+          WHERE t.course_id = ?
+            AND t.semester_id = ?
+            AND t.due_date IS NOT NULL
+            AND t.due_date >= ?
+            AND t.due_date <= ?
+            AND t.subject_id IN (${placeholders})
+          ORDER BY t.due_date ASC, t.created_at DESC
+        `,
+        params
+      );
+      teamworkDeadlines = (rows || []).map((row) => ({
+        id: row.id,
+        description: row.title,
+        subject_id: row.subject_id,
+        subject_name: row.subject_name,
+        deadline_date: row.due_date,
+        type: 'teamwork',
+      }));
+    }
+  }
+
+  const deadlines = [...homeworkDeadlines, ...teamworkDeadlines].sort((a, b) =>
+    String(a.deadline_date || '').localeCompare(String(b.deadline_date || ''))
+  );
+
+  const upcomingWindowEnd = formatLocalDate(addDays(now, 7));
+  const upcomingItems = homeworkItems.filter((item) => {
+    if (!item.deadline_date) return false;
+    return item.deadline_date >= todayStr && item.deadline_date <= upcomingWindowEnd;
+  });
+  let topPriorities = [];
+  if (upcomingItems.length) {
+    const earliest = upcomingItems[0];
+    const subjectCounts = {};
+    upcomingItems.forEach((item) => {
+      const key = String(item.subject_id);
+      subjectCounts[key] = (subjectCounts[key] || 0) + 1;
+    });
+    let topSubjectId = null;
+    let topCount = 0;
+    Object.entries(subjectCounts).forEach(([key, count]) => {
+      if (count > topCount) {
+        topCount = count;
+        topSubjectId = Number(key);
+      }
+    });
+    topPriorities.push({ type: 'earliest', ...earliest });
+    if (topSubjectId && topSubjectId !== earliest.subject_id) {
+      const topSubjectItem = upcomingItems.find((item) => item.subject_id === topSubjectId);
+      if (topSubjectItem) {
+        topPriorities.push({ type: 'workload', ...topSubjectItem });
+      }
+    }
+  }
+
+  return {
+    today: todayStr,
+    tomorrow: tomorrowStr,
+    day_name: dayName,
+    week_number: weekNumber,
+    classes_today: classesToday,
+    current_class: currentClass,
+    next_class: nextClass,
+    deadlines,
+    top_priorities: topPriorities,
+  };
+}
+
+app.get('/my-day', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'myday.init');
+  }
+  try {
+    const myDay = await buildMyDayData(req.session.user);
+    return res.render('my-day', {
+      username: req.session.user.username,
+      role: req.session.role,
+      viewAs: req.session.viewAs || null,
+      myDay,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'myday');
+  }
+});
+
+app.get('/api/my-day', requireLogin, async (req, res) => {
+  try {
+    const myDay = await buildMyDayData(req.session.user);
+    return res.json(myDay);
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/homework/:id/complete', requireLogin, async (req, res) => {
+  const homeworkId = Number(req.params.id);
+  if (Number.isNaN(homeworkId)) {
+    return res.status(400).json({ error: 'Invalid homework' });
+  }
+  const { id: userId, course_id: courseId } = req.session.user;
+  const activeSemester = await getActiveSemester(courseId || 1);
+  const nowIso = new Date().toISOString();
+  try {
+    const homework = await db.get(
+      `SELECT id, subject_id, group_number
+       FROM homework
+       WHERE id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}
+         AND COALESCE(status, 'published') = 'published'
+         AND (scheduled_at IS NULL OR scheduled_at <= ?)`,
+      activeSemester ? [homeworkId, courseId || 1, activeSemester.id, nowIso] : [homeworkId, courseId || 1, nowIso]
+    );
+    if (!homework) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    const access = await db.get(
+      'SELECT 1 FROM student_groups WHERE student_id = ? AND subject_id = ? AND group_number = ?',
+      [userId, homework.subject_id, homework.group_number]
+    );
+    if (!access) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const existing = await db.get(
+      'SELECT id FROM homework_completions WHERE homework_id = ? AND user_id = ?',
+      [homeworkId, userId]
+    );
+    if (existing) {
+      await db.run('DELETE FROM homework_completions WHERE id = ?', [existing.id]);
+      return res.json({ completed: false });
+    }
+    await db.run(
+      'INSERT INTO homework_completions (user_id, homework_id, done_at) VALUES (?, ?, ?)',
+      [userId, homeworkId, new Date().toISOString()]
+    );
+    return res.json({ completed: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 app.get('/schedule', requireLogin, async (req, res) => {
@@ -2024,10 +2310,14 @@ app.get('/teamwork', requireLogin, async (req, res) => {
 });
 
 app.post('/teamwork/task/create', requireLogin, async (req, res) => {
-  const { title, subject_id } = req.body;
+  const { title, subject_id, due_date } = req.body;
   const subjectId = Number(subject_id);
   if (!title || Number.isNaN(subjectId)) {
     return res.redirect('/teamwork?err=Missing%20fields');
+  }
+  const dueDate = due_date ? String(due_date).slice(0, 10) : null;
+  if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+    return res.redirect('/teamwork?err=Invalid%20date');
   }
   const { id: userId, course_id: courseId } = req.session.user;
   const createdAt = new Date().toISOString();
@@ -2037,8 +2327,8 @@ app.post('/teamwork/task/create', requireLogin, async (req, res) => {
       return res.redirect('/teamwork?err=No%20active%20semester');
     }
     const taskRow = await db.get(
-      'INSERT INTO teamwork_tasks (subject_id, title, created_by, created_at, course_id, semester_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
-      [subjectId, title.trim(), userId, createdAt, courseId || 1, activeSemester.id]
+      'INSERT INTO teamwork_tasks (subject_id, title, created_by, created_at, due_date, course_id, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
+      [subjectId, title.trim(), userId, createdAt, dueDate, courseId || 1, activeSemester.id]
     );
     if (!taskRow || !taskRow.id) {
       return res.redirect('/teamwork?err=Database%20error');
