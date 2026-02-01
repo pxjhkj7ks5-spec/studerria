@@ -105,6 +105,21 @@
       #daily-phrase.fade-out {
         opacity: 0;
       }
+      .glass {
+        border-radius: var(--radius);
+        backdrop-filter: blur(20px);
+        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+      }
+      body.theme-dark .glass {
+        background: var(--glass-bg-dark);
+        border: 1px solid var(--glass-border-dark);
+        box-shadow: 0 18px 45px rgba(8, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
+      }
+      body.theme-light .glass {
+        background: var(--glass-bg-light);
+        border: 1px solid var(--glass-border-light);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+      }
       .week-hero {
         padding: 22px 26px;
         display: flex;
@@ -956,12 +971,6 @@ body.theme-light .mobile-menu-action {
         background: var(--glass-bg);
         border: var(--border-subtle);
         box-shadow: var(--glass-shadow);
-        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
-      }
-      body.theme-dark .glass {
-        background: var(--glass-bg-dark);
-        border: 1px solid var(--glass-border-dark);
-        box-shadow: 0 18px 45px rgba(8, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
       }
       body.theme-light .glass {
         background: var(--glass-bg-light);
@@ -2203,14 +2212,14 @@ body.theme-light .mobile-menu-action {
         }
       });
 
-      window.addEventListener('load', () => {
+      /* window.addEventListener('load', () => {
         const content = document.querySelector('.schedule-content');
         if (!content) return;
         requestAnimationFrame(() => {
           content.classList.add('enter-active');
           content.classList.remove('enter');
         });
-      });
+      }); */
 
       const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
       tooltipTriggerList.forEach((el) => {
