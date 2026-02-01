@@ -1114,7 +1114,7 @@ body.theme-light .mobile-menu-action {
   </head>
   <body class="theme-dark">
     <nav class="navbar navbar-expand-lg topbar">
-      <div class="container-fluid px-3 px-lg-4">
+      <div class="container">
         <span class="navbar-brand text-white me-auto">Studerria</span>
         <div class="d-flex align-items-center gap-2 topbar-actions flex-wrap justify-content-end">
           <span class="me-2 muted desktop-only text-nowrap">
@@ -1139,12 +1139,6 @@ body.theme-light .mobile-menu-action {
           <% if (role === 'deanery') { %>
             <a class="btn btn-glass me-1 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
           <% } %>
-          <button class="theme-toggle-min msg-btn me-1 desktop-only" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">
-            💬
-            <span class="msg-badge d-none" id="messagesBadge">0</span>
-          </button>
-          <a class="btn btn-glass me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
-          <a class="btn btn-glass me-1 desktop-only" href="/my-day">Мій день</a>
           <button
             class="theme-toggle theme-toggle-min me-1 desktop-only"
             type="button"
@@ -1155,6 +1149,12 @@ body.theme-light .mobile-menu-action {
           >
             🌙
           </button>
+          <button class="theme-toggle-min msg-btn me-1 desktop-only" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">
+            💬
+            <span class="msg-badge d-none" id="messagesBadge">0</span>
+          </button>
+          <a class="btn btn-glass me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
+          <a class="btn btn-glass me-1 desktop-only" href="/my-day">Мій день</a>
           <a class="btn btn-glass me-1 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
           <form method="POST" action="/logout" class="desktop-only">
             <button class="btn btn-glass" type="submit"><%= t('schedule.logout') %></button>
