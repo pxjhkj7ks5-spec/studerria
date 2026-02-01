@@ -385,7 +385,7 @@
                       autocomplete="current-password"
                       required
                     />
-                    <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">🔓</button>
+                    <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">Show</button>
                   </div>
                 </div>
                 <div class="helper mb-3"><%= t('login.forgot') %></div>
@@ -489,7 +489,7 @@
         toggle.addEventListener('click', () => {
           const isHidden = pwd.type === 'password';
           pwd.type = isHidden ? 'text' : 'password';
-          toggle.textContent = isHidden ? '�' : '🔓';
+          toggle.textContent = isHidden ? 'Hide' : 'Show';
           toggle.setAttribute('aria-label', isHidden ? 'Сховати пароль' : 'Показати пароль');
         });
       }
