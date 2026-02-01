@@ -812,6 +812,80 @@ const upload = multer({
   },
 });
 
+const rateBuckets = new Map();
+const RATE_BUCKET_LIMIT = 50000;
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || req.connection?.remoteAddress || 'unknown';
+}
+
+function rateLimit({ windowMs, max, keyFn, onLimit }) {
+  return (req, res, next) => {
+    const key = keyFn ? keyFn(req) : getClientIp(req);
+    const now = Date.now();
+    let bucket = rateBuckets.get(key);
+    if (!bucket || now > bucket.resetAt) {
+      bucket = { count: 0, resetAt: now + windowMs };
+    }
+    bucket.count += 1;
+    rateBuckets.set(key, bucket);
+    if (rateBuckets.size > RATE_BUCKET_LIMIT) {
+      const cutoff = now - windowMs * 2;
+      for (const [k, v] of rateBuckets.entries()) {
+        if (v.resetAt < cutoff) {
+          rateBuckets.delete(k);
+        }
+      }
+    }
+    if (bucket.count > max) {
+      if (onLimit) {
+        return onLimit(req, res);
+      }
+      if (req.accepts('json') || req.path.startsWith('/api')) {
+        return res.status(429).json({ error: 'Too many requests' });
+      }
+      return res.status(429).send('Too many requests');
+    }
+    return next();
+  };
+}
+
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 8,
+  keyFn: (req) => `auth:${getClientIp(req)}`,
+  onLimit: (req, res) => res.redirect('/login?error=1'),
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  keyFn: (req) => `register:${getClientIp(req)}`,
+  onLimit: (req, res) => res.redirect('/register?error=Too%20many%20requests'),
+});
+
+const writeLimiter = rateLimit({
+  windowMs: 30 * 1000,
+  max: 30,
+  keyFn: (req) => `write:${req.session?.user?.id || getClientIp(req)}`,
+});
+
+const readLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 90,
+  keyFn: (req) => `read:${req.session?.user?.id || getClientIp(req)}`,
+});
+
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 6,
+  keyFn: (req) => `upload:${req.session?.user?.id || getClientIp(req)}`,
+});
+
 function requireLogin(req, res, next) {
   if (!req.session.user) {
     return res.redirect('/login');
@@ -1154,7 +1228,7 @@ app.post('/_bootstrap', async (req, res) => {
   }
 });
 
-app.post('/login', async (req, res) => {
+app.post('/login', authLimiter, async (req, res) => {
   const { full_name, password, remember_me } = req.body;
   if (!full_name || !password) {
     return res.redirect('/login?error=1');
@@ -1230,7 +1304,7 @@ app.get('/register', (req, res) => {
   res.render('register', { error: req.query.error || '' });
 });
 
-app.post('/register', async (req, res) => {
+app.post('/register', registerLimiter, async (req, res) => {
   const { full_name, password, confirm_password, agree, remember_me } = req.body;
   if (!full_name || !password || !confirm_password || !agree) {
     return res.redirect('/register?error=Missing%20fields');
@@ -1281,7 +1355,7 @@ app.get('/register/course', (req, res) => {
   });
 });
 
-app.post('/register/course', (req, res) => {
+app.post('/register/course', registerLimiter, (req, res) => {
   const userId = req.session.pendingUserId;
   if (!userId) {
     return res.redirect('/register');
@@ -1323,7 +1397,7 @@ app.get('/register/subjects', (req, res) => {
   });
 });
 
-app.post('/register/subjects', (req, res) => {
+app.post('/register/subjects', registerLimiter, (req, res) => {
   const userId = req.session.pendingUserId;
   if (!userId) {
     return res.redirect('/register');
@@ -1731,7 +1805,7 @@ app.get('/my-day', requireLogin, async (req, res) => {
   }
 });
 
-app.get('/api/my-day', requireLogin, async (req, res) => {
+app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
   try {
     const myDay = await buildMyDayData(req.session.user);
     return res.json(myDay);
@@ -1740,7 +1814,7 @@ app.get('/api/my-day', requireLogin, async (req, res) => {
   }
 });
 
-app.get('/api/reminders', requireLogin, async (req, res) => {
+app.get('/api/reminders', requireLogin, readLimiter, async (req, res) => {
   const { from, to, status } = req.query;
   if (from && !isValidDateString(String(from))) {
     return res.status(400).json({ error: 'Invalid from date' });
@@ -1784,7 +1858,7 @@ app.get('/api/reminders', requireLogin, async (req, res) => {
   }
 });
 
-app.post('/api/reminders', requireLogin, async (req, res) => {
+app.post('/api/reminders', requireLogin, writeLimiter, async (req, res) => {
   const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
   const note = typeof req.body.note === 'string' ? req.body.note.trim() : '';
   const remindDate = typeof req.body.remind_date === 'string' ? req.body.remind_date.trim() : '';
@@ -1839,7 +1913,7 @@ app.post('/api/reminders', requireLogin, async (req, res) => {
   }
 });
 
-app.patch('/api/reminders/:id', requireLogin, async (req, res) => {
+app.patch('/api/reminders/:id', requireLogin, writeLimiter, async (req, res) => {
   const reminderId = Number(req.params.id);
   if (Number.isNaN(reminderId)) {
     return res.status(400).json({ error: 'Invalid reminder' });
@@ -1916,7 +1990,7 @@ app.patch('/api/reminders/:id', requireLogin, async (req, res) => {
   }
 });
 
-app.delete('/api/reminders/:id', requireLogin, async (req, res) => {
+app.delete('/api/reminders/:id', requireLogin, writeLimiter, async (req, res) => {
   const reminderId = Number(req.params.id);
   if (Number.isNaN(reminderId)) {
     return res.status(400).json({ error: 'Invalid reminder' });
@@ -1940,7 +2014,7 @@ app.delete('/api/reminders/:id', requireLogin, async (req, res) => {
   }
 });
 
-app.post('/api/homework/:id/complete', requireLogin, async (req, res) => {
+app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, res) => {
   const homeworkId = Number(req.params.id);
   if (Number.isNaN(homeworkId)) {
     return res.status(400).json({ error: 'Invalid homework' });
@@ -2573,7 +2647,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
   );
 });
 
-app.post('/teamwork/task/create', requireLogin, async (req, res) => {
+app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) => {
   const { title, subject_id, due_date } = req.body;
   const subjectId = Number(subject_id);
   if (!title || Number.isNaN(subjectId)) {
@@ -2616,7 +2690,7 @@ app.post('/teamwork/task/create', requireLogin, async (req, res) => {
   }
 });
 
-app.post('/teamwork/group/create', requireLogin, async (req, res) => {
+app.post('/teamwork/group/create', requireLogin, writeLimiter, async (req, res) => {
   const { task_id, name, max_members } = req.body;
   const taskId = Number(task_id);
   const maxMembers = max_members ? Number(max_members) : null;
@@ -2659,7 +2733,7 @@ app.post('/teamwork/group/create', requireLogin, async (req, res) => {
   }
 });
 
-app.post('/teamwork/group/join', requireLogin, (req, res) => {
+app.post('/teamwork/group/join', requireLogin, writeLimiter, (req, res) => {
   const { group_id } = req.body;
   const groupId = Number(group_id);
   if (Number.isNaN(groupId)) {
@@ -2720,7 +2794,7 @@ app.post('/teamwork/group/join', requireLogin, (req, res) => {
   );
 });
 
-app.post('/teamwork/group/leave', requireLogin, (req, res) => {
+app.post('/teamwork/group/leave', requireLogin, writeLimiter, (req, res) => {
   const { group_id } = req.body;
   const groupId = Number(group_id);
   if (Number.isNaN(groupId)) {
@@ -2751,7 +2825,7 @@ app.post('/teamwork/group/leave', requireLogin, (req, res) => {
   );
 });
 
-app.post('/teamwork/group/disband', requireLogin, (req, res) => {
+app.post('/teamwork/group/disband', requireLogin, writeLimiter, (req, res) => {
   const { group_id } = req.body;
   const groupId = Number(group_id);
   if (Number.isNaN(groupId)) {
@@ -2782,7 +2856,7 @@ app.post('/teamwork/group/disband', requireLogin, (req, res) => {
   );
 });
 
-app.post('/teamwork/group/update', requireLogin, (req, res) => {
+app.post('/teamwork/group/update', requireLogin, writeLimiter, (req, res) => {
   const { group_id, name, max_members } = req.body;
   const groupId = Number(group_id);
   const maxMembers = max_members ? Number(max_members) : null;
@@ -2830,7 +2904,7 @@ app.post('/admin/teamwork/delete/:id', requireStaff, (req, res) => {
   });
 });
 
-app.post('/admin/messages/send', requireStaff, async (req, res) => {
+app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) => {
   const { target_type, target_all, subject_id, group_number, body, user_ids, status, scheduled_at } = req.body;
   if (!body || !body.trim()) {
     return res.redirect('/admin?err=Message%20is%20empty');
@@ -2917,7 +2991,7 @@ app.post('/admin/messages/send', requireStaff, async (req, res) => {
   }
 });
 
-app.post('/admin/messages/delete/:id', requireStaff, (req, res) => {
+app.post('/admin/messages/delete/:id', requireStaff, writeLimiter, (req, res) => {
   const id = Number(req.params.id);
   if (Number.isNaN(id)) {
     return res.redirect('/admin?err=Invalid%20message');
@@ -2935,7 +3009,7 @@ app.post('/admin/messages/delete/:id', requireStaff, (req, res) => {
   });
 });
 
-app.get('/messages.json', requireLogin, async (req, res) => {
+app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
   const { id: userId, course_id: courseId } = req.session.user;
   const activeSemester = await getActiveSemester(courseId || 1);
   const filterSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
@@ -3039,7 +3113,7 @@ app.get('/messages.json', requireLogin, async (req, res) => {
   );
 });
 
-app.post('/messages/read', requireLogin, (req, res) => {
+app.post('/messages/read', requireLogin, writeLimiter, (req, res) => {
   const { message_ids } = req.body;
   const ids = Array.isArray(message_ids) ? message_ids : message_ids ? [message_ids] : [];
   const { id: userId } = req.session.user;
@@ -3056,7 +3130,7 @@ app.post('/messages/read', requireLogin, (req, res) => {
   stmt.finalize(() => res.json({ ok: true }));
 });
 
-app.get('/admin/api/messages/:id/reads', requireStaff, async (req, res) => {
+app.get('/admin/api/messages/:id/reads', requireStaff, readLimiter, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -3146,7 +3220,7 @@ app.get('/admin/api/messages/:id/reads', requireStaff, async (req, res) => {
 
 const allowedReactions = new Set(['🔥', '👍']);
 
-app.post('/homework/react', requireLogin, async (req, res) => {
+app.post('/homework/react', requireLogin, writeLimiter, async (req, res) => {
   const homeworkId = Number(req.body.homework_id);
   const emoji = req.body.emoji;
   const { id: userId } = req.session.user;
@@ -3192,7 +3266,7 @@ app.post('/homework/react', requireLogin, async (req, res) => {
   }
 });
 
-app.post('/messages/react', requireLogin, async (req, res) => {
+app.post('/messages/react', requireLogin, writeLimiter, async (req, res) => {
   const messageId = Number(req.body.message_id);
   const emoji = req.body.emoji;
   const { id: userId } = req.session.user;
@@ -3238,7 +3312,7 @@ app.post('/messages/react', requireLogin, async (req, res) => {
   }
 });
 
-app.post('/teamwork/react', requireLogin, async (req, res) => {
+app.post('/teamwork/react', requireLogin, writeLimiter, async (req, res) => {
   const taskId = Number(req.body.task_id);
   const emoji = req.body.emoji;
   const { id: userId } = req.session.user;
@@ -4410,7 +4484,7 @@ app.get('/admin/user-logins.json', requireAdmin, (req, res) => {
   );
 });
 
-app.post('/homework/add', requireLogin, upload.single('attachment'), async (req, res) => {
+app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment'), async (req, res) => {
   const {
     description,
     link_url,
@@ -4564,7 +4638,7 @@ app.post('/homework/add', requireLogin, upload.single('attachment'), async (req,
   }
 });
 
-app.post('/homework/custom', requireLogin, upload.single('attachment'), async (req, res) => {
+app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachment'), async (req, res) => {
   const { description, link_url, meeting_url, subject_id, custom_due_date } = req.body;
   const filePath = req.file ? `/uploads/${req.file.filename}` : null;
   const fileName = req.file ? req.file.originalname : null;
@@ -5770,7 +5844,7 @@ app.delete('/admin/api/courses/:courseId/study-days/:weekday/subjects/:subjectId
   }
 });
 
-app.post('/admin/api/homework/bulk', requireHomeworkBulkAccess, async (req, res) => {
+app.post('/admin/api/homework/bulk', requireHomeworkBulkAccess, writeLimiter, async (req, res) => {
   const { ids, action, payload } = req.body || {};
   const list = Array.isArray(ids) ? ids.map((id) => Number(id)).filter((id) => Number.isFinite(id)) : [];
   if (!list.length || !action) {
