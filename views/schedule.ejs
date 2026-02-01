@@ -2212,14 +2212,24 @@ body.theme-light .mobile-menu-action {
         }
       });
 
-      /* window.addEventListener('load', () => {
+      window.addEventListener('load', () => {
+        // --- FORCE REFLOW HACK ---
+        // This is a workaround for a stubborn rendering bug where hover effects
+        // cause artifacts on other elements. Forcing a reflow after the page
+        // loads seems to fix the browser's initial faulty rendering state,
+        // similar to how opening a modal fixes it.
+        document.body.style.transform = 'translateZ(0)';
+        void document.body.offsetHeight;
+        document.body.style.transform = '';
+        // --- END HACK ---
+
         const content = document.querySelector('.schedule-content');
         if (!content) return;
         requestAnimationFrame(() => {
           content.classList.add('enter-active');
           content.classList.remove('enter');
         });
-      }); */
+      });
 
       const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
       tooltipTriggerList.forEach((el) => {
