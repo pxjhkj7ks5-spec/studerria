@@ -1894,6 +1894,7 @@
                       <th>Created</th>
                       <th>Status</th>
                       <th>Schedule</th>
+                      <th>Reads</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -1919,6 +1920,15 @@
                         </td>
                         <td><%= m.scheduled_at || '—' %></td>
                         <td>
+                          <% if (typeof m.target_count !== 'undefined' && m.target_count > 0) { %>
+                            <button class="btn btn-sm btn-outline-primary message-reads-btn" type="button" data-message-id="<%= m.id %>">
+                              <%= m.read_count || 0 %>/<%= m.target_count %>
+                            </button>
+                          <% } else { %>
+                            <span class="text-muted">—</span>
+                          <% } %>
+                        </td>
+                        <td>
                           <form method="POST" action="/admin/messages/delete/<%= m.id %>">
                             <button
                               class="btn btn-sm btn-outline-danger"
@@ -1933,7 +1943,7 @@
                     <% }); %>
                     <% if (!(adminMessages || []).length) { %>
                       <tr>
-                        <td colspan="7" class="text-muted">No messages yet.</td>
+                        <td colspan="8" class="text-muted">No messages yet.</td>
                       </tr>
                     <% } %>
                   </tbody>
@@ -2035,6 +2045,33 @@
           </div>
           <div class="modal-body">
             <div id="subjectGroupsList" class="list-group"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="messageReadsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Read receipts</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-2 text-muted" id="messageReadsSummary">Loading…</div>
+            <div class="row g-3">
+              <div class="col-12 col-md-6">
+                <h6 class="mb-2">Read</h6>
+                <div id="messageReadsList" class="list-group"></div>
+              </div>
+              <div class="col-12 col-md-6">
+                <h6 class="mb-2">Unread</h6>
+                <div id="messageUnreadList" class="list-group"></div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
           </div>
         </div>
       </div>
@@ -2722,6 +2759,74 @@
         messageStatus.addEventListener('change', updateMessageScheduleFields);
         updateMessageScheduleFields();
       }
+
+      const messageReadsModal = document.getElementById('messageReadsModal');
+      const messageReadsSummary = document.getElementById('messageReadsSummary');
+      const messageReadsList = document.getElementById('messageReadsList');
+      const messageUnreadList = document.getElementById('messageUnreadList');
+
+      function escapeHtml(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function renderReadRows(list, target) {
+        if (!target) return;
+        if (!list.length) {
+          target.innerHTML = '<div class="list-group-item text-muted">Empty</div>';
+          return;
+        }
+        target.innerHTML = list
+          .map((row) => {
+            const meta = row.read_at ? ` · ${escapeHtml(row.read_at)}` : '';
+            return `<div class="list-group-item">${escapeHtml(row.full_name)}${meta}</div>`;
+          })
+          .join('');
+      }
+
+      function renderUnreadRows(list, target) {
+        if (!target) return;
+        if (!list.length) {
+          target.innerHTML = '<div class="list-group-item text-muted">Empty</div>';
+          return;
+        }
+        target.innerHTML = list
+          .map((row) => `<div class="list-group-item">${escapeHtml(row.full_name)}</div>`)
+          .join('');
+      }
+
+      document.querySelectorAll('.message-reads-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const messageId = btn.dataset.messageId;
+          if (!messageId || !messageReadsModal) return;
+          if (messageReadsSummary) messageReadsSummary.textContent = 'Loading…';
+          if (messageReadsList) messageReadsList.innerHTML = '';
+          if (messageUnreadList) messageUnreadList.innerHTML = '';
+          const modal = new bootstrap.Modal(messageReadsModal);
+          modal.show();
+          try {
+            const params = new URLSearchParams(window.location.search);
+            const courseParam = params.get('course');
+            const url = courseParam
+              ? `/admin/api/messages/${encodeURIComponent(messageId)}/reads?course=${encodeURIComponent(courseParam)}`
+              : `/admin/api/messages/${encodeURIComponent(messageId)}/reads`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('bad');
+            const data = await res.json();
+            if (messageReadsSummary) {
+              messageReadsSummary.textContent = `Read ${data.read_count || 0} of ${data.target_count || 0}`;
+            }
+            renderReadRows(data.reads || [], messageReadsList);
+            renderUnreadRows(data.unread || [], messageUnreadList);
+          } catch (err) {
+            if (messageReadsSummary) messageReadsSummary.textContent = 'Failed to load';
+          }
+        });
+      });
 
       bindUserRowClicks();
       bindSubjectButtons();
