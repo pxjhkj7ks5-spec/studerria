@@ -812,6 +812,104 @@ const upload = multer({
   },
 });
 
+const referenceCache = {
+  courses: { data: null, expiresAt: 0 },
+  subjects: new Map(),
+  semesters: new Map(),
+  activeSemester: new Map(),
+  studyDays: new Map(),
+};
+const REFERENCE_TTL_MS = 5 * 60 * 1000;
+
+function cacheGet(store, key) {
+  const entry = store instanceof Map ? store.get(key) : store[key];
+  if (!entry || !entry.expiresAt || entry.expiresAt < Date.now()) {
+    return null;
+  }
+  return entry.data;
+}
+
+function cacheSet(store, key, data, ttlMs = REFERENCE_TTL_MS) {
+  const entry = { data, expiresAt: Date.now() + ttlMs };
+  if (store instanceof Map) {
+    store.set(key, entry);
+  } else {
+    store[key] = entry;
+  }
+  return data;
+}
+
+function cacheDelete(store, key) {
+  if (store instanceof Map) {
+    store.delete(key);
+  } else {
+    store[key] = { data: null, expiresAt: 0 };
+  }
+}
+
+function invalidateCoursesCache() {
+  cacheDelete(referenceCache.courses, 'courses');
+}
+
+function invalidateSubjectsCache(courseId) {
+  if (!courseId) {
+    referenceCache.subjects.clear();
+    return;
+  }
+  referenceCache.subjects.delete(`${courseId}|all`);
+  referenceCache.subjects.delete(`${courseId}|visible`);
+}
+
+function invalidateSemestersCache(courseId) {
+  if (!courseId) {
+    referenceCache.semesters.clear();
+  } else {
+    referenceCache.semesters.delete(courseId);
+  }
+  invalidateActiveSemesterCache(courseId);
+}
+
+function invalidateActiveSemesterCache(courseId) {
+  if (!courseId) {
+    referenceCache.activeSemester.clear();
+  } else {
+    referenceCache.activeSemester.delete(courseId);
+  }
+}
+
+function invalidateStudyDaysCache(courseId) {
+  if (!courseId) {
+    referenceCache.studyDays.clear();
+  } else {
+    referenceCache.studyDays.delete(courseId);
+  }
+}
+
+async function getCoursesCached() {
+  const cached = cacheGet(referenceCache.courses, 'courses');
+  if (cached) return cached;
+  const rows = await db.all('SELECT id, name FROM courses ORDER BY id');
+  return cacheSet(referenceCache.courses, 'courses', rows || []);
+}
+
+async function getSubjectsCached(courseId, options = {}) {
+  const key = `${courseId}|${options.visibleOnly ? 'visible' : 'all'}`;
+  const cached = cacheGet(referenceCache.subjects, key);
+  if (cached) return cached;
+  const sql = options.visibleOnly
+    ? 'SELECT * FROM subjects WHERE course_id = ? AND visible = 1 ORDER BY name'
+    : 'SELECT * FROM subjects WHERE course_id = ? ORDER BY name';
+  const rows = await db.all(sql, [courseId]);
+  return cacheSet(referenceCache.subjects, key, rows || []);
+}
+
+async function getSemestersCached(courseId) {
+  const cached = cacheGet(referenceCache.semesters, courseId);
+  if (cached) return cached;
+  const rows = await db.all('SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC', [courseId]);
+  return cacheSet(referenceCache.semesters, courseId, rows || []);
+}
+
 const rateBuckets = new Map();
 const RATE_BUCKET_LIMIT = 50000;
 
@@ -1097,11 +1195,13 @@ function getAdminCourse(req) {
 }
 
 async function getActiveSemester(courseId) {
+  const cached = cacheGet(referenceCache.activeSemester, courseId);
+  if (cached) return cached;
   const row = await db.get(
     'SELECT id, title, start_date, weeks_count, is_active, is_archived FROM semesters WHERE course_id = ? AND is_active = 1 ORDER BY id DESC LIMIT 1',
     [courseId]
   );
-  return row || null;
+  return cacheSet(referenceCache.activeSemester, courseId, row || null);
 }
 
 async function ensureCourseStudyDays(courseId) {
@@ -1123,6 +1223,8 @@ async function ensureCourseStudyDays(courseId) {
 }
 
 async function getCourseStudyDays(courseId) {
+  const cached = cacheGet(referenceCache.studyDays, courseId);
+  if (cached) return cached;
   await ensureCourseStudyDays(courseId);
   const rows = await db.all(
     `SELECT d.id, d.weekday, d.is_active, s.id AS subject_id, s.name AS subject_name
@@ -1148,7 +1250,8 @@ async function getCourseStudyDays(courseId) {
       map.get(row.weekday).subjects.push({ id: row.subject_id, name: row.subject_name });
     }
   });
-  return Array.from(map.values()).sort((a, b) => a.weekday - b.weekday);
+  const result = Array.from(map.values()).sort((a, b) => a.weekday - b.weekday);
+  return cacheSet(referenceCache.studyDays, courseId, result);
 }
 
 function broadcast(type, payload) {
@@ -1347,12 +1450,14 @@ app.get('/register/course', (req, res) => {
   ensureDbReady().catch((err) => {
     console.error('DB init failed', err);
   });
-  db.all('SELECT id, name FROM courses ORDER BY id', (err, courses) => {
-    if (err) {
+  (async () => {
+    try {
+      const courses = await getCoursesCached();
+      return res.render('register-course', { courses, error: req.query.error || '' });
+    } catch (err) {
       return res.status(500).send('Database error');
     }
-    res.render('register-course', { courses, error: req.query.error || '' });
-  });
+  })();
 });
 
 app.post('/register/course', registerLimiter, (req, res) => {
@@ -1388,12 +1493,14 @@ app.get('/register/subjects', (req, res) => {
     if (uErr || !user || !user.course_id) {
       return res.redirect('/register/course');
     }
-    db.all('SELECT * FROM subjects WHERE course_id = ? AND visible = 1 ORDER BY name', [user.course_id], (err, subjects) => {
-      if (err) {
-        return res.status(500).send('Database error');
+    (async () => {
+      try {
+        const subjects = await getSubjectsCached(user.course_id, { visibleOnly: true });
+        res.render('register-subjects', { subjects });
+      } catch (err) {
+        res.status(500).send('Database error');
       }
-      res.render('register-subjects', { subjects });
-    });
+    })();
   });
 });
 
@@ -3435,18 +3542,11 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     ORDER BY se.week_number, se.day_of_week, se.class_number
   `;
 
-  db.all('SELECT id, name FROM courses ORDER BY id', (courseErr, courses) => {
-    if (courseErr) {
-      return handleDbError(res, courseErr, 'admin.courses');
-    }
-    db.all(
-      'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
-      [courseId],
-      (semErr, semesters) => {
-        if (semErr) {
-          return handleDbError(res, semErr, 'admin.semesters');
-        }
-    db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
+  getCoursesCached()
+    .then((courses) => {
+      getSemestersCached(courseId)
+        .then((semesters) => {
+          db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
     if (scheduleErr) {
       return handleDbError(res, scheduleErr, 'admin.schedule');
     }
@@ -3552,22 +3652,20 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
             if (userErr) {
               return handleDbError(res, userErr, 'admin.users');
             }
-            db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
-              if (subjectErr) {
-                return handleDbError(res, subjectErr, 'admin.subjects');
-              }
-              db.all(
-                `
-                  SELECT sg.student_id, sg.subject_id, sg.group_number, s.name AS subject_name
-                  FROM student_groups sg
-                  JOIN subjects s ON s.id = sg.subject_id
-                  WHERE s.course_id = ?
-                `,
-                [courseId],
-                (sgErr, studentGroups) => {
-                  if (sgErr) {
-                    return handleDbError(res, sgErr, 'admin.studentGroups');
-                  }
+            getSubjectsCached(courseId)
+              .then((subjects) => {
+                db.all(
+                  `
+                    SELECT sg.student_id, sg.subject_id, sg.group_number, s.name AS subject_name
+                    FROM student_groups sg
+                    JOIN subjects s ON s.id = sg.subject_id
+                    WHERE s.course_id = ?
+                  `,
+                  [courseId],
+                  (sgErr, studentGroups) => {
+                    if (sgErr) {
+                      return handleDbError(res, sgErr, 'admin.studentGroups');
+                    }
                   const historyFilters = [];
                   const historyParams = [];
                   historyFilters.push('course_id = ?');
@@ -3949,10 +4047,10 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                   return handleDbError(res, statsErr, 'admin.dashboard');
                                 }
                               })();
-                            }
-                          );
-                        }
-                      );
+                  }
+                );
+              })
+              .catch((subjectErr) => handleDbError(res, subjectErr, 'admin.subjects'));
             }
           );
                     }
@@ -3963,8 +4061,10 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
           });
         }
       );
-    });
-  });
+        })
+        .catch((semErr) => handleDbError(res, semErr, 'admin.semesters'));
+    })
+    .catch((courseErr) => handleDbError(res, courseErr, 'admin.courses'));
 });
 
 let schedulerRunning = false;
@@ -4060,7 +4160,7 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
   const isStarosta = role === 'starosta';
   let courses = [];
   try {
-    courses = await db.all('SELECT id, name FROM courses ORDER BY id');
+    courses = await getCoursesCached();
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.courses');
   }
@@ -4262,34 +4362,36 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
           console.error('Database error (admin.users.json.users)', userErr);
           return res.status(500).json({ error: 'Database error' });
         }
-        db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
-          if (subjectErr) {
+        getSubjectsCached(courseId)
+          .then((subjects) => {
+            getCoursesCached()
+              .then((courses) => {
+                db.all(
+                  `
+                    SELECT sg.student_id, sg.subject_id, sg.group_number
+                    FROM student_groups sg
+                    JOIN subjects s ON s.id = sg.subject_id
+                    WHERE s.course_id = ?
+                  `,
+                  [courseId],
+                  (sgErr, studentGroups) => {
+                    if (sgErr) {
+                      console.error('Database error (admin.users.json.studentGroups)', sgErr);
+                      return res.status(500).json({ error: 'Database error' });
+                    }
+                    res.json({ users, subjects, studentGroups, courses, selectedCourseId: courseId });
+                  }
+                );
+              })
+              .catch((courseErr) => {
+                console.error('Database error (admin.users.json.courses)', courseErr);
+                return res.status(500).json({ error: 'Database error' });
+              });
+          })
+          .catch((subjectErr) => {
             console.error('Database error (admin.users.json.subjects)', subjectErr);
             return res.status(500).json({ error: 'Database error' });
-          }
-          db.all('SELECT id, name FROM courses ORDER BY id', (courseErr, courses) => {
-            if (courseErr) {
-              console.error('Database error (admin.users.json.courses)', courseErr);
-              return res.status(500).json({ error: 'Database error' });
-            }
-            db.all(
-              `
-                SELECT sg.student_id, sg.subject_id, sg.group_number
-                FROM student_groups sg
-                JOIN subjects s ON s.id = sg.subject_id
-                WHERE s.course_id = ?
-              `,
-              [courseId],
-              (sgErr, studentGroups) => {
-                if (sgErr) {
-                  console.error('Database error (admin.users.json.studentGroups)', sgErr);
-                  return res.status(500).json({ error: 'Database error' });
-                }
-                res.json({ users, subjects, studentGroups, courses, selectedCourseId: courseId });
-              }
-            );
           });
-        });
       }
     );
   });
@@ -5448,6 +5550,7 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
     }
     logAction(db, req, 'subject_add', { name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag });
     logActivity(db, req, 'subject_add', 'subject', null, { name, group_count: count, default_group: def, visible: visibleFlag }, courseId);
+    invalidateSubjectsCache(courseId);
     return res.redirect('/admin?ok=Subject%20added');
     }
   );
@@ -5476,6 +5579,7 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
       }
       logAction(db, req, 'subject_edit', { id, name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag });
       logActivity(db, req, 'subject_edit', 'subject', Number(id) || null, { name, group_count: count, default_group: def, visible: visibleFlag }, courseId);
+      invalidateSubjectsCache(courseId);
       return res.redirect('/admin?ok=Subject%20updated');
     }
   );
@@ -5505,6 +5609,7 @@ app.post('/admin/api/subjects/:subjectId/clone', requireAdminOrDeanery, async (r
         courseId,
       ]
     );
+    invalidateSubjectsCache(courseId);
     return res.json({ ok: true, id: row?.id });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
@@ -5666,6 +5771,7 @@ app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
       }
       logAction(db, req, 'subject_delete', { id });
       logActivity(db, req, 'subject_delete', 'subject', Number(id) || null, null, courseId);
+      invalidateSubjectsCache(courseId);
       return res.redirect('/admin?ok=Subject%20deleted');
     });
   });
@@ -5682,6 +5788,7 @@ app.post('/admin/courses/add', requireAdmin, (req, res) => {
       return res.redirect('/admin?err=Database%20error');
     }
     logAction(db, req, 'course_add', { id: courseId, name: name.trim() });
+    invalidateCoursesCache();
     return res.redirect('/admin?ok=Course%20created');
   });
 });
@@ -5698,6 +5805,7 @@ app.post('/admin/courses/edit/:id', requireAdmin, (req, res) => {
       return res.redirect('/admin?err=Database%20error');
     }
     logAction(db, req, 'course_edit', { id: courseId, name: name.trim() });
+    invalidateCoursesCache();
     return res.redirect('/admin?ok=Course%20updated');
   });
 });
@@ -5734,6 +5842,10 @@ app.post('/admin/courses/delete/:id', requireAdmin, (req, res) => {
             return res.redirect('/admin?err=Database%20error');
           }
           logAction(db, req, 'course_delete', { id: courseId });
+          invalidateCoursesCache();
+          invalidateSubjectsCache(courseId);
+          invalidateSemestersCache(courseId);
+          invalidateStudyDaysCache(courseId);
           return res.redirect('/admin?ok=Course%20deleted');
         });
       });
@@ -5753,8 +5865,9 @@ app.get('/admin/api/courses/:courseId/study-days', requireAdminOrDeanery, async 
     const course = await db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: 'Course not found' });
     const studyDays = await getCourseStudyDays(courseId);
-    const subjects = await db.all('SELECT id, name FROM subjects WHERE course_id = ? ORDER BY name', [courseId]);
-    return res.json({ days: studyDays, subjects: subjects || [] });
+    const subjects = await getSubjectsCached(courseId);
+    const subjectRows = (subjects || []).map((s) => ({ id: s.id, name: s.name }));
+    return res.json({ days: studyDays, subjects: subjectRows });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
   }
@@ -5779,6 +5892,7 @@ app.patch('/admin/api/courses/:courseId/study-days/:weekday', requireAdminOrDean
       'UPDATE course_study_days SET is_active = ?, updated_at = ? WHERE course_id = ? AND weekday = ?',
       [is_active ? 1 : 0, updatedAt, courseId, weekday]
     );
+    invalidateStudyDaysCache(courseId);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
@@ -5812,6 +5926,7 @@ app.post('/admin/api/courses/:courseId/study-days/:weekday/subjects', requireAdm
       'INSERT INTO course_day_subjects (course_study_day_id, subject_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
       [dayRow.id, subjectId]
     );
+    invalidateStudyDaysCache(courseId);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
@@ -5838,6 +5953,7 @@ app.delete('/admin/api/courses/:courseId/study-days/:weekday/subjects/:subjectId
       'DELETE FROM course_day_subjects WHERE course_study_day_id = ? AND subject_id = ?',
       [dayRow.id, subjectId]
     );
+    invalidateStudyDaysCache(courseId);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
@@ -6011,8 +6127,8 @@ app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) 
     const activeDaySet = new Set(
       (studyDays || []).filter((d) => d.is_active).map((d) => d.day_name)
     );
-    const subjects = await db.all('SELECT id, name, group_count FROM subjects WHERE course_id = ?', [courseId]);
-    const subjectMap = new Map((subjects || []).map((s) => [s.id, s]));
+    const subjects = await getSubjectsCached(courseId);
+    const subjectMap = new Map((subjects || []).map((s) => [s.id, { id: s.id, name: s.name, group_count: s.group_count }]));
     const rows = await db.all(
       `SELECT se.*
        FROM schedule_entries se
@@ -6123,6 +6239,7 @@ app.post('/admin/semesters/add', requireAdmin, (req, res) => {
           return res.redirect('/admin?err=Database%20error');
         }
         logAction(db, req, 'semester_add', { title, start_date, weeks_count: weeks, is_active: active });
+        invalidateSemestersCache(courseId);
         return res.redirect('/admin?ok=Semester%20created');
       }
     );
@@ -6151,13 +6268,14 @@ app.post('/admin/semesters/edit/:id', requireAdmin, (req, res) => {
     'UPDATE semesters SET title = ?, start_date = ?, weeks_count = ? WHERE id = ? AND course_id = ?',
     [title.trim(), start_date, weeks, id, courseId],
     (err) => {
-      if (err) {
-        return res.redirect('/admin?err=Database%20error');
-      }
-      logAction(db, req, 'semester_edit', { id, title, start_date, weeks_count: weeks });
-      return res.redirect('/admin?ok=Semester%20updated');
+    if (err) {
+      return res.redirect('/admin?err=Database%20error');
     }
-  );
+    logAction(db, req, 'semester_edit', { id, title, start_date, weeks_count: weeks });
+    invalidateSemestersCache(courseId);
+    return res.redirect('/admin?ok=Semester%20updated');
+  }
+);
 });
 
 app.post('/admin/semesters/set-active/:id', requireAdmin, (req, res) => {
@@ -6172,6 +6290,7 @@ app.post('/admin/semesters/set-active/:id', requireAdmin, (req, res) => {
         return res.redirect('/admin?err=Database%20error');
       }
       logAction(db, req, 'semester_set_active', { id });
+      invalidateSemestersCache(courseId);
       return res.redirect('/admin?ok=Semester%20activated');
     });
   });
@@ -6185,6 +6304,7 @@ app.post('/admin/semesters/archive/:id', requireAdmin, (req, res) => {
       return res.redirect('/admin?err=Database%20error');
     }
     logAction(db, req, 'semester_archive', { id });
+    invalidateSemestersCache(courseId);
     return res.redirect('/admin?ok=Semester%20archived');
   });
 });
@@ -6197,6 +6317,7 @@ app.post('/admin/semesters/restore/:id', requireAdmin, (req, res) => {
       return res.redirect('/admin?err=Database%20error');
     }
     logAction(db, req, 'semester_restore', { id });
+    invalidateSemestersCache(courseId);
     return res.redirect('/admin?ok=Semester%20restored');
   });
 });
@@ -6223,6 +6344,7 @@ app.post('/admin/semesters/delete/:id', requireAdmin, (req, res) => {
           return res.redirect('/admin?err=Database%20error');
         }
         logAction(db, req, 'semester_delete', { id });
+        invalidateSemestersCache(courseId);
         return res.redirect('/admin?ok=Semester%20deleted');
       });
     });
