@@ -616,7 +616,6 @@
         width: 100%;
         box-sizing: border-box;
         transition: background 200ms ease, box-shadow 200ms ease, transform 200ms ease;
-        will-change: transform;
       }
       body.theme-light .list-group-item {
         background: rgba(15, 23, 42, 0.04);
@@ -1110,6 +1109,10 @@ body.theme-light .mobile-menu-action {
       .week-hero.glass,
       .alert.glass {
         transition: none;
+      }
+      .week-hero,
+      .alert.glass {
+        transform: translateZ(0);
       }
       .file-name {
         color: var(--text-muted);
