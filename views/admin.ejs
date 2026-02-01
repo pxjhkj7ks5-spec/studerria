@@ -736,9 +736,13 @@
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="card-title mb-0">Add class</h5>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
                   <button class="btn btn-outline-primary btn-sm" type="button" id="validateScheduleBtn">Перевірити розклад</button>
                   <a class="btn btn-outline-secondary btn-sm" href="/admin/export/schedule.csv">Export CSV</a>
+                  <form class="d-flex gap-2" method="POST" action="/admin/import/schedule.csv" enctype="multipart/form-data">
+                    <input class="form-control form-control-sm" type="file" name="csv_file" accept=".csv" required />
+                    <button class="btn btn-outline-secondary btn-sm" type="submit">Import CSV</button>
+                  </form>
                 </div>
               </div>
               <form method="POST" action="/admin/schedule/add">
@@ -1144,6 +1148,10 @@
               class="btn btn-outline-secondary btn-sm"
               href="/admin/export/users.csv?course=<%= selectedCourseId || 1 %><%= activeSemester ? '&semester_id=' + activeSemester.id : '' %><%= (filters && filters.users_group) ? '&group=' + encodeURIComponent(filters.users_group) : '' %>"
             ><%= t('admin.exportUsers') %></a>
+            <form class="d-flex gap-2" method="POST" action="/admin/import/users.csv" enctype="multipart/form-data">
+              <input class="form-control form-control-sm" type="file" name="csv_file" accept=".csv" required />
+              <button class="btn btn-outline-secondary btn-sm" type="submit">Import CSV</button>
+            </form>
             <div class="btn-group btn-group-sm" role="group">
               <button class="btn btn-outline-primary" type="button" data-status="active"><%= t('admin.active') %></button>
               <button class="btn btn-outline-primary" type="button" data-status="inactive"><%= t('admin.inactive') %></button>
@@ -1315,8 +1323,12 @@
             </div>
           </div>
 
-          <div class="d-flex justify-content-end mb-2">
+          <div class="d-flex justify-content-end gap-2 mb-2 flex-wrap">
             <a class="btn btn-outline-secondary btn-sm" href="/admin/export/subjects.csv">Export Subjects CSV</a>
+            <form class="d-flex gap-2" method="POST" action="/admin/import/subjects.csv" enctype="multipart/form-data">
+              <input class="form-control form-control-sm" type="file" name="csv_file" accept=".csv" required />
+              <button class="btn btn-outline-secondary btn-sm" type="submit">Import CSV</button>
+            </form>
           </div>
 
           <div class="table-responsive">

@@ -812,6 +812,18 @@ const upload = multer({
   },
 });
 
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const okTypes = new Set(['text/csv', 'application/vnd.ms-excel', 'application/csv', 'text/plain', 'application/octet-stream']);
+    if (!okTypes.has(file.mimetype)) {
+      return cb(new Error('Invalid file type'));
+    }
+    return cb(null, true);
+  },
+});
+
 const referenceCache = {
   courses: { data: null, expiresAt: 0 },
   subjects: new Map(),
@@ -1054,6 +1066,57 @@ function isValidTimeString(timeStr) {
   if (!/^\d{2}:\d{2}$/.test(timeStr)) return false;
   const [hours, minutes] = timeStr.split(':').map((n) => Number(n));
   return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+}
+
+function parseCsvText(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (inQuotes) {
+      if (ch === '"' && next === '"') {
+        field += '"';
+        i += 1;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      row.push(field);
+      field = '';
+    } else if (ch === '\n') {
+      row.push(field);
+      field = '';
+      if (row.some((cell) => String(cell).trim().length)) {
+        rows.push(row);
+      }
+      row = [];
+    } else if (ch !== '\r') {
+      field += ch;
+    }
+  }
+  row.push(field);
+  if (row.some((cell) => String(cell).trim().length)) {
+    rows.push(row);
+  }
+  if (!rows.length) return [];
+  const headers = rows
+    .shift()
+    .map((h) => String(h || '').replace(/^\uFEFF/, '').trim().toLowerCase());
+  return rows.map((r) => {
+    const obj = {};
+    headers.forEach((h, idx) => {
+      if (!h) return;
+      obj[h] = r[idx] !== undefined ? String(r[idx]).trim() : '';
+    });
+    return obj;
+  });
 }
 
 function getWeekDayForDate(dateStr, semesterStart) {
@@ -4426,6 +4489,76 @@ app.get('/admin/export/schedule.csv', requireAdmin, async (req, res) => {
   );
 });
 
+app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
+  if (!req.file || !req.file.buffer) {
+    return res.redirect('/admin?err=Missing%20CSV');
+  }
+  const courseId = getAdminCourse(req);
+  let activeSemester = null;
+  try {
+    activeSemester = await getActiveSemester(courseId);
+  } catch (err) {
+    return res.redirect('/admin?err=Semester%20error');
+  }
+  if (!activeSemester) {
+    return res.redirect('/admin?err=No%20active%20semester');
+  }
+  let subjects = [];
+  try {
+    subjects = await getSubjectsCached(courseId);
+  } catch (err) {
+    return res.redirect('/admin?err=Subjects%20error');
+  }
+  const subjectMap = new Map(
+    (subjects || []).map((s) => [String(s.name || '').trim().toLowerCase(), s])
+  );
+  let rows = [];
+  try {
+    const text = req.file.buffer.toString('utf8');
+    rows = parseCsvText(text);
+  } catch (err) {
+    return res.redirect('/admin?err=Invalid%20CSV');
+  }
+  if (!rows.length) {
+    return res.redirect('/admin?err=Empty%20CSV');
+  }
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const subjectName = String(row.subject || '').trim().toLowerCase();
+    const subject = subjectMap.get(subjectName);
+    const groupNumber = Number(row.group_number);
+    const classNumber = Number(row.class_number);
+    const weekNumber = Number(row.week_number);
+    const dayOfWeek = String(row.day_of_week || '').trim();
+    if (!subject || Number.isNaN(groupNumber) || Number.isNaN(classNumber) || Number.isNaN(weekNumber) || !dayOfWeek) {
+      skipped += 1;
+      continue;
+    }
+    const existing = await db.get(
+      `SELECT id FROM schedule_entries
+       WHERE course_id = ? AND semester_id = ? AND week_number = ?
+         AND day_of_week = ? AND class_number = ? AND group_number = ?`,
+      [courseId, activeSemester.id, weekNumber, dayOfWeek, classNumber, groupNumber]
+    );
+    if (existing && existing.id) {
+      await db.run('UPDATE schedule_entries SET subject_id = ? WHERE id = ?', [subject.id, existing.id]);
+      updated += 1;
+    } else {
+      await db.run(
+        `INSERT INTO schedule_entries
+         (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [subject.id, groupNumber, dayOfWeek, classNumber, weekNumber, courseId, activeSemester.id]
+      );
+      inserted += 1;
+    }
+  }
+  logAction(db, req, 'schedule_import_csv', { inserted, updated, skipped, course_id: courseId });
+  return res.redirect(`/admin?ok=Schedule%20imported%20(${inserted}%2F${updated}%2F${skipped})`);
+});
+
 app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
   const courseId = Number(req.query.course || getAdminCourse(req));
   const semesterId = req.query.semester_id ? Number(req.query.semester_id) : null;
@@ -4473,6 +4606,61 @@ app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
   });
 });
 
+app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
+  if (!req.file || !req.file.buffer) {
+    return res.redirect('/admin?err=Missing%20CSV');
+  }
+  const courseId = getAdminCourse(req);
+  let rows = [];
+  let courses = [];
+  try {
+    const text = req.file.buffer.toString('utf8');
+    rows = parseCsvText(text);
+    courses = await getCoursesCached();
+  } catch (err) {
+    return res.redirect('/admin?err=Invalid%20CSV');
+  }
+  if (!rows.length) {
+    return res.redirect('/admin?err=Empty%20CSV');
+  }
+  const courseSet = new Set((courses || []).map((c) => Number(c.id)));
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const fullName = String(row.full_name || '').trim().replace(/\s+/g, ' ');
+    if (!fullName) {
+      skipped += 1;
+      continue;
+    }
+    const role = String(row.role || 'student').trim().toLowerCase();
+    const scheduleGroup = String(row.schedule_group || 'A').trim();
+    const isActive = row.is_active === '' ? 1 : Number(row.is_active) ? 1 : 0;
+    const rowCourse = row.course_id ? Number(row.course_id) : courseId;
+    const finalCourse = courseSet.has(rowCourse) ? rowCourse : courseId;
+    const existing = await db.get('SELECT id FROM users WHERE LOWER(full_name) = LOWER(?)', [fullName]);
+    if (existing && existing.id) {
+      await db.run(
+        `UPDATE users
+         SET role = ?, schedule_group = ?, is_active = ?, course_id = ?, language = COALESCE(language, ?)
+         WHERE id = ?`,
+        [role || 'student', scheduleGroup || 'A', isActive, finalCourse, 'uk', existing.id]
+      );
+      updated += 1;
+    } else {
+      await db.run(
+        `INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id, language)
+         VALUES (?, ?, NULL, ?, ?, ?, ?)`,
+        [fullName, role || 'student', isActive, scheduleGroup || 'A', finalCourse, 'uk']
+      );
+      inserted += 1;
+    }
+  }
+  logAction(db, req, 'users_import_csv', { inserted, updated, skipped, course_id: courseId });
+  broadcast('users_updated');
+  return res.redirect(`/admin?ok=Users%20imported%20(${inserted}%2F${updated}%2F${skipped})`);
+});
+
 app.get('/admin/export/subjects.csv', requireAdmin, (req, res) => {
   const courseId = getAdminCourse(req);
   db.all('SELECT id, name, group_count, default_group FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (err, rows) => {
@@ -4489,6 +4677,52 @@ app.get('/admin/export/subjects.csv', requireAdmin, (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="subjects.csv"');
     res.send([header, ...lines].join('\n'));
   });
+});
+
+app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
+  if (!req.file || !req.file.buffer) {
+    return res.redirect('/admin?err=Missing%20CSV');
+  }
+  const courseId = getAdminCourse(req);
+  let rows = [];
+  try {
+    const text = req.file.buffer.toString('utf8');
+    rows = parseCsvText(text);
+  } catch (err) {
+    return res.redirect('/admin?err=Invalid%20CSV');
+  }
+  if (!rows.length) {
+    return res.redirect('/admin?err=Empty%20CSV');
+  }
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const name = String(row.name || '').trim();
+    const groupCount = row.group_count ? Number(row.group_count) : 1;
+    const defaultGroup = row.default_group ? Number(row.default_group) : 1;
+    if (!name || Number.isNaN(groupCount) || groupCount < 1 || groupCount > 3 || Number.isNaN(defaultGroup) || defaultGroup < 1 || defaultGroup > groupCount) {
+      skipped += 1;
+      continue;
+    }
+    const existing = await db.get('SELECT id FROM subjects WHERE name = ?', [name]);
+    if (existing && existing.id) {
+      await db.run(
+        'UPDATE subjects SET group_count = ?, default_group = ?, course_id = ? WHERE id = ?',
+        [groupCount, defaultGroup, courseId, existing.id]
+      );
+      updated += 1;
+    } else {
+      await db.run(
+        'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id) VALUES (?, ?, ?, 1, 1, ?)',
+        [name, groupCount, defaultGroup, courseId]
+      );
+      inserted += 1;
+    }
+  }
+  invalidateSubjectsCache(courseId);
+  logAction(db, req, 'subjects_import_csv', { inserted, updated, skipped, course_id: courseId });
+  return res.redirect(`/admin?ok=Subjects%20imported%20(${inserted}%2F${updated}%2F${skipped})`);
 });
 
 app.get('/admin/history.csv', requireAdmin, (req, res) => {
