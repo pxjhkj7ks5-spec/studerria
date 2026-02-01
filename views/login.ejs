@@ -489,7 +489,7 @@
         toggle.addEventListener('click', () => {
           const isHidden = pwd.type === 'password';
           pwd.type = isHidden ? 'text' : 'password';
-          toggle.textContent = isHidden ? '🙈' : '👁';
+          toggle.textContent = isHidden ? '�' : '🔓';
           toggle.setAttribute('aria-label', isHidden ? 'Сховати пароль' : 'Показати пароль');
         });
       }
