@@ -23,10 +23,38 @@
         backdrop-filter: blur(16px);
         background: rgba(12, 18, 36, 0.65);
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 0.75rem 0;
       }
       body.theme-light .topbar {
         background: rgba(247, 249, 255, 0.85);
         border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+      }
+      .topbar .container-fluid {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .topbar .navbar-brand {
+        font-weight: 700;
+        font-size: 1.25rem;
+        margin-right: auto;
+      }
+      .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .topbar-actions form {
+        display: contents;
+      }
+      @media (max-width: 991px) {
+        .topbar-actions {
+          flex-basis: 100%;
+          order: 3;
+          gap: 0.3rem;
+        }
       }
       .glass {
         background: rgba(255, 255, 255, 0.08);
@@ -171,10 +199,10 @@
   </head>
   <body class="theme-dark">
     <nav class="navbar navbar-expand-lg topbar">
-      <div class="container">
-        <span class="navbar-brand text-white">Studerria</span>
-        <div class="d-flex align-items-center topbar-actions">
-          <span class="me-3 muted desktop-only">
+      <div class="container-fluid px-3 px-lg-4">
+        <span class="navbar-brand text-white me-auto">Studerria</span>
+        <div class="d-flex align-items-center gap-2 topbar-actions flex-wrap justify-content-end">
+          <span class="me-2 muted desktop-only text-nowrap">
             <% if (role === 'admin') { %>
               <%= t('role.admin') %>: <%= username %>
             <% } else if (role === 'starosta') { %>
@@ -186,21 +214,21 @@
             <% } %>
           </span>
           <% if (role === 'admin') { %>
-            <form method="POST" action="/admin/switch-to-admin" class="me-2 desktop-only">
+            <form method="POST" action="/admin/switch-to-admin" class="me-1 desktop-only">
               <button class="btn btn-outline-primary btn-sm" type="submit"><%= t('schedule.backToAdmin') %></button>
             </form>
           <% } %>
           <% if (role === 'starosta') { %>
-            <a class="btn btn-outline-primary btn-sm me-2 desktop-only" href="/starosta"><%= t('menu.starosta') %></a>
+            <a class="btn btn-outline-primary btn-sm me-1 desktop-only" href="/starosta"><%= t('menu.starosta') %></a>
           <% } %>
           <% if (role === 'deanery') { %>
-            <a class="btn btn-outline-primary btn-sm me-2 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
+            <a class="btn btn-outline-primary btn-sm me-1 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
           <% } %>
-          <a class="btn btn-outline-light btn-sm me-2 desktop-only" href="/schedule">Розклад</a>
-          <a class="btn btn-glass btn-sm me-2 desktop-only" href="/my-day">Мій день</a>
-          <a class="btn btn-outline-light btn-sm me-2 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
+          <a class="btn btn-outline-light btn-sm me-1 desktop-only" href="/schedule">Розклад</a>
+          <a class="btn btn-glass btn-sm me-1 desktop-only" href="/my-day">Мій день</a>
+          <a class="btn btn-outline-light btn-sm me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
           <button
-            class="btn btn-outline-light btn-sm me-2 theme-toggle desktop-only"
+            class="btn btn-outline-light btn-sm me-1 theme-toggle desktop-only"
             type="button"
             id="themeToggle"
             data-light-label="<%= t('theme.light') %>"
@@ -208,7 +236,7 @@
           >
             <%= t('theme.light') %>
           </button>
-          <a class="btn btn-outline-light btn-sm me-2 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
+          <a class="btn btn-outline-light btn-sm me-1 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
           <form method="POST" action="/logout" class="desktop-only">
             <button class="btn btn-outline-light btn-sm" type="submit"><%= t('schedule.logout') %></button>
           </form>

@@ -42,12 +42,40 @@
       .topbar {
         backdrop-filter: blur(12px);
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 0.75rem 0;
       }
       body.theme-dark .topbar {
         background: rgba(10, 10, 20, 0.5);
       }
       body.theme-light .topbar {
         background: rgba(255, 255, 255, 0.75);
+      }
+      .topbar .container-fluid {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .topbar .navbar-brand {
+        font-weight: 700;
+        font-size: 1.25rem;
+        margin-right: auto;
+      }
+      .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .topbar-actions form {
+        display: contents;
+      }
+      @media (max-width: 991px) {
+        .topbar-actions {
+          flex-basis: 100%;
+          order: 3;
+          gap: 0.3rem;
+        }
       }
       .glass {
         border-radius: var(--radius);
@@ -383,11 +411,11 @@
   </head>
   <body class="theme-dark">
     <nav class="navbar navbar-expand-lg topbar">
-      <div class="container">
-        <span class="navbar-brand text-white">Teamwork</span>
-        <div class="d-flex align-items-center">
-          <span class="me-3 text-muted">Студент: <%= username %></span>
-          <button class="theme-toggle-min me-2" id="themeToggle" type="button" aria-label="Toggle theme">🌙</button>
+      <div class="container-fluid px-3 px-lg-4">
+        <span class="navbar-brand text-white me-auto">Teamwork</span>
+        <div class="d-flex align-items-center gap-2 topbar-actions flex-wrap justify-content-end">
+          <span class="me-2 text-muted text-nowrap desktop-only">Студент: <%= username %></span>
+          <button class="theme-toggle-min me-1" id="themeToggle" type="button" aria-label="Toggle theme">🌙</button>
           <a class="btn btn-outline-light btn-sm" href="/schedule">Back to schedule</a>
         </div>
       </div>
