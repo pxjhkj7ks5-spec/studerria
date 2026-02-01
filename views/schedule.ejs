@@ -1119,21 +1119,21 @@ body.theme-light .mobile-menu-action {
           </span>
           <% if (role === 'admin') { %>
             <form method="POST" action="/admin/switch-to-admin" class="me-1 desktop-only">
-              <button class="btn btn-outline-primary btn-sm" type="submit"><%= t('schedule.backToAdmin') %></button>
+              <button class="btn btn-glass" type="submit"><%= t('schedule.backToAdmin') %></button>
             </form>
           <% } %>
           <% if (role === 'starosta') { %>
-            <a class="btn btn-outline-primary btn-sm me-1 desktop-only" href="/starosta"><%= t('menu.starosta') %></a>
+            <a class="btn btn-glass me-1 desktop-only" href="/starosta"><%= t('menu.starosta') %></a>
           <% } %>
           <% if (role === 'deanery') { %>
-            <a class="btn btn-outline-primary btn-sm me-1 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
+            <a class="btn btn-glass me-1 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
           <% } %>
           <button class="theme-toggle-min msg-btn me-1 desktop-only" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">
             💬
             <span class="msg-badge d-none" id="messagesBadge">0</span>
           </button>
-          <a class="btn btn-outline-light btn-sm me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
-          <a class="btn btn-outline-light btn-sm me-1 desktop-only" href="/my-day">Мій день</a>
+          <a class="btn btn-glass me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
+          <a class="btn btn-glass me-1 desktop-only" href="/my-day">Мій день</a>
           <button
             class="theme-toggle theme-toggle-min me-1 desktop-only"
             type="button"
@@ -1144,12 +1144,12 @@ body.theme-light .mobile-menu-action {
           >
             🌙
           </button>
-          <a class="btn btn-outline-light btn-sm me-1 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
+          <a class="btn btn-glass me-1 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
           <form method="POST" action="/logout" class="desktop-only">
-            <button class="btn btn-outline-light btn-sm" type="submit"><%= t('schedule.logout') %></button>
+            <button class="btn btn-glass" type="submit"><%= t('schedule.logout') %></button>
           </form>
           <button
-            class="btn btn-outline-light btn-sm mobile-menu-btn"
+            class="theme-toggle-min mobile-menu-btn"
             type="button"
             data-bs-toggle="modal"
             data-bs-target="#mobileMenuModal"
