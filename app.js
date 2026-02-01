@@ -1237,10 +1237,12 @@ const ACTIVITY_POINTS_CASE =
 
 function handleDbError(res, err, label) {
   console.error(`Database error (${label})`, err);
-  if (process.env.DB_DEBUG === 'true') {
-    return res.status(500).send(`Database error (${label})`);
+  if (!res.headersSent) {
+    if (process.env.DB_DEBUG === 'true') {
+      return res.status(500).send(`Database error (${label})`);
+    }
+    return res.status(500).send('Database error');
   }
-  return res.status(500).send('Database error');
 }
 
 function ensureUsersSchema(cb) {
@@ -3605,11 +3607,15 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     ORDER BY se.week_number, se.day_of_week, se.class_number
   `;
 
-  getCoursesCached()
-    .then((courses) => {
-      getSemestersCached(courseId)
-        .then((semesters) => {
-          db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
+  let courses = [];
+  let semesters = [];
+  try {
+    courses = await getCoursesCached();
+    semesters = await getSemestersCached(courseId);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.reference');
+  }
+  db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
     if (scheduleErr) {
       return handleDbError(res, scheduleErr, 'admin.schedule');
     }
@@ -3686,9 +3692,13 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
       const homework = sortHomework(homeworkRows, sort_homework);
       db.all('SELECT name FROM homework_tags ORDER BY name', (tagErr, tagRows) => {
         if (tagErr) {
+          console.error('Error fetching homework_tags:', tagErr);
           return handleDbError(res, tagErr, 'admin.homework.tags');
         }
-        const homeworkTags = (tagRows || []).map((row) => row.name);
+        if (res.headersSent) {
+          return;
+        }
+        const homeworkTags = Array.isArray(tagRows) ? tagRows.map((row) => row.name) : [];
         ensureUsersSchema(() => {
         const userFilters = ['course_id = ?'];
         const userParams = [courseId];
@@ -3715,6 +3725,9 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
             if (userErr) {
               return handleDbError(res, userErr, 'admin.users');
             }
+            if (res.headersSent) {
+              return;
+            }
             getSubjectsCached(courseId)
               .then((subjects) => {
                 db.all(
@@ -3728,6 +3741,9 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                   (sgErr, studentGroups) => {
                     if (sgErr) {
                       return handleDbError(res, sgErr, 'admin.studentGroups');
+                    }
+                    if (res.headersSent) {
+                      return;
                     }
                   const historyFilters = [];
                   const historyParams = [];
@@ -3762,6 +3778,9 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     (logErr, logs) => {
       if (logErr) {
         return handleDbError(res, logErr, 'admin.history');
+      }
+      if (res.headersSent) {
+        return;
       }
       const activityFilters = [];
       const activityParams = [];
@@ -3799,6 +3818,9 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
           if (actErr) {
             return handleDbError(res, actErr, 'admin.activity');
           }
+          if (res.headersSent) {
+            return;
+          }
           const topParams = activeSemester ? [courseId, activeSemester.id] : [courseId];
           db.all(
             `
@@ -3816,6 +3838,9 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
             (topErr, activityTop) => {
               if (topErr) {
                 return handleDbError(res, topErr, 'admin.activityTop');
+              }
+              if (res.headersSent) {
+                return;
               }
           const teamworkFilters = ['t.course_id = ?'];
           const teamworkParams = [courseId];
@@ -3862,6 +3887,9 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                           if (taskErr) {
                             return handleDbError(res, taskErr, 'admin.teamwork');
                           }
+                          if (res.headersSent) {
+                            return;
+                          }
                           db.all(
                             `
                               SELECT m.*, s.name AS subject_name, u.full_name AS created_by,
@@ -3907,6 +3935,9 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                             (msgErr, messages) => {
                               if (msgErr) {
                                 return handleDbError(res, msgErr, 'admin.messages');
+                              }
+                              if (res.headersSent) {
+                                return;
                               }
                               const statsParams = activeSemester ? [courseId, activeSemester.id] : [courseId];
                               (async () => {
@@ -4124,10 +4155,6 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
           });
         }
       );
-        })
-        .catch((semErr) => handleDbError(res, semErr, 'admin.semesters'));
-    })
-    .catch((courseErr) => handleDbError(res, courseErr, 'admin.courses'));
 });
 
 let schedulerRunning = false;
