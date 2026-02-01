@@ -442,6 +442,25 @@ const initDb = async () => {
       )
     `,
     `
+      CREATE TABLE IF NOT EXISTS personal_reminders (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        note TEXT,
+        remind_date TEXT NOT NULL,
+        remind_time TEXT,
+        is_done INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        course_id INTEGER REFERENCES courses(id),
+        semester_id INTEGER REFERENCES semesters(id)
+      )
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS personal_reminders_user_date_idx
+      ON personal_reminders (user_id, remind_date)
+    `,
+    `
       CREATE TABLE IF NOT EXISTS history_log (
         id SERIAL PRIMARY KEY,
         actor_id INTEGER,
@@ -649,6 +668,8 @@ const initDb = async () => {
   await pool.query('UPDATE teamwork_tasks SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE messages SET course_id = 1 WHERE course_id IS NULL');
   await pool.query("UPDATE messages SET status = 'published' WHERE status IS NULL");
+  await pool.query('UPDATE personal_reminders SET course_id = 1 WHERE course_id IS NULL');
+  await pool.query('UPDATE personal_reminders SET updated_at = created_at WHERE updated_at IS NULL');
   await pool.query('UPDATE users SET password = NULL WHERE password IS NOT NULL');
 
   const courseRows = await pool.query('SELECT id, name FROM courses ORDER BY id');
@@ -685,6 +706,10 @@ const initDb = async () => {
         course.id,
       ]);
       await pool.query('UPDATE messages SET semester_id = $1 WHERE semester_id IS NULL AND course_id = $2', [
+        semesterId,
+        course.id,
+      ]);
+      await pool.query('UPDATE personal_reminders SET semester_id = $1 WHERE semester_id IS NULL AND course_id = $2', [
         semesterId,
         course.id,
       ]);
@@ -845,6 +870,18 @@ function parseDateUTC(dateStr) {
   const [y, m, d] = dateStr.split('-').map((n) => Number(n));
   if (!y || !m || !d) return null;
   return Date.UTC(y, m - 1, d);
+}
+
+function isValidDateString(dateStr) {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  return parseDateUTC(dateStr) !== null;
+}
+
+function isValidTimeString(timeStr) {
+  if (!timeStr) return false;
+  if (!/^\d{2}:\d{2}$/.test(timeStr)) return false;
+  const [hours, minutes] = timeStr.split(':').map((n) => Number(n));
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
 }
 
 function getWeekDayForDate(dateStr, semesterStart) {
@@ -1635,6 +1672,31 @@ async function buildMyDayData(user) {
     }
   }
 
+  let reminders = [];
+  if (activeSemester) {
+    const rows = await db.all(
+      `
+        SELECT id, title, note, remind_date, remind_time, is_done, created_at
+        FROM personal_reminders
+        WHERE user_id = ?
+          AND course_id = ?
+          AND semester_id = ?
+          AND remind_date >= ?
+          AND remind_date <= ?
+        ORDER BY remind_date ASC, remind_time ASC NULLS LAST, created_at DESC
+      `,
+      [user.id, courseId, activeSemester.id, todayStr, upcomingWindowEnd]
+    );
+    reminders = (rows || []).map((row) => ({
+      id: row.id,
+      title: row.title,
+      note: row.note,
+      remind_date: row.remind_date,
+      remind_time: row.remind_time,
+      is_done: Boolean(row.is_done),
+    }));
+  }
+
   return {
     today: todayStr,
     tomorrow: tomorrowStr,
@@ -1645,6 +1707,8 @@ async function buildMyDayData(user) {
     next_class: nextClass,
     deadlines,
     top_priorities: topPriorities,
+    reminders,
+    reminders_window_end: upcomingWindowEnd,
   };
 }
 
@@ -1671,6 +1735,206 @@ app.get('/api/my-day', requireLogin, async (req, res) => {
   try {
     const myDay = await buildMyDayData(req.session.user);
     return res.json(myDay);
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/reminders', requireLogin, async (req, res) => {
+  const { from, to, status } = req.query;
+  if (from && !isValidDateString(String(from))) {
+    return res.status(400).json({ error: 'Invalid from date' });
+  }
+  if (to && !isValidDateString(String(to))) {
+    return res.status(400).json({ error: 'Invalid to date' });
+  }
+  const filterStatus = status === 'all' || status === 'done' ? status : 'open';
+  try {
+    const { id: userId, course_id: courseId } = req.session.user;
+    const activeSemester = await getActiveSemester(courseId || 1);
+    if (!activeSemester) {
+      return res.status(400).json({ error: 'No active semester' });
+    }
+    const clauses = ['user_id = ?', 'course_id = ?', 'semester_id = ?'];
+    const params = [userId, courseId || 1, activeSemester.id];
+    if (from) {
+      clauses.push('remind_date >= ?');
+      params.push(String(from));
+    }
+    if (to) {
+      clauses.push('remind_date <= ?');
+      params.push(String(to));
+    }
+    if (filterStatus !== 'all') {
+      clauses.push('is_done = ?');
+      params.push(filterStatus === 'done' ? 1 : 0);
+    }
+    const rows = await db.all(
+      `
+        SELECT id, title, note, remind_date, remind_time, is_done
+        FROM personal_reminders
+        WHERE ${clauses.join(' AND ')}
+        ORDER BY remind_date ASC, remind_time ASC NULLS LAST, created_at DESC
+      `,
+      params
+    );
+    return res.json({ reminders: rows || [] });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/reminders', requireLogin, async (req, res) => {
+  const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
+  const note = typeof req.body.note === 'string' ? req.body.note.trim() : '';
+  const remindDate = typeof req.body.remind_date === 'string' ? req.body.remind_date.trim() : '';
+  const remindTime = typeof req.body.remind_time === 'string' ? req.body.remind_time.trim() : '';
+  if (!title) {
+    return res.status(400).json({ error: 'Title required' });
+  }
+  if (title.length > 160) {
+    return res.status(400).json({ error: 'Title too long' });
+  }
+  if (!isValidDateString(remindDate)) {
+    return res.status(400).json({ error: 'Invalid date' });
+  }
+  if (remindTime && !isValidTimeString(remindTime)) {
+    return res.status(400).json({ error: 'Invalid time' });
+  }
+  if (note.length > 500) {
+    return res.status(400).json({ error: 'Note too long' });
+  }
+  try {
+    const { id: userId, course_id: courseId } = req.session.user;
+    const activeSemester = await getActiveSemester(courseId || 1);
+    if (!activeSemester) {
+      return res.status(400).json({ error: 'No active semester' });
+    }
+    const nowIso = new Date().toISOString();
+    const row = await db.get(
+      `
+        INSERT INTO personal_reminders
+          (user_id, title, note, remind_date, remind_time, is_done, created_at, updated_at, course_id, semester_id)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+        RETURNING id, title, note, remind_date, remind_time, is_done
+      `,
+      [
+        userId,
+        title,
+        note || null,
+        remindDate,
+        remindTime || null,
+        nowIso,
+        nowIso,
+        courseId || 1,
+        activeSemester.id,
+      ]
+    );
+    if (!row) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    return res.json({ reminder: row });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.patch('/api/reminders/:id', requireLogin, async (req, res) => {
+  const reminderId = Number(req.params.id);
+  if (Number.isNaN(reminderId)) {
+    return res.status(400).json({ error: 'Invalid reminder' });
+  }
+  const updates = [];
+  const params = [];
+  if (typeof req.body.title === 'string') {
+    const title = req.body.title.trim();
+    if (!title) {
+      return res.status(400).json({ error: 'Title required' });
+    }
+    if (title.length > 160) {
+      return res.status(400).json({ error: 'Title too long' });
+    }
+    updates.push('title = ?');
+    params.push(title);
+  }
+  if (typeof req.body.note === 'string') {
+    const note = req.body.note.trim();
+    if (note.length > 500) {
+      return res.status(400).json({ error: 'Note too long' });
+    }
+    updates.push('note = ?');
+    params.push(note || null);
+  }
+  if (typeof req.body.remind_date === 'string') {
+    const remindDate = req.body.remind_date.trim();
+    if (!isValidDateString(remindDate)) {
+      return res.status(400).json({ error: 'Invalid date' });
+    }
+    updates.push('remind_date = ?');
+    params.push(remindDate);
+  }
+  if (typeof req.body.remind_time === 'string') {
+    const remindTime = req.body.remind_time.trim();
+    if (remindTime && !isValidTimeString(remindTime)) {
+      return res.status(400).json({ error: 'Invalid time' });
+    }
+    updates.push('remind_time = ?');
+    params.push(remindTime || null);
+  }
+  if (typeof req.body.is_done !== 'undefined') {
+    const done = req.body.is_done === true || req.body.is_done === 'true' || req.body.is_done === 1 || req.body.is_done === '1';
+    updates.push('is_done = ?');
+    params.push(done ? 1 : 0);
+  }
+  if (!updates.length) {
+    return res.status(400).json({ error: 'No changes' });
+  }
+  try {
+    const { id: userId, course_id: courseId } = req.session.user;
+    const activeSemester = await getActiveSemester(courseId || 1);
+    if (!activeSemester) {
+      return res.status(400).json({ error: 'No active semester' });
+    }
+    updates.push('updated_at = ?');
+    params.push(new Date().toISOString());
+    params.push(reminderId, userId, courseId || 1, activeSemester.id);
+    const row = await db.get(
+      `
+        UPDATE personal_reminders
+        SET ${updates.join(', ')}
+        WHERE id = ? AND user_id = ? AND course_id = ? AND semester_id = ?
+        RETURNING id, title, note, remind_date, remind_time, is_done
+      `,
+      params
+    );
+    if (!row) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    return res.json({ reminder: row });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.delete('/api/reminders/:id', requireLogin, async (req, res) => {
+  const reminderId = Number(req.params.id);
+  if (Number.isNaN(reminderId)) {
+    return res.status(400).json({ error: 'Invalid reminder' });
+  }
+  try {
+    const { id: userId, course_id: courseId } = req.session.user;
+    const activeSemester = await getActiveSemester(courseId || 1);
+    if (!activeSemester) {
+      return res.status(400).json({ error: 'No active semester' });
+    }
+    const result = await db.run(
+      'DELETE FROM personal_reminders WHERE id = ? AND user_id = ? AND course_id = ? AND semester_id = ?',
+      [reminderId, userId, courseId || 1, activeSemester.id]
+    );
+    if (!result || !result.changes) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
   }
