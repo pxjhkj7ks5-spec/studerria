@@ -169,6 +169,8 @@
         backdrop-filter: blur(12px);
         background-color: rgba(0, 0, 0, 0.3);
         transition: opacity 0.3s ease-in-out;
+        opacity: 0;
+        pointer-events: none;
       }
       body.theme-dark .modal-backdrop {
         background-color: rgba(20, 20, 20, 0.5);
@@ -268,7 +270,7 @@
           repeating-linear-gradient(90deg, rgba(0,0,0,0.03) 0, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 2px);
         opacity: 0.05;
         mix-blend-mode: soft-light;
-        z-index: 0;
+        z-index: -1;
       }
       body.theme-dark {
         background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.22), transparent 60%),
