@@ -888,6 +888,187 @@ body.theme-light .mobile-menu-action {
       body.theme-light .app-footer {
         color: rgba(15, 23, 42, 0.6);
       }
+      :root {
+        --radius-lg: 20px;
+        --radius-md: 14px;
+        --radius-sm: 10px;
+        --s-1: 8px;
+        --s-2: 12px;
+        --s-3: 16px;
+        --s-4: 24px;
+        --border-subtle: 1px solid rgba(255, 255, 255, 0.12);
+        --border-hover: 1px solid rgba(255, 255, 255, 0.18);
+        --glass-bg: rgba(20, 24, 32, 0.45);
+        --glass-bg-light: rgba(255, 255, 255, 0.55);
+        --glass-blur: 18px;
+        --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        --text-primary: rgba(255, 255, 255, 0.92);
+        --text-secondary: rgba(255, 255, 255, 0.68);
+        --text-muted: rgba(255, 255, 255, 0.52);
+        --focus-ring: 0 0 0 3px rgba(90, 140, 255, 0.25);
+        --focus-border: rgba(90, 140, 255, 0.65);
+      }
+      body.theme-light {
+        --text-primary: rgba(15, 23, 42, 0.92);
+        --text-secondary: rgba(15, 23, 42, 0.68);
+        --text-muted: rgba(15, 23, 42, 0.52);
+      }
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 2px),
+          repeating-linear-gradient(90deg, rgba(0,0,0,0.03) 0, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 2px);
+        opacity: 0.05;
+        mix-blend-mode: soft-light;
+        z-index: 0;
+      }
+      body.theme-dark {
+        background: radial-gradient(1200px 800px at 15% 10%, rgba(59, 130, 246, 0.18), transparent 60%),
+          radial-gradient(1000px 700px at 80% 20%, rgba(14, 165, 233, 0.14), transparent 60%),
+          linear-gradient(160deg, #0b0f1a 0%, #121a2b 100%);
+      }
+      body.theme-light {
+        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.18), transparent 60%),
+          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.18), transparent 60%),
+          linear-gradient(135deg, #ecf2fb 0%, #eef3fb 45%, #f5f7ff 100%);
+      }
+      .glass {
+        border-radius: var(--radius-lg);
+        backdrop-filter: blur(var(--glass-blur));
+        background: var(--glass-bg);
+        border: var(--border-subtle);
+        box-shadow: var(--glass-shadow);
+      }
+      body.theme-light .glass {
+        background: var(--glass-bg-light);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+      }
+      .hero-title {
+        font-weight: 600;
+      }
+      .hero-sub {
+        color: var(--text-secondary);
+      }
+      .form-label {
+        color: var(--text-secondary);
+      }
+      .form-control,
+      .form-select {
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary);
+      }
+      body.theme-light .form-control,
+      body.theme-light .form-select {
+        background: rgba(15, 23, 42, 0.04);
+        border-color: rgba(15, 23, 42, 0.12);
+        color: var(--text-primary);
+      }
+      .form-control:focus,
+      .form-select:focus {
+        border-color: var(--focus-border);
+        box-shadow: var(--focus-ring);
+      }
+      .btn-primary {
+        background: #3b82f6;
+        border: 1px solid rgba(59, 130, 246, 0.6);
+        border-radius: var(--radius-md);
+        height: 44px;
+      }
+      .btn-outline-light {
+        border-radius: var(--radius-md);
+      }
+      .btn-ghost {
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+      }
+      .theme-toggle-min {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary);
+        backdrop-filter: blur(10px);
+      }
+      body.theme-light .theme-toggle-min {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.7);
+      }
+      .modal-backdrop.show {
+        opacity: 0.48;
+      }
+      .modal-content {
+        display: flex;
+        flex-direction: column;
+        max-height: 80vh;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        background: var(--glass-bg);
+        border: var(--border-subtle);
+        backdrop-filter: blur(var(--glass-blur));
+      }
+      body.theme-light .modal-content {
+        background: var(--glass-bg-light);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+      }
+      .modal-header,
+      .modal-footer {
+        position: sticky;
+        z-index: 2;
+        background: inherit;
+        backdrop-filter: blur(var(--glass-blur));
+      }
+      .modal-header {
+        top: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .modal-footer {
+        bottom: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .modal-body {
+        overflow-y: auto;
+      }
+      .btn-close {
+        filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.2));
+      }
+      .file-field {
+        display: grid;
+        gap: 8px;
+        position: relative;
+      }
+      .file-input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .file-ui {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: var(--radius-md);
+        border: 1px dashed rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      body.theme-light .file-ui {
+        border-color: rgba(15, 23, 42, 0.14);
+        background: rgba(15, 23, 42, 0.04);
+      }
+      .file-name {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
     </style>
   </head>
   <body class="theme-dark">
@@ -924,13 +1105,14 @@ body.theme-light .mobile-menu-action {
           <a class="btn btn-outline-light btn-sm me-2 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
           <a class="btn btn-outline-light btn-sm me-2 desktop-only" href="/my-day">Мій день</a>
           <button
-            class="btn btn-outline-light btn-sm me-2 theme-toggle desktop-only"
+            class="theme-toggle theme-toggle-min me-2 desktop-only"
             type="button"
             id="themeToggle"
-            data-light-label="<%= t('theme.light') %>"
-            data-dark-label="<%= t('theme.dark') %>"
+            aria-label="Toggle theme"
+            data-light-label="☀️"
+            data-dark-label="🌙"
           >
-            <%= t('theme.light') %>
+            🌙
           </button>
           <a class="btn btn-outline-light btn-sm me-2 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
           <form method="POST" action="/logout" class="desktop-only">
@@ -1205,7 +1387,13 @@ body.theme-light .mobile-menu-action {
               </div>
               <div class="mb-3">
                 <label for="hwFile" class="form-label">Attachment (optional)</label>
-                <input id="hwFile" name="attachment" type="file" class="form-control" />
+                <div class="file-field">
+                  <input id="hwFile" name="attachment" type="file" class="file-input" />
+                  <div class="file-ui">
+                    <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="hwFile">Оберіть</button>
+                    <span class="file-name" data-file-name="hwFile">Файл не вибрано</span>
+                  </div>
+                </div>
               </div>
               <% if (role && role !== 'student') { %>
                 <div class="row g-2 mb-3">
@@ -1298,7 +1486,13 @@ body.theme-light .mobile-menu-action {
                 </div>
                 <div class="col-12">
                   <label class="form-label">Файл (опц.)</label>
-                  <input type="file" class="form-control" name="attachment" />
+                  <div class="file-field">
+                    <input id="customFile" type="file" class="file-input" name="attachment" />
+                    <div class="file-ui">
+                      <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="customFile">Оберіть</button>
+                      <span class="file-name" data-file-name="customFile">Файл не вибрано</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1367,10 +1561,10 @@ body.theme-light .mobile-menu-action {
               <button
                 class="btn w-100 glass mobile-menu-action theme-toggle"
                 type="button"
-                data-light-label="<%= t('theme.light') %>"
-                data-dark-label="<%= t('theme.dark') %>"
+                data-light-label="☀️"
+                data-dark-label="🌙"
               >
-                <%= t('theme.light') %>
+                🌙
               </button>
               <a class="btn w-100 glass mobile-menu-action" href="/profile"><%= t('schedule.profile') %></a>
               <form method="POST" action="/logout">
@@ -2176,6 +2370,30 @@ body.theme-light .mobile-menu-action {
             b.textContent = next === 'theme-dark' ? b.dataset.lightLabel : b.dataset.darkLabel;
           });
         });
+      });
+
+      document.querySelectorAll('.file-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.fileTarget;
+          const input = target ? document.getElementById(target) : null;
+          if (input) input.click();
+        });
+      });
+      document.querySelectorAll('.file-input').forEach((input) => {
+        input.addEventListener('change', () => {
+          const label = document.querySelector(`[data-file-name="${input.id}"]`);
+          if (!label) return;
+          const name = input.files && input.files.length ? input.files[0].name : 'Файл не вибрано';
+          label.textContent = name;
+        });
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        const openModal = document.querySelector('.modal.show');
+        if (!openModal) return;
+        const instance = bootstrap.Modal.getInstance(openModal);
+        if (instance) instance.hide();
       });
     </script>
   </body>

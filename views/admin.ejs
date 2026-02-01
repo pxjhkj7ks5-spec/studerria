@@ -471,6 +471,143 @@
         border-radius: 999px;
         padding: 0.75rem 1.5rem;
       }
+      :root {
+        --radius-lg: 20px;
+        --radius-md: 14px;
+        --radius-sm: 10px;
+        --s-1: 8px;
+        --s-2: 12px;
+        --s-3: 16px;
+        --s-4: 24px;
+        --border-subtle: 1px solid rgba(255, 255, 255, 0.12);
+        --border-hover: 1px solid rgba(255, 255, 255, 0.18);
+        --glass-bg: rgba(20, 24, 32, 0.45);
+        --glass-bg-light: rgba(255, 255, 255, 0.55);
+        --glass-blur: 18px;
+        --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        --text-primary: rgba(255, 255, 255, 0.92);
+        --text-secondary: rgba(255, 255, 255, 0.68);
+        --text-muted: rgba(255, 255, 255, 0.52);
+        --focus-ring: 0 0 0 3px rgba(90, 140, 255, 0.25);
+        --focus-border: rgba(90, 140, 255, 0.65);
+      }
+      body.theme-light {
+        --text-primary: rgba(15, 23, 42, 0.92);
+        --text-secondary: rgba(15, 23, 42, 0.68);
+        --text-muted: rgba(15, 23, 42, 0.52);
+      }
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 2px),
+          repeating-linear-gradient(90deg, rgba(0,0,0,0.03) 0, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 2px);
+        opacity: 0.05;
+        mix-blend-mode: soft-light;
+        z-index: 0;
+      }
+      .glass {
+        border-radius: var(--radius-lg);
+        backdrop-filter: blur(var(--glass-blur));
+        background: var(--glass-bg);
+        border: var(--border-subtle);
+        box-shadow: var(--glass-shadow);
+      }
+      body.theme-light .glass {
+        background: var(--glass-bg-light);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+      }
+      .form-control,
+      .form-select {
+        border-radius: var(--radius-md);
+      }
+      .form-control:focus,
+      .form-select:focus {
+        border-color: var(--focus-border);
+        box-shadow: var(--focus-ring);
+      }
+      .theme-toggle-min {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary);
+        backdrop-filter: blur(10px);
+      }
+      body.theme-light .theme-toggle-min {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.7);
+      }
+      .modal-backdrop.show {
+        opacity: 0.48;
+      }
+      .modal-content {
+        display: flex;
+        flex-direction: column;
+        max-height: 80vh;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        background: var(--glass-bg);
+        border: var(--border-subtle);
+        backdrop-filter: blur(var(--glass-blur));
+      }
+      body.theme-light .modal-content {
+        background: var(--glass-bg-light);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+      }
+      .modal-header,
+      .modal-footer {
+        position: sticky;
+        z-index: 2;
+        background: inherit;
+        backdrop-filter: blur(var(--glass-blur));
+      }
+      .modal-header {
+        top: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .modal-footer {
+        bottom: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .modal-body {
+        overflow-y: auto;
+      }
+      .file-field {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        position: relative;
+      }
+      .file-input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .file-ui {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: var(--radius-md);
+        border: 1px dashed rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      body.theme-light .file-ui {
+        border-color: rgba(15, 23, 42, 0.14);
+        background: rgba(15, 23, 42, 0.04);
+      }
+      .file-name {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+      }
     </style>
   </head>
   <body class="theme-light">
@@ -493,13 +630,14 @@
             <% } %>
           </span>
           <button
-            class="btn btn-outline-secondary btn-sm me-2"
+            class="theme-toggle-min me-2"
             type="button"
             id="themeToggle"
-            data-light-label="<%= t('theme.light') %>"
-            data-dark-label="<%= t('theme.dark') %>"
+            aria-label="Toggle theme"
+            data-light-label="☀️"
+            data-dark-label="🌙"
           >
-            <%= t('theme.dark') %>
+            🌙
           </button>
           <% if (!isLimitedView) { %>
             <form method="POST" action="/admin/switch-to-student" class="me-2">
@@ -740,7 +878,13 @@
                   <button class="btn btn-outline-primary btn-sm" type="button" id="validateScheduleBtn">Перевірити розклад</button>
                   <a class="btn btn-outline-secondary btn-sm" href="/admin/export/schedule.csv">Export CSV</a>
                   <form class="d-flex gap-2" method="POST" action="/admin/import/schedule.csv" enctype="multipart/form-data">
-                    <input class="form-control form-control-sm" type="file" name="csv_file" accept=".csv" required />
+                    <div class="file-field">
+                      <input id="scheduleCsv" class="file-input" type="file" name="csv_file" accept=".csv" required />
+                      <div class="file-ui">
+                        <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="scheduleCsv">Оберіть</button>
+                        <span class="file-name" data-file-name="scheduleCsv">Файл не вибрано</span>
+                      </div>
+                    </div>
                     <button class="btn btn-outline-secondary btn-sm" type="submit">Import CSV</button>
                   </form>
                 </div>
@@ -1149,7 +1293,13 @@
               href="/admin/export/users.csv?course=<%= selectedCourseId || 1 %><%= activeSemester ? '&semester_id=' + activeSemester.id : '' %><%= (filters && filters.users_group) ? '&group=' + encodeURIComponent(filters.users_group) : '' %>"
             ><%= t('admin.exportUsers') %></a>
             <form class="d-flex gap-2" method="POST" action="/admin/import/users.csv" enctype="multipart/form-data">
-              <input class="form-control form-control-sm" type="file" name="csv_file" accept=".csv" required />
+              <div class="file-field">
+                <input id="usersCsv" class="file-input" type="file" name="csv_file" accept=".csv" required />
+                <div class="file-ui">
+                  <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="usersCsv">Оберіть</button>
+                  <span class="file-name" data-file-name="usersCsv">Файл не вибрано</span>
+                </div>
+              </div>
               <button class="btn btn-outline-secondary btn-sm" type="submit">Import CSV</button>
             </form>
             <div class="btn-group btn-group-sm" role="group">
@@ -1326,7 +1476,13 @@
           <div class="d-flex justify-content-end gap-2 mb-2 flex-wrap">
             <a class="btn btn-outline-secondary btn-sm" href="/admin/export/subjects.csv">Export Subjects CSV</a>
             <form class="d-flex gap-2" method="POST" action="/admin/import/subjects.csv" enctype="multipart/form-data">
-              <input class="form-control form-control-sm" type="file" name="csv_file" accept=".csv" required />
+              <div class="file-field">
+                <input id="subjectsCsv" class="file-input" type="file" name="csv_file" accept=".csv" required />
+                <div class="file-ui">
+                  <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="subjectsCsv">Оберіть</button>
+                  <span class="file-name" data-file-name="subjectsCsv">Файл не вибрано</span>
+                </div>
+              </div>
               <button class="btn btn-outline-secondary btn-sm" type="submit">Import CSV</button>
             </form>
           </div>
@@ -2320,6 +2476,30 @@
         document.body.classList.add(next);
         localStorage.setItem('ui-theme', next);
         themeToggle.textContent = next === 'theme-dark' ? labelLight : labelDark;
+      });
+
+      document.querySelectorAll('.file-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.fileTarget;
+          const input = target ? document.getElementById(target) : null;
+          if (input) input.click();
+        });
+      });
+      document.querySelectorAll('.file-input').forEach((input) => {
+        input.addEventListener('change', () => {
+          const label = document.querySelector(`[data-file-name="${input.id}"]`);
+          if (!label) return;
+          const name = input.files && input.files.length ? input.files[0].name : 'Файл не вибрано';
+          label.textContent = name;
+        });
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        const openModal = document.querySelector('.modal.show');
+        if (!openModal) return;
+        const instance = bootstrap.Modal.getInstance(openModal);
+        if (instance) instance.hide();
       });
 
       const limitedStaffView = <%= isLimitedView ? 'true' : 'false' %>;

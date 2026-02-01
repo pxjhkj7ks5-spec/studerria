@@ -233,9 +233,193 @@
       body.theme-light .app-footer {
         color: rgba(15, 23, 42, 0.6);
       }
+      :root {
+        --radius-lg: 20px;
+        --radius-md: 14px;
+        --radius-sm: 10px;
+        --s-1: 8px;
+        --s-2: 12px;
+        --s-3: 16px;
+        --s-4: 24px;
+        --border-subtle: 1px solid rgba(255, 255, 255, 0.12);
+        --border-hover: 1px solid rgba(255, 255, 255, 0.18);
+        --glass-bg: rgba(20, 24, 32, 0.45);
+        --glass-bg-light: rgba(255, 255, 255, 0.55);
+        --glass-blur: 18px;
+        --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        --text-primary: rgba(255, 255, 255, 0.92);
+        --text-secondary: rgba(255, 255, 255, 0.68);
+        --text-muted: rgba(255, 255, 255, 0.52);
+        --focus-ring: 0 0 0 3px rgba(90, 140, 255, 0.25);
+        --focus-border: rgba(90, 140, 255, 0.65);
+      }
+      body.theme-light {
+        --text-primary: rgba(15, 23, 42, 0.92);
+        --text-secondary: rgba(15, 23, 42, 0.68);
+        --text-muted: rgba(15, 23, 42, 0.52);
+      }
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 2px),
+          repeating-linear-gradient(90deg, rgba(0,0,0,0.03) 0, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 2px);
+        opacity: 0.05;
+        mix-blend-mode: soft-light;
+        z-index: 0;
+      }
+      body.theme-dark {
+        background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.22), transparent 60%),
+          radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.18), transparent 60%),
+          linear-gradient(160deg, #07070b 0%, #110b18 55%, #161225 100%);
+      }
+      body.theme-light {
+        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.18), transparent 60%),
+          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.18), transparent 60%),
+          linear-gradient(135deg, #ecf2fb 0%, #eef3fb 45%, #f5f7ff 100%);
+      }
+      .glass {
+        border-radius: var(--radius-lg);
+        backdrop-filter: blur(var(--glass-blur));
+        background: var(--glass-bg);
+        border: var(--border-subtle);
+        box-shadow: var(--glass-shadow);
+      }
+      body.theme-light .glass {
+        background: var(--glass-bg-light);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+      }
+      .auth-card .form-label {
+        color: var(--text-secondary);
+        margin-bottom: var(--s-1);
+      }
+      .auth-card .form-control {
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary);
+        padding: 0.7rem 0.9rem;
+      }
+      body.theme-light .auth-card .form-control {
+        background: rgba(15, 23, 42, 0.04);
+        border-color: rgba(15, 23, 42, 0.12);
+        color: var(--text-primary);
+      }
+      .auth-card .form-control:focus {
+        border-color: var(--focus-border);
+        box-shadow: var(--focus-ring);
+      }
+      .form-control::placeholder {
+        color: var(--text-muted);
+      }
+      .btn-primary {
+        background: #3b82f6;
+        border: 1px solid rgba(59, 130, 246, 0.6);
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        height: 46px;
+      }
+      .btn-outline-primary {
+        border-radius: var(--radius-md);
+        height: 46px;
+      }
+      .btn-ghost {
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+      }
+      .theme-toggle-floating {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        z-index: 10;
+      }
+      .theme-toggle-min {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary);
+        backdrop-filter: blur(10px);
+      }
+      body.theme-light .theme-toggle-min {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.7);
+      }
+      .input-with-icon {
+        position: relative;
+      }
+      .input-with-icon .icon-btn {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        padding: 4px;
+        border-radius: 999px;
+      }
+      .input-with-icon .form-control {
+        padding-right: 38px;
+      }
+      .modal-backdrop.show {
+        opacity: 0.48;
+      }
+      .modal-content {
+        display: flex;
+        flex-direction: column;
+        max-height: 80vh;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        background: var(--glass-bg);
+        border: var(--border-subtle);
+        backdrop-filter: blur(var(--glass-blur));
+      }
+      body.theme-light .modal-content {
+        background: var(--glass-bg-light);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+      }
+      .modal-header,
+      .modal-footer {
+        position: sticky;
+        z-index: 2;
+        background: inherit;
+        backdrop-filter: blur(var(--glass-blur));
+      }
+      .modal-header {
+        top: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .modal-footer {
+        bottom: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .modal-body {
+        overflow-y: auto;
+      }
     </style>
   </head>
   <body class="theme-light">
+    <div class="theme-toggle-floating">
+      <button
+        class="theme-toggle-min"
+        type="button"
+        id="themeToggle"
+        aria-label="Toggle theme"
+        data-light-label="☀️"
+        data-dark-label="🌙"
+      >
+        🌙
+      </button>
+    </div>
     <div class="container">
       <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
         <div class="col-11 col-sm-8 col-md-6 col-lg-4">
@@ -254,11 +438,17 @@
                 </div>
                 <div class="mb-3">
                   <label for="password" class="form-label"><%= t('register.password') %></label>
-                  <input id="password" name="password" type="password" class="form-control" placeholder="<%= t('register.passwordPlaceholder') %>" required />
+                  <div class="input-with-icon">
+                    <input id="password" name="password" type="password" class="form-control" placeholder="<%= t('register.passwordPlaceholder') %>" required />
+                    <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">👁</button>
+                  </div>
                 </div>
                 <div class="mb-3">
                   <label for="confirm_password" class="form-label"><%= t('register.confirmPassword') %></label>
-                  <input id="confirm_password" name="confirm_password" type="password" class="form-control" placeholder="<%= t('register.confirmPasswordPlaceholder') %>" required />
+                  <div class="input-with-icon">
+                    <input id="confirm_password" name="confirm_password" type="password" class="form-control" placeholder="<%= t('register.confirmPasswordPlaceholder') %>" required />
+                    <button class="icon-btn" type="button" id="toggleConfirmPassword" aria-label="Показати пароль">👁</button>
+                  </div>
                 </div>
           <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" id="agree" name="agree" required />
@@ -285,17 +475,6 @@
                 <a href="/login"><%= t('register.haveAccount') %></a>
               </div>
             </div>
-          </div>
-          <div class="d-flex justify-content-center mt-3">
-            <button
-              class="btn btn-outline-secondary btn-sm theme-toggle-btn"
-              type="button"
-              id="themeToggle"
-              data-light-label="<%= t('theme.light') %>"
-              data-dark-label="<%= t('theme.dark') %>"
-            >
-              <%= t('theme.dark') %>
-            </button>
           </div>
           <footer class="app-footer text-center mt-3">
             <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
@@ -370,6 +549,20 @@
       const passwordInput = document.getElementById('password');
       const confirmInput = document.getElementById('confirm_password');
       const agreeInput = document.getElementById('agree');
+      const togglePassword = document.getElementById('togglePassword');
+      const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+
+      const toggleField = (btn, input) => {
+        if (!btn || !input) return;
+        btn.addEventListener('click', () => {
+          const isHidden = input.type === 'password';
+          input.type = isHidden ? 'text' : 'password';
+          btn.textContent = isHidden ? '🙈' : '👁';
+          btn.setAttribute('aria-label', isHidden ? 'Сховати пароль' : 'Показати пароль');
+        });
+      };
+      toggleField(togglePassword, passwordInput);
+      toggleField(toggleConfirmPassword, confirmInput);
 
       function clearInvalidState() {
         document.querySelectorAll('.field-invalid').forEach((el) => el.classList.remove('field-invalid'));
