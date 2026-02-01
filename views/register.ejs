@@ -440,14 +440,14 @@
                   <label for="password" class="form-label"><%= t('register.password') %></label>
                   <div class="input-with-icon">
                     <input id="password" name="password" type="password" class="form-control" placeholder="<%= t('register.passwordPlaceholder') %>" required />
-                    <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">👁</button>
+                    <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">Show</button>
                   </div>
                 </div>
                 <div class="mb-3">
                   <label for="confirm_password" class="form-label"><%= t('register.confirmPassword') %></label>
                   <div class="input-with-icon">
                     <input id="confirm_password" name="confirm_password" type="password" class="form-control" placeholder="<%= t('register.confirmPasswordPlaceholder') %>" required />
-                    <button class="icon-btn" type="button" id="toggleConfirmPassword" aria-label="Показати пароль">👁</button>
+                    <button class="icon-btn" type="button" id="toggleConfirmPassword" aria-label="Показати пароль">Show</button>
                   </div>
                 </div>
           <div class="form-check mb-3">
@@ -557,7 +557,7 @@
         btn.addEventListener('click', () => {
           const isHidden = input.type === 'password';
           input.type = isHidden ? 'text' : 'password';
-          btn.textContent = isHidden ? '🙈' : '👁';
+          btn.textContent = isHidden ? 'Hide' : 'Show';
           btn.setAttribute('aria-label', isHidden ? 'Сховати пароль' : 'Показати пароль');
         });
       };
