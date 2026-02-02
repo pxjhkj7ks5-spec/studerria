@@ -261,7 +261,7 @@ const refreshSettingsCache = async () => {
 };
 
 const ensureUser = async (fullName, role, passwordHash, options = {}) => {
-  const { courseId = 1, groupId = null } = options;
+  const { courseId = 1 } = options;
   const { forcePassword = false, forceRole = false } = options;
   if (!passwordHash) {
     return;
@@ -269,8 +269,8 @@ const ensureUser = async (fullName, role, passwordHash, options = {}) => {
   const existing = await db.get('SELECT id, password_hash, role FROM users WHERE full_name = ?', [fullName]);
   if (!existing) {
     await db.run(
-      'INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id, group_id, language) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [fullName, role, passwordHash, 1, 'A', courseId, groupId, 'uk']
+      'INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id, language) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [fullName, role, passwordHash, 1, 'A', courseId, 'uk']
     );
     return;
   }
@@ -296,26 +296,15 @@ const initDb = async () => {
       )
     `,
     `
-      CREATE TABLE IF NOT EXISTS groups (
-        id SERIAL PRIMARY KEY,
-        slug TEXT NOT NULL UNIQUE,
-        name TEXT NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `,
-    `
       CREATE TABLE IF NOT EXISTS courses (
         id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        group_id INTEGER NOT NULL REFERENCES groups(id),
-        UNIQUE(name, group_id)
+        name TEXT NOT NULL UNIQUE
       )
     `,
     `
       CREATE TABLE IF NOT EXISTS semesters (
         id SERIAL PRIMARY KEY,
         course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-        group_id INTEGER NOT NULL REFERENCES groups(id),
         title TEXT NOT NULL,
         start_date TEXT NOT NULL,
         weeks_count INTEGER NOT NULL,
@@ -336,7 +325,6 @@ const initDb = async () => {
         last_login_at TEXT,
         schedule_group TEXT NOT NULL DEFAULT 'A',
         course_id INTEGER REFERENCES courses(id),
-        group_id INTEGER REFERENCES groups(id),
         language TEXT,
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
@@ -349,8 +337,7 @@ const initDb = async () => {
         default_group INTEGER NOT NULL DEFAULT 1,
         show_in_teamwork INTEGER NOT NULL DEFAULT 1,
         visible INTEGER NOT NULL DEFAULT 1,
-        course_id INTEGER REFERENCES courses(id),
-        group_id INTEGER REFERENCES groups(id)
+        course_id INTEGER REFERENCES courses(id)
       )
     `,
     `
@@ -393,7 +380,6 @@ const initDb = async () => {
         class_number INTEGER NOT NULL,
         week_number INTEGER NOT NULL,
         course_id INTEGER REFERENCES courses(id),
-        group_id INTEGER REFERENCES groups(id),
         semester_id INTEGER REFERENCES semesters(id)
       )
     `,
@@ -419,7 +405,6 @@ const initDb = async () => {
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
         course_id INTEGER REFERENCES courses(id),
-        group_id INTEGER REFERENCES groups(id),
         semester_id INTEGER REFERENCES semesters(id),
         is_custom_deadline INTEGER NOT NULL DEFAULT 0,
         custom_due_date TEXT
@@ -468,7 +453,6 @@ const initDb = async () => {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         course_id INTEGER REFERENCES courses(id),
-        group_id INTEGER REFERENCES groups(id),
         semester_id INTEGER REFERENCES semesters(id)
       )
     `,
@@ -484,8 +468,7 @@ const initDb = async () => {
         action TEXT NOT NULL,
         details TEXT,
         created_at TEXT NOT NULL,
-        course_id INTEGER REFERENCES courses(id),
-        group_id INTEGER REFERENCES groups(id)
+        course_id INTEGER REFERENCES courses(id)
       )
     `,
     `
@@ -499,7 +482,6 @@ const initDb = async () => {
         details TEXT,
         created_at TEXT NOT NULL,
         course_id INTEGER REFERENCES courses(id),
-        group_id INTEGER REFERENCES groups(id),
         semester_id INTEGER REFERENCES semesters(id)
       )
     `,
@@ -511,8 +493,7 @@ const initDb = async () => {
         ip TEXT,
         user_agent TEXT,
         created_at TEXT NOT NULL,
-        course_id INTEGER REFERENCES courses(id),
-        group_id INTEGER REFERENCES groups(id)
+        course_id INTEGER REFERENCES courses(id)
       )
     `,
     `
@@ -524,7 +505,6 @@ const initDb = async () => {
         created_at TEXT NOT NULL,
         due_date TEXT,
         course_id INTEGER REFERENCES courses(id),
-        group_id INTEGER REFERENCES groups(id),
         semester_id INTEGER REFERENCES semesters(id)
       )
     `,
@@ -567,7 +547,6 @@ const initDb = async () => {
         created_by_id INTEGER NOT NULL REFERENCES users(id),
         created_at TEXT NOT NULL,
         course_id INTEGER REFERENCES courses(id),
-        group_id INTEGER REFERENCES groups(id),
         semester_id INTEGER REFERENCES semesters(id)
       )
     `,
@@ -621,18 +600,8 @@ const initDb = async () => {
 
   await pool.query(
     `
-      INSERT INTO groups (slug, name)
-      VALUES ('kyiv', 'Київ'), ('munich', 'Мюнхен')
-      ON CONFLICT (slug) DO NOTHING
-    `
-  );
-
-  await pool.query(
-    `
-      INSERT INTO courses (id, name, group_id)
-      VALUES
-        (1, '1 курс', (SELECT id FROM groups WHERE slug = 'kyiv')),
-        (2, '2 курс', (SELECT id FROM groups WHERE slug = 'kyiv'))
+      INSERT INTO courses (id, name)
+      VALUES (1, '1 курс'), (2, '2 курс')
       ON CONFLICT (id) DO NOTHING
     `
   );
@@ -649,12 +618,9 @@ const initDb = async () => {
   );
 
   const alters = [
-    'ALTER TABLE users ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS language TEXT',
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW()',
-    'ALTER TABLE courses ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
-    'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS title TEXT',
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS start_date TEXT',
@@ -662,13 +628,10 @@ const initDb = async () => {
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS is_active INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS is_archived INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
-    'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
     'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS visible INTEGER NOT NULL DEFAULT 1',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
-    'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
-    'ALTER TABLE homework ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS is_custom_deadline INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS custom_due_date TEXT',
@@ -676,98 +639,57 @@ const initDb = async () => {
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ',
     'ALTER TABLE history_log ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
-    'ALTER TABLE history_log ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
     'ALTER TABLE login_history ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
-    'ALTER TABLE login_history ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
     'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
-    'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
     'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE teamwork_tasks ADD COLUMN IF NOT EXISTS due_date TEXT',
     'ALTER TABLE messages ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
-    'ALTER TABLE messages ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
     'ALTER TABLE messages ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     "ALTER TABLE messages ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published'",
     'ALTER TABLE messages ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ',
     'ALTER TABLE messages ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ',
     'ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
-    'ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
     'ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
-    'ALTER TABLE personal_reminders ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
   ];
   for (const statement of alters) {
     await pool.query(statement);
   }
 
-  const kyivRow = await pool.query("SELECT id FROM groups WHERE slug = 'kyiv' LIMIT 1");
-  const kyivGroupId = kyivRow.rows.length ? kyivRow.rows[0].id : null;
-
   await pool.query('UPDATE users SET course_id = 1 WHERE course_id IS NULL');
-  if (kyivGroupId) {
-    await pool.query('UPDATE users SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-  }
   await pool.query("UPDATE users SET language = 'uk' WHERE language IS NULL");
   await pool.query('UPDATE users SET created_at = NOW() WHERE created_at IS NULL');
   await pool.query('UPDATE subjects SET course_id = 1 WHERE course_id IS NULL');
-  if (kyivGroupId) {
-    await pool.query('UPDATE subjects SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-  }
   await pool.query('UPDATE subjects SET visible = 1 WHERE visible IS NULL');
   await pool.query('UPDATE schedule_entries SET course_id = 1 WHERE course_id IS NULL');
-  if (kyivGroupId) {
-    await pool.query('UPDATE schedule_entries SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-  }
   await pool.query('UPDATE homework SET course_id = 1 WHERE course_id IS NULL');
-  if (kyivGroupId) {
-    await pool.query('UPDATE homework SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-  }
   await pool.query("UPDATE homework SET status = 'published' WHERE status IS NULL");
   await pool.query('UPDATE history_log SET course_id = 1 WHERE course_id IS NULL');
-  if (kyivGroupId) {
-    await pool.query('UPDATE history_log SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-  }
   await pool.query('UPDATE login_history SET course_id = 1 WHERE course_id IS NULL');
-  if (kyivGroupId) {
-    await pool.query('UPDATE login_history SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-  }
   await pool.query('UPDATE teamwork_tasks SET course_id = 1 WHERE course_id IS NULL');
-  if (kyivGroupId) {
-    await pool.query('UPDATE teamwork_tasks SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-  }
   await pool.query('UPDATE messages SET course_id = 1 WHERE course_id IS NULL');
-  if (kyivGroupId) {
-    await pool.query('UPDATE messages SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-  }
   await pool.query("UPDATE messages SET status = 'published' WHERE status IS NULL");
   await pool.query('UPDATE personal_reminders SET course_id = 1 WHERE course_id IS NULL');
-  if (kyivGroupId) {
-    await pool.query('UPDATE personal_reminders SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-  }
   await pool.query('UPDATE personal_reminders SET updated_at = created_at WHERE updated_at IS NULL');
   await pool.query('UPDATE users SET password = NULL WHERE password IS NOT NULL');
-  if (kyivGroupId) {
-    await pool.query('UPDATE courses SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-    await pool.query('UPDATE semesters SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-    await pool.query('UPDATE activity_log SET group_id = $1 WHERE group_id IS NULL', [kyivGroupId]);
-  }
 
-  const courseRows = await pool.query('SELECT id, name, group_id FROM courses ORDER BY id');
+  const courseRows = await pool.query('SELECT id, name FROM courses ORDER BY id');
   for (const course of courseRows.rows) {
     const activeRow = await pool.query(
-      'SELECT id, is_active FROM semesters WHERE course_id = $1 AND group_id = $2 ORDER BY is_active DESC, id ASC LIMIT 1',
-      [course.id, course.group_id]
+      'SELECT id, is_active FROM semesters WHERE course_id = $1 ORDER BY is_active DESC, id ASC LIMIT 1',
+      [course.id]
     );
     if (!activeRow.rows.length) {
       await pool.query(
-        'INSERT INTO semesters (course_id, group_id, title, start_date, weeks_count, is_active, is_archived) VALUES ($1, $2, $3, $4, $5, 1, 0)',
-        [course.id, course.group_id, `${course.name} семестр`, '2026-01-19', 15]
+        'INSERT INTO semesters (course_id, title, start_date, weeks_count, is_active, is_archived) VALUES ($1, $2, $3, $4, 1, 0)',
+        [course.id, `${course.name} семестр`, '2026-01-19', 15]
       );
     } else if (activeRow.rows[0].is_active !== 1) {
       await pool.query('UPDATE semesters SET is_active = 1 WHERE id = $1', [activeRow.rows[0].id]);
     }
 
     const currentActive = await pool.query(
-      'SELECT id FROM semesters WHERE course_id = $1 AND group_id = $2 AND is_active = 1 ORDER BY id ASC LIMIT 1',
-      [course.id, course.group_id]
+      'SELECT id FROM semesters WHERE course_id = $1 AND is_active = 1 ORDER BY id ASC LIMIT 1',
+      [course.id]
     );
     if (currentActive.rows.length) {
       const semesterId = currentActive.rows[0].id;
@@ -903,7 +825,6 @@ const csvUpload = multer({
 });
 
 const referenceCache = {
-  groups: { data: null, expiresAt: 0 },
   courses: { data: null, expiresAt: 0 },
   subjects: new Map(),
   semesters: new Map(),
@@ -939,37 +860,32 @@ function cacheDelete(store, key) {
 }
 
 function invalidateCoursesCache() {
-  cacheDelete(referenceCache.courses, 'courses:all');
+  cacheDelete(referenceCache.courses, 'courses');
 }
 
-function invalidateGroupsCache() {
-  cacheDelete(referenceCache.groups, 'groups');
-}
-
-function invalidateSubjectsCache(courseId, groupId) {
-  if (!courseId && !groupId) {
+function invalidateSubjectsCache(courseId) {
+  if (!courseId) {
     referenceCache.subjects.clear();
     return;
   }
-  const base = `${groupId || 'any'}|${courseId || 'any'}`;
-  referenceCache.subjects.delete(`${base}|all`);
-  referenceCache.subjects.delete(`${base}|visible`);
+  referenceCache.subjects.delete(`${courseId}|all`);
+  referenceCache.subjects.delete(`${courseId}|visible`);
 }
 
-function invalidateSemestersCache(courseId, groupId) {
-  if (!courseId && !groupId) {
+function invalidateSemestersCache(courseId) {
+  if (!courseId) {
     referenceCache.semesters.clear();
   } else {
-    referenceCache.semesters.delete(`${groupId || 'any'}|${courseId || 'any'}`);
+    referenceCache.semesters.delete(courseId);
   }
-  invalidateActiveSemesterCache(courseId, groupId);
+  invalidateActiveSemesterCache(courseId);
 }
 
-function invalidateActiveSemesterCache(courseId, groupId) {
-  if (!courseId && !groupId) {
+function invalidateActiveSemesterCache(courseId) {
+  if (!courseId) {
     referenceCache.activeSemester.clear();
   } else {
-    referenceCache.activeSemester.delete(`${groupId || 'any'}|${courseId || 'any'}`);
+    referenceCache.activeSemester.delete(courseId);
   }
 }
 
@@ -981,62 +897,29 @@ function invalidateStudyDaysCache(courseId) {
   }
 }
 
-async function getGroupsCached() {
-  const cached = cacheGet(referenceCache.groups, 'groups');
+async function getCoursesCached() {
+  const cached = cacheGet(referenceCache.courses, 'courses');
   if (cached) return cached;
-  const rows = await db.all('SELECT id, slug, name FROM groups ORDER BY id');
-  return cacheSet(referenceCache.groups, 'groups', rows || []);
+  const rows = await db.all('SELECT id, name FROM courses ORDER BY id');
+  return cacheSet(referenceCache.courses, 'courses', rows || []);
 }
 
-async function getCoursesCached(groupId) {
-  const key = `courses:${groupId || 'all'}`;
-  const cached = cacheGet(referenceCache.courses, key);
-  if (cached) return cached;
-  const rows = groupId
-    ? await db.all('SELECT id, name, group_id FROM courses WHERE group_id = ? ORDER BY id', [groupId])
-    : await db.all('SELECT id, name, group_id FROM courses ORDER BY id');
-  return cacheSet(referenceCache.courses, key, rows || []);
-}
-
-async function getSubjectsCached(courseId, groupId, options = {}) {
-  const key = `${groupId || 'any'}|${courseId || 'any'}|${options.visibleOnly ? 'visible' : 'all'}`;
+async function getSubjectsCached(courseId, options = {}) {
+  const key = `${courseId}|${options.visibleOnly ? 'visible' : 'all'}`;
   const cached = cacheGet(referenceCache.subjects, key);
   if (cached) return cached;
-  const conditions = [];
-  const params = [];
-  if (courseId) {
-    conditions.push('course_id = ?');
-    params.push(courseId);
-  }
-  if (groupId) {
-    conditions.push('group_id = ?');
-    params.push(groupId);
-  }
-  if (options.visibleOnly) {
-    conditions.push('visible = 1');
-  }
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-  const rows = await db.all(`SELECT * FROM subjects ${where} ORDER BY name`, params);
+  const sql = options.visibleOnly
+    ? 'SELECT * FROM subjects WHERE course_id = ? AND visible = 1 ORDER BY name'
+    : 'SELECT * FROM subjects WHERE course_id = ? ORDER BY name';
+  const rows = await db.all(sql, [courseId]);
   return cacheSet(referenceCache.subjects, key, rows || []);
 }
 
-async function getSemestersCached(courseId, groupId) {
-  const key = `${groupId || 'any'}|${courseId || 'any'}`;
-  const cached = cacheGet(referenceCache.semesters, key);
+async function getSemestersCached(courseId) {
+  const cached = cacheGet(referenceCache.semesters, courseId);
   if (cached) return cached;
-  const conditions = [];
-  const params = [];
-  if (courseId) {
-    conditions.push('course_id = ?');
-    params.push(courseId);
-  }
-  if (groupId) {
-    conditions.push('group_id = ?');
-    params.push(groupId);
-  }
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-  const rows = await db.all(`SELECT * FROM semesters ${where} ORDER BY start_date DESC`, params);
-  return cacheSet(referenceCache.semesters, key, rows || []);
+  const rows = await db.all('SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC', [courseId]);
+  return cacheSet(referenceCache.semesters, courseId, rows || []);
 }
 
 const rateBuckets = new Map();
@@ -1117,20 +1000,12 @@ function requireLogin(req, res, next) {
   if (!req.session.user) {
     return res.redirect('/login');
   }
-  if (!req.session.user.group_id && !req.path.startsWith('/onboarding/group')) {
-    req.session.postGroupRedirect = req.originalUrl || '/schedule';
-    return res.redirect('/onboarding/group');
-  }
   return next();
 }
 
 function requireAdmin(req, res, next) {
   if (!req.session.user || req.session.role !== 'admin') {
     return res.status(403).send('Forbidden');
-  }
-  if (!req.session.user.group_id && !req.path.startsWith('/onboarding/group')) {
-    req.session.postGroupRedirect = req.originalUrl || '/admin';
-    return res.redirect('/onboarding/group');
   }
   return next();
 }
@@ -1313,11 +1188,6 @@ function addDays(date, days) {
 function logAction(dbRef, req, action, details) {
   const actorId = req.session.user ? req.session.user.id : null;
   const actorName = req.session.user ? req.session.user.username : null;
-  const groupId = req.session && req.session.adminGroup
-    ? Number(req.session.adminGroup)
-    : req.session && req.session.user
-    ? req.session.user.group_id || null
-    : null;
   const courseId = req.session && req.session.adminCourse
     ? Number(req.session.adminCourse)
     : req.session && req.session.user
@@ -1325,8 +1195,8 @@ function logAction(dbRef, req, action, details) {
     : null;
   const createdAt = new Date().toISOString();
   dbRef.run(
-    'INSERT INTO history_log (actor_id, actor_name, action, details, created_at, course_id, group_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [actorId, actorName, action, details ? JSON.stringify(details) : null, createdAt, courseId, groupId]
+    'INSERT INTO history_log (actor_id, actor_name, action, details, created_at, course_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [actorId, actorName, action, details ? JSON.stringify(details) : null, createdAt, courseId]
   );
   broadcast('history_updated');
 }
@@ -1334,11 +1204,6 @@ function logAction(dbRef, req, action, details) {
 function logActivity(dbRef, req, actionType, targetType, targetId, details, courseIdOverride, semesterIdOverride) {
   const userId = req.session.user ? req.session.user.id : null;
   const userName = req.session.user ? req.session.user.username : null;
-  const groupId = req.session && req.session.adminGroup
-    ? Number(req.session.adminGroup)
-    : req.session && req.session.user
-    ? req.session.user.group_id || null
-    : null;
   const courseId = Number.isFinite(courseIdOverride)
     ? courseIdOverride
     : req.session && req.session.adminCourse
@@ -1349,7 +1214,7 @@ function logActivity(dbRef, req, actionType, targetType, targetId, details, cour
   const semesterId = Number.isFinite(semesterIdOverride) ? semesterIdOverride : null;
   const createdAt = new Date().toISOString();
   dbRef.run(
-    'INSERT INTO activity_log (user_id, user_name, action_type, target_type, target_id, details, created_at, course_id, group_id, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO activity_log (user_id, user_name, action_type, target_type, target_id, details, created_at, course_id, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       userId,
       userName,
@@ -1359,7 +1224,6 @@ function logActivity(dbRef, req, actionType, targetType, targetId, details, cour
       details ? JSON.stringify(details) : null,
       createdAt,
       courseId,
-      groupId,
       semesterId,
     ]
   );
@@ -1386,16 +1250,6 @@ function ensureUsersSchema(cb) {
   return cb(true);
 }
 
-function getActiveGroupId(req) {
-  if (req.session && req.session.adminGroup && Number.isFinite(Number(req.session.adminGroup))) {
-    return Number(req.session.adminGroup);
-  }
-  if (req.session && req.session.user && req.session.user.group_id) {
-    return Number(req.session.user.group_id);
-  }
-  return null;
-}
-
 function getAdminCourse(req) {
   const queryCourse = Number(req.query.course);
   if (!Number.isNaN(queryCourse)) {
@@ -1405,36 +1259,14 @@ function getAdminCourse(req) {
   return Number.isNaN(sessionCourse) ? 1 : sessionCourse;
 }
 
-function getAdminGroup(req) {
-  const queryGroup = Number(req.query.group_id || req.query.group);
-  if (!Number.isNaN(queryGroup)) {
-    req.session.adminGroup = queryGroup;
-  }
-  const sessionGroup = Number(req.session.adminGroup);
-  if (!Number.isNaN(sessionGroup)) return sessionGroup;
-  return req.session && req.session.user ? req.session.user.group_id || null : null;
-}
-
-async function getActiveSemester(courseId, groupId) {
-  const key = `${groupId || 'any'}|${courseId || 'any'}`;
-  const cached = cacheGet(referenceCache.activeSemester, key);
+async function getActiveSemester(courseId) {
+  const cached = cacheGet(referenceCache.activeSemester, courseId);
   if (cached) return cached;
-  const conditions = ['is_active = 1'];
-  const params = [];
-  if (courseId) {
-    conditions.push('course_id = ?');
-    params.push(courseId);
-  }
-  if (groupId) {
-    conditions.push('group_id = ?');
-    params.push(groupId);
-  }
-  const where = `WHERE ${conditions.join(' AND ')}`;
   const row = await db.get(
-    `SELECT id, title, start_date, weeks_count, is_active, is_archived FROM semesters ${where} ORDER BY id DESC LIMIT 1`,
-    params
+    'SELECT id, title, start_date, weeks_count, is_active, is_archived FROM semesters WHERE course_id = ? AND is_active = 1 ORDER BY id DESC LIMIT 1',
+    [courseId]
   );
-  return cacheSet(referenceCache.activeSemester, key, row || null);
+  return cacheSet(referenceCache.activeSemester, courseId, row || null);
 }
 
 async function ensureCourseStudyDays(courseId) {
@@ -1595,7 +1427,7 @@ app.post('/login', authLimiter, async (req, res) => {
       return map[normalized] || 'student';
     };
     db.get(
-      `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
+      `SELECT id, full_name, role, password_hash, schedule_group, course_id, language FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
       [normalizedName],
       (err, user) => {
         const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
@@ -1612,15 +1444,14 @@ app.post('/login', authLimiter, async (req, res) => {
           [req.ip, req.headers['user-agent'] || null, loginAt, user.id]
         );
         db.run(
-          'INSERT INTO login_history (user_id, full_name, ip, user_agent, created_at, course_id, group_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [user.id, user.full_name, req.ip, req.headers['user-agent'] || null, loginAt, user.course_id || 1, user.group_id || null]
+          'INSERT INTO login_history (user_id, full_name, ip, user_agent, created_at, course_id) VALUES (?, ?, ?, ?, ?, ?)',
+          [user.id, user.full_name, req.ip, req.headers['user-agent'] || null, loginAt, user.course_id || 1]
         );
         req.session.user = {
           id: user.id,
           username: user.full_name,
           schedule_group: user.schedule_group,
           course_id: user.course_id || 1,
-          group_id: user.group_id || null,
           language: user.language || getPreferredLang(req),
         };
         req.session.role = role;
@@ -1628,10 +1459,6 @@ app.post('/login', authLimiter, async (req, res) => {
         req.session.rememberMe = remember;
         req.session.cookie.maxAge = remember ? (settingsCache.session_duration_days || 14) * 24 * 60 * 60 * 1000 : null;
 
-        if (!user.group_id) {
-          req.session.postGroupRedirect = role === 'admin' ? '/admin' : '/schedule';
-          return res.redirect('/onboarding/group');
-        }
         if (role === 'admin') {
           return res.redirect('/admin');
         }
@@ -1715,85 +1542,7 @@ app.post('/register/course', registerLimiter, (req, res) => {
       if (updErr) {
         return res.redirect('/register/course?error=Database%20error');
       }
-      return res.redirect('/onboarding/group');
-    });
-  });
-});
-
-app.get('/onboarding/group', (req, res) => {
-  const pendingUserId = req.session.pendingUserId;
-  const sessionUser = req.session.user;
-  if (!pendingUserId && !sessionUser) {
-    return res.redirect('/register');
-  }
-  if (sessionUser && sessionUser.group_id) {
-    return res.redirect(req.session.postGroupRedirect || '/schedule');
-  }
-  ensureDbReady().catch((err) => {
-    console.error('DB init failed', err);
-  });
-  (async () => {
-    try {
-      const groups = await getGroupsCached();
-      return res.render('register-group', { groups, error: req.query.error || '' });
-    } catch (err) {
-      return res.status(500).send('Database error');
-    }
-  })();
-});
-
-app.post('/onboarding/group', registerLimiter, (req, res) => {
-  const groupId = Number(req.body.group_id);
-  if (Number.isNaN(groupId)) {
-    return res.redirect('/onboarding/group?error=Select%20group');
-  }
-  const pendingUserId = req.session.pendingUserId;
-  const sessionUser = req.session.user;
-  if (!pendingUserId && !sessionUser) {
-    return res.redirect('/register');
-  }
-  db.get('SELECT id, slug, name FROM groups WHERE id = ?', [groupId], (gErr, groupRow) => {
-    if (gErr || !groupRow) {
-      return res.redirect('/onboarding/group?error=Invalid%20group');
-    }
-    const targetUserId = pendingUserId || sessionUser.id;
-    db.get('SELECT id, course_id FROM users WHERE id = ?', [targetUserId], (uErr, userRow) => {
-      if (uErr || !userRow) {
-        return res.redirect('/onboarding/group?error=Database%20error');
-      }
-      const finalize = (nextCourseId) => {
-        db.run('UPDATE users SET group_id = ?, course_id = ? WHERE id = ?', [groupId, nextCourseId, targetUserId], (updErr) => {
-          if (updErr) {
-            return res.redirect('/onboarding/group?error=Database%20error');
-          }
-          if (req.session.user) {
-            req.session.user.group_id = groupId;
-            if (nextCourseId) req.session.user.course_id = nextCourseId;
-          }
-          req.session.adminGroup = groupId;
-          if (pendingUserId) {
-            return res.redirect('/register/subjects');
-          }
-          return res.redirect(req.session.postGroupRedirect || '/schedule');
-        });
-      };
-      if (!userRow.course_id) {
-        return finalize(null);
-      }
-      db.get('SELECT id, name, group_id FROM courses WHERE id = ?', [userRow.course_id], (cErr, courseRow) => {
-        if (cErr || !courseRow) {
-          return finalize(null);
-        }
-        if (!courseRow.group_id || Number(courseRow.group_id) === groupId) {
-          return finalize(courseRow.id);
-        }
-        db.get('SELECT id FROM courses WHERE name = ? AND group_id = ?', [courseRow.name, groupId], (mapErr, mapped) => {
-          if (mapErr || !mapped) {
-            return finalize(courseRow.id);
-          }
-          return finalize(mapped.id);
-        });
-      });
+      return res.redirect('/register/subjects');
     });
   });
 });
@@ -1805,16 +1554,13 @@ app.get('/register/subjects', (req, res) => {
   ensureDbReady().catch((err) => {
     console.error('DB init failed', err);
   });
-  db.get('SELECT course_id, group_id FROM users WHERE id = ?', [req.session.pendingUserId], (uErr, user) => {
+  db.get('SELECT course_id FROM users WHERE id = ?', [req.session.pendingUserId], (uErr, user) => {
     if (uErr || !user || !user.course_id) {
       return res.redirect('/register/course');
     }
-    if (!user.group_id) {
-      return res.redirect('/onboarding/group');
-    }
     (async () => {
       try {
-        const subjects = await getSubjectsCached(user.course_id, user.group_id, { visibleOnly: true });
+        const subjects = await getSubjectsCached(user.course_id, { visibleOnly: true });
         res.render('register-subjects', { subjects });
       } catch (err) {
         res.status(500).send('Database error');
@@ -1829,17 +1575,11 @@ app.post('/register/subjects', registerLimiter, (req, res) => {
     return res.redirect('/register');
   }
 
-  db.get('SELECT course_id, group_id FROM users WHERE id = ?', [userId], (uErr, userRow) => {
+  db.get('SELECT course_id FROM users WHERE id = ?', [userId], (uErr, userRow) => {
     if (uErr || !userRow || !userRow.course_id) {
       return res.redirect('/register/course');
     }
-    if (!userRow.group_id) {
-      return res.redirect('/onboarding/group');
-    }
-    db.all(
-      'SELECT id, group_count, default_group FROM subjects WHERE course_id = ? AND group_id = ? AND visible = 1',
-      [userRow.course_id, userRow.group_id],
-      (err, subjects) => {
+    db.all('SELECT id, group_count, default_group FROM subjects WHERE course_id = ? AND visible = 1', [userRow.course_id], (err, subjects) => {
       if (err) {
         return res.status(500).send('Database error');
       }
@@ -1865,7 +1605,7 @@ app.post('/register/subjects', registerLimiter, (req, res) => {
         }
       });
       stmt.finalize(() => {
-        db.get('SELECT id, full_name, role, schedule_group, course_id, group_id, language FROM users WHERE id = ?', [userId], (uErr2, user) => {
+        db.get('SELECT id, full_name, role, schedule_group, course_id, language FROM users WHERE id = ?', [userId], (uErr2, user) => {
           if (uErr2 || !user) {
             return res.redirect('/login');
           }
@@ -1874,7 +1614,6 @@ app.post('/register/subjects', registerLimiter, (req, res) => {
             username: user.full_name,
             schedule_group: user.schedule_group,
             course_id: user.course_id || 1,
-            group_id: user.group_id || null,
             language: user.language || getPreferredLang(req),
           };
           req.session.role = user.role;
@@ -1902,27 +1641,21 @@ app.get('/profile', requireLogin, async (req, res) => {
   }
   const { id } = req.session.user;
   try {
-    const user = await db.get('SELECT id, full_name, course_id, group_id, language FROM users WHERE id = ?', [id]);
+    const user = await db.get('SELECT id, full_name, course_id, language FROM users WHERE id = ?', [id]);
     if (!user) {
       return res.status(500).send('Database error');
     }
-    const activeSemester = await getActiveSemester(user.course_id || 1, user.group_id || null);
-    const pointsParams = [id];
-    if (activeSemester) pointsParams.push(activeSemester.id);
-    if (user.group_id) pointsParams.push(user.group_id);
+    const activeSemester = await getActiveSemester(user.course_id || 1);
     const pointsRow = await db.get(
       `
         SELECT COALESCE(SUM(${ACTIVITY_POINTS_CASE}), 0) AS points
         FROM activity_log
-        WHERE user_id = ?${activeSemester ? ' AND semester_id = ?' : ''}${user.group_id ? ' AND group_id = ?' : ''}
+        WHERE user_id = ?${activeSemester ? ' AND semester_id = ?' : ''}
       `,
-      pointsParams
+      activeSemester ? [id, activeSemester.id] : [id]
     );
     const activityPoints = pointsRow ? Number(pointsRow.points || 0) : 0;
-    const analyticsGroupId = user.group_id || null;
-    const analyticsParams = activeSemester
-      ? [id, user.course_id || 1, analyticsGroupId, activeSemester.id]
-      : [id, user.course_id || 1, analyticsGroupId];
+    const analyticsParams = activeSemester ? [id, user.course_id || 1, activeSemester.id] : [id, user.course_id || 1];
     const [
       homeworkCreatedRow,
       teamworkCreatedRow,
@@ -1931,20 +1664,20 @@ app.get('/profile', requireLogin, async (req, res) => {
       db.get(
         `SELECT COUNT(*) AS count
          FROM homework
-         WHERE created_by_id = ? AND course_id = ? AND group_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
+         WHERE created_by_id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
         analyticsParams
       ),
       db.get(
         `SELECT COUNT(*) AS count
          FROM teamwork_tasks
-         WHERE created_by = ? AND course_id = ? AND group_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
+         WHERE created_by = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
         analyticsParams
       ),
       db.get(
         `SELECT COUNT(*) AS count
          FROM teamwork_members m
          JOIN teamwork_tasks t ON t.id = m.task_id
-         WHERE m.user_id = ? AND t.course_id = ? AND t.group_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
+         WHERE m.user_id = ? AND t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
         analyticsParams
       ),
     ]);
@@ -2009,8 +1742,7 @@ app.post('/profile', requireLogin, (req, res) => {
 
 async function buildMyDayData(user) {
   const courseId = user.course_id || 1;
-  const groupId = user.group_id || null;
-  const activeSemester = await getActiveSemester(courseId, groupId);
+  const activeSemester = await getActiveSemester(courseId);
   const now = new Date();
   const todayStr = formatLocalDate(now);
   const tomorrowStr = formatLocalDate(addDays(now, 1));
@@ -2023,15 +1755,15 @@ async function buildMyDayData(user) {
       SELECT sg.subject_id, sg.group_number, s.name AS subject_name
       FROM student_groups sg
       JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ? AND s.course_id = ? AND s.group_id = ? AND s.visible = 1
+      WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
     `,
-    [user.id, courseId, groupId]
+    [user.id, courseId]
   );
 
   let classesToday = [];
   if (studentGroups.length && dayName) {
     const conditions = studentGroups.map(() => '(se.subject_id = ? AND se.group_number = ?)').join(' OR ');
-    const params = [weekNumber, groupId, courseId, activeSemester ? activeSemester.id : null, dayName];
+    const params = [weekNumber, courseId, activeSemester ? activeSemester.id : null, dayName];
     studentGroups.forEach((sg) => params.push(sg.subject_id, sg.group_number));
     const rows = await db.all(
       `
@@ -2039,16 +1771,14 @@ async function buildMyDayData(user) {
         FROM schedule_entries se
         JOIN subjects s ON s.id = se.subject_id
         WHERE se.week_number = ?
-          AND se.group_id = ?
           AND se.course_id = ?
           AND se.semester_id = ?
           AND se.day_of_week = ?
           AND s.visible = 1
-          AND s.group_id = ?
           AND (${conditions})
         ORDER BY se.class_number ASC
       `,
-      [...params, groupId]
+      params
     );
     classesToday = (rows || []).map((row) => {
       const slot = bellSchedule[row.class_number] || {};
@@ -2084,7 +1814,7 @@ async function buildMyDayData(user) {
     const conditions = studentGroups.map(() => '(h.subject_id = ? AND h.group_number = ?)').join(' OR ');
     const params = [user.id];
     studentGroups.forEach((sg) => params.push(sg.subject_id, sg.group_number));
-    params.push(groupId, courseId, activeSemester ? activeSemester.id : null, nowIso);
+    params.push(courseId, activeSemester ? activeSemester.id : null, nowIso);
     const rows = await db.all(
       `
         SELECT h.id, h.description, h.custom_due_date, h.class_date, h.subject_id, h.group_number,
@@ -2093,7 +1823,6 @@ async function buildMyDayData(user) {
         JOIN subjects subj ON subj.id = h.subject_id
         LEFT JOIN homework_completions hc ON hc.homework_id = h.id AND hc.user_id = ?
         WHERE (${conditions})
-          AND h.group_id = ?
           AND h.course_id = ?
           AND h.semester_id = ?
           AND COALESCE(h.status, 'published') = 'published'
@@ -2128,14 +1857,13 @@ async function buildMyDayData(user) {
     const subjectIds = Array.from(new Set(studentGroups.map((sg) => sg.subject_id)));
     if (subjectIds.length) {
       const placeholders = subjectIds.map(() => '?').join(',');
-      const params = [groupId, courseId, activeSemester ? activeSemester.id : null, todayStr, tomorrowStr, ...subjectIds];
+      const params = [courseId, activeSemester ? activeSemester.id : null, todayStr, tomorrowStr, ...subjectIds];
       const rows = await db.all(
         `
           SELECT t.id, t.title, t.due_date, t.subject_id, s.name AS subject_name
           FROM teamwork_tasks t
           JOIN subjects s ON s.id = t.subject_id
-          WHERE t.group_id = ?
-            AND t.course_id = ?
+          WHERE t.course_id = ?
             AND t.semester_id = ?
             AND t.due_date IS NOT NULL
             AND t.due_date >= ?
@@ -2268,13 +1996,13 @@ app.get('/api/reminders', requireLogin, readLimiter, async (req, res) => {
   }
   const filterStatus = status === 'all' || status === 'done' ? status : 'open';
   try {
-    const { id: userId, course_id: courseId, group_id: groupId } = req.session.user;
-    const activeSemester = await getActiveSemester(courseId || 1, groupId || null);
+    const { id: userId, course_id: courseId } = req.session.user;
+    const activeSemester = await getActiveSemester(courseId || 1);
     if (!activeSemester) {
       return res.status(400).json({ error: 'No active semester' });
     }
-    const clauses = ['user_id = ?', 'course_id = ?', 'group_id = ?', 'semester_id = ?'];
-    const params = [userId, courseId || 1, groupId || null, activeSemester.id];
+    const clauses = ['user_id = ?', 'course_id = ?', 'semester_id = ?'];
+    const params = [userId, courseId || 1, activeSemester.id];
     if (from) {
       clauses.push('remind_date >= ?');
       params.push(String(from));
@@ -2323,8 +2051,8 @@ app.post('/api/reminders', requireLogin, writeLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Note too long' });
   }
   try {
-    const { id: userId, course_id: courseId, group_id: groupId } = req.session.user;
-    const activeSemester = await getActiveSemester(courseId || 1, groupId || null);
+    const { id: userId, course_id: courseId } = req.session.user;
+    const activeSemester = await getActiveSemester(courseId || 1);
     if (!activeSemester) {
       return res.status(400).json({ error: 'No active semester' });
     }
@@ -2332,8 +2060,8 @@ app.post('/api/reminders', requireLogin, writeLimiter, async (req, res) => {
     const row = await db.get(
       `
         INSERT INTO personal_reminders
-          (user_id, title, note, remind_date, remind_time, is_done, created_at, updated_at, course_id, group_id, semester_id)
-        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
+          (user_id, title, note, remind_date, remind_time, is_done, created_at, updated_at, course_id, semester_id)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
         RETURNING id, title, note, remind_date, remind_time, is_done
       `,
       [
@@ -2345,7 +2073,6 @@ app.post('/api/reminders', requireLogin, writeLimiter, async (req, res) => {
         nowIso,
         nowIso,
         courseId || 1,
-        groupId || null,
         activeSemester.id,
       ]
     );
@@ -2409,19 +2136,19 @@ app.patch('/api/reminders/:id', requireLogin, writeLimiter, async (req, res) => 
     return res.status(400).json({ error: 'No changes' });
   }
   try {
-    const { id: userId, course_id: courseId, group_id: groupId } = req.session.user;
-    const activeSemester = await getActiveSemester(courseId || 1, groupId || null);
+    const { id: userId, course_id: courseId } = req.session.user;
+    const activeSemester = await getActiveSemester(courseId || 1);
     if (!activeSemester) {
       return res.status(400).json({ error: 'No active semester' });
     }
     updates.push('updated_at = ?');
     params.push(new Date().toISOString());
-    params.push(reminderId, userId, courseId || 1, groupId || null, activeSemester.id);
+    params.push(reminderId, userId, courseId || 1, activeSemester.id);
     const row = await db.get(
       `
         UPDATE personal_reminders
         SET ${updates.join(', ')}
-        WHERE id = ? AND user_id = ? AND course_id = ? AND group_id = ? AND semester_id = ?
+        WHERE id = ? AND user_id = ? AND course_id = ? AND semester_id = ?
         RETURNING id, title, note, remind_date, remind_time, is_done
       `,
       params
@@ -2441,14 +2168,14 @@ app.delete('/api/reminders/:id', requireLogin, writeLimiter, async (req, res) =>
     return res.status(400).json({ error: 'Invalid reminder' });
   }
   try {
-    const { id: userId, course_id: courseId, group_id: groupId } = req.session.user;
-    const activeSemester = await getActiveSemester(courseId || 1, groupId || null);
+    const { id: userId, course_id: courseId } = req.session.user;
+    const activeSemester = await getActiveSemester(courseId || 1);
     if (!activeSemester) {
       return res.status(400).json({ error: 'No active semester' });
     }
     const result = await db.run(
-      'DELETE FROM personal_reminders WHERE id = ? AND user_id = ? AND course_id = ? AND group_id = ? AND semester_id = ?',
-      [reminderId, userId, courseId || 1, groupId || null, activeSemester.id]
+      'DELETE FROM personal_reminders WHERE id = ? AND user_id = ? AND course_id = ? AND semester_id = ?',
+      [reminderId, userId, courseId || 1, activeSemester.id]
     );
     if (!result || !result.changes) {
       return res.status(404).json({ error: 'Not found' });
@@ -2464,19 +2191,17 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
   if (Number.isNaN(homeworkId)) {
     return res.status(400).json({ error: 'Invalid homework' });
   }
-  const { id: userId, course_id: courseId, group_id: groupId } = req.session.user;
-  const activeSemester = await getActiveSemester(courseId || 1, groupId || null);
+  const { id: userId, course_id: courseId } = req.session.user;
+  const activeSemester = await getActiveSemester(courseId || 1);
   const nowIso = new Date().toISOString();
   try {
     const homework = await db.get(
       `SELECT id, subject_id, group_number
        FROM homework
-       WHERE id = ? AND group_id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}
+       WHERE id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}
          AND COALESCE(status, 'published') = 'published'
          AND (scheduled_at IS NULL OR scheduled_at <= ?)`,
-      activeSemester
-        ? [homeworkId, groupId || null, courseId || 1, activeSemester.id, nowIso]
-        : [homeworkId, groupId || null, courseId || 1, nowIso]
+      activeSemester ? [homeworkId, courseId || 1, activeSemester.id, nowIso] : [homeworkId, courseId || 1, nowIso]
     );
     if (!homework) {
       return res.status(404).json({ error: 'Not found' });
@@ -2507,8 +2232,8 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
 });
 
 app.get('/schedule', requireLogin, async (req, res) => {
-  const { id: userId, schedule_group: group, username, course_id: courseId, group_id: groupId } = req.session.user;
-  const activeSemester = await getActiveSemester(courseId || 1, groupId || null);
+  const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
+  const activeSemester = await getActiveSemester(courseId || 1);
   const totalWeeks = activeSemester && activeSemester.weeks_count ? Number(activeSemester.weeks_count) : 15;
   let selectedWeek = parseInt(req.query.week, 10);
   if (Number.isNaN(selectedWeek)) {
@@ -2537,9 +2262,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
       SELECT sg.subject_id, sg.group_number, s.name AS subject_name
       FROM student_groups sg
       JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ? AND s.course_id = ? AND s.group_id = ? AND s.visible = 1
+      WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
     `,
-    [userId, courseId || 1, groupId || null],
+    [userId, courseId || 1],
     (groupErr, studentGroups) => {
       if (groupErr) {
         return res.status(500).send('Database error');
@@ -2574,13 +2299,12 @@ app.get('/schedule', requireLogin, async (req, res) => {
         studentGroups.forEach((sg) => {
           params.push(sg.subject_id, sg.group_number);
         });
-        params.push(groupId || null, courseId || 1, activeSemester ? activeSemester.id : null, nowIso, weekStartDate, weekEndDate);
+        params.push(courseId || 1, activeSemester ? activeSemester.id : null, nowIso, weekStartDate, weekEndDate);
         const sql = `
           SELECT h.*, subj.name AS subject_name
           FROM homework h
           JOIN subjects subj ON subj.id = h.subject_id
           WHERE (${conditions})
-            AND h.group_id = ?
             AND h.course_id = ?
             AND h.semester_id = ?
             AND COALESCE(h.status, 'published') = 'published'
@@ -2701,7 +2425,6 @@ app.get('/schedule', requireLogin, async (req, res) => {
             LEFT JOIN subgroups s ON s.homework_id = h.id
             LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
             WHERE (${hwConditions})
-              AND h.group_id = ?
               AND h.course_id = ?
               AND h.semester_id = ?
               AND COALESCE(h.status, 'published') = 'published'
@@ -2709,7 +2432,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
             ORDER BY h.created_at DESC
           `,
-          [...hwParams, groupId || null, courseId || 1, activeSemester ? activeSemester.id : null, nowIso],
+          [...hwParams, courseId || 1, activeSemester ? activeSemester.id : null, nowIso],
           (err, rows) => {
             if (err) {
               return res.status(500).send('Database error');
@@ -2872,7 +2595,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
       const conditions = studentGroups
         .map(() => '(se.subject_id = ? AND se.group_number = ?)')
         .join(' OR ');
-      const params = [selectedWeek, groupId || null, courseId || 1, activeSemester ? activeSemester.id : null];
+      const params = [selectedWeek, courseId || 1, activeSemester ? activeSemester.id : null];
       studentGroups.forEach((sg) => {
         params.push(sg.subject_id, sg.group_number);
       });
@@ -2881,10 +2604,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
         SELECT se.*, s.name AS subject_name
         FROM schedule_entries se
         JOIN subjects s ON s.id = se.subject_id
-        WHERE se.week_number = ? AND se.group_id = ? AND se.course_id = ? AND se.semester_id = ? AND s.visible = 1 AND s.group_id = ? AND (${conditions})
+        WHERE se.week_number = ? AND se.course_id = ? AND se.semester_id = ? AND s.visible = 1 AND (${conditions})
       `;
 
-      db.all(sql, [...params, groupId || null], (scheduleErr, rows) => {
+      db.all(sql, params, (scheduleErr, rows) => {
         if (scheduleErr) {
           return res.status(500).send('Database error');
         }
@@ -2904,18 +2627,18 @@ app.get('/schedule', requireLogin, async (req, res) => {
 });
 
 app.get('/teamwork', requireLogin, async (req, res) => {
-  const { id: userId, username, course_id: courseId, group_id: groupId } = req.session.user;
-  const activeSemester = await getActiveSemester(courseId || 1, groupId || null);
+  const { id: userId, username, course_id: courseId } = req.session.user;
+  const activeSemester = await getActiveSemester(courseId || 1);
   const selectedSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
   db.all(
     `
       SELECT sg.subject_id, s.name AS subject_name
       FROM student_groups sg
       JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ? AND s.show_in_teamwork = 1 AND s.visible = 1 AND s.course_id = ? AND s.group_id = ?
+      WHERE sg.student_id = ? AND s.show_in_teamwork = 1 AND s.visible = 1 AND s.course_id = ?
       ORDER BY s.name ASC
     `,
-    [userId, courseId || 1, groupId || null],
+    [userId, courseId || 1],
     (err, subjects) => {
       if (err) {
         return res.status(500).send('Database error');
@@ -2937,10 +2660,10 @@ app.get('/teamwork', requireLogin, async (req, res) => {
           SELECT t.*, s.name AS subject_name
           FROM teamwork_tasks t
           JOIN subjects s ON s.id = t.subject_id
-          WHERE t.subject_id = ? AND t.group_id = ? AND t.course_id = ? AND t.semester_id = ?
+          WHERE t.subject_id = ? AND t.course_id = ? AND t.semester_id = ?
           ORDER BY t.created_at DESC
         `,
-        [selectedSubjectId, groupId || null, courseId || 1, activeSemester ? activeSemester.id : null],
+        [selectedSubjectId, courseId || 1, activeSemester ? activeSemester.id : null],
         (taskErr, tasks) => {
           if (taskErr) {
             return res.status(500).send('Database error');
@@ -3051,10 +2774,10 @@ app.get('/teamwork', requireLogin, async (req, res) => {
                               SELECT u.id, u.full_name
                               FROM users u
                               JOIN student_groups sg ON sg.student_id = u.id
-                              WHERE sg.subject_id = ? AND u.course_id = ? AND u.group_id = ?
+                              WHERE sg.subject_id = ? AND u.course_id = ?
                               ORDER BY u.full_name ASC
                             `,
-                            [selectedSubjectId, courseId || 1, groupId || null],
+                            [selectedSubjectId, courseId || 1],
                             (stuErr, students) => {
                               if (stuErr) {
                                 return res.status(500).send('Database error');
@@ -3106,16 +2829,16 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
   if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
     return res.redirect('/teamwork?err=Invalid%20date');
   }
-  const { id: userId, course_id: courseId, group_id: groupId } = req.session.user;
+  const { id: userId, course_id: courseId } = req.session.user;
   const createdAt = new Date().toISOString();
   try {
-    const activeSemester = await getActiveSemester(courseId || 1, groupId || null);
+    const activeSemester = await getActiveSemester(courseId || 1);
     if (!activeSemester) {
       return res.redirect('/teamwork?err=No%20active%20semester');
     }
     const taskRow = await db.get(
-      'INSERT INTO teamwork_tasks (subject_id, title, created_by, created_at, due_date, course_id, group_id, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id',
-      [subjectId, title.trim(), userId, createdAt, dueDate, courseId || 1, groupId || null, activeSemester.id]
+      'INSERT INTO teamwork_tasks (subject_id, title, created_by, created_at, due_date, course_id, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
+      [subjectId, title.trim(), userId, createdAt, dueDate, courseId || 1, activeSemester.id]
     );
     if (!taskRow || !taskRow.id) {
       return res.redirect('/teamwork?err=Database%20error');
@@ -3360,9 +3083,8 @@ app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) =>
   }
   const createdAt = new Date().toISOString();
   const createdBy = req.session.user.id;
-  const groupId = getAdminGroup(req);
-  let courseId = getAdminCourse(req);
-  const activeSemester = await getActiveSemester(courseId, groupId);
+  const courseId = getAdminCourse(req);
+  const activeSemester = await getActiveSemester(courseId);
   const target = target_type || (String(target_all) === '1' ? 'all' : 'subject');
   const isAll = target === 'all';
   let messageStatus = (status || 'published').toLowerCase();
@@ -3394,8 +3116,8 @@ app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) =>
   try {
     const row = await db.get(
       `
-        INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, group_id, semester_id, status, scheduled_at, published_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+        INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
       `,
       [
         isAll || target === 'users' ? null : subjectId,
@@ -3405,7 +3127,6 @@ app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) =>
         createdBy,
         createdAt,
         courseId,
-        groupId,
         activeSemester ? activeSemester.id : null,
         messageStatus,
         scheduledAt,
@@ -3447,12 +3168,9 @@ app.post('/admin/messages/delete/:id', requireStaff, writeLimiter, (req, res) =>
   if (Number.isNaN(id)) {
     return res.redirect('/admin?err=Invalid%20message');
   }
-  const role = req.session.role;
-  const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
-  const groupId = role === 'admin' ? getAdminGroup(req) : (req.session.user.group_id || null);
   db.run('DELETE FROM message_reads WHERE message_id = ?', [id], () => {
     db.run('DELETE FROM message_targets WHERE message_id = ?', [id], () => {
-      db.run('DELETE FROM messages WHERE id = ? AND course_id = ? AND group_id = ?', [id, courseId, groupId || null], (err) => {
+      db.run('DELETE FROM messages WHERE id = ?', [id], (err) => {
         if (err) {
           return res.redirect('/admin?err=Database%20error');
         }
@@ -3464,17 +3182,17 @@ app.post('/admin/messages/delete/:id', requireStaff, writeLimiter, (req, res) =>
 });
 
 app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
-  const { id: userId, course_id: courseId, group_id: groupId } = req.session.user;
-  const activeSemester = await getActiveSemester(courseId || 1, groupId || null);
+  const { id: userId, course_id: courseId } = req.session.user;
+  const activeSemester = await getActiveSemester(courseId || 1);
   const filterSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
   db.all(
     `
       SELECT sg.subject_id, sg.group_number
       FROM student_groups sg
       JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ? AND s.course_id = ? AND s.group_id = ?
+      WHERE sg.student_id = ? AND s.course_id = ?
     `,
-    [userId, courseId || 1, groupId || null],
+    [userId, courseId || 1],
     (sgErr, groups) => {
       if (sgErr) {
         return res.status(500).json({ error: 'Database error' });
@@ -3490,11 +3208,11 @@ app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
       conditions.push('mt.user_id = ?');
       params.push(userId);
       const baseWhere = conditions.length ? `WHERE ${conditions.map((c) => `(${c})`).join(' OR ')}` : '';
-      const courseFilter = ' AND m.course_id = ? AND m.group_id = ?';
+      const courseFilter = ' AND m.course_id = ?';
       const semesterFilter = activeSemester ? ' AND m.semester_id = ?' : '';
       const statusFilter = " AND COALESCE(m.status, 'published') = 'published' AND (m.scheduled_at IS NULL OR m.scheduled_at <= ?)";
       const subjectFilter = !Number.isNaN(filterSubjectId) ? ' AND m.subject_id = ?' : '';
-      const finalParams = [...params, courseId || 1, groupId || null];
+      const finalParams = [...params, courseId || 1];
       if (activeSemester) {
         finalParams.push(activeSemester.id);
       }
@@ -3594,11 +3312,10 @@ app.get('/admin/api/messages/:id/reads', requireStaff, readLimiter, async (req, 
   if (Number.isNaN(messageId)) {
     return res.status(400).json({ error: 'Invalid message' });
   }
-  let courseId = getAdminCourse(req);
-  const groupId = getAdminGroup(req);
+  const courseId = getAdminCourse(req);
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId, groupId || null);
+    activeSemester = await getActiveSemester(courseId);
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
   }
@@ -3606,8 +3323,8 @@ app.get('/admin/api/messages/:id/reads', requireStaff, readLimiter, async (req, 
     const message = await db.get(
       `SELECT id, subject_id, group_number, target_all
        FROM messages
-       WHERE id = ? AND course_id = ? AND group_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
-      activeSemester ? [messageId, courseId, groupId || null, activeSemester.id] : [messageId, courseId, groupId || null]
+       WHERE id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
+      activeSemester ? [messageId, courseId, activeSemester.id] : [messageId, courseId]
     );
     if (!message) {
       return res.status(404).json({ error: 'Not found' });
@@ -3618,27 +3335,27 @@ app.get('/admin/api/messages/:id/reads', requireStaff, readLimiter, async (req, 
       recipients = await db.all(
         `SELECT u.id, u.full_name
          FROM users u
-         WHERE u.course_id = ? AND u.group_id = ? AND u.role = 'student'${activeFilter}
+         WHERE u.course_id = ? AND u.role = 'student'${activeFilter}
          ORDER BY u.full_name`,
-        [courseId, groupId || null]
+        [courseId]
       );
     } else if (message.subject_id) {
       recipients = await db.all(
         `SELECT DISTINCT u.id, u.full_name
          FROM student_groups sg
          JOIN users u ON u.id = sg.student_id
-         WHERE sg.subject_id = ? AND sg.group_number = ? AND u.course_id = ? AND u.group_id = ?${activeFilter}
+         WHERE sg.subject_id = ? AND sg.group_number = ? AND u.course_id = ?${activeFilter}
          ORDER BY u.full_name`,
-        [message.subject_id, message.group_number, courseId, groupId || null]
+        [message.subject_id, message.group_number, courseId]
       );
     } else {
       recipients = await db.all(
         `SELECT u.id, u.full_name
          FROM message_targets mt
          JOIN users u ON u.id = mt.user_id
-         WHERE mt.message_id = ? AND u.course_id = ? AND u.group_id = ?${activeFilter}
+         WHERE mt.message_id = ? AND u.course_id = ?${activeFilter}
          ORDER BY u.full_name`,
-        [message.id, courseId, groupId || null]
+        [message.id, courseId]
       );
     }
     const recipientIds = new Set((recipients || []).map((row) => String(row.id)));
@@ -3819,17 +3536,6 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
   } catch (err) {
     return handleDbError(res, err, 'init');
   }
-  let groupId = getAdminGroup(req);
-  let groups = [];
-  try {
-    groups = await getGroupsCached();
-  } catch (err) {
-    return handleDbError(res, err, 'admin.groups');
-  }
-  if (!groupId && groups.length) {
-    groupId = groups[0].id;
-    req.session.adminGroup = groupId;
-  }
   const courseId = getAdminCourse(req);
   const {
     group_number,
@@ -3854,37 +3560,22 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     teamwork_to,
     schedule_date,
   } = req.query;
-  let courses = [];
-  let semesters = [];
-  try {
-    courses = await getCoursesCached(groupId);
-    semesters = await getSemestersCached(courseId, groupId);
-  } catch (err) {
-    return handleDbError(res, err, 'admin.reference');
-  }
-  if (courses.length && !courses.some((c) => Number(c.id) === Number(courseId))) {
-    courseId = courses[0].id;
-    req.session.adminCourse = courseId;
-  }
+  const scheduleFilters = [];
+  const scheduleParams = [];
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId, groupId);
+    activeSemester = await getActiveSemester(courseId);
   } catch (err) {
     return handleDbError(res, err, 'admin.semester');
   }
 
-  const scheduleFilters = [];
-  const scheduleParams = [];
-  if (groupId) {
-    scheduleFilters.push('se.group_id = ?');
-    scheduleParams.push(groupId);
-  }
   scheduleFilters.push('se.course_id = ?');
   scheduleParams.push(courseId);
   if (activeSemester) {
     scheduleFilters.push('se.semester_id = ?');
     scheduleParams.push(activeSemester.id);
   }
+
   if (group_number) {
     scheduleFilters.push('se.group_number = ?');
     scheduleParams.push(group_number);
@@ -3915,6 +3606,15 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     ${scheduleWhere}
     ORDER BY se.week_number, se.day_of_week, se.class_number
   `;
+
+  let courses = [];
+  let semesters = [];
+  try {
+    courses = await getCoursesCached();
+    semesters = await getSemestersCached(courseId);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.reference');
+  }
   db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
     if (scheduleErr) {
       return handleDbError(res, scheduleErr, 'admin.schedule');
@@ -3923,10 +3623,6 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
 
     const homeworkFilters = [];
     const homeworkParams = [];
-    if (groupId) {
-      homeworkFilters.push('h.group_id = ?');
-      homeworkParams.push(groupId);
-    }
     homeworkFilters.push('h.course_id = ?');
     homeworkParams.push(courseId);
   if (activeSemester) {
@@ -4006,10 +3702,6 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         ensureUsersSchema(() => {
         const userFilters = ['course_id = ?'];
         const userParams = [courseId];
-        if (groupId) {
-          userFilters.unshift('group_id = ?');
-          userParams.unshift(groupId);
-        }
         if (usersHasIsActive) {
           if (users_status === 'inactive') {
             userFilters.push('is_active = 0');
@@ -4036,16 +3728,16 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
             if (res.headersSent) {
               return;
             }
-            getSubjectsCached(courseId, groupId)
+            getSubjectsCached(courseId)
               .then((subjects) => {
                 db.all(
                   `
                     SELECT sg.student_id, sg.subject_id, sg.group_number, s.name AS subject_name
                     FROM student_groups sg
                     JOIN subjects s ON s.id = sg.subject_id
-                    WHERE s.course_id = ? AND s.group_id = ?
+                    WHERE s.course_id = ?
                   `,
-                  [courseId, groupId],
+                  [courseId],
                   (sgErr, studentGroups) => {
                     if (sgErr) {
                       return handleDbError(res, sgErr, 'admin.studentGroups');
@@ -4055,10 +3747,6 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                     }
                   const historyFilters = [];
                   const historyParams = [];
-                  if (groupId) {
-                    historyFilters.push('group_id = ?');
-                    historyParams.push(groupId);
-                  }
                   historyFilters.push('course_id = ?');
                   historyParams.push(courseId);
                   if (history_actor) {
@@ -4096,10 +3784,6 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
       }
       const activityFilters = [];
       const activityParams = [];
-      if (groupId) {
-        activityFilters.push('group_id = ?');
-        activityParams.push(groupId);
-      }
       activityFilters.push('course_id = ?');
       activityParams.push(courseId);
       if (req.query.activity_user) {
@@ -4137,14 +3821,14 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
           if (res.headersSent) {
             return;
           }
-          const topParams = activeSemester ? [courseId, groupId || null, activeSemester.id] : [courseId, groupId || null];
+          const topParams = activeSemester ? [courseId, activeSemester.id] : [courseId];
           db.all(
             `
               SELECT user_id, user_name,
                      SUM(${ACTIVITY_POINTS_CASE}) AS points,
                      COUNT(*) AS actions_count
               FROM activity_log
-              WHERE course_id = ? AND group_id = ?${activeSemester ? ' AND semester_id = ?' : ''}
+              WHERE course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}
               GROUP BY user_id, user_name
               HAVING SUM(${ACTIVITY_POINTS_CASE}) > 0
               ORDER BY points DESC, actions_count DESC, user_name ASC
@@ -4158,8 +3842,8 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
               if (res.headersSent) {
                 return;
               }
-          const teamworkFilters = ['t.course_id = ?', 't.group_id = ?'];
-          const teamworkParams = [courseId, groupId || null];
+          const teamworkFilters = ['t.course_id = ?'];
+          const teamworkParams = [courseId];
           if (activeSemester) {
             teamworkFilters.push('t.semester_id = ?');
             teamworkParams.push(activeSemester.id);
@@ -4224,30 +3908,30 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                   WHEN m.target_all = 1 THEN (
                                     SELECT COUNT(*)
                                     FROM users u2
-                                    WHERE u2.course_id = ? AND u2.group_id = ? AND u2.role = 'student' AND u2.is_active = 1
+                                    WHERE u2.course_id = ? AND u2.role = 'student' AND u2.is_active = 1
                                   )
                                   WHEN m.subject_id IS NOT NULL THEN (
                                     SELECT COUNT(DISTINCT sg.student_id)
                                     FROM student_groups sg
                                     JOIN users u3 ON u3.id = sg.student_id
                                     WHERE sg.subject_id = m.subject_id AND sg.group_number = m.group_number
-                                      AND u3.course_id = ? AND u3.group_id = ? AND u3.is_active = 1
+                                      AND u3.course_id = ? AND u3.is_active = 1
                                   )
                                   ELSE (
                                     SELECT COUNT(*)
                                     FROM message_targets mt
                                     JOIN users u4 ON u4.id = mt.user_id
-                                    WHERE mt.message_id = m.id AND u4.course_id = ? AND u4.group_id = ? AND u4.is_active = 1
+                                    WHERE mt.message_id = m.id AND u4.course_id = ? AND u4.is_active = 1
                                   )
                                 END AS target_count
                               ) targets ON true
-                              WHERE m.course_id = ? AND m.group_id = ?${activeSemester ? ' AND m.semester_id = ?' : ''}
+                              WHERE m.course_id = ?${activeSemester ? ' AND m.semester_id = ?' : ''}
                               ORDER BY m.created_at DESC
                               LIMIT 200
                             `,
                             activeSemester
-                              ? [courseId, groupId || null, courseId, groupId || null, courseId, groupId || null, courseId, groupId || null, activeSemester.id]
-                              : [courseId, groupId || null, courseId, groupId || null, courseId, groupId || null, courseId, groupId || null],
+                              ? [courseId, courseId, courseId, courseId, activeSemester.id]
+                              : [courseId, courseId, courseId, courseId],
                             (msgErr, messages) => {
                               if (msgErr) {
                                 return handleDbError(res, msgErr, 'admin.messages');
@@ -4255,7 +3939,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                               if (res.headersSent) {
                                 return;
                               }
-                              const statsParams = activeSemester ? [courseId, groupId || null, activeSemester.id] : [courseId, groupId || null];
+                              const statsParams = activeSemester ? [courseId, activeSemester.id] : [courseId];
                               (async () => {
                                 try {
                                   const [
@@ -4266,16 +3950,16 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                     teamworkGroupsRow,
                                     teamworkMembersRow,
                                   ] = await Promise.all([
-                                    db.get('SELECT COUNT(*) AS count FROM users WHERE course_id = ? AND group_id = ?', [courseId, groupId || null]),
-                                    db.get('SELECT COUNT(*) AS count FROM subjects WHERE course_id = ? AND group_id = ?', [courseId, groupId || null]),
+                                    db.get('SELECT COUNT(*) AS count FROM users WHERE course_id = ?', [courseId]),
+                                    db.get('SELECT COUNT(*) AS count FROM subjects WHERE course_id = ?', [courseId]),
                                     db.get(
-                                      `SELECT COUNT(*) AS count FROM homework WHERE course_id = ? AND group_id = ?${
+                                      `SELECT COUNT(*) AS count FROM homework WHERE course_id = ?${
                                         activeSemester ? ' AND semester_id = ?' : ''
                                       }`,
                                       statsParams
                                     ),
                                     db.get(
-                                      `SELECT COUNT(*) AS count FROM teamwork_tasks WHERE course_id = ? AND group_id = ?${
+                                      `SELECT COUNT(*) AS count FROM teamwork_tasks WHERE course_id = ?${
                                         activeSemester ? ' AND semester_id = ?' : ''
                                       }`,
                                       statsParams
@@ -4284,14 +3968,14 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                       `SELECT COUNT(*) AS count
                                        FROM teamwork_groups g
                                        JOIN teamwork_tasks t ON t.id = g.task_id
-                                       WHERE t.course_id = ? AND t.group_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
+                                       WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
                                       statsParams
                                     ),
                                     db.get(
                                       `SELECT COUNT(*) AS count
                                        FROM teamwork_members m
                                        JOIN teamwork_tasks t ON t.id = m.task_id
-                                       WHERE t.course_id = ? AND t.group_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
+                                       WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
                                       statsParams
                                     ),
                                   ]);
@@ -4321,13 +4005,13 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     let weeklyUserSeries = weeklyUserRoles.map(() => weeklyLabels.map(() => 0));
     try {
       const weeklyParams = activeSemester
-        ? [courseId, groupId || null, weekStart.toISOString(), activeSemester.id]
-        : [courseId, groupId || null, weekStart.toISOString()];
+        ? [courseId, weekStart.toISOString(), activeSemester.id]
+        : [courseId, weekStart.toISOString()];
       const [weeklyHomeworkRows, weeklyTeamworkRows, weeklyUsersRows] = await Promise.all([
         db.all(
           `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
            FROM homework
-           WHERE course_id = ? AND group_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
            GROUP BY day
            ORDER BY day`,
           weeklyParams
@@ -4335,7 +4019,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         db.all(
           `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
            FROM teamwork_tasks
-           WHERE course_id = ? AND group_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
            GROUP BY day
            ORDER BY day`,
           weeklyParams
@@ -4343,10 +4027,10 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         db.all(
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
            FROM users
-           WHERE course_id = ? AND group_id = ? AND created_at >= ?
+           WHERE course_id = ? AND created_at >= ?
            GROUP BY day, role
            ORDER BY day`,
-          [courseId, groupId || null, weekStart.toISOString()]
+          [courseId, weekStart.toISOString()]
         ),
       ]);
 
@@ -4402,11 +4086,9 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                       teamworkTasks,
                                       adminMessages: messages,
                                       courses,
-                                      groups,
         semesters,
         activeSemester,
         selectedCourseId: courseId,
-        selectedGroupId: groupId,
         limitedStaffView: false,
         weeklyLabels,
         weeklyHomework,
@@ -4566,20 +4248,9 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
   const isAdmin = role === 'admin';
   const isDeanery = role === 'deanery';
   const isStarosta = role === 'starosta';
-  let groups = [];
-  let groupId = isAdmin ? getAdminGroup(req) : getActiveGroupId(req);
-  try {
-    groups = await getGroupsCached();
-  } catch (err) {
-    return handleDbError(res, err, 'admin.overview.groups');
-  }
-  if (!groupId && groups.length) {
-    groupId = groups[0].id;
-    req.session.adminGroup = groupId;
-  }
   let courses = [];
   try {
-    courses = await getCoursesCached(groupId);
+    courses = await getCoursesCached();
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.courses');
   }
@@ -4595,12 +4266,12 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
   }
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId, groupId);
+    activeSemester = await getActiveSemester(courseId);
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.semester');
   }
   try {
-    const statsParams = activeSemester ? [groupId, courseId, activeSemester.id] : [groupId, courseId];
+    const statsParams = activeSemester ? [courseId, activeSemester.id] : [courseId];
     const [
       usersRow,
       subjectsRow,
@@ -4609,28 +4280,28 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
       teamworkGroupsRow,
       teamworkMembersRow,
     ] = await Promise.all([
-      db.get('SELECT COUNT(*) AS count FROM users WHERE group_id = ? AND course_id = ?', [groupId, courseId]),
-      db.get('SELECT COUNT(*) AS count FROM subjects WHERE group_id = ? AND course_id = ?', [groupId, courseId]),
+      db.get('SELECT COUNT(*) AS count FROM users WHERE course_id = ?', [courseId]),
+      db.get('SELECT COUNT(*) AS count FROM subjects WHERE course_id = ?', [courseId]),
       db.get(
-        `SELECT COUNT(*) AS count FROM homework WHERE group_id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
+        `SELECT COUNT(*) AS count FROM homework WHERE course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
         statsParams
       ),
       db.get(
-        `SELECT COUNT(*) AS count FROM teamwork_tasks WHERE group_id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
+        `SELECT COUNT(*) AS count FROM teamwork_tasks WHERE course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
         statsParams
       ),
       db.get(
         `SELECT COUNT(*) AS count
          FROM teamwork_groups g
          JOIN teamwork_tasks t ON t.id = g.task_id
-         WHERE t.group_id = ? AND t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
+         WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
         statsParams
       ),
       db.get(
         `SELECT COUNT(*) AS count
          FROM teamwork_members m
          JOIN teamwork_tasks t ON t.id = m.task_id
-         WHERE t.group_id = ? AND t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
+         WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
         statsParams
       ),
                                   ]);
@@ -4660,13 +4331,13 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
     let weeklyUserSeries = weeklyUserRoles.map(() => weeklyLabels.map(() => 0));
     try {
       const weeklyParams = activeSemester
-        ? [groupId, courseId, weekStart.toISOString(), activeSemester.id]
-        : [groupId, courseId, weekStart.toISOString()];
+        ? [courseId, weekStart.toISOString(), activeSemester.id]
+        : [courseId, weekStart.toISOString()];
       const [weeklyHomeworkRows, weeklyTeamworkRows, weeklyUsersRows] = await Promise.all([
         db.all(
           `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
            FROM homework
-           WHERE group_id = ? AND course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
            GROUP BY day
            ORDER BY day`,
           weeklyParams
@@ -4674,7 +4345,7 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
         db.all(
           `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
            FROM teamwork_tasks
-           WHERE group_id = ? AND course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
+           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
            GROUP BY day
            ORDER BY day`,
           weeklyParams
@@ -4682,10 +4353,10 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
         db.all(
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
            FROM users
-           WHERE group_id = ? AND course_id = ? AND created_at >= ?
+           WHERE course_id = ? AND created_at >= ?
            GROUP BY day, role
            ORDER BY day`,
-          [groupId, courseId, weekStart.toISOString()]
+          [courseId, weekStart.toISOString()]
         ),
       ]);
 
@@ -4726,9 +4397,7 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
       username: req.session.user.username,
       role: req.session.role,
       courses,
-      groups,
       selectedCourseId: courseId,
-      selectedGroupId: groupId,
       dashboardStats,
       weeklyLabels,
       weeklyHomework,
@@ -4737,9 +4406,7 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
       weeklyUserSeries,
       limitedStaffView: isStarosta,
       allowCourseSelect: isAdmin || isDeanery,
-      backLink: isAdmin
-        ? `/admin?group_id=${groupId || ''}&course=${courseId}`
-        : (isDeanery ? `/deanery?group_id=${groupId || ''}&course=${courseId}` : '/starosta'),
+      backLink: isAdmin ? `/admin?course=${courseId}` : (isDeanery ? `/deanery?course=${courseId}` : '/starosta'),
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.stats');
@@ -4755,15 +4422,10 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
   const status = req.query.status;
   const q = req.query.q;
   const group = req.query.group;
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
   ensureUsersSchema(() => {
     const userFilters = ['course_id = ?'];
     const userParams = [courseId];
-    if (groupId) {
-      userFilters.unshift('group_id = ?');
-      userParams.unshift(groupId);
-    }
     if (usersHasIsActive) {
       if (status === 'inactive') {
         userFilters.push('is_active = 0');
@@ -4783,31 +4445,31 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
     const cols = usersHasIsActive ? 'id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at'
       : 'id, full_name, role, schedule_group, last_login_ip, last_user_agent, last_login_at';
     db.all(
-      `SELECT ${cols}, course_id, group_id FROM users ${userWhere} ORDER BY full_name`,
+      `SELECT ${cols}, course_id FROM users ${userWhere} ORDER BY full_name`,
       userParams,
       (userErr, users) => {
         if (userErr) {
           console.error('Database error (admin.users.json.users)', userErr);
           return res.status(500).json({ error: 'Database error' });
         }
-        getSubjectsCached(courseId, groupId)
+        getSubjectsCached(courseId)
           .then((subjects) => {
-            getCoursesCached(groupId)
+            getCoursesCached()
               .then((courses) => {
                 db.all(
                   `
                     SELECT sg.student_id, sg.subject_id, sg.group_number
                     FROM student_groups sg
                     JOIN subjects s ON s.id = sg.subject_id
-                    WHERE s.course_id = ? AND s.group_id = ?
+                    WHERE s.course_id = ?
                   `,
-                  [courseId, groupId],
+                  [courseId],
                   (sgErr, studentGroups) => {
                     if (sgErr) {
                       console.error('Database error (admin.users.json.studentGroups)', sgErr);
                       return res.status(500).json({ error: 'Database error' });
                     }
-                    res.json({ users, subjects, studentGroups, courses, selectedCourseId: courseId, selectedGroupId: groupId });
+                    res.json({ users, subjects, studentGroups, courses, selectedCourseId: courseId });
                   }
                 );
               })
@@ -4826,18 +4488,17 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
 });
 
 app.get('/admin/export/schedule.csv', requireAdmin, async (req, res) => {
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
-  const activeSemester = await getActiveSemester(courseId, groupId);
+  const activeSemester = await getActiveSemester(courseId);
   db.all(
     `
       SELECT se.id, s.name AS subject, se.group_number, se.day_of_week, se.class_number, se.week_number
       FROM schedule_entries se
       JOIN subjects s ON s.id = se.subject_id
-      WHERE se.group_id = ? AND se.course_id = ?${activeSemester ? ' AND se.semester_id = ?' : ''}
+      WHERE se.course_id = ?${activeSemester ? ' AND se.semester_id = ?' : ''}
       ORDER BY se.week_number, se.day_of_week, se.class_number
     `,
-    activeSemester ? [groupId, courseId, activeSemester.id] : [groupId, courseId],
+    activeSemester ? [courseId, activeSemester.id] : [courseId],
     (err, rows) => {
       if (err) {
         return res.status(500).send('Database error');
@@ -4859,11 +4520,10 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
   if (!req.file || !req.file.buffer) {
     return res.redirect('/admin?err=Missing%20CSV');
   }
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId, groupId);
+    activeSemester = await getActiveSemester(courseId);
   } catch (err) {
     return res.redirect('/admin?err=Semester%20error');
   }
@@ -4872,7 +4532,7 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
   }
   let subjects = [];
   try {
-    subjects = await getSubjectsCached(courseId, groupId);
+    subjects = await getSubjectsCached(courseId);
   } catch (err) {
     return res.redirect('/admin?err=Subjects%20error');
   }
@@ -4905,9 +4565,9 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
     }
     const existing = await db.get(
       `SELECT id FROM schedule_entries
-       WHERE group_id = ? AND course_id = ? AND semester_id = ? AND week_number = ?
+       WHERE course_id = ? AND semester_id = ? AND week_number = ?
          AND day_of_week = ? AND class_number = ? AND group_number = ?`,
-      [groupId, courseId, activeSemester.id, weekNumber, dayOfWeek, classNumber, groupNumber]
+      [courseId, activeSemester.id, weekNumber, dayOfWeek, classNumber, groupNumber]
     );
     if (existing && existing.id) {
       await db.run('UPDATE schedule_entries SET subject_id = ? WHERE id = ?', [subject.id, existing.id]);
@@ -4915,9 +4575,9 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
     } else {
       await db.run(
         `INSERT INTO schedule_entries
-         (subject_id, group_number, day_of_week, class_number, week_number, course_id, group_id, semester_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [subject.id, groupNumber, dayOfWeek, classNumber, weekNumber, courseId, groupId, activeSemester.id]
+         (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [subject.id, groupNumber, dayOfWeek, classNumber, weekNumber, courseId, activeSemester.id]
       );
       inserted += 1;
     }
@@ -4927,16 +4587,11 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
 });
 
 app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
-  const groupId = Number(req.query.group_id || getAdminGroup(req));
   const courseId = Number(req.query.course || getAdminCourse(req));
   const semesterId = req.query.semester_id ? Number(req.query.semester_id) : null;
   const group = req.query.group;
   const filters = ['u.course_id = ?'];
   const params = [courseId];
-  if (groupId) {
-    filters.unshift('u.group_id = ?');
-    params.unshift(groupId);
-  }
   if (group) {
     filters.push('u.schedule_group = ?');
     params.push(group);
@@ -4950,8 +4605,6 @@ app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
           ON se.subject_id = sg.subject_id
          AND se.group_number = sg.group_number
          AND se.semester_id = ?
-         AND se.course_id = u.course_id
-         AND se.group_id = u.group_id
         WHERE sg.student_id = u.id
       )`
     );
@@ -4959,7 +4612,7 @@ app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
   }
   const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
   db.all(
-    `SELECT u.id, u.full_name, u.role, u.schedule_group, u.is_active, u.course_id, u.group_id
+    `SELECT u.id, u.full_name, u.role, u.schedule_group, u.is_active, u.course_id
      FROM users u
      ${where}
      ORDER BY u.full_name`,
@@ -4968,9 +4621,9 @@ app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
     if (err) {
       return res.status(500).send('Database error');
     }
-    const header = 'id,full_name,role,schedule_group,is_active,course_id,group_id';
+    const header = 'id,full_name,role,schedule_group,is_active,course_id';
     const lines = rows.map((r) =>
-      [r.id, r.full_name, r.role, r.schedule_group, r.is_active, r.course_id, r.group_id]
+      [r.id, r.full_name, r.role, r.schedule_group, r.is_active, r.course_id]
         .map((v) => `"${String(v ?? '').replace(/\"/g, '""')}"`)
         .join(',')
     );
@@ -4984,14 +4637,13 @@ app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single
   if (!req.file || !req.file.buffer) {
     return res.redirect('/admin?err=Missing%20CSV');
   }
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
   let rows = [];
   let courses = [];
   try {
     const text = req.file.buffer.toString('utf8');
     rows = parseCsvText(text);
-    courses = await getCoursesCached(groupId);
+    courses = await getCoursesCached();
   } catch (err) {
     return res.redirect('/admin?err=Invalid%20CSV');
   }
@@ -5013,21 +4665,20 @@ app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single
     const isActive = row.is_active === '' ? 1 : Number(row.is_active) ? 1 : 0;
     const rowCourse = row.course_id ? Number(row.course_id) : courseId;
     const finalCourse = courseSet.has(rowCourse) ? rowCourse : courseId;
-    const rowGroup = row.group_id ? Number(row.group_id) : groupId;
     const existing = await db.get('SELECT id FROM users WHERE LOWER(full_name) = LOWER(?)', [fullName]);
     if (existing && existing.id) {
       await db.run(
         `UPDATE users
-         SET role = ?, schedule_group = ?, is_active = ?, course_id = ?, group_id = ?, language = COALESCE(language, ?)
+         SET role = ?, schedule_group = ?, is_active = ?, course_id = ?, language = COALESCE(language, ?)
          WHERE id = ?`,
-        [role || 'student', scheduleGroup || 'A', isActive, finalCourse, rowGroup, 'uk', existing.id]
+        [role || 'student', scheduleGroup || 'A', isActive, finalCourse, 'uk', existing.id]
       );
       updated += 1;
     } else {
       await db.run(
-        `INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id, group_id, language)
-         VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
-        [fullName, role || 'student', isActive, scheduleGroup || 'A', finalCourse, rowGroup, 'uk']
+        `INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id, language)
+         VALUES (?, ?, NULL, ?, ?, ?, ?)`,
+        [fullName, role || 'student', isActive, scheduleGroup || 'A', finalCourse, 'uk']
       );
       inserted += 1;
     }
@@ -5038,9 +4689,8 @@ app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single
 });
 
 app.get('/admin/export/subjects.csv', requireAdmin, (req, res) => {
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
-  db.all('SELECT id, name, group_count, default_group FROM subjects WHERE course_id = ? AND group_id = ? ORDER BY name', [courseId, groupId], (err, rows) => {
+  db.all('SELECT id, name, group_count, default_group FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (err, rows) => {
     if (err) {
       return res.status(500).send('Database error');
     }
@@ -5060,7 +4710,6 @@ app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.sin
   if (!req.file || !req.file.buffer) {
     return res.redirect('/admin?err=Missing%20CSV');
   }
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
   let rows = [];
   try {
@@ -5083,22 +4732,22 @@ app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.sin
       skipped += 1;
       continue;
     }
-    const existing = await db.get('SELECT id FROM subjects WHERE name = ? AND group_id = ?', [name, groupId]);
+    const existing = await db.get('SELECT id FROM subjects WHERE name = ?', [name]);
     if (existing && existing.id) {
       await db.run(
-        'UPDATE subjects SET group_count = ?, default_group = ?, course_id = ?, group_id = ? WHERE id = ?',
-        [groupCount, defaultGroup, courseId, groupId, existing.id]
+        'UPDATE subjects SET group_count = ?, default_group = ?, course_id = ? WHERE id = ?',
+        [groupCount, defaultGroup, courseId, existing.id]
       );
       updated += 1;
     } else {
       await db.run(
-        'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id, group_id) VALUES (?, ?, ?, 1, 1, ?, ?)',
-        [name, groupCount, defaultGroup, courseId, groupId]
+        'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id) VALUES (?, ?, ?, 1, 1, ?)',
+        [name, groupCount, defaultGroup, courseId]
       );
       inserted += 1;
     }
   }
-  invalidateSubjectsCache(courseId, groupId);
+  invalidateSubjectsCache(courseId);
   logAction(db, req, 'subjects_import_csv', { inserted, updated, skipped, course_id: courseId });
   return res.redirect(`/admin?ok=Subjects%20imported%20(${inserted}%2F${updated}%2F${skipped})`);
 });
@@ -5237,9 +4886,9 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
     return res.status(400).send('Invalid data');
   }
 
-  const { schedule_group: group, username, id: userId, course_id: courseId, group_id: groupId } = req.session.user;
+  const { schedule_group: group, username, id: userId, course_id: courseId } = req.session.user;
   const createdAt = new Date().toISOString();
-  const activeSemester = await getActiveSemester(courseId || 1, groupId || null);
+  const activeSemester = await getActiveSemester(courseId || 1);
   const isStaff = ['admin', 'deanery', 'starosta'].includes(req.session.role);
   let homeworkStatus = isStaff ? String(req.body.status || 'published').toLowerCase() : 'published';
   if (!['draft', 'scheduled', 'published'].includes(homeworkStatus)) {
@@ -5269,8 +4918,8 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   }
 
   try {
-    const subjectRow = await db.get('SELECT name, course_id, group_id FROM subjects WHERE id = ?', [subjectId]);
-    if (!subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1)) || (subjectRow.group_id && subjectRow.group_id !== (groupId || null))) {
+    const subjectRow = await db.get('SELECT name, course_id FROM subjects WHERE id = ?', [subjectId]);
+    if (!subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
       if (req.file) {
         fs.unlink(req.file.path, () => {});
       }
@@ -5280,8 +4929,8 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
     const row = await db.get(
       `
         INSERT INTO homework
-        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, group_id, semester_id, status, scheduled_at, published_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, status, scheduled_at, published_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `,
       [
@@ -5303,7 +4952,6 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
         username,
         createdAt,
         courseId || 1,
-        groupId || null,
         activeSemester ? activeSemester.id : null,
         homeworkStatus,
         scheduledAt,
@@ -5372,9 +5020,9 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
     return res.status(400).send('Invalid date');
   }
 
-  const { schedule_group: group, username, id: userId, course_id: courseId, group_id: groupId } = req.session.user;
+  const { schedule_group: group, username, id: userId, course_id: courseId } = req.session.user;
   const createdAt = new Date().toISOString();
-  const activeSemester = await getActiveSemester(courseId || 1, groupId || null);
+  const activeSemester = await getActiveSemester(courseId || 1);
   const isStaff = ['admin', 'deanery', 'starosta'].includes(req.session.role);
   let homeworkStatus = isStaff ? String(req.body.status || 'published').toLowerCase() : 'published';
   if (!['draft', 'scheduled', 'published'].includes(homeworkStatus)) {
@@ -5404,8 +5052,8 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
   }
 
   try {
-    const subjectRow = await db.get('SELECT name, course_id, group_id FROM subjects WHERE id = ?', [subjectId]);
-    if (!subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1)) || (subjectRow.group_id && subjectRow.group_id !== (groupId || null))) {
+    const subjectRow = await db.get('SELECT name, course_id FROM subjects WHERE id = ?', [subjectId]);
+    if (!subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
       if (req.file) {
         fs.unlink(req.file.path, () => {});
       }
@@ -5425,8 +5073,8 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
     const row = await db.get(
       `
         INSERT INTO homework
-        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, group_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `,
       [
@@ -5448,7 +5096,6 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
         username,
         createdAt,
         courseId || 1,
-        groupId || null,
         activeSemester ? activeSemester.id : null,
         1,
         dueDate,
@@ -5530,7 +5177,6 @@ app.get('/starosta', requireStaff, async (req, res) => {
   }
 
   const courseId = req.session.user.course_id || 1;
-  const groupId = req.session.user.group_id || null;
   const {
     group_number,
     subject,
@@ -5542,29 +5188,29 @@ app.get('/starosta', requireStaff, async (req, res) => {
   } = req.query;
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId, groupId || null);
+    activeSemester = await getActiveSemester(courseId);
   } catch (err) {
     return handleDbError(res, err, 'starosta.activeSemester');
   }
-  db.all('SELECT id, name FROM courses WHERE id = ? AND group_id = ?', [courseId, groupId || null], (courseErr, courses) => {
+  db.all('SELECT id, name FROM courses WHERE id = ?', [courseId], (courseErr, courses) => {
     if (courseErr) {
       return handleDbError(res, courseErr, 'starosta.courses');
     }
     db.all(
-      'SELECT * FROM semesters WHERE course_id = ? AND group_id = ? ORDER BY start_date DESC',
-      [courseId, groupId || null],
+      'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
+      [courseId],
       (semErr, semesters) => {
         if (semErr) {
           return handleDbError(res, semErr, 'starosta.semesters');
         }
     db.all(
-      'SELECT id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at, course_id FROM users WHERE course_id = ? AND group_id = ? ORDER BY full_name',
-      [courseId, groupId || null],
+      'SELECT id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at, course_id FROM users WHERE course_id = ? ORDER BY full_name',
+      [courseId],
       (userErr, users) => {
         if (userErr) {
           return handleDbError(res, userErr, 'starosta.users');
         }
-        db.all('SELECT * FROM subjects WHERE course_id = ? AND group_id = ? ORDER BY name', [courseId, groupId || null], (subjectErr, subjects) => {
+        db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
           if (subjectErr) {
             return handleDbError(res, subjectErr, 'starosta.subjects');
           }
@@ -5572,8 +5218,6 @@ app.get('/starosta', requireStaff, async (req, res) => {
           const homeworkParams = [];
           homeworkFilters.push('h.course_id = ?');
           homeworkParams.push(courseId);
-          homeworkFilters.push('h.group_id = ?');
-          homeworkParams.push(groupId || null);
           if (activeSemester) {
             homeworkFilters.push('h.semester_id = ?');
             homeworkParams.push(activeSemester.id);
@@ -5651,11 +5295,11 @@ app.get('/starosta', requireStaff, async (req, res) => {
               JOIN subjects s ON s.id = t.subject_id
               LEFT JOIN teamwork_groups g ON g.task_id = t.id
               LEFT JOIN teamwork_members m ON m.task_id = t.id
-              WHERE t.group_id = ? AND t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}
+              WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}
               GROUP BY t.id, t.title, t.created_at, s.name
               ORDER BY t.created_at DESC
             `,
-            activeSemester ? [groupId, courseId, activeSemester.id] : [groupId, courseId],
+            activeSemester ? [courseId, activeSemester.id] : [courseId],
             (taskErr, teamworkTasks) => {
               if (taskErr) {
                 return handleDbError(res, taskErr, 'starosta.teamwork');
@@ -5678,30 +5322,30 @@ app.get('/starosta', requireStaff, async (req, res) => {
                       WHEN m.target_all = 1 THEN (
                         SELECT COUNT(*)
                         FROM users u2
-                        WHERE u2.group_id = ? AND u2.course_id = ? AND u2.role = 'student' AND u2.is_active = 1
+                        WHERE u2.course_id = ? AND u2.role = 'student' AND u2.is_active = 1
                       )
                       WHEN m.subject_id IS NOT NULL THEN (
                         SELECT COUNT(DISTINCT sg.student_id)
                         FROM student_groups sg
                         JOIN users u3 ON u3.id = sg.student_id
                         WHERE sg.subject_id = m.subject_id AND sg.group_number = m.group_number
-                          AND u3.group_id = ? AND u3.course_id = ? AND u3.is_active = 1
+                          AND u3.course_id = ? AND u3.is_active = 1
                       )
                       ELSE (
                         SELECT COUNT(*)
                         FROM message_targets mt
                         JOIN users u4 ON u4.id = mt.user_id
-                        WHERE mt.message_id = m.id AND u4.group_id = ? AND u4.course_id = ? AND u4.is_active = 1
+                        WHERE mt.message_id = m.id AND u4.course_id = ? AND u4.is_active = 1
                       )
                     END AS target_count
                   ) targets ON true
-                  WHERE m.group_id = ? AND m.course_id = ?${activeSemester ? ' AND m.semester_id = ?' : ''}
+                  WHERE m.course_id = ?${activeSemester ? ' AND m.semester_id = ?' : ''}
                   ORDER BY m.created_at DESC
                   LIMIT 200
                 `,
                 activeSemester
-                  ? [groupId, courseId, groupId, courseId, groupId, courseId, groupId, courseId, activeSemester.id]
-                  : [groupId, courseId, groupId, courseId, groupId, courseId, groupId, courseId],
+                  ? [courseId, courseId, courseId, courseId, activeSemester.id]
+                  : [courseId, courseId, courseId, courseId],
                 (msgErr, messages) => {
                   if (msgErr) {
                     return handleDbError(res, msgErr, 'starosta.messages');
@@ -5721,11 +5365,9 @@ app.get('/starosta', requireStaff, async (req, res) => {
                       teamworkTasks,
                       adminMessages: messages,
                       courses,
-                      groups,
                       semesters,
                       activeSemester,
                       selectedCourseId: courseId,
-                      selectedGroupId: groupId,
                       limitedStaffView: true,
                       allowedSections: ['admin-homework', 'admin-teamwork', 'admin-messages', 'admin-overview'],
                       filters: {
@@ -5767,27 +5409,16 @@ app.get('/deanery', requireDeanery, (req, res) => {
     } catch (err) {
       return handleDbError(res, err, 'deanery.init');
     }
-    const groupId = Number(req.query.group_id || req.session.user.group_id || null);
-    let groups = [];
-    try {
-      groups = await getGroupsCached();
-    } catch (err) {
-      return handleDbError(res, err, 'deanery.groups');
-    }
     const courseId = Number(req.query.course || req.session.user.course_id || 1);
     const { group_number, day, subject, sort_schedule, schedule_date } = req.query;
     let activeSemester = null;
     try {
-      activeSemester = await getActiveSemester(courseId, groupId);
+      activeSemester = await getActiveSemester(courseId);
     } catch (err) {
       return handleDbError(res, err, 'deanery.activeSemester');
     }
     const scheduleFilters = [];
     const scheduleParams = [];
-    if (groupId) {
-      scheduleFilters.push('se.group_id = ?');
-      scheduleParams.push(groupId);
-    }
     scheduleFilters.push('se.course_id = ?');
     scheduleParams.push(courseId);
     if (activeSemester) {
@@ -5823,50 +5454,64 @@ app.get('/deanery', requireDeanery, (req, res) => {
       ${scheduleWhere}
       ORDER BY se.week_number, se.day_of_week, se.class_number
     `;
-    const courses = await getCoursesCached(groupId);
-    const semesters = await getSemestersCached(courseId, groupId);
-    const subjects = await getSubjectsCached(courseId, groupId);
-    db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
-      if (scheduleErr) {
-        return handleDbError(res, scheduleErr, 'deanery.schedule');
+    db.all('SELECT id, name FROM courses ORDER BY id', [], (courseErr, courses) => {
+      if (courseErr) {
+        return handleDbError(res, courseErr, 'deanery.courses');
       }
-      const schedule = sortSchedule(scheduleRows, sort_schedule);
-      try {
-        return res.render('admin', {
-          username: req.session.user.username,
-          userId: req.session.user.id,
-          role: req.session.role,
-          schedule,
-          homework: [],
-          users: [],
-          subjects,
-          studentGroups: [],
-          logs: [],
-          teamworkTasks: [],
-          adminMessages: [],
-          courses,
-          groups,
-          semesters,
-          activeSemester,
-          selectedCourseId: courseId,
-          selectedGroupId: groupId,
-          limitedStaffView: true,
-          allowedSections: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-overview'],
-          filters: {
-            group_number: group_number || '',
-            day: day || '',
-            subject: subject || '',
-            schedule_date: schedule_date || '',
-          },
-          usersStatus: 'active',
-          sorts: {
-            schedule: sort_schedule || '',
-            homework: '',
-          },
-        });
-      } catch (renderErr) {
-        return handleDbError(res, renderErr, 'deanery.render');
-      }
+      db.all(
+        'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
+        [courseId],
+        (semErr, semesters) => {
+          if (semErr) {
+            return handleDbError(res, semErr, 'deanery.semesters');
+          }
+          db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
+            if (subjectErr) {
+              return handleDbError(res, subjectErr, 'deanery.subjects');
+            }
+            db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
+              if (scheduleErr) {
+                return handleDbError(res, scheduleErr, 'deanery.schedule');
+              }
+              const schedule = sortSchedule(scheduleRows, sort_schedule);
+              try {
+                return res.render('admin', {
+                  username: req.session.user.username,
+                  userId: req.session.user.id,
+                  role: req.session.role,
+                  schedule,
+                  homework: [],
+                  users: [],
+                  subjects,
+                  studentGroups: [],
+                  logs: [],
+                  teamworkTasks: [],
+                  adminMessages: [],
+                  courses,
+                  semesters,
+                  activeSemester,
+                  selectedCourseId: courseId,
+                  limitedStaffView: true,
+                  allowedSections: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-overview'],
+                  filters: {
+                    group_number: group_number || '',
+                    day: day || '',
+                    subject: subject || '',
+                    schedule_date: schedule_date || '',
+                  },
+                  usersStatus: 'active',
+                  sorts: {
+                    schedule: sort_schedule || '',
+                    homework: '',
+                  },
+                });
+              } catch (renderErr) {
+                return handleDbError(res, renderErr, 'deanery.render');
+              }
+            });
+          });
+        }
+      );
     });
   })();
 });
@@ -5928,7 +5573,6 @@ app.post('/admin/schedule/add', requireAdmin, (req, res) => {
   const { subject_id, group_number, day_of_week, class_number, week_numbers, semester_id } = req.body;
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
   const semesterId = Number(semester_id);
 
@@ -5942,7 +5586,7 @@ app.post('/admin/schedule/add', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20class%20number');
   }
 
-  db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ? AND group_id = ?', [semesterId, courseId, groupId], (semErr, semRow) => {
+  db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId], (semErr, semRow) => {
     if (semErr || !semRow) {
       return res.redirect('/admin?err=Invalid%20semester');
     }
@@ -5957,10 +5601,10 @@ app.post('/admin/schedule/add', requireAdmin, (req, res) => {
     }
 
     const stmt = db.prepare(
-      'INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id, group_id, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
     uniqueWeeks.forEach((week) => {
-      stmt.run(subject_id, groupNum, day_of_week, classNum, week, courseId, groupId, semesterId);
+      stmt.run(subject_id, groupNum, day_of_week, classNum, week, courseId, semesterId);
     });
     stmt.finalize((err) => {
       if (err) {
@@ -5993,7 +5637,6 @@ app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
   const weekNum = Number(week_number);
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
   const semesterId = Number(semester_id);
 
@@ -6007,7 +5650,7 @@ app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20class%20or%20week');
   }
 
-  db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ? AND group_id = ?', [semesterId, courseId, groupId], (semErr, semRow) => {
+  db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId], (semErr, semRow) => {
     if (semErr || !semRow) {
       return res.redirect('/admin?err=Invalid%20semester');
     }
@@ -6019,9 +5662,9 @@ app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
       `
         UPDATE schedule_entries
         SET subject_id = ?, group_number = ?, day_of_week = ?, class_number = ?, week_number = ?, semester_id = ?
-        WHERE id = ? AND course_id = ? AND group_id = ?
+        WHERE id = ? AND course_id = ?
       `,
-      [subject_id, groupNum, day_of_week, classNum, weekNum, semesterId, id, courseId, groupId],
+      [subject_id, groupNum, day_of_week, classNum, weekNum, semesterId, id, courseId],
       (err) => {
         if (err) {
           return res.redirect('/admin?err=Database%20error');
@@ -6043,9 +5686,8 @@ app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
 
 app.post('/admin/schedule/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
-  db.run('DELETE FROM schedule_entries WHERE id = ? AND course_id = ? AND group_id = ?', [id, courseId, groupId], (err) => {
+  db.run('DELETE FROM schedule_entries WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -6062,9 +5704,8 @@ app.post('/admin/schedule/delete-multiple', requireAdmin, (req, res) => {
   }
   const list = Array.isArray(ids) ? ids : [ids];
   const placeholders = list.map(() => '?').join(',');
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
-  db.run(`DELETE FROM schedule_entries WHERE course_id = ? AND group_id = ? AND id IN (${placeholders})`, [courseId, groupId, ...list], (err) => {
+  db.run(`DELETE FROM schedule_entries WHERE course_id = ? AND id IN (${placeholders})`, [courseId, ...list], (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -6075,9 +5716,8 @@ app.post('/admin/schedule/delete-multiple', requireAdmin, (req, res) => {
 });
 
 app.post('/admin/schedule/clear-all', requireAdmin, (req, res) => {
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
-  db.run('DELETE FROM schedule_entries WHERE course_id = ? AND group_id = ?', [courseId, groupId], (err) => {
+  db.run('DELETE FROM schedule_entries WHERE course_id = ?', [courseId], (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -6155,7 +5795,6 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
   const def = Number(default_group);
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
   const visibleFlag = String(visible) === '0' ? 0 : 1;
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
@@ -6164,15 +5803,15 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
   db.run(
-    'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id, group_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [name, count, def, teamworkFlag, visibleFlag, courseId, groupId],
+    'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [name, count, def, teamworkFlag, visibleFlag, courseId],
     (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
     logAction(db, req, 'subject_add', { name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag });
     logActivity(db, req, 'subject_add', 'subject', null, { name, group_count: count, default_group: def, visible: visibleFlag }, courseId);
-    invalidateSubjectsCache(courseId, groupId);
+    invalidateSubjectsCache(courseId);
     return res.redirect('/admin?ok=Subject%20added');
     }
   );
@@ -6185,7 +5824,6 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
   const def = Number(default_group);
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
   const visibleFlag = String(visible) === '0' ? 0 : 1;
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
@@ -6194,15 +5832,15 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
   db.run(
-    'UPDATE subjects SET name = ?, group_count = ?, default_group = ?, show_in_teamwork = ?, visible = ? WHERE id = ? AND course_id = ? AND group_id = ?',
-    [name, count, def, teamworkFlag, visibleFlag, id, courseId, groupId],
+    'UPDATE subjects SET name = ?, group_count = ?, default_group = ?, show_in_teamwork = ?, visible = ? WHERE id = ? AND course_id = ?',
+    [name, count, def, teamworkFlag, visibleFlag, id, courseId],
     (err) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
       }
       logAction(db, req, 'subject_edit', { id, name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag });
       logActivity(db, req, 'subject_edit', 'subject', Number(id) || null, { name, group_count: count, default_group: def, visible: visibleFlag }, courseId);
-      invalidateSubjectsCache(courseId, groupId);
+      invalidateSubjectsCache(courseId);
       return res.redirect('/admin?ok=Subject%20updated');
     }
   );
@@ -6215,15 +5853,14 @@ app.post('/admin/api/subjects/:subjectId/clone', requireAdminOrDeanery, async (r
     return res.status(400).json({ error: 'Invalid input' });
   }
   const role = req.session.role;
-  const groupId = role === 'admin' ? getAdminGroup(req) : (req.session.user.group_id || null);
   const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
   try {
-    const subject = await db.get('SELECT * FROM subjects WHERE id = ? AND course_id = ? AND group_id = ?', [subjectId, courseId, groupId]);
+    const subject = await db.get('SELECT * FROM subjects WHERE id = ? AND course_id = ?', [subjectId, courseId]);
     if (!subject) return res.status(404).json({ error: 'Subject not found' });
     const copySettings = copy_settings !== false;
     const row = await db.get(
-      `INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id, group_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      `INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id)
+       VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       [
         new_name.trim(),
         copySettings ? subject.group_count : 1,
@@ -6231,10 +5868,9 @@ app.post('/admin/api/subjects/:subjectId/clone', requireAdminOrDeanery, async (r
         copySettings ? subject.show_in_teamwork : 1,
         copySettings ? subject.visible : 1,
         courseId,
-        groupId,
       ]
     );
-    invalidateSubjectsCache(courseId, groupId);
+    invalidateSubjectsCache(courseId);
     return res.json({ ok: true, id: row?.id });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
@@ -6249,11 +5885,10 @@ app.post('/admin/api/schedule/weeks/clone', requireAdminOrDeanery, async (req, r
     return res.status(400).json({ error: 'Invalid week' });
   }
   const role = req.session.role;
-  const groupId = role === 'admin' ? getAdminGroup(req) : (req.session.user.group_id || null);
   const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId, groupId);
+    activeSemester = await getActiveSemester(courseId);
   } catch (err) {
     return res.status(500).json({ error: 'Semester error' });
   }
@@ -6262,17 +5897,17 @@ app.post('/admin/api/schedule/weeks/clone', requireAdminOrDeanery, async (req, r
     const activeDaySet = new Set((studyDays || []).filter((d) => d.is_active).map((d) => d.day_name));
     const rows = await db.all(
       `SELECT * FROM schedule_entries
-       WHERE group_id = ? AND course_id = ? AND semester_id = ? AND week_number = ?`,
-      [groupId, courseId, activeSemester ? activeSemester.id : null, srcWeek]
+       WHERE course_id = ? AND semester_id = ? AND week_number = ?`,
+      [courseId, activeSemester ? activeSemester.id : null, srcWeek]
     );
     let inserted = 0;
     for (const row of rows) {
       if (activeDaySet.size && !activeDaySet.has(row.day_of_week)) continue;
       const conflict = await db.get(
         `SELECT id FROM schedule_entries
-         WHERE group_id = ? AND course_id = ? AND semester_id = ? AND week_number = ?
+         WHERE course_id = ? AND semester_id = ? AND week_number = ?
            AND day_of_week = ? AND class_number = ? AND group_number = ?`,
-        [groupId, courseId, activeSemester ? activeSemester.id : null, tgtWeek, row.day_of_week, row.class_number, row.group_number]
+        [courseId, activeSemester ? activeSemester.id : null, tgtWeek, row.day_of_week, row.class_number, row.group_number]
       );
       if (conflict && mode !== 'overwrite') {
         continue;
@@ -6282,8 +5917,8 @@ app.post('/admin/api/schedule/weeks/clone', requireAdminOrDeanery, async (req, r
       }
       await db.run(
         `INSERT INTO schedule_entries
-         (subject_id, group_number, day_of_week, class_number, week_number, course_id, group_id, semester_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           row.subject_id,
           row.group_number,
@@ -6291,7 +5926,6 @@ app.post('/admin/api/schedule/weeks/clone', requireAdminOrDeanery, async (req, r
           row.class_number,
           tgtWeek,
           courseId,
-          groupId,
           activeSemester ? activeSemester.id : null,
         ]
       );
@@ -6307,19 +5941,18 @@ app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkBulkAccess, asy
   const homeworkId = Number(req.params.homeworkId);
   if (Number.isNaN(homeworkId)) return res.status(400).json({ error: 'Invalid homework' });
   const role = req.session.role;
-  const groupId = role === 'admin' ? getAdminGroup(req) : (req.session.user.group_id || null);
   const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId, groupId);
+    activeSemester = await getActiveSemester(courseId);
   } catch (err) {
     return res.status(500).json({ error: 'Semester error' });
   }
   const { target = {}, copy_attachments = true, copy_links = true } = req.body || {};
   try {
     const hw = await db.get(
-      `SELECT * FROM homework WHERE id = ? AND group_id = ? AND course_id = ? AND semester_id = ?`,
-      [homeworkId, groupId, courseId, activeSemester ? activeSemester.id : null]
+      `SELECT * FROM homework WHERE id = ? AND course_id = ? AND semester_id = ?`,
+      [homeworkId, courseId, activeSemester ? activeSemester.id : null]
     );
     if (!hw) return res.status(404).json({ error: 'Not found' });
     const createdAt = new Date().toISOString();
@@ -6349,7 +5982,7 @@ app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkBulkAccess, asy
       `INSERT INTO homework
        (group_name, subject, day, time, week_number, class_number, subject_id, group_number, day_of_week,
         created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at,
-        course_id, group_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at)
+        course_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING id`,
       [
@@ -6372,7 +6005,6 @@ app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkBulkAccess, asy
         hw.created_by,
         createdAt,
         courseId,
-        groupId,
         activeSemester ? activeSemester.id : null,
         isCustom,
         customDue,
@@ -6389,19 +6021,18 @@ app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkBulkAccess, asy
 
 app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const groupId = getAdminGroup(req);
   const courseId = getAdminCourse(req);
   db.run('DELETE FROM student_groups WHERE subject_id = ?', [id], (delErr) => {
     if (delErr) {
       return res.redirect('/admin?err=Database%20error');
     }
-    db.run('DELETE FROM subjects WHERE id = ? AND course_id = ? AND group_id = ?', [id, courseId, groupId], (err) => {
+    db.run('DELETE FROM subjects WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
       }
       logAction(db, req, 'subject_delete', { id });
       logActivity(db, req, 'subject_delete', 'subject', Number(id) || null, null, courseId);
-      invalidateSubjectsCache(courseId, groupId);
+      invalidateSubjectsCache(courseId);
       return res.redirect('/admin?ok=Subject%20deleted');
     });
   });
@@ -6410,11 +6041,10 @@ app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
 app.post('/admin/courses/add', requireAdmin, (req, res) => {
   const { id, name } = req.body;
   const courseId = Number(id);
-  const groupId = getAdminGroup(req);
   if (Number.isNaN(courseId) || courseId < 1 || !name || !name.trim()) {
     return res.redirect('/admin?err=Invalid%20course');
   }
-  db.run('INSERT INTO courses (id, name, group_id) VALUES (?, ?, ?)', [courseId, name.trim(), groupId], (err) => {
+  db.run('INSERT INTO courses (id, name) VALUES (?, ?)', [courseId, name.trim()], (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -6493,10 +6123,10 @@ app.get('/admin/api/courses/:courseId/study-days', requireAdminOrDeanery, async 
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
-    const course = await db.get('SELECT id, group_id FROM courses WHERE id = ?', [courseId]);
+    const course = await db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: 'Course not found' });
     const studyDays = await getCourseStudyDays(courseId);
-    const subjects = await getSubjectsCached(courseId, course.group_id);
+    const subjects = await getSubjectsCached(courseId);
     const subjectRows = (subjects || []).map((s) => ({ id: s.id, name: s.name }));
     return res.json({ days: studyDays, subjects: subjectRows });
   } catch (err) {
@@ -6599,18 +6229,17 @@ app.post('/admin/api/homework/bulk', requireHomeworkBulkAccess, writeLimiter, as
   }
   const role = req.session.role;
   const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
-  const groupId = role === 'admin' ? getAdminGroup(req) : (req.session.user.group_id || null);
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId, groupId || null);
+    activeSemester = await getActiveSemester(courseId);
   } catch (err) {
     return res.status(500).json({ error: 'Semester error' });
   }
   const placeholders = list.map(() => '?').join(',');
   const scoped = await db.all(
     `SELECT id, day_of_week, class_date, custom_due_date, week_number FROM homework
-     WHERE id IN (${placeholders}) AND course_id = ? AND group_id = ? AND semester_id = ?`,
-    [...list, courseId, groupId || null, activeSemester ? activeSemester.id : null]
+     WHERE id IN (${placeholders}) AND course_id = ? AND semester_id = ?`,
+    [...list, courseId, activeSemester ? activeSemester.id : null]
   );
   const scopedIds = scoped.map((row) => row.id);
   if (!scopedIds.length) {
@@ -6736,11 +6365,10 @@ app.post('/admin/api/homework/bulk', requireHomeworkBulkAccess, writeLimiter, as
 
 app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) => {
   const role = req.session.role;
-  const groupId = role === 'admin' ? getAdminGroup(req) : (req.session.user.group_id || null);
   const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId, groupId);
+    activeSemester = await getActiveSemester(courseId);
   } catch (err) {
     return res.status(500).json({ error: 'Semester error' });
   }
@@ -6750,10 +6378,6 @@ app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) 
   }
   const filters = ['se.course_id = ?', 'se.semester_id = ?'];
   const params = [courseId, activeSemester ? activeSemester.id : null];
-  if (groupId) {
-    filters.unshift('se.group_id = ?');
-    params.unshift(groupId);
-  }
   if (week) {
     filters.push('se.week_number = ?');
     params.push(week);
@@ -6764,7 +6388,7 @@ app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) 
     const activeDaySet = new Set(
       (studyDays || []).filter((d) => d.is_active).map((d) => d.day_name)
     );
-    const subjects = await getSubjectsCached(courseId, groupId);
+    const subjects = await getSubjectsCached(courseId);
     const subjectMap = new Map((subjects || []).map((s) => [s.id, { id: s.id, name: s.name, group_count: s.group_count }]));
     const rows = await db.all(
       `SELECT se.*
@@ -7148,17 +6772,13 @@ app.post('/admin/homework/migrate', requireAdmin, (req, res) => {
     const match = Object.entries(bellSchedule).find(([, slot]) => slot.start === start);
     return match ? Number(match[0]) : null;
   };
-  const courseId = getAdminCourse(req);
-  const groupId = getAdminGroup(req);
 
   db.all(
     `
       SELECT id, subject, day, time, subject_id, group_number, day_of_week, class_number
       FROM homework
-      WHERE course_id = ? AND group_id = ?
-        AND (subject_id IS NULL OR group_number IS NULL OR day_of_week IS NULL OR class_number IS NULL)
+      WHERE subject_id IS NULL OR group_number IS NULL OR day_of_week IS NULL OR class_number IS NULL
     `,
-    [courseId, groupId || null],
     (err, rows) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
@@ -7166,7 +6786,7 @@ app.post('/admin/homework/migrate', requireAdmin, (req, res) => {
       if (!rows.length) {
         return res.redirect('/admin?ok=Nothing%20to%20migrate');
       }
-      db.all('SELECT id, name FROM subjects WHERE course_id = ? AND group_id = ?', [courseId, groupId || null], (sErr, subjects) => {
+      db.all('SELECT id, name FROM subjects', (sErr, subjects) => {
         if (sErr) {
           return res.redirect('/admin?err=Database%20error');
         }
