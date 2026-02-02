@@ -629,16 +629,6 @@ const initDb = async () => {
 
   await pool.query(
     `
-      INSERT INTO courses (id, name, group_id)
-      VALUES
-        (1, '1 курс', (SELECT id FROM groups WHERE slug = 'kyiv')),
-        (2, '2 курс', (SELECT id FROM groups WHERE slug = 'kyiv'))
-      ON CONFLICT (id) DO NOTHING
-    `
-  );
-
-  await pool.query(
-    `
       INSERT INTO settings (key, value) VALUES
       ('session_duration_days', '14'),
       ('max_file_size_mb', '20'),
@@ -697,6 +687,16 @@ const initDb = async () => {
   for (const statement of alters) {
     await pool.query(statement);
   }
+
+  await pool.query(
+    `
+      INSERT INTO courses (id, name, group_id)
+      VALUES
+        (1, '1 курс', (SELECT id FROM groups WHERE slug = 'kyiv')),
+        (2, '2 курс', (SELECT id FROM groups WHERE slug = 'kyiv'))
+      ON CONFLICT (id) DO NOTHING
+    `
+  );
 
   const kyivRow = await pool.query("SELECT id FROM groups WHERE slug = 'kyiv' LIMIT 1");
   const kyivGroupId = kyivRow.rows.length ? kyivRow.rows[0].id : null;
