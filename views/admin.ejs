@@ -1344,6 +1344,7 @@
                     data-user-name="<%= u.full_name %>"
                     data-user-role="<%= u.role %>"
                     data-user-group-id="<%= u.group_id %>"
+                    data-user-group-name="<%= (groups || []).find(function(g) { return Number(g.id) === Number(u.group_id); })?.name || '' %>"
                     data-user-course="<%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %>"
                     data-user-course-id="<%= u.course_id || 1 %>"
                     data-user-active="<%= u.is_active %>"
@@ -1360,22 +1361,8 @@
                     <td><span class="badge text-bg-<%= u.role === 'admin' ? 'primary' : (u.role === 'starosta' ? 'warning' : (u.role === 'deanery' ? 'info' : 'secondary')) %>"><%= u.role %></span></td>
                     <td><%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %></td>
                     <td>
-                      <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <% 
-                          const currentGroup = (groups || []).find(function(g) { return Number(g.id) === Number(u.group_id); });
-                          const targetGroup = (groups || []).find(function(g) { return Number(g.id) !== Number(u.group_id); });
-                        %>
-                        <span class="badge text-bg-secondary"><%= currentGroup ? currentGroup.name : '' %></span>
-                        <% if (targetGroup && u.role !== 'admin') { %>
-                          <form method="POST" action="/admin/users/group" class="d-inline">
-                            <input type="hidden" name="user_id" value="<%= u.id %>" />
-                            <input type="hidden" name="group_id" value="<%= targetGroup.id %>" />
-                            <button class="btn btn-sm btn-outline-primary" type="submit">
-                              <%= t('admin.moveToGroup') %> <%= targetGroup.name %>
-                            </button>
-                          </form>
-                        <% } %>
-                      </div>
+                      <% const currentGroup = (groups || []).find(function(g) { return Number(g.id) === Number(u.group_id); }); %>
+                      <span class="badge text-bg-secondary"><%= currentGroup ? currentGroup.name : '' %></span>
                     </td>
                     <td>
                       <% 
@@ -2157,7 +2144,7 @@
             <div class="mb-2"><strong>Name:</strong> <span id="uaName"></span></div>
             <div class="mb-2"><strong>Role:</strong> <span id="uaRole"></span></div>
             <div class="mb-2"><strong>Active:</strong> <span id="uaActive"></span></div>
-            <div class="mb-2"><strong>Schedule Group:</strong> <span id="uaGroup"></span></div>
+            <div class="mb-2"><strong>Group:</strong> <span id="uaGroup"></span></div>
             <div class="mb-2"><strong>Course:</strong> <span id="uaCourse"></span></div>
             <div class="mb-2"><strong>Last Login IP:</strong> <span id="uaIp"></span></div>
             <div class="mb-2"><strong>Device:</strong> <span id="uaAgent"></span></div>
@@ -2521,7 +2508,6 @@
       const limitedStaffView = <%= isLimitedView ? 'true' : 'false' %>;
       const allowedSections = <%- JSON.stringify(allowedSectionsList || []) %>;
       const groupsData = <%- JSON.stringify(groups || []) %>;
-      const moveGroupLabel = "<%= t('admin.moveToGroup') %>";
       const adminSections = allowedSections.length
         ? allowedSections
         : ['admin-settings', 'admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-history', 'admin-activity', 'admin-teamwork', 'admin-messages'];
@@ -2636,25 +2622,14 @@
                 `;
 
             const currentGroup = (groupsData || []).find((g) => Number(g.id) === Number(u.group_id));
-            const targetGroup = (groupsData || []).find((g) => Number(g.id) !== Number(u.group_id));
-            const moveGroupForm = targetGroup && u.role !== 'admin'
-              ? `
-                  <form method="POST" action="/admin/users/group" class="d-inline">
-                    <input type="hidden" name="user_id" value="${u.id}" />
-                    <input type="hidden" name="group_id" value="${targetGroup.id}" />
-                    <button class="btn btn-sm btn-outline-primary" type="submit">
-                      ${moveGroupLabel} ${targetGroup.name}
-                    </button>
-                  </form>
-                `
-              : '';
 
             return `
               <tr class="user-row"
                   data-user-id="${u.id}"
                   data-user-name="${u.full_name}"
                   data-user-role="${u.role}"
-                  data-user-group-id="${u.group_id}"
+                  data-user-group-id="${u.group_id || ''}"
+                  data-user-group-name="${currentGroup ? currentGroup.name : ''}"
                   data-user-course="${courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}"
                   data-user-course-id="${u.course_id || 1}"
                   data-user-active="${isActive}"
@@ -2668,7 +2643,6 @@
                 <td>
                   <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="badge text-bg-secondary">${currentGroup ? currentGroup.name : ''}</span>
-                    ${moveGroupForm}
                   </div>
                 </td>
                 <td>${subjectsBtn}</td>
@@ -2800,7 +2774,8 @@
             const userId = row.dataset.userId;
             const userName = row.dataset.userName;
             const userRole = row.dataset.userRole;
-            const userGroup = row.dataset.userGroup;
+            const userGroup = row.dataset.userGroupName || '';
+            const userGroupId = row.dataset.userGroupId || '';
             const userActive = row.dataset.userActive === '1' ? 'Yes' : 'No';
             const userCourse = row.dataset.userCourse || '';
             const userIp = row.dataset.userIp || '-';
@@ -2817,11 +2792,15 @@
             document.getElementById('uaLoginAt').textContent = userLogin;
             document.getElementById('uaRoleUserId').value = userId;
             document.getElementById('uaPassUserId').value = userId;
+            document.getElementById('uaGroupUserId').value = userId;
             document.getElementById('uaRoleSelect').value = userRole;
             document.getElementById('uaDeleteUserId').value = userId;
             document.getElementById('uaCourseUserId').value = userId;
             if (document.getElementById('uaCourseSelect')) {
               document.getElementById('uaCourseSelect').value = row.dataset.userCourseId || '';
+            }
+            if (document.getElementById('uaGroupSelect')) {
+              document.getElementById('uaGroupSelect').value = userGroupId;
             }
 
             const modal = new bootstrap.Modal(document.getElementById('userActionsModal'));
@@ -3543,3 +3522,15 @@
     </script>
   </body>
 </html>
+            <form method="POST" action="/admin/users/group" class="mb-3">
+              <input type="hidden" name="user_id" id="uaGroupUserId" />
+              <label class="form-label">Move to group</label>
+              <div class="d-flex gap-2">
+                <select class="form-select" name="group_id" id="uaGroupSelect" required>
+                  <% (groups || []).forEach(function(g) { %>
+                    <option value="<%= g.id %>"><%= g.name %></option>
+                  <% }); %>
+                </select>
+                <button class="btn btn-outline-primary glass" type="submit">Save</button>
+              </div>
+            </form>
