@@ -103,8 +103,27 @@
         padding: 0.75rem 1rem;
         font-weight: 600;
       }
-      .theme-toggle-btn {
+      .theme-toggle-floating {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        z-index: 10;
+      }
+      .theme-toggle-min {
+        width: 40px;
+        height: 40px;
         border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+        backdrop-filter: blur(10px);
+      }
+      body.theme-light .theme-toggle-min {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.7);
       }
       .btn {
         transition: transform 140ms ease, box-shadow 140ms ease;
@@ -131,6 +150,18 @@
     <link rel="stylesheet" href="/css/pages/auth.css" />
 </head>
   <body class="theme-light">
+    <div class="theme-toggle-floating">
+      <button
+        class="theme-toggle-min"
+        type="button"
+        id="themeToggle"
+        aria-label="Toggle theme"
+        data-light-label="☀️"
+        data-dark-label="🌙"
+      >
+        🌙
+      </button>
+    </div>
     <div class="container">
       <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
         <div class="col-11 col-sm-8 col-md-6 col-lg-4">
@@ -152,17 +183,6 @@
                 <button type="submit" class="btn btn-primary w-100"><%= t('registerCourse.continue') %></button>
               </form>
             </div>
-          </div>
-          <div class="d-flex justify-content-center mt-3">
-            <button
-              class="btn btn-outline-secondary btn-sm theme-toggle-btn"
-              type="button"
-              id="themeToggle"
-              data-light-label="<%= t('theme.light') %>"
-              data-dark-label="<%= t('theme.dark') %>"
-            >
-              <%= t('theme.dark') %>
-            </button>
           </div>
           <footer class="app-footer text-center mt-3">
             <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
