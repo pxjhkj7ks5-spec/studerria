@@ -418,7 +418,16 @@
       .modal-body {
         overflow-y: auto;
       }
-    </style>
+    
+      /* hard override to prevent dark-theme hairline artifacts */
+      body.theme-dark .glass {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        background: rgba(18, 25, 40, 0.92) !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        box-shadow: 0 14px 28px rgba(0, 0, 0, 0.55) !important;
+      }
+</style>
   </head>
   <body class="theme-dark">
     <nav class="navbar navbar-expand-lg topbar">
