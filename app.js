@@ -345,7 +345,17 @@ const initDb = async () => {
         default_group INTEGER NOT NULL DEFAULT 1,
         show_in_teamwork INTEGER NOT NULL DEFAULT 1,
         visible INTEGER NOT NULL DEFAULT 1,
+        is_required BOOLEAN NOT NULL DEFAULT 1,
         course_id INTEGER REFERENCES courses(id)
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS user_subject_optouts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, subject_id)
       )
     `,
     `
@@ -637,6 +647,7 @@ const initDb = async () => {
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS is_archived INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS visible INTEGER NOT NULL DEFAULT 1',
+    'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_required BOOLEAN NOT NULL DEFAULT 1',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
@@ -1581,7 +1592,23 @@ app.get('/register/subjects', (req, res) => {
     (async () => {
       try {
         const subjects = await getSubjectsCached(user.course_id, { visibleOnly: true });
-        res.render('register-subjects', { subjects });
+        const requiredAuto = (subjects || []).filter((s) => s.is_required && Number(s.group_count) === 1);
+        await Promise.all(
+          requiredAuto.map((s) =>
+            db.run(
+              `INSERT INTO student_groups (student_id, subject_id, group_number)
+               VALUES (?, ?, 1)
+               ON CONFLICT(student_id, subject_id) DO NOTHING`,
+              [req.session.pendingUserId, s.id]
+            )
+          )
+        );
+        const optoutRows = await db.all(
+          'SELECT subject_id FROM user_subject_optouts WHERE user_id = ?',
+          [req.session.pendingUserId]
+        );
+        const optouts = (optoutRows || []).map((r) => r.subject_id);
+        res.render('register-subjects', { subjects, optouts, error: req.query.error || '' });
       } catch (err) {
         res.status(500).send('Database error');
       }
@@ -1599,10 +1626,14 @@ app.post('/register/subjects', registerLimiter, (req, res) => {
     if (uErr || !userRow || !userRow.course_id) {
       return res.redirect('/register/course');
     }
-    db.all('SELECT id, group_count, default_group FROM subjects WHERE course_id = ? AND visible = 1', [userRow.course_id], (err, subjects) => {
+    db.all(
+      'SELECT id, group_count, default_group, is_required FROM subjects WHERE course_id = ? AND visible = 1',
+      [userRow.course_id],
+      (err, subjects) => {
       if (err) {
         return res.status(500).send('Database error');
       }
+      let hasMissingRequired = false;
       const stmt = db.prepare(
         `
           INSERT INTO student_groups (student_id, subject_id, group_number)
@@ -1611,20 +1642,62 @@ app.post('/register/subjects', registerLimiter, (req, res) => {
           DO UPDATE SET group_number = excluded.group_number
         `
       );
+      const deleteStmt = db.prepare('DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?');
+      const optoutStmt = db.prepare(
+        `INSERT INTO user_subject_optouts (user_id, subject_id) VALUES (?, ?)
+         ON CONFLICT(user_id, subject_id) DO NOTHING`
+      );
+      const optoutDeleteStmt = db.prepare('DELETE FROM user_subject_optouts WHERE user_id = ? AND subject_id = ?');
       subjects.forEach((s) => {
         const value = req.body[`subject_${s.id}`];
-        if (!value) {
-          if (s.group_count === 1) {
+        const isRequired = s.is_required !== 0;
+        const optout = req.body[`optout_${s.id}`] === '1' || req.body[`optout_${s.id}`] === 'on';
+        if (isRequired) {
+          optoutDeleteStmt.run(userId, s.id);
+          if (Number(s.group_count) === 1) {
             stmt.run(userId, s.id, 1);
+            return;
           }
+          if (!value) {
+            hasMissingRequired = true;
+            return;
+          }
+          const groupNum = Number(value);
+          if (groupNum >= 1 && groupNum <= s.group_count) {
+            stmt.run(userId, s.id, groupNum);
+          } else {
+            hasMissingRequired = true;
+          }
+          return;
+        }
+        if (optout) {
+          deleteStmt.run(userId, s.id);
+          optoutStmt.run(userId, s.id);
+          return;
+        }
+        optoutDeleteStmt.run(userId, s.id);
+        if (!value) {
+          if (Number(s.group_count) === 1) {
+            stmt.run(userId, s.id, 1);
+            return;
+          }
+          hasMissingRequired = true;
           return;
         }
         const groupNum = Number(value);
         if (groupNum >= 1 && groupNum <= s.group_count) {
           stmt.run(userId, s.id, groupNum);
+        } else {
+          hasMissingRequired = true;
         }
       });
       stmt.finalize(() => {
+        deleteStmt.finalize();
+        optoutStmt.finalize();
+        optoutDeleteStmt.finalize();
+        if (hasMissingRequired) {
+          return res.redirect('/register/subjects?error=Select%20group');
+        }
         db.get('SELECT id, full_name, role, schedule_group, course_id, language FROM users WHERE id = ?', [userId], (uErr2, user) => {
           if (uErr2 || !user) {
             return res.redirect('/login');
@@ -4706,13 +4779,16 @@ app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single
 
 app.get('/admin/export/subjects.csv', requireAdmin, (req, res) => {
   const courseId = getAdminCourse(req);
-  db.all('SELECT id, name, group_count, default_group FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (err, rows) => {
+  db.all(
+    'SELECT id, name, group_count, default_group, is_required FROM subjects WHERE course_id = ? ORDER BY name',
+    [courseId],
+    (err, rows) => {
     if (err) {
       return res.status(500).send('Database error');
     }
-    const header = 'id,name,group_count,default_group';
+    const header = 'id,name,group_count,default_group,is_required';
     const lines = rows.map((r) =>
-      [r.id, r.name, r.group_count, r.default_group]
+      [r.id, r.name, r.group_count, r.default_group, r.is_required ? 1 : 0]
         .map((v) => `"${String(v ?? '').replace(/\"/g, '""')}"`)
         .join(',')
     );
@@ -4744,6 +4820,8 @@ app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.sin
     const name = String(row.name || '').trim();
     const groupCount = row.group_count ? Number(row.group_count) : 1;
     const defaultGroup = row.default_group ? Number(row.default_group) : 1;
+    const isRequired = String(row.is_required ?? '1');
+    const requiredFlag = ['0', 'false', 'no', 'off'].includes(isRequired.toLowerCase()) ? 0 : 1;
     if (!name || Number.isNaN(groupCount) || groupCount < 1 || groupCount > 3 || Number.isNaN(defaultGroup) || defaultGroup < 1 || defaultGroup > groupCount) {
       skipped += 1;
       continue;
@@ -4751,14 +4829,14 @@ app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.sin
     const existing = await db.get('SELECT id FROM subjects WHERE name = ?', [name]);
     if (existing && existing.id) {
       await db.run(
-        'UPDATE subjects SET group_count = ?, default_group = ?, course_id = ? WHERE id = ?',
-        [groupCount, defaultGroup, courseId, existing.id]
+        'UPDATE subjects SET group_count = ?, default_group = ?, is_required = ?, course_id = ? WHERE id = ?',
+        [groupCount, defaultGroup, requiredFlag, courseId, existing.id]
       );
       updated += 1;
     } else {
       await db.run(
-        'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id) VALUES (?, ?, ?, 1, 1, ?)',
-        [name, groupCount, defaultGroup, courseId]
+        'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, is_required, course_id) VALUES (?, ?, ?, 1, 1, ?, ?)',
+        [name, groupCount, defaultGroup, requiredFlag, courseId]
       );
       inserted += 1;
     }
@@ -5806,11 +5884,12 @@ app.post('/admin/homework/delete/:id', requireAdmin, (req, res) => {
 });
 
 app.post('/admin/subjects/add', requireAdmin, (req, res) => {
-  const { name, group_count, default_group, show_in_teamwork, visible } = req.body;
+  const { name, group_count, default_group, show_in_teamwork, visible, is_required } = req.body;
   const count = Number(group_count);
   const def = Number(default_group);
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
   const visibleFlag = String(visible) === '0' ? 0 : 1;
+  const requiredFlag = String(is_required) === '0' ? 0 : 1;
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
@@ -5819,14 +5898,14 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
   db.run(
-    'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id) VALUES (?, ?, ?, ?, ?, ?)',
-    [name, count, def, teamworkFlag, visibleFlag, courseId],
+    'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, is_required, course_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [name, count, def, teamworkFlag, visibleFlag, requiredFlag, courseId],
     (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
-    logAction(db, req, 'subject_add', { name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag });
-    logActivity(db, req, 'subject_add', 'subject', null, { name, group_count: count, default_group: def, visible: visibleFlag }, courseId);
+    logAction(db, req, 'subject_add', { name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag, is_required: requiredFlag });
+    logActivity(db, req, 'subject_add', 'subject', null, { name, group_count: count, default_group: def, visible: visibleFlag, is_required: requiredFlag }, courseId);
     invalidateSubjectsCache(courseId);
     return res.redirect('/admin?ok=Subject%20added');
     }
@@ -5835,11 +5914,12 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
 
 app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { name, group_count, default_group, show_in_teamwork, visible } = req.body;
+  const { name, group_count, default_group, show_in_teamwork, visible, is_required } = req.body;
   const count = Number(group_count);
   const def = Number(default_group);
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
   const visibleFlag = String(visible) === '0' ? 0 : 1;
+  const requiredFlag = String(is_required) === '0' ? 0 : 1;
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
@@ -5848,14 +5928,14 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
   db.run(
-    'UPDATE subjects SET name = ?, group_count = ?, default_group = ?, show_in_teamwork = ?, visible = ? WHERE id = ? AND course_id = ?',
-    [name, count, def, teamworkFlag, visibleFlag, id, courseId],
+    'UPDATE subjects SET name = ?, group_count = ?, default_group = ?, show_in_teamwork = ?, visible = ?, is_required = ? WHERE id = ? AND course_id = ?',
+    [name, count, def, teamworkFlag, visibleFlag, requiredFlag, id, courseId],
     (err) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
       }
-      logAction(db, req, 'subject_edit', { id, name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag });
-      logActivity(db, req, 'subject_edit', 'subject', Number(id) || null, { name, group_count: count, default_group: def, visible: visibleFlag }, courseId);
+      logAction(db, req, 'subject_edit', { id, name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag, is_required: requiredFlag });
+      logActivity(db, req, 'subject_edit', 'subject', Number(id) || null, { name, group_count: count, default_group: def, visible: visibleFlag, is_required: requiredFlag }, courseId);
       invalidateSubjectsCache(courseId);
       return res.redirect('/admin?ok=Subject%20updated');
     }
