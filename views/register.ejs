@@ -264,18 +264,6 @@
         --text-secondary: rgba(15, 23, 42, 0.68);
         --text-muted: rgba(15, 23, 42, 0.52);
       }
-      body::before {
-        content: '';
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        background-image:
-          repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 2px),
-          repeating-linear-gradient(90deg, rgba(0,0,0,0.03) 0, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 2px);
-        opacity: 0.05;
-        mix-blend-mode: soft-light;
-        z-index: -1;
-      }
       body.theme-dark {
         background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.22), transparent 60%),
           radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.18), transparent 60%),

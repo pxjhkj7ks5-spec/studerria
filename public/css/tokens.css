@@ -6,6 +6,7 @@
   --bg-1: #121a2a;
   --bg-bloom-1: rgba(61, 129, 255, 0.22);
   --bg-bloom-2: rgba(120, 165, 255, 0.16);
+  --bg-image: radial-gradient(1200px 900px at 12% 12%, rgba(76, 141, 255, 0.22), transparent 62%),\n    radial-gradient(1000px 800px at 78% 18%, rgba(58, 167, 255, 0.18), transparent 65%),\n    radial-gradient(900px 700px at 60% 88%, rgba(124, 122, 255, 0.12), transparent 68%),\n    linear-gradient(160deg, #0b0f1a 0%, #121a2a 55%, #0e1322 100%);
 
   --glass: rgba(20, 26, 42, 0.62);
   --glass-2: rgba(24, 32, 52, 0.7);
@@ -46,6 +47,7 @@ body.theme-dark {
   --bg-1: #141c2f;
   --bg-bloom-1: rgba(72, 132, 255, 0.25);
   --bg-bloom-2: rgba(123, 177, 255, 0.18);
+  --bg-image: radial-gradient(1200px 900px at 12% 12%, rgba(76, 141, 255, 0.24), transparent 62%),\n    radial-gradient(1000px 800px at 78% 18%, rgba(58, 167, 255, 0.2), transparent 65%),\n    radial-gradient(900px 700px at 60% 88%, rgba(124, 122, 255, 0.14), transparent 68%),\n    linear-gradient(160deg, #0a0f1c 0%, #141c2f 55%, #0d1224 100%);
 
   --glass: rgba(18, 24, 40, 0.62);
   --glass-2: rgba(22, 30, 50, 0.7);
@@ -70,6 +72,7 @@ body.theme-light {
   --bg-1: #eef3fb;
   --bg-bloom-1: rgba(167, 198, 255, 0.45);
   --bg-bloom-2: rgba(197, 213, 255, 0.4);
+  --bg-image: radial-gradient(1100px 800px at 18% 10%, rgba(125, 173, 255, 0.45), transparent 62%),\n    radial-gradient(900px 700px at 80% 18%, rgba(182, 200, 255, 0.4), transparent 65%),\n    radial-gradient(900px 700px at 60% 90%, rgba(213, 228, 255, 0.35), transparent 68%),\n    linear-gradient(135deg, #f4f7fc 0%, #edf3fb 55%, #f7f9ff 100%);
 
   --glass: rgba(255, 255, 255, 0.7);
   --glass-2: rgba(255, 255, 255, 0.85);
