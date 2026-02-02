@@ -659,7 +659,7 @@
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <h1 class="h3 mb-0"><%= t('admin.dashboard') %></h1>
         <% if (sectionAllowed('admin-overview')) { %>
-          <a class="btn btn-outline-primary btn-sm" href="/admin/overview?course=<%= selectedCourseId %>"><%= t('admin.openOverview') %></a>
+          <a class="btn btn-outline-primary btn-sm" href="/admin/overview?group_id=<%= selectedGroupId || '' %>&course=<%= selectedCourseId %>"><%= t('admin.openOverview') %></a>
         <% } %>
       </div>
 
@@ -676,8 +676,15 @@
 
       <% if (!isLimitedView || role === 'deanery') { %>
         <form class="mb-3" method="GET" action="<%= role === 'deanery' ? '/deanery' : '/admin' %>">
-          <div class="d-flex align-items-center gap-2">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
             <label class="form-label mb-0"><%= t('admin.course') %></label>
+            <select name="group_id" class="form-select w-auto" onchange="this.form.submit()">
+              <% (groups || []).forEach(function(g) { %>
+                <option value="<%= g.id %>" <%= Number(selectedGroupId) === Number(g.id) ? 'selected' : '' %>>
+                  <%= g.name %>
+                </option>
+              <% }); %>
+            </select>
             <select name="course" class="form-select w-auto" onchange="this.form.submit()">
               <% (courses || []).forEach(function(c) { %>
                 <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
@@ -878,7 +885,7 @@
                 <h5 class="card-title mb-0">Add class</h5>
                 <div class="d-flex gap-2 flex-wrap">
                   <button class="btn btn-outline-primary btn-sm" type="button" id="validateScheduleBtn">Перевірити розклад</button>
-                  <a class="btn btn-outline-secondary btn-sm" href="/admin/export/schedule.csv">Export CSV</a>
+                  <a class="btn btn-outline-secondary btn-sm" href="/admin/export/schedule.csv?group_id=<%= selectedGroupId || '' %>&course=<%= selectedCourseId || 1 %>">Export CSV</a>
                   <form class="d-flex gap-2" method="POST" action="/admin/import/schedule.csv" enctype="multipart/form-data">
                     <div class="file-field">
                       <input id="scheduleCsv" class="file-input" type="file" name="csv_file" accept=".csv" required />
@@ -1292,7 +1299,7 @@
             </button>
             <a
               class="btn btn-outline-secondary btn-sm"
-              href="/admin/export/users.csv?course=<%= selectedCourseId || 1 %><%= activeSemester ? '&semester_id=' + activeSemester.id : '' %><%= (filters && filters.users_group) ? '&group=' + encodeURIComponent(filters.users_group) : '' %>"
+              href="/admin/export/users.csv?group_id=<%= selectedGroupId || '' %>&course=<%= selectedCourseId || 1 %><%= activeSemester ? '&semester_id=' + activeSemester.id : '' %><%= (filters && filters.users_group) ? '&group=' + encodeURIComponent(filters.users_group) : '' %>"
             ><%= t('admin.exportUsers') %></a>
             <form class="d-flex gap-2" method="POST" action="/admin/import/users.csv" enctype="multipart/form-data">
               <div class="file-field">
@@ -1476,7 +1483,7 @@
           </div>
 
           <div class="d-flex justify-content-end gap-2 mb-2 flex-wrap">
-            <a class="btn btn-outline-secondary btn-sm" href="/admin/export/subjects.csv">Export Subjects CSV</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/admin/export/subjects.csv?group_id=<%= selectedGroupId || '' %>&course=<%= selectedCourseId || 1 %>">Export Subjects CSV</a>
             <form class="d-flex gap-2" method="POST" action="/admin/import/subjects.csv" enctype="multipart/form-data">
               <div class="file-field">
                 <input id="subjectsCsv" class="file-input" type="file" name="csv_file" accept=".csv" required />

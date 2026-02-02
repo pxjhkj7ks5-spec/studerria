@@ -187,5 +187,13 @@
   "admin.targetUsers": "Specific users",
   "admin.selectSubject": "Select subject",
   "admin.group": "Group",
-  "admin.send": "Send"
+  "admin.send": "Send",
+  "registerGroup": {
+    "title": "Choose group",
+    "continue": "Continue"
+  },
+  "groups": {
+    "kyiv": "Kyiv",
+    "munich": "Munich"
+  }
 }

@@ -187,5 +187,13 @@
   "admin.targetUsers": "Обраним користувачам",
   "admin.selectSubject": "Оберіть предмет",
   "admin.group": "Група",
-  "admin.send": "Надіслати"
+  "admin.send": "Надіслати",
+  "registerGroup": {
+    "title": "Оберіть групу",
+    "continue": "Продовжити"
+  },
+  "groups": {
+    "kyiv": "Київ",
+    "munich": "Мюнхен"
+  }
 }
