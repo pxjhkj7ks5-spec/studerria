@@ -2198,12 +2198,13 @@ async function buildMyDayData(user) {
         FROM personal_reminders
         WHERE user_id = ?
           AND course_id = ?
+          AND group_id = ?
           AND semester_id = ?
           AND remind_date >= ?
           AND remind_date <= ?
         ORDER BY remind_date ASC, remind_time ASC NULLS LAST, created_at DESC
       `,
-      [user.id, courseId, activeSemester.id, todayStr, upcomingWindowEnd]
+      [user.id, courseId, groupId || null, activeSemester.id, todayStr, upcomingWindowEnd]
     );
     reminders = (rows || []).map((row) => ({
       id: row.id,
@@ -6428,10 +6429,11 @@ app.post('/admin/courses/edit/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
   const courseId = Number(id);
+  const groupId = getAdminGroup(req);
   if (Number.isNaN(courseId) || !name || !name.trim()) {
     return res.redirect('/admin?err=Invalid%20course');
   }
-  db.run('UPDATE courses SET name = ? WHERE id = ?', [name.trim(), courseId], (err) => {
+  db.run('UPDATE courses SET name = ? WHERE id = ? AND group_id = ?', [name.trim(), courseId, groupId || null], (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -6444,38 +6446,39 @@ app.post('/admin/courses/edit/:id', requireAdmin, (req, res) => {
 app.post('/admin/courses/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const courseId = Number(id);
+  const groupId = getAdminGroup(req);
   if (Number.isNaN(courseId)) {
     return res.redirect('/admin?err=Invalid%20course');
   }
-  db.get('SELECT COUNT(*) AS cnt FROM users WHERE course_id = ?', [courseId], (userErr, userRow) => {
+  db.get('SELECT COUNT(*) AS cnt FROM users WHERE course_id = ? AND group_id = ?', [courseId, groupId || null], (userErr, userRow) => {
     if (userErr) {
       return res.redirect('/admin?err=Database%20error');
     }
     if (Number(userRow.cnt) > 0) {
       return res.redirect('/admin?err=Course%20has%20users');
     }
-    db.get('SELECT COUNT(*) AS cnt FROM subjects WHERE course_id = ?', [courseId], (subErr, subRow) => {
+    db.get('SELECT COUNT(*) AS cnt FROM subjects WHERE course_id = ? AND group_id = ?', [courseId, groupId || null], (subErr, subRow) => {
       if (subErr) {
         return res.redirect('/admin?err=Database%20error');
       }
       if (Number(subRow.cnt) > 0) {
         return res.redirect('/admin?err=Course%20has%20subjects');
       }
-      db.get('SELECT COUNT(*) AS cnt FROM semesters WHERE course_id = ?', [courseId], (semErr, semRow) => {
+      db.get('SELECT COUNT(*) AS cnt FROM semesters WHERE course_id = ? AND group_id = ?', [courseId, groupId || null], (semErr, semRow) => {
         if (semErr) {
           return res.redirect('/admin?err=Database%20error');
         }
         if (Number(semRow.cnt) > 0) {
           return res.redirect('/admin?err=Course%20has%20semesters');
         }
-        db.run('DELETE FROM courses WHERE id = ?', [courseId], (err) => {
+        db.run('DELETE FROM courses WHERE id = ? AND group_id = ?', [courseId, groupId || null], (err) => {
           if (err) {
             return res.redirect('/admin?err=Database%20error');
           }
           logAction(db, req, 'course_delete', { id: courseId });
           invalidateCoursesCache();
-          invalidateSubjectsCache(courseId);
-          invalidateSemestersCache(courseId);
+          invalidateSubjectsCache(courseId, groupId || null);
+          invalidateSemestersCache(courseId, groupId || null);
           invalidateStudyDaysCache(courseId);
           return res.redirect('/admin?ok=Course%20deleted');
         });
@@ -6495,6 +6498,12 @@ app.get('/admin/api/courses/:courseId/study-days', requireAdminOrDeanery, async 
   try {
     const course = await db.get('SELECT id, group_id FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: 'Course not found' });
+    if (req.session.role === 'admin') {
+      const adminGroup = getAdminGroup(req);
+      if (adminGroup && Number(course.group_id) !== Number(adminGroup)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
     const studyDays = await getCourseStudyDays(courseId);
     const subjects = await getSubjectsCached(courseId, course.group_id);
     const subjectRows = (subjects || []).map((s) => ({ id: s.id, name: s.name }));
@@ -6515,8 +6524,14 @@ app.patch('/admin/api/courses/:courseId/study-days/:weekday', requireAdminOrDean
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
-    const course = await db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
+    const course = await db.get('SELECT id, group_id FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: 'Course not found' });
+    if (req.session.role === 'admin') {
+      const adminGroup = getAdminGroup(req);
+      if (adminGroup && Number(course.group_id) !== Number(adminGroup)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
     await ensureCourseStudyDays(courseId);
     const updatedAt = new Date().toISOString();
     await db.run(
@@ -6541,10 +6556,16 @@ app.post('/admin/api/courses/:courseId/study-days/:weekday/subjects', requireAdm
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
-    const course = await db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
+    const course = await db.get('SELECT id, group_id FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: 'Course not found' });
-    const subject = await db.get('SELECT id, course_id FROM subjects WHERE id = ?', [subjectId]);
-    if (!subject || Number(subject.course_id) !== courseId) {
+    if (req.session.role === 'admin') {
+      const adminGroup = getAdminGroup(req);
+      if (adminGroup && Number(course.group_id) !== Number(adminGroup)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
+    const subject = await db.get('SELECT id, course_id, group_id FROM subjects WHERE id = ?', [subjectId]);
+    if (!subject || Number(subject.course_id) !== courseId || Number(subject.group_id) !== Number(course.group_id)) {
       return res.status(400).json({ error: 'Invalid subject' });
     }
     await ensureCourseStudyDays(courseId);
@@ -6575,6 +6596,14 @@ app.delete('/admin/api/courses/:courseId/study-days/:weekday/subjects/:subjectId
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
+    if (req.session.role === 'admin') {
+      const course = await db.get('SELECT id, group_id FROM courses WHERE id = ?', [courseId]);
+      if (!course) return res.status(404).json({ error: 'Course not found' });
+      const adminGroup = getAdminGroup(req);
+      if (adminGroup && Number(course.group_id) !== Number(adminGroup)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
     const dayRow = await db.get(
       'SELECT id FROM course_study_days WHERE course_id = ? AND weekday = ?',
       [courseId, weekday]
@@ -6792,7 +6821,7 @@ app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) 
             group: row.group_number,
             schedule_ids: [row.id],
           },
-          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
+          fix_url: `/admin?${groupId ? `group_id=${groupId}&` : ''}course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
         });
       }
 
@@ -6808,7 +6837,7 @@ app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) 
             group: row.group_number,
             schedule_ids: [row.id],
           },
-          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
+          fix_url: `/admin?${groupId ? `group_id=${groupId}&` : ''}course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
         });
       }
 
@@ -6825,7 +6854,7 @@ app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) 
             group: row.group_number,
             schedule_ids: [row.id],
           },
-          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
+          fix_url: `/admin?${groupId ? `group_id=${groupId}&` : ''}course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
         });
       }
     });
@@ -6844,7 +6873,7 @@ app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) 
             group: sample.group_number,
             schedule_ids: list.map((r) => r.id),
           },
-          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(sample.day_of_week)}&group_number=${sample.group_number}`,
+          fix_url: `/admin?${groupId ? `group_id=${groupId}&` : ''}course=${courseId}&day=${encodeURIComponent(sample.day_of_week)}&group_number=${sample.group_number}`,
         });
       }
     });
@@ -6862,6 +6891,7 @@ app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) 
 app.post('/admin/semesters/add', requireAdmin, (req, res) => {
   const { title, start_date, weeks_count, is_active } = req.body;
   const courseId = getAdminCourse(req);
+  const groupId = getAdminGroup(req);
   const weeks = Number(weeks_count);
   const active = String(is_active) === '1' ? 1 : 0;
   if (!title || !start_date || Number.isNaN(weeks) || weeks < 1 || weeks > 30) {
@@ -6869,20 +6899,20 @@ app.post('/admin/semesters/add', requireAdmin, (req, res) => {
   }
   const create = () => {
     db.run(
-      'INSERT INTO semesters (course_id, title, start_date, weeks_count, is_active, is_archived) VALUES (?, ?, ?, ?, ?, 0)',
-      [courseId, title.trim(), start_date, weeks, active],
+      'INSERT INTO semesters (course_id, group_id, title, start_date, weeks_count, is_active, is_archived) VALUES (?, ?, ?, ?, ?, ?, 0)',
+      [courseId, groupId || null, title.trim(), start_date, weeks, active],
       (err) => {
         if (err) {
           return res.redirect('/admin?err=Database%20error');
         }
         logAction(db, req, 'semester_add', { title, start_date, weeks_count: weeks, is_active: active });
-        invalidateSemestersCache(courseId);
+        invalidateSemestersCache(courseId, groupId || null);
         return res.redirect('/admin?ok=Semester%20created');
       }
     );
   };
   if (active) {
-    db.run('UPDATE semesters SET is_active = 0 WHERE course_id = ?', [courseId], (err) => {
+    db.run('UPDATE semesters SET is_active = 0 WHERE course_id = ? AND group_id = ?', [courseId, groupId || null], (err) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
       }
@@ -6897,19 +6927,20 @@ app.post('/admin/semesters/edit/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { title, start_date, weeks_count } = req.body;
   const courseId = getAdminCourse(req);
+  const groupId = getAdminGroup(req);
   const weeks = Number(weeks_count);
   if (!title || !start_date || Number.isNaN(weeks) || weeks < 1 || weeks > 30) {
     return res.redirect('/admin?err=Invalid%20semester');
   }
   db.run(
-    'UPDATE semesters SET title = ?, start_date = ?, weeks_count = ? WHERE id = ? AND course_id = ?',
-    [title.trim(), start_date, weeks, id, courseId],
+    'UPDATE semesters SET title = ?, start_date = ?, weeks_count = ? WHERE id = ? AND course_id = ? AND group_id = ?',
+    [title.trim(), start_date, weeks, id, courseId, groupId || null],
     (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
     logAction(db, req, 'semester_edit', { id, title, start_date, weeks_count: weeks });
-    invalidateSemestersCache(courseId);
+    invalidateSemestersCache(courseId, groupId || null);
     return res.redirect('/admin?ok=Semester%20updated');
   }
 );
@@ -6918,16 +6949,20 @@ app.post('/admin/semesters/edit/:id', requireAdmin, (req, res) => {
 app.post('/admin/semesters/set-active/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
-  db.run('UPDATE semesters SET is_active = 0 WHERE course_id = ?', [courseId], (err) => {
+  const groupId = getAdminGroup(req);
+  db.run('UPDATE semesters SET is_active = 0 WHERE course_id = ? AND group_id = ?', [courseId, groupId || null], (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
-    db.run('UPDATE semesters SET is_active = 1, is_archived = 0 WHERE id = ? AND course_id = ?', [id, courseId], (err2) => {
+    db.run(
+      'UPDATE semesters SET is_active = 1, is_archived = 0 WHERE id = ? AND course_id = ? AND group_id = ?',
+      [id, courseId, groupId || null],
+      (err2) => {
       if (err2) {
         return res.redirect('/admin?err=Database%20error');
       }
       logAction(db, req, 'semester_set_active', { id });
-      invalidateSemestersCache(courseId);
+      invalidateSemestersCache(courseId, groupId || null);
       return res.redirect('/admin?ok=Semester%20activated');
     });
   });
@@ -6936,12 +6971,16 @@ app.post('/admin/semesters/set-active/:id', requireAdmin, (req, res) => {
 app.post('/admin/semesters/archive/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
-  db.run('UPDATE semesters SET is_archived = 1, is_active = 0 WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
+  const groupId = getAdminGroup(req);
+  db.run(
+    'UPDATE semesters SET is_archived = 1, is_active = 0 WHERE id = ? AND course_id = ? AND group_id = ?',
+    [id, courseId, groupId || null],
+    (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
     logAction(db, req, 'semester_archive', { id });
-    invalidateSemestersCache(courseId);
+    invalidateSemestersCache(courseId, groupId || null);
     return res.redirect('/admin?ok=Semester%20archived');
   });
 });
@@ -6949,12 +6988,13 @@ app.post('/admin/semesters/archive/:id', requireAdmin, (req, res) => {
 app.post('/admin/semesters/restore/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
-  db.run('UPDATE semesters SET is_archived = 0 WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
+  const groupId = getAdminGroup(req);
+  db.run('UPDATE semesters SET is_archived = 0 WHERE id = ? AND course_id = ? AND group_id = ?', [id, courseId, groupId || null], (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
     logAction(db, req, 'semester_restore', { id });
-    invalidateSemestersCache(courseId);
+    invalidateSemestersCache(courseId, groupId || null);
     return res.redirect('/admin?ok=Semester%20restored');
   });
 });
@@ -6962,26 +7002,33 @@ app.post('/admin/semesters/restore/:id', requireAdmin, (req, res) => {
 app.post('/admin/semesters/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
-  db.get('SELECT is_active FROM semesters WHERE id = ? AND course_id = ?', [id, courseId], (semErr, semRow) => {
+  const groupId = getAdminGroup(req);
+  db.get(
+    'SELECT is_active FROM semesters WHERE id = ? AND course_id = ? AND group_id = ?',
+    [id, courseId, groupId || null],
+    (semErr, semRow) => {
     if (semErr || !semRow) {
       return res.redirect('/admin?err=Semester%20not%20found');
     }
     if (semRow.is_active === 1) {
       return res.redirect('/admin?err=Cannot%20delete%20active%20semester');
     }
-    db.get('SELECT COUNT(*) AS cnt FROM schedule_entries WHERE semester_id = ?', [id], (cntErr, cntRow) => {
+    db.get(
+      'SELECT COUNT(*) AS cnt FROM schedule_entries WHERE semester_id = ? AND course_id = ? AND group_id = ?',
+      [id, courseId, groupId || null],
+      (cntErr, cntRow) => {
       if (cntErr) {
         return res.redirect('/admin?err=Database%20error');
       }
       if (Number(cntRow.cnt) > 0) {
         return res.redirect('/admin?err=Semester%20in%20use');
       }
-      db.run('DELETE FROM semesters WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
+      db.run('DELETE FROM semesters WHERE id = ? AND course_id = ? AND group_id = ?', [id, courseId, groupId || null], (err) => {
         if (err) {
           return res.redirect('/admin?err=Database%20error');
         }
         logAction(db, req, 'semester_delete', { id });
-        invalidateSemestersCache(courseId);
+        invalidateSemestersCache(courseId, groupId || null);
         return res.redirect('/admin?ok=Semester%20deleted');
       });
     });
@@ -6992,10 +7039,14 @@ app.post('/admin/student-groups/set', requireAdmin, (req, res) => {
   const { student_id, subject_id, group_number } = req.body;
   const groupNum = Number(group_number);
   const courseId = getAdminCourse(req);
+  const groupId = getAdminGroup(req);
   if (!student_id || !subject_id || Number.isNaN(groupNum)) {
     return res.redirect('/admin?err=Invalid%20group%20assignment');
   }
-  db.get('SELECT group_count FROM subjects WHERE id = ? AND course_id = ?', [subject_id, courseId], (err, subject) => {
+  db.get(
+    'SELECT group_count FROM subjects WHERE id = ? AND course_id = ? AND group_id = ?',
+    [subject_id, courseId, groupId || null],
+    (err, subject) => {
     if (err || !subject) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -7046,6 +7097,7 @@ app.post('/admin/group/remove', requireAdmin, (req, res) => {
 app.post('/admin/users/role', requireAdmin, (req, res) => {
   const { user_id, role } = req.body;
   const courseId = getAdminCourse(req);
+  const groupId = getAdminGroup(req);
   if (!user_id || !role || !['student', 'admin', 'starosta', 'deanery'].includes(role)) {
     return res.redirect('/admin?err=Invalid%20role');
   }
@@ -7053,7 +7105,7 @@ app.post('/admin/users/role', requireAdmin, (req, res) => {
   if (Number(user_id) === Number(currentId)) {
     return res.redirect('/admin?err=Cannot%20change%20your%20own%20role');
   }
-  db.get('SELECT role FROM users WHERE id = ? AND course_id = ?', [user_id, courseId], (err, user) => {
+  db.get('SELECT role FROM users WHERE id = ? AND course_id = ? AND group_id = ?', [user_id, courseId, groupId || null], (err, user) => {
     if (err || !user) {
       return res.redirect('/admin?err=User%20not%20found');
     }
@@ -7065,7 +7117,7 @@ app.post('/admin/users/role', requireAdmin, (req, res) => {
         if (Number(row.count) <= 1) {
           return res.redirect('/admin?err=At%20least%20one%20admin%20required');
         }
-        db.run('UPDATE users SET role = ? WHERE id = ?', [role, user_id], (updErr) => {
+        db.run('UPDATE users SET role = ? WHERE id = ? AND group_id = ?', [role, user_id, groupId || null], (updErr) => {
           if (updErr) {
             return res.redirect('/admin?err=Database%20error');
           }
@@ -7076,7 +7128,7 @@ app.post('/admin/users/role', requireAdmin, (req, res) => {
       });
       return;
     }
-    db.run('UPDATE users SET role = ? WHERE id = ?', [role, user_id], (updErr) => {
+    db.run('UPDATE users SET role = ? WHERE id = ? AND group_id = ?', [role, user_id, groupId || null], (updErr) => {
       if (updErr) {
         return res.redirect('/admin?err=Database%20error');
       }
@@ -7092,21 +7144,22 @@ app.post('/admin/users/course', requireAdmin, (req, res) => {
   const userId = Number(user_id);
   const courseId = Number(course_id);
   const currentCourse = getAdminCourse(req);
+  const groupId = getAdminGroup(req);
   if (Number.isNaN(userId) || Number.isNaN(courseId)) {
     return res.redirect('/admin?err=Invalid%20course');
   }
-  db.get('SELECT id FROM courses WHERE id = ?', [courseId], (courseErr, courseRow) => {
+  db.get('SELECT id FROM courses WHERE id = ? AND group_id = ?', [courseId, groupId || null], (courseErr, courseRow) => {
     if (courseErr || !courseRow) {
       return res.redirect('/admin?err=Invalid%20course');
     }
-    db.get('SELECT role FROM users WHERE id = ? AND course_id = ?', [userId, currentCourse], (err, user) => {
+    db.get('SELECT role FROM users WHERE id = ? AND course_id = ? AND group_id = ?', [userId, currentCourse, groupId || null], (err, user) => {
       if (err || !user) {
         return res.redirect('/admin?err=User%20not%20found');
       }
       if (user.role === 'admin') {
         return res.redirect('/admin?err=Cannot%20change%20admin%20course');
       }
-      db.run('UPDATE users SET course_id = ? WHERE id = ?', [courseId, userId], (updErr) => {
+      db.run('UPDATE users SET course_id = ? WHERE id = ? AND group_id = ?', [courseId, userId, groupId || null], (updErr) => {
         if (updErr) {
           return res.redirect('/admin?err=Database%20error');
         }
@@ -7199,14 +7252,15 @@ app.post('/admin/homework/migrate', requireAdmin, (req, res) => {
 app.post('/admin/users/delete-multiple', requireAdmin, (req, res) => {
   const ids = req.body.delete_user_ids;
   const courseId = getAdminCourse(req);
+  const groupId = getAdminGroup(req);
   if (!ids) {
     return res.redirect('/admin?err=No%20users%20selected');
   }
   const list = Array.isArray(ids) ? ids : [ids];
   const placeholders = list.map(() => '?').join(',');
   db.all(
-    `SELECT id, role FROM users WHERE course_id = ? AND id IN (${placeholders})`,
-    [courseId, ...list],
+    `SELECT id, role FROM users WHERE course_id = ? AND group_id = ? AND id IN (${placeholders})`,
+    [courseId, groupId || null, ...list],
     (err, rows) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
@@ -7230,7 +7284,8 @@ app.post('/admin/users/delete-multiple', requireAdmin, (req, res) => {
 
 app.post('/admin/users/clear-all', requireAdmin, (req, res) => {
   const courseId = getAdminCourse(req);
-  db.all('SELECT id FROM users WHERE role != ? AND course_id = ?', ['admin', courseId], (err, rows) => {
+  const groupId = getAdminGroup(req);
+  db.all('SELECT id FROM users WHERE role != ? AND course_id = ? AND group_id = ?', ['admin', courseId, groupId || null], (err, rows) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
@@ -7253,17 +7308,21 @@ app.post('/admin/users/clear-all', requireAdmin, (req, res) => {
 app.post('/admin/users/deactivate', requireAdmin, (req, res) => {
   const { user_id } = req.body;
   const courseId = getAdminCourse(req);
+  const groupId = getAdminGroup(req);
   if (!user_id) {
     return res.status(400).json({ error: 'Missing user_id' });
   }
-  db.get('SELECT role, full_name FROM users WHERE id = ? AND course_id = ?', [user_id, courseId], (err, user) => {
+  db.get(
+    'SELECT role, full_name FROM users WHERE id = ? AND course_id = ? AND group_id = ?',
+    [user_id, courseId, groupId || null],
+    (err, user) => {
     if (err || !user) {
       return res.status(404).json({ error: 'User not found' });
     }
     if (user.role === 'admin') {
       return res.status(400).json({ error: 'Cannot deactivate admin' });
     }
-    db.run('UPDATE users SET is_active = 0 WHERE id = ?', [user_id], (updErr) => {
+    db.run('UPDATE users SET is_active = 0 WHERE id = ? AND group_id = ?', [user_id, groupId || null], (updErr) => {
       if (updErr) {
         return res.status(500).json({ error: 'Database error' });
       }
@@ -7277,10 +7336,11 @@ app.post('/admin/users/deactivate', requireAdmin, (req, res) => {
 app.post('/admin/users/activate', requireAdmin, (req, res) => {
   const { user_id } = req.body;
   const courseId = getAdminCourse(req);
+  const groupId = getAdminGroup(req);
   if (!user_id) {
     return res.status(400).json({ error: 'Missing user_id' });
   }
-  db.run('UPDATE users SET is_active = 1 WHERE id = ? AND course_id = ?', [user_id, courseId], (updErr) => {
+  db.run('UPDATE users SET is_active = 1 WHERE id = ? AND course_id = ? AND group_id = ?', [user_id, courseId, groupId || null], (updErr) => {
     if (updErr) {
       return res.status(500).json({ error: 'Database error' });
     }
@@ -7294,11 +7354,15 @@ app.post('/admin/users/delete-permanent', requireAdmin, async (req, res) => {
   const { user_id } = req.body;
   const userId = Number(user_id);
   const courseId = getAdminCourse(req);
+  const groupId = getAdminGroup(req);
   if (Number.isNaN(userId)) {
     return res.redirect('/admin?err=Invalid%20user');
   }
   try {
-    const user = await db.get('SELECT role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    const user = await db.get(
+      'SELECT role FROM users WHERE id = ? AND course_id = ? AND group_id = ?',
+      [userId, courseId, groupId || null]
+    );
     if (!user) {
       return res.redirect('/admin?err=User%20not%20found');
     }

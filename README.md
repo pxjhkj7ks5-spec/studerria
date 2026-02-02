@@ -18,3 +18,10 @@ gcloud sql export sql student-portal-db gs://YOUR_BUCKET/backups/student_portal_
   --database=student_portal \
   --project=project-25b725c0-e6f6-4253-afa
 ```
+
+## Group Context (Kyiv / Munich)
+- `groups` table is the top-level context; users have `users.group_id`.
+- Content is scoped by `group_id + course_id + semester_id` where applicable (schedule, subjects, homework, teamwork, messages, logs).
+- Onboarding flow: register → course → group → subjects.
+- Admin UI: group selector sits next to course selector; admin context stored in session (`adminGroup`).
+- If a user has no `group_id`, they are redirected to `/onboarding/group`.
