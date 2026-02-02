@@ -125,17 +125,11 @@
       body.theme-light .app-footer {
         color: rgba(15, 23, 42, 0.6);
       }
-      /* balanced dark glass: no blur + no inset to avoid hairline */
-      body.theme-dark .glass {
-        -webkit-backdrop-filter: none !important;
-        backdrop-filter: none !important;
-        background: linear-gradient(180deg, rgba(22, 30, 50, 0.68) 0%, rgba(16, 22, 38, 0.74) 100%) !important;
-        border: 1px solid rgba(255, 255, 255, 0.06) !important;
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.48) !important;
-        contain: paint;
-      }
 </style>
-  </head>
+      <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/pages/auth.css" />
+</head>
   <body class="theme-light">
     <div class="container">
       <div class="row justify-content-center align-items-center" style="min-height: 100vh;">

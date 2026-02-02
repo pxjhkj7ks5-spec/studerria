@@ -235,11 +235,6 @@
         mix-blend-mode: soft-light;
         z-index: -1;
       }
-
-      body.theme-dark::before {
-        background-image: none;
-        opacity: 0;
-      }
       body.theme-dark {
         background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.22), transparent 60%),
           radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.18), transparent 60%),
@@ -340,17 +335,11 @@
       .input-with-icon .form-control {
         padding-right: 38px;
       }
-      /* balanced dark glass: no blur + no inset to avoid hairline */
-      body.theme-dark .glass {
-        -webkit-backdrop-filter: none !important;
-        backdrop-filter: none !important;
-        background: linear-gradient(180deg, rgba(22, 30, 50, 0.68) 0%, rgba(16, 22, 38, 0.74) 100%) !important;
-        border: 1px solid rgba(255, 255, 255, 0.06) !important;
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.48) !important;
-        contain: paint;
-      }
 </style>
-  </head>
+      <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/pages/auth.css" />
+</head>
   <body class="theme-light">
     <div class="theme-toggle-floating">
       <button

@@ -1,0 +1,9 @@
+.task-card,
+.group-card {
+  border-radius: var(--r-lg);
+}
+
+.react-btn,
+.tag-pill {
+  border-radius: 999px;
+}

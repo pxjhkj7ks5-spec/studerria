@@ -1,0 +1,25 @@
+.auth-card {
+  border-radius: var(--r-xl);
+  padding: var(--s-6);
+  background: var(--glass-2);
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-card h1,
+.auth-card .h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.theme-toggle-min,
+.theme-toggle-btn {
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+body.theme-light .theme-toggle-min,
+body.theme-light .theme-toggle-btn {
+  background: rgba(15, 23, 42, 0.06);
+}

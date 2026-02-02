@@ -1,0 +1,90 @@
+:root {
+  --font-sans: "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Avenir Next", "Segoe UI", sans-serif;
+
+  --bg-0: #0b0f1a;
+  --bg-1: #121a2a;
+  --bg-bloom-1: rgba(61, 129, 255, 0.22);
+  --bg-bloom-2: rgba(120, 165, 255, 0.16);
+
+  --glass: rgba(20, 26, 42, 0.62);
+  --glass-2: rgba(24, 32, 52, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.2);
+  --glass-blur: 16px;
+
+  --text: #f8fafc;
+  --muted: #aeb7c7;
+  --faint: rgba(248, 250, 252, 0.6);
+
+  --accent: #4c8dff;
+  --accent-2: #78a6ff;
+  --accent-3: #3aa7ff;
+
+  --success: #2fbf71;
+  --danger: #ff6b6b;
+
+  --shadow-sm: 0 6px 16px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 16px 36px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 24px 56px rgba(0, 0, 0, 0.4);
+
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+}
+
+body.theme-dark {
+  --bg-0: #0a0f1c;
+  --bg-1: #141c2f;
+  --bg-bloom-1: rgba(72, 132, 255, 0.25);
+  --bg-bloom-2: rgba(123, 177, 255, 0.18);
+
+  --glass: rgba(18, 24, 40, 0.62);
+  --glass-2: rgba(22, 30, 50, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.2);
+
+  --text: #f8fafc;
+  --muted: #aab4c6;
+  --faint: rgba(248, 250, 252, 0.6);
+
+  --accent: #4b8cff;
+  --accent-2: #7aa7ff;
+  --accent-3: #3aa7ff;
+
+  --shadow-sm: 0 6px 16px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 16px 36px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 26px 60px rgba(0, 0, 0, 0.48);
+}
+
+body.theme-light {
+  --bg-0: #f4f7fc;
+  --bg-1: #eef3fb;
+  --bg-bloom-1: rgba(167, 198, 255, 0.45);
+  --bg-bloom-2: rgba(197, 213, 255, 0.4);
+
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-2: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(15, 23, 42, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.7);
+
+  --text: #0f172a;
+  --muted: #5b6477;
+  --faint: rgba(15, 23, 42, 0.6);
+
+  --accent: #2f6ef6;
+  --accent-2: #4f87ff;
+  --accent-3: #2f9bff;
+
+  --shadow-sm: 0 6px 14px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 16px 32px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 26px 50px rgba(15, 23, 42, 0.16);
+}

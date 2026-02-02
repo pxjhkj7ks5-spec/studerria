@@ -1,0 +1,8 @@
+.header-card,
+.myday-card {
+  border-radius: var(--r-lg);
+}
+
+.stat-pill {
+  border-radius: 999px;
+}

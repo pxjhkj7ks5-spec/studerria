@@ -1,0 +1,4 @@
+.welcome-card {
+  border-radius: var(--r-xl);
+  background: var(--glass-2);
+}

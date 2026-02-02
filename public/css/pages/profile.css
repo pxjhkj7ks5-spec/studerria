@@ -1,0 +1,4 @@
+.profile-stat,
+.stat-tile {
+  border-radius: var(--r-lg);
+}

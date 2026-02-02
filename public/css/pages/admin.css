@@ -1,0 +1,31 @@
+.admin-nav {
+  padding: 0.75rem 0;
+}
+
+.admin-nav .navbar-brand {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.bulk-bar,
+.flash-alert {
+  border-radius: var(--r-md);
+}
+
+.table {
+  border-collapse: separate;
+  border-spacing: 0 6px;
+}
+
+.table > :not(caption) > * > * {
+  border-bottom: none;
+}
+
+.table tbody tr {
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.theme-light .table tbody tr {
+  background: rgba(15, 23, 42, 0.03);
+}

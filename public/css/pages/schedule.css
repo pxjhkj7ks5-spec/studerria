@@ -1,0 +1,77 @@
+.week-hero {
+  border-radius: var(--r-xl);
+  padding: var(--s-6);
+  background: var(--glass-2);
+}
+
+.week-hero h1,
+.week-hero h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.badge-glow {
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  background: rgba(76, 141, 255, 0.2);
+  border: 1px solid rgba(76, 141, 255, 0.35);
+  color: var(--text);
+}
+
+.day-card {
+  border-radius: var(--r-lg);
+}
+
+.day-card .card-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+}
+
+body.theme-light .day-card .card-header {
+  border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+.list-group-item {
+  border-radius: var(--r-md);
+  margin-bottom: 0.6rem;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.theme-light .list-group-item {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.deadline-block {
+  border-radius: var(--r-lg);
+  background: rgba(76, 141, 255, 0.12);
+  border: 1px solid rgba(76, 141, 255, 0.25);
+}
+
+.deadline-item {
+  border-radius: var(--r-md);
+  border: 1px solid rgba(76, 141, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.week-slider {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
+}
+
+.week-nav-btn {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.week-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+body.theme-light .week-slider,
+body.theme-light .week-nav-btn {
+  background: rgba(15, 23, 42, 0.04);
+}
