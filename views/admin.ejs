@@ -1271,15 +1271,6 @@
                       value="<%= (filters && filters.users_q) || '' %>"
                     />
                   </div>
-                  <div class="col-12 col-md-3">
-                    <label class="form-label"><%= t('admin.scheduleGroup') %></label>
-                    <input
-                      class="form-control"
-                      name="users_group"
-                      placeholder="<%= t('admin.scheduleGroupPlaceholder') %>"
-                      value="<%= (filters && filters.users_group) || '' %>"
-                    />
-                  </div>
                   <div class="col-12 col-md-2 d-grid">
                     <button class="btn btn-outline-primary" type="submit"><%= t('admin.filter') %></button>
                   </div>
@@ -1299,7 +1290,7 @@
             </button>
             <a
               class="btn btn-outline-secondary btn-sm"
-              href="/admin/export/users.csv?group_id=<%= selectedGroupId || '' %>&course=<%= selectedCourseId || 1 %><%= activeSemester ? '&semester_id=' + activeSemester.id : '' %><%= (filters && filters.users_group) ? '&group=' + encodeURIComponent(filters.users_group) : '' %>"
+              href="/admin/export/users.csv?group_id=<%= selectedGroupId || '' %>&course=<%= selectedCourseId || 1 %><%= activeSemester ? '&semester_id=' + activeSemester.id : '' %>"
             ><%= t('admin.exportUsers') %></a>
             <form class="d-flex gap-2" method="POST" action="/admin/import/users.csv" enctype="multipart/form-data">
               <div class="file-field">
@@ -1332,7 +1323,7 @@
                   <th><%= t('admin.name') %></th>
                   <th><%= t('admin.role') %></th>
                   <th><%= t('admin.course') %></th>
-                  <th><%= t('admin.scheduleGroup') %></th>
+                  <th><%= t('admin.groupMove') %></th>
                   <th><%= t('admin.subjectGroup') %></th>
                   <th><%= t('admin.setGroup') %></th>
                   <th><%= t('admin.actions') %></th>
@@ -1345,7 +1336,6 @@
                 data-role-filter="all"
                 data-course-id="<%= selectedCourseId || 1 %>"
                 data-search="<%= (filters && filters.users_q) || '' %>"
-                data-group="<%= (filters && filters.users_group) || '' %>"
               >
                 <% (users || []).forEach(function(u) { %>
                   <tr
@@ -1353,7 +1343,7 @@
                     data-user-id="<%= u.id %>"
                     data-user-name="<%= u.full_name %>"
                     data-user-role="<%= u.role %>"
-                    data-user-group="<%= u.schedule_group %>"
+                    data-user-group-id="<%= u.group_id %>"
                     data-user-course="<%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %>"
                     data-user-course-id="<%= u.course_id || 1 %>"
                     data-user-active="<%= u.is_active %>"
@@ -1369,7 +1359,24 @@
                     <td><%= u.full_name %></td>
                     <td><span class="badge text-bg-<%= u.role === 'admin' ? 'primary' : (u.role === 'starosta' ? 'warning' : (u.role === 'deanery' ? 'info' : 'secondary')) %>"><%= u.role %></span></td>
                     <td><%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %></td>
-                    <td><%= u.schedule_group %></td>
+                    <td>
+                      <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <% 
+                          const currentGroup = (groups || []).find(function(g) { return Number(g.id) === Number(u.group_id); });
+                          const targetGroup = (groups || []).find(function(g) { return Number(g.id) !== Number(u.group_id); });
+                        %>
+                        <span class="badge text-bg-secondary"><%= currentGroup ? currentGroup.name : '' %></span>
+                        <% if (targetGroup && u.role !== 'admin') { %>
+                          <form method="POST" action="/admin/users/group" class="d-inline">
+                            <input type="hidden" name="user_id" value="<%= u.id %>" />
+                            <input type="hidden" name="group_id" value="<%= targetGroup.id %>" />
+                            <button class="btn btn-sm btn-outline-primary" type="submit">
+                              <%= t('admin.moveToGroup') %> <%= targetGroup.name %>
+                            </button>
+                          </form>
+                        <% } %>
+                      </div>
+                    </td>
                     <td>
                       <% 
                         const subjectList = [];
@@ -2513,6 +2520,8 @@
 
       const limitedStaffView = <%= isLimitedView ? 'true' : 'false' %>;
       const allowedSections = <%- JSON.stringify(allowedSectionsList || []) %>;
+      const groupsData = <%- JSON.stringify(groups || []) %>;
+      const moveGroupLabel = "<%= t('admin.moveToGroup') %>";
       const adminSections = allowedSections.length
         ? allowedSections
         : ['admin-settings', 'admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-history', 'admin-activity', 'admin-teamwork', 'admin-messages'];
@@ -2626,12 +2635,26 @@
                   </form>
                 `;
 
+            const currentGroup = (groupsData || []).find((g) => Number(g.id) === Number(u.group_id));
+            const targetGroup = (groupsData || []).find((g) => Number(g.id) !== Number(u.group_id));
+            const moveGroupForm = targetGroup && u.role !== 'admin'
+              ? `
+                  <form method="POST" action="/admin/users/group" class="d-inline">
+                    <input type="hidden" name="user_id" value="${u.id}" />
+                    <input type="hidden" name="group_id" value="${targetGroup.id}" />
+                    <button class="btn btn-sm btn-outline-primary" type="submit">
+                      ${moveGroupLabel} ${targetGroup.name}
+                    </button>
+                  </form>
+                `
+              : '';
+
             return `
               <tr class="user-row"
                   data-user-id="${u.id}"
                   data-user-name="${u.full_name}"
                   data-user-role="${u.role}"
-                  data-user-group="${u.schedule_group}"
+                  data-user-group-id="${u.group_id}"
                   data-user-course="${courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}"
                   data-user-course-id="${u.course_id || 1}"
                   data-user-active="${isActive}"
@@ -2642,7 +2665,12 @@
                 <td>${u.full_name}</td>
                 <td><span class="badge text-bg-${u.role === 'admin' ? 'primary' : (u.role === 'starosta' ? 'warning' : (u.role === 'deanery' ? 'info' : 'secondary'))}">${u.role}</span></td>
                 <td>${courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}</td>
-                <td>${u.schedule_group}</td>
+                <td>
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge text-bg-secondary">${currentGroup ? currentGroup.name : ''}</span>
+                    ${moveGroupForm}
+                  </div>
+                </td>
                 <td>${subjectsBtn}</td>
                 <td>
                   <form method="POST" action="/admin/student-groups/set" class="row g-2">
@@ -2686,11 +2714,10 @@
           const status = tbodyEl.dataset.status || 'active';
           const courseId = tbodyEl.dataset.courseId || '1';
           const q = tbodyEl.dataset.search || '';
-          const group = tbodyEl.dataset.group || '';
           const res = await fetch(
             `/admin/users.json?status=${encodeURIComponent(status)}&course=${encodeURIComponent(courseId)}&q=${encodeURIComponent(
               q
-            )}&group=${encodeURIComponent(group)}`
+            )}`
           );
           if (!res.ok) return;
           const data = await res.json();

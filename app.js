@@ -7171,6 +7171,83 @@ app.post('/admin/users/course', requireAdmin, (req, res) => {
   });
 });
 
+app.post('/admin/users/group', requireAdmin, (req, res) => {
+  const { user_id, group_id } = req.body;
+  const userId = Number(user_id);
+  const targetGroupId = Number(group_id);
+  if (Number.isNaN(userId) || Number.isNaN(targetGroupId)) {
+    return res.redirect('/admin?err=Invalid%20group');
+  }
+  const currentGroupId = getAdminGroup(req);
+  db.get('SELECT id, slug, name FROM groups WHERE id = ?', [targetGroupId], (gErr, targetGroup) => {
+    if (gErr || !targetGroup) {
+      return res.redirect('/admin?err=Invalid%20group');
+    }
+    db.get(
+      'SELECT id, course_id, group_id, role FROM users WHERE id = ? AND group_id = ?',
+      [userId, currentGroupId || null],
+      (uErr, userRow) => {
+        if (uErr || !userRow) {
+          return res.redirect('/admin?err=User%20not%20found');
+        }
+        if (userRow.role === 'admin') {
+          return res.redirect('/admin?err=Cannot%20move%20admin');
+        }
+        const finalize = (nextCourseId) => {
+          db.run(
+            'UPDATE users SET group_id = ?, course_id = ? WHERE id = ?',
+            [targetGroupId, nextCourseId || null, userId],
+            (updErr) => {
+              if (updErr) {
+                return res.redirect('/admin?err=Database%20error');
+              }
+              db.run('DELETE FROM student_groups WHERE student_id = ?', [userId], () => {
+                logAction(db, req, 'user_group_change', {
+                  user_id: userId,
+                  from_group_id: userRow.group_id,
+                  to_group_id: targetGroupId,
+                  course_id: nextCourseId || null,
+                });
+                broadcast('users_updated');
+                return res.redirect(`/admin?group_id=${currentGroupId || ''}&course=${getAdminCourse(req)}&ok=Group%20updated`);
+              });
+            }
+          );
+        };
+        if (!userRow.course_id) {
+          return finalize(null);
+        }
+        db.get('SELECT id, name, group_id FROM courses WHERE id = ?', [userRow.course_id], (cErr, courseRow) => {
+          if (cErr || !courseRow) {
+            return finalize(null);
+          }
+          if (Number(courseRow.group_id) === Number(targetGroupId)) {
+            return finalize(courseRow.id);
+          }
+          db.get(
+            'SELECT id FROM courses WHERE name = ? AND group_id = ?',
+            [courseRow.name, targetGroupId],
+            (mapErr, mapped) => {
+              if (mapErr) {
+                return finalize(null);
+              }
+              if (mapped && mapped.id) {
+                return finalize(mapped.id);
+              }
+              db.get('SELECT id FROM courses WHERE group_id = ? ORDER BY id ASC LIMIT 1', [targetGroupId], (fallbackErr, fallback) => {
+                if (fallbackErr || !fallback) {
+                  return finalize(null);
+                }
+                return finalize(fallback.id);
+              });
+            }
+          );
+        });
+      }
+    );
+  });
+});
+
 app.post('/admin/users/reset-password', requireAdmin, (req, res) => {
   const { user_id, new_password } = req.body;
   if (!user_id || !new_password) {
