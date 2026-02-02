@@ -78,6 +78,10 @@
 
       /* Glass card base */
       .glass {
+        position: relative;
+        isolation: isolate;
+        overflow: clip;
+        background-clip: padding-box;
         background: rgba(255, 255, 255, 0.08);
         border: 1px solid rgba(255, 255, 255, 0.12);
         backdrop-filter: blur(14px);

@@ -40,6 +40,10 @@
         color: #f8fafc;
       }
       .glass {
+        position: relative;
+        isolation: isolate;
+        overflow: clip;
+        background-clip: padding-box;
         border-radius: var(--card-radius);
         backdrop-filter: blur(20px);
         transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;

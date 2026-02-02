@@ -511,6 +511,10 @@
         z-index: -1;
       }
       .glass {
+        position: relative;
+        isolation: isolate;
+        overflow: clip;
+        background-clip: padding-box;
         border-radius: var(--radius-lg);
         backdrop-filter: blur(var(--glass-blur));
         background: var(--glass-bg);
