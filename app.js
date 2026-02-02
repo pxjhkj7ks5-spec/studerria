@@ -683,6 +683,7 @@ const initDb = async () => {
     'ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
     'ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE personal_reminders ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)',
+    'ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_name_key',
     'CREATE UNIQUE INDEX IF NOT EXISTS courses_name_group_id_key ON courses (name, group_id)',
   ];
   for (const statement of alters) {
