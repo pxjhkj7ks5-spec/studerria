@@ -694,7 +694,17 @@ const initDb = async () => {
       VALUES
         (1, '1 курс', (SELECT id FROM groups WHERE slug = 'kyiv')),
         (2, '2 курс', (SELECT id FROM groups WHERE slug = 'kyiv'))
-      ON CONFLICT (id) DO NOTHING
+      ON CONFLICT (name, group_id) DO NOTHING
+    `
+  );
+
+  await pool.query(
+    `
+      INSERT INTO courses (id, name, group_id)
+      VALUES
+        (101, '1 курс', (SELECT id FROM groups WHERE slug = 'munich')),
+        (102, '2 курс', (SELECT id FROM groups WHERE slug = 'munich'))
+      ON CONFLICT (name, group_id) DO NOTHING
     `
   );
 
@@ -1690,7 +1700,15 @@ app.get('/register/course', (req, res) => {
   });
   (async () => {
     try {
-      const courses = await getCoursesCached();
+      const allCourses = await getCoursesCached();
+      const seen = new Set();
+      const courses = (allCourses || []).filter((course) => {
+        if (!course || !course.name) return false;
+        const key = String(course.name);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       return res.render('register-course', { courses, error: req.query.error || '' });
     } catch (err) {
       return res.status(500).send('Database error');
