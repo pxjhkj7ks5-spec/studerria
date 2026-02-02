@@ -344,11 +344,6 @@
         <form method="GET" action="/admin/overview" class="mb-3">
           <div class="d-flex flex-wrap align-items-center gap-2">
             <label class="form-label mb-0"><%= t('admin.course') %></label>
-            <select class="form-select w-auto" name="group_id" onchange="this.form.submit()">
-              <% (groups || []).forEach(function(g) { %>
-                <option value="<%= g.id %>" <%= Number(selectedGroupId) === Number(g.id) ? 'selected' : '' %>><%= g.name %></option>
-              <% }); %>
-            </select>
             <select class="form-select w-auto" name="course" onchange="this.form.submit()">
               <% (courses || []).forEach(function(c) { %>
                 <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>><%= c.name %></option>
