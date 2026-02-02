@@ -112,11 +112,19 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
+const isProd = process.env.NODE_ENV === 'production';
+app.set('trust proxy', 1);
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
     resave: false,
     saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: isProd,
+    },
   })
 );
 
@@ -1229,6 +1237,16 @@ function logActivity(dbRef, req, actionType, targetType, targetId, details, cour
   );
 }
 
+function applyRememberMe(req, remember) {
+  const ttlDays = settingsCache.session_duration_days || 14;
+  if (remember) {
+    req.session.cookie.maxAge = ttlDays * 24 * 60 * 60 * 1000;
+  } else {
+    req.session.cookie.expires = false;
+    req.session.cookie.maxAge = null;
+  }
+}
+
 const ACTIVITY_POINTS_CASE =
   "CASE WHEN action_type = 'homework_create' THEN 1 " +
   "WHEN action_type = 'teamwork_task_create' THEN 2 " +
@@ -1455,14 +1473,16 @@ app.post('/login', authLimiter, async (req, res) => {
           language: user.language || getPreferredLang(req),
         };
         req.session.role = role;
-        const remember = remember_me === 'on';
+        const remember = remember_me === '1' || remember_me === 'on' || remember_me === true;
         req.session.rememberMe = remember;
-        req.session.cookie.maxAge = remember ? (settingsCache.session_duration_days || 14) * 24 * 60 * 60 * 1000 : null;
+        applyRememberMe(req, remember);
 
-        if (role === 'admin') {
-          return res.redirect('/admin');
-        }
-        return res.redirect('/schedule');
+        req.session.save(() => {
+          if (role === 'admin') {
+            return res.redirect('/admin');
+          }
+          return res.redirect('/schedule');
+        });
       }
     );
   });
@@ -1498,7 +1518,7 @@ app.post('/register', registerLimiter, async (req, res) => {
       return res.redirect('/register?error=Database%20error');
     }
     req.session.pendingUserId = row.id;
-    req.session.rememberMe = remember_me === 'on';
+    req.session.rememberMe = remember_me === '1' || remember_me === 'on' || remember_me === true;
     logAction(db, req, 'register_user', { user_id: row.id, full_name: normalizedName });
     broadcast('users_updated');
     return res.redirect('/register/course');
@@ -1617,16 +1637,12 @@ app.post('/register/subjects', registerLimiter, (req, res) => {
             language: user.language || getPreferredLang(req),
           };
           req.session.role = user.role;
-          if (req.session.rememberMe) {
-            req.session.cookie.maxAge = (settingsCache.session_duration_days || 14) * 24 * 60 * 60 * 1000;
-          } else {
-            req.session.cookie.maxAge = null;
-          }
+          applyRememberMe(req, Boolean(req.session.rememberMe));
           req.session.pendingUserId = null;
           req.session.rememberMe = null;
           logAction(db, req, 'register_subjects', { user_id: user.id });
           broadcast('users_updated');
-          return res.redirect('/schedule?welcome=1');
+          return req.session.save(() => res.redirect('/schedule?welcome=1'));
         });
       });
     });
