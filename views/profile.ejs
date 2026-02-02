@@ -325,6 +325,11 @@
         mix-blend-mode: soft-light;
         z-index: -1;
       }
+
+      body.theme-dark::before {
+        background-image: none;
+        opacity: 0;
+      }
       .glass {
         border-radius: var(--radius-lg);
         backdrop-filter: blur(var(--glass-blur));

@@ -957,6 +957,11 @@ body.theme-light .mobile-menu-action {
         mix-blend-mode: soft-light;
         z-index: -1;
       }
+
+      body.theme-dark::before {
+        background-image: none;
+        opacity: 0;
+      }
       body.theme-dark {
         background: radial-gradient(1200px 800px at 15% 10%, rgba(59, 130, 246, 0.18), transparent 60%),
           radial-gradient(1000px 700px at 80% 20%, rgba(14, 165, 233, 0.14), transparent 60%),
