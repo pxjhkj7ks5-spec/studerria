@@ -345,7 +345,7 @@ const initDb = async () => {
         default_group INTEGER NOT NULL DEFAULT 1,
         show_in_teamwork INTEGER NOT NULL DEFAULT 1,
         visible INTEGER NOT NULL DEFAULT 1,
-        is_required BOOLEAN NOT NULL DEFAULT 1,
+        is_required BOOLEAN NOT NULL DEFAULT true,
         course_id INTEGER REFERENCES courses(id)
       )
     `,
@@ -647,7 +647,7 @@ const initDb = async () => {
     'ALTER TABLE semesters ADD COLUMN IF NOT EXISTS is_archived INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS visible INTEGER NOT NULL DEFAULT 1',
-    'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_required BOOLEAN NOT NULL DEFAULT 1',
+    'ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_required BOOLEAN NOT NULL DEFAULT true',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
     'ALTER TABLE schedule_entries ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id)',
