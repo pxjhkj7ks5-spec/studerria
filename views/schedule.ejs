@@ -1110,64 +1110,7 @@ body.theme-light .mobile-menu-action {
     <link rel="stylesheet" href="/css/pages/schedule.css" />
 </head>
   <body class="theme-dark">
-    <nav class="navbar navbar-expand-lg topbar">
-      <div class="container">
-        <span class="navbar-brand text-white me-auto">Studerria</span>
-        <div class="d-flex align-items-center gap-2 topbar-actions flex-wrap justify-content-end">
-          <span class="me-2 muted desktop-only text-nowrap">
-            <% if (role === 'admin') { %>
-              <%= t('role.admin') %>: <%= username %>
-            <% } else if (role === 'starosta') { %>
-              <%= t('role.starosta') %>: <%= username %>
-            <% } else if (role === 'deanery') { %>
-              <%= t('role.deanery') %>: <%= username %>
-            <% } else { %>
-              <%= t('role.student') %>: <%= username %>
-            <% } %>
-          </span>
-          <% if (role === 'admin') { %>
-            <form method="POST" action="/admin/switch-to-admin" class="me-1 desktop-only">
-              <button class="btn btn-glass" type="submit"><%= t('schedule.backToAdmin') %></button>
-            </form>
-          <% } %>
-          <% if (role === 'starosta') { %>
-            <a class="btn btn-glass me-1 desktop-only" href="/starosta"><%= t('menu.starosta') %></a>
-          <% } %>
-          <% if (role === 'deanery') { %>
-            <a class="btn btn-glass me-1 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
-          <% } %>
-          <button
-            class="theme-toggle theme-toggle-min me-1 desktop-only"
-            type="button"
-            id="themeToggle"
-            aria-label="Toggle theme"
-            data-light-label="☀️"
-            data-dark-label="🌙"
-          >
-            🌙
-          </button>
-          <button class="theme-toggle-min msg-btn me-1 desktop-only" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">
-            💬
-            <span class="msg-badge d-none" id="messagesBadge">0</span>
-          </button>
-          <a class="btn btn-glass me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
-          <a class="btn btn-glass me-1 desktop-only" href="/my-day">Мій день</a>
-          <a class="btn btn-glass me-1 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
-          <form method="POST" action="/logout" class="desktop-only">
-            <button class="btn btn-glass" type="submit"><%= t('schedule.logout') %></button>
-          </form>
-          <button
-            class="theme-toggle-min mobile-menu-btn"
-            type="button"
-            data-bs-toggle="modal"
-            data-bs-target="#mobileMenuModal"
-            aria-label="Menu"
-          >
-            ☰
-          </button>
-        </div>
-      </div>
-    </nav>
+    <%- include('partials/topbar', { role, username, t }) %>
 
     <main class="container py-4 schedule-content enter">
       <div class="glass week-hero mb-4">

@@ -37,21 +37,10 @@
         background: rgba(247, 249, 255, 0.85);
         border-bottom: 1px solid rgba(15, 23, 42, 0.08);
       }
-      .topbar .container-fluid {
+      .topbar .container {
         display: flex;
         align-items: center;
         justify-content: space-between;
-      }
-      .topbar .btn,
-      .topbar a.btn {
-        border-radius: 999px;
-        text-decoration: none;
-        padding: 0.45rem 0.9rem;
-        font-weight: 600;
-      }
-      .topbar .btn.btn-sm,
-      .topbar a.btn.btn-sm {
-        padding: 0.4rem 0.85rem;
       }
       .topbar .navbar-brand {
         font-weight: 700;
@@ -75,15 +64,85 @@
           gap: 0.3rem;
         }
       }
-      .topbar .mobile-only {
+      button.mobile-menu-btn {
+        border-radius: 999px;
+        width: 38px;
+        height: 38px;
         display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
       }
-      @media (max-width: 991px) {
-        .topbar .desktop-only {
+      .mobile-menu-action {
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.92);
+        text-align: left;
+        font-size: 0.95rem;
+        padding: 12px 14px;
+        width: 100%;
+      }
+      .mobile-menu-action:hover {
+        background: rgba(255, 255, 255, 0.14);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+      body.theme-dark .mobile-menu-action {
+        color: #f8fafc;
+      }
+      body.theme-light .mobile-menu-action {
+        background: rgba(255, 255, 255, 0.82);
+        border-color: rgba(15, 23, 42, 0.14);
+        color: #0f172a;
+      }
+      body.theme-light .mobile-menu-action:hover {
+        background: rgba(255, 255, 255, 0.9);
+        border-color: rgba(15, 23, 42, 0.2);
+      }
+      #mobileMenuModal .modal-content {
+        border-radius: 18px;
+        background: rgba(20, 24, 36, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      body.theme-light #mobileMenuModal .modal-content {
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(15, 23, 42, 0.1);
+      }
+      #mobileMenuModal .modal-header {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 14px 16px;
+      }
+      body.theme-light #mobileMenuModal .modal-header {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.12);
+      }
+      #mobileMenuModal .modal-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+      }
+      #mobileMenuModal .modal-body {
+        padding: 12px 16px 16px;
+      }
+      #mobileMenuModal .btn-close {
+        filter: brightness(1.35);
+        opacity: 0.9;
+      }
+      body.theme-dark #mobileMenuModal .btn-close {
+        filter: brightness(1.8);
+        opacity: 0.95;
+      }
+      body.theme-light #mobileMenuModal .btn-close {
+        filter: none;
+        opacity: 0.75;
+      }
+      @media (max-width: 768px) {
+        .topbar-actions .desktop-only {
           display: none !important;
         }
-        .topbar .mobile-only {
+        .topbar-actions .mobile-menu-btn {
           display: inline-flex !important;
+        }
+        .topbar-actions {
+          gap: 8px;
         }
       }
 
@@ -461,35 +520,7 @@
         color: rgba(15, 23, 42, 0.6);
       }
 
-      /* Mobile menu bottom sheet */
-      .modal-dialog-bottom-sheet {
-        margin: 0;
-        height: 100vh;
-      }
-      .modal-dialog-bottom-sheet .modal-content {
-        margin-top: auto;
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
-      }
-      .modal-dialog-bottom-sheet .modal-header {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      }
-      body.theme-light .modal-dialog-bottom-sheet .modal-header {
-        border-bottom-color: rgba(15, 23, 42, 0.08);
-      }
-
-      @media (max-width: 576px) {
-        .modal-dialog-bottom-sheet .modal-body {
-          max-height: 60vh;
-          overflow-y: auto;
-        }
-      }
-
-      @media (min-width: 992px) {
-        #mobileMenuModal {
-          display: none !important;
-        }
-      }
+      /* Mobile menu modal */
 </style>
       <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
@@ -497,61 +528,7 @@
 </head>
   <body class="theme-dark">
     <!-- Top Navigation -->
-    <nav class="navbar navbar-expand-lg topbar">
-      <div class="container-fluid px-3 px-lg-4">
-        <span class="navbar-brand text-white me-auto">Studerria</span>
-        <div class="d-flex align-items-center gap-2 topbar-actions flex-wrap justify-content-end">
-          <span class="me-2 muted desktop-only text-nowrap">
-            <% if (role === 'admin') { %>
-              <%= t('role.admin') %>: <%= username %>
-            <% } else if (role === 'starosta') { %>
-              <%= t('role.starosta') %>: <%= username %>
-            <% } else if (role === 'deanery') { %>
-              <%= t('role.deanery') %>: <%= username %>
-            <% } else { %>
-              <%= t('role.student') %>: <%= username %>
-            <% } %>
-          </span>
-          <% if (role === 'admin') { %>
-            <form method="POST" action="/admin/switch-to-admin" class="me-1 desktop-only">
-              <button class="btn btn-outline-primary btn-sm" type="submit"><%= t('schedule.backToAdmin') %></button>
-            </form>
-          <% } %>
-          <% if (role === 'starosta') { %>
-            <a class="btn btn-outline-primary btn-sm me-1 desktop-only" href="/starosta"><%= t('menu.starosta') %></a>
-          <% } %>
-          <% if (role === 'deanery') { %>
-            <a class="btn btn-outline-primary btn-sm me-1 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
-          <% } %>
-          <a class="btn btn-outline-light btn-sm me-1 desktop-only" href="/schedule">Розклад</a>
-          <a class="btn btn-glass btn-sm me-1 desktop-only" href="/my-day">Мій день</a>
-          <a class="btn btn-outline-light btn-sm me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
-          <button
-            class="btn btn-outline-light btn-sm me-1 theme-toggle desktop-only"
-            type="button"
-            id="themeToggle"
-            data-light-label="<%= t('theme.light') %>"
-            data-dark-label="<%= t('theme.dark') %>"
-          >
-            <%= t('theme.light') %>
-          </button>
-          <a class="btn btn-outline-light btn-sm me-1 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
-          <form method="POST" action="/logout" class="desktop-only">
-            <button class="btn btn-outline-light btn-sm" type="submit"><%= t('schedule.logout') %></button>
-          </form>
-          <!-- Mobile menu button -->
-          <button
-            class="btn btn-outline-light btn-sm mobile-only"
-            type="button"
-            data-bs-toggle="modal"
-            data-bs-target="#mobileMenuModal"
-            aria-label="Menu"
-          >
-            ☰
-          </button>
-        </div>
-      </div>
-    </nav>
+    <%- include('partials/topbar', { role, username, t }) %>
 
     <!-- Main content -->
     <main>
@@ -638,39 +615,41 @@
 
     <!-- Mobile menu modal -->
     <div class="modal fade" id="mobileMenuModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-bottom-sheet">
-        <div class="modal-content glass">
-          <div class="modal-header border-0">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
             <h5 class="modal-title">Меню</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="d-grid gap-2">
               <% if (role === 'admin') { %>
                 <form method="POST" action="/admin/switch-to-admin">
-                  <button class="btn w-100 btn-glass" type="submit"><%= t('schedule.backToAdmin') %></button>
+                  <button class="btn w-100 glass mobile-menu-action" type="submit"><%= t('schedule.backToAdmin') %></button>
                 </form>
               <% } %>
               <% if (role === 'starosta') { %>
-                <a class="btn w-100 btn-glass" href="/starosta"><%= t('menu.starosta') %></a>
+                <a class="btn w-100 glass mobile-menu-action" href="/starosta"><%= t('menu.starosta') %></a>
               <% } %>
               <% if (role === 'deanery') { %>
-                <a class="btn w-100 btn-glass" href="/deanery"><%= t('menu.deanery') %></a>
+                <a class="btn w-100 glass mobile-menu-action" href="/deanery"><%= t('menu.deanery') %></a>
               <% } %>
-              <a class="btn w-100 btn-glass" href="/schedule">Розклад</a>
-              <a class="btn w-100 btn-glass" href="/my-day">Мій день</a>
-              <a class="btn w-100 btn-glass" href="/teamwork"><%= t('menu.teamwork') %></a>
-              <button
-                class="btn w-100 btn-glass theme-toggle"
-                type="button"
-                data-light-label="<%= t('theme.light') %>"
-                data-dark-label="<%= t('theme.dark') %>"
-              >
-                <%= t('theme.light') %>
+              <button class="btn w-100 glass mobile-menu-action" type="button" id="messagesBtnMobile" aria-label="<%= t('messages.aria') %>">
+                💬 Повідомлення
               </button>
-              <a class="btn w-100 btn-glass" href="/profile"><%= t('schedule.profile') %></a>
+              <a class="btn w-100 glass mobile-menu-action" href="/my-day">Мій день</a>
+              <a class="btn w-100 glass mobile-menu-action" href="/teamwork"><%= t('menu.teamwork') %></a>
+              <button
+                class="btn w-100 glass mobile-menu-action theme-toggle"
+                type="button"
+                data-light-label="☀️"
+                data-dark-label="🌙"
+              >
+                🌙
+              </button>
+              <a class="btn w-100 glass mobile-menu-action" href="/profile"><%= t('schedule.profile') %></a>
               <form method="POST" action="/logout">
-                <button class="btn w-100 btn-glass" type="submit"><%= t('schedule.logout') %></button>
+                <button class="btn w-100 glass mobile-menu-action" type="submit"><%= t('schedule.logout') %></button>
               </form>
             </div>
           </div>
