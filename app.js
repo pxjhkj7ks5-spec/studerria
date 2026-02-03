@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const session = require('express-session');
-const RedisStore = require('connect-redis').default;
+const RedisStoreModule = require('connect-redis');
 const { createClient } = require('redis');
 const path = require('path');
 const fs = require('fs');
@@ -119,17 +119,22 @@ app.set('trust proxy', 1);
 
 let sessionStore;
 if (process.env.REDIS_URL) {
-  const redisClient = createClient({ url: process.env.REDIS_URL });
-  redisClient.on('error', (err) => {
-    console.error('Redis client error:', err);
-  });
-  redisClient.connect().catch((err) => {
-    console.error('Failed to connect to Redis:', err);
-  });
-  sessionStore = new RedisStore({
-    client: redisClient,
-    prefix: 'studerria:sess:',
-  });
+  try {
+    const RedisStore = RedisStoreModule.default || RedisStoreModule;
+    const redisClient = createClient({ url: process.env.REDIS_URL });
+    redisClient.on('error', (err) => {
+      console.error('Redis client error:', err);
+    });
+    redisClient.connect().catch((err) => {
+      console.error('Failed to connect to Redis:', err);
+    });
+    sessionStore = new RedisStore({
+      client: redisClient,
+      prefix: 'studerria:sess:',
+    });
+  } catch (err) {
+    console.error('Redis session init failed, falling back to MemoryStore', err);
+  }
 }
 
 app.use(
