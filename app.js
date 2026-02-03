@@ -946,9 +946,31 @@ async function getSemestersCached(courseId) {
 }
 
 const { createRateLimiter, getClientIp } = require('./lib/rateLimit');
-const { requireLogin, requireAdmin, requireStaff, requireOverviewAccess, requireDeanery, requireAdminOrDeanery, requireHomeworkBulkAccess } = require('./lib/auth');
-const { daysOfWeek, fullWeekDays, studyDayLabels, parseDateUTC, isValidDateString, isValidTimeString, parseCsvText, getWeekDayForDate, getAcademicWeekForSemester, getDateForWeekDay, getDateForWeekIndex, getDayNameFromDate, formatLocalDate, addDays } = require('./lib/dateUtils');
-const { requireLogin, requireAdmin, requireStaff, requireOverviewAccess, requireDeanery, requireAdminOrDeanery, requireHomeworkBulkAccess } = require('./lib/auth');
+const {
+  requireLogin,
+  requireAdmin,
+  requireStaff,
+  requireOverviewAccess,
+  requireDeanery,
+  requireAdminOrDeanery,
+  requireHomeworkBulkAccess,
+} = require('./lib/auth');
+const {
+  daysOfWeek,
+  fullWeekDays,
+  studyDayLabels,
+  parseDateUTC,
+  isValidDateString,
+  isValidTimeString,
+  parseCsvText,
+  getWeekDayForDate,
+  getAcademicWeekForSemester,
+  getDateForWeekDay,
+  getDateForWeekIndex,
+  getDayNameFromDate,
+  formatLocalDate,
+  addDays,
+} = require('./lib/dateUtils');
 
 const authLimiter = createRateLimiter({
   windowMs: 60 * 1000,
@@ -981,9 +1003,6 @@ const uploadLimiter = createRateLimiter({
   max: 6,
   keyFn: (req) => `upload:${req.session?.user?.id || getClientIp(req)}`,
 });
-
-  return next();
-}
 
 function logAction(dbRef, req, action, details) {
   const actorId = req.session.user ? req.session.user.id : null;
