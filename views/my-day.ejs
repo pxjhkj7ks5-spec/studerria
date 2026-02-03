@@ -613,50 +613,6 @@
       </div>
     </main>
 
-    <!-- Mobile menu modal -->
-    <div class="modal fade" id="mobileMenuModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Меню</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="d-grid gap-2">
-              <% if (role === 'admin') { %>
-                <form method="POST" action="/admin/switch-to-admin">
-                  <button class="btn w-100 glass mobile-menu-action" type="submit"><%= t('schedule.backToAdmin') %></button>
-                </form>
-              <% } %>
-              <% if (role === 'starosta') { %>
-                <a class="btn w-100 glass mobile-menu-action" href="/starosta"><%= t('menu.starosta') %></a>
-              <% } %>
-              <% if (role === 'deanery') { %>
-                <a class="btn w-100 glass mobile-menu-action" href="/deanery"><%= t('menu.deanery') %></a>
-              <% } %>
-              <button class="btn w-100 glass mobile-menu-action" type="button" id="messagesBtnMobile" aria-label="<%= t('messages.aria') %>">
-                💬 Повідомлення
-              </button>
-              <a class="btn w-100 glass mobile-menu-action" href="/schedule">Повернутись до розкладу</a>
-              <a class="btn w-100 glass mobile-menu-action" href="/teamwork"><%= t('menu.teamwork') %></a>
-              <button
-                class="btn w-100 glass mobile-menu-action theme-toggle"
-                type="button"
-                data-light-label="☀️"
-                data-dark-label="🌙"
-              >
-                🌙
-              </button>
-              <a class="btn w-100 glass mobile-menu-action" href="/profile"><%= t('schedule.profile') %></a>
-              <form method="POST" action="/logout">
-                <button class="btn w-100 glass mobile-menu-action" type="submit"><%= t('schedule.logout') %></button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
@@ -684,7 +640,6 @@
 
       // ============ DATA ============
       const myDay = <%- JSON.stringify(myDay || {}) %>;
-      const mobileMenuModal = document.getElementById('mobileMenuModal');
       const reminderForm = document.getElementById('reminderForm');
       const toggleReminderForm = document.getElementById('toggleReminderForm');
       const reminderTitle = document.getElementById('reminderTitle');
