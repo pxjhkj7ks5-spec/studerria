@@ -1594,7 +1594,8 @@ app.get('/register/subjects', (req, res) => {
     (async () => {
       try {
         const subjects = await getSubjectsCached(user.course_id, { visibleOnly: true });
-        const requiredAuto = (subjects || []).filter((s) => s.is_required && Number(s.group_count) === 1);
+        const isRequired = (s) => s && (s.is_required === true || s.is_required === 1 || s.is_required === '1');
+        const requiredAuto = (subjects || []).filter((s) => isRequired(s) && Number(s.group_count) === 1);
         await Promise.all(
           requiredAuto.map((s) =>
             db.run(
@@ -1650,11 +1651,12 @@ app.post('/register/subjects', registerLimiter, (req, res) => {
          ON CONFLICT(user_id, subject_id) DO NOTHING`
       );
       const optoutDeleteStmt = db.prepare('DELETE FROM user_subject_optouts WHERE user_id = ? AND subject_id = ?');
+      const isRequired = (s) => s && (s.is_required === true || s.is_required === 1 || s.is_required === '1');
       subjects.forEach((s) => {
         const value = req.body[`subject_${s.id}`];
-        const isRequired = s.is_required !== 0;
+        const requiredFlag = isRequired(s);
         const optout = req.body[`optout_${s.id}`] === '1' || req.body[`optout_${s.id}`] === 'on';
-        if (isRequired) {
+        if (requiredFlag) {
           optoutDeleteStmt.run(userId, s.id);
           if (Number(s.group_count) === 1) {
             stmt.run(userId, s.id, 1);

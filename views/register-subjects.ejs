@@ -392,7 +392,7 @@
                   <div class="alert alert-info"><%= t('registerSubjects.noSubjects') %></div>
                 <% } else { %>
                   <% subjects.forEach(function(s) { %>
-                    <% const isRequired = s.is_required !== 0; %>
+                    <% const isRequired = s.is_required === true || s.is_required === 1 || s.is_required === '1'; %>
                     <% if (!(isRequired && Number(s.group_count) === 1)) { %>
                     <div class="border rounded p-3 mb-3 subject-card" data-subject-id="<%= s.id %>">
                       <div class="subject-header">
