@@ -232,6 +232,13 @@ body.theme-light .hw-chip {
   background: rgba(15, 23, 42, 0.06);
 }
 
+.chip.is-disabled,
+.tag-pill.is-disabled,
+.hw-chip.is-disabled {
+  opacity: 0.55;
+  filter: grayscale(0.2);
+}
+
 /* Segmented control */
 .segmented,
 .segment-control {
@@ -242,6 +249,27 @@ body.theme-light .hw-chip {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(10px);
+}
+
+.segment-control.is-disabled,
+.segmented.is-disabled {
+  opacity: 0.55;
+  filter: grayscale(0.2);
+  pointer-events: none;
+}
+
+.segment-control.is-disabled .segment,
+.segmented.is-disabled .segmented__item {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.segment-control.is-disabled .segment.is-selected,
+.segmented.is-disabled .segmented__item.is-active {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .segmented__item,
