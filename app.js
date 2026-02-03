@@ -945,75 +945,35 @@ async function getSemestersCached(courseId) {
   return cacheSet(referenceCache.semesters, courseId, rows || []);
 }
 
-const rateBuckets = new Map();
-const RATE_BUCKET_LIMIT = 50000;
+const { createRateLimiter, getClientIp } = require('./lib/rateLimit');
 
-function getClientIp(req) {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length) {
-    return forwarded.split(',')[0].trim();
-  }
-  return req.ip || req.connection?.remoteAddress || 'unknown';
-}
-
-function rateLimit({ windowMs, max, keyFn, onLimit }) {
-  return (req, res, next) => {
-    const key = keyFn ? keyFn(req) : getClientIp(req);
-    const now = Date.now();
-    let bucket = rateBuckets.get(key);
-    if (!bucket || now > bucket.resetAt) {
-      bucket = { count: 0, resetAt: now + windowMs };
-    }
-    bucket.count += 1;
-    rateBuckets.set(key, bucket);
-    if (rateBuckets.size > RATE_BUCKET_LIMIT) {
-      const cutoff = now - windowMs * 2;
-      for (const [k, v] of rateBuckets.entries()) {
-        if (v.resetAt < cutoff) {
-          rateBuckets.delete(k);
-        }
-      }
-    }
-    if (bucket.count > max) {
-      if (onLimit) {
-        return onLimit(req, res);
-      }
-      if (req.accepts('json') || req.path.startsWith('/api')) {
-        return res.status(429).json({ error: 'Too many requests' });
-      }
-      return res.status(429).send('Too many requests');
-    }
-    return next();
-  };
-}
-
-const authLimiter = rateLimit({
+const authLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 8,
   keyFn: (req) => `auth:${getClientIp(req)}`,
   onLimit: (req, res) => res.redirect('/login?error=1'),
 });
 
-const registerLimiter = rateLimit({
+const registerLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 5,
   keyFn: (req) => `register:${getClientIp(req)}`,
   onLimit: (req, res) => res.redirect('/register?error=Too%20many%20requests'),
 });
 
-const writeLimiter = rateLimit({
+const writeLimiter = createRateLimiter({
   windowMs: 30 * 1000,
   max: 30,
   keyFn: (req) => `write:${req.session?.user?.id || getClientIp(req)}`,
 });
 
-const readLimiter = rateLimit({
+const readLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 90,
   keyFn: (req) => `read:${req.session?.user?.id || getClientIp(req)}`,
 });
 
-const uploadLimiter = rateLimit({
+const uploadLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 6,
   keyFn: (req) => `upload:${req.session?.user?.id || getClientIp(req)}`,
