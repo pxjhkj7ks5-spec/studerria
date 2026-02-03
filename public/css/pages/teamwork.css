@@ -7,15 +7,3 @@
 .tag-pill {
   border-radius: 999px;
 }
-
-body.theme-dark .subject-pill {
-  color: #f8fafc;
-}
-
-body.theme-dark .subject-pill:hover,
-body.theme-dark .subject-pill:focus,
-body.theme-dark .subject-pill:active {
-  color: #f8fafc !important;
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.3);
-}

@@ -175,6 +175,23 @@ body.theme-light .btn-outline-light:hover {
   background: rgba(15, 23, 42, 0.06);
 }
 
+/* Subject pills */
+.subject-pill {
+  color: var(--text);
+}
+
+body.theme-dark .subject-pill {
+  color: #f8fafc;
+}
+
+body.theme-dark .subject-pill:hover,
+body.theme-dark .subject-pill:focus,
+body.theme-dark .subject-pill:active {
+  color: #f8fafc !important;
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
 .btn-danger,
 .btn-outline-danger {
   background: rgba(255, 107, 107, 0.18);
