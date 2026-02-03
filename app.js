@@ -772,6 +772,12 @@ async function getCourseStudyDays(courseId) {
   return cacheSet(referenceCache.studyDays, courseId, result);
 }
 
+async function isCourseDayActive(courseId, dayName) {
+  if (!courseId || !dayName) return false;
+  const studyDays = await getCourseStudyDays(courseId);
+  return (studyDays || []).some((d) => d.is_active && d.day_name === dayName);
+}
+
 function broadcast(type, payload) {
   const message = JSON.stringify({ type, payload });
   wss.clients.forEach((client) => {
@@ -4405,6 +4411,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   const groupNum = Number(group_number);
   const subjectId = Number(subject_id);
   const isControl = String(is_control || '').toLowerCase() === '1' ? 1 : 0;
+  const courseId = req.session.user?.course_id || 1;
 
   if (
     !description ||
@@ -4419,14 +4426,15 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
     }
     return res.status(400).send('Missing fields');
   }
-  if (!daysOfWeek.includes(day_of_week) || classNum < 1 || classNum > 7 || groupNum < 1 || groupNum > 3) {
+  const dayAllowed = await isCourseDayActive(courseId, day_of_week);
+  if (!dayAllowed || classNum < 1 || classNum > 7 || groupNum < 1 || groupNum > 3) {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
     }
     return res.status(400).send('Invalid data');
   }
 
-  const { schedule_group: group, username, id: userId, course_id: courseId } = req.session.user;
+  const { schedule_group: group, username, id: userId } = req.session.user;
   const createdAt = new Date().toISOString();
   const activeSemester = await getActiveSemester(courseId || 1);
   const isStaff = ['admin', 'deanery', 'starosta'].includes(req.session.role);
@@ -5110,7 +5118,7 @@ app.post('/subgroup/join', requireLogin, (req, res) => {
   );
 });
 
-app.post('/admin/schedule/add', requireAdmin, (req, res) => {
+app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
   const { subject_id, group_number, day_of_week, class_number, week_numbers, semester_id } = req.body;
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
@@ -5120,15 +5128,16 @@ app.post('/admin/schedule/add', requireAdmin, (req, res) => {
   if (!subject_id || !day_of_week || !week_numbers || Number.isNaN(groupNum) || Number.isNaN(classNum) || Number.isNaN(semesterId)) {
     return res.redirect('/admin?err=Missing%20fields');
   }
-  if (!daysOfWeek.includes(day_of_week)) {
+  const dayAllowed = await isCourseDayActive(courseId, day_of_week);
+  if (!dayAllowed) {
     return res.redirect('/admin?err=Invalid%20day');
   }
   if (classNum < 1 || classNum > 7) {
     return res.redirect('/admin?err=Invalid%20class%20number');
   }
-
-  db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId], (semErr, semRow) => {
-    if (semErr || !semRow) {
+  try {
+    const semRow = await db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
+    if (!semRow) {
       return res.redirect('/admin?err=Invalid%20semester');
     }
     const maxWeeks = Number(semRow.weeks_count) || 15;
@@ -5169,10 +5178,13 @@ app.post('/admin/schedule/add', requireAdmin, (req, res) => {
       });
       return res.redirect('/admin?ok=Class%20added');
     });
-  });
+  } catch (err) {
+    console.error('Failed to add schedule entry', err);
+    return res.redirect('/admin?err=Database%20error');
+  }
 });
 
-app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
+app.post('/admin/schedule/edit/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { subject_id, group_number, day_of_week, class_number, week_number, semester_id } = req.body;
   const groupNum = Number(group_number);
@@ -5184,15 +5196,16 @@ app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
   if (!subject_id || !day_of_week || Number.isNaN(groupNum) || Number.isNaN(classNum) || Number.isNaN(weekNum) || Number.isNaN(semesterId)) {
     return res.redirect('/admin?err=Missing%20fields');
   }
-  if (!daysOfWeek.includes(day_of_week)) {
+  const dayAllowed = await isCourseDayActive(courseId, day_of_week);
+  if (!dayAllowed) {
     return res.redirect('/admin?err=Invalid%20day');
   }
   if (classNum < 1 || classNum > 7) {
     return res.redirect('/admin?err=Invalid%20class%20or%20week');
   }
-
-  db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId], (semErr, semRow) => {
-    if (semErr || !semRow) {
+  try {
+    const semRow = await db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
+    if (!semRow) {
       return res.redirect('/admin?err=Invalid%20semester');
     }
     const maxWeeks = Number(semRow.weeks_count) || 15;
@@ -5222,7 +5235,10 @@ app.post('/admin/schedule/edit/:id', requireAdmin, (req, res) => {
         return res.redirect('/admin?ok=Class%20updated');
       }
     );
-  });
+  } catch (err) {
+    console.error('Failed to update schedule entry', err);
+    return res.redirect('/admin?err=Database%20error');
+  }
 });
 
 app.post('/admin/schedule/delete/:id', requireAdmin, (req, res) => {
