@@ -114,6 +114,14 @@
         backdrop-filter: blur(20px);
         transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
       }
+
+      /* Disable hover lift on background cards; keep hover on classes */
+      .glass.week-hero:hover,
+      .glass.day-card:hover,
+      .alert.glass:hover {
+        transform: none;
+        box-shadow: var(--glass-shadow);
+      }
       body.theme-dark .glass {
         background: var(--glass-bg-dark);
         border: 1px solid var(--glass-border-dark);
