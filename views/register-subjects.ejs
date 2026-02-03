@@ -410,6 +410,7 @@
                           </label>
                         <% } %>
                       </div>
+                      <% if (Number(s.group_count) >= 1) { %>
                       <div class="segment-control <%= (!isRequired && (optouts || []).includes(s.id)) ? 'is-disabled' : '' %>">
                         <% for (let g = 1; g <= s.group_count; g++) { %>
                           <label class="segment">
@@ -423,6 +424,7 @@
                           </label>
                         <% } %>
                       </div>
+                      <% } %>
                     </div>
                     <% } %>
                   <% }); %>

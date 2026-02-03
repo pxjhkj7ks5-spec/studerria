@@ -1683,7 +1683,6 @@ app.post('/register/subjects', registerLimiter, (req, res) => {
             stmt.run(userId, s.id, 1);
             return;
           }
-          hasMissingRequired = true;
           return;
         }
         const groupNum = Number(value);
