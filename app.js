@@ -674,7 +674,7 @@ const initDb = async () => {
     await pool.query(statement);
   }
 
-  await pool.query('UPDATE subjects SET is_required = 1 WHERE is_required IS NULL');
+  await pool.query('UPDATE subjects SET is_required = true WHERE is_required IS NULL');
 
   await pool.query('UPDATE users SET course_id = 1 WHERE course_id IS NULL');
   await pool.query("UPDATE users SET language = 'uk' WHERE language IS NULL");
