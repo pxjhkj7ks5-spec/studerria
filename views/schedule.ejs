@@ -208,9 +208,26 @@
         border: 1px solid rgba(59, 130, 246, 0.35);
         color: #dbeafe;
       }
+      .control-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        color: rgba(248, 113, 113, 0.95);
+        background: rgba(248, 113, 113, 0.16);
+        border: 1px solid rgba(248, 113, 113, 0.35);
+      }
       body.theme-light .hw-chip {
         background: rgba(59, 130, 246, 0.12);
         color: #1e3a8a;
+      }
+      body.theme-light .control-chip {
+        color: #b91c1c;
+        background: rgba(248, 113, 113, 0.18);
+        border-color: rgba(185, 28, 28, 0.2);
       }
       .tag-pill {
         display: inline-flex;
@@ -1002,6 +1019,48 @@ body.theme-light .mobile-menu-action {
         border-color: var(--focus-border);
         box-shadow: var(--focus-ring);
       }
+      .control-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .toggle-input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .toggle {
+        width: 46px;
+        height: 26px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        display: inline-flex;
+        align-items: center;
+        padding: 2px;
+        cursor: pointer;
+        transition: background 160ms ease, border-color 160ms ease;
+      }
+      .toggle-knob {
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        background: #fff;
+        transform: translateX(0);
+        transition: transform 160ms ease;
+        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+      }
+      .toggle-input:checked + .toggle {
+        background: rgba(76, 141, 255, 0.55);
+        border-color: rgba(76, 141, 255, 0.7);
+      }
+      .toggle-input:checked + .toggle .toggle-knob {
+        transform: translateX(20px);
+      }
+      .toggle-text {
+        font-weight: 600;
+        color: var(--text-primary);
+      }
       .btn-primary {
         background: #3b82f6;
         border: 1px solid rgba(59, 130, 246, 0.6);
@@ -1191,6 +1250,9 @@ body.theme-light .mobile-menu-action {
                       <div class="small muted">Group <%= cls.group_number %> · Class <%= cls.class_number %></div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
+                      <% if (hwMeta && hwMeta.control) { %>
+                        <span class="control-chip">Контроль</span>
+                      <% } %>
                       <% if (hwMeta) { %>
                         <span class="hw-chip">ДЗ <%= hwMeta.count %></span>
                       <% } %>
@@ -1293,15 +1355,6 @@ body.theme-light .mobile-menu-action {
             </div>
 
             <h6>Homework list</h6>
-            <div class="mb-2">
-              <label class="form-label">Filter by tag</label>
-              <input
-                id="homeworkTagFilter"
-                class="form-control"
-                list="homeworkTagsList"
-                placeholder="#тест або #онлайн"
-              />
-            </div>
             <ul id="homeworkList" class="list-group mb-4">
               <li class="list-group-item text-muted">No assignments yet.</li>
             </ul>
@@ -1364,15 +1417,14 @@ body.theme-light .mobile-menu-action {
                 />
               </div>
               <div class="mb-3">
-                <label for="hwTags" class="form-label">Tags (comma separated)</label>
-                <input
-                  id="hwTags"
-                  name="tags"
-                  type="text"
-                  class="form-control"
-                  list="homeworkTagsList"
-                  placeholder="#тест, #лекція"
-                />
+                <label class="form-label">Контроль</label>
+                <div class="control-toggle">
+                  <input class="toggle-input" type="checkbox" id="hwControl" name="is_control" value="1" />
+                  <label class="toggle" for="hwControl">
+                    <span class="toggle-knob"></span>
+                  </label>
+                  <span class="toggle-text">Контроль</span>
+                </div>
               </div>
               <div class="mb-3">
                 <label for="hwFile" class="form-label">Attachment (optional)</label>
@@ -1408,11 +1460,6 @@ body.theme-light .mobile-menu-action {
               <input type="hidden" id="hwDate" name="class_date" />
               <button type="submit" class="btn btn-primary glass">Save homework</button>
             </form>
-            <datalist id="homeworkTagsList">
-              <% (homeworkTags || []).forEach(function(tag) { %>
-                <option value="<%= tag %>"></option>
-              <% }); %>
-            </datalist>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
@@ -1744,7 +1791,7 @@ body.theme-light .mobile-menu-action {
       const subgroupHomeworkId = document.getElementById('subgroupHomeworkId');
       const joinSubgroupId = document.getElementById('joinSubgroupId');
       const currentUser = <%- JSON.stringify(username) %>;
-      const homeworkTagFilter = document.getElementById('homeworkTagFilter');
+      const hwControlToggle = document.getElementById('hwControl');
       let currentHomeworkItems = [];
 
       function updateReactionButtons(container, reactions, reacted) {
@@ -1803,16 +1850,11 @@ body.theme-light .mobile-menu-action {
           meta.textContent = `${item.created_by} • ${created}`;
           li.appendChild(meta);
 
-          if (item.tags && item.tags.length) {
-            const tagWrap = document.createElement('div');
-            tagWrap.className = 'hw-tags mb-2';
-            item.tags.forEach((tag) => {
-              const tagEl = document.createElement('span');
-              tagEl.className = 'tag-pill';
-              tagEl.textContent = tag;
-              tagWrap.appendChild(tagEl);
-            });
-            li.appendChild(tagWrap);
+          if (item.is_control) {
+            const control = document.createElement('div');
+            control.className = 'control-chip mb-2';
+            control.textContent = 'Контроль';
+            li.appendChild(control);
           }
 
           if (item.link_url) {
@@ -1922,6 +1964,9 @@ body.theme-light .mobile-menu-action {
         document.getElementById('hwGroupNum').value = groupNum;
         document.getElementById('hwClassNum').value = classNum;
         document.getElementById('hwDate').value = classDate || '';
+        if (hwControlToggle) {
+          hwControlToggle.checked = false;
+        }
 
         const filtered = homeworkData.filter((item) => {
           return (
@@ -1933,9 +1978,6 @@ body.theme-light .mobile-menu-action {
           );
         });
         currentHomeworkItems = filtered;
-        if (homeworkTagFilter) {
-          homeworkTagFilter.value = '';
-        }
         renderHomework(filtered);
         const first = filtered[0];
         if (first) {
@@ -1955,21 +1997,6 @@ body.theme-light .mobile-menu-action {
           history.replaceState(null, '', location.pathname + location.search);
         }
       });
-
-      if (homeworkTagFilter) {
-        homeworkTagFilter.addEventListener('input', () => {
-          const tag = homeworkTagFilter.value.trim().toLowerCase();
-          if (!tag) {
-            renderHomework(currentHomeworkItems);
-            return;
-          }
-          const filtered = currentHomeworkItems.filter((item) => {
-            const tags = item.tags || [];
-            return tags.some((t) => t.toLowerCase() === tag);
-          });
-          renderHomework(filtered);
-        });
-      }
 
       function openModalFromHash() {
         if (!location.hash.startsWith('#class=')) return;

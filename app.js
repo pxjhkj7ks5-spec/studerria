@@ -425,7 +425,8 @@ const initDb = async () => {
         course_id INTEGER REFERENCES courses(id),
         semester_id INTEGER REFERENCES semesters(id),
         is_custom_deadline INTEGER NOT NULL DEFAULT 0,
-        custom_due_date TEXT
+        custom_due_date TEXT,
+        is_control INTEGER NOT NULL DEFAULT 0
       )
     `,
     `
@@ -654,6 +655,7 @@ const initDb = async () => {
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS semester_id INTEGER REFERENCES semesters(id)',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS is_custom_deadline INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS custom_due_date TEXT',
+    'ALTER TABLE homework ADD COLUMN IF NOT EXISTS is_control INTEGER NOT NULL DEFAULT 0',
     "ALTER TABLE homework ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published'",
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ',
     'ALTER TABLE homework ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ',
@@ -2548,6 +2550,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                   file_name: row.file_name,
                   created_by: row.created_by,
                   created_at: row.created_at,
+                  is_control: Number(row.is_control || 0),
                   subgroups: {},
                 });
               }
@@ -2575,9 +2578,12 @@ app.get('/schedule', requireLogin, async (req, res) => {
               const legacyKey = `${hw.subject_id}|${hw.group_number}|${hw.day}|${hw.class_number}`;
               const key = hw.class_date ? `${legacyKey}|${hw.class_date}` : legacyKey;
               if (!homeworkMeta[key]) {
-                homeworkMeta[key] = { count: 0, preview: [] };
+                homeworkMeta[key] = { count: 0, preview: [], control: false };
               }
               homeworkMeta[key].count += 1;
+              if (hw.is_control) {
+                homeworkMeta[key].control = true;
+              }
               if (hw.description && homeworkMeta[key].preview.length < 2) {
                 homeworkMeta[key].preview.push(hw.description);
               }
@@ -4950,6 +4956,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
     link_url,
     meeting_url,
     tags,
+    is_control,
     subject_id,
     group_number,
     day_of_week,
@@ -4962,6 +4969,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   const classNum = Number(class_number);
   const groupNum = Number(group_number);
   const subjectId = Number(subject_id);
+  const isControl = String(is_control || '').toLowerCase() === '1' ? 1 : 0;
 
   if (
     !description ||
@@ -5026,8 +5034,8 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
     const row = await db.get(
       `
         INSERT INTO homework
-        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, status, scheduled_at, published_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, status, scheduled_at, published_at, is_control)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `,
       [
@@ -5053,6 +5061,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
         homeworkStatus,
         scheduledAt,
         publishedAt,
+        isControl,
       ]
     );
     if (!row || !row.id) {
@@ -5085,7 +5094,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
       'homework_create',
       'homework',
       row.id,
-      { subject_id: subjectId, group_number: groupNum, day_of_week, class_number: classNum, tags: tagList },
+      { subject_id: subjectId, group_number: groupNum, day_of_week, class_number: classNum, tags: tagList, is_control: isControl },
       courseId || 1,
       activeSemester ? activeSemester.id : null
     );
