@@ -528,7 +528,7 @@
 </head>
   <body class="theme-dark">
     <!-- Top Navigation -->
-    <%- include('partials/topbar', { role, username, t }) %>
+    <%- include('partials/topbar', { role, username, t, activePage: 'my-day' }) %>
 
     <!-- Main content -->
     <main>
@@ -637,7 +637,7 @@
               <button class="btn w-100 glass mobile-menu-action" type="button" id="messagesBtnMobile" aria-label="<%= t('messages.aria') %>">
                 💬 Повідомлення
               </button>
-              <a class="btn w-100 glass mobile-menu-action" href="/my-day">Мій день</a>
+              <a class="btn w-100 glass mobile-menu-action" href="/schedule">Повернутись до розкладу</a>
               <a class="btn w-100 glass mobile-menu-action" href="/teamwork"><%= t('menu.teamwork') %></a>
               <button
                 class="btn w-100 glass mobile-menu-action theme-toggle"

@@ -39,7 +39,11 @@
         <span class="msg-badge d-none" id="messagesBadge">0</span>
       </button>
       <a class="btn btn-glass me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
-      <a class="btn btn-glass me-1 desktop-only" href="/my-day">Мій день</a>
+      <% if (activePage === 'my-day') { %>
+        <a class="btn btn-glass me-1 desktop-only" href="/schedule">Повернутись до розкладу</a>
+      <% } else { %>
+        <a class="btn btn-glass me-1 desktop-only" href="/my-day">Мій день</a>
+      <% } %>
       <a class="btn btn-glass me-1 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
       <form method="POST" action="/logout" class="desktop-only">
         <button class="btn btn-glass" type="submit"><%= t('schedule.logout') %></button>
