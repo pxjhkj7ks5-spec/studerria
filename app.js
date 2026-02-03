@@ -1,8 +1,6 @@
 const express = require('express');
 const http = require('http');
 const session = require('express-session');
-const RedisStoreModule = require('connect-redis');
-const { createClient } = require('redis');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
@@ -117,32 +115,12 @@ app.use('/uploads', express.static('uploads'));
 const isProd = process.env.NODE_ENV === 'production';
 app.set('trust proxy', 1);
 
-let sessionStore;
-if (process.env.REDIS_URL) {
-  try {
-    const RedisStore = RedisStoreModule.default || RedisStoreModule;
-    const redisClient = createClient({ url: process.env.REDIS_URL });
-    redisClient.on('error', (err) => {
-      console.error('Redis client error:', err);
-    });
-    redisClient.connect().catch((err) => {
-      console.error('Failed to connect to Redis:', err);
-    });
-    sessionStore = new RedisStore({
-      client: redisClient,
-      prefix: 'studerria:sess:',
-    });
-  } catch (err) {
-    console.error('Redis session init failed, falling back to MemoryStore', err);
-  }
-}
 
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
     resave: false,
     saveUninitialized: false,
-    store: sessionStore,
     cookie: {
       httpOnly: true,
       sameSite: 'lax',

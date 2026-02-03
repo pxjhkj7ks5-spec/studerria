@@ -1,6 +1,6 @@
 {
   "name": "kma",
-  "version": "0.6.82",
+  "version": "0.6.83",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -16,13 +16,11 @@
   "description": "",
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "connect-redis": "^8.0.1",
     "ejs": "^4.0.1",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "multer": "^2.0.2",
     "pg": "^8.17.2",
-    "redis": "^4.7.1",
     "ws": "^8.19.0"
   },
   "devDependencies": {
