@@ -1254,6 +1254,21 @@ app.post('/profile', requireLogin, (req, res) => {
   });
 });
 
+app.post('/profile/reset-subjects', requireLogin, async (req, res) => {
+  const { id } = req.session.user;
+  try {
+    await db.run('DELETE FROM student_groups WHERE student_id = ?', [id]);
+    await db.run('DELETE FROM user_subject_optouts WHERE user_id = ?', [id]);
+    req.session.pendingUserId = id;
+    logAction(db, req, 'reset_subjects', { user_id: id });
+    broadcast('users_updated');
+    return req.session.save(() => res.redirect('/register/subjects'));
+  } catch (err) {
+    console.error('Failed to reset subjects', err);
+    return res.redirect('/profile?error=Database%20error');
+  }
+});
+
 async function buildMyDayData(user) {
   const courseId = user.course_id || 1;
   const activeSemester = await getActiveSemester(courseId);

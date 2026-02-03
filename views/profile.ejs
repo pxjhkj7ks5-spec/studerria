@@ -426,6 +426,14 @@
                   <a href="/schedule" class="btn btn-outline-secondary"><%= t('profile.back') %></a>
                 </div>
               </form>
+
+              <div class="mt-4">
+                <div class="text-muted small mb-2">Предмети та групи</div>
+                <form method="POST" action="/profile/reset-subjects" onsubmit="return confirm('Скинути вибір предметів та груп?')">
+                  <button class="btn btn-outline-danger w-100" type="submit">Обрати групи заново</button>
+                </form>
+                <div class="text-muted small mt-2">Обовʼязкові предмети буде призначено автоматично.</div>
+              </div>
             </div>
           </div>
           <footer class="app-footer text-center mt-3">
