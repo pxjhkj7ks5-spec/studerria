@@ -364,6 +364,24 @@
       .input-with-icon .form-control {
         padding-right: 38px;
       }
+      .field-error {
+        margin-top: 10px;
+        font-size: 14px;
+        line-height: 1.2;
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        background: rgba(239, 68, 68, 0.08);
+        color: var(--text-primary);
+        display: none;
+      }
+      body.theme-light .field-error {
+        border-color: rgba(239, 68, 68, 0.25);
+        background: rgba(239, 68, 68, 0.1);
+      }
+      .field-error.is-visible {
+        display: block;
+      }
       .modal-backdrop.show {
         opacity: 0.48;
       }
@@ -461,6 +479,7 @@
               </button>
             </label>
           </div>
+          <div class="field-error" id="consent-error" aria-live="polite"></div>
           <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" id="remember_me" name="remember_me" value="1" />
             <label class="form-check-label" for="remember_me"><%= t('auth.remember') %></label>
@@ -546,6 +565,7 @@
       const passwordInput = document.getElementById('password');
       const confirmInput = document.getElementById('confirm_password');
       const agreeInput = document.getElementById('agree');
+      const consentError = document.getElementById('consent-error');
       const togglePassword = document.getElementById('togglePassword');
       const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
 
@@ -564,12 +584,21 @@
       function clearInvalidState() {
         document.querySelectorAll('.field-invalid').forEach((el) => el.classList.remove('field-invalid'));
         document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
+        if (consentError) {
+          consentError.textContent = '';
+          consentError.classList.remove('is-visible');
+        }
       }
 
       function markInvalid(el, message) {
         clearInvalidState();
         el.classList.add('field-invalid');
-        showCustomTooltip(el, message);
+        if (el === agreeInput && consentError) {
+          consentError.textContent = message || 'Поставте прапорець згоди';
+          consentError.classList.add('is-visible');
+        } else {
+          showCustomTooltip(el, message);
+        }
         el.focus({ preventScroll: true });
       }
 
@@ -606,10 +635,18 @@
         el.addEventListener('input', () => {
           el.classList.remove('field-invalid');
           document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
+          if (el === agreeInput && consentError) {
+            consentError.textContent = '';
+            consentError.classList.remove('is-visible');
+          }
         });
         el.addEventListener('change', () => {
           el.classList.remove('field-invalid');
           document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
+          if (el === agreeInput && consentError) {
+            consentError.textContent = '';
+            consentError.classList.remove('is-visible');
+          }
         });
       });
 
