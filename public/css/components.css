@@ -337,16 +337,12 @@ body.theme-light .form-select {
 }
 
 .btn-close {
-  filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.2));
+  filter: var(--btn-close-filter);
 }
 
-body.theme-dark .btn-close {
-  filter: invert(1) drop-shadow(0 0 8px rgba(0, 0, 0, 0.4));
-}
-
-body.theme-dark input[type="date"]::-webkit-calendar-picker-indicator,
-body.theme-dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: var(--calendar-indicator-filter);
 }
 
 /* Tables */

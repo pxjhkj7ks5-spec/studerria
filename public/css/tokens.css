@@ -40,6 +40,9 @@
   --s-4: 16px;
   --s-5: 24px;
   --s-6: 32px;
+
+  --btn-close-filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.2));
+  --calendar-indicator-filter: invert(1);
 }
 
 body.theme-dark {
@@ -65,6 +68,9 @@ body.theme-dark {
   --shadow-sm: 0 6px 16px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 16px 36px rgba(0, 0, 0, 0.38);
   --shadow-lg: 0 26px 60px rgba(0, 0, 0, 0.48);
+
+  --btn-close-filter: invert(1) drop-shadow(0 0 8px rgba(0, 0, 0, 0.4));
+  --calendar-indicator-filter: invert(1);
 }
 
 body.theme-light {
@@ -90,4 +96,7 @@ body.theme-light {
   --shadow-sm: 0 6px 14px rgba(15, 23, 42, 0.08);
   --shadow-md: 0 16px 32px rgba(15, 23, 42, 0.12);
   --shadow-lg: 0 26px 50px rgba(15, 23, 42, 0.16);
+
+  --btn-close-filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.2));
+  --calendar-indicator-filter: none;
 }
