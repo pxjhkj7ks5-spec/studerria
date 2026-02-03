@@ -169,6 +169,14 @@ body.theme-light .btn-outline-secondary {
   background: rgba(255, 255, 255, 0.08);
 }
 
+body.theme-dark .btn-outline-primary:hover,
+body.theme-dark .btn-outline-secondary:hover,
+body.theme-dark .btn-outline-light:hover {
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.14);
+}
+
 body.theme-light .btn-outline-primary:hover,
 body.theme-light .btn-outline-secondary:hover,
 body.theme-light .btn-outline-light:hover {
