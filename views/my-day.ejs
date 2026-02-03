@@ -26,16 +26,27 @@
         color: #111827;
       }
 
-      /* Topbar */
+      /* Topbar (match Schedule) */
+      body.theme-light .text-white {
+        color: #0f172a !important;
+      }
+      body.theme-light .btn-outline-light {
+        color: #0f172a;
+        border-color: rgba(15, 23, 42, 0.2);
+      }
+      body.theme-light .btn-outline-light:hover {
+        background: rgba(15, 23, 42, 0.06);
+      }
       .topbar {
-        backdrop-filter: blur(16px);
-        background: rgba(12, 18, 36, 0.65);
+        backdrop-filter: blur(12px);
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         padding: 0.75rem 0;
       }
+      body.theme-dark .topbar {
+        background: rgba(10, 10, 20, 0.5);
+      }
       body.theme-light .topbar {
-        background: rgba(247, 249, 255, 0.85);
-        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        background: rgba(255, 255, 255, 0.75);
       }
       .topbar .container {
         display: flex;
@@ -44,7 +55,7 @@
       }
       .topbar .navbar-brand {
         font-weight: 700;
-        font-size: 1.15rem;
+        font-size: 1.25rem;
         margin-right: auto;
       }
       .topbar-actions {
