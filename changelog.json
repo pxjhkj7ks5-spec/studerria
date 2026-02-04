@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.08",
+      "date": "2026-02-05",
+      "items": [
+        "fix: restore bootstrap styles on My Day to prevent modal duplication"
+      ]
+    },
+    {
       "version": "0.7.07",
       "date": "2026-02-05",
       "items": [
