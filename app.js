@@ -1326,6 +1326,7 @@ app.get('/register/teacher-subjects', (req, res) => {
           subjects,
           selections,
           error: req.query.error || '',
+          isProfileEdit: false,
         });
       } catch (err) {
         return res.status(500).send('Database error');
