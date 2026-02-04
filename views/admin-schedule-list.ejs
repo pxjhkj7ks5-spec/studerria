@@ -62,16 +62,15 @@
         transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
       }
       body.theme-dark .card {
-        backdrop-filter: none;
-        background: linear-gradient(180deg, rgba(22, 30, 50, 0.68) 0%, rgba(16, 22, 38, 0.74) 100%);
+        background: rgba(18, 24, 40, 0.72);
         color: #f8fafc;
-        border-color: rgba(255, 255, 255, 0.06);
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.48);
+        border-color: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
       }
       body.theme-light .card {
-        background: var(--glass-bg-light);
+        background: rgba(255, 255, 255, 0.72);
         border-color: var(--glass-border-light);
-        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+        box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.4) inset;
       }
     </style>
     <link rel="stylesheet" href="/css/tokens.css" />
@@ -87,7 +86,7 @@
             <%= t('role.admin') %>: <%= username %>
           </span>
           <button
-            class="theme-toggle-min me-2"
+            class="theme-toggle theme-toggle-min me-2"
             type="button"
             id="themeToggle"
             aria-label="Toggle theme"
@@ -286,6 +285,27 @@
         localStorage.setItem('ui-theme', next);
         themeToggle.textContent = next === 'theme-dark' ? labelLight : labelDark;
       });
+
+      function wireSelectOpenState(root = document) {
+        root.querySelectorAll('select.form-select').forEach((select) => {
+          select.addEventListener('pointerdown', () => {
+            select.classList.add('select-open');
+          });
+          select.addEventListener('keydown', (event) => {
+            if ([' ', 'Enter', 'ArrowDown'].includes(event.key)) {
+              select.classList.add('select-open');
+            }
+          });
+          select.addEventListener('change', () => {
+            select.classList.remove('select-open');
+          });
+          select.addEventListener('blur', () => {
+            select.classList.remove('select-open');
+          });
+        });
+      }
+
+      wireSelectOpenState();
 
       const selectAll = document.getElementById('selectAllSchedule');
       if (selectAll) {

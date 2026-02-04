@@ -106,7 +106,7 @@ body.theme-light .glass-inset::before {
 .card:hover,
 .glass-card:hover,
 .glass-panel:hover {
-  transform: translateY(-1px);
+  transform: none;
   box-shadow: var(--shadow-lg);
 }
 
@@ -181,6 +181,14 @@ body.theme-light .btn-outline-primary:hover,
 body.theme-light .btn-outline-secondary:hover,
 body.theme-light .btn-outline-light:hover {
   background: rgba(15, 23, 42, 0.06);
+  color: var(--text);
+}
+
+body.theme-light .btn-glass:hover,
+body.theme-light .btn.btn-glass:hover,
+body.theme-light .btn.glass:hover,
+body.theme-light .mobile-menu-action:hover {
+  color: var(--text);
 }
 
 /* Subject pills */

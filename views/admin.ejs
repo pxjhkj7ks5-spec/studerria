@@ -2477,23 +2477,15 @@
       });
 
       const limitedStaffView = <%= isLimitedView ? 'true' : 'false' %>;
-      const allowedSections = <%- JSON.stringify(allowedSectionsList || []) %>;
+      const allowedSectionsRaw = <%- JSON.stringify(allowedSectionsList || []) %>;
+      const allowedSections = Array.isArray(allowedSectionsRaw)
+        ? allowedSectionsRaw
+        : typeof allowedSectionsRaw === 'string'
+          ? allowedSectionsRaw.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
       const adminSections = allowedSections.length
         ? allowedSections
-        : [
-            'admin-settings',
-            'admin-schedule',
-            'admin-homework',
-            'admin-users',
-            'admin-teachers',
-            'admin-subjects',
-            'admin-semesters',
-            'admin-courses',
-            'admin-history',
-            'admin-activity',
-            'admin-teamwork',
-            'admin-messages',
-          ];
+        : Array.from(document.querySelectorAll('.tab-content > [id^="admin-"]')).map((el) => el.id);
 
       function toggleSection(id) {
         const el = document.getElementById(id);

@@ -38,7 +38,6 @@ body.theme-light .table tbody tr {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  line-height: 1;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
@@ -62,6 +61,103 @@ body.theme-light.schedule-list-page .theme-toggle-min:hover {
   background: rgba(255, 255, 255, 0.9);
   border-color: rgba(15, 23, 42, 0.18);
   box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
+}
+
+.schedule-list-page .form-control,
+.schedule-list-page .form-select {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  backdrop-filter: blur(12px);
+  transition: box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.schedule-list-page .form-control::placeholder {
+  color: rgba(248, 250, 252, 0.6);
+}
+
+.schedule-list-page .form-select {
+  appearance: none;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+}
+
+.schedule-list-page .form-select.form-select-sm {
+  padding-right: 34px;
+  background-position: right 10px center;
+  background-size: 14px;
+}
+
+.schedule-list-page .form-select[multiple] {
+  background-image: none;
+  padding-right: 16px;
+}
+
+.schedule-list-page .form-select.select-open {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
+}
+
+body.theme-light.schedule-list-page .form-control,
+body.theme-light.schedule-list-page .form-select {
+  background: rgba(255, 255, 255, 0.8);
+  color: #0f172a;
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+body.theme-light.schedule-list-page .form-control::placeholder {
+  color: rgba(15, 23, 42, 0.5);
+}
+
+body.theme-light.schedule-list-page .form-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+body.theme-light.schedule-list-page .form-select.select-open {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
+}
+
+.schedule-list-page .form-control:focus,
+.schedule-list-page .form-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+body.theme-light.schedule-list-page .form-control:focus,
+body.theme-light.schedule-list-page .form-select:focus {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.2);
+  border-color: rgba(15, 23, 42, 0.18);
+}
+
+body.theme-dark.schedule-list-page .form-control,
+body.theme-dark.schedule-list-page .form-select {
+  color-scheme: dark;
+}
+
+body.theme-dark.schedule-list-page .form-select option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+body.theme-light.schedule-list-page .form-select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+body.theme-dark.schedule-list-page .form-select option:checked,
+body.theme-dark.schedule-list-page .form-select option:hover {
+  background: rgba(59, 130, 246, 0.6);
+  color: #fff;
+}
+
+body.theme-light.schedule-list-page .form-select option:checked,
+body.theme-light.schedule-list-page .form-select option:hover {
+  background: rgba(59, 130, 246, 0.15);
+  color: #0f172a;
 }
 
 .schedule-list-page .table {

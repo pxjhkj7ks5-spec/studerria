@@ -2,3 +2,15 @@
 .stat-tile {
   border-radius: var(--r-lg);
 }
+
+body.theme-light .profile-reset-btn {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #991b1b;
+}
+
+body.theme-light .profile-reset-btn:hover {
+  background: rgba(239, 68, 68, 0.28);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #7f1d1d;
+}

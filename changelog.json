@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.7.07",
+      "date": "2026-02-05",
+      "items": [
+        "fix: schedule list theme polish + select arrow animation",
+        "fix: align My Day layout width with schedule",
+        "fix: profile labels and light-theme button contrast",
+        "fix: keep light-theme hover text readable",
+        "fix: stabilize admin show/hide all sections"
+      ]
+    },
+    {
       "version": "0.7.06",
       "date": "2026-02-05",
       "items": [
