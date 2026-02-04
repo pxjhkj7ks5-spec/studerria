@@ -1186,11 +1186,11 @@ body.theme-light .mobile-menu-action {
                   data-classnum="<%= cls.class_number %>"
                   data-groupnum="<%= cls.group_number %>"
                   data-date="<%= cls.class_date %>"
-                  <% if (hwMeta) { %>
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="top"
-                    title="<%= hwMeta.preview.join(' • ') %>"
-                  <% } %>
+                  <% const tooltipParts = [cls.subject_name, `Group ${cls.group_number}`, `Class ${cls.class_number}`, timeLabel]; %>
+                  <% if (hwMeta && hwMeta.preview && hwMeta.preview.length) { tooltipParts.push(...hwMeta.preview); } %>
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="<%= tooltipParts.join(' • ') %>"
                 >
                   <div class="d-flex justify-content-between">
                     <div>
@@ -1786,6 +1786,24 @@ body.theme-light .mobile-menu-action {
           const li = document.createElement('li');
           li.className = 'list-group-item';
 
+          const tooltipParts = [];
+          if (item.custom_due_date || item.class_date) {
+            const dueDate = item.custom_due_date || item.class_date;
+            const dueLabel = new Date(dueDate).toLocaleDateString('uk-UA');
+            tooltipParts.push(`Дедлайн: ${dueLabel}`);
+          }
+          if (item.tags && item.tags.length) {
+            tooltipParts.push(`Теги: ${item.tags.join(', ')}`);
+          }
+          if (item.link_url) tooltipParts.push('Є посилання');
+          if (item.meeting_url) tooltipParts.push('Є онлайн-зустріч');
+          if (item.file_path) tooltipParts.push('Є файл');
+          if (tooltipParts.length) {
+            li.setAttribute('data-bs-toggle', 'tooltip');
+            li.setAttribute('data-bs-placement', 'top');
+            li.setAttribute('data-bs-title', tooltipParts.join(' • '));
+          }
+
           const title = document.createElement('div');
           title.className = 'fw-semibold mb-1';
           title.textContent = item.description;
@@ -1797,12 +1815,40 @@ body.theme-light .mobile-menu-action {
           meta.textContent = `${item.created_by} • ${created}`;
           li.appendChild(meta);
 
-          if (item.is_control) {
-            const control = document.createElement('div');
-            control.className = 'control-chip mb-2';
-            control.textContent = 'Контроль';
-            li.appendChild(control);
+          const dueDate = item.custom_due_date || item.class_date;
+          let isUrgent = false;
+          if (dueDate) {
+            const due = new Date(dueDate);
+            const now = new Date();
+            const diffDays = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+            isUrgent = diffDays >= 0 && diffDays <= 2;
           }
+          const priorityWrap = document.createElement('div');
+          priorityWrap.className = 'd-flex flex-wrap gap-2 mb-2';
+          if (item.is_control) {
+            const control = document.createElement('span');
+            control.className = 'priority-chip priority-control';
+            control.textContent = 'Контрольна';
+            priorityWrap.appendChild(control);
+          } else if (isUrgent) {
+            const urgent = document.createElement('span');
+            urgent.className = 'priority-chip priority-urgent';
+            urgent.textContent = 'Терміново';
+            priorityWrap.appendChild(urgent);
+          } else {
+            const normal = document.createElement('span');
+            normal.className = 'priority-chip priority-normal';
+            normal.textContent = 'Звичайне';
+            priorityWrap.appendChild(normal);
+          }
+          if (dueDate) {
+            const dueLabel = new Date(dueDate).toLocaleDateString('uk-UA');
+            const due = document.createElement('span');
+            due.className = 'priority-chip priority-normal';
+            due.textContent = `Дедлайн: ${dueLabel}`;
+            priorityWrap.appendChild(due);
+          }
+          li.appendChild(priorityWrap);
 
           if (item.link_url) {
             const link = document.createElement('a');
@@ -1850,6 +1896,10 @@ body.theme-light .mobile-menu-action {
           li.appendChild(reactWrap);
 
           listEl.appendChild(li);
+
+          if (tooltipParts.length) {
+            new bootstrap.Tooltip(li);
+          }
         });
       }
 

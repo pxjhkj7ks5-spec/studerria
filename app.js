@@ -3107,6 +3107,19 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
   } catch (err) {
     return handleDbError(res, err, 'admin.semester');
   }
+  let activeScheduleDays = [];
+  try {
+    const studyDays = await getCourseStudyDays(courseId);
+    activeScheduleDays = (studyDays || [])
+      .filter((d) => d.is_active)
+      .map((d) => d.day_name)
+      .filter(Boolean);
+  } catch (err) {
+    console.error('Failed to load study days', err);
+  }
+  if (!activeScheduleDays.length) {
+    activeScheduleDays = [...daysOfWeek];
+  }
 
   scheduleFilters.push('se.course_id = ?');
   scheduleParams.push(courseId);
@@ -3635,6 +3648,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         weeklyUserRoles,
         weeklyUserSeries,
         settings: settingsCache,
+        activeScheduleDays,
         filters: {
           group_number: group_number || '',
           day: day || '',

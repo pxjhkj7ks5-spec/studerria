@@ -76,6 +76,24 @@
       body.modal-open {
         overflow: hidden;
       }
+      .schedule-spoiler summary {
+        list-style: none;
+      }
+      .schedule-spoiler summary::-webkit-details-marker {
+        display: none;
+      }
+      .schedule-spoiler .spoiler-btn {
+        border-radius: 999px;
+        padding: 0.45rem 1rem;
+        font-weight: 600;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+      }
+      body.theme-light .schedule-spoiler .spoiler-btn {
+        border-color: rgba(15, 23, 42, 0.14);
+        background: rgba(255, 255, 255, 0.7);
+      }
       .modal-backdrop {
         backdrop-filter: blur(12px);
         background-color: rgba(0, 0, 0, 0.3);
@@ -830,7 +848,7 @@
                   <div class="col-12 col-md-3">
                     <select class="form-select" name="day">
                       <option value="">All days</option>
-                      <% ['Monday','Tuesday','Wednesday','Thursday','Friday'].forEach(function(d) { %>
+                      <% (activeScheduleDays || ['Monday','Tuesday','Wednesday','Thursday','Friday']).forEach(function(d) { %>
                         <option value="<%= d %>" <%= filters && filters.day === d ? 'selected' : '' %>><%= d %></option>
                       <% }); %>
                     </select>
@@ -922,7 +940,7 @@
                   <div class="col-12 col-md-2">
                     <select class="form-select" name="day_of_week" required>
                       <option value="" disabled selected>Day</option>
-                      <% ['Monday','Tuesday','Wednesday','Thursday','Friday'].forEach(function(d) { %>
+                      <% (activeScheduleDays || ['Monday','Tuesday','Wednesday','Thursday','Friday']).forEach(function(d) { %>
                         <option value="<%= d %>"><%= d %></option>
                       <% }); %>
                     </select>
@@ -951,6 +969,10 @@
             </div>
           </div>
 
+          <details class="schedule-spoiler">
+            <summary class="mb-3">
+              <button class="spoiler-btn" type="button">Показати всі пари</button>
+            </summary>
           <form method="POST" action="/admin/schedule/delete-multiple">
             <div class="d-flex flex-wrap gap-2 mb-2">
               <button class="btn btn-outline-danger btn-sm" type="submit">Delete Selected</button>
@@ -1008,7 +1030,7 @@
                     </td>
                     <td>
                       <select class="form-select form-select-sm" name="day_of_week" form="edit-<%= item.id %>" required>
-                        <% ['Monday','Tuesday','Wednesday','Thursday','Friday'].forEach(function(d) { %>
+                        <% (activeScheduleDays || ['Monday','Tuesday','Wednesday','Thursday','Friday']).forEach(function(d) { %>
                           <option value="<%= d %>" <%= item.day_of_week === d ? 'selected' : '' %>><%= d %></option>
                         <% }); %>
                       </select>
@@ -1067,6 +1089,7 @@
             </div>
           </form>
           <form id="clearScheduleForm" method="POST" action="/admin/schedule/clear-all"></form>
+          </details>
         </div>
 
         <% } %>

@@ -86,6 +86,47 @@ body.theme-dark .deadline-item {
   color: rgba(255, 255, 255, 0.75);
 }
 
+.priority-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.priority-control {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.priority-urgent {
+  background: rgba(250, 204, 21, 0.2);
+  color: #fde68a;
+  border-color: rgba(250, 204, 21, 0.5);
+}
+
+.priority-normal {
+  background: rgba(148, 163, 184, 0.16);
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+body.theme-light .priority-control {
+  color: #991b1b;
+}
+
+body.theme-light .priority-urgent {
+  color: #92400e;
+}
+
+body.theme-light .priority-normal {
+  color: #334155;
+}
+
 body.theme-light .deadline-block {
   background: rgba(250, 204, 21, 0.18);
   border-color: rgba(250, 204, 21, 0.35);
