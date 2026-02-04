@@ -2469,7 +2469,20 @@
       const allowedSections = <%- JSON.stringify(allowedSectionsList || []) %>;
       const adminSections = allowedSections.length
         ? allowedSections
-        : ['admin-settings', 'admin-schedule', 'admin-homework', 'admin-users', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-history', 'admin-activity', 'admin-teamwork', 'admin-messages'];
+        : [
+            'admin-settings',
+            'admin-schedule',
+            'admin-homework',
+            'admin-users',
+            'admin-teachers',
+            'admin-subjects',
+            'admin-semesters',
+            'admin-courses',
+            'admin-history',
+            'admin-activity',
+            'admin-teamwork',
+            'admin-messages',
+          ];
 
       function toggleSection(id) {
         const el = document.getElementById(id);
