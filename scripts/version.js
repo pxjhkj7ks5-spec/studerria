@@ -4,30 +4,38 @@ const path = require('path');
 const versionFile = path.join(__dirname, '..', 'version.json');
 
 function parseVersion(value) {
-  const parts = value.split('.').map((p) => Number(p));
+  const raw = value.split('.');
+  const parts = raw.map((p) => Number(p));
   if (parts.length !== 3 || parts.some((p) => Number.isNaN(p))) {
     throw new Error(`Invalid version: ${value}`);
   }
-  return parts;
+  const widths = raw.map((p) => p.length);
+  return { parts, widths };
 }
 
-function formatVersion([major, minor, patch]) {
-  return `${major}.${minor}.${patch}`;
+function pad(num, width) {
+  return String(num).padStart(width, '0');
+}
+
+function formatVersion([major, minor, patch], widths) {
+  const [wMajor, wMinor, wPatch] = widths;
+  return `${pad(major, wMajor)}.${pad(minor, wMinor)}.${pad(patch, wPatch)}`;
 }
 
 function bumpVersion(current, mode) {
-  let [major, minor, patch] = parseVersion(current);
+  const { parts, widths } = parseVersion(current);
+  let [major, minor, patch] = parts;
   if (mode === 'release') {
-    return '1.0.0';
+    return formatVersion([1, 0, 0], widths);
   }
   if (mode === 'minor') {
     minor += 1;
     patch = 0;
-    return formatVersion([major, minor, patch]);
+    return formatVersion([major, minor, patch], widths);
   }
   if (mode === 'patch') {
     patch += 1;
-    return formatVersion([major, minor, patch]);
+    return formatVersion([major, minor, patch], widths);
   }
   throw new Error(`Unknown mode: ${mode}`);
 }

@@ -3879,6 +3879,8 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     teamwork_to,
     schedule_date,
   } = req.query;
+  const scheduleFilters = [];
+  const scheduleParams = [];
   let activeSemester = null;
   try {
     activeSemester = await getActiveSemester(courseId);
@@ -3898,6 +3900,44 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
   if (!activeScheduleDays.length) {
     activeScheduleDays = [...daysOfWeek];
   }
+
+  scheduleFilters.push('se.course_id = ?');
+  scheduleParams.push(courseId);
+  if (activeSemester) {
+    scheduleFilters.push('se.semester_id = ?');
+    scheduleParams.push(activeSemester.id);
+  }
+
+  if (group_number) {
+    scheduleFilters.push('se.group_number = ?');
+    scheduleParams.push(group_number);
+  }
+  if (day) {
+    scheduleFilters.push('se.day_of_week = ?');
+    scheduleParams.push(day);
+  }
+  if (subject) {
+    scheduleFilters.push('s.name LIKE ?');
+    scheduleParams.push(`%${subject}%`);
+  }
+  if (schedule_date && activeSemester && activeSemester.start_date) {
+    const mapped = getWeekDayForDate(schedule_date, activeSemester.start_date);
+    if (mapped) {
+      scheduleFilters.push('se.week_number = ?');
+      scheduleParams.push(mapped.weekNumber);
+      scheduleFilters.push('se.day_of_week = ?');
+      scheduleParams.push(mapped.dayName);
+    }
+  }
+
+  const scheduleWhere = scheduleFilters.length ? `WHERE ${scheduleFilters.join(' AND ')}` : '';
+  const scheduleSql = `
+    SELECT se.*, s.name AS subject_name
+    FROM schedule_entries se
+    JOIN subjects s ON s.id = se.subject_id
+    ${scheduleWhere}
+    ORDER BY se.week_number, se.day_of_week, se.class_number
+  `;
 
   let courses = [];
   let semesters = [];
@@ -3926,8 +3966,13 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
   } catch (err) {
     return handleDbError(res, err, 'admin.reference');
   }
-  const schedule = [];
-  const homeworkFilters = [];
+  db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
+    if (scheduleErr) {
+      return handleDbError(res, scheduleErr, 'admin.schedule');
+    }
+    const schedule = sortSchedule(scheduleRows, sort_schedule);
+
+    const homeworkFilters = [];
     const homeworkParams = [];
     homeworkFilters.push('h.course_id = ?');
     homeworkParams.push(courseId);
