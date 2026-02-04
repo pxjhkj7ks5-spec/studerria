@@ -3879,8 +3879,6 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     teamwork_to,
     schedule_date,
   } = req.query;
-  const scheduleFilters = [];
-  const scheduleParams = [];
   let activeSemester = null;
   try {
     activeSemester = await getActiveSemester(courseId);
@@ -3900,44 +3898,6 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
   if (!activeScheduleDays.length) {
     activeScheduleDays = [...daysOfWeek];
   }
-
-  scheduleFilters.push('se.course_id = ?');
-  scheduleParams.push(courseId);
-  if (activeSemester) {
-    scheduleFilters.push('se.semester_id = ?');
-    scheduleParams.push(activeSemester.id);
-  }
-
-  if (group_number) {
-    scheduleFilters.push('se.group_number = ?');
-    scheduleParams.push(group_number);
-  }
-  if (day) {
-    scheduleFilters.push('se.day_of_week = ?');
-    scheduleParams.push(day);
-  }
-  if (subject) {
-    scheduleFilters.push('s.name LIKE ?');
-    scheduleParams.push(`%${subject}%`);
-  }
-  if (schedule_date && activeSemester && activeSemester.start_date) {
-    const mapped = getWeekDayForDate(schedule_date, activeSemester.start_date);
-    if (mapped) {
-      scheduleFilters.push('se.week_number = ?');
-      scheduleParams.push(mapped.weekNumber);
-      scheduleFilters.push('se.day_of_week = ?');
-      scheduleParams.push(mapped.dayName);
-    }
-  }
-
-  const scheduleWhere = scheduleFilters.length ? `WHERE ${scheduleFilters.join(' AND ')}` : '';
-  const scheduleSql = `
-    SELECT se.*, s.name AS subject_name
-    FROM schedule_entries se
-    JOIN subjects s ON s.id = se.subject_id
-    ${scheduleWhere}
-    ORDER BY se.week_number, se.day_of_week, se.class_number
-  `;
 
   let courses = [];
   let semesters = [];
@@ -3966,13 +3926,8 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
   } catch (err) {
     return handleDbError(res, err, 'admin.reference');
   }
-  db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
-    if (scheduleErr) {
-      return handleDbError(res, scheduleErr, 'admin.schedule');
-    }
-    const schedule = sortSchedule(scheduleRows, sort_schedule);
-
-    const homeworkFilters = [];
+  const schedule = [];
+  const homeworkFilters = [];
     const homeworkParams = [];
     homeworkFilters.push('h.course_id = ?');
     homeworkParams.push(courseId);
@@ -4510,6 +4465,155 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
       );
 });
 
+app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleList.init');
+  }
+  const courseId = getAdminCourse(req);
+  const {
+    group_number,
+    day,
+    subject,
+    schedule_date,
+    sort_schedule,
+    page,
+  } = req.query;
+
+  let activeSemester = null;
+  try {
+    activeSemester = await getActiveSemester(courseId);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleList.semester');
+  }
+  let activeScheduleDays = [];
+  try {
+    const studyDays = await getCourseStudyDays(courseId);
+    activeScheduleDays = (studyDays || [])
+      .filter((d) => d.is_active)
+      .map((d) => d.day_name)
+      .filter(Boolean);
+  } catch (err) {
+    console.error('Failed to load study days', err);
+  }
+  if (!activeScheduleDays.length) {
+    activeScheduleDays = [...daysOfWeek];
+  }
+
+  const scheduleFilters = ['se.course_id = ?'];
+  const scheduleParams = [courseId];
+  if (activeSemester) {
+    scheduleFilters.push('se.semester_id = ?');
+    scheduleParams.push(activeSemester.id);
+  }
+  if (group_number) {
+    scheduleFilters.push('se.group_number = ?');
+    scheduleParams.push(group_number);
+  }
+  if (day) {
+    scheduleFilters.push('se.day_of_week = ?');
+    scheduleParams.push(day);
+  }
+  if (subject) {
+    scheduleFilters.push('s.name LIKE ?');
+    scheduleParams.push(`%${subject}%`);
+  }
+  if (schedule_date && activeSemester && activeSemester.start_date) {
+    const mapped = getWeekDayForDate(schedule_date, activeSemester.start_date);
+    if (mapped) {
+      scheduleFilters.push('se.week_number = ?');
+      scheduleParams.push(mapped.weekNumber);
+      scheduleFilters.push('se.day_of_week = ?');
+      scheduleParams.push(mapped.dayName);
+    }
+  }
+
+  const scheduleWhere = scheduleFilters.length ? `WHERE ${scheduleFilters.join(' AND ')}` : '';
+  let orderClause = 'se.week_number, se.day_of_week, se.class_number';
+  if (sort_schedule === 'group') {
+    orderClause = 'se.group_number, se.day_of_week, se.class_number';
+  } else if (sort_schedule === 'day') {
+    orderClause = 'se.day_of_week, se.class_number, se.group_number';
+  } else if (sort_schedule === 'time') {
+    orderClause = 'se.class_number, se.day_of_week, se.group_number';
+  }
+
+  const perPage = 30;
+  const rawPage = Number(page || 1);
+  let currentPage = Number.isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
+
+  try {
+    const countRow = await db.get(
+      `
+        SELECT COUNT(*) AS count
+        FROM schedule_entries se
+        JOIN subjects s ON s.id = se.subject_id
+        ${scheduleWhere}
+      `,
+      scheduleParams
+    );
+    const totalCount = Number(countRow?.count || 0);
+    const totalPages = Math.max(1, Math.ceil(totalCount / perPage));
+    if (currentPage > totalPages) currentPage = totalPages;
+    const offset = (currentPage - 1) * perPage;
+    const rows = await db.all(
+      `
+        SELECT se.*, s.name AS subject_name
+        FROM schedule_entries se
+        JOIN subjects s ON s.id = se.subject_id
+        ${scheduleWhere}
+        ORDER BY ${orderClause}
+        LIMIT ? OFFSET ?
+      `,
+      [...scheduleParams, perPage, offset]
+    );
+
+    const courses = await getCoursesCached();
+    const semesters = await getSemestersCached(courseId);
+    const subjects = await getSubjectsCached(courseId);
+
+    const queryParams = new URLSearchParams();
+    if (courseId) queryParams.set('course', courseId);
+    if (group_number) queryParams.set('group_number', group_number);
+    if (day) queryParams.set('day', day);
+    if (subject) queryParams.set('subject', subject);
+    if (schedule_date) queryParams.set('schedule_date', schedule_date);
+    if (sort_schedule) queryParams.set('sort_schedule', sort_schedule);
+    const baseQuery = queryParams.toString();
+    const pageBase = baseQuery ? `?${baseQuery}&page=` : '?page=';
+
+    return res.render('admin-schedule-list', {
+      username: req.session.user.username,
+      role: req.session.role,
+      courses,
+      subjects,
+      semesters,
+      activeSemester,
+      selectedCourseId: courseId,
+      activeScheduleDays,
+      schedule: rows || [],
+      perPage,
+      filters: {
+        group_number: group_number || '',
+        day: day || '',
+        subject: subject || '',
+        schedule_date: schedule_date || '',
+      },
+      sorts: {
+        schedule: sort_schedule || '',
+      },
+      pagination: {
+        page: currentPage,
+        totalPages,
+        pageBase,
+      },
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleList');
+  }
+});
+
 let schedulerRunning = false;
 const publishScheduledItems = async () => {
   if (schedulerRunning) {
@@ -4552,11 +4656,6 @@ app.post('/admin/api/scheduler/run', requireAdmin, async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
   }
-});
-      }
-    );
-  });
-});
 });
 
 app.post('/admin/settings', requireAdmin, async (req, res) => {
@@ -6169,43 +6268,57 @@ app.post('/admin/schedule/edit/:id', requireAdmin, async (req, res) => {
 app.post('/admin/schedule/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
+  const referer = req.get('referer');
+  const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : '/admin';
+  const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
   db.run('DELETE FROM schedule_entries WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
     if (err) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(withStatus(redirectBase, 'err=Database%20error'));
     }
     logActivity(db, req, 'schedule_delete', 'schedule', Number(id) || null, null, courseId);
     logAction(db, req, 'schedule_delete', { id });
-    return res.redirect('/admin?ok=Class%20deleted');
+    return res.redirect(withStatus(redirectBase, 'ok=Class%20deleted'));
   });
 });
 
 app.post('/admin/schedule/delete-multiple', requireAdmin, (req, res) => {
   const ids = req.body.delete_ids;
+  const returnTo = req.body.return_to || req.query.return_to || '';
+  const referer = req.get('referer');
+  const fallback = '/admin';
+  const redirectBase =
+    (returnTo && returnTo.startsWith('/admin/schedule-list') ? returnTo : null) ||
+    (referer && referer.includes('/admin/schedule-list') ? referer : null) ||
+    fallback;
+  const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
   if (!ids) {
-    return res.redirect('/admin?err=No%20items%20selected');
+    return res.redirect(withStatus(redirectBase, 'err=No%20items%20selected'));
   }
   const list = Array.isArray(ids) ? ids : [ids];
   const placeholders = list.map(() => '?').join(',');
   const courseId = getAdminCourse(req);
   db.run(`DELETE FROM schedule_entries WHERE course_id = ? AND id IN (${placeholders})`, [courseId, ...list], (err) => {
     if (err) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(withStatus(redirectBase, 'err=Database%20error'));
     }
     logActivity(db, req, 'schedule_delete_multiple', 'schedule', null, { ids: list }, courseId);
     logAction(db, req, 'schedule_delete_multiple', { ids: list });
-    return res.redirect('/admin?ok=Selected%20classes%20deleted');
+    return res.redirect(withStatus(redirectBase, 'ok=Selected%20classes%20deleted'));
   });
 });
 
 app.post('/admin/schedule/clear-all', requireAdmin, (req, res) => {
   const courseId = getAdminCourse(req);
+  const referer = req.get('referer');
+  const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : '/admin';
+  const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
   db.run('DELETE FROM schedule_entries WHERE course_id = ?', [courseId], (err) => {
     if (err) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(withStatus(redirectBase, 'err=Database%20error'));
     }
     logActivity(db, req, 'schedule_clear_all', 'schedule', null, null, courseId);
     logAction(db, req, 'schedule_clear_all');
-    return res.redirect('/admin?ok=Schedule%20cleared');
+    return res.redirect(withStatus(redirectBase, 'ok=Schedule%20cleared'));
   });
 });
 
