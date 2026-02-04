@@ -83,12 +83,24 @@
         display: none;
       }
       .schedule-spoiler .spoiler-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
         border-radius: 999px;
         padding: 0.45rem 1rem;
         font-weight: 600;
         border: 1px solid rgba(255, 255, 255, 0.2);
         background: rgba(255, 255, 255, 0.08);
         color: inherit;
+      }
+      .schedule-spoiler .spoiler-btn::after {
+        content: '▾';
+        font-size: 0.9em;
+        opacity: 0.8;
+      }
+      .schedule-spoiler[open] .spoiler-btn::after {
+        content: '▴';
       }
       body.theme-light .schedule-spoiler .spoiler-btn {
         border-color: rgba(15, 23, 42, 0.14);
@@ -970,9 +982,7 @@
           </div>
 
           <details class="schedule-spoiler">
-            <summary class="mb-3">
-              <button class="spoiler-btn" type="button">Показати всі пари</button>
-            </summary>
+            <summary class="mb-3 spoiler-btn">Показати всі пари</summary>
           <form method="POST" action="/admin/schedule/delete-multiple">
             <div class="d-flex flex-wrap gap-2 mb-2">
               <button class="btn btn-outline-danger btn-sm" type="submit">Delete Selected</button>
@@ -2429,6 +2439,19 @@
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script>
+      document.querySelectorAll('.schedule-spoiler').forEach((spoiler) => {
+        const summary = spoiler.querySelector('summary');
+        if (!summary) return;
+        const base = 'Показати всі пари';
+        const open = 'Сховати всі пари';
+        const update = () => {
+          summary.textContent = spoiler.open ? open : base;
+        };
+        update();
+        summary.addEventListener('click', () => {
+          requestAnimationFrame(update);
+        });
+      });
       function wireSelectOpenState(root = document) {
         root.querySelectorAll('select.form-select').forEach((select) => {
           select.addEventListener('pointerdown', () => {
