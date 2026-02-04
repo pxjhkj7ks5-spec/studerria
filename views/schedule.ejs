@@ -70,6 +70,10 @@
         font-weight: 700;
         font-size: 1.25rem;
         margin-right: auto;
+        display: flex;
+        align-items: center;
+        height: 36px;
+        line-height: 1;
       }
       .topbar-actions {
         display: flex;
@@ -799,10 +803,13 @@
         background: rgba(255, 255, 255, 0.14);
         border-color: rgba(255, 255, 255, 0.3);
       }
-            body.theme-dark .mobile-menu-action {
-        color: #f8fafc;
+      body.theme-dark .mobile-menu-action {
+        color: #f8fafc !important;
       }
-body.theme-light .mobile-menu-action {
+      body.theme-dark .mobile-menu-action:hover {
+        color: #f8fafc !important;
+      }
+      body.theme-light .mobile-menu-action {
         background: rgba(255, 255, 255, 0.82);
         border-color: rgba(15, 23, 42, 0.14);
         color: #0f172a;
@@ -839,7 +846,7 @@ body.theme-light .mobile-menu-action {
         opacity: 0.9;
       }
       body.theme-dark #mobileMenuModal .btn-close {
-        filter: brightness(1.8);
+        filter: invert(1) brightness(1.2);
         opacity: 0.95;
       }
       body.theme-light #mobileMenuModal .btn-close {
