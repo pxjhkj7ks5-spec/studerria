@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.09",
+      "date": "2026-02-05",
+      "items": [
+        "fix: pass role into teamwork view for unified topbar"
+      ]
+    },
+    {
       "version": "0.7.08",
       "date": "2026-02-05",
       "items": [

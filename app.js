@@ -2958,7 +2958,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
 });
 
 app.get('/teamwork', requireLogin, async (req, res) => {
-  const { id: userId, username, course_id: courseId } = req.session.user;
+  const { id: userId, username, role, course_id: courseId } = req.session.user;
   const activeSemester = await getActiveSemester(courseId || 1);
   const selectedSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
   db.all(
@@ -2983,6 +2983,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
           freeStudents: [],
           messages: res.locals.messages,
           username,
+          role,
         });
       }
 
@@ -3007,6 +3008,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
               freeStudents: [],
               messages: res.locals.messages,
               username,
+              role,
             });
           }
 
@@ -3133,6 +3135,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
                                 freeStudents,
                                 messages: res.locals.messages,
                                 username,
+                                role,
                               });
                             }
                           );
