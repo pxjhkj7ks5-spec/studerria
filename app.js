@@ -6269,7 +6269,7 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
   const visibleFlag = String(visible) === '0' ? 0 : 1;
   const requiredFlag = String(is_required) === '0' ? 0 : 1;
-  const generalFlag = String(is_general) === '0' ? 0 : 1;
+  const generalFlag = String(is_general) === '1' || String(is_general) === 'on' ? 1 : 0;
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
@@ -6300,7 +6300,7 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
   const visibleFlag = String(visible) === '0' ? 0 : 1;
   const requiredFlag = String(is_required) === '0' ? 0 : 1;
-  const generalFlag = String(is_general) === '0' ? 0 : 1;
+  const generalFlag = String(is_general) === '1' || String(is_general) === 'on' ? 1 : 0;
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
