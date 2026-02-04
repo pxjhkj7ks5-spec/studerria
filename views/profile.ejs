@@ -428,11 +428,21 @@
               </form>
 
               <div class="mt-4">
-                <div class="text-muted small mb-2">Предмети та групи</div>
-                <form method="POST" action="/profile/reset-subjects" onsubmit="return confirm('Скинути вибір предметів та груп?')">
-                  <button class="btn btn-outline-danger w-100" type="submit">Обрати групи заново</button>
-                </form>
-                <div class="text-muted small mt-2">Обовʼязкові предмети буде призначено автоматично.</div>
+                <% if (teacherCourse) { %>
+                  <div class="text-muted small mb-2">Викладацькі предмети</div>
+                  <a class="btn btn-outline-primary w-100" href="/teacher/subjects">Обрати предмети заново</a>
+                  <% if (teacherStatus) { %>
+                    <div class="text-muted small mt-2">
+                      Статус: <%= teacherStatus === 'approved' ? 'Підтверджено' : (teacherStatus === 'rejected' ? 'Відхилено' : 'Очікує підтвердження') %>
+                    </div>
+                  <% } %>
+                <% } else { %>
+                  <div class="text-muted small mb-2">Предмети та групи</div>
+                  <form method="POST" action="/profile/reset-subjects" onsubmit="return confirm('Скинути вибір предметів та груп?')">
+                    <button class="btn btn-outline-danger w-100" type="submit">Обрати групи заново</button>
+                  </form>
+                  <div class="text-muted small mt-2">Обовʼязкові предмети буде призначено автоматично.</div>
+                <% } %>
               </div>
             </div>
           </div>

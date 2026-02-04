@@ -10,6 +10,8 @@
             <%= t('role.starosta') %>: <%= username %>
           <% } else if (role === 'deanery') { %>
             <%= t('role.deanery') %>: <%= username %>
+          <% } else if (role === 'teacher') { %>
+            <%= t('role.teacher') %>: <%= username %>
           <% } else { %>
             <%= t('role.student') %>: <%= username %>
           <% } %>

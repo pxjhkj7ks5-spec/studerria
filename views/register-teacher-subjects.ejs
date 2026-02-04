@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Вибір предметів викладача</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <style>
+      :root {
+        --accent: #3b82f6;
+        --accent-dark: #2563eb;
+        --card-radius: 20px;
+        --glass-border-dark: rgba(255, 255, 255, 0.14);
+        --glass-border-light: rgba(15, 23, 42, 0.08);
+        --glass-bg-dark: rgba(255, 255, 255, 0.06);
+        --glass-bg-light: rgba(255, 255, 255, 0.7);
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+          "Helvetica Neue", "Inter", Arial, sans-serif;
+        min-height: 100vh;
+      }
+      body.theme-light {
+        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.35), transparent 60%),
+          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.35), transparent 60%),
+          linear-gradient(135deg, #eef2ff 0%, #f0f9ff 50%, #fdf4ff 100%);
+        color: #0f172a;
+      }
+      body.theme-dark {
+        background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.3), transparent 60%),
+          radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.25), transparent 60%),
+          linear-gradient(160deg, #050508 0%, #12061a 45%, #1b0f26 100%);
+        color: #f8fafc;
+      }
+      .glass {
+        position: relative;
+        isolation: isolate;
+        overflow: clip;
+        background-clip: padding-box;
+        border-radius: var(--card-radius);
+        backdrop-filter: blur(20px);
+        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+      }
+      body.theme-dark .glass {
+        background: var(--glass-bg-dark);
+        border: 1px solid var(--glass-border-dark);
+        box-shadow: 0 18px 45px rgba(8, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
+      }
+      body.theme-light .glass {
+        background: var(--glass-bg-light);
+        border: 1px solid var(--glass-border-light);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+      }
+      .subject-card {
+        padding: 16px;
+        border-radius: 16px;
+      }
+      .subject-name {
+        font-weight: 600;
+      }
+      .subject-course {
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.7);
+      }
+      body.theme-light .subject-course {
+        color: rgba(15, 23, 42, 0.6);
+      }
+      .form-check-input {
+        width: 1.15rem;
+        height: 1.15rem;
+      }
+      .btn-primary {
+        background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        font-weight: 600;
+      }
+      .app-footer {
+        font-size: 0.8rem;
+      }
+      body.theme-dark .app-footer {
+        color: rgba(255, 255, 255, 0.6);
+      }
+      body.theme-light .app-footer {
+        color: rgba(15, 23, 42, 0.6);
+      }
+    </style>
+  </head>
+  <body class="theme-dark">
+    <div class="container py-4">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="h3 mb-1">Вибір предметів викладача</h1>
+          <div class="text-muted">Оберіть предмети, які ви викладаєте.</div>
+        </div>
+        <button class="btn btn-outline-secondary theme-toggle-btn" type="button" id="themeToggle">🌙</button>
+      </div>
+
+      <% if (error) { %>
+        <div class="alert alert-danger glass"><%= decodeURIComponent(error) %></div>
+      <% } %>
+
+      <form method="POST" action="<%= isProfileEdit ? '/teacher/subjects' : '/register/teacher-subjects' %>">
+        <div class="d-grid gap-3">
+          <% (subjects || []).forEach(function(s) { %>
+            <% const selectedGroup = selections && selections.get ? selections.get(s.id) : null; %>
+            <% const isSelected = selections && selections.get ? selections.has(s.id) : false; %>
+            <% const generalFlag = s.is_general === true || Number(s.is_general) === 1; %>
+            <div class="glass subject-card">
+              <div class="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <div class="subject-name"><%= s.name %></div>
+                  <div class="subject-course"><%= s.course_name %></div>
+                </div>
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="subject_<%= s.id %>"
+                    name="subject_<%= s.id %>"
+                    value="1"
+                    data-subject-toggle="<%= s.id %>"
+                    <%= isSelected ? 'checked' : '' %>
+                  />
+                  <label class="form-check-label" for="subject_<%= s.id %>">Викладаю</label>
+                </div>
+              </div>
+              <% if (!generalFlag) { %>
+                <div class="mt-3">
+                  <label class="form-label small">Група</label>
+                  <select class="form-select" name="group_<%= s.id %>" data-subject-group="<%= s.id %>">
+                    <option value="">Оберіть групу</option>
+                    <% for (let g = 1; g <= Number(s.group_count || 1); g += 1) { %>
+                      <option value="<%= g %>" <%= Number(selectedGroup) === g ? 'selected' : '' %>><%= g %></option>
+                    <% } %>
+                  </select>
+                </div>
+              <% } %>
+            </div>
+          <% }); %>
+        </div>
+
+        <div class="d-grid gap-2 mt-4">
+          <button class="btn btn-primary" type="submit"><%= isProfileEdit ? 'Зберегти' : 'Надіслати на підтвердження' %></button>
+          <% if (isProfileEdit) { %>
+            <a href="/profile" class="btn btn-outline-secondary">Назад до профілю</a>
+          <% } else { %>
+            <a href="/register/course" class="btn btn-outline-secondary">Назад</a>
+          <% } %>
+        </div>
+      </form>
+
+      <footer class="app-footer text-center mt-4">
+        <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
+      </footer>
+    </div>
+
+    <script>
+      const themeToggle = document.getElementById('themeToggle');
+      const storedTheme = localStorage.getItem('ui-theme') || 'theme-light';
+      document.body.classList.remove('theme-dark', 'theme-light');
+      document.body.classList.add(storedTheme);
+      if (themeToggle) {
+        themeToggle.textContent = storedTheme === 'theme-dark' ? '☀️' : '🌙';
+        themeToggle.addEventListener('click', () => {
+          const isDark = document.body.classList.contains('theme-dark');
+          const next = isDark ? 'theme-light' : 'theme-dark';
+          document.body.classList.remove('theme-dark', 'theme-light');
+          document.body.classList.add(next);
+          localStorage.setItem('ui-theme', next);
+          themeToggle.textContent = next === 'theme-dark' ? '☀️' : '🌙';
+        });
+      }
+
+      document.querySelectorAll('[data-subject-toggle]').forEach((toggle) => {
+        const id = toggle.dataset.subjectToggle;
+        const select = document.querySelector(`[data-subject-group="${id}"]`);
+        const sync = () => {
+          if (!select) return;
+          select.disabled = !toggle.checked;
+          if (!toggle.checked) {
+            select.value = '';
+          }
+        };
+        toggle.addEventListener('change', sync);
+        sync();
+      });
+    </script>
+  </body>
+</html>

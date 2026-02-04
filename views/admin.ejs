@@ -748,6 +748,11 @@
             <%= t('admin.users') %>
           </button>
         <% } %>
+        <% if (sectionAllowed('admin-teachers')) { %>
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-teachers')">
+            Заявки викладачів
+          </button>
+        <% } %>
         <% if (sectionAllowed('admin-subjects')) { %>
           <button class="btn btn-outline-primary btn-sm" type="button" onclick="toggleSection('admin-subjects')">
             <%= t('admin.subjects') %>
@@ -1463,6 +1468,73 @@
 
         <% } %>
 
+        <% if (sectionAllowed('admin-teachers')) { %>
+        <div id="admin-teachers">
+          <div class="card mb-4">
+            <div class="card-body">
+              <h5 class="card-title mb-3">Заявки викладачів</h5>
+              <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                  <thead>
+                    <tr>
+                      <th>Імʼя</th>
+                      <th>Предмети</th>
+                      <th>Статус</th>
+                      <th>Дата</th>
+                      <th>Дії</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% (teacherRequests || []).forEach(function(reqRow) { %>
+                      <tr>
+                        <td><%= reqRow.full_name %></td>
+                        <td>
+                          <% if (reqRow.subjects && reqRow.subjects.length) { %>
+                            <div class="d-flex flex-wrap gap-1">
+                              <% reqRow.subjects.forEach(function(subj) { %>
+                                <span class="badge bg-secondary"><%= subj %></span>
+                              <% }); %>
+                            </div>
+                          <% } else { %>
+                            <span class="text-muted">—</span>
+                          <% } %>
+                        </td>
+                        <td>
+                          <span class="badge <%= reqRow.status === 'approved' ? 'bg-success' : (reqRow.status === 'rejected' ? 'bg-danger' : 'bg-warning text-dark') %>">
+                            <%= reqRow.status %>
+                          </span>
+                        </td>
+                        <td class="small text-muted">
+                          <%= reqRow.created_at ? new Date(reqRow.created_at).toLocaleDateString('uk-UA') : '' %>
+                        </td>
+                        <td class="d-flex gap-2">
+                          <% if (reqRow.status !== 'approved') { %>
+                            <form method="POST" action="/admin/teacher-requests/<%= reqRow.user_id %>/approve">
+                              <button class="btn btn-sm btn-outline-success" type="submit">Approve</button>
+                            </form>
+                          <% } %>
+                          <% if (reqRow.status !== 'rejected') { %>
+                            <form method="POST" action="/admin/teacher-requests/<%= reqRow.user_id %>/reject">
+                              <button class="btn btn-sm btn-outline-danger" type="submit">Reject</button>
+                            </form>
+                          <% } %>
+                        </td>
+                      </tr>
+                    <% }); %>
+                    <% if (!(teacherRequests || []).length) { %>
+                      <tr>
+                        <td colspan="5" class="text-muted">Немає заявок</td>
+                      </tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <% } %>
+
         <% if (sectionAllowed('admin-subjects')) { %>
         <div id="admin-subjects">
           <div class="card mb-4">
@@ -1506,6 +1578,12 @@
                       <option value="0">Required: No</option>
                     </select>
                   </div>
+                  <div class="col-12 col-md-2 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="is_general" id="subjectGeneralCreate" value="1" checked />
+                      <label class="form-check-label" for="subjectGeneralCreate">Загальний предмет</label>
+                    </div>
+                  </div>
                   <div class="col-12 col-md-3 d-grid">
                     <button class="btn btn-primary" type="submit">Add</button>
                   </div>
@@ -1539,12 +1617,14 @@
                   <th>Teamwork</th>
                   <th>Visible</th>
                   <th>Required</th>
+                  <th>General</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <% (subjects || []).forEach(function(s) { %>
                   <% const requiredFlag = typeof s.is_required === 'undefined' || s.is_required === null ? 1 : Number(s.is_required); %>
+                  <% const generalFlag = typeof s.is_general === 'undefined' || s.is_general === null ? 1 : Number(s.is_general); %>
                   <tr>
                     <td><%= s.id %></td>
                     <td>
@@ -1581,6 +1661,16 @@
                         <option value="1" <%= requiredFlag === 1 ? 'selected' : '' %>>Yes</option>
                         <option value="0" <%= requiredFlag === 0 ? 'selected' : '' %>>No</option>
                       </select>
+                    </td>
+                    <td class="text-center">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="is_general"
+                        form="subject-<%= s.id %>"
+                        value="1"
+                        <%= generalFlag === 1 ? 'checked' : '' %>
+                      />
                     </td>
                     <td class="d-flex gap-2">
                       <form id="subject-<%= s.id %>" method="POST" action="/admin/subjects/edit/<%= s.id %>" data-save-all="true"></form>
@@ -1720,6 +1810,12 @@
                   <div class="col-12 col-md-5">
                     <input class="form-control" name="name" placeholder="Course name (e.g. 3 курс)" required />
                   </div>
+                  <div class="col-12 col-md-2 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="is_teacher_course" id="teacherCourseCreate" value="1" />
+                      <label class="form-check-label" for="teacherCourseCreate">Курс викладачів</label>
+                    </div>
+                  </div>
                   <div class="col-12 col-md-2 d-grid">
                     <button class="btn btn-primary" type="submit">Create</button>
                   </div>
@@ -1737,6 +1833,7 @@
                     <tr>
                       <th>ID</th>
                       <th>Name</th>
+                      <th>Teacher</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -1746,6 +1843,16 @@
                         <td><%= c.id %></td>
                         <td>
                           <input class="form-control form-control-sm" name="name" form="course-<%= c.id %>" value="<%= c.name %>" required />
+                        </td>
+                        <td>
+                          <input
+                            class="form-check-input"
+                            type="checkbox"
+                            name="is_teacher_course"
+                            form="course-<%= c.id %>"
+                            value="1"
+                            <%= c.is_teacher_course ? 'checked' : '' %>
+                          />
                         </td>
                         <td class="d-flex gap-2">
                           <form id="course-<%= c.id %>" method="POST" action="/admin/courses/edit/<%= c.id %>" data-save-all="true"></form>
@@ -1766,7 +1873,7 @@
                     <% }); %>
                     <% if (!(courses || []).length) { %>
                       <tr>
-                        <td colspan="3" class="text-muted"><%= t('admin.noCourses') %></td>
+                        <td colspan="4" class="text-muted"><%= t('admin.noCourses') %></td>
                       </tr>
                     <% } %>
                   </tbody>
@@ -2208,6 +2315,7 @@
                   <option value="student">student</option>
                   <option value="starosta">starosta</option>
                   <option value="deanery">deanery</option>
+                  <option value="teacher">teacher</option>
                   <option value="admin">admin</option>
                 </select>
                 <button class="btn btn-outline-primary glass" type="submit">Save</button>
@@ -2673,6 +2781,7 @@
                       <option value="student" ${u.role === 'student' ? 'selected' : ''}>student</option>
                       <option value="starosta" ${u.role === 'starosta' ? 'selected' : ''}>starosta</option>
                       <option value="deanery" ${u.role === 'deanery' ? 'selected' : ''}>deanery</option>
+                      <option value="teacher" ${u.role === 'teacher' ? 'selected' : ''}>teacher</option>
                       <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
                     </select>
                     <button class="btn btn-sm btn-outline-primary" type="submit">Save</button>

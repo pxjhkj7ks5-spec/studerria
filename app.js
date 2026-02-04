@@ -409,6 +409,54 @@ const ensureDbReady = async () => {
   }
 };
 
+app.use(async (req, res, next) => {
+  if (!req.session || !req.session.user) {
+    return next();
+  }
+  if (req.session.role === 'admin') {
+    return next();
+  }
+  const allowedPrefixes = [
+    '/teacher/pending',
+    '/teacher/subjects',
+    '/profile',
+    '/logout',
+    '/login',
+    '/register',
+    '/register/course',
+    '/register/teacher-subjects',
+    '/register/subjects',
+  ];
+  if (allowedPrefixes.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`))) {
+    return next();
+  }
+  try {
+    await ensureDbReady();
+    const courseId = req.session.user.course_id;
+    if (!courseId) {
+      return next();
+    }
+    const isTeacher = await isTeacherCourse(courseId);
+    if (!isTeacher) {
+      return next();
+    }
+    const request = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [req.session.user.id]);
+    if (!request) {
+      return next();
+    }
+    if (request.status === 'approved') {
+      if (req.session.role !== 'teacher') {
+        req.session.role = 'teacher';
+      }
+      return next();
+    }
+    return res.redirect('/teacher/pending');
+  } catch (err) {
+    console.error('Teacher gate error', err);
+    return next();
+  }
+});
+
 const uploadsDir = path.join(__dirname, 'uploads');
 try {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -546,8 +594,20 @@ function invalidateStudyDaysCache(courseId) {
 async function getCoursesCached() {
   const cached = cacheGet(referenceCache.courses, 'courses');
   if (cached) return cached;
-  const rows = await db.all('SELECT id, name FROM courses ORDER BY id');
+  const rows = await db.all('SELECT id, name, is_teacher_course FROM courses ORDER BY id');
   return cacheSet(referenceCache.courses, 'courses', rows || []);
+}
+
+async function getCourseById(courseId) {
+  const courses = await getCoursesCached();
+  return (courses || []).find((c) => Number(c.id) === Number(courseId)) || null;
+}
+
+async function isTeacherCourse(courseId) {
+  if (!courseId) return false;
+  const course = await getCourseById(courseId);
+  if (!course) return false;
+  return course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
 }
 
 async function getSubjectsCached(courseId, options = {}) {
@@ -778,6 +838,86 @@ async function isCourseDayActive(courseId, dayName) {
   return (studyDays || []).some((d) => d.is_active && d.day_name === dayName);
 }
 
+async function getTeacherSubjectCatalog() {
+  return db.all(
+    `
+      SELECT s.id, s.name, s.group_count, s.is_general, s.course_id, c.name AS course_name
+      FROM subjects s
+      JOIN courses c ON c.id = s.course_id
+      JOIN semesters sem ON sem.course_id = s.course_id AND sem.is_active = 1
+      WHERE s.visible = 1
+      ORDER BY c.id, s.name
+    `
+  );
+}
+
+async function getTeacherSelections(userId) {
+  const rows = await db.all(
+    'SELECT subject_id, group_number FROM teacher_subjects WHERE user_id = ?',
+    [userId]
+  );
+  const map = new Map();
+  (rows || []).forEach((row) => {
+    map.set(Number(row.subject_id), row.group_number === null ? null : Number(row.group_number));
+  });
+  return map;
+}
+
+async function saveTeacherSubjects(userId, body, options = {}) {
+  const catalog = await getTeacherSubjectCatalog();
+  const selections = [];
+  let hasAny = false;
+  for (const subject of catalog) {
+    const selected = body[`subject_${subject.id}`];
+    if (!selected) {
+      continue;
+    }
+    hasAny = true;
+    const isGeneral = subject.is_general === true || Number(subject.is_general) === 1;
+    if (isGeneral) {
+      selections.push({ subject_id: subject.id, group_number: null });
+      continue;
+    }
+    const groupVal = body[`group_${subject.id}`];
+    const groupNum = Number(groupVal);
+    if (!groupVal || Number.isNaN(groupNum) || groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
+      return { ok: false, error: 'Select%20group' };
+    }
+    selections.push({ subject_id: subject.id, group_number: groupNum });
+  }
+  if (!hasAny) {
+    return { ok: false, error: 'Select%20subject' };
+  }
+  await db.run('DELETE FROM teacher_subjects WHERE user_id = ?', [userId]);
+  for (const item of selections) {
+    await db.run(
+      'INSERT INTO teacher_subjects (user_id, subject_id, group_number) VALUES (?, ?, ?)',
+      [userId, item.subject_id, item.group_number]
+    );
+  }
+  const existing = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [userId]);
+  let nextStatus = existing ? String(existing.status || 'pending') : 'pending';
+  if (nextStatus === 'rejected') {
+    nextStatus = 'pending';
+  }
+  if (existing) {
+    if (nextStatus !== 'approved' || options.allowPendingReset) {
+      await db.run(
+        'UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?',
+        [nextStatus, userId]
+      );
+    } else {
+      await db.run('UPDATE teacher_requests SET updated_at = NOW() WHERE user_id = ?', [userId]);
+    }
+  } else {
+    await db.run(
+      'INSERT INTO teacher_requests (user_id, status) VALUES (?, ?)',
+      [userId, nextStatus]
+    );
+  }
+  return { ok: true, status: nextStatus, selections };
+}
+
 function broadcast(type, payload) {
   const message = JSON.stringify({ type, payload });
   wss.clients.forEach((client) => {
@@ -995,13 +1135,16 @@ app.post('/register/course', registerLimiter, (req, res) => {
   if (Number.isNaN(courseId)) {
     return res.redirect('/register/course?error=Select%20course');
   }
-  db.get('SELECT id FROM courses WHERE id = ?', [courseId], (err, course) => {
+  db.get('SELECT id, is_teacher_course FROM courses WHERE id = ?', [courseId], (err, course) => {
     if (err || !course) {
       return res.redirect('/register/course?error=Invalid%20course');
     }
     db.run('UPDATE users SET course_id = ? WHERE id = ?', [courseId, userId], (updErr) => {
       if (updErr) {
         return res.redirect('/register/course?error=Database%20error');
+      }
+      if (course.is_teacher_course === true || Number(course.is_teacher_course) === 1) {
+        return res.redirect('/register/teacher-subjects');
       }
       return res.redirect('/register/subjects');
     });
@@ -1019,6 +1162,10 @@ app.get('/register/subjects', (req, res) => {
     if (uErr || !user || !user.course_id) {
       return res.redirect('/register/course');
     }
+    db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [user.course_id], (cErr, course) => {
+      if (!cErr && course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+        return res.redirect('/register/teacher-subjects');
+      }
     (async () => {
       try {
         const subjects = await getSubjectsCached(user.course_id, { visibleOnly: true });
@@ -1044,6 +1191,7 @@ app.get('/register/subjects', (req, res) => {
         res.status(500).send('Database error');
       }
     })();
+    });
   });
 });
 
@@ -1153,6 +1301,152 @@ app.post('/register/subjects', registerLimiter, (req, res) => {
   });
 });
 
+app.get('/register/teacher-subjects', (req, res) => {
+  if (!req.session.pendingUserId) {
+    return res.redirect('/register');
+  }
+  ensureDbReady().catch((err) => {
+    console.error('DB init failed', err);
+  });
+  db.get('SELECT id, course_id FROM users WHERE id = ?', [req.session.pendingUserId], (uErr, user) => {
+    if (uErr || !user || !user.course_id) {
+      return res.redirect('/register/course');
+    }
+    db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [user.course_id], async (cErr, course) => {
+      if (cErr || !course) {
+        return res.redirect('/register/course');
+      }
+      if (!(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+        return res.redirect('/register/subjects');
+      }
+      try {
+        const subjects = await getTeacherSubjectCatalog();
+        const selections = await getTeacherSelections(user.id);
+        return res.render('register-teacher-subjects', {
+          subjects,
+          selections,
+          error: req.query.error || '',
+        });
+      } catch (err) {
+        return res.status(500).send('Database error');
+      }
+    });
+  });
+});
+
+app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
+  const userId = req.session.pendingUserId;
+  if (!userId) {
+    return res.redirect('/register');
+  }
+  try {
+    const userRow = await db.get('SELECT id, full_name, role, schedule_group, course_id, language FROM users WHERE id = ?', [userId]);
+    if (!userRow || !userRow.course_id) {
+      return res.redirect('/register/course');
+    }
+    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [userRow.course_id]);
+    if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+      return res.redirect('/register/subjects');
+    }
+    const result = await saveTeacherSubjects(userId, req.body);
+    if (!result.ok) {
+      return res.redirect(`/register/teacher-subjects?error=${result.error || 'Select%20subject'}`);
+    }
+    req.session.user = {
+      id: userRow.id,
+      username: userRow.full_name,
+      schedule_group: userRow.schedule_group,
+      course_id: userRow.course_id || 1,
+      language: userRow.language || getPreferredLang(req),
+    };
+    req.session.role = userRow.role || 'student';
+    applyRememberMe(req, Boolean(req.session.rememberMe));
+    req.session.pendingUserId = null;
+    req.session.rememberMe = null;
+    logAction(db, req, 'register_teacher_subjects', { user_id: userRow.id });
+    broadcast('users_updated');
+    return req.session.save(() => res.redirect('/teacher/pending'));
+  } catch (err) {
+    console.error('Register teacher subjects failed', err);
+    return res.redirect('/register/teacher-subjects?error=Database%20error');
+  }
+});
+
+app.get('/teacher/subjects', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.subjects.init');
+  }
+  const { id: userId, course_id: courseId } = req.session.user;
+  try {
+    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [courseId]);
+    if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+      return res.redirect('/schedule');
+    }
+    const subjects = await getTeacherSubjectCatalog();
+    const selections = await getTeacherSelections(userId);
+    return res.render('register-teacher-subjects', {
+      subjects,
+      selections,
+      error: req.query.error || '',
+      isProfileEdit: true,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.subjects');
+  }
+});
+
+app.post('/teacher/subjects', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.subjects.save.init');
+  }
+  const { id: userId, course_id: courseId } = req.session.user;
+  try {
+    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [courseId]);
+    if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+      return res.redirect('/schedule');
+    }
+    const result = await saveTeacherSubjects(userId, req.body);
+    if (!result.ok) {
+      return res.redirect(`/teacher/subjects?error=${result.error || 'Select%20subject'}`);
+    }
+    logAction(db, req, 'teacher_subjects_update', { user_id: userId });
+    broadcast('users_updated');
+    return res.redirect('/profile?ok=Subjects%20updated');
+  } catch (err) {
+    console.error('Failed to save teacher subjects', err);
+    return res.redirect('/teacher/subjects?error=Database%20error');
+  }
+});
+
+app.get('/teacher/pending', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.pending.init');
+  }
+  try {
+    const { id: userId, course_id: courseId } = req.session.user;
+    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [courseId]);
+    if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+      return res.redirect('/schedule');
+    }
+    const request = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [userId]);
+    if (request && request.status === 'approved') {
+      req.session.role = 'teacher';
+      return res.redirect('/schedule');
+    }
+    return res.render('teacher-pending', {
+      status: request ? request.status : 'pending',
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.pending');
+  }
+});
+
 app.get('/profile', requireLogin, async (req, res) => {
   try {
     await ensureDbReady();
@@ -1164,6 +1458,15 @@ app.get('/profile', requireLogin, async (req, res) => {
     const user = await db.get('SELECT id, full_name, course_id, language FROM users WHERE id = ?', [id]);
     if (!user) {
       return res.status(500).send('Database error');
+    }
+    let teacherStatus = null;
+    let teacherCourse = false;
+    if (user.course_id) {
+      teacherCourse = await isTeacherCourse(user.course_id);
+      if (teacherCourse) {
+        const tr = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [id]);
+        teacherStatus = tr ? tr.status : null;
+      }
     }
     const activeSemester = await getActiveSemester(user.course_id || 1);
     const pointsRow = await db.get(
@@ -1210,6 +1513,8 @@ app.get('/profile', requireLogin, async (req, res) => {
       user,
       activityPoints,
       profileStats,
+      teacherStatus,
+      teacherCourse,
       error: req.query.error || '',
       success: req.query.ok || '',
     });
@@ -1768,6 +2073,477 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
 
 app.get('/schedule', requireLogin, async (req, res) => {
   const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
+  if (req.session.role === 'teacher') {
+    try {
+      await ensureDbReady();
+      const teacherSubjects = await db.all(
+        `
+          SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count, s.is_general,
+                 s.course_id, c.name AS course_name
+          FROM teacher_subjects ts
+          JOIN subjects s ON s.id = ts.subject_id
+          JOIN courses c ON c.id = s.course_id
+          WHERE ts.user_id = ? AND s.visible = 1
+          ORDER BY c.id, s.name
+        `,
+        [userId]
+      );
+      const teacherCourseMap = new Map();
+      teacherSubjects.forEach((row) => {
+        if (!teacherCourseMap.has(row.course_id)) {
+          teacherCourseMap.set(row.course_id, { id: row.course_id, name: row.course_name });
+        }
+      });
+      const teacherCourses = Array.from(teacherCourseMap.values());
+      const courseFilter = req.query.course ? Number(req.query.course) : null;
+      const selectedCourse = teacherCourses.find((c) => Number(c.id) === Number(courseFilter)) || null;
+      const courseIds = selectedCourse ? [selectedCourse.id] : teacherCourses.map((c) => c.id);
+      const semesterMap = new Map();
+      for (const cid of courseIds) {
+        semesterMap.set(cid, await getActiveSemester(cid));
+      }
+      const primaryCourseId = selectedCourse ? selectedCourse.id : (courseIds[0] || null);
+      const primarySemester = primaryCourseId ? semesterMap.get(primaryCourseId) : null;
+      const totalWeeks = primarySemester && primarySemester.weeks_count ? Number(primarySemester.weeks_count) : 15;
+      let selectedWeek = parseInt(req.query.week, 10);
+      if (Number.isNaN(selectedWeek)) {
+        selectedWeek = getAcademicWeekForSemester(new Date(), primarySemester);
+      }
+      if (selectedWeek < 1) selectedWeek = 1;
+      if (selectedWeek > totalWeeks) selectedWeek = totalWeeks;
+
+      let activeDaysSet = new Set();
+      if (primaryCourseId) {
+        if (selectedCourse) {
+          const studyDays = await getCourseStudyDays(primaryCourseId);
+          (studyDays || []).filter((d) => d.is_active).forEach((d) => {
+            if (d.day_name) activeDaysSet.add(d.day_name);
+          });
+        } else {
+          for (const cid of courseIds) {
+            const studyDays = await getCourseStudyDays(cid);
+            (studyDays || []).filter((d) => d.is_active).forEach((d) => {
+              if (d.day_name) activeDaysSet.add(d.day_name);
+            });
+          }
+        }
+      }
+      let activeDays = fullWeekDays.filter((day) => activeDaysSet.has(day));
+      if (!activeDays.length) {
+        activeDays = [...daysOfWeek];
+      }
+      const weekDates = fullWeekDays.map((_, idx) =>
+        getDateForWeekIndex(selectedWeek, idx, primarySemester ? primarySemester.start_date : null)
+      );
+      const weekStartDate = weekDates[0];
+      const weekEndDate = weekDates[6];
+      const dayDates = {};
+      activeDays.forEach((day) => {
+        const idx = fullWeekDays.indexOf(day);
+        dayDates[day] = idx >= 0 ? weekDates[idx] : null;
+      });
+      const scheduleByDay = {};
+      activeDays.forEach((day) => {
+        scheduleByDay[day] = [];
+      });
+
+      const selectionMap = new Map();
+      teacherSubjects.forEach((row) => {
+        const existing = selectionMap.get(row.subject_id) || {
+          general: false,
+          groups: new Set(),
+          course_id: row.course_id,
+          course_name: row.course_name,
+          subject_name: row.subject_name,
+        };
+        if (row.group_number === null || typeof row.group_number === 'undefined') {
+          existing.general = true;
+        } else {
+          existing.groups.add(Number(row.group_number));
+        }
+        selectionMap.set(row.subject_id, existing);
+      });
+
+      const courseNameMap = new Map(teacherCourses.map((c) => [Number(c.id), c.name]));
+      const groupedMap = new Map();
+      const scheduleRows = [];
+
+      for (const cid of courseIds) {
+        const subjectIds = teacherSubjects.filter((s) => Number(s.course_id) === Number(cid)).map((s) => s.subject_id);
+        if (!subjectIds.length) continue;
+        const sem = semesterMap.get(cid);
+        const placeholders = subjectIds.map(() => '?').join(',');
+        const params = [selectedWeek, cid];
+        let sql = `
+          SELECT se.*, s.name AS subject_name
+          FROM schedule_entries se
+          JOIN subjects s ON s.id = se.subject_id
+          WHERE se.week_number = ? AND se.course_id = ?
+        `;
+        if (sem) {
+          sql += ' AND se.semester_id = ?';
+          params.push(sem.id);
+        }
+        sql += ` AND se.subject_id IN (${placeholders})`;
+        params.push(...subjectIds);
+        const rows = await db.all(sql, params);
+        rows.forEach((row) => {
+          const selection = selectionMap.get(row.subject_id);
+          if (!selection) return;
+          if (!selection.general && !selection.groups.has(Number(row.group_number))) return;
+          row.course_id = cid;
+          row.course_name = courseNameMap.get(Number(cid)) || '';
+          row.class_date = getDateForWeekDay(selectedWeek, row.day_of_week, sem ? sem.start_date : null);
+          scheduleRows.push(row);
+        });
+      }
+
+      scheduleRows.forEach((row) => {
+        const key = `${row.course_id}|${row.subject_id}|${row.day_of_week}|${row.class_number}`;
+        if (!groupedMap.has(key)) {
+          groupedMap.set(key, {
+            ...row,
+            group_numbers: new Set(),
+          });
+        }
+        groupedMap.get(key).group_numbers.add(Number(row.group_number));
+      });
+
+      const teacherTargets = [];
+      const targetSeen = new Set();
+      teacherSubjects.forEach((row) => {
+        const sem = semesterMap.get(row.course_id);
+        const semId = sem ? sem.id : 0;
+        if (row.group_number === null || typeof row.group_number === 'undefined') {
+          const maxGroups = Number(row.group_count || 1);
+          for (let g = 1; g <= maxGroups; g += 1) {
+            const key = `${row.subject_id}|${g}|${row.course_id}|${semId}`;
+            if (targetSeen.has(key)) continue;
+            targetSeen.add(key);
+            teacherTargets.push({
+              subject_id: row.subject_id,
+              group_number: g,
+              course_id: row.course_id,
+              semester_id: semId,
+            });
+          }
+          return;
+        }
+        const groupNum = Number(row.group_number);
+        const key = `${row.subject_id}|${groupNum}|${row.course_id}|${semId}`;
+        if (targetSeen.has(key)) return;
+        targetSeen.add(key);
+        teacherTargets.push({
+          subject_id: row.subject_id,
+          group_number: groupNum,
+          course_id: row.course_id,
+          semester_id: semId,
+        });
+      });
+      groupedMap.forEach((entry) => {
+        const groups = Array.from(entry.group_numbers).sort((a, b) => a - b);
+        const selection = selectionMap.get(entry.subject_id);
+        let groupLabel = '';
+        if (selection && selection.general) {
+          groupLabel = 'Усі групи';
+        } else if (groups.length === 1) {
+          groupLabel = `Група ${groups[0]}`;
+        } else {
+          groupLabel = `Групи: ${groups.join(', ')}`;
+        }
+        const normalized = {
+          ...entry,
+          group_numbers: groups,
+          group_number: groups[0] || null,
+          group_label: groupLabel,
+          is_general: selection ? selection.general : false,
+        };
+        if (scheduleByDay[entry.day_of_week]) {
+          scheduleByDay[entry.day_of_week].push(normalized);
+        }
+      });
+
+      activeDays.forEach((day) => {
+        scheduleByDay[day].sort((a, b) => a.class_number - b.class_number);
+      });
+
+      const nowIso = new Date().toISOString();
+      const homeworkMeta = {};
+      const homeworkMetaAll = {};
+      let homework = [];
+      let homeworkTags = [];
+
+      if (teacherTargets.length) {
+        const hwConditions = teacherTargets
+          .map(() => '(h.subject_id = ? AND h.group_number = ? AND h.course_id = ? AND COALESCE(h.semester_id, 0) = ?)')
+          .join(' OR ');
+        const hwParams = [];
+        teacherTargets.forEach((t) => {
+          hwParams.push(t.subject_id, t.group_number, t.course_id, t.semester_id);
+        });
+        const hwRows = await db.all(
+          `
+            SELECT h.*, subj.name AS subject_name, s.id AS subgroup_id, s.name AS subgroup_name, m.member_username AS subgroup_member
+            FROM homework h
+            JOIN subjects subj ON subj.id = h.subject_id
+            LEFT JOIN subgroups s ON s.homework_id = h.id
+            LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
+            WHERE (${hwConditions})
+              AND COALESCE(h.status, 'published') = 'published'
+              AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
+              AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
+            ORDER BY h.created_at DESC
+          `,
+          [...hwParams, nowIso]
+        );
+        const homeworkMap = new Map();
+        (hwRows || []).forEach((row) => {
+          if (!homeworkMap.has(row.id)) {
+            homeworkMap.set(row.id, {
+              id: row.id,
+              group_number: row.group_number,
+              subject_id: row.subject_id,
+              subject: row.subject_name,
+              day: row.day_of_week,
+              class_number: row.class_number,
+              description: row.description,
+              class_date: row.class_date,
+              meeting_url: row.meeting_url,
+              link_url: row.link_url,
+              file_path: row.file_path,
+              file_name: row.file_name,
+              created_by: row.created_by,
+              created_at: row.created_at,
+              is_control: Number(row.is_control || 0),
+              course_id: row.course_id,
+              subgroups: {},
+            });
+          }
+          if (row.subgroup_id) {
+            const hw = homeworkMap.get(row.id);
+            if (!hw.subgroups[row.subgroup_id]) {
+              hw.subgroups[row.subgroup_id] = {
+                id: row.subgroup_id,
+                name: row.subgroup_name,
+                members: [],
+              };
+            }
+            if (row.subgroup_member) {
+              hw.subgroups[row.subgroup_id].members.push(row.subgroup_member);
+            }
+          }
+        });
+        homework = Array.from(homeworkMap.values()).map((hw) => ({
+          ...hw,
+          subgroups: Object.values(hw.subgroups),
+        }));
+        homework.forEach((hw) => {
+          const legacyKey = `${hw.subject_id}|${hw.group_number}|${hw.day}|${hw.class_number}`;
+          const key = hw.class_date ? `${legacyKey}|${hw.class_date}` : legacyKey;
+          if (!homeworkMeta[key]) {
+            homeworkMeta[key] = { count: 0, preview: [], control: false };
+          }
+          homeworkMeta[key].count += 1;
+          if (hw.is_control) {
+            homeworkMeta[key].control = true;
+          }
+          if (hw.description && homeworkMeta[key].preview.length < 2) {
+            homeworkMeta[key].preview.push(hw.description);
+          }
+          const allKey = hw.class_date
+            ? `${hw.subject_id}|${hw.day}|${hw.class_number}|${hw.class_date}`
+            : `${hw.subject_id}|${hw.day}|${hw.class_number}`;
+          if (!homeworkMetaAll[allKey]) {
+            homeworkMetaAll[allKey] = { count: 0, preview: [], control: false };
+          }
+          homeworkMetaAll[allKey].count += 1;
+          if (hw.is_control) {
+            homeworkMetaAll[allKey].control = true;
+          }
+          if (hw.description && homeworkMetaAll[allKey].preview.length < 2) {
+            homeworkMetaAll[allKey].preview.push(hw.description);
+          }
+        });
+        const homeworkIds = homework.map((h) => h.id);
+        if (homeworkIds.length) {
+          const placeholders = homeworkIds.map(() => '?').join(',');
+          const tagRows = await db.all(
+            `SELECT ht.homework_id, t.name
+             FROM homework_tag_map ht
+             JOIN homework_tags t ON t.id = ht.tag_id
+             WHERE ht.homework_id IN (${placeholders})`,
+            homeworkIds
+          );
+          if (tagRows && tagRows.length) {
+            const tagMap = {};
+            tagRows.forEach((row) => {
+              if (!tagMap[row.homework_id]) tagMap[row.homework_id] = [];
+              tagMap[row.homework_id].push(row.name);
+            });
+            homework.forEach((hw) => {
+              hw.tags = tagMap[hw.id] || [];
+            });
+          }
+          const tagList = await db.all('SELECT name FROM homework_tags ORDER BY name');
+          homeworkTags = (tagList || []).map((row) => row.name);
+          const reactRows = await db.all(
+            `SELECT homework_id, emoji, COUNT(*) AS count
+             FROM homework_reactions
+             WHERE homework_id IN (${placeholders})
+             GROUP BY homework_id, emoji`,
+            homeworkIds
+          );
+          const reactionMap = {};
+          (reactRows || []).forEach((row) => {
+            if (!reactionMap[row.homework_id]) reactionMap[row.homework_id] = {};
+            reactionMap[row.homework_id][row.emoji] = Number(row.count || 0);
+          });
+          const myRows = await db.all(
+            `SELECT homework_id, emoji
+             FROM homework_reactions
+             WHERE homework_id IN (${placeholders}) AND user_id = ?`,
+            [...homeworkIds, userId]
+          );
+          const reactedMap = {};
+          (myRows || []).forEach((row) => {
+            if (!reactedMap[row.homework_id]) reactedMap[row.homework_id] = {};
+            reactedMap[row.homework_id][row.emoji] = true;
+          });
+          homework.forEach((hw) => {
+            hw.reactions = reactionMap[hw.id] || {};
+            hw.reacted = reactedMap[hw.id] || {};
+          });
+        }
+      }
+
+      let customDeadlinesByDate = {};
+      let weekendDeadlineCards = [];
+      let customDeadlineItems = [];
+      if (teacherTargets.length && weekStartDate && weekEndDate) {
+        const cdConditions = teacherTargets
+          .map(() => '(h.subject_id = ? AND h.group_number = ? AND h.course_id = ? AND COALESCE(h.semester_id, 0) = ?)')
+          .join(' OR ');
+        const cdParams = [];
+        teacherTargets.forEach((t) => {
+          cdParams.push(t.subject_id, t.group_number, t.course_id, t.semester_id);
+        });
+        const cdRows = await db.all(
+          `
+            SELECT h.*, subj.name AS subject_name, c.name AS course_name
+            FROM homework h
+            JOIN subjects subj ON subj.id = h.subject_id
+            JOIN courses c ON c.id = h.course_id
+            WHERE (${cdConditions})
+              AND COALESCE(h.status, 'published') = 'published'
+              AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
+              AND h.is_custom_deadline = 1
+              AND h.custom_due_date IS NOT NULL
+              AND h.custom_due_date >= ?
+              AND h.custom_due_date <= ?
+            ORDER BY h.custom_due_date ASC, h.created_at DESC
+          `,
+          [...cdParams, nowIso, weekStartDate, weekEndDate]
+        );
+        customDeadlineItems = cdRows || [];
+        const ids = customDeadlineItems.map((row) => row.id);
+        const byDate = {};
+        customDeadlineItems.forEach((row) => {
+          const key = row.custom_due_date;
+          if (!byDate[key]) byDate[key] = [];
+          byDate[key].push(row);
+        });
+        const weekendCards = [];
+        ['Saturday', 'Sunday'].forEach((day) => {
+          const idx = fullWeekDays.indexOf(day);
+          const date = idx >= 0 ? weekDates[idx] : null;
+          if (!date) return;
+          const items = byDate[date] || [];
+          if (items.length) {
+            weekendCards.push({ day, date, items });
+          }
+        });
+        customDeadlinesByDate = byDate;
+        weekendDeadlineCards = weekendCards;
+        if (ids.length) {
+          const placeholders = ids.map(() => '?').join(',');
+          const reactRows = await db.all(
+            `SELECT homework_id, emoji, COUNT(*) AS count
+             FROM homework_reactions
+             WHERE homework_id IN (${placeholders})
+             GROUP BY homework_id, emoji`,
+            ids
+          );
+          const reactionMap = {};
+          (reactRows || []).forEach((row) => {
+            if (!reactionMap[row.homework_id]) reactionMap[row.homework_id] = {};
+            reactionMap[row.homework_id][row.emoji] = Number(row.count || 0);
+          });
+          const myRows = await db.all(
+            `SELECT homework_id, emoji
+             FROM homework_reactions
+             WHERE homework_id IN (${placeholders}) AND user_id = ?`,
+            [...ids, userId]
+          );
+          const reactedMap = {};
+          (myRows || []).forEach((row) => {
+            if (!reactedMap[row.homework_id]) reactedMap[row.homework_id] = {};
+            reactedMap[row.homework_id][row.emoji] = true;
+          });
+          customDeadlineItems.forEach((row) => {
+            row.reactions = reactionMap[row.id] || {};
+            row.reacted = reactedMap[row.id] || {};
+          });
+        }
+      }
+
+      const customDeadlineSubjects = [];
+      const seenCustom = new Set();
+      teacherSubjects.forEach((row) => {
+        const key = `${row.subject_id}|${row.group_number || 'all'}`;
+        if (seenCustom.has(key)) return;
+        seenCustom.add(key);
+        const generalFlag = row.is_general === false || Number(row.is_general) === 0 ? 0 : 1;
+        customDeadlineSubjects.push({
+          id: row.subject_id,
+          name: row.subject_name,
+          course_id: row.course_id,
+          course_name: row.course_name,
+          group_number: row.group_number,
+          is_general: generalFlag,
+          group_count: row.group_count,
+        });
+      });
+
+      return res.render('schedule', {
+        scheduleByDay,
+        daysOfWeek: activeDays,
+        dayDates,
+        currentWeek: selectedWeek,
+        totalWeeks,
+        semester: primarySemester,
+        bellSchedule,
+        group: group || 'A',
+        username,
+        homework,
+        homeworkMeta,
+        homeworkMetaAll,
+        homeworkTags,
+        customDeadlinesByDate,
+        weekendDeadlineCards,
+        customDeadlineItems,
+        customDeadlineSubjects,
+        subgroupError: req.query.sg || null,
+        role: req.session.role,
+        viewAs: req.session.viewAs || null,
+        messageSubjects: [],
+        userId,
+        teacherCourses,
+        selectedCourseId: selectedCourse ? selectedCourse.id : null,
+      });
+    } catch (err) {
+      return handleDbError(res, err, 'teacher.schedule');
+    }
+  }
   const activeSemester = await getActiveSemester(courseId || 1);
   const totalWeeks = activeSemester && activeSemester.weeks_count ? Number(activeSemester.weeks_count) : 15;
   let selectedWeek = parseInt(req.query.week, 10);
@@ -1930,6 +2706,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               username,
               homework: [],
               homeworkMeta: {},
+              homeworkMetaAll: null,
               homeworkTags: [],
               customDeadlinesByDate,
               weekendDeadlineCards,
@@ -1992,6 +2769,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                   created_by: row.created_by,
                   created_at: row.created_at,
                   is_control: Number(row.is_control || 0),
+                  course_id: row.course_id,
                   subgroups: {},
                 });
               }
@@ -2044,6 +2822,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 username,
                 homework,
                 homeworkMeta,
+                homeworkMetaAll: null,
                 homeworkTags: tagOptions,
                 customDeadlinesByDate,
                 weekendDeadlineCards,
@@ -3161,9 +3940,28 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
 
   let courses = [];
   let semesters = [];
+  let teacherRequests = [];
   try {
     courses = await getCoursesCached();
     semesters = await getSemestersCached(courseId);
+    teacherRequests = await db.all(
+      `
+        SELECT tr.user_id, tr.status, tr.created_at,
+               u.full_name,
+               COALESCE(
+                 array_agg(DISTINCT (s.name || ' (' || c.name || ')'))
+                   FILTER (WHERE s.id IS NOT NULL),
+                 ARRAY[]::text[]
+               ) AS subjects
+        FROM teacher_requests tr
+        JOIN users u ON u.id = tr.user_id
+        LEFT JOIN teacher_subjects ts ON ts.user_id = tr.user_id
+        LEFT JOIN subjects s ON s.id = ts.subject_id
+        LEFT JOIN courses c ON c.id = s.course_id
+        GROUP BY tr.user_id, tr.status, tr.created_at, u.full_name
+        ORDER BY tr.created_at DESC
+      `
+    );
   } catch (err) {
     return handleDbError(res, err, 'admin.reference');
   }
@@ -3600,7 +4398,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
       weeklyHomework = weeklyLabels.map((key) => homeworkMap[key] || 0);
       weeklyTeamwork = weeklyLabels.map((key) => teamworkMap[key] || 0);
 
-      const roleOrder = ['student', 'starosta', 'deanery', 'admin'];
+      const roleOrder = ['student', 'teacher', 'starosta', 'deanery', 'admin'];
       const roleMap = {};
       (weeklyUsersRows || []).forEach((row) => {
         const key = String(row.day);
@@ -3621,10 +4419,10 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     }
 
     try {
-      res.render('admin', {
-        username: req.session.user.username,
-        userId: req.session.user.id,
-        role: req.session.role,
+        res.render('admin', {
+          username: req.session.user.username,
+          userId: req.session.user.id,
+          role: req.session.role,
                                       schedule,
                                       homework,
                                       homeworkTags,
@@ -3638,6 +4436,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                       teamworkTasks,
                                       adminMessages: messages,
                                       courses,
+                                      teacherRequests,
         semesters,
         activeSemester,
         selectedCourseId: courseId,
@@ -4244,15 +5043,15 @@ app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single
 app.get('/admin/export/subjects.csv', requireAdmin, (req, res) => {
   const courseId = getAdminCourse(req);
   db.all(
-    'SELECT id, name, group_count, default_group, is_required FROM subjects WHERE course_id = ? ORDER BY name',
+    'SELECT id, name, group_count, default_group, is_required, is_general FROM subjects WHERE course_id = ? ORDER BY name',
     [courseId],
     (err, rows) => {
     if (err) {
       return res.status(500).send('Database error');
     }
-    const header = 'id,name,group_count,default_group,is_required';
+    const header = 'id,name,group_count,default_group,is_required,is_general';
     const lines = rows.map((r) =>
-      [r.id, r.name, r.group_count, r.default_group, r.is_required ? 1 : 0]
+      [r.id, r.name, r.group_count, r.default_group, r.is_required ? 1 : 0, r.is_general ? 1 : 0]
         .map((v) => `"${String(v ?? '').replace(/\"/g, '""')}"`)
         .join(',')
     );
@@ -4285,7 +5084,9 @@ app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.sin
     const groupCount = row.group_count ? Number(row.group_count) : 1;
     const defaultGroup = row.default_group ? Number(row.default_group) : 1;
     const isRequired = String(row.is_required ?? '1');
+    const isGeneral = String(row.is_general ?? '1');
     const requiredFlag = ['0', 'false', 'no', 'off'].includes(isRequired.toLowerCase()) ? 0 : 1;
+    const generalFlag = ['0', 'false', 'no', 'off'].includes(isGeneral.toLowerCase()) ? 0 : 1;
     if (!name || Number.isNaN(groupCount) || groupCount < 1 || groupCount > 3 || Number.isNaN(defaultGroup) || defaultGroup < 1 || defaultGroup > groupCount) {
       skipped += 1;
       continue;
@@ -4293,14 +5094,14 @@ app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.sin
     const existing = await db.get('SELECT id FROM subjects WHERE name = ?', [name]);
     if (existing && existing.id) {
       await db.run(
-        'UPDATE subjects SET group_count = ?, default_group = ?, is_required = ?, course_id = ? WHERE id = ?',
-        [groupCount, defaultGroup, requiredFlag, courseId, existing.id]
+        'UPDATE subjects SET group_count = ?, default_group = ?, is_required = ?, is_general = ?, course_id = ? WHERE id = ?',
+        [groupCount, defaultGroup, requiredFlag, generalFlag, courseId, existing.id]
       );
       updated += 1;
     } else {
       await db.run(
-        'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, is_required, course_id) VALUES (?, ?, ?, 1, 1, ?, ?)',
-        [name, groupCount, defaultGroup, requiredFlag, courseId]
+        'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, is_required, is_general, course_id) VALUES (?, ?, ?, 1, 1, ?, ?, ?)',
+        [name, groupCount, defaultGroup, requiredFlag, generalFlag, courseId]
       );
       inserted += 1;
     }
@@ -4425,7 +5226,10 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   const groupNum = Number(group_number);
   const subjectId = Number(subject_id);
   const isControl = String(is_control || '').toLowerCase() === '1' ? 1 : 0;
-  const courseId = req.session.user?.course_id || 1;
+  const sessionCourseId = req.session.user?.course_id || 1;
+  const inputCourseId = Number(req.body.course_id);
+  const isTeacher = req.session.role === 'teacher';
+  const courseId = isTeacher && !Number.isNaN(inputCourseId) ? inputCourseId : sessionCourseId;
 
   if (
     !description ||
@@ -4441,7 +5245,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
     return res.status(400).send('Missing fields');
   }
   const dayAllowed = await isCourseDayActive(courseId, day_of_week);
-  if (!dayAllowed || classNum < 1 || classNum > 7 || groupNum < 1 || groupNum > 3) {
+  if (!dayAllowed || classNum < 1 || classNum > 7) {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
     }
@@ -4451,7 +5255,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   const { schedule_group: group, username, id: userId } = req.session.user;
   const createdAt = new Date().toISOString();
   const activeSemester = await getActiveSemester(courseId || 1);
-  const isStaff = ['admin', 'deanery', 'starosta'].includes(req.session.role);
+  const isStaff = ['admin', 'deanery', 'starosta', 'teacher'].includes(req.session.role);
   let homeworkStatus = isStaff ? String(req.body.status || 'published').toLowerCase() : 'published';
   if (!['draft', 'scheduled', 'published'].includes(homeworkStatus)) {
     homeworkStatus = 'published';
@@ -4480,52 +5284,100 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   }
 
   try {
-    const subjectRow = await db.get('SELECT name, course_id FROM subjects WHERE id = ?', [subjectId]);
+    const subjectRow = await db.get(
+      'SELECT name, course_id, group_count, is_general FROM subjects WHERE id = ?',
+      [subjectId]
+    );
     if (!subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
       if (req.file) {
         fs.unlink(req.file.path, () => {});
       }
       return res.status(400).send('Invalid subject');
     }
-
-    const row = await db.get(
-      `
-        INSERT INTO homework
-        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, status, scheduled_at, published_at, is_control)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        RETURNING id
-      `,
-      [
-        group,
-        subjectRow.name,
-        day_of_week,
-        time,
-        classNum,
-        subjectId,
-        groupNum,
-        day_of_week,
-        userId,
-        description,
-        class_date,
-        meeting_url || null,
-        link_url || null,
-        filePath,
-        fileName,
-        username,
-        createdAt,
-        courseId || 1,
-        activeSemester ? activeSemester.id : null,
-        homeworkStatus,
-        scheduledAt,
-        publishedAt,
-        isControl,
-      ]
-    );
-    if (!row || !row.id) {
+    const maxGroups = Number(subjectRow.group_count || 1);
+    let targetGroups = [];
+    if (isTeacher) {
+      const teacherRow = await db.get(
+        'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
+        [userId, subjectId]
+      );
+      if (!teacherRow) {
+        if (req.file) {
+          fs.unlink(req.file.path, () => {});
+        }
+        return res.status(400).send('Invalid subject');
+      }
+      const isGeneral = subjectRow.is_general === true || Number(subjectRow.is_general) === 1;
+      if (isGeneral) {
+        targetGroups = Array.from({ length: maxGroups }, (_, idx) => idx + 1);
+      } else {
+        const resolvedGroup = teacherRow.group_number !== null ? Number(teacherRow.group_number) : groupNum;
+        if (!resolvedGroup || Number.isNaN(resolvedGroup)) {
+          if (req.file) {
+            fs.unlink(req.file.path, () => {});
+          }
+          return res.status(400).send('Invalid group');
+        }
+        if (teacherRow.group_number !== null && Number(teacherRow.group_number) !== groupNum) {
+          if (req.file) {
+            fs.unlink(req.file.path, () => {});
+          }
+          return res.status(400).send('Invalid group');
+        }
+        targetGroups = [Number(resolvedGroup)];
+      }
+    } else {
+      targetGroups = [groupNum];
+    }
+    if (targetGroups.some((g) => Number.isNaN(g) || g < 1 || g > maxGroups)) {
       if (req.file) {
         fs.unlink(req.file.path, () => {});
       }
-      return res.status(500).send('Database error');
+      return res.status(400).send('Invalid group');
+    }
+
+    const createdIds = [];
+    for (const targetGroup of targetGroups) {
+      const row = await db.get(
+        `
+          INSERT INTO homework
+          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, status, scheduled_at, published_at, is_control)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          RETURNING id
+        `,
+        [
+          group,
+          subjectRow.name,
+          day_of_week,
+          time,
+          classNum,
+          subjectId,
+          targetGroup,
+          day_of_week,
+          userId,
+          description,
+          class_date,
+          meeting_url || null,
+          link_url || null,
+          filePath,
+          fileName,
+          username,
+          createdAt,
+          courseId || 1,
+          activeSemester ? activeSemester.id : null,
+          homeworkStatus,
+          scheduledAt,
+          publishedAt,
+          isControl,
+        ]
+      );
+      if (!row || !row.id) {
+        if (req.file) {
+          fs.unlink(req.file.path, () => {});
+        }
+        return res.status(500).send('Database error');
+      }
+      createdIds.push(row.id);
     }
 
     const tagList = String(tags || '')
@@ -4537,11 +5389,13 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
         'INSERT INTO homework_tags (name) VALUES (?) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id',
         [tag]
       );
-      if (tagRow && tagRow.id) {
-        await db.run(
-          'INSERT INTO homework_tag_map (homework_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
-          [row.id, tagRow.id]
-        );
+      if (tagRow && tagRow.id && createdIds.length) {
+        for (const hwId of createdIds) {
+          await db.run(
+            'INSERT INTO homework_tag_map (homework_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+            [hwId, tagRow.id]
+          );
+        }
       }
     }
 
@@ -4569,6 +5423,7 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
   const filePath = req.file ? `/uploads/${req.file.filename}` : null;
   const fileName = req.file ? req.file.originalname : null;
   const subjectId = Number(subject_id);
+  const groupInput = req.body.group_number ? Number(req.body.group_number) : null;
   const dueDate = String(custom_due_date || '').slice(0, 10);
   if (!description || Number.isNaN(subjectId) || !dueDate) {
     if (req.file) {
@@ -4583,10 +5438,13 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
     return res.status(400).send('Invalid date');
   }
 
-  const { schedule_group: group, username, id: userId, course_id: courseId } = req.session.user;
+  const { schedule_group: group, username, id: userId } = req.session.user;
+  const sessionCourseId = req.session.user.course_id || 1;
+  const isTeacher = req.session.role === 'teacher';
+  const courseId = isTeacher && !Number.isNaN(Number(req.body.course_id)) ? Number(req.body.course_id) : sessionCourseId;
   const createdAt = new Date().toISOString();
   const activeSemester = await getActiveSemester(courseId || 1);
-  const isStaff = ['admin', 'deanery', 'starosta'].includes(req.session.role);
+  const isStaff = ['admin', 'deanery', 'starosta', 'teacher'].includes(req.session.role);
   let homeworkStatus = isStaff ? String(req.body.status || 'published').toLowerCase() : 'published';
   if (!['draft', 'scheduled', 'published'].includes(homeworkStatus)) {
     homeworkStatus = 'published';
@@ -4615,70 +5473,114 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
   }
 
   try {
-    const subjectRow = await db.get('SELECT name, course_id FROM subjects WHERE id = ?', [subjectId]);
+    const subjectRow = await db.get('SELECT name, course_id, group_count, is_general FROM subjects WHERE id = ?', [subjectId]);
     if (!subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
       if (req.file) {
         fs.unlink(req.file.path, () => {});
       }
       return res.status(400).send('Invalid subject');
     }
-    const groupRow = await db.get(
-      'SELECT group_number FROM student_groups WHERE student_id = ? AND subject_id = ?',
-      [userId, subjectId]
-    );
-    if (!groupRow) {
+    let targetGroups = [];
+    if (isTeacher) {
+      const teacherRow = await db.get(
+        'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
+        [userId, subjectId]
+      );
+      if (!teacherRow) {
+        if (req.file) {
+          fs.unlink(req.file.path, () => {});
+        }
+        return res.status(400).send('Invalid subject');
+      }
+      const resolvedGroup = groupInput && !Number.isNaN(groupInput) ? groupInput : teacherRow.group_number;
+      if (resolvedGroup && teacherRow.group_number !== null && Number(teacherRow.group_number) !== Number(resolvedGroup)) {
+        if (req.file) {
+          fs.unlink(req.file.path, () => {});
+        }
+        return res.status(400).send('Invalid group');
+      }
+      if (resolvedGroup && !Number.isNaN(resolvedGroup)) {
+        targetGroups = [Number(resolvedGroup)];
+      } else if (subjectRow.is_general === true || Number(subjectRow.is_general) === 1) {
+        const maxGroups = Number(subjectRow.group_count || 1);
+        targetGroups = Array.from({ length: maxGroups }, (_, idx) => idx + 1);
+      } else {
+        if (req.file) {
+          fs.unlink(req.file.path, () => {});
+        }
+        return res.status(400).send('Select group');
+      }
+    } else {
+      const groupRow = await db.get(
+        'SELECT group_number FROM student_groups WHERE student_id = ? AND subject_id = ?',
+        [userId, subjectId]
+      );
+      if (!groupRow) {
+        if (req.file) {
+          fs.unlink(req.file.path, () => {});
+        }
+        return res.status(400).send('Invalid group');
+      }
+      targetGroups = [groupRow.group_number];
+    }
+    const maxGroups = Number(subjectRow.group_count || 1);
+    if (targetGroups.some((g) => Number.isNaN(g) || g < 1 || g > maxGroups)) {
       if (req.file) {
         fs.unlink(req.file.path, () => {});
       }
       return res.status(400).send('Invalid group');
     }
     const dayName = getDayNameFromDate(dueDate);
-    const row = await db.get(
-      `
-        INSERT INTO homework
-        (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        RETURNING id
-      `,
-      [
-        group,
-        subjectRow.name,
-        dayName || 'Deadline',
-        'Deadline',
-        null,
-        subjectId,
-        groupRow.group_number,
-        dayName,
-        userId,
-        description,
-        null,
-        meeting_url || null,
-        link_url || null,
-        filePath,
-        fileName,
-        username,
-        createdAt,
-        courseId || 1,
-        activeSemester ? activeSemester.id : null,
-        1,
-        dueDate,
-        homeworkStatus,
-        scheduledAt,
-        publishedAt,
-      ]
-    );
-    if (!row || !row.id) {
-      if (req.file) {
-        fs.unlink(req.file.path, () => {});
+    let createdId = null;
+    for (const targetGroup of targetGroups) {
+      const row = await db.get(
+        `
+          INSERT INTO homework
+          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          RETURNING id
+        `,
+        [
+          group,
+          subjectRow.name,
+          dayName || 'Deadline',
+          'Deadline',
+          null,
+          subjectId,
+          targetGroup,
+          dayName,
+          userId,
+          description,
+          null,
+          meeting_url || null,
+          link_url || null,
+          filePath,
+          fileName,
+          username,
+          createdAt,
+          courseId || 1,
+          activeSemester ? activeSemester.id : null,
+          1,
+          dueDate,
+          homeworkStatus,
+          scheduledAt,
+          publishedAt,
+        ]
+      );
+      if (!row || !row.id) {
+        if (req.file) {
+          fs.unlink(req.file.path, () => {});
+        }
+        return res.status(500).send('Database error');
       }
-      return res.status(500).send('Database error');
+      createdId = row.id;
     }
     logActivity(
       db,
       req,
       'homework_create',
       'homework',
-      row.id,
+      createdId,
       { subject_id: subjectId, custom_due_date: dueDate, is_custom_deadline: true },
       courseId || 1,
       activeSemester ? activeSemester.id : null
@@ -5361,12 +6263,13 @@ app.post('/admin/homework/delete/:id', requireAdmin, (req, res) => {
 });
 
 app.post('/admin/subjects/add', requireAdmin, (req, res) => {
-  const { name, group_count, default_group, show_in_teamwork, visible, is_required } = req.body;
+  const { name, group_count, default_group, show_in_teamwork, visible, is_required, is_general } = req.body;
   const count = Number(group_count);
   const def = Number(default_group);
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
   const visibleFlag = String(visible) === '0' ? 0 : 1;
   const requiredFlag = String(is_required) === '0' ? 0 : 1;
+  const generalFlag = String(is_general) === '0' ? 0 : 1;
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
@@ -5375,14 +6278,14 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
   db.run(
-    'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, is_required, course_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [name, count, def, teamworkFlag, visibleFlag, requiredFlag, courseId],
+    'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, is_required, is_general, course_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [name, count, def, teamworkFlag, visibleFlag, requiredFlag, generalFlag, courseId],
     (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
-    logAction(db, req, 'subject_add', { name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag, is_required: requiredFlag });
-    logActivity(db, req, 'subject_add', 'subject', null, { name, group_count: count, default_group: def, visible: visibleFlag, is_required: requiredFlag }, courseId);
+    logAction(db, req, 'subject_add', { name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag, is_required: requiredFlag, is_general: generalFlag });
+    logActivity(db, req, 'subject_add', 'subject', null, { name, group_count: count, default_group: def, visible: visibleFlag, is_required: requiredFlag, is_general: generalFlag }, courseId);
     invalidateSubjectsCache(courseId);
     return res.redirect('/admin?ok=Subject%20added');
     }
@@ -5391,12 +6294,13 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
 
 app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { name, group_count, default_group, show_in_teamwork, visible, is_required } = req.body;
+  const { name, group_count, default_group, show_in_teamwork, visible, is_required, is_general } = req.body;
   const count = Number(group_count);
   const def = Number(default_group);
   const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
   const visibleFlag = String(visible) === '0' ? 0 : 1;
   const requiredFlag = String(is_required) === '0' ? 0 : 1;
+  const generalFlag = String(is_general) === '0' ? 0 : 1;
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
@@ -5405,14 +6309,14 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
   db.run(
-    'UPDATE subjects SET name = ?, group_count = ?, default_group = ?, show_in_teamwork = ?, visible = ?, is_required = ? WHERE id = ? AND course_id = ?',
-    [name, count, def, teamworkFlag, visibleFlag, requiredFlag, id, courseId],
+    'UPDATE subjects SET name = ?, group_count = ?, default_group = ?, show_in_teamwork = ?, visible = ?, is_required = ?, is_general = ? WHERE id = ? AND course_id = ?',
+    [name, count, def, teamworkFlag, visibleFlag, requiredFlag, generalFlag, id, courseId],
     (err) => {
       if (err) {
         return res.redirect('/admin?err=Database%20error');
       }
-      logAction(db, req, 'subject_edit', { id, name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag, is_required: requiredFlag });
-      logActivity(db, req, 'subject_edit', 'subject', Number(id) || null, { name, group_count: count, default_group: def, visible: visibleFlag, is_required: requiredFlag }, courseId);
+      logAction(db, req, 'subject_edit', { id, name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag, is_required: requiredFlag, is_general: generalFlag });
+      logActivity(db, req, 'subject_edit', 'subject', Number(id) || null, { name, group_count: count, default_group: def, visible: visibleFlag, is_required: requiredFlag, is_general: generalFlag }, courseId);
       invalidateSubjectsCache(courseId);
       return res.redirect('/admin?ok=Subject%20updated');
     }
@@ -5432,14 +6336,15 @@ app.post('/admin/api/subjects/:subjectId/clone', requireAdminOrDeanery, async (r
     if (!subject) return res.status(404).json({ error: 'Subject not found' });
     const copySettings = copy_settings !== false;
     const row = await db.get(
-      `INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, course_id)
-       VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+      `INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, is_general, course_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
       [
         new_name.trim(),
         copySettings ? subject.group_count : 1,
         copySettings ? subject.default_group : 1,
         copySettings ? subject.show_in_teamwork : 1,
         copySettings ? subject.visible : 1,
+        copySettings ? (subject.is_general === false || subject.is_general === 0 ? 0 : 1) : 1,
         courseId,
       ]
     );
@@ -5612,33 +6517,39 @@ app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
 });
 
 app.post('/admin/courses/add', requireAdmin, (req, res) => {
-  const { id, name } = req.body;
+  const { id, name, is_teacher_course } = req.body;
   const courseId = Number(id);
+  const teacherFlag = String(is_teacher_course) === '1' ? 1 : 0;
   if (Number.isNaN(courseId) || courseId < 1 || !name || !name.trim()) {
     return res.redirect('/admin?err=Invalid%20course');
   }
-  db.run('INSERT INTO courses (id, name) VALUES (?, ?)', [courseId, name.trim()], (err) => {
+  db.run(
+    'INSERT INTO courses (id, name, is_teacher_course) VALUES (?, ?, ?)',
+    [courseId, name.trim(), teacherFlag],
+    (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
-    logAction(db, req, 'course_add', { id: courseId, name: name.trim() });
+    logAction(db, req, 'course_add', { id: courseId, name: name.trim(), is_teacher_course: teacherFlag });
     invalidateCoursesCache();
     return res.redirect('/admin?ok=Course%20created');
-  });
+    }
+  );
 });
 
 app.post('/admin/courses/edit/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { name } = req.body;
+  const { name, is_teacher_course } = req.body;
   const courseId = Number(id);
+  const teacherFlag = String(is_teacher_course) === '1' ? 1 : 0;
   if (Number.isNaN(courseId) || !name || !name.trim()) {
     return res.redirect('/admin?err=Invalid%20course');
   }
-  db.run('UPDATE courses SET name = ? WHERE id = ?', [name.trim(), courseId], (err) => {
+  db.run('UPDATE courses SET name = ?, is_teacher_course = ? WHERE id = ?', [name.trim(), teacherFlag, courseId], (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
-    logAction(db, req, 'course_edit', { id: courseId, name: name.trim() });
+    logAction(db, req, 'course_edit', { id: courseId, name: name.trim(), is_teacher_course: teacherFlag });
     invalidateCoursesCache();
     return res.redirect('/admin?ok=Course%20updated');
   });
@@ -5685,6 +6596,42 @@ app.post('/admin/courses/delete/:id', requireAdmin, (req, res) => {
       });
     });
   });
+});
+
+app.post('/admin/teacher-requests/:userId/approve', requireAdmin, async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (Number.isNaN(userId)) {
+    return res.redirect('/admin?err=Invalid%20user');
+  }
+  try {
+    await ensureDbReady();
+    await db.run('UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?', ['approved', userId]);
+    await db.run('UPDATE users SET role = ? WHERE id = ?', ['teacher', userId]);
+    logAction(db, req, 'teacher_request_approve', { user_id: userId });
+    broadcast('users_updated');
+    return res.redirect('/admin?ok=Teacher%20approved');
+  } catch (err) {
+    console.error('Approve teacher failed', err);
+    return res.redirect('/admin?err=Database%20error');
+  }
+});
+
+app.post('/admin/teacher-requests/:userId/reject', requireAdmin, async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (Number.isNaN(userId)) {
+    return res.redirect('/admin?err=Invalid%20user');
+  }
+  try {
+    await ensureDbReady();
+    await db.run('UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?', ['rejected', userId]);
+    await db.run('UPDATE users SET role = ? WHERE id = ?', ['student', userId]);
+    logAction(db, req, 'teacher_request_reject', { user_id: userId });
+    broadcast('users_updated');
+    return res.redirect('/admin?ok=Teacher%20rejected');
+  } catch (err) {
+    console.error('Reject teacher failed', err);
+    return res.redirect('/admin?err=Database%20error');
+  }
 });
 
 app.get('/admin/api/courses/:courseId/study-days', requireAdminOrDeanery, async (req, res) => {
@@ -6243,7 +7190,7 @@ app.post('/admin/group/remove', requireAdmin, (req, res) => {
 app.post('/admin/users/role', requireAdmin, (req, res) => {
   const { user_id, role } = req.body;
   const courseId = getAdminCourse(req);
-  if (!user_id || !role || !['student', 'admin', 'starosta', 'deanery'].includes(role)) {
+  if (!user_id || !role || !['student', 'admin', 'starosta', 'deanery', 'teacher'].includes(role)) {
     return res.redirect('/admin?err=Invalid%20role');
   }
   const currentId = req.session.user.id;

@@ -1150,7 +1150,18 @@
         </div>
         <div class="hero-actions">
           <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
-          <% if (role === 'student' || role === 'starosta' || viewAs === 'student') { %>
+          <% if (role === 'teacher' && teacherCourses && teacherCourses.length > 1) { %>
+            <form method="GET" action="/schedule" class="d-inline">
+              <input type="hidden" name="week" value="<%= currentWeek %>" />
+              <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
+                <option value="">Усі курси</option>
+                <% teacherCourses.forEach(function(c) { %>
+                  <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
+                <% }); %>
+              </select>
+            </form>
+          <% } %>
+          <% if (role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') { %>
             <button class="btn btn-glass btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
               🪄 Дивні дедлайни
             </button>
@@ -1188,7 +1199,10 @@
                 <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : ''; %>
                 <% const legacyKey = `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}`; %>
                 <% const datedKey = cls.class_date ? `${legacyKey}|${cls.class_date}` : null; %>
-                <% const hwMeta = homeworkMeta ? (datedKey ? homeworkMeta[datedKey] : homeworkMeta[legacyKey]) : null; %>
+                <% const baseKey = cls.class_date ? `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}|${cls.class_date}` : `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}`; %>
+                <% const hwMeta = cls.is_general && homeworkMetaAll ? homeworkMetaAll[baseKey] : (homeworkMeta ? (datedKey ? homeworkMeta[datedKey] : homeworkMeta[legacyKey]) : null); %>
+                <% const groupLabel = cls.group_label ? cls.group_label : `Group ${cls.group_number}`; %>
+                <% const courseLabel = cls.course_name ? ` · ${cls.course_name}` : ''; %>
                 <button
                   class="list-group-item list-group-item-action"
                   type="button"
@@ -1200,8 +1214,11 @@
                   data-time="<%= timeLabel %>"
                   data-classnum="<%= cls.class_number %>"
                   data-groupnum="<%= cls.group_number %>"
+                  data-courseid="<%= cls.course_id || '' %>"
                   data-date="<%= cls.class_date %>"
-                  <% const tooltipParts = [cls.subject_name, `Group ${cls.group_number}`, `Class ${cls.class_number}`, timeLabel]; %>
+                  data-is-general="<%= cls.is_general ? 1 : 0 %>"
+                  <% const tooltipParts = [cls.subject_name, groupLabel, `Class ${cls.class_number}`, timeLabel]; %>
+                  <% if (cls.course_name) { tooltipParts.push(cls.course_name); } %>
                   <% if (hwMeta && hwMeta.preview && hwMeta.preview.length) { tooltipParts.push(...hwMeta.preview); } %>
                   data-bs-toggle="tooltip"
                   data-bs-placement="top"
@@ -1210,7 +1227,7 @@
                   <div class="d-flex justify-content-between">
                     <div>
                       <div class="fw-semibold"><%= cls.subject_name %></div>
-                      <div class="small muted">Group <%= cls.group_number %> · Class <%= cls.class_number %></div>
+                      <div class="small muted"><%= groupLabel %> · Class <%= cls.class_number %><%= courseLabel %></div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                       <% if (hwMeta && hwMeta.control) { %>
@@ -1243,7 +1260,8 @@
                 >
                   <div>
                     <div class="fw-semibold"><%= item.subject_name %></div>
-                    <div class="deadline-meta">Дедлайн: <%= dueLabel %></div>
+                    <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
+                    <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
                   </div>
                 </div>
               <% }); %>
@@ -1277,7 +1295,8 @@
                 >
                   <div>
                     <div class="fw-semibold"><%= item.subject_name %></div>
-                    <div class="deadline-meta">Дедлайн: <%= dueLabel %></div>
+                    <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
+                    <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
                   </div>
                 </div>
               <% }); %>
@@ -1420,6 +1439,7 @@
               <input type="hidden" id="hwTime" name="time" />
               <input type="hidden" id="hwClassNum" name="class_number" />
               <input type="hidden" id="hwDate" name="class_date" />
+              <input type="hidden" id="hwCourseId" name="course_id" />
               <button type="submit" class="btn btn-primary glass">Save homework</button>
             </form>
           </div>
@@ -1443,15 +1463,48 @@
                 <div class="alert alert-warning">Спочатку оберіть предмети у профілі, щоб додати дедлайн.</div>
               <% } %>
               <div class="row g-3">
+                <% if (role === 'teacher') { %>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label">Курс</label>
+                    <select class="form-select" id="customCourseSelect" name="course_id" required>
+                      <option value="" disabled selected>Оберіть курс</option>
+                      <% (teacherCourses || []).forEach(function(c) { %>
+                        <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                <% } %>
                 <div class="col-12 col-md-6">
                   <label class="form-label">Предмет</label>
-                  <select class="form-select" name="subject_id" <%= (!customDeadlineSubjects || !customDeadlineSubjects.length) ? 'disabled' : '' %> required>
+                  <select
+                    class="form-select"
+                    id="customSubjectSelect"
+                    name="subject_id"
+                    <%= (!customDeadlineSubjects || !customDeadlineSubjects.length) ? 'disabled' : '' %>
+                    required
+                  >
                     <option value="" disabled selected>Оберіть предмет</option>
                     <% (customDeadlineSubjects || []).forEach(function(subj) { %>
-                      <option value="<%= subj.id %>"><%= subj.name %></option>
+                      <option
+                        value="<%= subj.id %>"
+                        data-course-id="<%= subj.course_id || '' %>"
+                        data-group-number="<%= typeof subj.group_number === 'number' ? subj.group_number : '' %>"
+                        data-group-count="<%= subj.group_count || '' %>"
+                        data-is-general="<%= subj.is_general ? 1 : 0 %>"
+                      >
+                        <%= subj.name %><%= subj.course_name ? ` (${subj.course_name})` : '' %>
+                      </option>
                     <% }); %>
                   </select>
                 </div>
+                <% if (role === 'teacher') { %>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label">Група</label>
+                    <select class="form-select" id="customGroupSelect" name="group_number">
+                      <option value="">Усі групи</option>
+                    </select>
+                  </div>
+                <% } %>
                 <div class="col-12 col-md-6">
                   <label class="form-label">Дедлайн</label>
                   <input type="date" class="form-control" name="custom_due_date" required />
@@ -1675,6 +1728,81 @@
       bindScheduleStatus('hwStatus', 'hwScheduledAt');
       bindScheduleStatus('customHwStatus', 'customHwScheduledAt');
 
+      const customCourseSelect = document.getElementById('customCourseSelect');
+      const customSubjectSelect = document.getElementById('customSubjectSelect');
+      const customGroupSelect = document.getElementById('customGroupSelect');
+
+      function syncCustomDeadlineSubjects() {
+        if (!customSubjectSelect || !customCourseSelect) return;
+        const selectedCourse = customCourseSelect.value;
+        let hasVisible = false;
+        Array.from(customSubjectSelect.options).forEach((opt) => {
+          if (!opt.value) return;
+          const courseId = opt.dataset.courseId;
+          const visible = !selectedCourse || courseId === selectedCourse;
+          opt.hidden = !visible;
+          opt.disabled = !visible;
+          if (visible) hasVisible = true;
+        });
+        if (customSubjectSelect.value) {
+          const current = customSubjectSelect.selectedOptions[0];
+          if (current && current.hidden) {
+            customSubjectSelect.value = '';
+          }
+        }
+        if (!hasVisible) {
+          customSubjectSelect.value = '';
+        }
+        syncCustomDeadlineGroups();
+      }
+
+      function syncCustomDeadlineGroups() {
+        if (!customGroupSelect || !customSubjectSelect) return;
+        const opt = customSubjectSelect.selectedOptions[0];
+        customGroupSelect.innerHTML = '';
+        if (!opt || !opt.value) {
+          customGroupSelect.disabled = true;
+          customGroupSelect.innerHTML = '<option value="">Усі групи</option>';
+          return;
+        }
+        const isGeneral = opt.dataset.isGeneral === '1';
+        const groupNum = opt.dataset.groupNumber;
+        const groupCount = Number(opt.dataset.groupCount || 0);
+        if (isGeneral) {
+          customGroupSelect.disabled = true;
+          customGroupSelect.innerHTML = '<option value="">Усі групи</option>';
+          return;
+        }
+        if (groupNum) {
+          customGroupSelect.disabled = false;
+          customGroupSelect.innerHTML = `<option value="${groupNum}">Група ${groupNum}</option>`;
+          customGroupSelect.value = groupNum;
+          return;
+        }
+        if (groupCount > 0) {
+          customGroupSelect.disabled = false;
+          customGroupSelect.innerHTML = '<option value="" disabled selected>Оберіть групу</option>';
+          for (let i = 1; i <= groupCount; i += 1) {
+            const option = document.createElement('option');
+            option.value = String(i);
+            option.textContent = `Група ${i}`;
+            customGroupSelect.appendChild(option);
+          }
+          return;
+        }
+        customGroupSelect.disabled = true;
+        customGroupSelect.innerHTML = '<option value="">Усі групи</option>';
+      }
+
+      if (customCourseSelect) {
+        customCourseSelect.addEventListener('change', syncCustomDeadlineSubjects);
+        syncCustomDeadlineSubjects();
+      }
+      if (customSubjectSelect) {
+        customSubjectSelect.addEventListener('change', syncCustomDeadlineGroups);
+        syncCustomDeadlineGroups();
+      }
+
       const currentUserId = <%- JSON.stringify(userId || null) %>;
       const welcomeModalEl = document.getElementById('welcomeModal');
       if (welcomeModalEl) {
@@ -1703,6 +1831,7 @@
         }
       }
 
+      const isTeacherView = <%- JSON.stringify(role === 'teacher') %>;
       const homeworkModal = document.getElementById('homeworkModal');
       const homeworkData = <%- JSON.stringify(homework || []) %>;
       const customDeadlineItems = <%- JSON.stringify(customDeadlineItems || []) %>;
@@ -1787,6 +1916,9 @@
           meta.className = 'text-muted small mb-2';
           const created = new Date(item.created_at).toLocaleString();
           meta.textContent = `${item.created_by} • ${created}`;
+          if (isTeacherView && item.group_number) {
+            meta.textContent += ` • Група ${item.group_number}`;
+          }
           li.appendChild(meta);
 
           const dueDate = item.custom_due_date || item.class_date;
@@ -1924,7 +2056,9 @@
         const time = button.getAttribute('data-time');
         const classNum = Number(button.getAttribute('data-classnum'));
         const groupNum = Number(button.getAttribute('data-groupnum'));
+        const courseId = Number(button.getAttribute('data-courseid'));
         const classDate = button.getAttribute('data-date');
+        const isGeneral = button.getAttribute('data-is-general') === '1';
 
         document.getElementById('homeworkModalTitle').textContent = subject;
         document.getElementById('homeworkModalMeta').textContent = `${day} · ${time}`;
@@ -1935,6 +2069,10 @@
         document.getElementById('hwGroupNum').value = groupNum;
         document.getElementById('hwClassNum').value = classNum;
         document.getElementById('hwDate').value = classDate || '';
+        const courseField = document.getElementById('hwCourseId');
+        if (courseField) {
+          courseField.value = Number.isNaN(courseId) ? '' : String(courseId);
+        }
         if (hwControlToggle) {
           hwControlToggle.checked = false;
         }
@@ -1942,9 +2080,10 @@
         const filtered = homeworkData.filter((item) => {
           return (
             Number(item.subject_id) === subjectId &&
-            Number(item.group_number) === groupNum &&
+            (!isGeneral ? Number(item.group_number) === groupNum : true) &&
             item.day === day &&
             Number(item.class_number) === classNum &&
+            (Number.isNaN(courseId) ? true : Number(item.course_id) === courseId) &&
             item.class_date === classDate
           );
         });
