@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.10",
+      "date": "2026-02-05",
+      "items": [
+        "fix: simplify teamwork topbar actions"
+      ]
+    },
+    {
       "version": "0.7.09",
       "date": "2026-02-05",
       "items": [

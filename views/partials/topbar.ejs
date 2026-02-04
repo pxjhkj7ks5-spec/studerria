@@ -9,6 +9,19 @@
   <div class="container">
     <span class="navbar-brand text-white me-auto"><%= brandTitle %></span>
     <div class="d-flex align-items-center gap-2 topbar-actions flex-wrap justify-content-end">
+      <% if (isTeamwork) { %>
+        <button
+          class="theme-toggle theme-toggle-min"
+          type="button"
+          id="themeToggle"
+          aria-label="Toggle theme"
+          data-light-label="☀️"
+          data-dark-label="🌙"
+        >
+          🌙
+        </button>
+        <a class="btn btn-glass" href="/schedule">Повернутись до розкладу</a>
+      <% } else { %>
       <% if (!isMyDay) { %>
         <span class="me-2 muted desktop-only text-nowrap">
           <% if (role === 'admin') { %>
@@ -76,6 +89,7 @@
       >
         ☰
       </button>
+      <% } %>
     </div>
   </div>
 </nav>
