@@ -5400,13 +5400,21 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
       }
     }
 
+    const logGroup = targetGroups.length === 1 ? targetGroups[0] : null;
     logActivity(
       db,
       req,
       'homework_create',
       'homework',
-      row.id,
-      { subject_id: subjectId, group_number: groupNum, day_of_week, class_number: classNum, tags: tagList, is_control: isControl },
+      createdIds[0] || null,
+      {
+        subject_id: subjectId,
+        group_number: logGroup,
+        day_of_week,
+        class_number: classNum,
+        tags: tagList,
+        is_control: isControl,
+      },
       courseId || 1,
       activeSemester ? activeSemester.id : null
     );
