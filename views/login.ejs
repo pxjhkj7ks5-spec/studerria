@@ -397,7 +397,17 @@
             </div>
           </div>
           <footer class="app-footer text-center mt-3">
-            <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
+            <small>
+              © <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %> ·
+              <button
+                type="button"
+                class="btn btn-link btn-sm p-0 align-baseline"
+                data-bs-toggle="modal"
+                data-bs-target="#changelogModal"
+              >
+                Changelog
+              </button>
+            </small>
           </footer>
         </div>
       </div>
@@ -408,6 +418,7 @@
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
+    <%- include('partials/changelog-modal') %>
     <script>
       function showCustomTooltip(el, message) {
         document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());

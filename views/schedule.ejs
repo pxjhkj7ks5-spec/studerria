@@ -1320,9 +1320,20 @@
     </div>
 
     <footer class="app-footer text-center py-4">
-      <small>© <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %></small>
+      <small>
+        © <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %> ·
+        <button
+          type="button"
+          class="btn btn-link btn-sm p-0 align-baseline"
+          data-bs-toggle="modal"
+          data-bs-target="#changelogModal"
+        >
+          Changelog
+        </button>
+      </small>
     </footer>
 
+    <%- include('partials/changelog-modal') %>
     <div class="modal fade" id="homeworkModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">

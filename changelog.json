@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "version": "0.7.05",
+      "date": "2026-02-05",
+      "items": [
+        "feat: add changelog modal in footer"
+      ]
+    },
+    {
+      "version": "0.7.04",
+      "date": "2026-02-04",
+      "items": [
+        "fix: include teacher requests in toggle all",
+        "fix: tune schedule list theme",
+        "fix: restore missing closures",
+        "fix: restore admin route structure"
+      ]
+    },
+    {
+      "version": "0.7.00",
+      "date": "2026-02-04",
+      "items": [
+        "feat: move schedule list to paged admin view",
+        "fix: homework logging for teacher multi-group",
+        "fix: define teacher subject view mode",
+        "fix: persist subject general flag"
+      ]
+    },
+    {
+      "version": "0.6.98",
+      "date": "2026-02-03",
+      "items": [
+        "feat: teacher course flow and schedule integration",
+        "Unify mobile menu modal across pages; tweak forbidden message",
+        "Add mobile menu modal to My Day"
+      ]
+    }
+  ]
+}

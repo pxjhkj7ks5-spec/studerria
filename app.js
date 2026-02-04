@@ -9,6 +9,7 @@ const { WebSocketServer } = require('ws');
 const bcrypt = require('bcryptjs');
 const pkg = require('./package.json');
 const versionFile = path.join(__dirname, 'version.json');
+const changelogFile = path.join(__dirname, 'changelog.json');
 let appVersion = pkg.version || '0.0.0';
 try {
   const raw = fs.readFileSync(versionFile, 'utf8');
@@ -18,6 +19,16 @@ try {
   }
 } catch (err) {
   // keep package.json version as fallback
+}
+let appChangelog = [];
+try {
+  const raw = fs.readFileSync(changelogFile, 'utf8');
+  const parsed = JSON.parse(raw);
+  if (parsed && Array.isArray(parsed.items)) {
+    appChangelog = parsed.items;
+  }
+} catch (err) {
+  appChangelog = [];
 }
 const buildStamp = new Date().toISOString();
 const localesDir = path.join(__dirname, 'locales');
@@ -138,6 +149,7 @@ app.use((req, res, next) => {
   res.locals.appVersion = appVersion;
   res.locals.buildStamp = buildStamp;
   res.locals.authorName = 'Andrii Marchenko';
+  res.locals.changelog = appChangelog;
   res.locals.lang = lang;
   res.locals.t = (key) => translate(lang, key);
   next();
