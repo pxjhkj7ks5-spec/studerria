@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.06",
+      "date": "2026-02-05",
+      "items": [
+        "feat: unify topbar and menu modal on profile, my-day, teamwork"
+      ]
+    },
+    {
       "version": "0.7.05",
       "date": "2026-02-05",
       "items": [

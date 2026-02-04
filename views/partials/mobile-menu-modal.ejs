@@ -1,5 +1,7 @@
 <%
   const isMyDay = activePage === 'my-day';
+  const isProfile = activePage === 'profile';
+  const isTeamwork = activePage === 'teamwork';
 %>
 <div class="modal fade" id="mobileMenuModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -21,15 +23,21 @@
           <% if (role === 'deanery') { %>
             <a class="btn w-100 glass mobile-menu-action" href="/deanery"><%= t('menu.deanery') %></a>
           <% } %>
-          <% if (!isMyDay) { %>
+          <% if (activePage === 'schedule') { %>
             <button class="btn w-100 glass mobile-menu-action" type="button" id="messagesBtnMobile" aria-label="<%= t('messages.aria') %>">
               💬 Повідомлення
             </button>
+          <% } %>
+          <% if (!isMyDay) { %>
             <a class="btn w-100 glass mobile-menu-action" href="/my-day">Мій день</a>
           <% } else { %>
             <a class="btn w-100 glass mobile-menu-action" href="/schedule">Повернутись до розкладу</a>
           <% } %>
-          <a class="btn w-100 glass mobile-menu-action" href="/teamwork"><%= t('menu.teamwork') %></a>
+          <% if (!isTeamwork) { %>
+            <a class="btn w-100 glass mobile-menu-action" href="/teamwork"><%= t('menu.teamwork') %></a>
+          <% } else { %>
+            <a class="btn w-100 glass mobile-menu-action" href="/schedule">Повернутись до розкладу</a>
+          <% } %>
           <button
             class="btn w-100 glass mobile-menu-action theme-toggle"
             type="button"
@@ -38,7 +46,11 @@
           >
             🌙
           </button>
-          <a class="btn w-100 glass mobile-menu-action" href="/profile"><%= t('schedule.profile') %></a>
+          <% if (!isProfile) { %>
+            <a class="btn w-100 glass mobile-menu-action" href="/profile"><%= t('schedule.profile') %></a>
+          <% } else { %>
+            <a class="btn w-100 glass mobile-menu-action" href="/schedule">Повернутись до розкладу</a>
+          <% } %>
           <form method="POST" action="/logout">
             <button class="btn w-100 glass mobile-menu-action" type="submit"><%= t('schedule.logout') %></button>
           </form>
