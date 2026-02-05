@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.22",
+      "date": "2026-02-05",
+      "items": [
+        "fix: lift schedule carousel and respect iOS safe area in footer"
+      ]
+    },
+    {
       "version": "0.7.21",
       "date": "2026-02-05",
       "items": [
