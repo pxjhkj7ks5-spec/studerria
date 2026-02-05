@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.18",
+      "date": "2026-02-05",
+      "items": [
+        "fix: prevent light-theme select arrow tiling"
+      ]
+    },
+    {
       "version": "0.7.17",
       "date": "2026-02-05",
       "items": [
