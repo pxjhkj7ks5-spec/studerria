@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.19",
+      "date": "2026-02-05",
+      "items": [
+        "feat: show unread messages badge on mobile menu button"
+      ]
+    },
+    {
       "version": "0.7.18",
       "date": "2026-02-05",
       "items": [

@@ -379,6 +379,10 @@ body.theme-light .table-striped > tbody > tr:nth-of-type(odd) > * {
   background: rgba(12, 16, 28, 0.6);
 }
 
+.mobile-menu-btn {
+  position: relative;
+}
+
 body.theme-light .topbar,
 body.theme-light .admin-nav {
   background: rgba(255, 255, 255, 0.8);

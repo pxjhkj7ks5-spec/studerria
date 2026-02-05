@@ -2168,6 +2168,7 @@
       const messagesBtnMobile = document.getElementById('messagesBtnMobile');
       const messagesList = document.getElementById('messagesList');
       const messagesBadge = document.getElementById('messagesBadge');
+      const mobileMenuBadge = document.getElementById('mobileMenuBadge');
       const messagesSubjectFilter = document.getElementById('messagesSubjectFilter');
       const weekPrev = document.getElementById('weekPrev');
       const weekNext = document.getElementById('weekNext');
@@ -2370,6 +2371,9 @@
             if (messagesBadge) {
               messagesBadge.classList.add('d-none');
             }
+            if (mobileMenuBadge) {
+              mobileMenuBadge.classList.add('d-none');
+            }
             return;
           }
           messagesList.innerHTML = data.messages
@@ -2406,6 +2410,15 @@
               messagesBadge.classList.remove('d-none');
             } else {
               messagesBadge.classList.add('d-none');
+            }
+          }
+          if (mobileMenuBadge) {
+            const unread = data.unread_count || 0;
+            if (unread > 0) {
+              mobileMenuBadge.textContent = unread > 99 ? '99+' : String(unread);
+              mobileMenuBadge.classList.remove('d-none');
+            } else {
+              mobileMenuBadge.classList.add('d-none');
             }
           }
           const unreadIds = data.messages.filter((m) => !m.read_id).map((m) => m.id);
