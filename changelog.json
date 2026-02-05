@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.12",
+      "date": "2026-02-05",
+      "items": [
+        "fix: ensure teamwork back button is visible in dark theme",
+        "fix: pass role/username into profile view"
+      ]
+    },
+    {
       "version": "0.7.11",
       "date": "2026-02-05",
       "items": [

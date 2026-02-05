@@ -1466,7 +1466,7 @@ app.get('/profile', requireLogin, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'profile.init');
   }
-  const { id } = req.session.user;
+  const { id, role, username } = req.session.user;
   try {
     const user = await db.get('SELECT id, full_name, course_id, language FROM users WHERE id = ?', [id]);
     if (!user) {
@@ -1530,6 +1530,8 @@ app.get('/profile', requireLogin, async (req, res) => {
       teacherCourse,
       error: req.query.error || '',
       success: req.query.ok || '',
+      role,
+      username,
     });
   } catch (err) {
     return handleDbError(res, err, 'profile');
