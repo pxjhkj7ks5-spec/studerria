@@ -856,8 +856,12 @@ async function getTeacherSubjectCatalog() {
       SELECT s.id, s.name, s.group_count, s.is_general, s.course_id, c.name AS course_name
       FROM subjects s
       JOIN courses c ON c.id = s.course_id
-      JOIN semesters sem ON sem.course_id = s.course_id AND sem.is_active = 1
       WHERE s.visible = 1
+        AND EXISTS (
+          SELECT 1
+          FROM semesters sem
+          WHERE sem.course_id = s.course_id AND sem.is_active = 1
+        )
       ORDER BY c.id, s.name
     `
   );

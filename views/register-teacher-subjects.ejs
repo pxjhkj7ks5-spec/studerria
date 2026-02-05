@@ -75,6 +75,70 @@
         width: 1.15rem;
         height: 1.15rem;
       }
+      .theme-toggle-min {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
+      }
+      .theme-toggle-min:hover {
+        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.35);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+      }
+      body.theme-light .theme-toggle-min {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.7);
+        color: #0f172a;
+      }
+      body.theme-light .theme-toggle-min:hover {
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
+      }
+      select.form-select {
+        appearance: none;
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+        border-radius: 14px;
+        padding: 10px 40px 10px 16px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: inherit;
+        font-size: 0.95rem;
+        transition: background-image 160ms ease, box-shadow 0.2s ease, background 0.2s ease;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+        background-size: 16px;
+      }
+      body.theme-light select.form-select {
+        background: rgba(255, 255, 255, 0.85);
+        color: #0f172a;
+        border-color: rgba(15, 23, 42, 0.12);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      }
+      select.form-select:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+      }
+      body.theme-light select.form-select:focus {
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.2);
+      }
+      body.theme-dark select.form-select option {
+        background: #0f172a;
+        color: #f8fafc;
+      }
+      body.theme-light select.form-select option {
+        background: #ffffff;
+        color: #0f172a;
+      }
       .btn-primary {
         background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
         border: none;
@@ -100,7 +164,7 @@
           <h1 class="h3 mb-1">Вибір предметів викладача</h1>
           <div class="text-muted">Оберіть предмети, які ви викладаєте.</div>
         </div>
-        <button class="btn btn-outline-secondary theme-toggle-btn" type="button" id="themeToggle">🌙</button>
+        <button class="theme-toggle-min" type="button" id="themeToggle">🌙</button>
       </div>
 
       <% if (error) { %>

@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.15",
+      "date": "2026-02-05",
+      "items": [
+        "fix: dedupe teacher subject catalog",
+        "fix: align teacher subject selector styles with dark theme"
+      ]
+    },
+    {
       "version": "0.7.14",
       "date": "2026-02-05",
       "items": [
