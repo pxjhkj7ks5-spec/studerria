@@ -55,11 +55,17 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        min-height: 44px;
       }
       .topbar .navbar-brand {
         font-weight: 700;
         font-size: 1.25rem;
         margin-right: auto;
+        display: flex;
+        align-items: center;
+        height: 36px;
+        line-height: 1;
+        padding: 0;
       }
       .topbar-actions {
         display: flex;
@@ -67,14 +73,20 @@
         gap: 0.5rem;
         flex-wrap: wrap;
         justify-content: flex-end;
+        min-height: 36px;
       }
       .topbar-actions form {
         display: contents;
       }
+      .mobile-menu-btn {
+        line-height: 1;
+        align-self: center;
+        margin-top: 0;
+      }
       @media (max-width: 991px) {
         .topbar-actions {
-          flex-basis: 100%;
-          order: 3;
+          flex-basis: auto;
+          order: 2;
           gap: 0.3rem;
         }
       }
