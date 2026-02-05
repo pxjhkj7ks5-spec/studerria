@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.21",
+      "date": "2026-02-05",
+      "items": [
+        "fix: keep optional subject toggle aligned with long titles"
+      ]
+    },
+    {
       "version": "0.7.20",
       "date": "2026-02-05",
       "items": [
