@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.16",
+      "date": "2026-02-05",
+      "items": [
+        "fix: dim disabled group select in teacher subjects (dark theme)"
+      ]
+    },
+    {
       "version": "0.7.15",
       "date": "2026-02-05",
       "items": [
