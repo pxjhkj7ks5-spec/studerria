@@ -2302,6 +2302,20 @@
       updateMobileWeekDots();
       window.addEventListener('resize', updateMobileWeekDots);
 
+      function updateUnreadBadges(count) {
+        const targets = [messagesBadge, mobileMenuBadge].filter(Boolean);
+        if (!targets.length) return;
+        if (count > 0) {
+          const value = count > 99 ? '99+' : String(count);
+          targets.forEach((badge) => {
+            badge.textContent = value;
+            badge.classList.remove('d-none');
+          });
+        } else {
+          targets.forEach((badge) => badge.classList.add('d-none'));
+        }
+      }
+
       const scheduleContent = document.querySelector('.schedule-content');
       if (scheduleContent) {
         let touchStartX = 0;
@@ -2368,12 +2382,7 @@
           const data = await res.json();
           if (!data.messages || !data.messages.length) {
             messagesList.innerHTML = '<li class="list-group-item text-muted">Немає повідомлень</li>';
-            if (messagesBadge) {
-              messagesBadge.classList.add('d-none');
-            }
-            if (mobileMenuBadge) {
-              mobileMenuBadge.classList.add('d-none');
-            }
+            updateUnreadBadges(0);
             return;
           }
           messagesList.innerHTML = data.messages
@@ -2403,31 +2412,17 @@
               `;
             })
             .join('');
-          if (messagesBadge) {
-            const unread = data.unread_count || 0;
-            if (unread > 0) {
-              messagesBadge.textContent = unread > 99 ? '99+' : String(unread);
-              messagesBadge.classList.remove('d-none');
-            } else {
-              messagesBadge.classList.add('d-none');
-            }
-          }
-          if (mobileMenuBadge) {
-            const unread = data.unread_count || 0;
-            if (unread > 0) {
-              mobileMenuBadge.textContent = unread > 99 ? '99+' : String(unread);
-              mobileMenuBadge.classList.remove('d-none');
-            } else {
-              mobileMenuBadge.classList.add('d-none');
-            }
-          }
+          updateUnreadBadges(data.unread_count || 0);
           const unreadIds = data.messages.filter((m) => !m.read_id).map((m) => m.id);
           if (unreadIds.length) {
+            const nextUnread = Math.max(0, (data.unread_count || 0) - unreadIds.length);
             fetch('/messages/read', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ message_ids: unreadIds }),
-            });
+            })
+              .then(() => updateUnreadBadges(nextUnread))
+              .catch(() => {});
           }
           const reactionButtons = messagesList.querySelectorAll('.msg-reactions .react-btn');
           reactionButtons.forEach((btn) => {

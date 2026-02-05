@@ -61,8 +61,20 @@
         padding: 16px;
         border-radius: 16px;
       }
+      .subject-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .subject-info {
+        flex: 1 1 220px;
+        min-width: 0;
+      }
       .subject-name {
         font-weight: 600;
+        word-break: break-word;
       }
       .subject-course {
         font-size: 0.85rem;
@@ -70,6 +82,11 @@
       }
       body.theme-light .subject-course {
         color: rgba(15, 23, 42, 0.6);
+      }
+      .subject-toggle {
+        flex: 0 0 auto;
+        margin-left: auto;
+        white-space: nowrap;
       }
       .form-check-input {
         width: 1.15rem;
@@ -198,12 +215,12 @@
             <% const isSelected = selections && selections.get ? selections.has(s.id) : false; %>
             <% const generalFlag = s.is_general === true || Number(s.is_general) === 1; %>
             <div class="glass subject-card">
-              <div class="d-flex justify-content-between align-items-start gap-3">
-                <div>
+              <div class="subject-row">
+                <div class="subject-info">
                   <div class="subject-name"><%= s.name %></div>
                   <div class="subject-course"><%= s.course_name %></div>
                 </div>
-                <div class="form-check">
+                <div class="form-check subject-toggle">
                   <input
                     class="form-check-input"
                     type="checkbox"

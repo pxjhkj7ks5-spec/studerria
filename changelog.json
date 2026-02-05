@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.20",
+      "date": "2026-02-05",
+      "items": [
+        "fix: clear unread badge after opening messages",
+        "fix: keep teacher subject toggle from overflowing long names"
+      ]
+    },
+    {
       "version": "0.7.19",
       "date": "2026-02-05",
       "items": [
