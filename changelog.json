@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.13",
+      "date": "2026-02-05",
+      "items": [
+        "fix: allow optional links on mobile for custom deadlines"
+      ]
+    },
+    {
       "version": "0.7.12",
       "date": "2026-02-05",
       "items": [
