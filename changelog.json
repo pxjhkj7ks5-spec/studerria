@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.14",
+      "date": "2026-02-05",
+      "items": [
+        "chore: remove remember me from login/register"
+      ]
+    },
+    {
       "version": "0.7.13",
       "date": "2026-02-05",
       "items": [
