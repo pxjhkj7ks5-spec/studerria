@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.17",
+      "date": "2026-02-05",
+      "items": [
+        "fix: normalize light-theme select arrows in teacher subjects"
+      ]
+    },
+    {
       "version": "0.7.16",
       "date": "2026-02-05",
       "items": [
