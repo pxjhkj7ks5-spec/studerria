@@ -751,6 +751,21 @@
       body.theme-dark .btn:hover {
         box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45);
       }
+      .topbar .btn,
+      .topbar .theme-toggle-min,
+      .topbar .msg-btn,
+      .topbar .mobile-menu-btn {
+        transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+        transform: none;
+        box-shadow: none;
+      }
+      .topbar .btn:hover,
+      .topbar .theme-toggle-min:hover,
+      .topbar .msg-btn:hover,
+      .topbar .mobile-menu-btn:hover {
+        transform: none;
+        box-shadow: none;
+      }
       .btn:active {
         transform: translateY(0);
         box-shadow: none;

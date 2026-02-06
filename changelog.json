@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.23",
+      "date": "2026-02-06",
+      "items": [
+        "fix: reduce schedule topbar hover flicker"
+      ]
+    },
+    {
       "version": "0.7.22",
       "date": "2026-02-05",
       "items": [
