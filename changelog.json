@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.24",
+      "date": "2026-02-06",
+      "items": [
+        "fix: reduce hover flicker on schedule class cards"
+      ]
+    },
+    {
       "version": "0.7.23",
       "date": "2026-02-06",
       "items": [
