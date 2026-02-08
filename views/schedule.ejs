@@ -1229,11 +1229,13 @@
                   data-subjectid="<%= cls.subject_id %>"
                   data-day="<%= cls.day_of_week %>"
                   data-time="<%= timeLabel %>"
+                  data-time-base="<%= timeLabel %>"
                   data-classnum="<%= cls.class_number %>"
                   data-groupnum="<%= cls.group_number %>"
                   data-courseid="<%= cls.course_id || '' %>"
                   data-date="<%= cls.class_date %>"
                   data-is-general="<%= cls.is_general ? 1 : 0 %>"
+                  data-use-local-time="<%= cls.use_local_time ? 1 : 0 %>"
                   <% const tooltipParts = [cls.subject_name, groupLabel, `Class ${cls.class_number}`, timeLabel]; %>
                   <% if (cls.course_name) { tooltipParts.push(cls.course_name); } %>
                   <% if (hwMeta && hwMeta.preview && hwMeta.preview.length) { tooltipParts.push(...hwMeta.preview); } %>
@@ -1253,7 +1255,7 @@
                       <% if (hwMeta) { %>
                         <span class="hw-chip">ДЗ <%= hwMeta.count %></span>
                       <% } %>
-                      <div class="muted small"><%= timeLabel %></div>
+                      <div class="muted small schedule-time"><%= timeLabel %></div>
                     </div>
                   </div>
                 </button>
@@ -2109,6 +2111,7 @@
         const subjectId = Number(button.getAttribute('data-subjectid'));
         const day = button.getAttribute('data-day');
         const time = button.getAttribute('data-time');
+        const timeBase = button.getAttribute('data-time-base') || time;
         const classNum = Number(button.getAttribute('data-classnum'));
         const groupNum = Number(button.getAttribute('data-groupnum'));
         const courseId = Number(button.getAttribute('data-courseid'));
@@ -2119,7 +2122,7 @@
         document.getElementById('homeworkModalMeta').textContent = `${day} · ${time}`;
 
         document.getElementById('hwDay').value = day;
-        document.getElementById('hwTime').value = time;
+        document.getElementById('hwTime').value = timeBase;
         document.getElementById('hwSubjectId').value = subjectId;
         document.getElementById('hwGroupNum').value = groupNum;
         document.getElementById('hwClassNum').value = classNum;
@@ -2381,6 +2384,81 @@
           content.classList.remove('enter');
         });
       });
+
+      const scheduleTimeZone = 'Europe/Kyiv';
+
+      function getTimeZoneOffsetMinutes(timeZone, date) {
+        const dtf = new Intl.DateTimeFormat('en-US', {
+          timeZone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        });
+        const parts = dtf.formatToParts(date);
+        const values = {};
+        parts.forEach((part) => {
+          values[part.type] = part.value;
+        });
+        const asUTC = Date.UTC(
+          Number(values.year),
+          Number(values.month) - 1,
+          Number(values.day),
+          Number(values.hour),
+          Number(values.minute),
+          Number(values.second)
+        );
+        return (asUTC - date.getTime()) / 60000;
+      }
+
+      function buildLocalTime(dateStr, timeStr, timeZone) {
+        if (!dateStr || !timeStr) return null;
+        const [y, m, d] = dateStr.split('-').map((n) => Number(n));
+        const [hh, mm] = timeStr.split(':').map((n) => Number(n));
+        if (!y || !m || !d || Number.isNaN(hh) || Number.isNaN(mm)) return null;
+        const naiveUTC = Date.UTC(y, m - 1, d, hh, mm);
+        const offsetMin = getTimeZoneOffsetMinutes(timeZone, new Date(naiveUTC));
+        return new Date(naiveUTC - offsetMin * 60000);
+      }
+
+      function formatLocalRange(dateStr, start, end, timeZone) {
+        const startDate = buildLocalTime(dateStr, start, timeZone);
+        const endDate = buildLocalTime(dateStr, end, timeZone);
+        if (!startDate || !endDate) return null;
+        const opts = { hour: '2-digit', minute: '2-digit', hour12: false };
+        const startLabel = startDate.toLocaleTimeString(undefined, opts);
+        const endLabel = endDate.toLocaleTimeString(undefined, opts);
+        return `${startLabel} - ${endLabel}`;
+      }
+
+      function applyLocalWeekTimes() {
+        const items = document.querySelectorAll('[data-time-base][data-date]');
+        items.forEach((btn) => {
+          if (btn.dataset.useLocalTime !== '1') return;
+          const baseRange = btn.dataset.timeBase || '';
+          const dateStr = btn.dataset.date;
+          const [start, end] = baseRange.split('-').map((s) => s.trim());
+          if (!start || !end || !dateStr) return;
+          const localRange = formatLocalRange(dateStr, start, end, scheduleTimeZone);
+          if (!localRange) return;
+          const label = btn.querySelector('.schedule-time');
+          if (label) label.textContent = localRange;
+          btn.dataset.time = localRange;
+          const title = btn.getAttribute('data-bs-title');
+          if (title) {
+            const parts = title.split(' • ');
+            if (parts.length) {
+              parts[parts.length - 1] = localRange;
+              btn.setAttribute('data-bs-title', parts.join(' • '));
+            }
+          }
+        });
+      }
+
+      applyLocalWeekTimes();
 
       const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
       tooltipTriggerList.forEach((el) => {

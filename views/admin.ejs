@@ -434,6 +434,32 @@
         padding: 12px 14px;
         background: rgba(255, 255, 255, 0.06);
       }
+      .week-time-row {
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: rgba(255, 255, 255, 0.06);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .week-time-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .week-time-label {
+        font-weight: 700;
+      }
+      .week-time-sub {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+      .week-time-hint {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+      }
       .study-day-header {
         display: flex;
         align-items: center;
@@ -467,6 +493,10 @@
         color: inherit;
       }
       body.theme-light .study-day-row {
+        background: rgba(255, 255, 255, 0.7);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      body.theme-light .week-time-row {
         background: rgba(255, 255, 255, 0.7);
         border-color: rgba(15, 23, 42, 0.12);
       }
@@ -1658,6 +1688,14 @@
                           >
                             Дні навчання
                           </button>
+                          <button
+                            class="btn btn-sm btn-outline-primary week-time-btn"
+                            type="button"
+                            data-course-id="<%= c.id %>"
+                            data-course-name="<%= c.name %>"
+                          >
+                            Час тижнів
+                          </button>
                           <form method="POST" action="/admin/courses/delete/<%= c.id %>">
                             <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete this course?');">Delete</button>
                           </form>
@@ -2215,6 +2253,26 @@
           </div>
           <div class="modal-body">
             <div id="studyDaysBody" class="d-grid gap-3"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="weekTimeModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="weekTimeTitle">Час тижнів</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="week-time-hint mb-3">
+              За замовчуванням — звичайний час. Увімкніть локальний, щоб пари показувались за часом телефона.
+            </div>
+            <div id="weekTimeBody" class="d-grid gap-3"></div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
@@ -3406,6 +3464,9 @@
       const studyDaysBody = document.getElementById('studyDaysBody');
       const studyDaysTitle = document.getElementById('studyDaysTitle');
       const studyDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+      const weekTimeModal = document.getElementById('weekTimeModal');
+      const weekTimeBody = document.getElementById('weekTimeBody');
+      const weekTimeTitle = document.getElementById('weekTimeTitle');
 
       async function loadStudyDays(courseId, courseName) {
         if (!studyDaysBody) return;
@@ -3472,6 +3533,63 @@
         });
       }
 
+      async function loadWeekTime(courseId, courseName) {
+        if (!weekTimeBody) return;
+        weekTimeBody.innerHTML = '<div class="text-muted">Завантаження...</div>';
+        const res = await fetch(`/admin/api/courses/${courseId}/week-time`);
+        if (!res.ok) {
+          weekTimeBody.innerHTML = '<div class="text-danger">Помилка завантаження</div>';
+          return;
+        }
+        const data = await res.json();
+        const weeks = data.weeks || [];
+        if (weekTimeTitle) {
+          weekTimeTitle.textContent = courseName ? `Час тижнів — ${courseName}` : 'Час тижнів';
+        }
+        if (!weeks.length) {
+          weekTimeBody.innerHTML = '<div class="text-muted">Немає активного семестру</div>';
+          return;
+        }
+        weekTimeBody.innerHTML = weeks
+          .map((week) => {
+            const isLocal = week.use_local_time;
+            const modeLabel = isLocal ? 'Локальний час' : 'Звичайний час';
+            return `
+              <div class="week-time-row" data-week="${week.week_number}">
+                <div class="week-time-meta">
+                  <div class="week-time-label">Тиждень ${week.week_number}</div>
+                  <div class="week-time-sub">${modeLabel}</div>
+                </div>
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input week-time-toggle" type="checkbox" ${isLocal ? 'checked' : ''} data-week="${week.week_number}">
+                </div>
+              </div>
+            `;
+          })
+          .join('');
+
+        weekTimeBody.querySelectorAll('.week-time-toggle').forEach((toggle) => {
+          toggle.addEventListener('change', async (event) => {
+            const week = event.target.dataset.week;
+            const nextValue = event.target.checked;
+            const row = event.target.closest('.week-time-row');
+            const label = row ? row.querySelector('.week-time-sub') : null;
+            const resUpdate = await fetch(`/admin/api/courses/${courseId}/week-time/${week}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ use_local_time: nextValue }),
+            });
+            if (!resUpdate.ok) {
+              event.target.checked = !nextValue;
+              return alert('Помилка оновлення');
+            }
+            if (label) {
+              label.textContent = nextValue ? 'Локальний час' : 'Звичайний час';
+            }
+          });
+        });
+      }
+
       document.querySelectorAll('.study-days-btn').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const courseId = btn.dataset.courseId;
@@ -3479,6 +3597,17 @@
           if (!courseId || !studyDaysModal) return;
           await loadStudyDays(courseId, courseName);
           const modal = new bootstrap.Modal(studyDaysModal);
+          modal.show();
+        });
+      });
+
+      document.querySelectorAll('.week-time-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const courseId = btn.dataset.courseId;
+          const courseName = btn.dataset.courseName;
+          if (!courseId || !weekTimeModal) return;
+          await loadWeekTime(courseId, courseName);
+          const modal = new bootstrap.Modal(weekTimeModal);
           modal.show();
         });
       });

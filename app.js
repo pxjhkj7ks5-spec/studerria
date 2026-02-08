@@ -536,6 +536,7 @@ const referenceCache = {
   semesters: new Map(),
   activeSemester: new Map(),
   studyDays: new Map(),
+  weekTime: new Map(),
 };
 const REFERENCE_TTL_MS = 5 * 60 * 1000;
 
@@ -601,6 +602,10 @@ function invalidateStudyDaysCache(courseId) {
   } else {
     referenceCache.studyDays.delete(courseId);
   }
+}
+
+function invalidateWeekTimeCache() {
+  referenceCache.weekTime.clear();
 }
 
 async function getCoursesCached() {
@@ -842,6 +847,33 @@ async function getCourseStudyDays(courseId) {
   });
   const result = Array.from(map.values()).sort((a, b) => a.weekday - b.weekday);
   return cacheSet(referenceCache.studyDays, courseId, result);
+}
+
+async function getCourseWeekTimeMap(courseId, semesterId) {
+  if (!courseId || !semesterId) return new Map();
+  const key = `${courseId}|${semesterId}`;
+  const cached = cacheGet(referenceCache.weekTime, key);
+  if (cached) return cached;
+  const rows = await db.all(
+    'SELECT week_number, use_local_time FROM course_week_time_modes WHERE course_id = ? AND semester_id = ?',
+    [courseId, semesterId]
+  );
+  const map = new Map();
+  (rows || []).forEach((row) => {
+    map.set(Number(row.week_number), row.use_local_time === true || Number(row.use_local_time) === 1);
+  });
+  return cacheSet(referenceCache.weekTime, key, map);
+}
+
+async function getCourseWeekTimeList(courseId, semester) {
+  if (!courseId || !semester || !semester.id) return [];
+  const totalWeeks = Number(semester.weeks_count || 0);
+  if (!totalWeeks) return [];
+  const weekMap = await getCourseWeekTimeMap(courseId, semester.id);
+  return Array.from({ length: totalWeeks }, (_, idx) => ({
+    week_number: idx + 1,
+    use_local_time: weekMap.get(idx + 1) === true,
+  }));
 }
 
 async function isCourseDayActive(courseId, dayName) {
@@ -2121,6 +2153,13 @@ app.get('/schedule', requireLogin, async (req, res) => {
       for (const cid of courseIds) {
         semesterMap.set(cid, await getActiveSemester(cid));
       }
+      const courseWeekTime = new Map();
+      for (const cid of courseIds) {
+        const sem = semesterMap.get(cid);
+        if (sem && sem.id) {
+          courseWeekTime.set(cid, await getCourseWeekTimeMap(cid, sem.id));
+        }
+      }
       const primaryCourseId = selectedCourse ? selectedCourse.id : (courseIds[0] || null);
       const primarySemester = primaryCourseId ? semesterMap.get(primaryCourseId) : null;
       const totalWeeks = primarySemester && primarySemester.weeks_count ? Number(primarySemester.weeks_count) : 15;
@@ -2191,6 +2230,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
         const subjectIds = teacherSubjects.filter((s) => Number(s.course_id) === Number(cid)).map((s) => s.subject_id);
         if (!subjectIds.length) continue;
         const sem = semesterMap.get(cid);
+        const weekTimeMap = courseWeekTime.get(cid);
+        const useLocalTime = weekTimeMap ? weekTimeMap.get(selectedWeek) === true : false;
         const placeholders = subjectIds.map(() => '?').join(',');
         const params = [selectedWeek, cid];
         let sql = `
@@ -2213,6 +2254,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           row.course_id = cid;
           row.course_name = courseNameMap.get(Number(cid)) || '';
           row.class_date = getDateForWeekDay(selectedWeek, row.day_of_week, sem ? sem.start_date : null);
+          row.use_local_time = useLocalTime;
           scheduleRows.push(row);
         });
       }
@@ -2572,6 +2614,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
   if (selectedWeek < 1) selectedWeek = 1;
   if (selectedWeek < 1) selectedWeek = 1;
   if (selectedWeek > totalWeeks) selectedWeek = totalWeeks;
+  const weekTimeMap = activeSemester && activeSemester.id
+    ? await getCourseWeekTimeMap(courseId || 1, activeSemester.id)
+    : new Map();
+  const useLocalTime = weekTimeMap.get(selectedWeek) === true;
   const studyDays = await getCourseStudyDays(courseId || 1);
   let activeDays = studyDays
     .filter((day) => day.is_active)
@@ -2950,6 +2996,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         }
         rows.forEach((row) => {
           row.class_date = getDateForWeekDay(selectedWeek, row.day_of_week, activeSemester ? activeSemester.start_date : null);
+          row.use_local_time = useLocalTime;
           if (scheduleByDay[row.day_of_week]) {
             scheduleByDay[row.day_of_week].push(row);
           }
@@ -6928,6 +6975,67 @@ app.delete('/admin/api/courses/:courseId/study-days/:weekday/subjects/:subjectId
       [dayRow.id, subjectId]
     );
     invalidateStudyDaysCache(courseId);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/admin/api/courses/:courseId/week-time', requireAdminOrDeanery, async (req, res) => {
+  const courseId = Number(req.params.courseId);
+  if (Number.isNaN(courseId) || courseId < 1) {
+    return res.status(400).json({ error: 'Invalid course' });
+  }
+  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const course = await db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+    const semester = await getActiveSemester(courseId);
+    if (!semester) {
+      return res.json({ weeks: [], semester: null });
+    }
+    const weeks = await getCourseWeekTimeList(courseId, semester);
+    return res.json({
+      weeks,
+      semester: { id: semester.id, weeks_count: semester.weeks_count },
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.patch('/admin/api/courses/:courseId/week-time/:weekNumber', requireAdminOrDeanery, async (req, res) => {
+  const courseId = Number(req.params.courseId);
+  const weekNumber = Number(req.params.weekNumber);
+  const { use_local_time } = req.body || {};
+  if (Number.isNaN(courseId) || courseId < 1 || Number.isNaN(weekNumber) || weekNumber < 1) {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const course = await db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+    const semester = await getActiveSemester(courseId);
+    if (!semester || !semester.id) {
+      return res.status(400).json({ error: 'No active semester' });
+    }
+    const totalWeeks = Number(semester.weeks_count || 0);
+    if (!totalWeeks || weekNumber > totalWeeks) {
+      return res.status(400).json({ error: 'Invalid week' });
+    }
+    const now = new Date().toISOString();
+    await db.run(
+      `INSERT INTO course_week_time_modes (course_id, semester_id, week_number, use_local_time, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (course_id, semester_id, week_number)
+       DO UPDATE SET use_local_time = EXCLUDED.use_local_time, updated_at = EXCLUDED.updated_at`,
+      [courseId, semester.id, weekNumber, use_local_time ? 1 : 0, now, now]
+    );
+    invalidateWeekTimeCache();
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });

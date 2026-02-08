@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.25",
+      "date": "2026-02-08",
+      "items": [
+        "feat: add week local-time toggle for schedule display"
+      ]
+    },
+    {
       "version": "0.7.24",
       "date": "2026-02-06",
       "items": [
