@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.46",
+      "date": "2026-02-09",
+      "items": [
+        "fix: guard missing body on generator render"
+      ]
+    },
+    {
       "version": "0.7.45",
       "date": "2026-02-09",
       "items": [

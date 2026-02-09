@@ -4896,7 +4896,7 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
     const config = parsedConfig && typeof parsedConfig === 'object'
       ? { ...DEFAULT_GENERATOR_CONFIG, ...parsedConfig }
       : { ...DEFAULT_GENERATOR_CONFIG };
-    const requestedLocation = String(req.body.active_location || '');
+    const requestedLocation = String((req.body && req.body.active_location) || '');
     const activeLocation = requestedLocation.toLowerCase() === 'munich'
       ? 'munich'
       : requestedLocation
