@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.7.26",
+      "date": "2026-02-09",
+      "items": [
+        "feat: add smart current/next class highlights",
+        "feat: add liquid-glass filter + sync status panel on schedule",
+        "feat: cache schedule locally with auto refresh",
+        "feat: smooth schedule card hover/active motion"
+      ]
+    },
+    {
       "version": "0.7.25",
       "date": "2026-02-08",
       "items": [

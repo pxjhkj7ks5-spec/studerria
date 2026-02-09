@@ -1167,22 +1167,43 @@
         </div>
         <div class="hero-actions">
           <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
-          <% if (role === 'teacher' && teacherCourses && teacherCourses.length > 1) { %>
-            <form method="GET" action="/schedule" class="d-inline">
-              <input type="hidden" name="week" value="<%= currentWeek %>" />
-              <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
-                <option value="">Усі курси</option>
-                <% teacherCourses.forEach(function(c) { %>
-                  <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
-                <% }); %>
-              </select>
-            </form>
-          <% } %>
           <% if (role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') { %>
             <button class="btn btn-glass btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
               🪄 Дивні дедлайни
             </button>
           <% } %>
+        </div>
+      </div>
+
+      <div class="glass schedule-panel mb-4">
+        <div class="panel-section">
+          <div class="panel-title">Фільтри</div>
+          <div class="panel-body">
+            <% if (role === 'teacher' && teacherCourses && teacherCourses.length > 1) { %>
+              <form method="GET" action="/schedule" class="d-inline">
+                <input type="hidden" name="week" value="<%= currentWeek %>" />
+                <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
+                  <option value="">Усі курси</option>
+                  <% teacherCourses.forEach(function(c) { %>
+                    <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
+                  <% }); %>
+                </select>
+              </form>
+            <% } else { %>
+              <div class="panel-muted">Немає доступних фільтрів</div>
+            <% } %>
+          </div>
+        </div>
+        <div class="panel-divider"></div>
+        <div class="panel-section panel-sync">
+          <div class="panel-title">Синхронізація</div>
+          <div class="panel-body">
+            <div class="sync-row">
+              <span class="sync-dot" id="syncDot"></span>
+              <span id="syncStatusLabel">Онлайн</span>
+            </div>
+            <div class="sync-meta" id="syncStatusMeta">Щойно</div>
+          </div>
         </div>
       </div>
 
@@ -1198,9 +1219,10 @@
         </div>
       <% } %>
 
+      <div id="scheduleWeekGrid">
       <% daysOfWeek.forEach(function(day) { %>
         <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString('uk-UA') : ''; %>
-        <div class="card mb-3 glass day-card">
+        <div class="card mb-3 glass day-card" data-day-date="<%= dayDates && dayDates[day] ? dayDates[day] : '' %>">
           <div class="card-header fw-semibold text-white d-flex justify-content-between align-items-center">
             <span><%= day %></span>
             <% if (dateLabel) { %>
@@ -1221,7 +1243,7 @@
                 <% const groupLabel = cls.group_label ? cls.group_label : `Group ${cls.group_number}`; %>
                 <% const courseLabel = cls.course_name ? ` · ${cls.course_name}` : ''; %>
                 <button
-                  class="list-group-item list-group-item-action"
+                  class="list-group-item list-group-item-action schedule-card"
                   type="button"
                   data-bs-toggle="modal"
                   data-bs-target="#homeworkModal"
@@ -1293,7 +1315,7 @@
         <% weekendDeadlineCards.forEach(function(card) { %>
           <% if (activeDaySet.has(card.day)) { return; } %>
           <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString('uk-UA') : ''; %>
-          <div class="card mb-3 glass day-card">
+          <div class="card mb-3 glass day-card" data-day-date="<%= card.date || '' %>">
             <div class="card-header fw-semibold text-white d-flex justify-content-between align-items-center">
               <span><%= card.day %></span>
               <% if (dateLabel) { %>
@@ -1323,6 +1345,7 @@
           </div>
         <% }); %>
       <% } %>
+      </div>
     </main>
 
     <div class="week-slider" id="weekSlider">
@@ -2460,10 +2483,143 @@
 
       applyLocalWeekTimes();
 
-      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-      tooltipTriggerList.forEach((el) => {
-        new bootstrap.Tooltip(el);
-      });
+      const weekGrid = document.getElementById('scheduleWeekGrid');
+      const syncDot = document.getElementById('syncDot');
+      const syncStatusLabel = document.getElementById('syncStatusLabel');
+      const syncStatusMeta = document.getElementById('syncStatusMeta');
+      const scheduleCacheKey = `schedule-cache:<%= currentWeek || 1 %>:<%= selectedCourseId || 'all' %>:<%= userId || 'guest' %>:<%= role || 'user' %>`;
+      let lastSyncTs = Date.now();
+
+      function initTooltips(root = document) {
+        root.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+          if (bootstrap.Tooltip.getInstance(el)) return;
+          new bootstrap.Tooltip(el);
+        });
+      }
+
+      function formatRelativeTime(ts) {
+        if (!ts) return 'ніколи';
+        const diff = Math.max(0, Date.now() - ts);
+        if (diff < 60000) return 'щойно';
+        const minutes = Math.round(diff / 60000);
+        if (minutes < 60) return `${minutes} хв тому`;
+        const hours = Math.round(minutes / 60);
+        if (hours < 24) return `${hours} год тому`;
+        const days = Math.round(hours / 24);
+        return `${days} дн тому`;
+      }
+
+      function updateSyncStatus(state = {}) {
+        const online = navigator.onLine;
+        const failed = state.failed === true;
+        if (syncDot) {
+          syncDot.classList.toggle('offline', !online);
+        }
+        if (syncStatusLabel) {
+          syncStatusLabel.textContent = online ? 'Онлайн' : 'Офлайн';
+        }
+        if (syncStatusMeta) {
+          const prefix = failed
+            ? 'Не вдалося оновити · кеш '
+            : online
+              ? 'Оновлено '
+              : 'Офлайн · кеш ';
+          syncStatusMeta.textContent = `${prefix}${formatRelativeTime(lastSyncTs)}`;
+        }
+      }
+
+      function readScheduleCache() {
+        try {
+          const raw = localStorage.getItem(scheduleCacheKey);
+          return raw ? JSON.parse(raw) : null;
+        } catch (err) {
+          return null;
+        }
+      }
+
+      function writeScheduleCache(html) {
+        if (!html) return;
+        lastSyncTs = Date.now();
+        try {
+          localStorage.setItem(scheduleCacheKey, JSON.stringify({ ts: lastSyncTs, html }));
+        } catch (err) {
+          // ignore storage failures
+        }
+        updateSyncStatus();
+      }
+
+      function updateSmartHighlights() {
+        const now = new Date();
+        const kyivToday = now.toLocaleDateString('en-CA', { timeZone: scheduleTimeZone });
+        document.querySelectorAll('.day-card').forEach((card) => {
+          const dayDate = card.dataset.dayDate || '';
+          card.classList.toggle('is-today', dayDate && dayDate === kyivToday);
+        });
+        const entries = [];
+        document.querySelectorAll('.schedule-card[data-time-base][data-date]').forEach((btn) => {
+          btn.classList.remove('is-now', 'is-next');
+          const baseRange = btn.dataset.timeBase || '';
+          const dateStr = btn.dataset.date;
+          const [start, end] = baseRange.split('-').map((s) => s.trim());
+          if (!start || !end || !dateStr) return;
+          const startDate = buildLocalTime(dateStr, start, scheduleTimeZone);
+          const endDate = buildLocalTime(dateStr, end, scheduleTimeZone);
+          if (!startDate || !endDate) return;
+          entries.push({ start: startDate.getTime(), end: endDate.getTime(), el: btn });
+        });
+        if (!entries.length) return;
+        entries.sort((a, b) => a.start - b.start);
+        const nowMs = now.getTime();
+        const current = entries.find((entry) => nowMs >= entry.start && nowMs < entry.end);
+        const next = entries.find((entry) => entry.start > nowMs);
+        if (current) current.el.classList.add('is-now');
+        if (next) next.el.classList.add('is-next');
+      }
+
+      async function refreshSchedule() {
+        if (!weekGrid) return;
+        if (document.hidden) return;
+        if (document.body.classList.contains('modal-open')) return;
+        if (!navigator.onLine) {
+          updateSyncStatus();
+          return;
+        }
+        const url = `${window.location.pathname}${window.location.search}${window.location.search ? '&' : '?'}refresh=1&_=${Date.now()}`;
+        try {
+          const res = await fetch(url, { headers: { 'X-Requested-With': 'schedule-refresh' } });
+          if (!res.ok) throw new Error('bad');
+          const html = await res.text();
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          const nextGrid = doc.getElementById('scheduleWeekGrid');
+          if (nextGrid) {
+            weekGrid.innerHTML = nextGrid.innerHTML;
+            applyLocalWeekTimes();
+            updateSmartHighlights();
+            initTooltips(weekGrid);
+            writeScheduleCache(weekGrid.innerHTML);
+          }
+        } catch (err) {
+          updateSyncStatus({ failed: true });
+          return;
+        }
+        updateSyncStatus();
+      }
+
+      const cachedSchedule = readScheduleCache();
+      if (cachedSchedule && cachedSchedule.ts) {
+        lastSyncTs = cachedSchedule.ts;
+      }
+      if (weekGrid) {
+        writeScheduleCache(weekGrid.innerHTML);
+      }
+      updateSmartHighlights();
+      initTooltips();
+
+      setInterval(updateSmartHighlights, 30000);
+      setInterval(() => updateSyncStatus(), 60000);
+      setInterval(refreshSchedule, 5 * 60 * 1000);
+      window.addEventListener('online', () => refreshSchedule());
+      window.addEventListener('offline', () => updateSyncStatus());
 
       async function loadMessages() {
         if (!messagesList) return;
