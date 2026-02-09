@@ -623,8 +623,25 @@ function invalidateWeekTimeCache() {
 async function getCoursesCached() {
   const cached = cacheGet(referenceCache.courses, 'courses');
   if (cached) return cached;
-  const rows = await db.all('SELECT id, name, is_teacher_course, location FROM courses ORDER BY id');
-  return cacheSet(referenceCache.courses, 'courses', rows || []);
+  try {
+    const rows = await db.all('SELECT id, name, is_teacher_course, location FROM courses ORDER BY id');
+    const normalized = (rows || []).map((row) => ({
+      ...row,
+      location: row.location || 'kyiv',
+    }));
+    return cacheSet(referenceCache.courses, 'courses', normalized);
+  } catch (err) {
+    const missingColumn = err && err.code === '42703';
+    if (missingColumn) {
+      const rows = await db.all('SELECT id, name, is_teacher_course FROM courses ORDER BY id');
+      const normalized = (rows || []).map((row) => ({
+        ...row,
+        location: 'kyiv',
+      }));
+      return cacheSet(referenceCache.courses, 'courses', normalized);
+    }
+    throw err;
+  }
 }
 
 async function getCourseById(courseId) {

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.41",
+      "date": "2026-02-09",
+      "items": [
+        "fix: fallback course location when column is missing"
+      ]
+    },
+    {
       "version": "0.7.40",
       "date": "2026-02-09",
       "items": [
