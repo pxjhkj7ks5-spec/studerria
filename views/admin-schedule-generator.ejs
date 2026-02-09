@@ -188,7 +188,7 @@
                     <input class="form-check-input" type="checkbox" name="mirror_groups" id="mirrorGroups" <%= config.mirror_groups ? 'checked' : '' %> />
                     <label class="form-check-label" for="mirrorGroups">Швидке дзеркало груп (A/B)</label>
                   </div>
-                  <div class="small text-muted">Парно зʼєднуємо групи 1/2 з однаковою кількістю пар і чергуємо по тижнях.</div>
+                  <div class="small text-muted">Парно зʼєднуємо групи 1/2 з однаковим ключем дзеркала та чергуємо по тижнях.</div>
                 </div>
                 <div class="col-12 d-grid">
                   <button class="btn btn-outline-primary" type="submit">Зберегти налаштування</button>
@@ -339,10 +339,15 @@
                   </select>
                 </div>
                 <div class="col-12 col-md-3">
+                  <label class="form-label">Ключ дзеркала</label>
+                  <input class="form-control" name="mirror_key" placeholder="A1" />
+                  <div class="form-text text-muted">Однаковий ключ для груп 1/2.</div>
+                </div>
+                <div class="col-12 col-md-4">
                   <label class="form-label">Тижні (необовʼязково)</label>
                   <input class="form-control" name="weeks_set" placeholder="1-2,5,7" />
                 </div>
-                <div class="col-6 col-md-3">
+                <div class="col-6 col-md-4">
                   <label class="form-label">Фіксований день</label>
                   <select class="form-select" name="fixed_day">
                     <option value="">Будь-який</option>
@@ -351,7 +356,7 @@
                     <% }); %>
                   </select>
                 </div>
-                <div class="col-6 col-md-3">
+                <div class="col-6 col-md-4">
                   <label class="form-label">Фіксований слот</label>
                   <select class="form-select" name="fixed_class_number">
                     <option value="">Будь-який</option>
@@ -382,6 +387,7 @@
                         <th>Викладач</th>
                         <th>Пар</th>
                         <th>Тижні</th>
+                        <th>Дзеркало</th>
                         <th>Фікс. день</th>
                         <th>Фікс. слот</th>
                         <th>Дії</th>
@@ -441,6 +447,9 @@
                           </td>
                           <td>
                             <input class="form-control form-control-sm" name="weeks_set" form="gen-item-<%= item.id %>" value="<%= item.weeks_set || '' %>" />
+                          </td>
+                          <td>
+                            <input class="form-control form-control-sm" name="mirror_key" form="gen-item-<%= item.id %>" value="<%= item.mirror_key || '' %>" />
                           </td>
                           <td>
                             <select class="form-select form-select-sm" name="fixed_day" form="gen-item-<%= item.id %>">

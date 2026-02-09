@@ -96,13 +96,16 @@
                       <% const slot = bellSchedule[cls.class_number] || null; %>
                       <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : `Пара ${cls.class_number}`; %>
                       <% const typeLabel = cls.lesson_type === 'lecture' ? 'Лекція' : cls.lesson_type === 'seminar' ? 'Семінар' : cls.lesson_type === 'lab' ? 'Лаб' : cls.lesson_type === 'practice' ? 'Практика' : cls.lesson_type; %>
-                      <div class="list-group-item schedule-card">
+                      <div class="list-group-item schedule-card <%= cls.is_mirror ? 'is-mirror' : '' %>">
                         <div class="d-flex justify-content-between align-items-center">
                           <div>
                             <div class="fw-semibold">
                               <%= cls.subject_name %>
                               <% if (typeLabel) { %>
                                 <span class="badge text-bg-secondary ms-2"><%= typeLabel %></span>
+                              <% } %>
+                              <% if (cls.is_mirror) { %>
+                                <span class="badge mirror-chip ms-2" title="Дзеркало<%= cls.mirror_key ? ': ' + cls.mirror_key : '' %>">A/B</span>
                               <% } %>
                             </div>
                             <div class="small muted"><%= cls.group_label %> · <%= cls.teacher_name || 'Без викладача' %></div>

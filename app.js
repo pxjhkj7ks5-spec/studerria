@@ -5090,6 +5090,8 @@ app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) =
   const weeksSet = String(req.body.weeks_set || '').trim();
   const fixedDay = normalizeWeekdayName(req.body.fixed_day);
   const fixedClass = req.body.fixed_class_number ? Number(req.body.fixed_class_number) : null;
+  const mirrorKeyRaw = String(req.body.mirror_key || '').trim();
+  const mirrorKey = mirrorKeyRaw || null;
 
   if (!Number.isFinite(runId) || runId <= 0 || !Number.isFinite(courseId) || !Number.isFinite(subjectId)) {
     return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20data`);
@@ -5136,8 +5138,8 @@ app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) =
     await db.run(
       `
         INSERT INTO schedule_generator_items
-          (run_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, pairs_count, weeks_set, fixed_day, fixed_class_number)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (run_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, pairs_count, weeks_set, fixed_day, fixed_class_number, mirror_key)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         runId,
@@ -5151,6 +5153,7 @@ app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) =
         weeksSet || null,
         fixedDay,
         fixedClass || null,
+        mirrorKey,
       ]
     );
     return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Item%20added`);
@@ -5178,6 +5181,8 @@ app.post('/admin/schedule-generator/items/edit/:id', requireAdmin, async (req, r
   const weeksSet = String(req.body.weeks_set || '').trim();
   const fixedDay = normalizeWeekdayName(req.body.fixed_day);
   const fixedClass = req.body.fixed_class_number ? Number(req.body.fixed_class_number) : null;
+  const mirrorKeyRaw = String(req.body.mirror_key || '').trim();
+  const mirrorKey = mirrorKeyRaw || null;
 
   if (!Number.isFinite(itemId) || !Number.isFinite(runId) || runId <= 0) {
     return res.redirect('/admin/schedule-generator?err=Invalid%20item');
@@ -5224,7 +5229,7 @@ app.post('/admin/schedule-generator/items/edit/:id', requireAdmin, async (req, r
     await db.run(
       `
         UPDATE schedule_generator_items
-        SET course_id = ?, semester_id = ?, subject_id = ?, teacher_id = ?, lesson_type = ?, group_number = ?, pairs_count = ?, weeks_set = ?, fixed_day = ?, fixed_class_number = ?
+        SET course_id = ?, semester_id = ?, subject_id = ?, teacher_id = ?, lesson_type = ?, group_number = ?, pairs_count = ?, weeks_set = ?, fixed_day = ?, fixed_class_number = ?, mirror_key = ?
         WHERE id = ? AND run_id = ?
       `,
       [
@@ -5238,6 +5243,7 @@ app.post('/admin/schedule-generator/items/edit/:id', requireAdmin, async (req, r
         weeksSet || null,
         fixedDay,
         fixedClass || null,
+        mirrorKey,
         itemId,
         runId,
       ]
@@ -5394,8 +5400,8 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
       const stmt = db.prepare(
         `
           INSERT INTO schedule_generator_entries
-            (run_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, day_of_week, class_number, week_number)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (run_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, day_of_week, class_number, week_number, is_mirror, mirror_key)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
       );
       result.entries.forEach((entry) => {
@@ -5409,7 +5415,9 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
           entry.group_number,
           entry.day_of_week,
           entry.class_number,
-          entry.week_number
+          entry.week_number,
+          Boolean(entry.is_mirror),
+          entry.mirror_key || null
         );
       });
       await stmt.finalize();
@@ -5514,7 +5522,7 @@ app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, re
     );
     const grouped = new Map();
     (rows || []).forEach((row) => {
-      const key = `${row.subject_id}|${row.day_of_week}|${row.class_number}|${row.teacher_id || 0}|${row.lesson_type || ''}`;
+      const key = `${row.subject_id}|${row.day_of_week}|${row.class_number}|${row.teacher_id || 0}|${row.lesson_type || ''}|${row.is_mirror ? 1 : 0}|${row.mirror_key || ''}`;
       if (!grouped.has(key)) {
         grouped.set(key, { ...row, group_numbers: new Set() });
       }
@@ -5527,6 +5535,8 @@ app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, re
         ...entry,
         group_numbers: groups,
         group_label: groupLabel,
+        is_mirror: Boolean(entry.is_mirror),
+        mirror_key: entry.mirror_key ? String(entry.mirror_key).trim() : null,
       };
       if (scheduleByDay[entry.day_of_week]) {
         scheduleByDay[entry.day_of_week].push(normalized);

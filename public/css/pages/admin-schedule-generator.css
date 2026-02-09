@@ -148,3 +148,42 @@ body.theme-light.schedule-generator-page .generator-empty {
   padding: 0.35rem 0.7rem;
   font-weight: 600;
 }
+
+body.theme-dark.schedule-generator-page .text-muted,
+body.theme-dark.schedule-generator-page .muted {
+  color: rgba(248, 250, 252, 0.68) !important;
+}
+
+body.theme-light.schedule-generator-page .generator-table thead th {
+  color: rgba(15, 23, 42, 0.6);
+}
+
+body.theme-dark.schedule-generator-page .generator-table thead th {
+  color: rgba(248, 250, 252, 0.72);
+}
+
+.schedule-preview-page .schedule-card.is-mirror {
+  border-color: rgba(99, 102, 241, 0.5);
+  background: rgba(99, 102, 241, 0.16);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.28), var(--shadow-sm);
+}
+
+body.theme-light.schedule-preview-page .schedule-card.is-mirror {
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.schedule-preview-page .mirror-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  background: rgba(99, 102, 241, 0.18);
+  color: #e0e7ff;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+body.theme-light.schedule-preview-page .mirror-chip {
+  color: #3730a3;
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.35);
+}

@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.40",
+      "date": "2026-02-09",
+      "items": [
+        "feat: add mirror keys per subject and highlight mirror pairs in preview",
+        "fix: improve dark-theme contrast in generator and preview"
+      ]
+    },
+    {
       "version": "0.7.39",
       "date": "2026-02-09",
       "items": [
