@@ -1175,11 +1175,12 @@
         </div>
       </div>
 
-      <div class="glass schedule-panel mb-4">
-        <div class="panel-section">
-          <div class="panel-title">Фільтри</div>
-          <div class="panel-body">
-            <% if (role === 'teacher' && teacherCourses && teacherCourses.length > 1) { %>
+      <% const hasCourseFilters = role === 'teacher' && teacherCourses && teacherCourses.length > 1; %>
+      <div class="glass schedule-panel mb-4 <%= hasCourseFilters ? '' : 'single-panel' %>">
+        <% if (hasCourseFilters) { %>
+          <div class="panel-section">
+            <div class="panel-title">Фільтри</div>
+            <div class="panel-body">
               <form method="GET" action="/schedule" class="d-inline">
                 <input type="hidden" name="week" value="<%= currentWeek %>" />
                 <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
@@ -1189,12 +1190,10 @@
                   <% }); %>
                 </select>
               </form>
-            <% } else { %>
-              <div class="panel-muted">Немає доступних фільтрів</div>
-            <% } %>
+            </div>
           </div>
-        </div>
-        <div class="panel-divider"></div>
+          <div class="panel-divider"></div>
+        <% } %>
         <div class="panel-section panel-sync">
           <div class="panel-title">Синхронізація</div>
           <div class="panel-body">
@@ -1277,6 +1276,8 @@
                       <% if (hwMeta) { %>
                         <span class="hw-chip">ДЗ <%= hwMeta.count %></span>
                       <% } %>
+                      <span class="schedule-chip chip-now">Зараз</span>
+                      <span class="schedule-chip chip-next">Далі</span>
                       <div class="muted small schedule-time"><%= timeLabel %></div>
                     </div>
                   </div>

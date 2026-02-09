@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.7.28",
+      "date": "2026-02-09",
+      "items": [
+        "feat: hide empty filters section on schedule",
+        "feat: add now/next chips for smart highlights",
+        "feat: soften schedule highlights with green palette"
+      ]
+    },
+    {
       "version": "0.7.27",
       "date": "2026-02-09",
       "items": [
