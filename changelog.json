@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.31",
+      "date": "2026-02-09",
+      "items": [
+        "fix: restore blue hover and purple press for schedule cards",
+        "fix: keep now/next highlights during hover"
+      ]
+    },
+    {
       "version": "0.7.30",
       "date": "2026-02-09",
       "items": [
