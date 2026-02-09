@@ -254,6 +254,70 @@ body.theme-dark.schedule-generator-page .generator-table td {
   vertical-align: middle;
 }
 
+@media (min-width: 900px) {
+  .schedule-generator-page .generator-table {
+    min-width: 1240px;
+  }
+}
+
+@media (max-width: 899px) {
+  .schedule-generator-page .generator-table {
+    min-width: 980px;
+  }
+}
+
+.schedule-generator-page .generator-table th:nth-child(1),
+.schedule-generator-page .generator-table td:nth-child(1) {
+  min-width: 140px;
+}
+
+.schedule-generator-page .generator-table th:nth-child(2),
+.schedule-generator-page .generator-table td:nth-child(2) {
+  min-width: 220px;
+}
+
+.schedule-generator-page .generator-table th:nth-child(3),
+.schedule-generator-page .generator-table td:nth-child(3) {
+  min-width: 120px;
+}
+
+.schedule-generator-page .generator-table th:nth-child(4),
+.schedule-generator-page .generator-table td:nth-child(4) {
+  min-width: 100px;
+}
+
+.schedule-generator-page .generator-table th:nth-child(5),
+.schedule-generator-page .generator-table td:nth-child(5) {
+  min-width: 170px;
+}
+
+.schedule-generator-page .generator-table th:nth-child(6),
+.schedule-generator-page .generator-table td:nth-child(6) {
+  min-width: 80px;
+}
+
+.schedule-generator-page .generator-table th:nth-child(7),
+.schedule-generator-page .generator-table td:nth-child(7) {
+  min-width: 130px;
+}
+
+.schedule-generator-page .generator-table th:nth-child(8),
+.schedule-generator-page .generator-table td:nth-child(8) {
+  min-width: 120px;
+}
+
+.schedule-generator-page .generator-table th:nth-child(9),
+.schedule-generator-page .generator-table td:nth-child(9),
+.schedule-generator-page .generator-table th:nth-child(10),
+.schedule-generator-page .generator-table td:nth-child(10) {
+  min-width: 110px;
+}
+
+.schedule-generator-page .generator-table th:nth-child(11),
+.schedule-generator-page .generator-table td:nth-child(11) {
+  min-width: 120px;
+}
+
 body.theme-dark.schedule-generator-page .form-label {
   color: rgba(248, 250, 252, 0.82);
 }

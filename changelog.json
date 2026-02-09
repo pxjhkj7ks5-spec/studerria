@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.49",
+      "date": "2026-02-09",
+      "items": [
+        "fix: widen generator plan table columns"
+      ]
+    },
+    {
       "version": "0.7.48",
       "date": "2026-02-09",
       "items": [
