@@ -30,10 +30,18 @@ body.theme-light .table tbody tr {
   background: rgba(15, 23, 42, 0.03);
 }
 
+.role-access-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.4rem;
+  -webkit-overflow-scrolling: touch;
+}
+
 .role-access-grid {
   display: grid;
   gap: 0.6rem;
   --role-access-cols: 13;
+  min-width: 100%;
+  width: max-content;
 }
 
 .role-access-row {
@@ -76,9 +84,6 @@ body.theme-light .table tbody tr {
 }
 
 @media (max-width: 992px) {
-  .role-access-grid {
-    overflow-x: auto;
-  }
   .role-access-row {
     min-width: 980px;
   }

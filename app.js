@@ -7325,6 +7325,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'starosta.courses');
   }
+
   const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, allCourses);
   const requestedCourse = Number(req.query.course);
   let courseId = allowedCourseIds.has(requestedCourse) ? requestedCourse : baseCourseId;
@@ -7332,6 +7333,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
     courseId = Number(allowedCourses[0].id);
   }
   const allowCourseSelect = allowedCourses.length > 1;
+
   const {
     group_number,
     subject,
@@ -7341,218 +7343,227 @@ app.get('/starosta', requireStaff, async (req, res) => {
     homework_to,
     homework_tag,
   } = req.query;
+
   let activeSemester = null;
   try {
     activeSemester = await getActiveSemester(courseId);
   } catch (err) {
     return handleDbError(res, err, 'starosta.activeSemester');
   }
+
   const courses = allowedCourses;
-  db.all(
-    'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
-    [courseId],
-    (semErr, semesters) => {
-      if (semErr) {
-        return handleDbError(res, semErr, 'starosta.semesters');
-      }
-  db.all(
-    'SELECT id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at, course_id FROM users WHERE course_id = ? ORDER BY full_name',
-    [courseId],
-    (userErr, users) => {
-      if (userErr) {
-        return handleDbError(res, userErr, 'starosta.users');
-      }
-      db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
-        if (subjectErr) {
-          return handleDbError(res, subjectErr, 'starosta.subjects');
-        }
-          const homeworkFilters = [];
-          const homeworkParams = [];
-          homeworkFilters.push('h.course_id = ?');
-          homeworkParams.push(courseId);
-          if (activeSemester) {
-            homeworkFilters.push('h.semester_id = ?');
-            homeworkParams.push(activeSemester.id);
-          }
-          if (group_number) {
-            homeworkFilters.push('h.group_number = ?');
-            homeworkParams.push(group_number);
-          }
-          if (subject) {
-            homeworkFilters.push('h.subject LIKE ?');
-            homeworkParams.push(`%${subject}%`);
-          }
-          if (q) {
-            homeworkFilters.push('(h.description LIKE ? OR h.created_by LIKE ?)');
-            homeworkParams.push(`%${q}%`, `%${q}%`);
-          }
-          if (homework_from) {
-            const start = new Date(homework_from);
-            if (!Number.isNaN(start.getTime())) {
-              start.setHours(0, 0, 0, 0);
-              homeworkFilters.push('h.created_at >= ?');
-              homeworkParams.push(start.toISOString());
-            }
-          }
-          if (homework_to) {
-            const end = new Date(homework_to);
-            if (!Number.isNaN(end.getTime())) {
-              end.setHours(23, 59, 59, 999);
-              homeworkFilters.push('h.created_at <= ?');
-              homeworkParams.push(end.toISOString());
-            }
-          }
-          if (homework_tag) {
-            homeworkFilters.push(
-              `EXISTS (
-                SELECT 1
-                FROM homework_tag_map ht
-                JOIN homework_tags t ON t.id = ht.tag_id
-                WHERE ht.homework_id = h.id AND t.name = ?
-              )`
-            );
-            homeworkParams.push(homework_tag);
-          }
-          const homeworkWhere = homeworkFilters.length ? `WHERE ${homeworkFilters.join(' AND ')}` : '';
-          const homeworkSql = `
-            SELECT h.*, subj.name AS subject_name,
-                   COALESCE(taglist.tags, ARRAY[]::text[]) AS tags
-            FROM homework h
-            JOIN subjects subj ON subj.id = h.subject_id
-            LEFT JOIN LATERAL (
-              SELECT array_agg(t.name ORDER BY t.name) AS tags
-              FROM homework_tag_map ht
-              JOIN homework_tags t ON t.id = ht.tag_id
-              WHERE ht.homework_id = h.id
-            ) taglist ON true
-            ${homeworkWhere}
-            ORDER BY h.created_at DESC
-          `;
-          db.all(homeworkSql, homeworkParams, (homeworkErr, homeworkRows) => {
-            if (homeworkErr) {
-              return handleDbError(res, homeworkErr, 'starosta.homework');
-            }
-            const homework = sortHomework(homeworkRows, sort_homework);
-            db.all('SELECT name FROM homework_tags ORDER BY name', (tagErr, tagRows) => {
-              if (tagErr) {
-                return handleDbError(res, tagErr, 'starosta.homework.tags');
-              }
-              const homeworkTags = (tagRows || []).map((row) => row.name);
-          db.all(
-            `
-              SELECT t.id, t.title, t.created_at, s.name AS subject_name,
-                     COUNT(DISTINCT g.id) AS group_count,
-                     COUNT(DISTINCT m.user_id) AS member_count
-              FROM teamwork_tasks t
-              JOIN subjects s ON s.id = t.subject_id
-              LEFT JOIN teamwork_groups g ON g.task_id = t.id
-              LEFT JOIN teamwork_members m ON m.task_id = t.id
-              WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}
-              GROUP BY t.id, t.title, t.created_at, s.name
-              ORDER BY t.created_at DESC
-            `,
-            activeSemester ? [courseId, activeSemester.id] : [courseId],
-            (taskErr, teamworkTasks) => {
-              if (taskErr) {
-                return handleDbError(res, taskErr, 'starosta.teamwork');
-              }
-              db.all(
-                `
-                  SELECT m.*, s.name AS subject_name, u.full_name AS created_by,
-                         COALESCE(reads.read_count, 0) AS read_count,
-                         COALESCE(targets.target_count, 0) AS target_count
-                  FROM messages m
-                  LEFT JOIN subjects s ON s.id = m.subject_id
-                  LEFT JOIN users u ON u.id = m.created_by_id
-                  LEFT JOIN LATERAL (
-                    SELECT COUNT(*) AS read_count
-                    FROM message_reads mr
-                    WHERE mr.message_id = m.id
-                  ) reads ON true
-                  LEFT JOIN LATERAL (
-                    SELECT CASE
-                      WHEN m.target_all = 1 THEN (
-                        SELECT COUNT(*)
-                        FROM users u2
-                        WHERE u2.course_id = ? AND u2.role = 'student' AND u2.is_active = 1
-                      )
-                      WHEN m.subject_id IS NOT NULL THEN (
-                        SELECT COUNT(DISTINCT sg.student_id)
-                        FROM student_groups sg
-                        JOIN users u3 ON u3.id = sg.student_id
-                        WHERE sg.subject_id = m.subject_id AND sg.group_number = m.group_number
-                          AND u3.course_id = ? AND u3.is_active = 1
-                      )
-                      ELSE (
-                        SELECT COUNT(*)
-                        FROM message_targets mt
-                        JOIN users u4 ON u4.id = mt.user_id
-                        WHERE mt.message_id = m.id AND u4.course_id = ? AND u4.is_active = 1
-                      )
-                    END AS target_count
-                  ) targets ON true
-                  WHERE m.course_id = ?${activeSemester ? ' AND m.semester_id = ?' : ''}
-                  ORDER BY m.created_at DESC
-                  LIMIT 200
-                `,
-                activeSemester
-                  ? [courseId, courseId, courseId, courseId, activeSemester.id]
-                  : [courseId, courseId, courseId, courseId],
-                (msgErr, messages) => {
-                  if (msgErr) {
-                    return handleDbError(res, msgErr, 'starosta.messages');
-                  }
-                  try {
-                    return res.render('admin', {
-                      username: req.session.user.username,
-                      userId: req.session.user.id,
-                      role: req.session.role,
-                      schedule: [],
-                      homework,
-                      homeworkTags,
-                      users,
-                      subjects,
-                      studentGroups: [],
-                      logs: [],
-                      teamworkTasks,
-                      adminMessages: messages,
-                      courses,
-                      semesters,
-                      activeSemester,
-                      selectedCourseId: courseId,
-                      limitedStaffView: true,
-                      allowedSections: getRoleAllowedSections('starosta'),
-                      allowCourseSelect,
-                      filters: {
-                        group_number: group_number || '',
-                        day: '',
-                        subject: subject || '',
-                        q: q || '',
-                        homework_from: homework_from || '',
-                        homework_to: homework_to || '',
-                        homework_tag: homework_tag || '',
-                      },
-                      usersStatus: 'active',
-                      sorts: {
-                        schedule: '',
-                        homework: sort_homework || '',
-                      },
-                    });
-                  } catch (renderErr) {
-                    return handleDbError(res, renderErr, 'starosta.render');
-                  }
-                }
-              );
-            }
-          );
-            });
-          });
-        });
-      }
+  let semesters = [];
+  try {
+    semesters = await db.all('SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC', [courseId]);
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.semesters');
+  }
+
+  let users = [];
+  try {
+    users = await db.all(
+      'SELECT id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at, course_id FROM users WHERE course_id = ? ORDER BY full_name',
+      [courseId]
     );
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.users');
+  }
+
+  let subjects = [];
+  try {
+    subjects = await db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId]);
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.subjects');
+  }
+
+  const homeworkFilters = [];
+  const homeworkParams = [];
+  homeworkFilters.push('h.course_id = ?');
+  homeworkParams.push(courseId);
+  if (activeSemester) {
+    homeworkFilters.push('h.semester_id = ?');
+    homeworkParams.push(activeSemester.id);
+  }
+  if (group_number) {
+    homeworkFilters.push('h.group_number = ?');
+    homeworkParams.push(group_number);
+  }
+  if (subject) {
+    homeworkFilters.push('h.subject LIKE ?');
+    homeworkParams.push(`%${subject}%`);
+  }
+  if (q) {
+    homeworkFilters.push('(h.description LIKE ? OR h.created_by LIKE ?)');
+    homeworkParams.push(`%${q}%`, `%${q}%`);
+  }
+  if (homework_from) {
+    const start = new Date(homework_from);
+    if (!Number.isNaN(start.getTime())) {
+      start.setHours(0, 0, 0, 0);
+      homeworkFilters.push('h.created_at >= ?');
+      homeworkParams.push(start.toISOString());
     }
-  );
-  });
+  }
+  if (homework_to) {
+    const end = new Date(homework_to);
+    if (!Number.isNaN(end.getTime())) {
+      end.setHours(23, 59, 59, 999);
+      homeworkFilters.push('h.created_at <= ?');
+      homeworkParams.push(end.toISOString());
+    }
+  }
+  if (homework_tag) {
+    homeworkFilters.push(
+      `EXISTS (
+        SELECT 1
+        FROM homework_tag_map ht
+        JOIN homework_tags t ON t.id = ht.tag_id
+        WHERE ht.homework_id = h.id AND t.name = ?
+      )`
+    );
+    homeworkParams.push(homework_tag);
+  }
+  const homeworkWhere = homeworkFilters.length ? `WHERE ${homeworkFilters.join(' AND ')}` : '';
+  const homeworkSql = `
+    SELECT h.*, subj.name AS subject_name,
+           COALESCE(taglist.tags, ARRAY[]::text[]) AS tags
+    FROM homework h
+    JOIN subjects subj ON subj.id = h.subject_id
+    LEFT JOIN LATERAL (
+      SELECT array_agg(t.name ORDER BY t.name) AS tags
+      FROM homework_tag_map ht
+      JOIN homework_tags t ON t.id = ht.tag_id
+      WHERE ht.homework_id = h.id
+    ) taglist ON true
+    ${homeworkWhere}
+    ORDER BY h.created_at DESC
+  `;
+
+  let homeworkRows = [];
+  try {
+    homeworkRows = await db.all(homeworkSql, homeworkParams);
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.homework');
+  }
+  const homework = sortHomework(homeworkRows, sort_homework);
+
+  let tagRows = [];
+  try {
+    tagRows = await db.all('SELECT name FROM homework_tags ORDER BY name');
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.homework.tags');
+  }
+  const homeworkTags = (tagRows || []).map((row) => row.name);
+
+  let teamworkTasks = [];
+  try {
+    teamworkTasks = await db.all(
+      `
+        SELECT t.id, t.title, t.created_at, s.name AS subject_name,
+               COUNT(DISTINCT g.id) AS group_count,
+               COUNT(DISTINCT m.user_id) AS member_count
+        FROM teamwork_tasks t
+        JOIN subjects s ON s.id = t.subject_id
+        LEFT JOIN teamwork_groups g ON g.task_id = t.id
+        LEFT JOIN teamwork_members m ON m.task_id = t.id
+        WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}
+        GROUP BY t.id, t.title, t.created_at, s.name
+        ORDER BY t.created_at DESC
+      `,
+      activeSemester ? [courseId, activeSemester.id] : [courseId]
+    );
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.teamwork');
+  }
+
+  let adminMessages = [];
+  try {
+    adminMessages = await db.all(
+      `
+        SELECT m.*, s.name AS subject_name, u.full_name AS created_by,
+               COALESCE(reads.read_count, 0) AS read_count,
+               COALESCE(targets.target_count, 0) AS target_count
+        FROM messages m
+        LEFT JOIN subjects s ON s.id = m.subject_id
+        LEFT JOIN users u ON u.id = m.created_by_id
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*) AS read_count
+          FROM message_reads mr
+          WHERE mr.message_id = m.id
+        ) reads ON true
+        LEFT JOIN LATERAL (
+          SELECT CASE
+            WHEN m.target_all = 1 THEN (
+              SELECT COUNT(*)
+              FROM users u2
+              WHERE u2.course_id = ? AND u2.role = 'student' AND u2.is_active = 1
+            )
+            WHEN m.subject_id IS NOT NULL THEN (
+              SELECT COUNT(DISTINCT sg.student_id)
+              FROM student_groups sg
+              JOIN users u3 ON u3.id = sg.student_id
+              WHERE sg.subject_id = m.subject_id AND sg.group_number = m.group_number
+                AND u3.course_id = ? AND u3.is_active = 1
+            )
+            ELSE (
+              SELECT COUNT(*)
+              FROM message_targets mt
+              JOIN users u4 ON u4.id = mt.user_id
+              WHERE mt.message_id = m.id AND u4.course_id = ? AND u4.is_active = 1
+            )
+          END AS target_count
+        ) targets ON true
+        WHERE m.course_id = ?${activeSemester ? ' AND m.semester_id = ?' : ''}
+        ORDER BY m.created_at DESC
+        LIMIT 200
+      `,
+      activeSemester
+        ? [courseId, courseId, courseId, courseId, activeSemester.id]
+        : [courseId, courseId, courseId, courseId]
+    );
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.messages');
+  }
+
+  try {
+    return res.render('admin', {
+      username: req.session.user.username,
+      userId: req.session.user.id,
+      role: req.session.role,
+      schedule: [],
+      homework,
+      homeworkTags,
+      users,
+      subjects,
+      studentGroups: [],
+      logs: [],
+      teamworkTasks,
+      adminMessages,
+      courses,
+      semesters,
+      activeSemester,
+      selectedCourseId: courseId,
+      limitedStaffView: true,
+      allowedSections: getRoleAllowedSections('starosta'),
+      allowCourseSelect,
+      filters: {
+        group_number: group_number || '',
+        day: '',
+        subject: subject || '',
+        q: q || '',
+        homework_from: homework_from || '',
+        homework_to: homework_to || '',
+        homework_tag: homework_tag || '',
+      },
+      usersStatus: 'active',
+      sorts: {
+        schedule: '',
+        homework: sort_homework || '',
+      },
+    });
+  } catch (renderErr) {
+    return handleDbError(res, renderErr, 'starosta.render');
+  }
 });
 
 app.get('/deanery', requireDeanery, (req, res) => {

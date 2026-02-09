@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.54",
+      "date": "2026-02-09",
+      "items": [
+        "fix: repair starosta dashboard query flow after syntax error",
+        "fix: add horizontal scroll to role access matrix"
+      ]
+    },
+    {
       "version": "0.7.53",
       "date": "2026-02-09",
       "items": [
