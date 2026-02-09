@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.44",
+      "date": "2026-02-09",
+      "items": [
+        "fix: use explicit GROUP BY expressions for weekly stats"
+      ]
+    },
+    {
       "version": "0.7.43",
       "date": "2026-02-09",
       "items": [

@@ -4568,7 +4568,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
           `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
            FROM homework
            WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-           GROUP BY day
+           GROUP BY DATE(created_at::timestamp)
            ORDER BY day`,
           weeklyParams
         ),
@@ -4576,7 +4576,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
           `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
            FROM teamwork_tasks
            WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-           GROUP BY day
+           GROUP BY DATE(created_at::timestamp)
            ORDER BY day`,
           weeklyParams
         ),
@@ -4584,7 +4584,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
            FROM users
            WHERE course_id = ? AND created_at >= ?
-           GROUP BY day, role
+           GROUP BY DATE(created_at), role
            ORDER BY day`,
           [courseId, weekStart.toISOString()]
         ),
@@ -5844,7 +5844,7 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
           `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
            FROM homework
            WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-           GROUP BY day
+           GROUP BY DATE(created_at::timestamp)
            ORDER BY day`,
           weeklyParams
         ),
@@ -5852,7 +5852,7 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
           `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
            FROM teamwork_tasks
            WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-           GROUP BY day
+           GROUP BY DATE(created_at::timestamp)
            ORDER BY day`,
           weeklyParams
         ),
@@ -5860,7 +5860,7 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
            FROM users
            WHERE course_id = ? AND created_at >= ?
-           GROUP BY day, role
+           GROUP BY DATE(created_at), role
            ORDER BY day`,
           [courseId, weekStart.toISOString()]
         ),
