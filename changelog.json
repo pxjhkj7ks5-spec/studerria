@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.35",
+      "date": "2026-02-09",
+      "items": [
+        "revert: remove day card hover sheen change"
+      ]
+    },
+    {
       "version": "0.7.34",
       "date": "2026-02-09",
       "items": [
