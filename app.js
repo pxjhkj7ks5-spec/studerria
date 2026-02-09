@@ -2782,6 +2782,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               viewAs: req.session.viewAs || null,
               messageSubjects: studentGroups || [],
               userId,
+              selectedCourseId: courseId || 1,
             })
           );
         }
@@ -2898,6 +2899,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 viewAs: req.session.viewAs || null,
                 messageSubjects: studentGroups || [],
                 userId,
+                selectedCourseId: courseId || 1,
               });
             };
 

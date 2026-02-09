@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.27",
+      "date": "2026-02-09",
+      "items": [
+        "fix: set selected course id for schedule cache key"
+      ]
+    },
+    {
       "version": "0.7.26",
       "date": "2026-02-09",
       "items": [
