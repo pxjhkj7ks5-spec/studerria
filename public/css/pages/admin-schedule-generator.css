@@ -303,7 +303,7 @@ body.theme-dark.schedule-generator-page .generator-table td {
 
 .schedule-generator-page .generator-table th:nth-child(8),
 .schedule-generator-page .generator-table td:nth-child(8) {
-  min-width: 120px;
+  min-width: 170px;
 }
 
 .schedule-generator-page .generator-table th:nth-child(9),
@@ -315,7 +315,7 @@ body.theme-dark.schedule-generator-page .generator-table td {
 
 .schedule-generator-page .generator-table th:nth-child(11),
 .schedule-generator-page .generator-table td:nth-child(11) {
-  min-width: 120px;
+  min-width: 190px;
 }
 
 body.theme-dark.schedule-generator-page .form-label {
@@ -443,4 +443,168 @@ body.theme-light.schedule-preview-page .mirror-chip {
   color: #3730a3;
   background: rgba(99, 102, 241, 0.14);
   border-color: rgba(99, 102, 241, 0.35);
+}
+
+.mirror-key-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.mirror-key-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.mirror-key-field .form-control {
+  flex: 1 1 auto;
+}
+
+.validation-empty {
+  color: var(--muted);
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.theme-light.schedule-generator-page .validation-empty {
+  border-color: rgba(15, 23, 42, 0.18);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.validation-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.validation-chip {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.validation-chip.is-error {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.18);
+  color: #fecaca;
+}
+
+.validation-chip.is-warn {
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.18);
+  color: #fef3c7;
+}
+
+.validation-issue {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.validation-issue.is-error {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.validation-issue.is-warn {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.12);
+}
+
+.validation-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 0.3rem;
+  border-radius: 50%;
+  background: rgba(148, 197, 255, 0.9);
+  box-shadow: 0 0 8px rgba(148, 197, 255, 0.45);
+}
+
+.validation-issue.is-error .validation-dot {
+  background: rgba(248, 113, 113, 0.9);
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.45);
+}
+
+.validation-issue.is-warn .validation-dot {
+  background: rgba(251, 191, 36, 0.9);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
+}
+
+.heatmap-grid {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.heatmap-row {
+  display: grid;
+  grid-template-columns: 52px repeat(7, minmax(26px, 1fr));
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.heatmap-head {
+  opacity: 0.75;
+}
+
+.heatmap-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+
+.heatmap-head-cell {
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.heatmap-cell {
+  height: 28px;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 0.7rem;
+  line-height: 28px;
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(94, 176, 255, calc(0.12 + var(--heat) * 0.55));
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.25);
+}
+
+body.theme-light.schedule-generator-page .heatmap-cell {
+  color: rgba(15, 23, 42, 0.85);
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(99, 102, 241, calc(0.12 + var(--heat) * 0.4));
+  box-shadow: inset 0 0 10px rgba(99, 102, 241, 0.12);
+}
+
+.mirror-row.mirror-warn {
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.conflict-row {
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.problem-row {
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.problem-row[data-problem-level="error"] {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.problem-toggle .form-check-input:disabled {
+  opacity: 0.4;
 }

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.7.51",
+      "date": "2026-02-09",
+      "items": [
+        "feat: add validation gate, conflict insights, and problem filter for generator items",
+        "feat: add mirror key helpers, mirror summary, and schedule density heatmap",
+        "feat: add course-only regeneration, slot locking, and evenness bias control"
+      ]
+    },
+    {
       "version": "0.7.50",
       "date": "2026-02-09",
       "items": [

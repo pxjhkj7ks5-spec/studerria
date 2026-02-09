@@ -51,6 +51,9 @@
         <div class="alert alert-success"><%= messages.success %></div>
       <% } %>
 
+      <% const disableRunKyiv = validationByLocation && validationByLocation.kyiv ? validationByLocation.kyiv.hasCritical : false; %>
+      <% const disableRunMunich = validationByLocation && validationByLocation.munich ? validationByLocation.munich.hasCritical : false; %>
+
       <div class="generator-hero glass mb-4">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
           <div>
@@ -70,13 +73,48 @@
           <form method="POST" action="/admin/schedule-generator/run">
             <input type="hidden" name="run_id" value="<%= run.id %>" />
             <input type="hidden" name="active_location" id="runLocationInput" value="<%= activeLocation %>" />
-            <button class="btn btn-primary" type="submit">Згенерувати превʼю</button>
+            <button
+              class="btn btn-primary"
+              type="submit"
+              id="generatePreviewBtn"
+              data-disable-kyiv="<%= disableRunKyiv ? 'true' : 'false' %>"
+              data-disable-munich="<%= disableRunMunich ? 'true' : 'false' %>"
+              <%= (activeLocation === 'kyiv' ? disableRunKyiv : disableRunMunich) ? 'disabled' : '' %>
+            >
+              Згенерувати превʼю
+            </button>
           </form>
           <% const activeCourseList = (courseSemestersByLocation && courseSemestersByLocation[activeLocation]) || []; %>
           <% const firstCourseId = activeCourseList.length ? activeCourseList[0].course.id : null; %>
           <% if (firstCourseId) { %>
             <a class="btn btn-outline-primary" href="/admin/schedule-generator/<%= run.id %>/preview?course=<%= firstCourseId %>&week=1">Відкрити превʼю</a>
           <% } %>
+        </div>
+        <div class="generator-actions mt-2">
+          <% ['kyiv', 'munich'].forEach(function(location) { %>
+            <% const locationCourses = (courseSemestersByLocation && courseSemestersByLocation[location]) || []; %>
+            <% if (locationCourses.length) { %>
+              <form method="POST" action="/admin/schedule-generator/run" class="d-flex flex-wrap align-items-center gap-2" data-location-section="<%= location %>">
+                <input type="hidden" name="run_id" value="<%= run.id %>" />
+                <input type="hidden" name="active_location" value="<%= location %>" />
+                <input type="hidden" name="scope" value="course" />
+                <select name="course_id" class="form-select form-select-sm w-auto">
+                  <% locationCourses.forEach(function(row) { %>
+                    <option value="<%= row.course.id %>"><%= row.course.name %></option>
+                  <% }); %>
+                </select>
+                <button
+                  class="btn btn-outline-primary btn-sm"
+                  type="submit"
+                  data-disable-kyiv="<%= disableRunKyiv ? 'true' : 'false' %>"
+                  data-disable-munich="<%= disableRunMunich ? 'true' : 'false' %>"
+                  <%= (location === 'kyiv' ? disableRunKyiv : disableRunMunich) ? 'disabled' : '' %>
+                >
+                  Перегенерувати курс
+                </button>
+              </form>
+            <% } %>
+          <% }); %>
         </div>
       </div>
 
@@ -146,6 +184,23 @@
                   <input class="form-control" type="number" name="target_daily_pairs" min="1" max="7" value="<%= config.target_daily_pairs || 4 %>" />
                 </div>
                 <div class="col-12">
+                  <% const evennessValue = Number.isFinite(Number(config.evenness_bias)) ? Number(config.evenness_bias) : 50; %>
+                  <label class="form-label d-flex justify-content-between align-items-center">
+                    <span>Баланс рівномірності</span>
+                    <span class="badge bg-secondary" id="evennessBiasValue"><%= evennessValue %>%</span>
+                  </label>
+                  <input
+                    class="form-range"
+                    type="range"
+                    name="evenness_bias"
+                    id="evennessBiasRange"
+                    min="0"
+                    max="100"
+                    value="<%= evennessValue %>"
+                  />
+                  <div class="small text-muted">0 — компактніше, 100 — максимально рівномірно.</div>
+                </div>
+                <div class="col-12">
                   <label class="form-label">Особливі тижні (1-3,8)</label>
                   <input class="form-control" name="blocked_weeks" value="<%= config.blocked_weeks || '' %>" placeholder="1-2,6,9" />
                 </div>
@@ -199,6 +254,41 @@
 
           <div class="card glass-panel mb-4">
             <div class="card-body">
+              <div class="generator-section-title mb-2">Перед запуском</div>
+              <% ['kyiv', 'munich'].forEach(function(location) { %>
+                <% const validation = validationByLocation && validationByLocation[location]; %>
+                <div data-location-section="<%= location %>">
+                  <% if (!validation || !validation.issues.length) { %>
+                    <div class="validation-empty">Все готово до генерації.</div>
+                  <% } else { %>
+                    <div class="validation-summary mb-2">
+                      <span class="validation-chip <%= validation.hasCritical ? 'is-error' : 'is-warn' %>">
+                        <%= validation.hasCritical ? 'Критично' : 'Увага' %>
+                      </span>
+                      <span class="small text-muted"><%= validation.issues.length %> перевірок</span>
+                    </div>
+                    <div class="d-grid gap-2">
+                      <% validation.issues.slice(0, 6).forEach(function(issue) { %>
+                        <div class="validation-issue <%= issue.level === 'error' ? 'is-error' : 'is-warn' %>">
+                          <span class="validation-dot"></span>
+                          <div>
+                            <div class="small fw-semibold"><%= issue.message %></div>
+                            <div class="small text-muted"><%= issue.level === 'error' ? 'Блокує генерацію' : 'Попередження' %></div>
+                          </div>
+                        </div>
+                      <% }); %>
+                    </div>
+                    <% if (validation.issues.length > 6) { %>
+                      <div class="small text-muted mt-2">Ще <%= validation.issues.length - 6 %> пунктів.</div>
+                    <% } %>
+                  <% } %>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
               <div class="generator-section-title mb-2">Остання генерація</div>
               <% if (lastStats) { %>
                 <div class="d-grid gap-2 mb-3">
@@ -211,6 +301,15 @@
                     <div class="fw-semibold"><%= lastStats.conflicts %></div>
                   </div>
                   <div class="small text-muted">Оновлено: <%= lastStats.generated_at ? new Date(lastStats.generated_at).toLocaleString('uk-UA') : '' %></div>
+                  <% if (lastStats.scope) { %>
+                    <div class="small text-muted">
+                      <% if (lastStats.scope.type === 'course') { %>
+                        Курс: <%= courseById[lastStats.scope.course_id] || 'Невідомий' %>
+                      <% } else { %>
+                        Локація: <%= lastStats.scope.location === 'munich' ? 'Munich' : 'Kyiv' %>
+                      <% } %>
+                    </div>
+                  <% } %>
                 </div>
               <% } else { %>
                 <div class="generator-empty mb-3">Ще не запускали генерацію.</div>
@@ -226,6 +325,45 @@
                   <% }); %>
                 </div>
               <% } %>
+            </div>
+          </div>
+
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
+              <div class="generator-section-title mb-2">Щільність розкладу</div>
+              <% ['kyiv', 'munich'].forEach(function(location) { %>
+                <% const heatmap = heatmapByLocation && heatmapByLocation[location]; %>
+                <div class="heatmap" data-location-section="<%= location %>">
+                  <% if (!heatmap || !heatmap.max) { %>
+                    <div class="generator-empty">Немає даних для теплової карти.</div>
+                  <% } else { %>
+                    <div class="heatmap-grid">
+                      <div class="heatmap-row heatmap-head">
+                        <span class="heatmap-label"></span>
+                        <% classOptions.forEach(function(slot) { %>
+                          <span class="heatmap-head-cell"><%= slot %></span>
+                        <% }); %>
+                      </div>
+                      <% dayOptions.forEach(function(day) { %>
+                        <div class="heatmap-row">
+                          <span class="heatmap-label"><%= dayLabels[dayOptions.indexOf(day)] || day.slice(0, 2) %></span>
+                          <% classOptions.forEach(function(slot) { %>
+                            <% const count = heatmap.counts && heatmap.counts[day] ? heatmap.counts[day][slot] : 0; %>
+                            <% const intensity = heatmap.max ? (count / heatmap.max) : 0; %>
+                            <span
+                              class="heatmap-cell"
+                              style="--heat:<%= intensity.toFixed(2) %>;"
+                              title="<%= day %>, пара <%= slot %>: <%= count %> записів"
+                            >
+                              <%= count ? count : '' %>
+                            </span>
+                          <% }); %>
+                        </div>
+                      <% }); %>
+                    </div>
+                  <% } %>
+                </div>
+              <% }); %>
             </div>
           </div>
 
@@ -340,7 +478,11 @@
                 </div>
                 <div class="col-12 col-md-3">
                   <label class="form-label">Ключ дзеркала</label>
-                  <input class="form-control" name="mirror_key" placeholder="A1" />
+                  <input class="form-control" name="mirror_key" id="mirrorKeyInput" placeholder="A1" />
+                  <div class="mirror-key-actions mt-2">
+                    <button class="btn btn-outline-secondary btn-sm" type="button" id="mirrorKeyGenerate">Згенерувати</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" id="mirrorKeyCopy">Копіювати</button>
+                  </div>
                   <div class="form-text text-muted">Однаковий ключ для груп 1/2.</div>
                 </div>
                 <div class="col-12 col-md-4">
@@ -372,9 +514,93 @@
             </div>
           </div>
 
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
+              <div class="generator-section-title mb-2">Дзеркальні ключі</div>
+              <% ['kyiv', 'munich'].forEach(function(location) { %>
+                <% const mirrorSummary = mirrorSummaryByLocation && mirrorSummaryByLocation[location]; %>
+                <div class="d-grid gap-2" data-location-section="<%= location %>">
+                  <% if (!mirrorSummary || !mirrorSummary.length) { %>
+                    <div class="generator-empty">Немає дзеркальних ключів.</div>
+                  <% } else { %>
+                    <% mirrorSummary.forEach(function(group) { %>
+                      <div class="glass-inset p-3 mirror-row <%= group.status === 'ok' ? '' : 'mirror-warn' %>">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <div class="fw-semibold"><%= group.key %></div>
+                          <span class="badge <%= group.status === 'ok' ? 'bg-success' : group.status === 'warn' ? 'bg-warning text-dark' : 'bg-secondary' %>">
+                            <%= group.status === 'ok' ? 'OK' : group.status === 'warn' ? 'Нерівно' : 'Немає пари' %>
+                          </span>
+                        </div>
+                        <div class="small text-muted">
+                          Група 1: <%= group.group1 %> · Група 2: <%= group.group2 %>
+                        </div>
+                        <% if (group.subjects && group.subjects.length) { %>
+                          <div class="small text-muted">Предмети: <%= group.subjects.join(', ') %></div>
+                        <% } %>
+                        <% if (group.courses && group.courses.length) { %>
+                          <div class="small text-muted">Курси: <%= group.courses.join(', ') %></div>
+                        <% } %>
+                      </div>
+                    <% }); %>
+                  <% } %>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
+              <div class="generator-section-title mb-2">Конфлікти після генерації</div>
+              <% const conflictLabels = { missing_course_context: 'Немає активного семестру', missing_weeks_count: 'Не задано кількість тижнів', no_available_weeks: 'Немає доступних тижнів', no_allowed_days: 'Немає доступних днів', no_slot_found: 'Немає слота', partial_schedule: 'Часткова генерація', unknown: 'Невідома причина' }; %>
+              <% ['kyiv', 'munich'].forEach(function(location) { %>
+                <% const conflicts = conflictDetails && conflictDetails[location]; %>
+                <div class="d-grid gap-2" data-location-section="<%= location %>">
+                  <% if (!conflicts || !conflicts.length) { %>
+                    <div class="generator-empty">Конфліктів немає.</div>
+                  <% } else { %>
+                    <% conflicts.slice(0, 6).forEach(function(conflict) { %>
+                      <div class="glass-inset p-3 conflict-row">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                          <div class="fw-semibold"><%= conflict.subject || 'Без предмета' %></div>
+                          <span class="badge bg-danger">Проблема</span>
+                        </div>
+                        <div class="small text-muted">
+                          <%= conflictLabels[conflict.reason] || conflict.reason || conflictLabels.unknown %>
+                          <% if (conflict.scheduled) { %> · <%= conflict.scheduled %><% } %>
+                          <% if (conflict.target) { %> / <%= conflict.target %><% } %>
+                        </div>
+                        <% if (conflict.items && conflict.items.length) { %>
+                          <div class="small text-muted mt-1">
+                            <% conflict.items.forEach(function(item, idx) { %>
+                              <span><%= item.course %> · <%= item.group %> · <%= item.teacher || 'Без викладача' %></span><%= idx < conflict.items.length - 1 ? ' · ' : '' %>
+                            <% }); %>
+                          </div>
+                        <% } %>
+                      </div>
+                    <% }); %>
+                    <% if (conflicts.length > 6) { %>
+                      <div class="small text-muted">Ще <%= conflicts.length - 6 %> конфліктів.</div>
+                    <% } %>
+                  <% } %>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+
           <div class="card glass-panel">
             <div class="card-body">
-              <div class="generator-section-title mb-2">План занять</div>
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="generator-section-title">План занять</div>
+                <% ['kyiv', 'munich'].forEach(function(location) { %>
+                  <% const problemCount = problemItemLookupByLocation && problemItemLookupByLocation[location] ? Object.keys(problemItemLookupByLocation[location]).length : 0; %>
+                  <div class="form-check form-switch m-0 problem-toggle" data-location-section="<%= location %>">
+                    <input class="form-check-input" type="checkbox" id="problemToggle-<%= location %>" <%= problemCount ? '' : 'disabled' %> />
+                    <label class="form-check-label small" for="problemToggle-<%= location %>">
+                      Показати проблемні (<%= problemCount %>)
+                    </label>
+                  </div>
+                <% }); %>
+              </div>
               <% if (items && items.length) { %>
                 <div class="table-responsive">
                   <table class="table generator-table align-middle">
@@ -395,7 +621,20 @@
                     </thead>
                     <tbody>
                       <% items.forEach(function(item) { %>
-                        <tr data-location-row data-location="<%= courseLocationMap[item.course_id] || 'kyiv' %>">
+                        <% const rowLocation = courseLocationMap[item.course_id] || 'kyiv'; %>
+                        <% const problemLevel = problemItemLookupByLocation && problemItemLookupByLocation[rowLocation] ? problemItemLookupByLocation[rowLocation][item.id] : null; %>
+                        <% const hasConflict = conflictItemIds && conflictItemIds[rowLocation] ? conflictItemIds[rowLocation].has(item.id) : false; %>
+                        <% const isFixed = item.fixed_day || item.fixed_class_number; %>
+                        <tr
+                          data-location-row
+                          data-location="<%= rowLocation %>"
+                          data-item-id="<%= item.id %>"
+                          data-problem="<%= problemLevel ? 'true' : 'false' %>"
+                          data-problem-level="<%= problemLevel || '' %>"
+                          data-conflict="<%= hasConflict ? 'true' : 'false' %>"
+                          data-fixed="<%= isFixed ? 'true' : 'false' %>"
+                          class="<%= problemLevel ? 'problem-row' : '' %>"
+                        >
                           <td>
                             <select class="form-select form-select-sm" name="course_id" form="gen-item-<%= item.id %>">
                               <% Object.values(coursesByLocation).flat().forEach(function(course) { %>
@@ -449,7 +688,22 @@
                             <input class="form-control form-control-sm" name="weeks_set" form="gen-item-<%= item.id %>" value="<%= item.weeks_set || '' %>" />
                           </td>
                           <td>
-                            <input class="form-control form-control-sm" name="mirror_key" form="gen-item-<%= item.id %>" value="<%= item.mirror_key || '' %>" />
+                            <div class="mirror-key-field">
+                              <input
+                                class="form-control form-control-sm"
+                                name="mirror_key"
+                                id="mirror-key-<%= item.id %>"
+                                form="gen-item-<%= item.id %>"
+                                value="<%= item.mirror_key || '' %>"
+                              />
+                              <button
+                                class="btn btn-outline-secondary btn-sm mirror-key-copy"
+                                type="button"
+                                data-target="mirror-key-<%= item.id %>"
+                              >
+                                Копіювати
+                              </button>
+                            </div>
                           </td>
                           <td>
                             <select class="form-select form-select-sm" name="fixed_day" form="gen-item-<%= item.id %>">
@@ -467,11 +721,22 @@
                               <% }); %>
                             </select>
                           </td>
-                          <td class="d-flex gap-2">
+                          <td class="d-flex flex-wrap gap-2">
                             <form id="gen-item-<%= item.id %>" method="POST" action="/admin/schedule-generator/items/edit/<%= item.id %>">
                               <input type="hidden" name="run_id" value="<%= run.id %>" />
                             </form>
                             <button class="btn btn-sm btn-outline-primary" type="submit" form="gen-item-<%= item.id %>">Save</button>
+                            <% if (isFixed) { %>
+                              <form method="POST" action="/admin/schedule-generator/items/unfreeze/<%= item.id %>">
+                                <input type="hidden" name="run_id" value="<%= run.id %>" />
+                                <button class="btn btn-sm btn-outline-secondary" type="submit">Unlock</button>
+                              </form>
+                            <% } else { %>
+                              <form method="POST" action="/admin/schedule-generator/items/freeze/<%= item.id %>">
+                                <input type="hidden" name="run_id" value="<%= run.id %>" />
+                                <button class="btn btn-sm btn-outline-secondary" type="submit">Lock</button>
+                              </form>
+                            <% } %>
                             <form method="POST" action="/admin/schedule-generator/items/delete/<%= item.id %>">
                               <input type="hidden" name="run_id" value="<%= run.id %>" />
                               <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Видалити запис?');">Delete</button>
@@ -536,6 +801,90 @@
       const groupSelect = document.getElementById('genGroupSelect');
       const courseOptions = courseSelect ? Array.from(courseSelect.options) : [];
       const subjectGroups = subjectSelect ? Array.from(subjectSelect.querySelectorAll('optgroup')) : [];
+      const runButtons = document.querySelectorAll('[data-disable-kyiv]');
+
+      const evennessRange = document.getElementById('evennessBiasRange');
+      const evennessValue = document.getElementById('evennessBiasValue');
+      if (evennessRange && evennessValue) {
+        const syncEvenness = () => {
+          evennessValue.textContent = `${evennessRange.value}%`;
+        };
+        syncEvenness();
+        evennessRange.addEventListener('input', syncEvenness);
+      }
+
+      const mirrorKeyInput = document.getElementById('mirrorKeyInput');
+      const mirrorKeyGenerate = document.getElementById('mirrorKeyGenerate');
+      const mirrorKeyCopy = document.getElementById('mirrorKeyCopy');
+
+      const generateMirrorKey = () => {
+        const seed = Math.random().toString(36).slice(2, 5).toUpperCase();
+        const time = Date.now().toString(36).slice(-3).toUpperCase();
+        return `M-${time}${seed}`;
+      };
+
+      const copyText = async (text) => {
+        if (!text) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          return;
+        }
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      };
+
+      if (mirrorKeyGenerate && mirrorKeyInput) {
+        mirrorKeyGenerate.addEventListener('click', () => {
+          mirrorKeyInput.value = generateMirrorKey();
+          mirrorKeyInput.focus();
+        });
+      }
+      if (mirrorKeyCopy && mirrorKeyInput) {
+        mirrorKeyCopy.addEventListener('click', () => copyText(mirrorKeyInput.value));
+      }
+      document.querySelectorAll('.mirror-key-copy').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const targetId = btn.dataset.target;
+          const input = targetId ? document.getElementById(targetId) : null;
+          if (input) copyText(input.value);
+        });
+      });
+
+      const problemToggles = {
+        kyiv: document.getElementById('problemToggle-kyiv'),
+        munich: document.getElementById('problemToggle-munich'),
+      };
+
+      const applyProblemFilter = (location) => {
+        const toggle = problemToggles[location];
+        const onlyProblem = toggle && toggle.checked;
+        locationRows.forEach((row) => {
+          if (row.dataset.location !== location) return;
+          if (!onlyProblem) {
+            row.style.display = '';
+            return;
+          }
+          row.style.display = row.dataset.problem === 'true' ? '' : 'none';
+        });
+      };
+
+      Object.entries(problemToggles).forEach(([location, toggle]) => {
+        if (!toggle) return;
+        toggle.addEventListener('change', () => applyProblemFilter(location));
+      });
+
+      const updateRunButtons = (location) => {
+        runButtons.forEach((btn) => {
+          const disable = location === 'munich' ? btn.dataset.disableMunich === 'true' : btn.dataset.disableKyiv === 'true';
+          btn.disabled = disable;
+        });
+      };
 
       function syncSubjects() {
         if (!courseSelect || !subjectSelect) return;
@@ -567,6 +916,7 @@
         const safe = location === 'munich' ? 'munich' : 'kyiv';
         if (locationInput) locationInput.value = safe;
         if (runLocationInput) runLocationInput.value = safe;
+        updateRunButtons(safe);
         locationButtons.forEach((btn) => {
           btn.classList.toggle('active', btn.dataset.location === safe);
         });
@@ -580,6 +930,7 @@
         locationRows.forEach((row) => {
           row.style.display = row.dataset.location === safe ? '' : 'none';
         });
+        applyProblemFilter(safe);
         if (courseOptions.length) {
           courseOptions.forEach((opt) => {
             const optLocation = opt.dataset.location || 'kyiv';

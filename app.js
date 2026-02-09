@@ -685,6 +685,7 @@ const DEFAULT_GENERATOR_CONFIG = {
   seminar_distribution: 'start',
   max_daily_pairs: 7,
   target_daily_pairs: 4,
+  evenness_bias: 50,
   blocked_weeks: '',
   special_weeks_mode: 'block',
   prefer_compactness: true,
@@ -754,6 +755,191 @@ async function getCoursesByLocation(location) {
   });
 }
 
+const normalizeMirrorKey = (value) => String(value || '').trim().toLowerCase();
+
+const buildHeatmap = (entries, days, slots) => {
+  const counts = {};
+  days.forEach((day) => {
+    counts[day] = {};
+    slots.forEach((slot) => {
+      counts[day][slot] = 0;
+    });
+  });
+  (entries || []).forEach((entry) => {
+    const day = normalizeWeekdayName(entry.day_of_week);
+    const slot = Number(entry.class_number);
+    if (!day || !counts[day] || !Number.isFinite(slot)) return;
+    if (counts[day][slot] === undefined) return;
+    counts[day][slot] += 1;
+  });
+  let max = 0;
+  Object.values(counts).forEach((row) => {
+    Object.values(row).forEach((value) => {
+      if (value > max) max = value;
+    });
+  });
+  return { counts, max };
+};
+
+const buildMirrorSummary = (items, courseById) => {
+  const groups = new Map();
+  (items || []).forEach((item) => {
+    const key = normalizeMirrorKey(item.mirror_key);
+    if (!key) return;
+    if (!groups.has(key)) {
+      groups.set(key, { key, raw: item.mirror_key, items: [] });
+    }
+    groups.get(key).items.push(item);
+  });
+  const summary = [];
+  groups.forEach((group) => {
+    const group1 = group.items.filter((item) => Number(item.group_number) === 1).length;
+    const group2 = group.items.filter((item) => Number(item.group_number) === 2).length;
+    const subjects = Array.from(new Set(group.items.map((item) => item.subject_name).filter(Boolean)));
+    const courses = Array.from(new Set(group.items.map((item) => courseById[item.course_id]).filter(Boolean)));
+    const status = group1 && group2 ? (group1 === group2 ? 'ok' : 'warn') : 'missing';
+    summary.push({
+      key: group.raw || group.key,
+      group1,
+      group2,
+      subjects,
+      courses,
+      status,
+    });
+  });
+  summary.sort((a, b) => a.key.localeCompare(b.key));
+  return summary;
+};
+
+const buildGeneratorValidation = ({
+  items,
+  courseMetaById,
+  teacherLimits,
+  config,
+  locationLabel,
+}) => {
+  const issues = [];
+  const itemIssues = {};
+
+  const pushIssue = (level, message, itemId) => {
+    issues.push({ level, message, itemId });
+    if (!itemId) return;
+    if (!itemIssues[itemId]) {
+      itemIssues[itemId] = { level };
+    } else if (itemIssues[itemId].level !== 'error' && level === 'error') {
+      itemIssues[itemId].level = 'error';
+    }
+  };
+
+  if (!items.length) {
+    pushIssue('error', `Немає предметів для ${locationLabel}.`);
+    return { issues, itemIssues, hasCritical: true };
+  }
+
+  items.forEach((item) => {
+    const meta = courseMetaById[item.course_id];
+    if (!meta) {
+      pushIssue('error', `Предмет "${item.subject_name}" без активного семестру.`, item.id);
+      return;
+    }
+    const weeksCount = Number(meta.weeks_count || 0);
+    if (!weeksCount) {
+      pushIssue('error', `Курс "${item.subject_name}" без кількості тижнів.`, item.id);
+    }
+    if (item.group_number && item.group_count && Number(item.group_number) > Number(item.group_count)) {
+      pushIssue('error', `Група ${item.group_number} перевищує кількість груп у "${item.subject_name}".`, item.id);
+    }
+    if (item.fixed_class_number && Number(item.fixed_class_number) > Number(config.max_daily_pairs || 7)) {
+      pushIssue('warn', `"${item.subject_name}" має фіксований слот поза max пар/день.`, item.id);
+    }
+    if (item.weeks_set && weeksCount) {
+      const parsedWeeks = parseWeekSet(item.weeks_set, weeksCount);
+      if (!parsedWeeks.length) {
+        pushIssue('warn', `"${item.subject_name}" має некоректний набір тижнів.`, item.id);
+      } else if (parsedWeeks.length < Number(item.pairs_count || 0)) {
+        pushIssue('warn', `"${item.subject_name}" має менше тижнів ніж пар (${parsedWeeks.length}).`, item.id);
+      }
+    }
+    if (item.fixed_day && meta.active_days && meta.active_days.length && !meta.active_days.includes(item.fixed_day)) {
+      pushIssue('warn', `"${item.subject_name}" стоїть на день поза активними днями курсу.`, item.id);
+    }
+    const limit = teacherLimits[item.teacher_id] || null;
+    if (limit && limit.allowed_weekdays && limit.allowed_weekdays.length) {
+      if (item.fixed_day && !limit.allowed_weekdays.includes(item.fixed_day)) {
+        pushIssue('error', `"${item.subject_name}" у день, коли викладач недоступний.`, item.id);
+      }
+      if (!item.fixed_day && meta.active_days && meta.active_days.length) {
+        const overlap = meta.active_days.some((day) => limit.allowed_weekdays.includes(day));
+        if (!overlap) {
+          pushIssue('error', `"${item.subject_name}" не має доступних днів викладача.`, item.id);
+        }
+      }
+    }
+  });
+
+  if (config.mirror_groups) {
+    const mirrorMap = new Map();
+    items.forEach((item) => {
+      const key = normalizeMirrorKey(item.mirror_key);
+      if (!key) return;
+      if (!mirrorMap.has(key)) {
+        mirrorMap.set(key, { group1: [], group2: [] });
+      }
+      const bucket = mirrorMap.get(key);
+      if (Number(item.group_number) === 1) bucket.group1.push(item);
+      if (Number(item.group_number) === 2) bucket.group2.push(item);
+    });
+    mirrorMap.forEach((bucket, key) => {
+      if (!bucket.group1.length || !bucket.group2.length) {
+        const list = [...bucket.group1, ...bucket.group2];
+        list.forEach((item) => {
+          pushIssue('warn', `"${item.subject_name}" дзеркало "${key}" без пари.`, item.id);
+        });
+      } else if (bucket.group1.length !== bucket.group2.length) {
+        const list = [...bucket.group1, ...bucket.group2];
+        list.forEach((item) => {
+          pushIssue('warn', `"${item.subject_name}" дзеркало "${key}" має різні кількості пар.`, item.id);
+        });
+      }
+    });
+  }
+
+  const hasCritical = issues.some((issue) => issue.level === 'error');
+  return { issues, itemIssues, hasCritical };
+};
+
+const buildConflictContext = (conflicts, itemsById, courseById, courseLocationMap) => {
+  const conflictDetails = { kyiv: [], munich: [] };
+  const conflictItemIds = { kyiv: new Set(), munich: new Set() };
+  (conflicts || []).forEach((conflict) => {
+    const rawId = String(conflict.item_id || '');
+    const ids = rawId
+      .split('|')
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    const items = ids.map((id) => itemsById[id]).filter(Boolean);
+    const location = items.length
+      ? (courseLocationMap[items[0].course_id] || 'kyiv')
+      : 'kyiv';
+    ids.forEach((id) => conflictItemIds[location].add(id));
+    conflictDetails[location].push({
+      id: rawId,
+      reason: conflict.reason || 'unknown',
+      subject: conflict.subject,
+      scheduled: conflict.scheduled,
+      target: conflict.target,
+      items: items.map((item) => ({
+        id: item.id,
+        subject: item.subject_name,
+        course: courseById[item.course_id],
+        teacher: item.teacher_name,
+        group: item.group_number ? `Група ${item.group_number}` : 'Усі групи',
+      })),
+    });
+  });
+  return { conflictDetails, conflictItemIds };
+};
+
 const { createRateLimiter, getClientIp } = require('./lib/rateLimit');
 const {
   requireLogin,
@@ -780,7 +966,7 @@ const {
   formatLocalDate,
   addDays,
 } = require('./lib/dateUtils');
-const { generateSchedule } = require('./lib/scheduleGenerator');
+const { generateSchedule, parseWeekSet } = require('./lib/scheduleGenerator');
 const { runMigrations } = require('./lib/migrations');
 
 const authLimiter = createRateLimiter({
@@ -4979,6 +5165,79 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
     });
     const lastConflicts = Array.isArray(config.last_conflicts) ? config.last_conflicts : [];
     const lastStats = config.last_stats || null;
+    const allCourses = Object.values(coursesByLocation).flat();
+    const courseById = {};
+    allCourses.forEach((course) => {
+      courseById[course.id] = course.name;
+    });
+    const courseMetaById = {};
+    ['kyiv', 'munich'].forEach((location) => {
+      (courseSemestersByLocation[location] || []).forEach((row) => {
+        courseMetaById[row.course.id] = {
+          weeks_count: row.semester ? Number(row.semester.weeks_count || 0) : 0,
+          active_days: courseDaysByLocation[location][row.course.id] || [],
+          location,
+        };
+      });
+    });
+    const itemsByLocation = { kyiv: [], munich: [] };
+    const itemsById = {};
+    (items || []).forEach((item) => {
+      itemsById[item.id] = item;
+      const location = courseLocationMap[item.course_id] || 'kyiv';
+      itemsByLocation[location].push(item);
+    });
+    const mirrorSummaryByLocation = {
+      kyiv: buildMirrorSummary(itemsByLocation.kyiv, courseById),
+      munich: buildMirrorSummary(itemsByLocation.munich, courseById),
+    };
+    const validationByLocation = {
+      kyiv: buildGeneratorValidation({
+        items: itemsByLocation.kyiv,
+        courseMetaById,
+        teacherLimits: limitsByTeacher,
+        config,
+        locationLabel: 'Kyiv',
+      }),
+      munich: buildGeneratorValidation({
+        items: itemsByLocation.munich,
+        courseMetaById,
+        teacherLimits: limitsByTeacher,
+        config,
+        locationLabel: 'Munich',
+      }),
+    };
+    const { conflictDetails, conflictItemIds } = buildConflictContext(
+      lastConflicts,
+      itemsById,
+      courseById,
+      courseLocationMap
+    );
+    const problemItemLookupByLocation = { kyiv: {}, munich: {} };
+    ['kyiv', 'munich'].forEach((location) => {
+      const validationItems = validationByLocation[location].itemIssues || {};
+      Object.entries(validationItems).forEach(([itemId, info]) => {
+        problemItemLookupByLocation[location][itemId] = info.level;
+      });
+      conflictItemIds[location].forEach((itemId) => {
+        if (!problemItemLookupByLocation[location][itemId]) {
+          problemItemLookupByLocation[location][itemId] = 'warn';
+        }
+      });
+    });
+    const entryRows = await db.all(
+      'SELECT course_id, day_of_week, class_number FROM schedule_generator_entries WHERE run_id = ?',
+      [run.id]
+    );
+    const entriesByLocation = { kyiv: [], munich: [] };
+    (entryRows || []).forEach((row) => {
+      const location = courseLocationMap[row.course_id] || 'kyiv';
+      entriesByLocation[location].push(row);
+    });
+    const heatmapByLocation = {
+      kyiv: buildHeatmap(entriesByLocation.kyiv, fullWeekDays, [1, 2, 3, 4, 5, 6, 7]),
+      munich: buildHeatmap(entriesByLocation.munich, fullWeekDays, [1, 2, 3, 4, 5, 6, 7]),
+    };
 
     return res.render('admin-schedule-generator', {
       username: req.session.user.username,
@@ -4993,11 +5252,18 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       semestersByCourse,
       selectedSemestersByLocation,
       courseLocationMap,
+      courseById,
       teachers,
       items,
       limitsByTeacher,
       lastConflicts,
       lastStats,
+      mirrorSummaryByLocation,
+      validationByLocation,
+      conflictDetails,
+      conflictItemIds,
+      problemItemLookupByLocation,
+      heatmapByLocation,
       dayOptions: fullWeekDays,
       dayLabels: studyDayLabels,
       classOptions: [1, 2, 3, 4, 5, 6, 7],
@@ -5042,12 +5308,16 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
     const existing = parseGeneratorConfig(run.config);
     const maxDailyRaw = Number(req.body.max_daily_pairs);
     const targetDailyRaw = Number(req.body.target_daily_pairs);
+    const evennessRaw = Number(req.body.evenness_bias);
     const maxDailyPairs = Number.isNaN(maxDailyRaw)
       ? existing.max_daily_pairs
       : Math.min(Math.max(maxDailyRaw, 1), 7);
     const targetDailyPairs = Number.isNaN(targetDailyRaw)
       ? existing.target_daily_pairs
       : Math.min(Math.max(targetDailyRaw, 1), 7);
+    const evennessBias = Number.isNaN(evennessRaw)
+      ? existing.evenness_bias
+      : Math.min(Math.max(evennessRaw, 0), 100);
     const activeLocation = String(req.body.active_location || existing.active_location || 'kyiv').toLowerCase() === 'munich'
       ? 'munich'
       : 'kyiv';
@@ -5074,6 +5344,7 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
       seminar_distribution: String(req.body.seminar_distribution || existing.seminar_distribution || 'start'),
       max_daily_pairs: maxDailyPairs || 7,
       target_daily_pairs: targetDailyPairs || 4,
+      evenness_bias: evennessBias,
       blocked_weeks: String(req.body.blocked_weeks || ''),
       special_weeks_mode: String(req.body.special_weeks_mode || existing.special_weeks_mode || 'block'),
       prefer_compactness: String(req.body.prefer_compactness || '') === 'on',
@@ -5299,6 +5570,90 @@ app.post('/admin/schedule-generator/items/delete/:id', requireAdmin, async (req,
   }
 });
 
+app.post('/admin/schedule-generator/items/freeze/:id', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.item.freeze');
+  }
+  const itemId = Number(req.params.id);
+  const runId = Number(req.body.run_id);
+  if (!Number.isFinite(itemId) || !Number.isFinite(runId) || runId <= 0) {
+    return res.redirect('/admin/schedule-generator?err=Invalid%20item');
+  }
+  try {
+    const item = await db.get(
+      'SELECT * FROM schedule_generator_items WHERE id = ? AND run_id = ?',
+      [itemId, runId]
+    );
+    if (!item) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Item%20not%20found`);
+    }
+    let slot = await db.get(
+      `
+        SELECT day_of_week, class_number, COUNT(*) as cnt
+        FROM schedule_generator_entries
+        WHERE run_id = ? AND item_id = ?
+        GROUP BY day_of_week, class_number
+        ORDER BY cnt DESC
+        LIMIT 1
+      `,
+      [runId, itemId]
+    );
+    if (!slot) {
+      const params = [runId, item.course_id, item.subject_id];
+      let where = 'run_id = ? AND course_id = ? AND subject_id = ?';
+      if (item.group_number) {
+        where += ' AND group_number = ?';
+        params.push(item.group_number);
+      }
+      slot = await db.get(
+        `
+          SELECT day_of_week, class_number, COUNT(*) as cnt
+          FROM schedule_generator_entries
+          WHERE ${where}
+          GROUP BY day_of_week, class_number
+          ORDER BY cnt DESC
+          LIMIT 1
+        `,
+        params
+      );
+    }
+    if (!slot) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20generated%20slot`);
+    }
+    await db.run(
+      'UPDATE schedule_generator_items SET fixed_day = ?, fixed_class_number = ? WHERE id = ? AND run_id = ?',
+      [slot.day_of_week, slot.class_number, itemId, runId]
+    );
+    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Slot%20fixed`);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.item.freeze');
+  }
+});
+
+app.post('/admin/schedule-generator/items/unfreeze/:id', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.item.unfreeze');
+  }
+  const itemId = Number(req.params.id);
+  const runId = Number(req.body.run_id);
+  if (!Number.isFinite(itemId) || !Number.isFinite(runId) || runId <= 0) {
+    return res.redirect('/admin/schedule-generator?err=Invalid%20item');
+  }
+  try {
+    await db.run(
+      'UPDATE schedule_generator_items SET fixed_day = NULL, fixed_class_number = NULL WHERE id = ? AND run_id = ?',
+      [itemId, runId]
+    );
+    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Slot%20unfixed`);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.item.unfreeze');
+  }
+});
+
 app.post('/admin/schedule-generator/teachers/save', requireAdmin, async (req, res) => {
   try {
     await ensureDbReady();
@@ -5340,6 +5695,8 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
     return handleDbError(res, err, 'admin.scheduleGenerator.run');
   }
   const runId = Number(req.body.run_id);
+  const courseOnlyRaw = Number(req.body.course_id);
+  const courseOnly = Number.isFinite(courseOnlyRaw) && courseOnlyRaw > 0 ? courseOnlyRaw : null;
   if (!Number.isFinite(runId) || runId <= 0) {
     return res.redirect('/admin/schedule-generator?err=Invalid%20run');
   }
@@ -5347,9 +5704,16 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
     const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
     if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
     const config = parseGeneratorConfig(run.config);
-    const activeLocation = config.active_location === 'munich' ? 'munich' : 'kyiv';
+    const requestedLocation = String(req.body.active_location || config.active_location || 'kyiv').toLowerCase();
+    const activeLocation = requestedLocation === 'munich' ? 'munich' : 'kyiv';
+    if (activeLocation !== config.active_location) {
+      config.active_location = activeLocation;
+    }
     const locationCourses = await getCoursesByLocation(activeLocation);
     const locationCourseIds = new Set((locationCourses || []).map((c) => Number(c.id)));
+    if (courseOnly && !locationCourseIds.has(courseOnly)) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Course%20not%20in%20location`);
+    }
     const itemsAll = await db.all(
       `
         SELECT sgi.*, s.name AS subject_name, s.group_count
@@ -5359,7 +5723,10 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
       `,
       [runId]
     );
-    const items = (itemsAll || []).filter((item) => locationCourseIds.has(Number(item.course_id)));
+    const items = (itemsAll || []).filter((item) =>
+      locationCourseIds.has(Number(item.course_id)) &&
+      (!courseOnly || Number(item.course_id) === courseOnly)
+    );
     if (!items.length) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20items%20for%20location`);
     }
@@ -5408,14 +5775,36 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
       semester_id: (courseContexts.get(String(item.course_id)) || {}).semester_id || item.semester_id,
     }));
 
+    let existingEntries = [];
+    if (courseOnly) {
+      const otherCourseIds = Array.from(locationCourseIds).filter((id) => id !== courseOnly);
+      if (otherCourseIds.length) {
+        const placeholders = otherCourseIds.map(() => '?').join(',');
+        existingEntries = await db.all(
+          `
+            SELECT teacher_id, day_of_week, class_number, week_number
+            FROM schedule_generator_entries
+            WHERE run_id = ? AND course_id IN (${placeholders})
+          `,
+          [runId, ...otherCourseIds]
+        );
+      }
+    }
+
     const result = generateSchedule({
       items: normalizedItems,
       courseContexts,
       teacherLimits: limitsMap,
       config,
+      existingEntries,
     });
 
-    if (courseIds.length) {
+    if (courseOnly) {
+      await db.run(
+        'DELETE FROM schedule_generator_entries WHERE run_id = ? AND course_id = ?',
+        [runId, courseOnly]
+      );
+    } else if (courseIds.length) {
       const placeholders = courseIds.map(() => '?').join(',');
       await db.run(
         `DELETE FROM schedule_generator_entries WHERE run_id = ? AND course_id IN (${placeholders})`,
@@ -5426,13 +5815,14 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
       const stmt = db.prepare(
         `
           INSERT INTO schedule_generator_entries
-            (run_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, day_of_week, class_number, week_number, is_mirror, mirror_key)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (run_id, item_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, day_of_week, class_number, week_number, is_mirror, mirror_key)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
       );
       result.entries.forEach((entry) => {
         stmt.run(
           runId,
+          entry.item_id || null,
           entry.course_id,
           entry.semester_id,
           entry.subject_id,
@@ -5456,6 +5846,7 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
         items: normalizedItems.length,
         entries: result.entries.length,
         conflicts: result.conflicts.length,
+        scope: courseOnly ? { type: 'course', course_id: courseOnly } : { type: 'location', location: activeLocation },
       },
       last_conflicts: result.conflicts,
     };
@@ -5464,7 +5855,7 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
       [serializeGeneratorConfig(nextConfig), runId]
     );
 
-    const firstCourse = normalizedItems[0] ? normalizedItems[0].course_id : courseIds[0];
+    const firstCourse = courseOnly || (normalizedItems[0] ? normalizedItems[0].course_id : courseIds[0]);
     return res.redirect(`/admin/schedule-generator/${runId}/preview?course=${firstCourse}&week=1`);
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.run');
