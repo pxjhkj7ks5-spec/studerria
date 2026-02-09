@@ -665,6 +665,8 @@ const DEFAULT_GENERATOR_CONFIG = {
   blocked_weeks: '',
   special_weeks_mode: 'block',
   prefer_compactness: true,
+  mirror_groups: false,
+  course_semesters: {},
 };
 
 const parseGeneratorConfig = (raw) => {
@@ -4842,8 +4844,24 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
     const courseSemesters = [];
     const courseDays = {};
     const subjectsByCourse = {};
+    const semestersByCourse = {};
+    const selectedSemesters = {};
     for (const course of kyivCourses) {
-      const semester = await getActiveSemester(course.id);
+      const semesters = await getSemestersCached(course.id);
+      semestersByCourse[course.id] = semesters || [];
+      const configuredId = config.course_semesters
+        ? config.course_semesters[course.id] || config.course_semesters[String(course.id)]
+        : null;
+      let semester = null;
+      if (configuredId) {
+        semester = (semesters || []).find((s) => Number(s.id) === Number(configuredId)) || null;
+      }
+      if (!semester) {
+        semester = await getActiveSemester(course.id);
+      }
+      if (semester) {
+        selectedSemesters[course.id] = semester.id;
+      }
       courseSemesters.push({ course, semester });
       const studyDays = await getCourseStudyDays(course.id);
       const activeDays = (studyDays || [])
@@ -4891,6 +4909,8 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       courseSemesters,
       courseDays,
       subjectsByCourse,
+      semestersByCourse,
+      selectedSemesters,
       teachers,
       items,
       limitsByTeacher,
@@ -4946,6 +4966,18 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
     const targetDailyPairs = Number.isNaN(targetDailyRaw)
       ? existing.target_daily_pairs
       : Math.min(Math.max(targetDailyRaw, 1), 7);
+    const courseSemesterInput = req.body.course_semesters || {};
+    const sanitizedCourseSemesters = {};
+    const entries = Object.entries(courseSemesterInput);
+    for (const [courseIdRaw, semesterIdRaw] of entries) {
+      const courseId = Number(courseIdRaw);
+      const semesterId = Number(semesterIdRaw);
+      if (!Number.isFinite(courseId) || !Number.isFinite(semesterId)) continue;
+      const row = await db.get('SELECT id FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
+      if (row) {
+        sanitizedCourseSemesters[String(courseId)] = semesterId;
+      }
+    }
     const nextConfig = {
       ...existing,
       distribution: String(req.body.distribution || existing.distribution || 'even'),
@@ -4955,11 +4987,20 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
       blocked_weeks: String(req.body.blocked_weeks || ''),
       special_weeks_mode: String(req.body.special_weeks_mode || existing.special_weeks_mode || 'block'),
       prefer_compactness: String(req.body.prefer_compactness || '') === 'on',
+      mirror_groups: String(req.body.mirror_groups || '') === 'on',
+      course_semesters: sanitizedCourseSemesters,
     };
     await db.run(
       'UPDATE schedule_generator_runs SET config = ?, updated_at = NOW() WHERE id = ?',
       [serializeGeneratorConfig(nextConfig), runId]
     );
+    const semesterPairs = Object.entries(sanitizedCourseSemesters);
+    for (const [courseId, semesterId] of semesterPairs) {
+      await db.run(
+        'UPDATE schedule_generator_items SET semester_id = ? WHERE run_id = ? AND course_id = ?',
+        [Number(semesterId), runId, Number(courseId)]
+      );
+    }
     return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Settings%20saved`);
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.config.save');
@@ -5006,7 +5047,21 @@ app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) =
     if (groupNumber && Number(groupNumber) > Number(subjectRow.group_count || 1)) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
     }
-    const semester = await getActiveSemester(courseId);
+    const run = await db.get('SELECT config FROM schedule_generator_runs WHERE id = ?', [runId]);
+    if (!run) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Run%20not%20found`);
+    }
+    const runConfig = parseGeneratorConfig(run.config);
+    const configuredSemesterId = runConfig.course_semesters
+      ? runConfig.course_semesters[courseId] || runConfig.course_semesters[String(courseId)]
+      : null;
+    let semester = null;
+    if (configuredSemesterId) {
+      semester = await db.get('SELECT id FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, courseId]);
+    }
+    if (!semester) {
+      semester = await getActiveSemester(courseId);
+    }
     if (!semester) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Semester%20not%20found`);
     }
@@ -5077,7 +5132,21 @@ app.post('/admin/schedule-generator/items/edit/:id', requireAdmin, async (req, r
     if (groupNumber && Number(groupNumber) > Number(subjectRow.group_count || 1)) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
     }
-    const semester = await getActiveSemester(courseId);
+    const run = await db.get('SELECT config FROM schedule_generator_runs WHERE id = ?', [runId]);
+    if (!run) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Run%20not%20found`);
+    }
+    const runConfig = parseGeneratorConfig(run.config);
+    const configuredSemesterId = runConfig.course_semesters
+      ? runConfig.course_semesters[courseId] || runConfig.course_semesters[String(courseId)]
+      : null;
+    let semester = null;
+    if (configuredSemesterId) {
+      semester = await db.get('SELECT id FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, courseId]);
+    }
+    if (!semester) {
+      semester = await getActiveSemester(courseId);
+    }
     if (!semester) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Semester%20not%20found`);
     }
@@ -5191,7 +5260,16 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
     const courseContexts = new Map();
     const courseIds = Array.from(new Set(items.map((item) => String(item.course_id))));
     for (const courseId of courseIds) {
-      const semester = await getActiveSemester(courseId);
+      const configuredSemesterId = config.course_semesters
+        ? config.course_semesters[courseId] || config.course_semesters[String(courseId)]
+        : null;
+      let semester = null;
+      if (configuredSemesterId) {
+        semester = await db.get('SELECT * FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, courseId]);
+      }
+      if (!semester) {
+        semester = await getActiveSemester(courseId);
+      }
       if (!semester) continue;
       const studyDays = await getCourseStudyDays(courseId);
       const activeDays = (studyDays || [])
@@ -5220,7 +5298,7 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
 
     const normalizedItems = items.map((item) => ({
       ...item,
-      semester_id: item.semester_id || (courseContexts.get(String(item.course_id)) || {}).semester_id,
+      semester_id: (courseContexts.get(String(item.course_id)) || {}).semester_id || item.semester_id,
     }));
 
     const result = generateSchedule({
@@ -5292,13 +5370,23 @@ app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, re
   try {
     const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
     if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    const config = parseGeneratorConfig(run.config);
     const kyivCourses = await getKyivCoursesCached();
     const availableCourseIds = kyivCourses.map((c) => Number(c.id));
     const selectedCourseId = availableCourseIds.includes(courseId) ? courseId : availableCourseIds[0];
     if (!selectedCourseId) {
       return res.redirect('/admin/schedule-generator?run=' + runId);
     }
-    const activeSemester = await getActiveSemester(selectedCourseId);
+    const configuredSemesterId = config.course_semesters
+      ? config.course_semesters[selectedCourseId] || config.course_semesters[String(selectedCourseId)]
+      : null;
+    let activeSemester = null;
+    if (configuredSemesterId) {
+      activeSemester = await db.get('SELECT * FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, selectedCourseId]);
+    }
+    if (!activeSemester) {
+      activeSemester = await getActiveSemester(selectedCourseId);
+    }
     const totalWeeks = activeSemester && activeSemester.weeks_count ? Number(activeSemester.weeks_count) : 15;
     let selectedWeek = Number(req.query.week);
     if (Number.isNaN(selectedWeek) || selectedWeek < 1) selectedWeek = 1;
@@ -5373,7 +5461,7 @@ app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, re
       totalWeeks,
       semester: activeSemester,
       bellSchedule,
-      config: parseGeneratorConfig(run.config),
+      config,
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.preview');

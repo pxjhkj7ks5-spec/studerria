@@ -145,10 +145,36 @@
                   </select>
                 </div>
                 <div class="col-12">
+                  <label class="form-label">Семестри курсів</label>
+                  <div class="d-grid gap-2">
+                    <% courseSemesters.forEach(function(row) { %>
+                      <% const semList = semestersByCourse[row.course.id] || []; %>
+                      <% const selectedSemId = (selectedSemesters && selectedSemesters[row.course.id]) || (row.semester ? row.semester.id : null); %>
+                      <div class="glass-inset p-3">
+                        <div class="fw-semibold"><%= row.course.name %></div>
+                        <select class="form-select form-select-sm mt-2" name="course_semesters[<%= row.course.id %>]">
+                          <% semList.forEach(function(sem) { %>
+                            <option value="<%= sem.id %>" <%= Number(sem.id) === Number(selectedSemId) ? 'selected' : '' %>>
+                              <%= sem.title %> · <%= sem.weeks_count %> тижнів
+                            </option>
+                          <% }); %>
+                        </select>
+                      </div>
+                    <% }); %>
+                  </div>
+                </div>
+                <div class="col-12">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="prefer_compactness" id="preferCompactness" <%= config.prefer_compactness ? 'checked' : '' %> />
                     <label class="form-check-label" for="preferCompactness">Менше вікон між парами</label>
                   </div>
+                </div>
+                <div class="col-12">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="mirror_groups" id="mirrorGroups" <%= config.mirror_groups ? 'checked' : '' %> />
+                    <label class="form-check-label" for="mirrorGroups">Швидке дзеркало груп (A/B)</label>
+                  </div>
+                  <div class="small text-muted">Парно зʼєднуємо групи 1/2 з однаковою кількістю пар і чергуємо по тижнях.</div>
                 </div>
                 <div class="col-12 d-grid">
                   <button class="btn btn-outline-primary" type="submit">Зберегти налаштування</button>

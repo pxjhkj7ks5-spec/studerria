@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.38",
+      "date": "2026-02-09",
+      "items": [
+        "feat: add A/B mirror groups mode to semester generator",
+        "feat: allow selecting semesters per course in generator settings"
+      ]
+    },
+    {
       "version": "0.7.37",
       "date": "2026-02-09",
       "items": [
