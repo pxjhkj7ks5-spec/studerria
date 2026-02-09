@@ -1,13 +1,6 @@
 {
   "items": [
     {
-      "version": "0.7.35",
-      "date": "2026-02-09",
-      "items": [
-        "fix: disable glass sheen on hover to reduce flicker"
-      ]
-    },
-    {
       "version": "0.7.34",
       "date": "2026-02-09",
       "items": [
