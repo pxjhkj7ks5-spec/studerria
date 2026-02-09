@@ -351,6 +351,23 @@ const getRoleAllowedSections = (role) => {
   return DEFAULT_ROLE_PERMISSIONS[role] || [];
 };
 
+const isTeacherCourseRow = (course) =>
+  course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
+
+const buildStaffCourseAccess = (userCourseId, courses) => {
+  const allowedCourseIds = new Set();
+  if (Number.isFinite(Number(userCourseId))) {
+    allowedCourseIds.add(Number(userCourseId));
+  }
+  (courses || []).forEach((course) => {
+    if (isTeacherCourseRow(course)) {
+      allowedCourseIds.add(Number(course.id));
+    }
+  });
+  const allowedCourses = (courses || []).filter((course) => allowedCourseIds.has(Number(course.id)));
+  return { allowedCourseIds, allowedCourses };
+};
+
 const ensureUser = async (fullName, role, passwordHash, options = {}) => {
   const { courseId = 1 } = options;
   const { forcePassword = false, forceRole = false } = options;
@@ -6250,14 +6267,20 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
     return handleDbError(res, err, 'admin.overview.courses');
   }
   let courseId = isAdmin ? getAdminCourse(req) : Number(req.session.user.course_id || 1);
-  if (isDeanery) {
+  let allowCourseSelect = isAdmin;
+  if (!isAdmin) {
+    const baseCourseId = Number(req.session.user.course_id || 1);
+    const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, courses);
+    courses = allowedCourses;
     const requested = Number(req.query.course);
-    if (!Number.isNaN(requested)) {
-      courseId = requested;
+    courseId = allowedCourseIds.has(requested) ? requested : baseCourseId;
+    if (!allowedCourseIds.has(courseId) && courses.length) {
+      courseId = Number(courses[0].id);
     }
+    allowCourseSelect = courses.length > 1;
   }
   if (courses.length && !courses.some((c) => Number(c.id) === Number(courseId))) {
-    courseId = courses[0].id;
+    courseId = Number(courses[0].id);
   }
   let activeSemester = null;
   try {
@@ -6400,7 +6423,7 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
       weeklyUserRoles,
       weeklyUserSeries,
       limitedStaffView: isStarosta,
-      allowCourseSelect: isAdmin || isDeanery,
+      allowCourseSelect,
       backLink: isAdmin ? `/admin?course=${courseId}` : (isDeanery ? `/deanery?course=${courseId}` : '/starosta'),
     });
   } catch (err) {
@@ -7295,7 +7318,20 @@ app.get('/starosta', requireStaff, async (req, res) => {
     return handleDbError(res, err, 'starosta.init');
   }
 
-  const courseId = req.session.user.course_id || 1;
+  const baseCourseId = Number(req.session.user.course_id || 1);
+  let allCourses = [];
+  try {
+    allCourses = await getCoursesCached();
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.courses');
+  }
+  const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, allCourses);
+  const requestedCourse = Number(req.query.course);
+  let courseId = allowedCourseIds.has(requestedCourse) ? requestedCourse : baseCourseId;
+  if (allowedCourses.length && !allowedCourses.some((course) => Number(course.id) === Number(courseId))) {
+    courseId = Number(allowedCourses[0].id);
+  }
+  const allowCourseSelect = allowedCourses.length > 1;
   const {
     group_number,
     subject,
@@ -7311,28 +7347,25 @@ app.get('/starosta', requireStaff, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'starosta.activeSemester');
   }
-  db.all('SELECT id, name FROM courses WHERE id = ?', [courseId], (courseErr, courses) => {
-    if (courseErr) {
-      return handleDbError(res, courseErr, 'starosta.courses');
-    }
-    db.all(
-      'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
-      [courseId],
-      (semErr, semesters) => {
-        if (semErr) {
-          return handleDbError(res, semErr, 'starosta.semesters');
+  const courses = allowedCourses;
+  db.all(
+    'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
+    [courseId],
+    (semErr, semesters) => {
+      if (semErr) {
+        return handleDbError(res, semErr, 'starosta.semesters');
+      }
+  db.all(
+    'SELECT id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at, course_id FROM users WHERE course_id = ? ORDER BY full_name',
+    [courseId],
+    (userErr, users) => {
+      if (userErr) {
+        return handleDbError(res, userErr, 'starosta.users');
+      }
+      db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
+        if (subjectErr) {
+          return handleDbError(res, subjectErr, 'starosta.subjects');
         }
-    db.all(
-      'SELECT id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at, course_id FROM users WHERE course_id = ? ORDER BY full_name',
-      [courseId],
-      (userErr, users) => {
-        if (userErr) {
-          return handleDbError(res, userErr, 'starosta.users');
-        }
-        db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
-          if (subjectErr) {
-            return handleDbError(res, subjectErr, 'starosta.subjects');
-          }
           const homeworkFilters = [];
           const homeworkParams = [];
           homeworkFilters.push('h.course_id = ?');
@@ -7489,6 +7522,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
                       selectedCourseId: courseId,
                       limitedStaffView: true,
                       allowedSections: getRoleAllowedSections('starosta'),
+                      allowCourseSelect,
                       filters: {
                         group_number: group_number || '',
                         day: '',
@@ -7516,8 +7550,8 @@ app.get('/starosta', requireStaff, async (req, res) => {
         });
       }
     );
-      }
-    );
+    }
+  );
   });
 });
 
@@ -7528,7 +7562,20 @@ app.get('/deanery', requireDeanery, (req, res) => {
     } catch (err) {
       return handleDbError(res, err, 'deanery.init');
     }
-    const courseId = Number(req.query.course || req.session.user.course_id || 1);
+    const baseCourseId = Number(req.session.user.course_id || 1);
+    let allCourses = [];
+    try {
+      allCourses = await getCoursesCached();
+    } catch (err) {
+      return handleDbError(res, err, 'deanery.courses');
+    }
+    const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, allCourses);
+    const requestedCourse = Number(req.query.course);
+    let courseId = allowedCourseIds.has(requestedCourse) ? requestedCourse : baseCourseId;
+    if (allowedCourses.length && !allowedCourses.some((course) => Number(course.id) === Number(courseId))) {
+      courseId = Number(allowedCourses[0].id);
+    }
+    const allowCourseSelect = allowedCourses.length > 1;
     const { group_number, day, subject, sort_schedule, schedule_date } = req.query;
     let activeSemester = null;
     try {
@@ -7573,65 +7620,62 @@ app.get('/deanery', requireDeanery, (req, res) => {
       ${scheduleWhere}
       ORDER BY se.week_number, se.day_of_week, se.class_number
     `;
-    db.all('SELECT id, name FROM courses ORDER BY id', [], (courseErr, courses) => {
-      if (courseErr) {
-        return handleDbError(res, courseErr, 'deanery.courses');
-      }
-      db.all(
-        'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
-        [courseId],
-        (semErr, semesters) => {
-          if (semErr) {
-            return handleDbError(res, semErr, 'deanery.semesters');
-          }
-          db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
-            if (subjectErr) {
-              return handleDbError(res, subjectErr, 'deanery.subjects');
-            }
-            db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
-              if (scheduleErr) {
-                return handleDbError(res, scheduleErr, 'deanery.schedule');
-              }
-              const schedule = sortSchedule(scheduleRows, sort_schedule);
-              try {
-                return res.render('admin', {
-                  username: req.session.user.username,
-                  userId: req.session.user.id,
-                  role: req.session.role,
-                  schedule,
-                  homework: [],
-                  users: [],
-                  subjects,
-                  studentGroups: [],
-                  logs: [],
-                  teamworkTasks: [],
-                  adminMessages: [],
-                  courses,
-                  semesters,
-                  activeSemester,
-                  selectedCourseId: courseId,
-                  limitedStaffView: true,
-                  allowedSections: getRoleAllowedSections('deanery'),
-                  filters: {
-                    group_number: group_number || '',
-                    day: day || '',
-                    subject: subject || '',
-                    schedule_date: schedule_date || '',
-                  },
-                  usersStatus: 'active',
-                  sorts: {
-                    schedule: sort_schedule || '',
-                    homework: '',
-                  },
-                });
-              } catch (renderErr) {
-                return handleDbError(res, renderErr, 'deanery.render');
-              }
-            });
-          });
+    const courses = allowedCourses;
+    db.all(
+      'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
+      [courseId],
+      (semErr, semesters) => {
+        if (semErr) {
+          return handleDbError(res, semErr, 'deanery.semesters');
         }
-      );
-    });
+        db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
+          if (subjectErr) {
+            return handleDbError(res, subjectErr, 'deanery.subjects');
+          }
+          db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
+            if (scheduleErr) {
+              return handleDbError(res, scheduleErr, 'deanery.schedule');
+            }
+            const schedule = sortSchedule(scheduleRows, sort_schedule);
+            try {
+              return res.render('admin', {
+                username: req.session.user.username,
+                userId: req.session.user.id,
+                role: req.session.role,
+                schedule,
+                homework: [],
+                users: [],
+                subjects,
+                studentGroups: [],
+                logs: [],
+                teamworkTasks: [],
+                adminMessages: [],
+                courses,
+                semesters,
+                activeSemester,
+                selectedCourseId: courseId,
+                limitedStaffView: true,
+                allowedSections: getRoleAllowedSections('deanery'),
+                allowCourseSelect,
+                filters: {
+                  group_number: group_number || '',
+                  day: day || '',
+                  subject: subject || '',
+                  schedule_date: schedule_date || '',
+                },
+                usersStatus: 'active',
+                sorts: {
+                  schedule: sort_schedule || '',
+                  homework: '',
+                },
+              });
+            } catch (renderErr) {
+              return handleDbError(res, renderErr, 'deanery.render');
+            }
+          });
+        });
+      }
+    );
   })();
 });
 

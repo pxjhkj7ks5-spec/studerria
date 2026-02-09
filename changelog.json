@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.53",
+      "date": "2026-02-09",
+      "items": [
+        "feat: restrict starosta/deanery to own course with teacher-course exception"
+      ]
+    },
+    {
       "version": "0.7.52",
       "date": "2026-02-09",
       "items": [
