@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.30",
+      "date": "2026-02-09",
+      "items": [
+        "fix: reduce schedule hover artifacts with paint containment"
+      ]
+    },
+    {
       "version": "0.7.29",
       "date": "2026-02-09",
       "items": [

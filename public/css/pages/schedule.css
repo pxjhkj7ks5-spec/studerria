@@ -127,19 +127,22 @@ body.theme-light .day-card .card-header {
 }
 
 .schedule-card {
-  transition: box-shadow 180ms ease, border-color 180ms ease, background 180ms ease;
+  position: relative;
+  isolation: isolate;
+  contain: paint;
+  background-clip: padding-box;
+  transition: border-color 180ms ease, background 180ms ease;
 }
 
 @media (hover: hover) {
   .schedule-card:hover {
-    box-shadow: var(--shadow-sm);
     border-color: rgba(122, 167, 255, 0.35);
     background: rgba(255, 255, 255, 0.08);
   }
 }
 
 .schedule-card:active {
-  box-shadow: var(--shadow-sm);
+  border-color: rgba(122, 167, 255, 0.45);
 }
 
 .schedule-card.is-now {
