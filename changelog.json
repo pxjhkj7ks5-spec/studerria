@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.42",
+      "date": "2026-02-09",
+      "items": [
+        "fix: add migration and safe backfill for course location"
+      ]
+    },
+    {
       "version": "0.7.41",
       "date": "2026-02-09",
       "items": [

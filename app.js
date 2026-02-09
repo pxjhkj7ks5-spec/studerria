@@ -324,7 +324,13 @@ const initDb = async () => {
 
   await pool.query('UPDATE subjects SET is_required = true WHERE is_required IS NULL');
 
-  await pool.query("UPDATE courses SET location = 'kyiv' WHERE location IS NULL");
+  try {
+    await pool.query("UPDATE courses SET location = 'kyiv' WHERE location IS NULL");
+  } catch (err) {
+    if (!(err && err.code === '42703')) {
+      throw err;
+    }
+  }
   await pool.query('UPDATE users SET course_id = 1 WHERE course_id IS NULL');
   await pool.query("UPDATE users SET language = 'uk' WHERE language IS NULL");
   await pool.query('UPDATE users SET created_at = NOW() WHERE created_at IS NULL');
