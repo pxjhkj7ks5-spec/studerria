@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.47",
+      "date": "2026-02-09",
+      "items": [
+        "fix: improve generator theme toggle and table readability"
+      ]
+    },
+    {
       "version": "0.7.46",
       "date": "2026-02-09",
       "items": [

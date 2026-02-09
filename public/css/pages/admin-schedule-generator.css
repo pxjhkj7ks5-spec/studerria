@@ -16,6 +16,39 @@ body.theme-light.schedule-generator-page {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.schedule-generator-page .theme-toggle-min {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  backdrop-filter: blur(10px);
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.schedule-generator-page .theme-toggle-min:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+}
+
+body.theme-light.schedule-generator-page .theme-toggle-min {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.85);
+  color: #0f172a;
+}
+
+body.theme-light.schedule-generator-page .theme-toggle-min:hover {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(15, 23, 42, 0.2);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
+}
+
 .schedule-generator-page .glass {
   background: rgba(255, 255, 255, 0.06);
 }
@@ -56,6 +89,10 @@ body.theme-light.schedule-generator-page .glass {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--faint);
+}
+
+body.theme-dark.schedule-generator-page .generator-section-title {
+  color: rgba(226, 232, 240, 0.75);
 }
 
 .schedule-generator-page .form-control,
@@ -109,15 +146,19 @@ body.theme-light.schedule-generator-page .teacher-day-pill {
 
 .generator-table tbody tr {
   background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 body.theme-light.schedule-generator-page .generator-table tbody tr {
-  background: rgba(15, 23, 42, 0.03);
+  background: rgba(15, 23, 42, 0.06);
+  border-color: rgba(15, 23, 42, 0.12);
 }
 
 .generator-table thead th {
   color: var(--faint);
   font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .generator-empty {
@@ -150,16 +191,36 @@ body.theme-light.schedule-generator-page .generator-empty {
 }
 
 body.theme-dark.schedule-generator-page .text-muted,
-body.theme-dark.schedule-generator-page .muted {
+body.theme-dark.schedule-generator-page .muted,
+body.theme-dark.schedule-generator-page .form-text {
   color: rgba(248, 250, 252, 0.68) !important;
 }
 
 body.theme-light.schedule-generator-page .generator-table thead th {
-  color: rgba(15, 23, 42, 0.6);
+  color: rgba(15, 23, 42, 0.7);
+  background: rgba(15, 23, 42, 0.05);
+  border-bottom-color: rgba(15, 23, 42, 0.12);
 }
 
 body.theme-dark.schedule-generator-page .generator-table thead th {
-  color: rgba(248, 250, 252, 0.72);
+  color: rgba(248, 250, 252, 0.78);
+}
+
+.schedule-generator-page .table > :not(caption) > * > * {
+  background-clip: padding-box;
+}
+
+.schedule-generator-page .table td,
+.schedule-generator-page .table th {
+  vertical-align: middle;
+}
+
+body.theme-dark.schedule-generator-page .form-label {
+  color: rgba(248, 250, 252, 0.82);
+}
+
+body.theme-dark.schedule-generator-page .small.text-muted {
+  color: rgba(226, 232, 240, 0.68) !important;
 }
 
 .schedule-preview-page .schedule-card.is-mirror {
