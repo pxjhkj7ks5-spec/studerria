@@ -2081,13 +2081,20 @@
                   </div>
                 </div>
                 <div class="row g-2 align-items-end">
+                  <% const canBroadcastAllCourses = role === 'admin'; %>
                   <div class="col-12 col-md-4">
                     <label class="form-label"><%= t('admin.target') %></label>
                     <select class="form-select" name="target_type" id="messageTargetType">
                       <option value="all"><%= t('admin.targetAll') %></option>
+                      <% if (canBroadcastAllCourses) { %>
+                        <option value="all_courses">Усі курси</option>
+                      <% } %>
                       <option value="subject"><%= t('admin.targetSubjectGroup') %></option>
                       <option value="users"><%= t('admin.targetUsers') %></option>
                     </select>
+                    <div class="form-text text-muted">
+                      <% if (canBroadcastAllCourses) { %>Адмін може надсилати всім курсам, інші ролі — лише своєму.<% } else { %>Доступно лише для вашого курсу.<% } %>
+                    </div>
                   </div>
                   <div class="col-12 col-md-4">
                     <label class="form-label"><%= t('admin.subject') %></label>

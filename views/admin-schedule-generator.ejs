@@ -94,7 +94,7 @@
           <% ['kyiv', 'munich'].forEach(function(location) { %>
             <% const locationCourses = (courseSemestersByLocation && courseSemestersByLocation[location]) || []; %>
             <% if (locationCourses.length) { %>
-              <form method="POST" action="/admin/schedule-generator/run" class="d-flex flex-wrap align-items-center gap-2" data-location-section="<%= location %>">
+              <form method="POST" action="/admin/schedule-generator/run" class="d-flex flex-wrap align-items-center gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                 <input type="hidden" name="run_id" value="<%= run.id %>" />
                 <input type="hidden" name="active_location" value="<%= location %>" />
                 <input type="hidden" name="scope" value="course" />
@@ -131,7 +131,7 @@
               </div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const courseList = courseSemestersByLocation[location] || []; %>
-                <div class="d-grid gap-2" data-location-section="<%= location %>">
+                <div class="d-grid gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                   <% if (courseList.length) { %>
                     <% courseList.forEach(function(row) { %>
                       <div class="glass-inset p-3">
@@ -214,7 +214,7 @@
                 <div class="col-12">
                   <label class="form-label">Семестри курсів</label>
                   <% ['kyiv', 'munich'].forEach(function(location) { %>
-                    <div class="d-grid gap-2" data-location-section="<%= location %>">
+                    <div class="d-grid gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                       <% (courseSemestersByLocation[location] || []).forEach(function(row) { %>
                         <% const semList = semestersByCourse[row.course.id] || []; %>
                         <% const selectedSemId = (selectedSemestersByLocation[location] && selectedSemestersByLocation[location][row.course.id]) || (row.semester ? row.semester.id : null); %>
@@ -257,7 +257,7 @@
               <div class="generator-section-title mb-2">Перед запуском</div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const validation = validationByLocation && validationByLocation[location]; %>
-                <div data-location-section="<%= location %>">
+                <div data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                   <% if (!validation || !validation.issues.length) { %>
                     <div class="validation-empty">Все готово до генерації.</div>
                   <% } else { %>
@@ -333,7 +333,7 @@
               <div class="generator-section-title mb-2">Щільність розкладу</div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const heatmap = heatmapByLocation && heatmapByLocation[location]; %>
-                <div class="heatmap" data-location-section="<%= location %>">
+                <div class="heatmap" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                   <% if (!heatmap || !heatmap.max) { %>
                     <div class="generator-empty">Немає даних для теплової карти.</div>
                   <% } else { %>
@@ -519,7 +519,7 @@
               <div class="generator-section-title mb-2">Дзеркальні ключі</div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const mirrorSummary = mirrorSummaryByLocation && mirrorSummaryByLocation[location]; %>
-                <div class="d-grid gap-2" data-location-section="<%= location %>">
+                <div class="d-grid gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                   <% if (!mirrorSummary || !mirrorSummary.length) { %>
                     <div class="generator-empty">Немає дзеркальних ключів.</div>
                   <% } else { %>
@@ -554,7 +554,7 @@
               <% const conflictLabels = { missing_course_context: 'Немає активного семестру', missing_weeks_count: 'Не задано кількість тижнів', no_available_weeks: 'Немає доступних тижнів', no_allowed_days: 'Немає доступних днів', no_slot_found: 'Немає слота', partial_schedule: 'Часткова генерація', unknown: 'Невідома причина' }; %>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const conflicts = conflictDetails && conflictDetails[location]; %>
-                <div class="d-grid gap-2" data-location-section="<%= location %>">
+                <div class="d-grid gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                   <% if (!conflicts || !conflicts.length) { %>
                     <div class="generator-empty">Конфліктів немає.</div>
                   <% } else { %>
@@ -593,7 +593,7 @@
                 <div class="generator-section-title">План занять</div>
                 <% ['kyiv', 'munich'].forEach(function(location) { %>
                   <% const problemCount = problemItemLookupByLocation && problemItemLookupByLocation[location] ? Object.keys(problemItemLookupByLocation[location]).length : 0; %>
-                  <div class="form-check form-switch m-0 problem-toggle" data-location-section="<%= location %>">
+                  <div class="form-check form-switch m-0 problem-toggle" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                     <input class="form-check-input" type="checkbox" id="problemToggle-<%= location %>" <%= problemCount ? '' : 'disabled' %> />
                     <label class="form-check-label small" for="problemToggle-<%= location %>">
                       Показати проблемні (<%= problemCount %>)

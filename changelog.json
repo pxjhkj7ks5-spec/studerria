@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.7.55",
+      "date": "2026-02-09",
+      "items": [
+        "fix: hide inactive location panels in schedule generator",
+        "feat: add arrow-key navigation in schedule preview",
+        "feat: allow admins to broadcast messages to all courses"
+      ]
+    },
+    {
       "version": "0.7.54",
       "date": "2026-02-09",
       "items": [

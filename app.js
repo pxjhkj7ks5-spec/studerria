@@ -3854,10 +3854,12 @@ app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) =>
   }
   const createdAt = new Date().toISOString();
   const createdBy = req.session.user.id;
-  const courseId = getAdminCourse(req);
-  const activeSemester = await getActiveSemester(courseId);
+  const isAdmin = req.session.role === 'admin';
+  const baseCourseId = getAdminCourse(req);
+  const activeSemester = await getActiveSemester(baseCourseId);
   const target = target_type || (String(target_all) === '1' ? 'all' : 'subject');
-  const isAll = target === 'all';
+  const isAllCourses = target === 'all_courses';
+  const isAll = target === 'all' || isAllCourses;
   let messageStatus = (status || 'published').toLowerCase();
   if (!['draft', 'scheduled', 'published'].includes(messageStatus)) {
     messageStatus = 'published';
@@ -3884,7 +3886,46 @@ app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) =>
   if (target === 'users' && !users.length) {
     return res.redirect('/admin?err=Select%20users');
   }
+  if (isAllCourses && !isAdmin) {
+    return res.redirect('/admin?err=Not%20allowed');
+  }
   try {
+    if (isAllCourses) {
+      const courses = await db.all('SELECT id FROM courses ORDER BY id');
+      for (const course of courses) {
+        const courseId = Number(course.id);
+        const courseSemester = await getActiveSemester(courseId);
+        const row = await db.get(
+          `
+            INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+          `,
+          [
+            null,
+            null,
+            1,
+            body.trim(),
+            createdBy,
+            createdAt,
+            courseId,
+            courseSemester ? courseSemester.id : null,
+            messageStatus,
+            scheduledAt,
+            publishedAt,
+          ]
+        );
+        if (!row || !row.id) {
+          return res.redirect('/admin?err=Database%20error');
+        }
+      }
+      logAction(db, req, 'message_send', {
+        target_type: target,
+        target_all: true,
+        course_scope: 'all',
+      });
+      return res.redirect('/admin?ok=Message%20sent');
+    }
+
     const row = await db.get(
       `
         INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
@@ -3897,7 +3938,7 @@ app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) =>
         body.trim(),
         createdBy,
         createdAt,
-        courseId,
+        baseCourseId,
         activeSemester ? activeSemester.id : null,
         messageStatus,
         scheduledAt,

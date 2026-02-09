@@ -212,6 +212,12 @@
         setTimeout(() => updateSchedule(safe), 200);
       }
 
+      const isTypingTarget = (el) => {
+        if (!el) return false;
+        const tag = el.tagName ? el.tagName.toLowerCase() : '';
+        return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+      };
+
       if (weekSlider) {
         weekSlider.addEventListener('click', (event) => {
           const btn = event.target.closest('.week-dot');
@@ -239,6 +245,18 @@
         });
         updateMobileWeekDots();
       }
+
+      document.addEventListener('keydown', (event) => {
+        if (isTypingTarget(event.target)) return;
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          animateWeekChange(currentWeek - 1);
+        }
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          animateWeekChange(currentWeek + 1);
+        }
+      });
     </script>
   </body>
 </html>
