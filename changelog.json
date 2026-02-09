@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.45",
+      "date": "2026-02-09",
+      "items": [
+        "fix: harden generator config parsing and add scheduler alias"
+      ]
+    },
+    {
       "version": "0.7.44",
       "date": "2026-02-09",
       "items": [

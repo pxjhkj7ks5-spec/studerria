@@ -4892,7 +4892,10 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       return res.redirect(`/admin/schedule-generator?run=${newId}`);
     }
 
-    const config = parseGeneratorConfig(run.config);
+    const parsedConfig = parseGeneratorConfig(run.config);
+    const config = parsedConfig && typeof parsedConfig === 'object'
+      ? { ...DEFAULT_GENERATOR_CONFIG, ...parsedConfig }
+      : { ...DEFAULT_GENERATOR_CONFIG };
     const requestedLocation = String(req.body.active_location || '');
     const activeLocation = requestedLocation.toLowerCase() === 'munich'
       ? 'munich'
@@ -5687,6 +5690,8 @@ const publishScheduledItems = async () => {
     schedulerRunning = false;
   }
 };
+
+const publishScheduleItems = publishScheduledItems;
 
 app.post('/admin/api/scheduler/run', requireAdmin, async (req, res) => {
   try {
