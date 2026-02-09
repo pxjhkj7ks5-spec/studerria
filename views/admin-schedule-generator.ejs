@@ -69,9 +69,11 @@
         <div class="generator-actions mt-3">
           <form method="POST" action="/admin/schedule-generator/run">
             <input type="hidden" name="run_id" value="<%= run.id %>" />
+            <input type="hidden" name="active_location" id="runLocationInput" value="<%= activeLocation %>" />
             <button class="btn btn-primary" type="submit">Згенерувати превʼю</button>
           </form>
-          <% const firstCourseId = (courseSemesters && courseSemesters.length) ? courseSemesters[0].course.id : null; %>
+          <% const activeCourseList = (courseSemestersByLocation && courseSemestersByLocation[activeLocation]) || []; %>
+          <% const firstCourseId = activeCourseList.length ? activeCourseList[0].course.id : null; %>
           <% if (firstCourseId) { %>
             <a class="btn btn-outline-primary" href="/admin/schedule-generator/<%= run.id %>/preview?course=<%= firstCourseId %>&week=1">Відкрити превʼю</a>
           <% } %>
@@ -82,25 +84,34 @@
         <div class="col-12 col-xl-4">
           <div class="card glass-panel mb-4">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Київські курси</div>
-              <% if (courseSemesters && courseSemesters.length) { %>
-                <div class="d-grid gap-2">
-                  <% courseSemesters.forEach(function(row) { %>
-                    <div class="glass-inset p-3">
-                      <div class="fw-semibold"><%= row.course.name %></div>
-                      <div class="small text-muted">
-                        <%= row.semester ? row.semester.title : 'Немає активного семестру' %>
-                        <% if (row.semester) { %> · <%= row.semester.weeks_count %> тижнів <% } %>
-                      </div>
-                      <div class="small text-muted">
-                        Активні дні: <%= (courseDays[row.course.id] || []).join(', ') %>
-                      </div>
-                    </div>
-                  <% }); %>
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="generator-section-title">Курси</div>
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-primary location-toggle <%= activeLocation === 'kyiv' ? 'active' : '' %>" type="button" data-location="kyiv">Kyiv</button>
+                  <button class="btn btn-outline-primary location-toggle <%= activeLocation === 'munich' ? 'active' : '' %>" type="button" data-location="munich">Munich</button>
                 </div>
-              <% } else { %>
-                <div class="generator-empty">Немає курсів з міткою Kyiv.</div>
-              <% } %>
+              </div>
+              <% ['kyiv', 'munich'].forEach(function(location) { %>
+                <% const courseList = courseSemestersByLocation[location] || []; %>
+                <div class="d-grid gap-2" data-location-section="<%= location %>">
+                  <% if (courseList.length) { %>
+                    <% courseList.forEach(function(row) { %>
+                      <div class="glass-inset p-3">
+                        <div class="fw-semibold"><%= row.course.name %></div>
+                        <div class="small text-muted">
+                          <%= row.semester ? row.semester.title : 'Немає активного семестру' %>
+                          <% if (row.semester) { %> · <%= row.semester.weeks_count %> тижнів <% } %>
+                        </div>
+                        <div class="small text-muted">
+                          Активні дні: <%= (courseDaysByLocation[location][row.course.id] || []).join(', ') %>
+                        </div>
+                      </div>
+                    <% }); %>
+                  <% } else { %>
+                    <div class="generator-empty">Немає курсів для <%= location === 'kyiv' ? 'Kyiv' : 'Munich' %>.</div>
+                  <% } %>
+                </div>
+              <% }); %>
             </div>
           </div>
 
@@ -109,6 +120,7 @@
               <div class="generator-section-title mb-2">Налаштування генерації</div>
               <form method="POST" action="/admin/schedule-generator/config" class="row g-3">
                 <input type="hidden" name="run_id" value="<%= run.id %>" />
+                <input type="hidden" name="active_location" id="activeLocationInput" value="<%= activeLocation %>" />
                 <div class="col-12">
                   <label class="form-label">Розподіл пар</label>
                   <select class="form-select" name="distribution">
@@ -146,22 +158,24 @@
                 </div>
                 <div class="col-12">
                   <label class="form-label">Семестри курсів</label>
-                  <div class="d-grid gap-2">
-                    <% courseSemesters.forEach(function(row) { %>
-                      <% const semList = semestersByCourse[row.course.id] || []; %>
-                      <% const selectedSemId = (selectedSemesters && selectedSemesters[row.course.id]) || (row.semester ? row.semester.id : null); %>
-                      <div class="glass-inset p-3">
-                        <div class="fw-semibold"><%= row.course.name %></div>
-                        <select class="form-select form-select-sm mt-2" name="course_semesters[<%= row.course.id %>]">
-                          <% semList.forEach(function(sem) { %>
-                            <option value="<%= sem.id %>" <%= Number(sem.id) === Number(selectedSemId) ? 'selected' : '' %>>
-                              <%= sem.title %> · <%= sem.weeks_count %> тижнів
-                            </option>
-                          <% }); %>
-                        </select>
-                      </div>
-                    <% }); %>
-                  </div>
+                  <% ['kyiv', 'munich'].forEach(function(location) { %>
+                    <div class="d-grid gap-2" data-location-section="<%= location %>">
+                      <% (courseSemestersByLocation[location] || []).forEach(function(row) { %>
+                        <% const semList = semestersByCourse[row.course.id] || []; %>
+                        <% const selectedSemId = (selectedSemestersByLocation[location] && selectedSemestersByLocation[location][row.course.id]) || (row.semester ? row.semester.id : null); %>
+                        <div class="glass-inset p-3">
+                          <div class="fw-semibold"><%= row.course.name %></div>
+                          <select class="form-select form-select-sm mt-2" name="course_semesters[<%= row.course.id %>]">
+                            <% semList.forEach(function(sem) { %>
+                              <option value="<%= sem.id %>" <%= Number(sem.id) === Number(selectedSemId) ? 'selected' : '' %>>
+                                <%= sem.title %> · <%= sem.weeks_count %> тижнів
+                              </option>
+                            <% }); %>
+                          </select>
+                        </div>
+                      <% }); %>
+                    </div>
+                  <% }); %>
                 </div>
                 <div class="col-12">
                   <div class="form-check">
@@ -274,16 +288,16 @@
                 <div class="col-12 col-md-4">
                   <label class="form-label">Курс</label>
                   <select class="form-select" name="course_id" id="genCourseSelect" required>
-                    <% kyivCourses.forEach(function(course) { %>
-                      <option value="<%= course.id %>"><%= course.name %></option>
+                    <% Object.values(coursesByLocation).flat().forEach(function(course) { %>
+                      <option value="<%= course.id %>" data-location="<%= course.location || 'kyiv' %>"><%= course.name %></option>
                     <% }); %>
                   </select>
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="form-label">Предмет</label>
                   <select class="form-select" name="subject_id" id="genSubjectSelect" required>
-                    <% kyivCourses.forEach(function(course) { %>
-                      <optgroup label="<%= course.name %>">
+                    <% Object.values(coursesByLocation).flat().forEach(function(course) { %>
+                      <optgroup label="<%= course.name %>" data-location="<%= course.location || 'kyiv' %>">
                         <% (subjectsByCourse[course.id] || []).forEach(function(subject) { %>
                           <option value="<%= subject.id %>" data-course="<%= course.id %>" data-group-count="<%= subject.group_count %>">
                             <%= subject.name %>
@@ -375,17 +389,17 @@
                     </thead>
                     <tbody>
                       <% items.forEach(function(item) { %>
-                        <tr>
+                        <tr data-location-row data-location="<%= courseLocationMap[item.course_id] || 'kyiv' %>">
                           <td>
                             <select class="form-select form-select-sm" name="course_id" form="gen-item-<%= item.id %>">
-                              <% kyivCourses.forEach(function(course) { %>
+                              <% Object.values(coursesByLocation).flat().forEach(function(course) { %>
                                 <option value="<%= course.id %>" <%= Number(item.course_id) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
                               <% }); %>
                             </select>
                           </td>
                           <td>
                             <select class="form-select form-select-sm" name="subject_id" form="gen-item-<%= item.id %>">
-                              <% kyivCourses.forEach(function(course) { %>
+                              <% Object.values(coursesByLocation).flat().forEach(function(course) { %>
                                 <optgroup label="<%= course.name %>">
                                   <% (subjectsByCourse[course.id] || []).forEach(function(subject) { %>
                                     <option value="<%= subject.id %>" <%= Number(item.subject_id) === Number(subject.id) ? 'selected' : '' %>>
@@ -502,9 +516,17 @@
         });
       }
 
+      const locationButtons = document.querySelectorAll('.location-toggle');
+      const locationInput = document.getElementById('activeLocationInput');
+      const runLocationInput = document.getElementById('runLocationInput');
+      const locationSections = document.querySelectorAll('[data-location-section]');
+      const locationRows = document.querySelectorAll('[data-location-row]');
+
       const courseSelect = document.getElementById('genCourseSelect');
       const subjectSelect = document.getElementById('genSubjectSelect');
       const groupSelect = document.getElementById('genGroupSelect');
+      const courseOptions = courseSelect ? Array.from(courseSelect.options) : [];
+      const subjectGroups = subjectSelect ? Array.from(subjectSelect.querySelectorAll('optgroup')) : [];
 
       function syncSubjects() {
         if (!courseSelect || !subjectSelect) return;
@@ -532,13 +554,57 @@
         });
       }
 
+      function applyLocation(location) {
+        const safe = location === 'munich' ? 'munich' : 'kyiv';
+        if (locationInput) locationInput.value = safe;
+        if (runLocationInput) runLocationInput.value = safe;
+        locationButtons.forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.location === safe);
+        });
+        locationSections.forEach((section) => {
+          const isActive = section.dataset.locationSection === safe;
+          section.style.display = isActive ? '' : 'none';
+          section.querySelectorAll('select[name^="course_semesters["]').forEach((select) => {
+            select.disabled = !isActive;
+          });
+        });
+        locationRows.forEach((row) => {
+          row.style.display = row.dataset.location === safe ? '' : 'none';
+        });
+        if (courseOptions.length) {
+          courseOptions.forEach((opt) => {
+            const optLocation = opt.dataset.location || 'kyiv';
+            opt.hidden = optLocation !== safe;
+          });
+          const firstVisible = courseOptions.find((opt) => !opt.hidden);
+          if (firstVisible) {
+            courseSelect.value = firstVisible.value;
+          }
+        }
+        if (subjectGroups.length) {
+          subjectGroups.forEach((group) => {
+            const groupLocation = group.dataset.location || 'kyiv';
+            const show = groupLocation === safe;
+            group.hidden = !show;
+            group.disabled = !show;
+          });
+        }
+        syncSubjects();
+      }
+
       if (courseSelect) {
         courseSelect.addEventListener('change', syncSubjects);
       }
       if (subjectSelect) {
         subjectSelect.addEventListener('change', syncGroupOptions);
       }
-      syncSubjects();
+      if (locationButtons.length) {
+        locationButtons.forEach((btn) => {
+          btn.addEventListener('click', () => applyLocation(btn.dataset.location));
+        });
+      }
+
+      applyLocation(locationInput ? locationInput.value : 'kyiv');
     </script>
   </body>
 </html>

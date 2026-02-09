@@ -666,14 +666,43 @@ const DEFAULT_GENERATOR_CONFIG = {
   special_weeks_mode: 'block',
   prefer_compactness: true,
   mirror_groups: false,
+  active_location: 'kyiv',
   course_semesters: {},
+  course_semesters_by_location: {
+    kyiv: {},
+    munich: {},
+  },
 };
 
 const parseGeneratorConfig = (raw) => {
   if (!raw) return { ...DEFAULT_GENERATOR_CONFIG };
   try {
-    const parsed = JSON.parse(raw);
-    return { ...DEFAULT_GENERATOR_CONFIG, ...(parsed || {}) };
+    const parsed = JSON.parse(raw) || {};
+    if (parsed.course_semesters && !parsed.course_semesters_by_location) {
+      parsed.course_semesters_by_location = {
+        kyiv: parsed.course_semesters,
+        munich: {},
+      };
+    }
+    const merged = {
+      ...DEFAULT_GENERATOR_CONFIG,
+      ...parsed,
+    };
+    if (!merged.course_semesters_by_location) {
+      merged.course_semesters_by_location = { kyiv: {}, munich: {} };
+    }
+    merged.course_semesters_by_location = {
+      kyiv: {
+        ...(DEFAULT_GENERATOR_CONFIG.course_semesters_by_location || {}).kyiv,
+        ...(merged.course_semesters_by_location.kyiv || {}),
+      },
+      munich: {
+        ...(DEFAULT_GENERATOR_CONFIG.course_semesters_by_location || {}).munich,
+        ...(merged.course_semesters_by_location.munich || {}),
+      },
+    };
+    merged.active_location = merged.active_location === 'munich' ? 'munich' : 'kyiv';
+    return merged;
   } catch (err) {
     return { ...DEFAULT_GENERATOR_CONFIG };
   }
@@ -692,12 +721,13 @@ const normalizeWeekdayName = (value) => {
   return match || null;
 };
 
-async function getKyivCoursesCached() {
+async function getCoursesByLocation(location) {
+  const target = String(location || 'kyiv').toLowerCase();
   const courses = await getCoursesCached();
   return (courses || []).filter((course) => {
     const isTeacher = course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
-    const location = String(course.location || 'kyiv').toLowerCase();
-    return !isTeacher && location === 'kyiv';
+    const courseLocation = String(course.location || 'kyiv').toLowerCase();
+    return !isTeacher && courseLocation === target;
   });
 }
 
@@ -4840,36 +4870,54 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
     }
 
     const config = parseGeneratorConfig(run.config);
-    const kyivCourses = await getKyivCoursesCached();
-    const courseSemesters = [];
-    const courseDays = {};
+    const requestedLocation = String(req.body.active_location || '');
+    const activeLocation = requestedLocation.toLowerCase() === 'munich'
+      ? 'munich'
+      : requestedLocation
+      ? 'kyiv'
+      : config.active_location === 'munich'
+      ? 'munich'
+      : 'kyiv';
+    if (activeLocation !== config.active_location) {
+      config.active_location = activeLocation;
+    }
+    const coursesByLocation = {
+      kyiv: await getCoursesByLocation('kyiv'),
+      munich: await getCoursesByLocation('munich'),
+    };
+    const courseSemestersByLocation = { kyiv: [], munich: [] };
+    const courseDaysByLocation = { kyiv: {}, munich: {} };
     const subjectsByCourse = {};
     const semestersByCourse = {};
-    const selectedSemesters = {};
-    for (const course of kyivCourses) {
-      const semesters = await getSemestersCached(course.id);
-      semestersByCourse[course.id] = semesters || [];
-      const configuredId = config.course_semesters
-        ? config.course_semesters[course.id] || config.course_semesters[String(course.id)]
-        : null;
-      let semester = null;
-      if (configuredId) {
-        semester = (semesters || []).find((s) => Number(s.id) === Number(configuredId)) || null;
+    const selectedSemestersByLocation = { kyiv: {}, munich: {} };
+    for (const location of ['kyiv', 'munich']) {
+      const courses = coursesByLocation[location] || [];
+      for (const course of courses) {
+        const semesters = await getSemestersCached(course.id);
+        semestersByCourse[course.id] = semesters || [];
+        const configuredId = config.course_semesters_by_location
+          ? config.course_semesters_by_location[location]?.[course.id]
+            || config.course_semesters_by_location[location]?.[String(course.id)]
+          : null;
+        let semester = null;
+        if (configuredId) {
+          semester = (semesters || []).find((s) => Number(s.id) === Number(configuredId)) || null;
+        }
+        if (!semester) {
+          semester = await getActiveSemester(course.id);
+        }
+        if (semester) {
+          selectedSemestersByLocation[location][course.id] = semester.id;
+        }
+        courseSemestersByLocation[location].push({ course, semester });
+        const studyDays = await getCourseStudyDays(course.id);
+        const activeDays = (studyDays || [])
+          .filter((d) => d.is_active)
+          .map((d) => d.day_name)
+          .filter(Boolean);
+        courseDaysByLocation[location][course.id] = activeDays.length ? activeDays : [...daysOfWeek];
+        subjectsByCourse[course.id] = await getSubjectsCached(course.id);
       }
-      if (!semester) {
-        semester = await getActiveSemester(course.id);
-      }
-      if (semester) {
-        selectedSemesters[course.id] = semester.id;
-      }
-      courseSemesters.push({ course, semester });
-      const studyDays = await getCourseStudyDays(course.id);
-      const activeDays = (studyDays || [])
-        .filter((d) => d.is_active)
-        .map((d) => d.day_name)
-        .filter(Boolean);
-      courseDays[course.id] = activeDays.length ? activeDays : [...daysOfWeek];
-      subjectsByCourse[course.id] = await getSubjectsCached(course.id);
     }
 
     const teachers = await db.all(
@@ -4886,6 +4934,12 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       `,
       [run.id]
     );
+    const courseLocationMap = {};
+    Object.entries(coursesByLocation).forEach(([location, list]) => {
+      (list || []).forEach((course) => {
+        courseLocationMap[course.id] = location;
+      });
+    });
     const limitsRows = await db.all(
       'SELECT * FROM schedule_generator_teacher_limits WHERE run_id = ?',
       [run.id]
@@ -4905,12 +4959,14 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       role: req.session.role,
       run,
       config,
-      kyivCourses,
-      courseSemesters,
-      courseDays,
+      activeLocation,
+      coursesByLocation,
+      courseSemestersByLocation,
+      courseDaysByLocation,
       subjectsByCourse,
       semestersByCourse,
-      selectedSemesters,
+      selectedSemestersByLocation,
+      courseLocationMap,
       teachers,
       items,
       limitsByTeacher,
@@ -4966,6 +5022,9 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
     const targetDailyPairs = Number.isNaN(targetDailyRaw)
       ? existing.target_daily_pairs
       : Math.min(Math.max(targetDailyRaw, 1), 7);
+    const activeLocation = String(req.body.active_location || existing.active_location || 'kyiv').toLowerCase() === 'munich'
+      ? 'munich'
+      : 'kyiv';
     const courseSemesterInput = req.body.course_semesters || {};
     const sanitizedCourseSemesters = {};
     const entries = Object.entries(courseSemesterInput);
@@ -4978,8 +5037,13 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
         sanitizedCourseSemesters[String(courseId)] = semesterId;
       }
     }
+    const nextCourseSemestersByLocation = {
+      ...(existing.course_semesters_by_location || { kyiv: {}, munich: {} }),
+      [activeLocation]: sanitizedCourseSemesters,
+    };
     const nextConfig = {
       ...existing,
+      active_location: activeLocation,
       distribution: String(req.body.distribution || existing.distribution || 'even'),
       seminar_distribution: String(req.body.seminar_distribution || existing.seminar_distribution || 'start'),
       max_daily_pairs: maxDailyPairs || 7,
@@ -4989,6 +5053,7 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
       prefer_compactness: String(req.body.prefer_compactness || '') === 'on',
       mirror_groups: String(req.body.mirror_groups || '') === 'on',
       course_semesters: sanitizedCourseSemesters,
+      course_semesters_by_location: nextCourseSemestersByLocation,
     };
     await db.run(
       'UPDATE schedule_generator_runs SET config = ?, updated_at = NOW() WHERE id = ?',
@@ -5052,8 +5117,11 @@ app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) =
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Run%20not%20found`);
     }
     const runConfig = parseGeneratorConfig(run.config);
-    const configuredSemesterId = runConfig.course_semesters
-      ? runConfig.course_semesters[courseId] || runConfig.course_semesters[String(courseId)]
+    const courseRow = await db.get('SELECT location FROM courses WHERE id = ?', [courseId]);
+    const courseLocation = String(courseRow?.location || 'kyiv').toLowerCase() === 'munich' ? 'munich' : 'kyiv';
+    const configuredSemesterId = runConfig.course_semesters_by_location
+      ? runConfig.course_semesters_by_location[courseLocation]?.[courseId]
+        || runConfig.course_semesters_by_location[courseLocation]?.[String(courseId)]
       : null;
     let semester = null;
     if (configuredSemesterId) {
@@ -5137,8 +5205,11 @@ app.post('/admin/schedule-generator/items/edit/:id', requireAdmin, async (req, r
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Run%20not%20found`);
     }
     const runConfig = parseGeneratorConfig(run.config);
-    const configuredSemesterId = runConfig.course_semesters
-      ? runConfig.course_semesters[courseId] || runConfig.course_semesters[String(courseId)]
+    const courseRow = await db.get('SELECT location FROM courses WHERE id = ?', [courseId]);
+    const courseLocation = String(courseRow?.location || 'kyiv').toLowerCase() === 'munich' ? 'munich' : 'kyiv';
+    const configuredSemesterId = runConfig.course_semesters_by_location
+      ? runConfig.course_semesters_by_location[courseLocation]?.[courseId]
+        || runConfig.course_semesters_by_location[courseLocation]?.[String(courseId)]
       : null;
     let semester = null;
     if (configuredSemesterId) {
@@ -5244,7 +5315,10 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
     const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
     if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
     const config = parseGeneratorConfig(run.config);
-    const items = await db.all(
+    const activeLocation = config.active_location === 'munich' ? 'munich' : 'kyiv';
+    const locationCourses = await getCoursesByLocation(activeLocation);
+    const locationCourseIds = new Set((locationCourses || []).map((c) => Number(c.id)));
+    const itemsAll = await db.all(
       `
         SELECT sgi.*, s.name AS subject_name, s.group_count
         FROM schedule_generator_items sgi
@@ -5253,8 +5327,9 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
       `,
       [runId]
     );
+    const items = (itemsAll || []).filter((item) => locationCourseIds.has(Number(item.course_id)));
     if (!items.length) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20items`);
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20items%20for%20location`);
     }
 
     const courseContexts = new Map();
@@ -5308,7 +5383,13 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
       config,
     });
 
-    await db.run('DELETE FROM schedule_generator_entries WHERE run_id = ?', [runId]);
+    if (courseIds.length) {
+      const placeholders = courseIds.map(() => '?').join(',');
+      await db.run(
+        `DELETE FROM schedule_generator_entries WHERE run_id = ? AND course_id IN (${placeholders})`,
+        [runId, ...courseIds]
+      );
+    }
     if (result.entries.length) {
       const stmt = db.prepare(
         `
@@ -5371,9 +5452,16 @@ app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, re
     const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
     if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
     const config = parseGeneratorConfig(run.config);
-    const kyivCourses = await getKyivCoursesCached();
-    const availableCourseIds = kyivCourses.map((c) => Number(c.id));
-    const selectedCourseId = availableCourseIds.includes(courseId) ? courseId : availableCourseIds[0];
+    const activeLocation = config.active_location === 'munich' ? 'munich' : 'kyiv';
+    const coursesByLocation = {
+      kyiv: await getCoursesByLocation('kyiv'),
+      munich: await getCoursesByLocation('munich'),
+    };
+    const allCourses = [...(coursesByLocation.kyiv || []), ...(coursesByLocation.munich || [])];
+    const availableCourseIds = allCourses.map((c) => Number(c.id));
+    const preferredList = coursesByLocation[activeLocation] || [];
+    const fallbackCourseId = preferredList.length ? Number(preferredList[0].id) : availableCourseIds[0];
+    const selectedCourseId = availableCourseIds.includes(courseId) ? courseId : fallbackCourseId;
     if (!selectedCourseId) {
       return res.redirect('/admin/schedule-generator?run=' + runId);
     }
@@ -5452,7 +5540,7 @@ app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, re
       username: req.session.user.username,
       role: req.session.role,
       run,
-      courses: kyivCourses,
+      courses: allCourses,
       selectedCourseId,
       scheduleByDay,
       daysOfWeek: activeDays,
