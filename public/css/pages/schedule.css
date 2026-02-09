@@ -37,6 +37,19 @@
   transition: opacity 180ms ease;
 }
 
+@media (hover: hover) {
+  .schedule-content .day-card:hover,
+  .schedule-content .schedule-panel:hover,
+  .schedule-content .day-card:focus-within {
+    border-color: var(--glass-border);
+  }
+
+  .schedule-content .day-card:hover::before,
+  .schedule-content .schedule-panel:hover::before,
+  .schedule-content .day-card:focus-within::before {
+    opacity: 0;
+  }
+}
 .schedule-panel {
   display: grid;
   grid-template-columns: 1fr auto;
