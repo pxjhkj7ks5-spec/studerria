@@ -1167,7 +1167,7 @@
         </div>
         <div class="hero-actions">
           <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
-          <% if (role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') { %>
+          <% if ((role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') && settings && settings.allow_custom_deadlines) { %>
             <button class="btn btn-glass btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
               🪄 Дивні дедлайни
             </button>
@@ -1287,7 +1287,7 @@
           </div>
           <% const dateKey = dayDates && dayDates[day] ? dayDates[day] : null; %>
           <% const customItems = dateKey && customDeadlinesByDate ? customDeadlinesByDate[dateKey] : null; %>
-          <% if (customItems && customItems.length) { %>
+          <% if (settings && settings.allow_custom_deadlines && customItems && customItems.length) { %>
             <div class="deadline-block">
               <div class="deadline-title">🪄 Дивні дедлайни</div>
               <% customItems.forEach(function(item) { %>
@@ -1312,7 +1312,7 @@
         </div>
       <% }); %>
       <% const activeDaySet = new Set(daysOfWeek || []); %>
-      <% if (weekendDeadlineCards && weekendDeadlineCards.length) { %>
+      <% if (settings && settings.allow_custom_deadlines && weekendDeadlineCards && weekendDeadlineCards.length) { %>
         <% weekendDeadlineCards.forEach(function(card) { %>
           <% if (activeDaySet.has(card.day)) { return; } %>
           <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString('uk-UA') : ''; %>
@@ -1515,6 +1515,7 @@
       </div>
     </div>
 
+    <% if (settings && settings.allow_custom_deadlines) { %>
     <div class="modal fade" id="customDeadlineModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
@@ -1664,9 +1665,11 @@
         </div>
       </div>
     </div>
+    <% } %>
 
     <%- include('partials/mobile-menu-modal', { role, t, activePage: 'schedule' }) %>
 
+    <% if (settings && settings.allow_messages) { %>
     <div class="modal fade" id="messagesModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-scrollable">
         <div class="modal-content">
@@ -1691,6 +1694,7 @@
         </div>
       </div>
     </div>
+    <% } %>
 
     <div class="modal fade" id="welcomeModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
@@ -2627,7 +2631,9 @@
 
       setInterval(updateSmartHighlights, 30000);
       setInterval(() => updateSyncStatus(), 60000);
-      setInterval(refreshSchedule, 5 * 60 * 1000);
+      const scheduleRefreshMinutes = Number(<%= (settings && settings.schedule_refresh_minutes) ? settings.schedule_refresh_minutes : 5 %>);
+      const scheduleRefreshMs = Math.max(60000, scheduleRefreshMinutes * 60 * 1000);
+      setInterval(refreshSchedule, scheduleRefreshMs);
       window.addEventListener('online', () => refreshSchedule());
       window.addEventListener('offline', () => updateSyncStatus());
 

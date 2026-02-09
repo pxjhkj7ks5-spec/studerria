@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.36",
+      "date": "2026-02-09",
+      "items": [
+        "feat: add system settings for custom deadlines, messages, and schedule auto-refresh"
+      ]
+    },
+    {
       "version": "0.7.35",
       "date": "2026-02-09",
       "items": [

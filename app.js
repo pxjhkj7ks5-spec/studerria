@@ -103,6 +103,9 @@ const DEFAULT_SETTINGS = {
   max_file_size_mb: 20,
   allow_homework_creation: true,
   min_team_members: 2,
+  allow_custom_deadlines: true,
+  allow_messages: true,
+  schedule_refresh_minutes: 5,
 };
 let settingsCache = { ...DEFAULT_SETTINGS };
 
@@ -150,6 +153,7 @@ app.use((req, res, next) => {
   res.locals.buildStamp = buildStamp;
   res.locals.authorName = 'Andrii Marchenko';
   res.locals.changelog = appChangelog;
+  res.locals.settings = settingsCache;
   res.locals.lang = lang;
   res.locals.t = (key) => translate(lang, key);
   next();
@@ -276,6 +280,13 @@ const refreshSettingsCache = async () => {
     } else if (row.key === 'min_team_members') {
       const n = Number(row.value);
       if (!Number.isNaN(n) && n > 0) parsed.min_team_members = n;
+    } else if (row.key === 'allow_custom_deadlines') {
+      parsed.allow_custom_deadlines = String(row.value).toLowerCase() === 'true';
+    } else if (row.key === 'allow_messages') {
+      parsed.allow_messages = String(row.value).toLowerCase() === 'true';
+    } else if (row.key === 'schedule_refresh_minutes') {
+      const n = Number(row.value);
+      if (!Number.isNaN(n) && n > 0) parsed.schedule_refresh_minutes = n;
     }
   }
   settingsCache = parsed;
@@ -2480,7 +2491,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
       let customDeadlinesByDate = {};
       let weekendDeadlineCards = [];
       let customDeadlineItems = [];
-      if (teacherTargets.length && weekStartDate && weekEndDate) {
+      if (settingsCache.allow_custom_deadlines && teacherTargets.length && weekStartDate && weekEndDate) {
         const cdConditions = teacherTargets
           .map(() => '(h.subject_id = ? AND h.group_number = ? AND h.course_id = ? AND COALESCE(h.semester_id, 0) = ?)')
           .join(' OR ');
@@ -2557,23 +2568,25 @@ app.get('/schedule', requireLogin, async (req, res) => {
         }
       }
 
-      const customDeadlineSubjects = [];
-      const seenCustom = new Set();
-      teacherSubjects.forEach((row) => {
-        const key = `${row.subject_id}|${row.group_number || 'all'}`;
-        if (seenCustom.has(key)) return;
-        seenCustom.add(key);
-        const generalFlag = row.is_general === false || Number(row.is_general) === 0 ? 0 : 1;
-        customDeadlineSubjects.push({
-          id: row.subject_id,
-          name: row.subject_name,
-          course_id: row.course_id,
-          course_name: row.course_name,
-          group_number: row.group_number,
-          is_general: generalFlag,
-          group_count: row.group_count,
+      let customDeadlineSubjects = [];
+      if (settingsCache.allow_custom_deadlines) {
+        const seenCustom = new Set();
+        teacherSubjects.forEach((row) => {
+          const key = `${row.subject_id}|${row.group_number || 'all'}`;
+          if (seenCustom.has(key)) return;
+          seenCustom.add(key);
+          const generalFlag = row.is_general === false || Number(row.is_general) === 0 ? 0 : 1;
+          customDeadlineSubjects.push({
+            id: row.subject_id,
+            name: row.subject_name,
+            course_id: row.course_id,
+            course_name: row.course_name,
+            group_number: row.group_number,
+            is_general: generalFlag,
+            group_count: row.group_count,
+          });
         });
-      });
+      }
 
       return res.render('schedule', {
         scheduleByDay,
@@ -2656,15 +2669,20 @@ app.get('/schedule', requireLogin, async (req, res) => {
         dayDates[day] = idx >= 0 ? weekDates[idx] : null;
       });
       const customDeadlineSubjects = [];
-      const subjectSeen = new Set();
-      studentGroups.forEach((sg) => {
-        if (!subjectSeen.has(sg.subject_id)) {
-          subjectSeen.add(sg.subject_id);
-          customDeadlineSubjects.push({ id: sg.subject_id, name: sg.subject_name });
-        }
-      });
+      if (settingsCache.allow_custom_deadlines) {
+        const subjectSeen = new Set();
+        studentGroups.forEach((sg) => {
+          if (!subjectSeen.has(sg.subject_id)) {
+            subjectSeen.add(sg.subject_id);
+            customDeadlineSubjects.push({ id: sg.subject_id, name: sg.subject_name });
+          }
+        });
+      }
 
       const loadCustomDeadlines = (cb) => {
+        if (!settingsCache.allow_custom_deadlines) {
+          return cb({}, [], []);
+        }
         if (!studentGroups.length || !weekStartDate || !weekEndDate) {
           return cb({}, [], []);
         }
@@ -3466,6 +3484,9 @@ app.post('/admin/teamwork/delete/:id', requireStaff, (req, res) => {
 });
 
 app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) => {
+  if (!settingsCache.allow_messages) {
+    return res.redirect('/admin?err=Messages%20disabled');
+  }
   const { target_type, target_all, subject_id, group_number, body, user_ids, status, scheduled_at } = req.body;
   if (!body || !body.trim()) {
     return res.redirect('/admin?err=Message%20is%20empty');
@@ -3553,6 +3574,9 @@ app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) =>
 });
 
 app.post('/admin/messages/delete/:id', requireStaff, writeLimiter, (req, res) => {
+  if (!settingsCache.allow_messages) {
+    return res.redirect('/admin?err=Messages%20disabled');
+  }
   const id = Number(req.params.id);
   if (Number.isNaN(id)) {
     return res.redirect('/admin?err=Invalid%20message');
@@ -3571,6 +3595,9 @@ app.post('/admin/messages/delete/:id', requireStaff, writeLimiter, (req, res) =>
 });
 
 app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
+  if (!settingsCache.allow_messages) {
+    return res.json({ messages: [], unread_count: 0 });
+  }
   const { id: userId, course_id: courseId } = req.session.user;
   const activeSemester = await getActiveSemester(courseId || 1);
   const filterSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
@@ -3675,6 +3702,9 @@ app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
 });
 
 app.post('/messages/read', requireLogin, writeLimiter, (req, res) => {
+  if (!settingsCache.allow_messages) {
+    return res.status(403).json({ error: 'Messages disabled' });
+  }
   const { message_ids } = req.body;
   const ids = Array.isArray(message_ids) ? message_ids : message_ids ? [message_ids] : [];
   const { id: userId } = req.session.user;
@@ -3692,6 +3722,9 @@ app.post('/messages/read', requireLogin, writeLimiter, (req, res) => {
 });
 
 app.get('/admin/api/messages/:id/reads', requireStaff, readLimiter, async (req, res) => {
+  if (!settingsCache.allow_messages) {
+    return res.status(403).json({ error: 'Messages disabled' });
+  }
   try {
     await ensureDbReady();
   } catch (err) {
@@ -3828,6 +3861,9 @@ app.post('/homework/react', requireLogin, writeLimiter, async (req, res) => {
 });
 
 app.post('/messages/react', requireLogin, writeLimiter, async (req, res) => {
+  if (!settingsCache.allow_messages) {
+    return res.status(403).json({ error: 'Messages disabled' });
+  }
   const messageId = Number(req.body.message_id);
   const emoji = req.body.emoji;
   const { id: userId } = req.session.user;
@@ -4738,12 +4774,14 @@ const publishScheduledItems = async () => {
   try {
     await ensureDbReady();
     const nowIso = new Date().toISOString();
-    const msgResult = await db.run(
-      `UPDATE messages
-       SET status = 'published', published_at = ?
-       WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ?`,
-      [nowIso, nowIso]
-    );
+    const msgResult = settingsCache.allow_messages
+      ? await db.run(
+          `UPDATE messages
+           SET status = 'published', published_at = ?
+           WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ?`,
+          [nowIso, nowIso]
+        )
+      : { changes: 0 };
     const hwResult = await db.run(
       `UPDATE homework
        SET status = 'published', published_at = ?
@@ -4788,11 +4826,18 @@ app.post('/admin/settings', requireAdmin, async (req, res) => {
   const maxFileSize = Number(req.body.max_file_size_mb);
   const minTeamMembers = Number(req.body.min_team_members);
   const allowHomework = String(req.body.allow_homework_creation).toLowerCase() === 'true';
+  const allowCustomDeadlines = String(req.body.allow_custom_deadlines).toLowerCase() === 'true';
+  const allowMessages = String(req.body.allow_messages).toLowerCase() === 'true';
+  const scheduleRefreshMinutes = Number(req.body.schedule_refresh_minutes);
   if (
     Number.isNaN(sessionDays) || sessionDays <= 0 ||
     Number.isNaN(maxFileSize) || maxFileSize <= 0 ||
-    Number.isNaN(minTeamMembers) || minTeamMembers <= 0
+    Number.isNaN(minTeamMembers) || minTeamMembers <= 0 ||
+    Number.isNaN(scheduleRefreshMinutes) || scheduleRefreshMinutes <= 0
   ) {
+    return res.redirect('/admin?err=Invalid%20settings');
+  }
+  if (scheduleRefreshMinutes > 120) {
     return res.redirect('/admin?err=Invalid%20settings');
   }
   try {
@@ -4803,6 +4848,9 @@ app.post('/admin/settings', requireAdmin, async (req, res) => {
     stmt.run('max_file_size_mb', String(maxFileSize));
     stmt.run('allow_homework_creation', allowHomework ? 'true' : 'false');
     stmt.run('min_team_members', String(minTeamMembers));
+    stmt.run('allow_custom_deadlines', allowCustomDeadlines ? 'true' : 'false');
+    stmt.run('allow_messages', allowMessages ? 'true' : 'false');
+    stmt.run('schedule_refresh_minutes', String(scheduleRefreshMinutes));
     await refreshSettingsCache();
     return res.redirect('/admin?ok=Settings%20saved');
   } catch (err) {
@@ -5647,6 +5695,9 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
 });
 
 app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachment'), async (req, res) => {
+  if (!settingsCache.allow_custom_deadlines && req.session.role !== 'admin') {
+    return res.status(403).send('Custom deadlines disabled');
+  }
   const { description, link_url, meeting_url, subject_id, custom_due_date } = req.body;
   const filePath = req.file ? `/uploads/${req.file.filename}` : null;
   const fileName = req.file ? req.file.originalname : null;

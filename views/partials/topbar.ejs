@@ -58,7 +58,7 @@
       >
         🌙
       </button>
-      <% if (activePage === 'schedule') { %>
+      <% if (activePage === 'schedule' && settings && settings.allow_messages) { %>
         <button class="theme-toggle-min msg-btn me-1 desktop-only" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">
           💬
           <span class="msg-badge d-none" id="messagesBadge">0</span>

@@ -23,7 +23,7 @@
           <% if (role === 'deanery') { %>
             <a class="btn w-100 glass mobile-menu-action" href="/deanery"><%= t('menu.deanery') %></a>
           <% } %>
-          <% if (activePage === 'schedule') { %>
+          <% if (activePage === 'schedule' && settings && settings.allow_messages) { %>
             <button class="btn w-100 glass mobile-menu-action" type="button" id="messagesBtnMobile" aria-label="<%= t('messages.aria') %>">
               💬 Повідомлення
             </button>
