@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Генератор розкладу</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/pages/admin.css" />
+    <link rel="stylesheet" href="/css/pages/admin-schedule-generator.css" />
+  </head>
+  <body class="theme-light schedule-generator-page">
+    <nav class="navbar navbar-expand-lg admin-nav">
+      <div class="container">
+        <span class="navbar-brand">Генератор розкладу</span>
+        <div class="d-flex align-items-center">
+          <span class="me-3 text-muted"><%= t('role.admin') %>: <%= username %></span>
+          <button
+            class="theme-toggle theme-toggle-min me-2"
+            type="button"
+            id="themeToggle"
+            aria-label="Toggle theme"
+            data-light-label="☀️"
+            data-dark-label="🌙"
+          >
+            🌙
+          </button>
+          <a class="btn btn-outline-primary btn-sm me-2" href="/admin">Назад в адмінку</a>
+          <form method="POST" action="/admin/schedule-generator/new" class="me-2">
+            <button class="btn btn-outline-secondary btn-sm" type="submit">Новий драфт</button>
+          </form>
+          <form method="POST" action="/logout">
+            <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
+          </form>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-4">
+      <% if (messages && messages.error) { %>
+        <div class="alert alert-danger"><%= messages.error %></div>
+      <% } %>
+      <% if (messages && messages.success) { %>
+        <div class="alert alert-success"><%= messages.success %></div>
+      <% } %>
+
+      <div class="generator-hero glass mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+          <div>
+            <h1 class="h3 mb-2">Семестровий генератор</h1>
+            <div class="text-muted">
+              Формуємо повний розклад по київських курсах: фіксовані слоти, дзеркальні тижні, обмеження викладачів.
+            </div>
+          </div>
+          <div class="generator-status">
+            <span class="generator-chip">Run #<%= run.id %></span>
+            <span class="badge bg-<%= run.status === 'published' ? 'success' : 'secondary' %>">
+              <%= run.status === 'published' ? 'Опубліковано' : 'Чернетка' %>
+            </span>
+          </div>
+        </div>
+        <div class="generator-actions mt-3">
+          <form method="POST" action="/admin/schedule-generator/run">
+            <input type="hidden" name="run_id" value="<%= run.id %>" />
+            <button class="btn btn-primary" type="submit">Згенерувати превʼю</button>
+          </form>
+          <% const firstCourseId = (courseSemesters && courseSemesters.length) ? courseSemesters[0].course.id : null; %>
+          <% if (firstCourseId) { %>
+            <a class="btn btn-outline-primary" href="/admin/schedule-generator/<%= run.id %>/preview?course=<%= firstCourseId %>&week=1">Відкрити превʼю</a>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-12 col-xl-4">
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
+              <div class="generator-section-title mb-2">Київські курси</div>
+              <% if (courseSemesters && courseSemesters.length) { %>
+                <div class="d-grid gap-2">
+                  <% courseSemesters.forEach(function(row) { %>
+                    <div class="glass-inset p-3">
+                      <div class="fw-semibold"><%= row.course.name %></div>
+                      <div class="small text-muted">
+                        <%= row.semester ? row.semester.title : 'Немає активного семестру' %>
+                        <% if (row.semester) { %> · <%= row.semester.weeks_count %> тижнів <% } %>
+                      </div>
+                      <div class="small text-muted">
+                        Активні дні: <%= (courseDays[row.course.id] || []).join(', ') %>
+                      </div>
+                    </div>
+                  <% }); %>
+                </div>
+              <% } else { %>
+                <div class="generator-empty">Немає курсів з міткою Kyiv.</div>
+              <% } %>
+            </div>
+          </div>
+
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
+              <div class="generator-section-title mb-2">Налаштування генерації</div>
+              <form method="POST" action="/admin/schedule-generator/config" class="row g-3">
+                <input type="hidden" name="run_id" value="<%= run.id %>" />
+                <div class="col-12">
+                  <label class="form-label">Розподіл пар</label>
+                  <select class="form-select" name="distribution">
+                    <option value="start" <%= config.distribution === 'start' ? 'selected' : '' %>>Концентрація на початку</option>
+                    <option value="even" <%= config.distribution === 'even' ? 'selected' : '' %>>Рівномірно</option>
+                    <option value="end" <%= config.distribution === 'end' ? 'selected' : '' %>>Концентрація в кінці</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Семінари</label>
+                  <select class="form-select" name="seminar_distribution">
+                    <option value="start" <%= config.seminar_distribution === 'start' ? 'selected' : '' %>>На початку</option>
+                    <option value="even" <%= config.seminar_distribution === 'even' ? 'selected' : '' %>>Рівномірно</option>
+                    <option value="end" <%= config.seminar_distribution === 'end' ? 'selected' : '' %>>В кінці</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Max пар/день</label>
+                  <input class="form-control" type="number" name="max_daily_pairs" min="1" max="7" value="<%= config.max_daily_pairs || 7 %>" />
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Ціль пар/день</label>
+                  <input class="form-control" type="number" name="target_daily_pairs" min="1" max="7" value="<%= config.target_daily_pairs || 4 %>" />
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Особливі тижні (1-3,8)</label>
+                  <input class="form-control" name="blocked_weeks" value="<%= config.blocked_weeks || '' %>" placeholder="1-2,6,9" />
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Режим особливих тижнів</label>
+                  <select class="form-select" name="special_weeks_mode">
+                    <option value="block" <%= config.special_weeks_mode !== 'overlay' ? 'selected' : '' %>>Блокувати заняття</option>
+                    <option value="overlay" <%= config.special_weeks_mode === 'overlay' ? 'selected' : '' %>>Накладати поверх</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="prefer_compactness" id="preferCompactness" <%= config.prefer_compactness ? 'checked' : '' %> />
+                    <label class="form-check-label" for="preferCompactness">Менше вікон між парами</label>
+                  </div>
+                </div>
+                <div class="col-12 d-grid">
+                  <button class="btn btn-outline-primary" type="submit">Зберегти налаштування</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
+              <div class="generator-section-title mb-2">Остання генерація</div>
+              <% if (lastStats) { %>
+                <div class="d-grid gap-2 mb-3">
+                  <div class="glass-inset p-3">
+                    <div class="small text-muted">Записів</div>
+                    <div class="fw-semibold"><%= lastStats.entries %> пар</div>
+                  </div>
+                  <div class="glass-inset p-3">
+                    <div class="small text-muted">Конфліктів</div>
+                    <div class="fw-semibold"><%= lastStats.conflicts %></div>
+                  </div>
+                  <div class="small text-muted">Оновлено: <%= lastStats.generated_at ? new Date(lastStats.generated_at).toLocaleString('uk-UA') : '' %></div>
+                </div>
+              <% } else { %>
+                <div class="generator-empty mb-3">Ще не запускали генерацію.</div>
+              <% } %>
+              <% if (lastConflicts && lastConflicts.length) { %>
+                <div class="small text-muted mb-2">Проблеми:</div>
+                <div class="d-grid gap-2">
+                  <% lastConflicts.slice(0, 5).forEach(function(conflict) { %>
+                    <div class="glass-inset p-2">
+                      <div class="fw-semibold"><%= conflict.subject || 'Без предмета' %></div>
+                      <div class="small text-muted"><%= conflict.reason %></div>
+                    </div>
+                  <% }); %>
+                </div>
+              <% } %>
+            </div>
+          </div>
+
+          <div class="card glass-panel">
+            <div class="card-body">
+              <div class="generator-section-title mb-2">Викладачі</div>
+              <% if (teachers && teachers.length) { %>
+                <div class="d-grid gap-3">
+                  <% teachers.forEach(function(teacher) { %>
+                    <% const limit = limitsByTeacher[teacher.id] || {}; %>
+                    <form method="POST" action="/admin/schedule-generator/teachers/save" class="glass-inset p-3">
+                      <input type="hidden" name="run_id" value="<%= run.id %>" />
+                      <input type="hidden" name="teacher_id" value="<%= teacher.id %>" />
+                      <div class="fw-semibold mb-2"><%= teacher.full_name %></div>
+                      <div class="teacher-days mb-2">
+                        <% dayOptions.forEach(function(day, idx) { %>
+                          <% const label = dayLabels[idx] || day.slice(0, 2); %>
+                          <label class="teacher-day-pill">
+                            <input
+                              class="form-check-input"
+                              type="checkbox"
+                              name="allowed_days"
+                              value="<%= day %>"
+                              <%= (limit.allowed_weekdays || []).includes(day) ? 'checked' : '' %>
+                            />
+                            <span><%= label %></span>
+                          </label>
+                        <% }); %>
+                      </div>
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="flex-grow-1">
+                          <label class="form-label small">Max пар/тиждень</label>
+                          <input
+                            class="form-control form-control-sm"
+                            type="number"
+                            name="max_pairs_per_week"
+                            min="1"
+                            placeholder="Без ліміту"
+                            value="<%= limit.max_pairs_per_week || '' %>"
+                          />
+                        </div>
+                        <button class="btn btn-outline-primary btn-sm" type="submit">Зберегти</button>
+                      </div>
+                    </form>
+                  <% }); %>
+                </div>
+              <% } else { %>
+                <div class="generator-empty">Немає викладачів.</div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-8">
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
+              <div class="generator-section-title mb-2">Додати предмет</div>
+              <form method="POST" action="/admin/schedule-generator/items/add" class="row g-3">
+                <input type="hidden" name="run_id" value="<%= run.id %>" />
+                <div class="col-12 col-md-4">
+                  <label class="form-label">Курс</label>
+                  <select class="form-select" name="course_id" id="genCourseSelect" required>
+                    <% kyivCourses.forEach(function(course) { %>
+                      <option value="<%= course.id %>"><%= course.name %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label">Предмет</label>
+                  <select class="form-select" name="subject_id" id="genSubjectSelect" required>
+                    <% kyivCourses.forEach(function(course) { %>
+                      <optgroup label="<%= course.name %>">
+                        <% (subjectsByCourse[course.id] || []).forEach(function(subject) { %>
+                          <option value="<%= subject.id %>" data-course="<%= course.id %>" data-group-count="<%= subject.group_count %>">
+                            <%= subject.name %>
+                          </option>
+                        <% }); %>
+                      </optgroup>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label">Тип заняття</label>
+                  <select class="form-select" name="lesson_type">
+                    <option value="lecture">Лекція</option>
+                    <option value="seminar">Семінар</option>
+                    <option value="lab">Лаб</option>
+                    <option value="practice">Практика</option>
+                  </select>
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">Група</label>
+                  <select class="form-select" name="group_number" id="genGroupSelect">
+                    <option value="all">Усі групи</option>
+                    <option value="1" data-group="1">1</option>
+                    <option value="2" data-group="2">2</option>
+                    <option value="3" data-group="3">3</option>
+                  </select>
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">К-сть пар</label>
+                  <input class="form-control" type="number" name="pairs_count" min="1" value="1" required />
+                </div>
+                <div class="col-12 col-md-3">
+                  <label class="form-label">Викладач</label>
+                  <select class="form-select" name="teacher_id">
+                    <option value="">Без викладача</option>
+                    <% teachers.forEach(function(teacher) { %>
+                      <option value="<%= teacher.id %>"><%= teacher.full_name %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-12 col-md-3">
+                  <label class="form-label">Тижні (необовʼязково)</label>
+                  <input class="form-control" name="weeks_set" placeholder="1-2,5,7" />
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">Фіксований день</label>
+                  <select class="form-select" name="fixed_day">
+                    <option value="">Будь-який</option>
+                    <% dayOptions.forEach(function(day) { %>
+                      <option value="<%= day %>"><%= day %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">Фіксований слот</label>
+                  <select class="form-select" name="fixed_class_number">
+                    <option value="">Будь-який</option>
+                    <% classOptions.forEach(function(n) { %>
+                      <option value="<%= n %>"><%= n %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-12 col-md-6 d-grid">
+                  <button class="btn btn-primary" type="submit">Додати до генератора</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card glass-panel">
+            <div class="card-body">
+              <div class="generator-section-title mb-2">План занять</div>
+              <% if (items && items.length) { %>
+                <div class="table-responsive">
+                  <table class="table generator-table align-middle">
+                    <thead>
+                      <tr>
+                        <th>Курс</th>
+                        <th>Предмет</th>
+                        <th>Тип</th>
+                        <th>Група</th>
+                        <th>Викладач</th>
+                        <th>Пар</th>
+                        <th>Тижні</th>
+                        <th>Фікс. день</th>
+                        <th>Фікс. слот</th>
+                        <th>Дії</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% items.forEach(function(item) { %>
+                        <tr>
+                          <td>
+                            <select class="form-select form-select-sm" name="course_id" form="gen-item-<%= item.id %>">
+                              <% kyivCourses.forEach(function(course) { %>
+                                <option value="<%= course.id %>" <%= Number(item.course_id) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
+                              <% }); %>
+                            </select>
+                          </td>
+                          <td>
+                            <select class="form-select form-select-sm" name="subject_id" form="gen-item-<%= item.id %>">
+                              <% kyivCourses.forEach(function(course) { %>
+                                <optgroup label="<%= course.name %>">
+                                  <% (subjectsByCourse[course.id] || []).forEach(function(subject) { %>
+                                    <option value="<%= subject.id %>" <%= Number(item.subject_id) === Number(subject.id) ? 'selected' : '' %>>
+                                      <%= subject.name %>
+                                    </option>
+                                  <% }); %>
+                                </optgroup>
+                              <% }); %>
+                            </select>
+                          </td>
+                          <td>
+                            <select class="form-select form-select-sm" name="lesson_type" form="gen-item-<%= item.id %>">
+                              <option value="lecture" <%= item.lesson_type === 'lecture' ? 'selected' : '' %>>Лекція</option>
+                              <option value="seminar" <%= item.lesson_type === 'seminar' ? 'selected' : '' %>>Семінар</option>
+                              <option value="lab" <%= item.lesson_type === 'lab' ? 'selected' : '' %>>Лаб</option>
+                              <option value="practice" <%= item.lesson_type === 'practice' ? 'selected' : '' %>>Практика</option>
+                            </select>
+                          </td>
+                          <td>
+                            <select class="form-select form-select-sm" name="group_number" form="gen-item-<%= item.id %>">
+                              <option value="all" <%= item.group_number === null || typeof item.group_number === 'undefined' ? 'selected' : '' %>>Усі</option>
+                              <option value="1" <%= Number(item.group_number) === 1 ? 'selected' : '' %>>1</option>
+                              <option value="2" <%= Number(item.group_number) === 2 ? 'selected' : '' %>>2</option>
+                              <option value="3" <%= Number(item.group_number) === 3 ? 'selected' : '' %>>3</option>
+                            </select>
+                          </td>
+                          <td>
+                            <select class="form-select form-select-sm" name="teacher_id" form="gen-item-<%= item.id %>">
+                              <option value="">—</option>
+                              <% teachers.forEach(function(teacher) { %>
+                                <option value="<%= teacher.id %>" <%= Number(item.teacher_id) === Number(teacher.id) ? 'selected' : '' %>>
+                                  <%= teacher.full_name %>
+                                </option>
+                              <% }); %>
+                            </select>
+                          </td>
+                          <td>
+                            <input class="form-control form-control-sm" type="number" name="pairs_count" min="1" form="gen-item-<%= item.id %>" value="<%= item.pairs_count %>" />
+                          </td>
+                          <td>
+                            <input class="form-control form-control-sm" name="weeks_set" form="gen-item-<%= item.id %>" value="<%= item.weeks_set || '' %>" />
+                          </td>
+                          <td>
+                            <select class="form-select form-select-sm" name="fixed_day" form="gen-item-<%= item.id %>">
+                              <option value="">—</option>
+                              <% dayOptions.forEach(function(day) { %>
+                                <option value="<%= day %>" <%= item.fixed_day === day ? 'selected' : '' %>><%= day %></option>
+                              <% }); %>
+                            </select>
+                          </td>
+                          <td>
+                            <select class="form-select form-select-sm" name="fixed_class_number" form="gen-item-<%= item.id %>">
+                              <option value="">—</option>
+                              <% classOptions.forEach(function(n) { %>
+                                <option value="<%= n %>" <%= Number(item.fixed_class_number) === Number(n) ? 'selected' : '' %>><%= n %></option>
+                              <% }); %>
+                            </select>
+                          </td>
+                          <td class="d-flex gap-2">
+                            <form id="gen-item-<%= item.id %>" method="POST" action="/admin/schedule-generator/items/edit/<%= item.id %>">
+                              <input type="hidden" name="run_id" value="<%= run.id %>" />
+                            </form>
+                            <button class="btn btn-sm btn-outline-primary" type="submit" form="gen-item-<%= item.id %>">Save</button>
+                            <form method="POST" action="/admin/schedule-generator/items/delete/<%= item.id %>">
+                              <input type="hidden" name="run_id" value="<%= run.id %>" />
+                              <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Видалити запис?');">Delete</button>
+                            </form>
+                          </td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
+                </div>
+              <% } else { %>
+                <div class="generator-empty">Додайте предмети, щоб створити план.</div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="app-footer text-center py-4">
+      <small>
+        © <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %> ·
+        <button
+          type="button"
+          class="btn btn-link btn-sm p-0 align-baseline"
+          data-bs-toggle="modal"
+          data-bs-target="#changelogModal"
+        >
+          Changelog
+        </button>
+      </small>
+    </footer>
+
+    <%- include('partials/changelog-modal') %>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script>
+      const themeToggle = document.getElementById('themeToggle');
+      if (themeToggle) {
+        const applyTheme = (theme) => {
+          document.body.classList.toggle('theme-light', theme === 'light');
+          document.body.classList.toggle('theme-dark', theme === 'dark');
+          themeToggle.textContent = theme === 'light' ? themeToggle.dataset.darkLabel : themeToggle.dataset.lightLabel;
+        };
+        const stored = localStorage.getItem('theme') || 'light';
+        applyTheme(stored);
+        themeToggle.addEventListener('click', () => {
+          const next = document.body.classList.contains('theme-light') ? 'dark' : 'light';
+          localStorage.setItem('theme', next);
+          applyTheme(next);
+        });
+      }
+
+      const courseSelect = document.getElementById('genCourseSelect');
+      const subjectSelect = document.getElementById('genSubjectSelect');
+      const groupSelect = document.getElementById('genGroupSelect');
+
+      function syncSubjects() {
+        if (!courseSelect || !subjectSelect) return;
+        const courseId = courseSelect.value;
+        const options = Array.from(subjectSelect.querySelectorAll('option'));
+        options.forEach((opt) => {
+          const optCourse = opt.dataset.course;
+          const show = !optCourse || optCourse === courseId;
+          opt.hidden = !show;
+        });
+        const visible = options.find((opt) => !opt.hidden);
+        if (visible) {
+          subjectSelect.value = visible.value;
+        }
+        syncGroupOptions();
+      }
+
+      function syncGroupOptions() {
+        if (!subjectSelect || !groupSelect) return;
+        const selected = subjectSelect.options[subjectSelect.selectedIndex];
+        const groupCount = Number(selected?.dataset?.groupCount || 1);
+        Array.from(groupSelect.querySelectorAll('option[data-group]')).forEach((opt) => {
+          const num = Number(opt.dataset.group);
+          opt.disabled = num > groupCount;
+        });
+      }
+
+      if (courseSelect) {
+        courseSelect.addEventListener('change', syncSubjects);
+      }
+      if (subjectSelect) {
+        subjectSelect.addEventListener('change', syncGroupOptions);
+      }
+      syncSubjects();
+    </script>
+  </body>
+</html>

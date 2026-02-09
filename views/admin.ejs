@@ -881,6 +881,7 @@
                 <h5 class="card-title mb-0">Add class</h5>
                 <div class="d-flex gap-2 flex-wrap">
                   <button class="btn btn-outline-primary btn-sm" type="button" id="validateScheduleBtn">Перевірити розклад</button>
+                  <a class="btn btn-outline-primary btn-sm" href="/admin/schedule-generator">Генератор семестру</a>
                   <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-list">Відкрити список пар</a>
                   <a class="btn btn-outline-secondary btn-sm" href="/admin/export/schedule.csv">Export CSV</a>
                   <form class="d-flex gap-2" method="POST" action="/admin/import/schedule.csv" enctype="multipart/form-data">
@@ -1653,11 +1654,17 @@
               <h5 class="card-title mb-3">Create course</h5>
               <form method="POST" action="/admin/courses/add">
                 <div class="row g-2">
-                  <div class="col-12 col-md-3">
+                  <div class="col-12 col-md-2">
                     <input class="form-control" type="number" name="id" min="1" placeholder="Course ID (e.g. 3)" required />
                   </div>
-                  <div class="col-12 col-md-5">
+                  <div class="col-12 col-md-4">
                     <input class="form-control" name="name" placeholder="Course name (e.g. 3 курс)" required />
+                  </div>
+                  <div class="col-12 col-md-2">
+                    <select class="form-select" name="location" required>
+                      <option value="kyiv" selected>Kyiv</option>
+                      <option value="munich">Munich</option>
+                    </select>
                   </div>
                   <div class="col-12 col-md-2 d-flex align-items-center">
                     <div class="form-check">
@@ -1682,6 +1689,7 @@
                     <tr>
                       <th>ID</th>
                       <th>Name</th>
+                      <th>Campus</th>
                       <th>Teacher</th>
                       <th>Actions</th>
                     </tr>
@@ -1692,6 +1700,12 @@
                         <td><%= c.id %></td>
                         <td>
                           <input class="form-control form-control-sm" name="name" form="course-<%= c.id %>" value="<%= c.name %>" required />
+                        </td>
+                        <td>
+                          <select class="form-select form-select-sm" name="location" form="course-<%= c.id %>" required>
+                            <option value="kyiv" <%= String(c.location || 'kyiv') === 'kyiv' ? 'selected' : '' %>>Kyiv</option>
+                            <option value="munich" <%= String(c.location || '') === 'munich' ? 'selected' : '' %>>Munich</option>
+                          </select>
                         </td>
                         <td>
                           <input
@@ -1730,7 +1744,7 @@
                     <% }); %>
                     <% if (!(courses || []).length) { %>
                       <tr>
-                        <td colspan="4" class="text-muted"><%= t('admin.noCourses') %></td>
+                        <td colspan="5" class="text-muted"><%= t('admin.noCourses') %></td>
                       </tr>
                     <% } %>
                   </tbody>

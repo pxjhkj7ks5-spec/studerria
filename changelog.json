@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.7.37",
+      "date": "2026-02-09",
+      "items": [
+        "feat: add semester schedule generator with preview + publish flow",
+        "feat: add Kyiv/Munich campus flag for courses",
+        "feat: add teacher availability/load constraints for generator"
+      ]
+    },
+    {
       "version": "0.7.36",
       "date": "2026-02-09",
       "items": [

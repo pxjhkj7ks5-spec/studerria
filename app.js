@@ -324,6 +324,7 @@ const initDb = async () => {
 
   await pool.query('UPDATE subjects SET is_required = true WHERE is_required IS NULL');
 
+  await pool.query("UPDATE courses SET location = 'kyiv' WHERE location IS NULL");
   await pool.query('UPDATE users SET course_id = 1 WHERE course_id IS NULL');
   await pool.query("UPDATE users SET language = 'uk' WHERE language IS NULL");
   await pool.query('UPDATE users SET created_at = NOW() WHERE created_at IS NULL');
@@ -622,7 +623,7 @@ function invalidateWeekTimeCache() {
 async function getCoursesCached() {
   const cached = cacheGet(referenceCache.courses, 'courses');
   if (cached) return cached;
-  const rows = await db.all('SELECT id, name, is_teacher_course FROM courses ORDER BY id');
+  const rows = await db.all('SELECT id, name, is_teacher_course, location FROM courses ORDER BY id');
   return cacheSet(referenceCache.courses, 'courses', rows || []);
 }
 
@@ -656,6 +657,48 @@ async function getSemestersCached(courseId) {
   return cacheSet(referenceCache.semesters, courseId, rows || []);
 }
 
+const DEFAULT_GENERATOR_CONFIG = {
+  distribution: 'even',
+  seminar_distribution: 'start',
+  max_daily_pairs: 7,
+  target_daily_pairs: 4,
+  blocked_weeks: '',
+  special_weeks_mode: 'block',
+  prefer_compactness: true,
+};
+
+const parseGeneratorConfig = (raw) => {
+  if (!raw) return { ...DEFAULT_GENERATOR_CONFIG };
+  try {
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_GENERATOR_CONFIG, ...(parsed || {}) };
+  } catch (err) {
+    return { ...DEFAULT_GENERATOR_CONFIG };
+  }
+};
+
+const serializeGeneratorConfig = (config) => JSON.stringify({ ...DEFAULT_GENERATOR_CONFIG, ...(config || {}) });
+
+const normalizeGeneratorDays = (days) =>
+  (Array.isArray(days) ? days : typeof days === 'string' ? [days] : [])
+    .map((d) => String(d))
+    .filter(Boolean);
+
+const normalizeWeekdayName = (value) => {
+  if (!value) return null;
+  const match = fullWeekDays.find((day) => day.toLowerCase() === String(value).toLowerCase());
+  return match || null;
+};
+
+async function getKyivCoursesCached() {
+  const courses = await getCoursesCached();
+  return (courses || []).filter((course) => {
+    const isTeacher = course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
+    const location = String(course.location || 'kyiv').toLowerCase();
+    return !isTeacher && location === 'kyiv';
+  });
+}
+
 const { createRateLimiter, getClientIp } = require('./lib/rateLimit');
 const {
   requireLogin,
@@ -682,6 +725,7 @@ const {
   formatLocalDate,
   addDays,
 } = require('./lib/dateUtils');
+const { generateSchedule } = require('./lib/scheduleGenerator');
 const { runMigrations } = require('./lib/migrations');
 
 const authLimiter = createRateLimiter({
@@ -4765,6 +4809,639 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
   }
 });
 
+app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.init');
+  }
+  const userId = req.session.user.id;
+  const runId = Number(req.query.run);
+  let run = null;
+  try {
+    if (Number.isFinite(runId) && runId > 0) {
+      run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
+    }
+    if (!run) {
+      run = await db.get(
+        'SELECT * FROM schedule_generator_runs WHERE created_by_id = ? ORDER BY created_at DESC LIMIT 1',
+        [userId]
+      );
+    }
+    if (!run) {
+      const insert = await db.run(
+        'INSERT INTO schedule_generator_runs (status, created_by_id, config) VALUES (?, ?, ?) RETURNING id',
+        ['draft', userId, serializeGeneratorConfig(DEFAULT_GENERATOR_CONFIG)]
+      );
+      const newId = insert.lastID;
+      return res.redirect(`/admin/schedule-generator?run=${newId}`);
+    }
+
+    const config = parseGeneratorConfig(run.config);
+    const kyivCourses = await getKyivCoursesCached();
+    const courseSemesters = [];
+    const courseDays = {};
+    const subjectsByCourse = {};
+    for (const course of kyivCourses) {
+      const semester = await getActiveSemester(course.id);
+      courseSemesters.push({ course, semester });
+      const studyDays = await getCourseStudyDays(course.id);
+      const activeDays = (studyDays || [])
+        .filter((d) => d.is_active)
+        .map((d) => d.day_name)
+        .filter(Boolean);
+      courseDays[course.id] = activeDays.length ? activeDays : [...daysOfWeek];
+      subjectsByCourse[course.id] = await getSubjectsCached(course.id);
+    }
+
+    const teachers = await db.all(
+      "SELECT id, full_name FROM users WHERE role = 'teacher' ORDER BY full_name"
+    );
+    const items = await db.all(
+      `
+        SELECT sgi.*, s.name AS subject_name, s.group_count, u.full_name AS teacher_name
+        FROM schedule_generator_items sgi
+        JOIN subjects s ON s.id = sgi.subject_id
+        LEFT JOIN users u ON u.id = sgi.teacher_id
+        WHERE sgi.run_id = ?
+        ORDER BY sgi.id DESC
+      `,
+      [run.id]
+    );
+    const limitsRows = await db.all(
+      'SELECT * FROM schedule_generator_teacher_limits WHERE run_id = ?',
+      [run.id]
+    );
+    const limitsByTeacher = {};
+    limitsRows.forEach((row) => {
+      limitsByTeacher[row.teacher_id] = {
+        allowed_weekdays: row.allowed_weekdays ? row.allowed_weekdays.split(',') : [],
+        max_pairs_per_week: row.max_pairs_per_week,
+      };
+    });
+    const lastConflicts = Array.isArray(config.last_conflicts) ? config.last_conflicts : [];
+    const lastStats = config.last_stats || null;
+
+    return res.render('admin-schedule-generator', {
+      username: req.session.user.username,
+      role: req.session.role,
+      run,
+      config,
+      kyivCourses,
+      courseSemesters,
+      courseDays,
+      subjectsByCourse,
+      teachers,
+      items,
+      limitsByTeacher,
+      lastConflicts,
+      lastStats,
+      dayOptions: fullWeekDays,
+      dayLabels: studyDayLabels,
+      classOptions: [1, 2, 3, 4, 5, 6, 7],
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.render');
+  }
+});
+
+app.post('/admin/schedule-generator/new', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.create');
+  }
+  const userId = req.session.user.id;
+  try {
+    const insert = await db.run(
+      'INSERT INTO schedule_generator_runs (status, created_by_id, config) VALUES (?, ?, ?) RETURNING id',
+      ['draft', userId, serializeGeneratorConfig(DEFAULT_GENERATOR_CONFIG)]
+    );
+    const runId = insert.lastID;
+    return res.redirect(`/admin/schedule-generator?run=${runId}`);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.create');
+  }
+});
+
+app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.config');
+  }
+  const runId = Number(req.body.run_id);
+  if (!Number.isFinite(runId) || runId <= 0) {
+    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+  }
+  try {
+    const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
+    if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    const existing = parseGeneratorConfig(run.config);
+    const maxDailyRaw = Number(req.body.max_daily_pairs);
+    const targetDailyRaw = Number(req.body.target_daily_pairs);
+    const maxDailyPairs = Number.isNaN(maxDailyRaw)
+      ? existing.max_daily_pairs
+      : Math.min(Math.max(maxDailyRaw, 1), 7);
+    const targetDailyPairs = Number.isNaN(targetDailyRaw)
+      ? existing.target_daily_pairs
+      : Math.min(Math.max(targetDailyRaw, 1), 7);
+    const nextConfig = {
+      ...existing,
+      distribution: String(req.body.distribution || existing.distribution || 'even'),
+      seminar_distribution: String(req.body.seminar_distribution || existing.seminar_distribution || 'start'),
+      max_daily_pairs: maxDailyPairs || 7,
+      target_daily_pairs: targetDailyPairs || 4,
+      blocked_weeks: String(req.body.blocked_weeks || ''),
+      special_weeks_mode: String(req.body.special_weeks_mode || existing.special_weeks_mode || 'block'),
+      prefer_compactness: String(req.body.prefer_compactness || '') === 'on',
+    };
+    await db.run(
+      'UPDATE schedule_generator_runs SET config = ?, updated_at = NOW() WHERE id = ?',
+      [serializeGeneratorConfig(nextConfig), runId]
+    );
+    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Settings%20saved`);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.config.save');
+  }
+});
+
+app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.item');
+  }
+  const runId = Number(req.body.run_id);
+  const courseId = Number(req.body.course_id);
+  const subjectId = Number(req.body.subject_id);
+  const teacherIdRaw = req.body.teacher_id ? Number(req.body.teacher_id) : null;
+  const lessonTypeRaw = String(req.body.lesson_type || 'lecture').trim();
+  const lessonType = lessonTypeRaw || 'lecture';
+  const groupRaw = String(req.body.group_number || 'all');
+  const groupNumber = groupRaw === 'all' || groupRaw === '0' ? null : Number(groupRaw);
+  const pairsCount = Number(req.body.pairs_count);
+  const weeksSet = String(req.body.weeks_set || '').trim();
+  const fixedDay = normalizeWeekdayName(req.body.fixed_day);
+  const fixedClass = req.body.fixed_class_number ? Number(req.body.fixed_class_number) : null;
+
+  if (!Number.isFinite(runId) || runId <= 0 || !Number.isFinite(courseId) || !Number.isFinite(subjectId)) {
+    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20data`);
+  }
+  if (!Number.isFinite(pairsCount) || pairsCount <= 0) {
+    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20pairs`);
+  }
+  if (groupNumber && (Number.isNaN(groupNumber) || groupNumber < 1)) {
+    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
+  }
+  if (fixedClass && (fixedClass < 1 || fixedClass > 7)) {
+    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20slot`);
+  }
+
+  try {
+    const subjectRow = await db.get('SELECT id, group_count FROM subjects WHERE id = ? AND course_id = ?', [subjectId, courseId]);
+    if (!subjectRow) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Subject%20not%20found`);
+    }
+    if (groupNumber && Number(groupNumber) > Number(subjectRow.group_count || 1)) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
+    }
+    const semester = await getActiveSemester(courseId);
+    if (!semester) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Semester%20not%20found`);
+    }
+    await db.run(
+      `
+        INSERT INTO schedule_generator_items
+          (run_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, pairs_count, weeks_set, fixed_day, fixed_class_number)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        runId,
+        courseId,
+        semester.id,
+        subjectId,
+        teacherIdRaw || null,
+        lessonType,
+        groupNumber,
+        pairsCount,
+        weeksSet || null,
+        fixedDay,
+        fixedClass || null,
+      ]
+    );
+    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Item%20added`);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.item.add');
+  }
+});
+
+app.post('/admin/schedule-generator/items/edit/:id', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.item.edit');
+  }
+  const itemId = Number(req.params.id);
+  const runId = Number(req.body.run_id);
+  const courseId = Number(req.body.course_id);
+  const subjectId = Number(req.body.subject_id);
+  const teacherIdRaw = req.body.teacher_id ? Number(req.body.teacher_id) : null;
+  const lessonTypeRaw = String(req.body.lesson_type || 'lecture').trim();
+  const lessonType = lessonTypeRaw || 'lecture';
+  const groupRaw = String(req.body.group_number || 'all');
+  const groupNumber = groupRaw === 'all' || groupRaw === '0' ? null : Number(groupRaw);
+  const pairsCount = Number(req.body.pairs_count);
+  const weeksSet = String(req.body.weeks_set || '').trim();
+  const fixedDay = normalizeWeekdayName(req.body.fixed_day);
+  const fixedClass = req.body.fixed_class_number ? Number(req.body.fixed_class_number) : null;
+
+  if (!Number.isFinite(itemId) || !Number.isFinite(runId) || runId <= 0) {
+    return res.redirect('/admin/schedule-generator?err=Invalid%20item');
+  }
+  if (!Number.isFinite(pairsCount) || pairsCount <= 0) {
+    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20pairs`);
+  }
+  if (groupNumber && (Number.isNaN(groupNumber) || groupNumber < 1)) {
+    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
+  }
+  if (fixedClass && (fixedClass < 1 || fixedClass > 7)) {
+    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20slot`);
+  }
+
+  try {
+    const subjectRow = await db.get('SELECT id, group_count FROM subjects WHERE id = ? AND course_id = ?', [subjectId, courseId]);
+    if (!subjectRow) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Subject%20not%20found`);
+    }
+    if (groupNumber && Number(groupNumber) > Number(subjectRow.group_count || 1)) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
+    }
+    const semester = await getActiveSemester(courseId);
+    if (!semester) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Semester%20not%20found`);
+    }
+    await db.run(
+      `
+        UPDATE schedule_generator_items
+        SET course_id = ?, semester_id = ?, subject_id = ?, teacher_id = ?, lesson_type = ?, group_number = ?, pairs_count = ?, weeks_set = ?, fixed_day = ?, fixed_class_number = ?
+        WHERE id = ? AND run_id = ?
+      `,
+      [
+        courseId,
+        semester.id,
+        subjectId,
+        teacherIdRaw || null,
+        lessonType,
+        groupNumber,
+        pairsCount,
+        weeksSet || null,
+        fixedDay,
+        fixedClass || null,
+        itemId,
+        runId,
+      ]
+    );
+    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Item%20saved`);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.item.edit');
+  }
+});
+
+app.post('/admin/schedule-generator/items/delete/:id', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.item.delete');
+  }
+  const itemId = Number(req.params.id);
+  const runId = Number(req.body.run_id);
+  if (!Number.isFinite(itemId) || !Number.isFinite(runId) || runId <= 0) {
+    return res.redirect('/admin/schedule-generator?err=Invalid%20item');
+  }
+  try {
+    await db.run('DELETE FROM schedule_generator_items WHERE id = ? AND run_id = ?', [itemId, runId]);
+    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Item%20deleted`);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.item.delete');
+  }
+});
+
+app.post('/admin/schedule-generator/teachers/save', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.teacher');
+  }
+  const runId = Number(req.body.run_id);
+  const teacherId = Number(req.body.teacher_id);
+  if (!Number.isFinite(runId) || runId <= 0 || !Number.isFinite(teacherId)) {
+    return res.redirect('/admin/schedule-generator?err=Invalid%20teacher');
+  }
+  const allowedDaysRaw = normalizeGeneratorDays(req.body.allowed_days);
+  const allowedDays = allowedDaysRaw
+    .map((day) => normalizeWeekdayName(day))
+    .filter(Boolean);
+  const maxPairsRaw = Number(req.body.max_pairs_per_week);
+  const maxPairs = Number.isNaN(maxPairsRaw) || maxPairsRaw <= 0 ? null : maxPairsRaw;
+
+  try {
+    await db.run(
+      `
+        INSERT INTO schedule_generator_teacher_limits (run_id, teacher_id, allowed_weekdays, max_pairs_per_week)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT (run_id, teacher_id)
+        DO UPDATE SET allowed_weekdays = EXCLUDED.allowed_weekdays, max_pairs_per_week = EXCLUDED.max_pairs_per_week, updated_at = NOW()
+      `,
+      [runId, teacherId, allowedDays.join(','), maxPairs]
+    );
+    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Teacher%20saved`);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.teacher.save');
+  }
+});
+
+app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.run');
+  }
+  const runId = Number(req.body.run_id);
+  if (!Number.isFinite(runId) || runId <= 0) {
+    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+  }
+  try {
+    const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
+    if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    const config = parseGeneratorConfig(run.config);
+    const items = await db.all(
+      `
+        SELECT sgi.*, s.name AS subject_name, s.group_count
+        FROM schedule_generator_items sgi
+        JOIN subjects s ON s.id = sgi.subject_id
+        WHERE sgi.run_id = ?
+      `,
+      [runId]
+    );
+    if (!items.length) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20items`);
+    }
+
+    const courseContexts = new Map();
+    const courseIds = Array.from(new Set(items.map((item) => String(item.course_id))));
+    for (const courseId of courseIds) {
+      const semester = await getActiveSemester(courseId);
+      if (!semester) continue;
+      const studyDays = await getCourseStudyDays(courseId);
+      const activeDays = (studyDays || [])
+        .filter((d) => d.is_active)
+        .map((d) => d.day_name)
+        .filter(Boolean);
+      courseContexts.set(String(courseId), {
+        course_id: Number(courseId),
+        semester_id: semester.id,
+        weeks_count: Number(semester.weeks_count || 15),
+        active_days: activeDays.length ? activeDays : [...daysOfWeek],
+      });
+    }
+
+    const limitsRows = await db.all(
+      'SELECT * FROM schedule_generator_teacher_limits WHERE run_id = ?',
+      [runId]
+    );
+    const limitsMap = new Map();
+    limitsRows.forEach((row) => {
+      limitsMap.set(String(row.teacher_id), {
+        allowed_days: row.allowed_weekdays ? row.allowed_weekdays.split(',') : [],
+        max_pairs_per_week: row.max_pairs_per_week,
+      });
+    });
+
+    const normalizedItems = items.map((item) => ({
+      ...item,
+      semester_id: item.semester_id || (courseContexts.get(String(item.course_id)) || {}).semester_id,
+    }));
+
+    const result = generateSchedule({
+      items: normalizedItems,
+      courseContexts,
+      teacherLimits: limitsMap,
+      config,
+    });
+
+    await db.run('DELETE FROM schedule_generator_entries WHERE run_id = ?', [runId]);
+    if (result.entries.length) {
+      const stmt = db.prepare(
+        `
+          INSERT INTO schedule_generator_entries
+            (run_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, day_of_week, class_number, week_number)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      );
+      result.entries.forEach((entry) => {
+        stmt.run(
+          runId,
+          entry.course_id,
+          entry.semester_id,
+          entry.subject_id,
+          entry.teacher_id,
+          entry.lesson_type || null,
+          entry.group_number,
+          entry.day_of_week,
+          entry.class_number,
+          entry.week_number
+        );
+      });
+      await stmt.finalize();
+    }
+
+    const nextConfig = {
+      ...config,
+      last_stats: {
+        generated_at: new Date().toISOString(),
+        items: normalizedItems.length,
+        entries: result.entries.length,
+        conflicts: result.conflicts.length,
+      },
+      last_conflicts: result.conflicts,
+    };
+    await db.run(
+      'UPDATE schedule_generator_runs SET config = ?, updated_at = NOW() WHERE id = ?',
+      [serializeGeneratorConfig(nextConfig), runId]
+    );
+
+    const firstCourse = normalizedItems[0] ? normalizedItems[0].course_id : courseIds[0];
+    return res.redirect(`/admin/schedule-generator/${runId}/preview?course=${firstCourse}&week=1`);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.run');
+  }
+});
+
+app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.preview');
+  }
+  const runId = Number(req.params.runId);
+  const courseId = Number(req.query.course);
+  if (!Number.isFinite(runId) || runId <= 0) {
+    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+  }
+  try {
+    const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
+    if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    const kyivCourses = await getKyivCoursesCached();
+    const availableCourseIds = kyivCourses.map((c) => Number(c.id));
+    const selectedCourseId = availableCourseIds.includes(courseId) ? courseId : availableCourseIds[0];
+    if (!selectedCourseId) {
+      return res.redirect('/admin/schedule-generator?run=' + runId);
+    }
+    const activeSemester = await getActiveSemester(selectedCourseId);
+    const totalWeeks = activeSemester && activeSemester.weeks_count ? Number(activeSemester.weeks_count) : 15;
+    let selectedWeek = Number(req.query.week);
+    if (Number.isNaN(selectedWeek) || selectedWeek < 1) selectedWeek = 1;
+    if (selectedWeek > totalWeeks) selectedWeek = totalWeeks;
+
+    const studyDays = await getCourseStudyDays(selectedCourseId);
+    let activeDays = (studyDays || [])
+      .filter((d) => d.is_active)
+      .map((d) => d.day_name)
+      .filter(Boolean);
+    if (!activeDays.length) {
+      activeDays = [...daysOfWeek];
+    }
+    const weekDates = fullWeekDays.map((_, idx) =>
+      getDateForWeekIndex(selectedWeek, idx, activeSemester ? activeSemester.start_date : null)
+    );
+    const dayDates = {};
+    activeDays.forEach((day) => {
+      const idx = fullWeekDays.indexOf(day);
+      dayDates[day] = idx >= 0 ? weekDates[idx] : null;
+    });
+
+    const scheduleByDay = {};
+    activeDays.forEach((day) => {
+      scheduleByDay[day] = [];
+    });
+
+    const rows = await db.all(
+      `
+        SELECT sge.*, s.name AS subject_name, u.full_name AS teacher_name
+        FROM schedule_generator_entries sge
+        JOIN subjects s ON s.id = sge.subject_id
+        LEFT JOIN users u ON u.id = sge.teacher_id
+        WHERE sge.run_id = ? AND sge.course_id = ? AND sge.week_number = ?
+      `,
+      [runId, selectedCourseId, selectedWeek]
+    );
+    const grouped = new Map();
+    (rows || []).forEach((row) => {
+      const key = `${row.subject_id}|${row.day_of_week}|${row.class_number}|${row.teacher_id || 0}|${row.lesson_type || ''}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, { ...row, group_numbers: new Set() });
+      }
+      grouped.get(key).group_numbers.add(Number(row.group_number));
+    });
+    grouped.forEach((entry) => {
+      const groups = Array.from(entry.group_numbers).sort((a, b) => a - b);
+      const groupLabel = groups.length === 1 ? `Група ${groups[0]}` : `Групи: ${groups.join(', ')}`;
+      const normalized = {
+        ...entry,
+        group_numbers: groups,
+        group_label: groupLabel,
+      };
+      if (scheduleByDay[entry.day_of_week]) {
+        scheduleByDay[entry.day_of_week].push(normalized);
+      }
+    });
+    activeDays.forEach((day) => {
+      scheduleByDay[day].sort((a, b) => a.class_number - b.class_number);
+    });
+
+    return res.render('admin-schedule-generator-preview', {
+      username: req.session.user.username,
+      role: req.session.role,
+      run,
+      courses: kyivCourses,
+      selectedCourseId,
+      scheduleByDay,
+      daysOfWeek: activeDays,
+      dayDates,
+      currentWeek: selectedWeek,
+      totalWeeks,
+      semester: activeSemester,
+      bellSchedule,
+      config: parseGeneratorConfig(run.config),
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.preview');
+  }
+});
+
+app.post('/admin/schedule-generator/:runId/publish', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.publish');
+  }
+  const runId = Number(req.params.runId);
+  if (!Number.isFinite(runId) || runId <= 0) {
+    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+  }
+  const replace = String(req.body.replace || '') === '1' || String(req.body.replace || '') === 'on';
+  try {
+    const entries = await db.all(
+      `
+        SELECT run_id, course_id, semester_id, subject_id, group_number, day_of_week, class_number, week_number
+        FROM schedule_generator_entries
+        WHERE run_id = ?
+      `,
+      [runId]
+    );
+    if (!entries.length) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20entries`);
+    }
+    if (replace) {
+      const pairs = new Map();
+      entries.forEach((entry) => {
+        const key = `${entry.course_id}|${entry.semester_id}`;
+        pairs.set(key, { course_id: entry.course_id, semester_id: entry.semester_id });
+      });
+      for (const pair of pairs.values()) {
+        await db.run(
+          'DELETE FROM schedule_entries WHERE course_id = ? AND semester_id = ?',
+          [pair.course_id, pair.semester_id]
+        );
+      }
+    }
+    const stmt = db.prepare(
+      `
+        INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+    );
+    entries.forEach((entry) => {
+      stmt.run(
+        entry.subject_id,
+        entry.group_number,
+        entry.day_of_week,
+        entry.class_number,
+        entry.week_number,
+        entry.course_id,
+        entry.semester_id
+      );
+    });
+    await stmt.finalize();
+    await db.run('UPDATE schedule_generator_runs SET status = ?, updated_at = NOW() WHERE id = ?', ['published', runId]);
+    logAction(db, req, 'schedule_generator_publish', { run_id: runId, replace });
+    return res.redirect('/admin?ok=Schedule%20published');
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.publish');
+  }
+});
+
 let schedulerRunning = false;
 const publishScheduledItems = async () => {
   if (schedulerRunning) {
@@ -6810,20 +7487,21 @@ app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
 });
 
 app.post('/admin/courses/add', requireAdmin, (req, res) => {
-  const { id, name, is_teacher_course } = req.body;
+  const { id, name, is_teacher_course, location } = req.body;
   const courseId = Number(id);
   const teacherFlag = String(is_teacher_course) === '1' ? 1 : 0;
+  const campus = String(location || 'kyiv').toLowerCase() === 'munich' ? 'munich' : 'kyiv';
   if (Number.isNaN(courseId) || courseId < 1 || !name || !name.trim()) {
     return res.redirect('/admin?err=Invalid%20course');
   }
   db.run(
-    'INSERT INTO courses (id, name, is_teacher_course) VALUES (?, ?, ?)',
-    [courseId, name.trim(), teacherFlag],
+    'INSERT INTO courses (id, name, is_teacher_course, location) VALUES (?, ?, ?, ?)',
+    [courseId, name.trim(), teacherFlag, campus],
     (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
-    logAction(db, req, 'course_add', { id: courseId, name: name.trim(), is_teacher_course: teacherFlag });
+    logAction(db, req, 'course_add', { id: courseId, name: name.trim(), is_teacher_course: teacherFlag, location: campus });
     invalidateCoursesCache();
     return res.redirect('/admin?ok=Course%20created');
     }
@@ -6832,17 +7510,21 @@ app.post('/admin/courses/add', requireAdmin, (req, res) => {
 
 app.post('/admin/courses/edit/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { name, is_teacher_course } = req.body;
+  const { name, is_teacher_course, location } = req.body;
   const courseId = Number(id);
   const teacherFlag = String(is_teacher_course) === '1' ? 1 : 0;
+  const campus = String(location || 'kyiv').toLowerCase() === 'munich' ? 'munich' : 'kyiv';
   if (Number.isNaN(courseId) || !name || !name.trim()) {
     return res.redirect('/admin?err=Invalid%20course');
   }
-  db.run('UPDATE courses SET name = ?, is_teacher_course = ? WHERE id = ?', [name.trim(), teacherFlag, courseId], (err) => {
+  db.run(
+    'UPDATE courses SET name = ?, is_teacher_course = ?, location = ? WHERE id = ?',
+    [name.trim(), teacherFlag, campus, courseId],
+    (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
-    logAction(db, req, 'course_edit', { id: courseId, name: name.trim(), is_teacher_course: teacherFlag });
+    logAction(db, req, 'course_edit', { id: courseId, name: name.trim(), is_teacher_course: teacherFlag, location: campus });
     invalidateCoursesCache();
     return res.redirect('/admin?ok=Course%20updated');
   });

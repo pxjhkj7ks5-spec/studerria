@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Превʼю розкладу</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/pages/admin.css" />
+    <link rel="stylesheet" href="/css/pages/admin-schedule-generator.css" />
+    <link rel="stylesheet" href="/css/pages/schedule.css" />
+  </head>
+  <body class="theme-light schedule-generator-page schedule-preview-page">
+    <nav class="navbar navbar-expand-lg admin-nav">
+      <div class="container">
+        <span class="navbar-brand">Превʼю розкладу</span>
+        <div class="d-flex align-items-center">
+          <span class="me-3 text-muted"><%= t('role.admin') %>: <%= username %></span>
+          <button
+            class="theme-toggle theme-toggle-min me-2"
+            type="button"
+            id="themeToggle"
+            aria-label="Toggle theme"
+            data-light-label="☀️"
+            data-dark-label="🌙"
+          >
+            🌙
+          </button>
+          <a class="btn btn-outline-primary btn-sm me-2" href="/admin/schedule-generator?run=<%= run.id %>">Назад до генератора</a>
+          <form method="POST" action="/logout">
+            <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
+          </form>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-4 schedule-content">
+      <div class="glass schedule-panel mb-4">
+        <div class="panel-section">
+          <div class="panel-title">Курс</div>
+          <div class="panel-body">
+            <form method="GET" action="/admin/schedule-generator/<%= run.id %>/preview" class="d-flex gap-2 align-items-center">
+              <input type="hidden" name="week" value="<%= currentWeek %>" />
+              <select name="course" class="form-select w-auto" onchange="this.form.submit()">
+                <% (courses || []).forEach(function(course) { %>
+                  <option value="<%= course.id %>" <%= Number(course.id) === Number(selectedCourseId) ? 'selected' : '' %>><%= course.name %></option>
+                <% }); %>
+              </select>
+            </form>
+          </div>
+        </div>
+        <div class="panel-section">
+          <div class="panel-title">Тиждень</div>
+          <div class="panel-body">
+            <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %> / <%= totalWeeks %></span>
+          </div>
+        </div>
+        <div class="panel-section panel-sync">
+          <div class="panel-title">Публікація</div>
+          <form method="POST" action="/admin/schedule-generator/<%= run.id %>/publish" class="d-flex flex-column gap-2">
+            <label class="form-check small">
+              <input class="form-check-input" type="checkbox" name="replace" value="1" checked />
+              Замінити існуючий розклад
+            </label>
+            <button class="btn btn-primary btn-sm" type="submit">Опублікувати</button>
+            <div class="small text-muted">Публікує увесь згенерований розклад для Kyiv-курсів.</div>
+          </form>
+        </div>
+      </div>
+
+      <div id="scheduleWeekGrid" class="row g-3">
+        <% (daysOfWeek || []).forEach(function(day) { %>
+          <% const list = scheduleByDay[day] || []; %>
+          <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString('uk-UA') : ''; %>
+          <div class="col-12">
+            <div class="card glass day-card">
+              <div class="card-header fw-semibold text-white d-flex justify-content-between align-items-center">
+                <span><%= day %></span>
+                <% if (dateLabel) { %>
+                  <span class="small muted"><%= dateLabel %></span>
+                <% } %>
+              </div>
+              <div class="card-body">
+                <% if (!list.length) { %>
+                  <div class="text-muted">Немає пар</div>
+                <% } else { %>
+                  <div class="list-group list-group-flush">
+                    <% list.forEach(function(cls) { %>
+                      <% const slot = bellSchedule[cls.class_number] || null; %>
+                      <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : `Пара ${cls.class_number}`; %>
+                      <% const typeLabel = cls.lesson_type === 'lecture' ? 'Лекція' : cls.lesson_type === 'seminar' ? 'Семінар' : cls.lesson_type === 'lab' ? 'Лаб' : cls.lesson_type === 'practice' ? 'Практика' : cls.lesson_type; %>
+                      <div class="list-group-item schedule-card">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <div>
+                            <div class="fw-semibold">
+                              <%= cls.subject_name %>
+                              <% if (typeLabel) { %>
+                                <span class="badge text-bg-secondary ms-2"><%= typeLabel %></span>
+                              <% } %>
+                            </div>
+                            <div class="small muted"><%= cls.group_label %> · <%= cls.teacher_name || 'Без викладача' %></div>
+                          </div>
+                          <div class="muted small"><%= timeLabel %></div>
+                        </div>
+                      </div>
+                    <% }); %>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    </main>
+
+    <div class="week-slider" id="weekSlider">
+      <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
+      <% for (let w = 1; w <= (totalWeeks || 15); w++) { %>
+        <button
+          type="button"
+          class="week-dot <%= w === currentWeek ? 'active' : '' %>"
+          data-week="<%= w %>"
+          aria-label="<%= t('schedule.week') %> <%= w %>"
+        ></button>
+      <% } %>
+      <button class="week-nav-btn" type="button" id="weekNext" aria-label="Next week">›</button>
+    </div>
+
+    <footer class="app-footer text-center py-4">
+      <small>
+        © <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %> ·
+        <button
+          type="button"
+          class="btn btn-link btn-sm p-0 align-baseline"
+          data-bs-toggle="modal"
+          data-bs-target="#changelogModal"
+        >
+          Changelog
+        </button>
+      </small>
+    </footer>
+
+    <%- include('partials/changelog-modal') %>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script>
+      const themeToggle = document.getElementById('themeToggle');
+      if (themeToggle) {
+        const applyTheme = (theme) => {
+          document.body.classList.toggle('theme-light', theme === 'light');
+          document.body.classList.toggle('theme-dark', theme === 'dark');
+          themeToggle.textContent = theme === 'light' ? themeToggle.dataset.darkLabel : themeToggle.dataset.lightLabel;
+        };
+        const stored = localStorage.getItem('theme') || 'light';
+        applyTheme(stored);
+        themeToggle.addEventListener('click', () => {
+          const next = document.body.classList.contains('theme-light') ? 'dark' : 'light';
+          localStorage.setItem('theme', next);
+          applyTheme(next);
+        });
+      }
+
+      const weekSlider = document.getElementById('weekSlider');
+      const weekPrev = document.getElementById('weekPrev');
+      const weekNext = document.getElementById('weekNext');
+      const totalWeeks = <%= totalWeeks || 15 %>;
+      let currentWeek = <%= currentWeek %>;
+
+      function updateMobileWeekDots() {
+        if (!weekSlider) return;
+        const dots = weekSlider.querySelectorAll('.week-dot');
+        if (window.innerWidth > 768) {
+          dots.forEach((dot) => dot.classList.remove('hidden-mobile'));
+          return;
+        }
+        dots.forEach((dot) => {
+          const week = Number(dot.dataset.week);
+          const visible = week === currentWeek || week === currentWeek - 1 || week === currentWeek + 1;
+          dot.classList.toggle('hidden-mobile', !visible);
+        });
+      }
+
+      function updateSchedule(week) {
+        const safe = Math.max(1, Math.min(totalWeeks, week));
+        const params = new URLSearchParams(window.location.search);
+        params.set('week', safe);
+        window.location.search = params.toString();
+      }
+
+      function animateWeekChange(nextWeek) {
+        const safe = Math.max(1, Math.min(totalWeeks, nextWeek));
+        const active = weekSlider ? weekSlider.querySelector('.week-dot.active') : null;
+        const target = weekSlider
+          ? weekSlider.querySelector(`.week-dot[data-week="${safe}"]`)
+          : null;
+        if (active && target && active !== target) {
+          active.classList.remove('active');
+          target.classList.add('active');
+        }
+        currentWeek = safe;
+        updateMobileWeekDots();
+        setTimeout(() => updateSchedule(safe), 200);
+      }
+
+      if (weekSlider) {
+        weekSlider.addEventListener('click', (event) => {
+          const btn = event.target.closest('.week-dot');
+          if (!btn) return;
+          const week = Number(btn.dataset.week);
+          if (!Number.isNaN(week)) animateWeekChange(week);
+        });
+        if (weekPrev) {
+          weekPrev.addEventListener('click', () => animateWeekChange(currentWeek - 1));
+        }
+        if (weekNext) {
+          weekNext.addEventListener('click', () => animateWeekChange(currentWeek + 1));
+        }
+
+        let startX = 0;
+        weekSlider.addEventListener('touchstart', (event) => {
+          startX = event.touches[0].clientX;
+        }, { passive: true });
+        weekSlider.addEventListener('touchend', (event) => {
+          const endX = event.changedTouches[0].clientX;
+          const delta = endX - startX;
+          if (Math.abs(delta) < 40) return;
+          if (delta < 0) animateWeekChange(currentWeek + 1);
+          if (delta > 0) animateWeekChange(currentWeek - 1);
+        });
+        updateMobileWeekDots();
+      }
+    </script>
+  </body>
+</html>

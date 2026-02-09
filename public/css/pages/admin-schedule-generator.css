@@ -1,0 +1,150 @@
+.schedule-generator-page {
+  min-height: 100vh;
+  background: radial-gradient(900px 600px at 15% 10%, rgba(94, 176, 255, 0.22), transparent 60%),
+    radial-gradient(800px 540px at 85% 20%, rgba(121, 192, 255, 0.16), transparent 60%),
+    linear-gradient(160deg, rgba(6, 10, 20, 0.98) 0%, rgba(12, 18, 34, 0.98) 55%, rgba(7, 12, 24, 0.98) 100%);
+}
+
+body.theme-light.schedule-generator-page {
+  background: radial-gradient(900px 600px at 15% 10%, rgba(125, 178, 255, 0.28), transparent 60%),
+    radial-gradient(800px 520px at 85% 18%, rgba(182, 200, 255, 0.22), transparent 60%),
+    linear-gradient(150deg, #edf3ff 0%, #f0f5ff 48%, #e8effa 100%);
+}
+
+.schedule-generator-page .admin-nav {
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.schedule-generator-page .glass {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.theme-light.schedule-generator-page .glass {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.generator-hero {
+  padding: var(--s-6);
+  border-radius: var(--r-xl);
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.16), rgba(99, 102, 241, 0.16));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+.generator-hero h1 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.generator-chip {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 197, 255, 0.4);
+  background: rgba(148, 197, 255, 0.18);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.generator-grid {
+  display: grid;
+  gap: var(--s-4);
+}
+
+.generator-section-title {
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.schedule-generator-page .form-control,
+.schedule-generator-page .form-select {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  backdrop-filter: blur(12px);
+}
+
+body.theme-light.schedule-generator-page .form-control,
+body.theme-light.schedule-generator-page .form-select {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+}
+
+.schedule-generator-page .form-control:focus,
+.schedule-generator-page .form-select:focus {
+  box-shadow: 0 0 0 2px rgba(94, 176, 255, 0.35);
+  border-color: rgba(94, 176, 255, 0.45);
+}
+
+.teacher-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.teacher-day-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.75rem;
+}
+
+body.theme-light.schedule-generator-page .teacher-day-pill {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.generator-table {
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+
+.generator-table tbody tr {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.theme-light.schedule-generator-page .generator-table tbody tr {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.generator-table thead th {
+  color: var(--faint);
+  font-weight: 600;
+}
+
+.generator-empty {
+  color: var(--muted);
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+body.theme-light.schedule-generator-page .generator-empty {
+  border-color: rgba(15, 23, 42, 0.15);
+}
+
+.generator-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.generator-status {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.generator-status .badge {
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-weight: 600;
+}
