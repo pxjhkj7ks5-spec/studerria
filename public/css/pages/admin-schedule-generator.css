@@ -196,6 +196,30 @@ body.theme-dark.schedule-generator-page .form-text {
   color: rgba(248, 250, 252, 0.68) !important;
 }
 
+body.theme-dark.schedule-generator-page .glass-inset .fw-semibold,
+body.theme-dark.schedule-generator-page .glass-panel .fw-semibold,
+body.theme-dark.schedule-generator-page .card .fw-semibold {
+  color: rgba(248, 250, 252, 0.92);
+}
+
+body.theme-dark.schedule-generator-page .glass-inset .small,
+body.theme-dark.schedule-generator-page .glass-inset .text-muted {
+  color: rgba(226, 232, 240, 0.72) !important;
+}
+
+body.theme-dark.schedule-generator-page .form-check-label {
+  color: rgba(248, 250, 252, 0.82);
+}
+
+body.theme-dark.schedule-generator-page .teacher-day-pill {
+  border-color: rgba(148, 197, 255, 0.18);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+body.theme-dark.schedule-generator-page .teacher-day-pill span {
+  color: rgba(248, 250, 252, 0.8);
+}
+
 body.theme-light.schedule-generator-page .generator-table thead th {
   color: rgba(15, 23, 42, 0.7);
   background: rgba(15, 23, 42, 0.05);
@@ -204,10 +228,25 @@ body.theme-light.schedule-generator-page .generator-table thead th {
 
 body.theme-dark.schedule-generator-page .generator-table thead th {
   color: rgba(248, 250, 252, 0.78);
+  background: rgba(15, 23, 42, 0.5);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
 .schedule-generator-page .table > :not(caption) > * > * {
   background-clip: padding-box;
+}
+
+.schedule-generator-page .generator-table > :not(caption) > * > * {
+  background-color: transparent;
+}
+
+body.theme-dark.schedule-generator-page .generator-table > :not(caption) > * > * {
+  background-color: rgba(15, 23, 42, 0.35);
+  color: rgba(248, 250, 252, 0.85);
+}
+
+body.theme-dark.schedule-generator-page .generator-table td {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .schedule-generator-page .table td,
@@ -221,6 +260,21 @@ body.theme-dark.schedule-generator-page .form-label {
 
 body.theme-dark.schedule-generator-page .small.text-muted {
   color: rgba(226, 232, 240, 0.68) !important;
+}
+
+body.theme-dark.schedule-generator-page .generator-table .form-control,
+body.theme-dark.schedule-generator-page .generator-table .form-select {
+  background: rgba(12, 18, 34, 0.7);
+  border-color: rgba(148, 197, 255, 0.22);
+  color: rgba(248, 250, 252, 0.9);
+}
+
+body.theme-dark.schedule-generator-page .generator-table .form-control::placeholder {
+  color: rgba(226, 232, 240, 0.6);
+}
+
+body.theme-dark.schedule-generator-page .generator-table .form-select option {
+  color: #0f172a;
 }
 
 .schedule-preview-page .schedule-card.is-mirror {
