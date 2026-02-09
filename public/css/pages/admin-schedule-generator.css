@@ -326,6 +326,84 @@ body.theme-dark.schedule-generator-page .small.text-muted {
   color: rgba(226, 232, 240, 0.68) !important;
 }
 
+body.theme-dark.schedule-preview-page .navbar-brand {
+  color: rgba(248, 250, 252, 0.92);
+}
+
+body.theme-light.schedule-preview-page .day-card .card-header {
+  color: #0f172a !important;
+}
+
+body.theme-light.schedule-preview-page .day-card .card-header .muted {
+  color: rgba(15, 23, 42, 0.65) !important;
+}
+
+.schedule-preview-page .week-slider {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 20px;
+  backdrop-filter: blur(8px);
+  z-index: 1050;
+}
+
+body.theme-dark.schedule-preview-page .week-slider {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+body.theme-light.schedule-preview-page .week-slider {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.schedule-preview-page .week-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.4);
+  opacity: 0.3;
+  cursor: pointer;
+  transition: transform 220ms ease, background 220ms ease, width 260ms ease, box-shadow 260ms ease;
+}
+
+.schedule-preview-page .week-dot:hover {
+  transform: scale(1.15);
+  opacity: 0.6;
+}
+
+.schedule-preview-page .week-dot.active {
+  width: 28px;
+  height: 8px;
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 8px 18px rgba(148, 163, 184, 0.35);
+  transform: scale(1.05);
+}
+
+body.theme-light.schedule-preview-page .week-dot {
+  background: rgba(15, 23, 42, 0.4);
+}
+
+body.theme-light.schedule-preview-page .week-dot.active {
+  background: rgba(15, 23, 42, 0.85);
+}
+
+@media (max-width: 576px) {
+  .schedule-preview-page .week-slider {
+    bottom: 16px;
+  }
+}
+
 body.theme-dark.schedule-generator-page .generator-table .form-control,
 body.theme-dark.schedule-generator-page .generator-table .form-select {
   background: rgba(12, 18, 34, 0.7);
