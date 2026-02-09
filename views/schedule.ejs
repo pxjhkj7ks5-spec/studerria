@@ -2390,6 +2390,15 @@
         }
       });
 
+      let scrollTimer = null;
+      window.addEventListener('scroll', () => {
+        document.body.classList.add('is-scrolling');
+        if (scrollTimer) clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          document.body.classList.remove('is-scrolling');
+        }, 140);
+      }, { passive: true });
+
       window.addEventListener('load', () => {
         // --- FORCE REFLOW HACK ---
         // This is a workaround for a stubborn rendering bug where hover effects

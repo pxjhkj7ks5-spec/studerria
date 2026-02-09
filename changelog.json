@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.29",
+      "date": "2026-02-09",
+      "items": [
+        "fix: reduce schedule hover flicker while scrolling"
+      ]
+    },
+    {
       "version": "0.7.28",
       "date": "2026-02-09",
       "items": [

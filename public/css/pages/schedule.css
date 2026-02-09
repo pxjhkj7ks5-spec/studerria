@@ -127,13 +127,11 @@ body.theme-light .day-card .card-header {
 }
 
 .schedule-card {
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease;
-  will-change: transform;
+  transition: box-shadow 180ms ease, border-color 180ms ease, background 180ms ease;
 }
 
 @media (hover: hover) {
   .schedule-card:hover {
-    transform: translateY(-2px);
     box-shadow: var(--shadow-sm);
     border-color: rgba(122, 167, 255, 0.35);
     background: rgba(255, 255, 255, 0.08);
@@ -141,7 +139,7 @@ body.theme-light .day-card .card-header {
 }
 
 .schedule-card:active {
-  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
 }
 
 .schedule-card.is-now {
@@ -204,8 +202,22 @@ body.theme-light .schedule-card.is-next .chip-next {
     transition: none;
   }
   .schedule-card:hover {
-    transform: none;
+    box-shadow: none;
   }
+}
+
+body.is-scrolling .schedule-card {
+  transition: none;
+}
+
+body.is-scrolling .schedule-card:hover {
+  box-shadow: none;
+  border-color: var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.theme-light.is-scrolling .schedule-card:hover {
+  background: rgba(15, 23, 42, 0.03);
 }
 
 body.theme-light .list-group-item {
