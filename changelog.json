@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.34",
+      "date": "2026-02-09",
+      "items": [
+        "fix: make schedule hover fill uniform without bright edge"
+      ]
+    },
+    {
       "version": "0.7.33",
       "date": "2026-02-09",
       "items": [

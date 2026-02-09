@@ -147,27 +147,36 @@ body.theme-light .day-card .card-header {
   contain: paint;
   background-clip: padding-box;
   transition: border-color 180ms ease, background 180ms ease;
+  outline: none;
 }
 
 @media (hover: hover) {
   .schedule-card:not(.is-now):not(.is-next):hover {
-    border-color: rgba(76, 141, 255, 0.55);
+    border-color: transparent;
+    outline: 1px solid rgba(76, 141, 255, 0.55);
+    outline-offset: -1px;
     background: rgba(76, 141, 255, 0.12);
   }
 
   .schedule-card.is-now:hover {
-    border-color: rgba(34, 197, 94, 0.6);
+    border-color: transparent;
+    outline: 1px solid rgba(34, 197, 94, 0.55);
+    outline-offset: -1px;
     background: rgba(34, 197, 94, 0.2);
   }
 
   .schedule-card.is-next:hover {
-    border-color: rgba(16, 185, 129, 0.55);
+    border-color: transparent;
+    outline: 1px solid rgba(16, 185, 129, 0.55);
+    outline-offset: -1px;
     background: rgba(16, 185, 129, 0.16);
   }
 }
 
 .schedule-card:active {
-  border-color: rgba(124, 122, 255, 0.6);
+  border-color: transparent;
+  outline: 1px solid rgba(124, 122, 255, 0.6);
+  outline-offset: -1px;
   background: rgba(124, 122, 255, 0.18);
 }
 
@@ -241,6 +250,7 @@ body.is-scrolling .schedule-card {
 
 body.is-scrolling .schedule-card:not(.is-now):not(.is-next):hover {
   border-color: var(--glass-border);
+  outline: none;
   background: rgba(255, 255, 255, 0.04);
 }
 
