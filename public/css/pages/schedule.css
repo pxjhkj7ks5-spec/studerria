@@ -250,15 +250,12 @@ body.theme-light.is-scrolling .schedule-card:not(.is-now):not(.is-next):hover {
 
 body.is-scrolling .schedule-content .day-card,
 body.is-scrolling .schedule-content .schedule-panel {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background: var(--glass-2);
-  box-shadow: var(--shadow-sm);
+  transition: none;
 }
 
-body.is-scrolling .schedule-content .day-card::before,
-body.is-scrolling .schedule-content .schedule-panel::before {
-  opacity: 0;
+body.is-scrolling .schedule-content .day-card:hover,
+body.is-scrolling .schedule-content .schedule-panel:hover {
+  box-shadow: var(--shadow-md);
 }
 
 body.theme-light .list-group-item {

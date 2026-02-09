@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.33",
+      "date": "2026-02-09",
+      "items": [
+        "fix: keep schedule visuals stable during scroll"
+      ]
+    },
+    {
       "version": "0.7.32",
       "date": "2026-02-09",
       "items": [
