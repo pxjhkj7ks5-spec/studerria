@@ -30,6 +30,60 @@ body.theme-light .table tbody tr {
   background: rgba(15, 23, 42, 0.03);
 }
 
+.role-access-grid {
+  display: grid;
+  gap: 0.6rem;
+  --role-access-cols: 13;
+}
+
+.role-access-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 180px) repeat(var(--role-access-cols), minmax(86px, 1fr));
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0;
+}
+
+.role-access-row.role-access-head {
+  padding-top: 0;
+  font-weight: 600;
+}
+
+.role-access-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.role-access-cell:first-child {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.role-access-row.is-disabled {
+  opacity: 0.7;
+}
+
+.role-access-row .form-check-input {
+  margin: 0;
+}
+
+@media (max-width: 1200px) {
+  .role-access-row {
+    grid-template-columns: minmax(130px, 160px) repeat(var(--role-access-cols), minmax(70px, 1fr));
+  }
+}
+
+@media (max-width: 992px) {
+  .role-access-grid {
+    overflow-x: auto;
+  }
+  .role-access-row {
+    min-width: 980px;
+  }
+}
+
 /* Schedule list page */
 .schedule-list-page .theme-toggle-min {
   width: 36px;

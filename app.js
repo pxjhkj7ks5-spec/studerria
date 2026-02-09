@@ -98,6 +98,29 @@ const adminSeed = process.env.ADMIN_HASHED_PASS
 
 const userSeed = adminSeed ? [adminSeed] : [];
 
+const ADMIN_SECTION_OPTIONS = [
+  { id: 'admin-overview', label: 'Огляд' },
+  { id: 'admin-settings', label: 'Налаштування' },
+  { id: 'admin-schedule', label: 'Розклад' },
+  { id: 'admin-homework', label: 'Домашні' },
+  { id: 'admin-users', label: 'Користувачі' },
+  { id: 'admin-teachers', label: 'Заявки викладачів' },
+  { id: 'admin-subjects', label: 'Предмети' },
+  { id: 'admin-semesters', label: 'Семестри' },
+  { id: 'admin-courses', label: 'Курси' },
+  { id: 'admin-history', label: 'Історія' },
+  { id: 'admin-activity', label: 'Активність' },
+  { id: 'admin-teamwork', label: 'Командна робота' },
+  { id: 'admin-messages', label: 'Повідомлення' },
+];
+
+const DEFAULT_ROLE_PERMISSIONS = {
+  starosta: ['admin-homework', 'admin-teamwork', 'admin-messages', 'admin-overview'],
+  deanery: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-overview'],
+  teacher: [],
+  student: [],
+};
+
 const DEFAULT_SETTINGS = {
   session_duration_days: 14,
   max_file_size_mb: 20,
@@ -106,6 +129,7 @@ const DEFAULT_SETTINGS = {
   allow_custom_deadlines: true,
   allow_messages: true,
   schedule_refresh_minutes: 5,
+  role_permissions: { ...DEFAULT_ROLE_PERMISSIONS },
 };
 let settingsCache = { ...DEFAULT_SETTINGS };
 
@@ -287,9 +311,44 @@ const refreshSettingsCache = async () => {
     } else if (row.key === 'schedule_refresh_minutes') {
       const n = Number(row.value);
       if (!Number.isNaN(n) && n > 0) parsed.schedule_refresh_minutes = n;
+    } else if (row.key === 'role_permissions') {
+      try {
+        const raw = JSON.parse(row.value);
+        if (raw && typeof raw === 'object') {
+          const allowedIds = new Set(ADMIN_SECTION_OPTIONS.map((item) => item.id));
+          const normalized = {};
+          Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach((role) => {
+            if (!Object.prototype.hasOwnProperty.call(raw, role)) return;
+            const input = raw[role];
+            const list = Array.isArray(input)
+              ? input
+              : typeof input === 'string'
+                ? [input]
+                : [];
+            normalized[role] = list
+              .map((id) => String(id))
+              .filter((id) => allowedIds.has(id));
+          });
+          parsed.role_permissions = {
+            ...DEFAULT_ROLE_PERMISSIONS,
+            ...normalized,
+          };
+        }
+      } catch (err) {
+        // ignore invalid role permissions payload
+      }
     }
   }
   settingsCache = parsed;
+};
+
+const getRoleAllowedSections = (role) => {
+  if (role === 'admin') return null;
+  const permissions = settingsCache.role_permissions || {};
+  if (Object.prototype.hasOwnProperty.call(permissions, role)) {
+    return permissions[role];
+  }
+  return DEFAULT_ROLE_PERMISSIONS[role] || [];
 };
 
 const ensureUser = async (fullName, role, passwordHash, options = {}) => {
@@ -4839,6 +4898,8 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         weeklyUserRoles,
         weeklyUserSeries,
         settings: settingsCache,
+        rolePermissions: settingsCache.role_permissions || { ...DEFAULT_ROLE_PERMISSIONS },
+        adminSectionOptions: ADMIN_SECTION_OPTIONS,
         activeScheduleDays,
         filters: {
           group_number: group_number || '',
@@ -6140,6 +6201,38 @@ app.post('/admin/settings', requireAdmin, async (req, res) => {
   }
 });
 
+app.post('/admin/role-access', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.roleAccess.init');
+  }
+  try {
+    const allowedIds = new Set(ADMIN_SECTION_OPTIONS.map((item) => item.id));
+    const rolePermissions = req.body.role_permissions || {};
+    const nextPermissions = {};
+    Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach((role) => {
+      const raw = rolePermissions[role];
+      const list = Array.isArray(raw)
+        ? raw
+        : typeof raw === 'string'
+          ? [raw]
+          : [];
+      nextPermissions[role] = list
+        .map((id) => String(id))
+        .filter((id) => allowedIds.has(id));
+    });
+    await db.run(
+      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
+      ['role_permissions', JSON.stringify(nextPermissions)]
+    );
+    await refreshSettingsCache();
+    return res.redirect('/admin?ok=Role%20access%20saved');
+  } catch (err) {
+    return handleDbError(res, err, 'admin.roleAccess.save');
+  }
+});
+
 app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
   try {
     await ensureDbReady();
@@ -7395,7 +7488,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
                       activeSemester,
                       selectedCourseId: courseId,
                       limitedStaffView: true,
-                      allowedSections: ['admin-homework', 'admin-teamwork', 'admin-messages', 'admin-overview'],
+                      allowedSections: getRoleAllowedSections('starosta'),
                       filters: {
                         group_number: group_number || '',
                         day: '',
@@ -7518,7 +7611,7 @@ app.get('/deanery', requireDeanery, (req, res) => {
                   activeSemester,
                   selectedCourseId: courseId,
                   limitedStaffView: true,
-                  allowedSections: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-overview'],
+                  allowedSections: getRoleAllowedSections('deanery'),
                   filters: {
                     group_number: group_number || '',
                     day: day || '',
