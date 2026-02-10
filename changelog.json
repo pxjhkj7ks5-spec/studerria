@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.68",
+      "date": "2026-02-10",
+      "items": [
+        "feat: add subject merge report payload in settings",
+        "feat: add schedule generator merge preview endpoint"
+      ]
+    },
+    {
       "version": "0.7.67",
       "date": "2026-02-10",
       "items": [

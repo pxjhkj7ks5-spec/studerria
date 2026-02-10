@@ -862,6 +862,153 @@ async function getCoursesByLocation(location) {
 
 const normalizeMirrorKey = (value) => String(value || '').trim().toLowerCase();
 
+const parseSubjectTypeSuffix = (name) => {
+  const raw = String(name || '').trim();
+  const match = raw.match(/\s*\(([^)]+)\)\s*$/i);
+  if (!match) {
+    return { base: raw, type: null };
+  }
+  const label = match[1].trim().toLowerCase();
+  let type = null;
+  if (label.startsWith('лек') || label === 'lecture' || label === 'lect') {
+    type = 'lecture';
+  } else if (label.startsWith('сем') || label === 'seminar') {
+    type = 'seminar';
+  }
+  if (!type) {
+    return { base: raw, type: null };
+  }
+  const base = raw.replace(match[0], '').trim();
+  return { base, type };
+};
+
+const loadSubjectCounts = async (table) => {
+  const rows = await db.all(`SELECT subject_id, COUNT(*) AS cnt FROM ${table} GROUP BY subject_id`);
+  const map = new Map();
+  (rows || []).forEach((row) => {
+    map.set(Number(row.subject_id), Number(row.cnt || 0));
+  });
+  return map;
+};
+
+const buildSubjectMergePreview = async (courseIdFilter) => {
+  const subjects = await db.all(
+    `SELECT id, name, group_count, default_group, show_in_teamwork, visible, is_required, is_general, course_id
+     FROM subjects
+     ORDER BY id`
+  );
+  if (!subjects.length) return [];
+
+  const countTables = [
+    'schedule_entries',
+    'student_groups',
+    'teacher_subjects',
+    'user_subject_optouts',
+    'course_day_subjects',
+    'homework',
+    'teamwork_tasks',
+    'messages',
+    'schedule_generator_items',
+    'schedule_generator_entries',
+  ];
+  const usageCounts = new Map();
+  for (const table of countTables) {
+    const tableCounts = await loadSubjectCounts(table);
+    tableCounts.forEach((count, subjectId) => {
+      usageCounts.set(subjectId, (usageCounts.get(subjectId) || 0) + count);
+    });
+  }
+
+  const groups = new Map();
+  subjects.forEach((subject) => {
+    const parsed = parseSubjectTypeSuffix(subject.name);
+    if (!parsed.base) return;
+    const key = `${subject.course_id || 0}|${parsed.base.toLowerCase()}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        courseId: subject.course_id,
+        baseName: parsed.base,
+        lecture: null,
+        seminar: null,
+        base: null,
+      });
+    }
+    const group = groups.get(key);
+    if (parsed.type === 'lecture') {
+      group.lecture = subject;
+    } else if (parsed.type === 'seminar') {
+      group.seminar = subject;
+    } else if (String(subject.name).trim().toLowerCase() === parsed.base.toLowerCase()) {
+      group.base = subject;
+    }
+  });
+
+  const courses = await getCoursesCached();
+  const courseNameById = {};
+  (courses || []).forEach((course) => {
+    courseNameById[course.id] = course.name;
+  });
+
+  const preview = [];
+  for (const group of groups.values()) {
+    if (!group.lecture || !group.seminar) continue;
+    if (Number.isFinite(courseIdFilter) && Number(group.courseId) !== Number(courseIdFilter)) {
+      continue;
+    }
+    const lecture = group.lecture;
+    const seminar = group.seminar;
+    const baseSubject = group.base;
+
+    let canonical = baseSubject || null;
+    if (!canonical) {
+      const lectureScore = usageCounts.get(lecture.id) || 0;
+      const seminarScore = usageCounts.get(seminar.id) || 0;
+      canonical = lectureScore === seminarScore ? lecture : lectureScore > seminarScore ? lecture : seminar;
+    }
+
+    const canonicalId = canonical.id;
+    const targetName = group.baseName;
+    let finalName = canonical.name;
+    let renameConflict = false;
+    if (targetName && String(canonical.name) !== String(targetName)) {
+      const nameCheck = await db.all('SELECT id FROM subjects WHERE LOWER(name) = LOWER(?)', [targetName]);
+      const conflict = (nameCheck || []).find(
+        (row) =>
+          Number(row.id) !== Number(canonicalId) && ![lecture.id, seminar.id].includes(Number(row.id))
+      );
+      if (!conflict) {
+        finalName = targetName;
+      } else {
+        renameConflict = true;
+      }
+    }
+
+    preview.push({
+      course_id: group.courseId,
+      course_name: courseNameById[group.courseId] || null,
+      base_name: group.baseName,
+      canonical_id: canonicalId,
+      canonical_name: finalName,
+      canonical_source: canonicalId === lecture.id ? 'lecture' : canonicalId === seminar.id ? 'seminar' : 'base',
+      lecture: {
+        id: lecture.id,
+        name: lecture.name,
+        usage: usageCounts.get(lecture.id) || 0,
+      },
+      seminar: {
+        id: seminar.id,
+        name: seminar.name,
+        usage: usageCounts.get(seminar.id) || 0,
+      },
+      base_subject_id: baseSubject ? baseSubject.id : null,
+      rename: finalName !== canonical.name ? { from: canonical.name, to: finalName } : null,
+      rename_conflict: renameConflict,
+    });
+  }
+
+  return preview;
+};
+
 const buildHeatmap = (entries, days, slots) => {
   const counts = {};
   days.forEach((day) => {
@@ -5513,6 +5660,27 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.render');
+  }
+});
+
+app.get('/admin/schedule-generator/merge-preview', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.mergePreview');
+  }
+  const courseIdRaw = Number(req.query.course_id);
+  const courseId = Number.isFinite(courseIdRaw) && courseIdRaw > 0 ? courseIdRaw : null;
+  try {
+    const preview = await buildSubjectMergePreview(courseId);
+    return res.json({
+      generated_at: new Date().toISOString(),
+      total: preview.length,
+      course_id: courseId,
+      merges: preview,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.mergePreview');
   }
 });
 

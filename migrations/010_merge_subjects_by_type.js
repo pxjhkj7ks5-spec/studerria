@@ -30,6 +30,7 @@ async function loadCounts(pool, table) {
 async function up(pool) {
   await pool.query('BEGIN');
   try {
+    const report = [];
     const subjectsRes = await pool.query(
       `SELECT id, name, group_count, default_group, show_in_teamwork, visible, is_required, is_general, course_id
        FROM subjects
@@ -121,6 +122,17 @@ async function up(pool) {
         }
       }
 
+      report.push({
+        course_id: group.courseId,
+        base_name: group.baseName,
+        canonical_id: canonicalId,
+        canonical_name: finalName,
+        canonical_source: canonicalId === lecture.id ? 'lecture' : canonicalId === seminar.id ? 'seminar' : 'base',
+        lecture: { id: lecture.id, name: lecture.name },
+        seminar: { id: seminar.id, name: seminar.name },
+        base_subject_id: baseSubject ? baseSubject.id : null,
+        renamed: finalName !== canonical.name ? { from: canonical.name, to: finalName } : null,
+      });
 
       await pool.query(
         `UPDATE subjects
@@ -235,7 +247,28 @@ async function up(pool) {
       }
     }
 
+    let reportPayload = null;
+    if (report.length) {
+      reportPayload = {
+        generated_at: new Date().toISOString(),
+        total: report.length,
+        merges: report,
+      };
+      await pool.query(
+        `
+          INSERT INTO settings (key, value)
+          VALUES ('last_subject_merge_report', $1)
+          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+        `,
+        [JSON.stringify(reportPayload)]
+      );
+    }
+
     await pool.query('COMMIT');
+    if (reportPayload) {
+      console.log(`[merge_subjects_by_type] merged ${reportPayload.total} subject groups`);
+      console.log(JSON.stringify(reportPayload, null, 2));
+    }
   } catch (err) {
     await pool.query('ROLLBACK');
     throw err;
