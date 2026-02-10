@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.71",
+      "date": "2026-02-10",
+      "items": [
+        "feat: add semester hard delete action to remove linked data"
+      ]
+    },
+    {
       "version": "0.7.70",
       "date": "2026-02-10",
       "items": [

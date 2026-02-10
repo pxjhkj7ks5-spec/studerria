@@ -9397,6 +9397,40 @@ app.post('/admin/semesters/delete/:id', requireAdmin, (req, res) => {
   });
 });
 
+app.post('/admin/semesters/hard-delete/:id', requireAdmin, async (req, res) => {
+  const semesterId = Number(req.params.id);
+  const courseId = getAdminCourse(req);
+  if (!Number.isFinite(semesterId) || semesterId <= 0) {
+    return res.redirect('/admin?err=Invalid%20semester');
+  }
+  try {
+    const semRow = await db.get('SELECT id, is_active FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
+    if (!semRow) {
+      return res.redirect('/admin?err=Semester%20not%20found');
+    }
+    if (Number(semRow.is_active) === 1) {
+      await db.run('UPDATE semesters SET is_active = 0 WHERE id = ? AND course_id = ?', [semesterId, courseId]);
+    }
+
+    await db.run('DELETE FROM schedule_entries WHERE semester_id = ?', [semesterId]);
+    await db.run('DELETE FROM homework WHERE semester_id = ?', [semesterId]);
+    await db.run('DELETE FROM teamwork_tasks WHERE semester_id = ?', [semesterId]);
+    await db.run('DELETE FROM messages WHERE semester_id = ?', [semesterId]);
+    await db.run('DELETE FROM personal_reminders WHERE semester_id = ?', [semesterId]);
+    await db.run('DELETE FROM activity_log WHERE semester_id = ?', [semesterId]);
+    await db.run('DELETE FROM course_week_time_modes WHERE semester_id = ?', [semesterId]);
+    await db.run('DELETE FROM schedule_generator_items WHERE semester_id = ?', [semesterId]);
+    await db.run('DELETE FROM schedule_generator_entries WHERE semester_id = ?', [semesterId]);
+
+    await db.run('DELETE FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
+    logAction(db, req, 'semester_hard_delete', { id: semesterId });
+    invalidateSemestersCache(courseId);
+    return res.redirect('/admin?ok=Semester%20hard%20deleted');
+  } catch (err) {
+    return handleDbError(res, err, 'admin.semesters.hardDelete');
+  }
+});
+
 app.post('/admin/student-groups/set', requireAdmin, (req, res) => {
   const { student_id, subject_id, group_number } = req.body;
   const groupNum = Number(group_number);

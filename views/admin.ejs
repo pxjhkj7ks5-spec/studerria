@@ -1977,6 +1977,7 @@
                           <form id="semester-restore-<%= sem.id %>" method="POST" action="/admin/semesters/restore/<%= sem.id %>"></form>
                           <form id="semester-archive-<%= sem.id %>" method="POST" action="/admin/semesters/archive/<%= sem.id %>"></form>
                           <form id="semester-delete-<%= sem.id %>" method="POST" action="/admin/semesters/delete/<%= sem.id %>"></form>
+                          <form id="semester-hard-delete-<%= sem.id %>" method="POST" action="/admin/semesters/hard-delete/<%= sem.id %>"></form>
                           <div class="dropdown">
                             <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                               ⋯
@@ -1993,6 +1994,18 @@
                               <% } %>
                               <li><hr class="dropdown-divider" /></li>
                               <li><button class="dropdown-item text-danger" type="submit" form="semester-delete-<%= sem.id %>" data-confirm="Delete this semester? This cannot be undone." data-confirm-level="danger">Delete</button></li>
+                              <li>
+                                <button
+                                  class="dropdown-item text-danger"
+                                  type="submit"
+                                  form="semester-hard-delete-<%= sem.id %>"
+                                  data-confirm="Hard delete semester and ALL related data? This cannot be undone."
+                                  data-confirm-level="danger"
+                                  data-confirm-typed="HARD DELETE"
+                                >
+                                  Hard delete
+                                </button>
+                              </li>
                             </ul>
                           </div>
                         </td>
