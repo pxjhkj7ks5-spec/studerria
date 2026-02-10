@@ -5526,6 +5526,27 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
       [...scheduleParams, perPage, offset]
     );
 
+    const summaryFilters = ['se.course_id = ?'];
+    const summaryParams = [courseId];
+    if (activeSemester) {
+      summaryFilters.push('se.semester_id = ?');
+      summaryParams.push(activeSemester.id);
+    }
+    const summaryWhere = summaryFilters.length ? `WHERE ${summaryFilters.join(' AND ')}` : '';
+    const summaryRows = await db.all(
+      `
+        SELECT s.name AS subject_name,
+               COALESCE(se.lesson_type, '') AS lesson_type,
+               COUNT(*) AS total
+        FROM schedule_entries se
+        JOIN subjects s ON s.id = se.subject_id
+        ${summaryWhere}
+        GROUP BY s.name, COALESCE(se.lesson_type, '')
+        ORDER BY s.name, COALESCE(se.lesson_type, '')
+      `,
+      summaryParams
+    );
+
     const courses = await getCoursesCached();
     const semesters = await getSemestersCached(courseId);
     const subjects = await getSubjectsCached(courseId);
@@ -5547,6 +5568,7 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
       subjects,
       semesters,
       activeSemester,
+      semesterSummary: summaryRows || [],
       selectedCourseId: courseId,
       activeScheduleDays,
       schedule: rows || [],

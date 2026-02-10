@@ -72,6 +72,24 @@
         border-color: var(--glass-border-light);
         box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.4) inset;
       }
+      .semester-summary {
+        margin-top: 12px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px dashed rgba(148, 163, 184, 0.4);
+        background: rgba(15, 23, 42, 0.08);
+      }
+      body.theme-dark .semester-summary {
+        background: rgba(15, 23, 42, 0.35);
+      }
+      .semester-summary ul {
+        margin: 0;
+        padding-left: 0;
+        list-style: none;
+      }
+      .semester-summary li + li {
+        margin-top: 6px;
+      }
     </style>
     <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
@@ -179,6 +197,20 @@
                 Clear All
               </button>
             </form>
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="toggleSemesterSummary">Сводка семестру</button>
+          </div>
+          <div class="semester-summary d-none" id="semesterSummary">
+            <div class="small text-muted mb-2">Формат: предмет — тип — кількість</div>
+            <% if (semesterSummary && semesterSummary.length) { %>
+              <ul>
+                <% semesterSummary.forEach(function(row) { %>
+                  <% const typeLabel = row.lesson_type === 'lecture' ? 'Лекція' : row.lesson_type === 'seminar' ? 'Семінар' : row.lesson_type === 'lab' ? 'Лаб' : row.lesson_type === 'practice' ? 'Практика' : 'Без типу'; %>
+                  <li><%= row.subject_name %> — <%= typeLabel %> — <%= row.total %></li>
+                <% }); %>
+              </ul>
+            <% } else { %>
+              <div class="text-muted">Немає даних для підсумку.</div>
+            <% } %>
           </div>
           <div class="table-responsive">
             <table class="table table-striped align-middle">
@@ -361,6 +393,15 @@
           document.querySelectorAll('input[name="delete_ids"]').forEach((checkbox) => {
             checkbox.checked = selectAll.checked;
           });
+        });
+      }
+
+      const summaryBtn = document.getElementById('toggleSemesterSummary');
+      const summaryPanel = document.getElementById('semesterSummary');
+      if (summaryBtn && summaryPanel) {
+        summaryBtn.addEventListener('click', () => {
+          const isHidden = summaryPanel.classList.toggle('d-none');
+          summaryBtn.textContent = isHidden ? 'Сводка семестру' : 'Сховати сводку';
         });
       }
     </script>
