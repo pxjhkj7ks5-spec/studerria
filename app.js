@@ -5362,16 +5362,20 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       return raw.includes('seminar') || raw.includes('сем');
     };
     const autoMirrorCandidatesByLocation = { kyiv: [], munich: [] };
+    const autoMirrorExclusionsByLocation = { kyiv: [], munich: [] };
     Object.entries(itemsByLocation).forEach(([location, list]) => {
       const buckets = new Map();
+      const matchedIds = new Set();
+      const sameSubjectOnly = new Set();
       (list || []).forEach((item) => {
         const groupNum = Number(item.group_number);
-        if (groupNum !== 1 && groupNum !== 2) return;
-        if (!isSeminarType(item.lesson_type)) return;
-        if (item.mirror_key) return;
-        if (item.fixed_day || item.fixed_class_number || item.weeks_set) return;
         const generalFlag = item.is_general === true || Number(item.is_general) === 1;
-        if (generalFlag) return;
+        const baseEligible = isSeminarType(item.lesson_type)
+          && (groupNum === 1 || groupNum === 2)
+          && !item.mirror_key
+          && !(item.fixed_day || item.fixed_class_number || item.weeks_set)
+          && !generalFlag;
+        if (!baseEligible) return;
         const key = `${item.course_id}|${item.semester_id || ''}|${String(item.lesson_type || '')}|${item.pairs_count || 0}`;
         if (!buckets.has(key)) {
           buckets.set(key, { group1: [], group2: [] });
@@ -5382,14 +5386,16 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       });
       const candidates = [];
       buckets.forEach((bucket) => {
-        bucket.group1.sort((a, b) => a.subject_name.localeCompare(b.subject_name) || a.id - b.id);
-        bucket.group2.sort((a, b) => a.subject_name.localeCompare(b.subject_name) || a.id - b.id);
-        const length = Math.min(bucket.group1.length, bucket.group2.length);
-        for (let i = 0; i < length; i += 1) {
-          const a = bucket.group1[i];
-          const b = bucket.group2[i];
-          if (!a || !b) continue;
-          if (Number(a.subject_id) === Number(b.subject_id)) continue;
+        const group1 = [...bucket.group1].sort((a, b) => a.subject_name.localeCompare(b.subject_name) || a.id - b.id);
+        const group2 = [...bucket.group2].sort((a, b) => a.subject_name.localeCompare(b.subject_name) || a.id - b.id);
+        const used = new Set();
+        group1.forEach((a) => {
+          const idx = group2.findIndex((b, i) => !used.has(i) && Number(b.subject_id) !== Number(a.subject_id));
+          if (idx === -1) return;
+          const b = group2[idx];
+          used.add(idx);
+          matchedIds.add(a.id);
+          matchedIds.add(b.id);
           candidates.push({
             a,
             b,
@@ -5397,9 +5403,50 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
             lesson_type: a.lesson_type,
             pairs_count: a.pairs_count,
           });
+        });
+      });
+      buckets.forEach((bucket) => {
+        bucket.group1.forEach((a) => {
+          if (matchedIds.has(a.id)) return;
+          const hasSame = bucket.group2.some((b) => Number(b.subject_id) === Number(a.subject_id));
+          if (hasSame) sameSubjectOnly.add(a.id);
+        });
+        bucket.group2.forEach((b) => {
+          if (matchedIds.has(b.id)) return;
+          const hasSame = bucket.group1.some((a) => Number(a.subject_id) === Number(b.subject_id));
+          if (hasSame) sameSubjectOnly.add(b.id);
+        });
+      });
+      const exclusions = [];
+      (list || []).forEach((item) => {
+        const reasons = [];
+        const groupNum = Number(item.group_number);
+        const generalFlag = item.is_general === true || Number(item.is_general) === 1;
+        if (!isSeminarType(item.lesson_type)) reasons.push('Не семінар');
+        if (!(groupNum === 1 || groupNum === 2)) reasons.push('Не група 1/2');
+        if (item.mirror_key) reasons.push('Вже має ключ дзеркала');
+        if (item.fixed_day || item.fixed_class_number || item.weeks_set) reasons.push('Є фіксований день/слот/тижні');
+        if (generalFlag) reasons.push('Загальний предмет');
+        if (!reasons.length && !matchedIds.has(item.id)) {
+          if (sameSubjectOnly.has(item.id)) {
+            reasons.push('У іншій групі лише такий самий предмет');
+          } else {
+            reasons.push('Немає пари для групи 1/2');
+          }
         }
+        if (!reasons.length) return;
+        exclusions.push({
+          id: item.id,
+          subject_name: item.subject_name,
+          course_name: courseById[item.course_id] || '',
+          group_number: item.group_number,
+          lesson_type: item.lesson_type,
+          pairs_count: item.pairs_count,
+          reasons,
+        });
       });
       autoMirrorCandidatesByLocation[location] = candidates;
+      autoMirrorExclusionsByLocation[location] = exclusions;
     });
 
     return res.render('admin-schedule-generator', {
@@ -5428,6 +5475,7 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       problemItemLookupByLocation,
       heatmapByLocation,
       autoMirrorCandidatesByLocation,
+      autoMirrorExclusionsByLocation,
       dayOptions: fullWeekDays,
       dayLabels: studyDayLabels,
       classOptions: [1, 2, 3, 4, 5, 6, 7],

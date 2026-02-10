@@ -825,6 +825,36 @@
                         <% }); %>
                       </div>
                     <% } %>
+                    <% const exclusions = autoMirrorExclusionsByLocation && autoMirrorExclusionsByLocation[location]; %>
+                    <% if (exclusions && exclusions.length) { %>
+                      <% const shown = exclusions.slice(0, 60); %>
+                      <details class="mirror-auto-exclusions mt-3">
+                        <summary>Чому не попало в авто‑пари (<%= exclusions.length %>)</summary>
+                        <div class="list-group mirror-exclusion-list mt-2">
+                          <% shown.forEach(function(item) { %>
+                            <div class="list-group-item">
+                              <div class="fw-semibold">
+                                <%= item.subject_name %>
+                                <span class="small text-muted">· Група <%= item.group_number || '—' %></span>
+                              </div>
+                              <div class="small text-muted">
+                                <%= item.course_name %> · <%= item.lesson_type === 'seminar' ? 'Семінар' : item.lesson_type %> · <%= item.pairs_count %> пар
+                              </div>
+                              <div class="d-flex flex-wrap gap-2 mt-2">
+                                <% item.reasons.forEach(function(reason) { %>
+                                  <span class="mirror-reason-chip"><%= reason %></span>
+                                <% }); %>
+                              </div>
+                            </div>
+                          <% }); %>
+                          <% if (exclusions.length > shown.length) { %>
+                            <div class="small text-muted">
+                              Ще <%= exclusions.length - shown.length %> записів.
+                            </div>
+                          <% } %>
+                        </div>
+                      </details>
+                    <% } %>
                   </div>
                 <% }); %>
               </div>
