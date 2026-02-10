@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.81",
+      "date": "2026-02-10",
+      "items": [
+        "fix: show lectures for all students regardless of group mapping"
+      ]
+    },
+    {
       "version": "0.7.80",
       "date": "2026-02-10",
       "items": [

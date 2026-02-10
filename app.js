@@ -3709,23 +3709,24 @@ app.get('/schedule', requireLogin, async (req, res) => {
         );
       };
 
-      if (!studentGroups.length) {
-        return loadHomework();
-      }
-
-      const conditions = studentGroups
-        .map(() => '(se.subject_id = ? AND se.group_number = ?)')
-        .join(' OR ');
+      const conditionParts = [];
       const params = [selectedWeek, courseId || 1, activeSemester ? activeSemester.id : null];
-      studentGroups.forEach((sg) => {
-        params.push(sg.subject_id, sg.group_number);
-      });
+      if (studentGroups.length) {
+        conditionParts.push(
+          studentGroups.map(() => '(se.subject_id = ? AND se.group_number = ?)').join(' OR ')
+        );
+        studentGroups.forEach((sg) => {
+          params.push(sg.subject_id, sg.group_number);
+        });
+      }
+      conditionParts.push("COALESCE(se.lesson_type, '') = 'lecture'");
 
       const sql = `
         SELECT se.*, s.name AS subject_name
         FROM schedule_entries se
         JOIN subjects s ON s.id = se.subject_id
-        WHERE se.week_number = ? AND se.course_id = ? AND se.semester_id = ? AND s.visible = 1 AND (${conditions})
+        WHERE se.week_number = ? AND se.course_id = ? AND se.semester_id = ? AND s.visible = 1
+          AND (${conditionParts.join(' OR ')})
       `;
 
       db.all(sql, params, (scheduleErr, rows) => {
