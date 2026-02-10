@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.74",
+      "date": "2026-02-10",
+      "items": [
+        "feat: add tooltip with group list for multi-group schedule rows"
+      ]
+    },
+    {
       "version": "0.7.73",
       "date": "2026-02-10",
       "items": [
