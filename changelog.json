@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.82",
+      "date": "2026-02-11",
+      "items": [
+        "feat: add admin test view selector for student schedule by course/group",
+        "fix: improve dark-theme contrast on teacher pending page"
+      ]
+    },
+    {
       "version": "0.7.81",
       "date": "2026-02-10",
       "items": [

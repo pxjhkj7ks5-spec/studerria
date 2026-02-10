@@ -3327,6 +3327,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
         subgroupError: req.query.sg || null,
         role: req.session.role,
         viewAs: req.session.viewAs || null,
+        viewAsCourse: null,
+        viewAsGroupNumber: null,
         messageSubjects: [],
         userId,
         teacherCourses,
@@ -3336,7 +3338,25 @@ app.get('/schedule', requireLogin, async (req, res) => {
       return handleDbError(res, err, 'teacher.schedule');
     }
   }
-  const activeSemester = await getActiveSemester(courseId || 1);
+  const isAdminViewAs = req.session.role === 'admin' && req.session.viewAs === 'student';
+  let viewAsCourseId = isAdminViewAs ? Number(req.session.viewAsCourseId) : null;
+  let viewAsGroupNumber = isAdminViewAs ? Number(req.session.viewAsGroupNumber) : null;
+  if (isAdminViewAs) {
+    if (!Number.isFinite(viewAsCourseId)) {
+      viewAsCourseId = Number.isFinite(Number(courseId)) ? Number(courseId) : 1;
+      req.session.viewAsCourseId = viewAsCourseId;
+    }
+    if (!Number.isFinite(viewAsGroupNumber) || viewAsGroupNumber < 1) {
+      viewAsGroupNumber = 1;
+      req.session.viewAsGroupNumber = viewAsGroupNumber;
+    }
+  }
+  const scheduleCourseId = isAdminViewAs && Number.isFinite(viewAsCourseId)
+    ? viewAsCourseId
+    : (courseId || 1);
+  const viewAsCourse = isAdminViewAs ? await getCourseById(scheduleCourseId) : null;
+
+  const activeSemester = await getActiveSemester(scheduleCourseId);
   const totalWeeks = activeSemester && activeSemester.weeks_count ? Number(activeSemester.weeks_count) : 15;
   let selectedWeek = parseInt(req.query.week, 10);
   if (Number.isNaN(selectedWeek)) {
@@ -3346,10 +3366,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
   if (selectedWeek < 1) selectedWeek = 1;
   if (selectedWeek > totalWeeks) selectedWeek = totalWeeks;
   const weekTimeMap = activeSemester && activeSemester.id
-    ? await getCourseWeekTimeMap(courseId || 1, activeSemester.id)
+    ? await getCourseWeekTimeMap(scheduleCourseId, activeSemester.id)
     : new Map();
   const useLocalTime = weekTimeMap.get(selectedWeek) === true;
-  const studyDays = await getCourseStudyDays(courseId || 1);
+  const studyDays = await getCourseStudyDays(scheduleCourseId);
   let activeDays = studyDays
     .filter((day) => day.is_active)
     .map((day) => fullWeekDays[day.weekday - 1])
@@ -3364,15 +3384,45 @@ app.get('/schedule', requireLogin, async (req, res) => {
   const weekEndDate = weekDates[6];
   const nowIso = new Date().toISOString();
 
-  db.all(
-    `
-      SELECT sg.subject_id, sg.group_number, s.name AS subject_name
-      FROM student_groups sg
-      JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
-    `,
-    [userId, courseId || 1],
-    (groupErr, studentGroups) => {
+  const loadStudentGroups = (cb) => {
+    if (!isAdminViewAs) {
+      return db.all(
+        `
+          SELECT sg.subject_id, sg.group_number, s.name AS subject_name
+          FROM student_groups sg
+          JOIN subjects s ON s.id = sg.subject_id
+          WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
+        `,
+        [userId, scheduleCourseId],
+        cb
+      );
+    }
+    db.all(
+      `
+        SELECT id AS subject_id, name AS subject_name, group_count
+        FROM subjects
+        WHERE course_id = ? AND visible = 1
+        ORDER BY name
+      `,
+      [scheduleCourseId],
+      (err, subjects) => {
+        if (err) {
+          return cb(err);
+        }
+        const groupNumber = Number.isFinite(viewAsGroupNumber) ? viewAsGroupNumber : 1;
+        const groups = (subjects || [])
+          .filter((s) => Number(s.group_count || 1) >= groupNumber)
+          .map((s) => ({
+            subject_id: s.subject_id,
+            group_number: groupNumber,
+            subject_name: s.subject_name,
+          }));
+        return cb(null, groups);
+      }
+    );
+  };
+
+  loadStudentGroups((groupErr, studentGroups) => {
       if (groupErr) {
         return res.status(500).send('Database error');
       }
@@ -3411,7 +3461,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         studentGroups.forEach((sg) => {
           params.push(sg.subject_id, sg.group_number);
         });
-        params.push(courseId || 1, activeSemester ? activeSemester.id : null, nowIso, weekStartDate, weekEndDate);
+        params.push(scheduleCourseId, activeSemester ? activeSemester.id : null, nowIso, weekStartDate, weekEndDate);
         const sql = `
           SELECT h.*, subj.name AS subject_name
           FROM homework h
@@ -3503,7 +3553,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               totalWeeks,
               semester: activeSemester,
               bellSchedule,
-              group: group || 'A',
+              group: isAdminViewAs ? `Група ${viewAsGroupNumber || 1}` : (group || 'A'),
               username,
               homework: [],
               homeworkMeta: {},
@@ -3516,9 +3566,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
               subgroupError: req.query.sg || null,
               role: req.session.role,
               viewAs: req.session.viewAs || null,
+              viewAsCourse,
+              viewAsGroupNumber: isAdminViewAs ? (viewAsGroupNumber || 1) : null,
               messageSubjects: studentGroups || [],
               userId,
-              selectedCourseId: courseId || 1,
+              selectedCourseId: scheduleCourseId,
             })
           );
         }
@@ -3546,7 +3598,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
             ORDER BY h.created_at DESC
           `,
-          [...hwParams, courseId || 1, activeSemester ? activeSemester.id : null, nowIso],
+          [...hwParams, scheduleCourseId, activeSemester ? activeSemester.id : null, nowIso],
           (err, rows) => {
             if (err) {
               return res.status(500).send('Database error');
@@ -3620,7 +3672,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 totalWeeks,
                 semester: activeSemester,
                 bellSchedule,
-                group: group || 'A',
+                group: isAdminViewAs ? `Група ${viewAsGroupNumber || 1}` : (group || 'A'),
                 username,
                 homework,
                 homeworkMeta,
@@ -3633,9 +3685,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 subgroupError: req.query.sg || null,
                 role: req.session.role,
                 viewAs: req.session.viewAs || null,
+                viewAsCourse,
+                viewAsGroupNumber: isAdminViewAs ? (viewAsGroupNumber || 1) : null,
                 messageSubjects: studentGroups || [],
                 userId,
-                selectedCourseId: courseId || 1,
+                selectedCourseId: scheduleCourseId,
               });
             };
 
@@ -3710,7 +3764,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
       };
 
       const conditionParts = [];
-      const params = [selectedWeek, courseId || 1, activeSemester ? activeSemester.id : null];
+      const params = [selectedWeek, scheduleCourseId, activeSemester ? activeSemester.id : null];
       if (studentGroups.length) {
         conditionParts.push(
           studentGroups.map(() => '(se.subject_id = ? AND se.group_number = ?)').join(' OR ')
@@ -10542,13 +10596,34 @@ app.post('/admin/users/delete-permanent', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/switch-to-student', requireAdmin, (req, res) => {
+app.post('/admin/switch-to-student', requireAdmin, async (req, res) => {
+  let courseId = Number(req.body.course_id || req.body.course);
+  let groupNumber = Number(req.body.group_number);
+  if (!Number.isFinite(groupNumber) || groupNumber < 1 || groupNumber > 3) {
+    groupNumber = 1;
+  }
+  try {
+    const courses = await getCoursesCached();
+    const match = (courses || []).find((c) => Number(c.id) === Number(courseId));
+    if (!match) {
+      courseId = getAdminCourse(req);
+    }
+  } catch (err) {
+    courseId = getAdminCourse(req);
+  }
+  if (!Number.isFinite(courseId)) {
+    courseId = getAdminCourse(req);
+  }
   req.session.viewAs = 'student';
+  req.session.viewAsCourseId = courseId;
+  req.session.viewAsGroupNumber = groupNumber;
   return res.redirect('/schedule');
 });
 
 app.post('/admin/switch-to-admin', requireAdmin, (req, res) => {
   req.session.viewAs = null;
+  req.session.viewAsCourseId = null;
+  req.session.viewAsGroupNumber = null;
   return res.redirect('/admin');
 });
 

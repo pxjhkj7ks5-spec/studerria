@@ -52,6 +52,37 @@
       body.theme-dark .admin-nav {
         background: rgba(10, 10, 20, 0.6);
       }
+      .admin-viewas-form {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.25rem 0.45rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(12px);
+      }
+      body.theme-light .admin-viewas-form {
+        background: rgba(255, 255, 255, 0.7);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      body.theme-dark .admin-viewas-form {
+        background: rgba(15, 23, 42, 0.5);
+        border-color: rgba(148, 163, 184, 0.25);
+      }
+      .admin-viewas-form .form-select {
+        height: 32px;
+        padding: 0.2rem 0.75rem;
+        font-size: 0.85rem;
+        border-radius: 999px;
+        min-width: 110px;
+      }
+      .admin-viewas-form .btn {
+        height: 32px;
+        padding: 0.2rem 0.9rem;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        white-space: nowrap;
+      }
       .card {
         position: relative;
         isolation: isolate;
@@ -694,11 +725,23 @@
           >
             🌙
           </button>
-          <% if (!isLimitedView) { %>
-            <form method="POST" action="/admin/switch-to-student" class="me-2">
+          <% if (!isLimitedView && role === 'admin') { %>
+            <form method="POST" action="/admin/switch-to-student" class="admin-viewas-form me-2">
+              <select name="course_id" class="form-select form-select-sm" aria-label="Select course">
+                <% (courses || []).forEach(function(c) { %>
+                  <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
+                    <%= c.name %>
+                  </option>
+                <% }); %>
+              </select>
+              <select name="group_number" class="form-select form-select-sm" aria-label="Select group">
+                <option value="1">Група 1</option>
+                <option value="2">Група 2</option>
+                <option value="3">Група 3</option>
+              </select>
               <button class="btn btn-outline-primary btn-sm" type="submit"><%= t('admin.viewAsStudent') %></button>
             </form>
-          <% } else { %>
+          <% } else if (isLimitedView) { %>
             <a class="btn btn-outline-primary btn-sm me-2" href="/schedule"><%= t('admin.backToSchedule') %></a>
           <% } %>
           <form method="POST" action="/logout">
