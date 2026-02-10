@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.73",
+      "date": "2026-02-10",
+      "items": [
+        "feat: show multi-group badge in schedule list rows"
+      ]
+    },
+    {
       "version": "0.7.72",
       "date": "2026-02-10",
       "items": [

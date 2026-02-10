@@ -5292,7 +5292,19 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
     const offset = (currentPage - 1) * perPage;
     const rows = await db.all(
       `
-        SELECT se.*, s.name AS subject_name
+        SELECT se.*,
+          s.name AS subject_name,
+          (
+            SELECT COUNT(*)
+            FROM schedule_entries se2
+            WHERE se2.subject_id = se.subject_id
+              AND se2.day_of_week = se.day_of_week
+              AND se2.class_number = se.class_number
+              AND se2.week_number = se.week_number
+              AND COALESCE(se2.semester_id, 0) = COALESCE(se.semester_id, 0)
+              AND COALESCE(se2.course_id, 0) = COALESCE(se.course_id, 0)
+              AND COALESCE(se2.lesson_type, '') = COALESCE(se.lesson_type, '')
+          ) AS slot_group_count
         FROM schedule_entries se
         JOIN subjects s ON s.id = se.subject_id
         ${scheduleWhere}
