@@ -516,7 +516,12 @@
 
           <div class="card glass-panel mb-4">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Дзеркальні ключі</div>
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="generator-section-title">Дзеркальні ключі</div>
+                <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#mirrorAutoModal">
+                  Авто-пари A/B
+                </button>
+              </div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const mirrorSummary = mirrorSummaryByLocation && mirrorSummaryByLocation[location]; %>
                 <div class="d-grid gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
@@ -770,7 +775,67 @@
       </small>
     </footer>
 
-    <%- include('partials/changelog-modal') %>
+      <%- include('partials/changelog-modal') %>
+
+      <div class="modal fade" id="mirrorAutoModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content glass-panel">
+            <div class="modal-header">
+              <h5 class="modal-title">Авто-пари для дзеркала</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="/admin/schedule-generator/mirror-auto">
+              <input type="hidden" name="run_id" value="<%= run.id %>" />
+              <div class="modal-body">
+                <div class="text-muted small mb-3">
+                  Ми підберемо пари для груп 1/2 з однаковою кількістю пар і без фіксованих тижнів/слотів.
+                  Загальні предмети та предмети з уже заданими дзеркалами не включаємо.
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-mirror-select="all">Вибрати всі</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-mirror-select="none">Зняти всі</button>
+                </div>
+                <% ['kyiv', 'munich'].forEach(function(location) { %>
+                  <% const candidates = autoMirrorCandidatesByLocation && autoMirrorCandidatesByLocation[location]; %>
+                  <div data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
+                    <% if (!candidates || !candidates.length) { %>
+                      <div class="validation-empty">Немає кандидатів для автопар у цій локації.</div>
+                    <% } else { %>
+                      <div class="list-group mirror-auto-list">
+                        <% candidates.forEach(function(pair) { %>
+                          <label class="list-group-item d-flex gap-3 align-items-start">
+                            <input
+                              class="form-check-input mt-1"
+                              type="checkbox"
+                              name="mirror_pairs[]"
+                              value="<%= pair.a.id %>:<%= pair.b.id %>"
+                              data-location="<%= location %>"
+                              <%= activeLocation === location ? '' : 'disabled' %>
+                              checked
+                            />
+                            <div>
+                              <div class="fw-semibold">
+                                Група 1: <%= pair.a.subject_name %> → Група 2: <%= pair.b.subject_name %>
+                              </div>
+                              <div class="small text-muted">
+                                <%= pair.course_name %> · <%= pair.lesson_type === 'seminar' ? 'Семінар' : pair.lesson_type %> · <%= pair.pairs_count %> пар
+                              </div>
+                            </div>
+                          </label>
+                        <% }); %>
+                      </div>
+                    <% } %>
+                  </div>
+                <% }); %>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Скасувати</button>
+                <button type="submit" class="btn btn-primary">Застосувати пари</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
     <script>
@@ -802,6 +867,10 @@
       const courseOptions = courseSelect ? Array.from(courseSelect.options) : [];
       const subjectGroups = subjectSelect ? Array.from(subjectSelect.querySelectorAll('optgroup')) : [];
       const runButtons = document.querySelectorAll('[data-disable-kyiv]');
+      const mirrorAutoModal = document.getElementById('mirrorAutoModal');
+      const mirrorAutoInputs = mirrorAutoModal
+        ? Array.from(mirrorAutoModal.querySelectorAll('input[name="mirror_pairs[]"]'))
+        : [];
 
       const evennessRange = document.getElementById('evennessBiasRange');
       const evennessValue = document.getElementById('evennessBiasValue');
@@ -950,6 +1019,12 @@
           });
         }
         syncSubjects();
+        if (mirrorAutoInputs.length) {
+          mirrorAutoInputs.forEach((input) => {
+            const targetLocation = input.dataset.location || 'kyiv';
+            input.disabled = targetLocation !== safe;
+          });
+        }
       }
 
       if (courseSelect) {
@@ -961,6 +1036,19 @@
       if (locationButtons.length) {
         locationButtons.forEach((btn) => {
           btn.addEventListener('click', () => applyLocation(btn.dataset.location));
+        });
+      }
+
+      if (mirrorAutoModal) {
+        mirrorAutoModal.querySelectorAll('[data-mirror-select]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const mode = btn.dataset.mirrorSelect;
+            const safe = locationInput ? locationInput.value : 'kyiv';
+            mirrorAutoInputs.forEach((input) => {
+              if (input.dataset.location !== safe || input.disabled) return;
+              input.checked = mode === 'all';
+            });
+          });
         });
       }
 

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.58",
+      "date": "2026-02-09",
+      "items": [
+        "feat: add auto mirror pairing modal for seminars"
+      ]
+    },
+    {
       "version": "0.7.57",
       "date": "2026-02-09",
       "items": [

@@ -5256,7 +5256,7 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
     );
     const items = await db.all(
       `
-        SELECT sgi.*, s.name AS subject_name, s.group_count, u.full_name AS teacher_name
+        SELECT sgi.*, s.name AS subject_name, s.group_count, s.is_general, u.full_name AS teacher_name
         FROM schedule_generator_items sgi
         JOIN subjects s ON s.id = sgi.subject_id
         LEFT JOIN users u ON u.id = sgi.teacher_id
@@ -5357,6 +5357,50 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       kyiv: buildHeatmap(entriesByLocation.kyiv, fullWeekDays, [1, 2, 3, 4, 5, 6, 7]),
       munich: buildHeatmap(entriesByLocation.munich, fullWeekDays, [1, 2, 3, 4, 5, 6, 7]),
     };
+    const isSeminarType = (lessonType) => {
+      const raw = String(lessonType || '').toLowerCase();
+      return raw.includes('seminar') || raw.includes('сем');
+    };
+    const autoMirrorCandidatesByLocation = { kyiv: [], munich: [] };
+    Object.entries(itemsByLocation).forEach(([location, list]) => {
+      const buckets = new Map();
+      (list || []).forEach((item) => {
+        const groupNum = Number(item.group_number);
+        if (groupNum !== 1 && groupNum !== 2) return;
+        if (!isSeminarType(item.lesson_type)) return;
+        if (item.mirror_key) return;
+        if (item.fixed_day || item.fixed_class_number || item.weeks_set) return;
+        const generalFlag = item.is_general === true || Number(item.is_general) === 1;
+        if (generalFlag) return;
+        const key = `${item.course_id}|${item.semester_id || ''}|${String(item.lesson_type || '')}|${item.pairs_count || 0}`;
+        if (!buckets.has(key)) {
+          buckets.set(key, { group1: [], group2: [] });
+        }
+        const bucket = buckets.get(key);
+        if (groupNum === 1) bucket.group1.push(item);
+        if (groupNum === 2) bucket.group2.push(item);
+      });
+      const candidates = [];
+      buckets.forEach((bucket) => {
+        bucket.group1.sort((a, b) => a.subject_name.localeCompare(b.subject_name) || a.id - b.id);
+        bucket.group2.sort((a, b) => a.subject_name.localeCompare(b.subject_name) || a.id - b.id);
+        const length = Math.min(bucket.group1.length, bucket.group2.length);
+        for (let i = 0; i < length; i += 1) {
+          const a = bucket.group1[i];
+          const b = bucket.group2[i];
+          if (!a || !b) continue;
+          if (Number(a.subject_id) === Number(b.subject_id)) continue;
+          candidates.push({
+            a,
+            b,
+            course_name: courseById[a.course_id] || '',
+            lesson_type: a.lesson_type,
+            pairs_count: a.pairs_count,
+          });
+        }
+      });
+      autoMirrorCandidatesByLocation[location] = candidates;
+    });
 
     return res.render('admin-schedule-generator', {
       username: req.session.user.username,
@@ -5383,6 +5427,7 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       conflictItemIds,
       problemItemLookupByLocation,
       heatmapByLocation,
+      autoMirrorCandidatesByLocation,
       dayOptions: fullWeekDays,
       dayLabels: studyDayLabels,
       classOptions: [1, 2, 3, 4, 5, 6, 7],
@@ -5576,6 +5621,71 @@ app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) =
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.item.add');
   }
+});
+
+app.post('/admin/schedule-generator/mirror-auto', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.mirrorAuto');
+  }
+  const runId = Number(req.body.run_id);
+  if (!Number.isFinite(runId) || runId <= 0) {
+    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+  }
+  const pairsRaw = req.body.mirror_pairs || [];
+  const pairs = Array.isArray(pairsRaw) ? pairsRaw : pairsRaw ? [pairsRaw] : [];
+  if (!pairs.length) {
+    return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20pairs%20selected`);
+  }
+  const run = await db.get('SELECT id FROM schedule_generator_runs WHERE id = ?', [runId]);
+  if (!run) {
+    return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+  }
+  let updated = 0;
+  for (const pair of pairs) {
+    const [aRaw, bRaw] = String(pair || '').split(':');
+    const aId = Number(aRaw);
+    const bId = Number(bRaw);
+    if (!Number.isFinite(aId) || !Number.isFinite(bId)) continue;
+    const items = await db.all(
+      `
+        SELECT sgi.*, s.name AS subject_name, s.is_general
+        FROM schedule_generator_items sgi
+        JOIN subjects s ON s.id = sgi.subject_id
+        WHERE sgi.run_id = ? AND sgi.id IN (?, ?)
+      `,
+      [runId, aId, bId]
+    );
+    if (!items || items.length < 2) continue;
+    const a = items.find((row) => Number(row.id) === aId);
+    const b = items.find((row) => Number(row.id) === bId);
+    if (!a || !b) continue;
+    if (Number(a.group_number) !== 1 || Number(b.group_number) !== 2) continue;
+    if (Number(a.course_id) !== Number(b.course_id)) continue;
+    if (Number(a.semester_id || 0) !== Number(b.semester_id || 0)) continue;
+    if (String(a.lesson_type || '') !== String(b.lesson_type || '')) continue;
+    if (Number(a.pairs_count || 0) !== Number(b.pairs_count || 0)) continue;
+    if (a.fixed_day || a.fixed_class_number || a.weeks_set) continue;
+    if (b.fixed_day || b.fixed_class_number || b.weeks_set) continue;
+    if (a.mirror_key || b.mirror_key) continue;
+    const generalA = a.is_general === true || Number(a.is_general) === 1;
+    const generalB = b.is_general === true || Number(b.is_general) === 1;
+    if (generalA || generalB) continue;
+    const lessonType = String(a.lesson_type || '').toLowerCase();
+    if (!(lessonType.includes('seminar') || lessonType.includes('сем'))) continue;
+    if (Number(a.subject_id) === Number(b.subject_id)) continue;
+    const key = `AUTO-${aId.toString(36).toUpperCase()}${bId.toString(36).toUpperCase()}`;
+    await db.run(
+      'UPDATE schedule_generator_items SET mirror_key = ? WHERE run_id = ? AND id IN (?, ?)',
+      [key, runId, aId, bId]
+    );
+    updated += 1;
+  }
+  if (!updated) {
+    return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20pairs%20updated`);
+  }
+  return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Auto%20mirror%20pairs%20applied`);
 });
 
 app.post('/admin/schedule-generator/items/edit/:id', requireAdmin, async (req, res) => {
