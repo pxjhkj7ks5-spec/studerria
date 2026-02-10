@@ -1208,7 +1208,7 @@
 
       <% if (viewAs === 'student') { %>
         <div class="alert alert-info glass text-white border-0">
-          Тестовий перегляд: <%= viewAsCourse && viewAsCourse.name ? viewAsCourse.name : 'Курс' %> · Група <%= viewAsGroupNumber || 1 %>
+          Тестовий перегляд: <%= viewAsCourse && viewAsCourse.name ? viewAsCourse.name : 'Курс' %> · <%= viewAsLabel || (`Група ${viewAsGroupNumber || 1}`) %>
         </div>
       <% } else if (role === 'admin') { %>
         <div class="alert alert-info glass text-white border-0">

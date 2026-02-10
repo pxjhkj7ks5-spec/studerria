@@ -3339,14 +3339,20 @@ app.get('/schedule', requireLogin, async (req, res) => {
     }
   }
   const isAdminViewAs = req.session.role === 'admin' && req.session.viewAs === 'student';
+  const viewAsMode = isAdminViewAs ? (req.session.viewAsMode || 'manual') : null;
   let viewAsCourseId = isAdminViewAs ? Number(req.session.viewAsCourseId) : null;
   let viewAsGroupNumber = isAdminViewAs ? Number(req.session.viewAsGroupNumber) : null;
   if (isAdminViewAs) {
-    if (!Number.isFinite(viewAsCourseId)) {
+    if (viewAsMode === 'self') {
+      viewAsCourseId = Number.isFinite(Number(courseId)) ? Number(courseId) : 1;
+      req.session.viewAsCourseId = viewAsCourseId;
+      viewAsGroupNumber = null;
+      req.session.viewAsGroupNumber = null;
+    } else if (!Number.isFinite(viewAsCourseId)) {
       viewAsCourseId = Number.isFinite(Number(courseId)) ? Number(courseId) : 1;
       req.session.viewAsCourseId = viewAsCourseId;
     }
-    if (!Number.isFinite(viewAsGroupNumber) || viewAsGroupNumber < 1) {
+    if (viewAsMode !== 'self' && (!Number.isFinite(viewAsGroupNumber) || viewAsGroupNumber < 1)) {
       viewAsGroupNumber = 1;
       req.session.viewAsGroupNumber = viewAsGroupNumber;
     }
@@ -3355,6 +3361,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
     ? viewAsCourseId
     : (courseId || 1);
   const viewAsCourse = isAdminViewAs ? await getCourseById(scheduleCourseId) : null;
+  const viewAsLabel = isAdminViewAs
+    ? (viewAsMode === 'self' ? 'Ваші групи' : `Група ${viewAsGroupNumber || 1}`)
+    : null;
 
   const activeSemester = await getActiveSemester(scheduleCourseId);
   const totalWeeks = activeSemester && activeSemester.weeks_count ? Number(activeSemester.weeks_count) : 15;
@@ -3386,6 +3395,18 @@ app.get('/schedule', requireLogin, async (req, res) => {
 
   const loadStudentGroups = (cb) => {
     if (!isAdminViewAs) {
+      return db.all(
+        `
+          SELECT sg.subject_id, sg.group_number, s.name AS subject_name
+          FROM student_groups sg
+          JOIN subjects s ON s.id = sg.subject_id
+          WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
+        `,
+        [userId, scheduleCourseId],
+        cb
+      );
+    }
+    if (viewAsMode === 'self') {
       return db.all(
         `
           SELECT sg.subject_id, sg.group_number, s.name AS subject_name
@@ -3567,7 +3588,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
               role: req.session.role,
               viewAs: req.session.viewAs || null,
               viewAsCourse,
-              viewAsGroupNumber: isAdminViewAs ? (viewAsGroupNumber || 1) : null,
+              viewAsGroupNumber: isAdminViewAs ? viewAsGroupNumber : null,
+              viewAsLabel,
               messageSubjects: studentGroups || [],
               userId,
               selectedCourseId: scheduleCourseId,
@@ -3686,7 +3708,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 role: req.session.role,
                 viewAs: req.session.viewAs || null,
                 viewAsCourse,
-                viewAsGroupNumber: isAdminViewAs ? (viewAsGroupNumber || 1) : null,
+                viewAsGroupNumber: isAdminViewAs ? viewAsGroupNumber : null,
+                viewAsLabel,
                 messageSubjects: studentGroups || [],
                 userId,
                 selectedCourseId: scheduleCourseId,
@@ -10597,10 +10620,14 @@ app.post('/admin/users/delete-permanent', requireAdmin, async (req, res) => {
 });
 
 app.post('/admin/switch-to-student', requireAdmin, async (req, res) => {
+  const mode = req.body.mode === 'self' ? 'self' : 'manual';
   let courseId = Number(req.body.course_id || req.body.course);
   let groupNumber = Number(req.body.group_number);
   if (!Number.isFinite(groupNumber) || groupNumber < 1 || groupNumber > 3) {
     groupNumber = 1;
+  }
+  if (mode === 'self') {
+    courseId = Number(req.session.user.course_id || 1);
   }
   try {
     const courses = await getCoursesCached();
@@ -10615,13 +10642,15 @@ app.post('/admin/switch-to-student', requireAdmin, async (req, res) => {
     courseId = getAdminCourse(req);
   }
   req.session.viewAs = 'student';
+  req.session.viewAsMode = mode;
   req.session.viewAsCourseId = courseId;
-  req.session.viewAsGroupNumber = groupNumber;
+  req.session.viewAsGroupNumber = mode === 'self' ? null : groupNumber;
   return res.redirect('/schedule');
 });
 
 app.post('/admin/switch-to-admin', requireAdmin, (req, res) => {
   req.session.viewAs = null;
+  req.session.viewAsMode = null;
   req.session.viewAsCourseId = null;
   req.session.viewAsGroupNumber = null;
   return res.redirect('/admin');

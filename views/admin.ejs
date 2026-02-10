@@ -727,6 +727,7 @@
           </button>
           <% if (!isLimitedView && role === 'admin') { %>
             <form method="POST" action="/admin/switch-to-student" class="admin-viewas-form me-2">
+              <input type="hidden" name="mode" value="manual" />
               <select name="course_id" class="form-select form-select-sm" aria-label="Select course">
                 <% (courses || []).forEach(function(c) { %>
                   <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
@@ -740,6 +741,10 @@
                 <option value="3">Група 3</option>
               </select>
               <button class="btn btn-outline-primary btn-sm" type="submit"><%= t('admin.viewAsStudent') %></button>
+            </form>
+            <form method="POST" action="/admin/switch-to-student" class="me-2">
+              <input type="hidden" name="mode" value="self" />
+              <button class="btn btn-outline-secondary btn-sm" type="submit">Мій розклад</button>
             </form>
           <% } else if (isLimitedView) { %>
             <a class="btn btn-outline-primary btn-sm me-2" href="/schedule"><%= t('admin.backToSchedule') %></a>
