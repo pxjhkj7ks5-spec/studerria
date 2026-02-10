@@ -822,6 +822,27 @@
         return date.toLocaleDateString('uk-UA');
       }
 
+      function getLessonTypeLabel(type) {
+        if (!type) return '';
+        if (type === 'lecture') return 'Лекція';
+        if (type === 'seminar') return 'Семінар';
+        if (type === 'lab') return 'Лаб';
+        if (type === 'practice') return 'Практика';
+        return '';
+      }
+
+      function hasInlineType(name) {
+        return /(лекц|семін|лаб|практ|lecture|seminar|lab|practice)/i.test(String(name || ''));
+      }
+
+      function buildClassName(cls) {
+        if (!cls) return '';
+        const base = String(cls.subject_name || '');
+        const typeLabel = getLessonTypeLabel(cls.lesson_type);
+        if (!typeLabel || hasInlineType(base)) return base;
+        return `${base} · ${typeLabel}`;
+      }
+
       // ============ RENDER: NOW/NEXT ============
       function renderNowNext() {
         const currentBlock = document.getElementById('currentBlock');
@@ -831,14 +852,14 @@
         if (myDay.current_class) {
           currentBlock.innerHTML = `
             <div class="item-title">🎯 Йде зараз</div>
-            <div class="item-meta">${escapeHtml(myDay.current_class.subject_name)} · ${myDay.current_class.start}–${myDay.current_class.end}</div>
+            <div class="item-meta">${escapeHtml(buildClassName(myDay.current_class))} · ${myDay.current_class.start}–${myDay.current_class.end}</div>
           `;
         } else {
           currentBlock.innerHTML = '<div class="empty-state" style="min-height: auto; padding: 1rem 0;"><div class="empty-state-text">Зараз немає пар</div></div>';
         }
 
         if (myDay.next_class) {
-          nextBlock.textContent = `Далі: ${escapeHtml(myDay.next_class.subject_name)} о ${myDay.next_class.start}`;
+          nextBlock.textContent = `Далі: ${buildClassName(myDay.next_class)} о ${myDay.next_class.start}`;
         } else {
           nextBlock.textContent = 'Наступних пар сьогодні немає.';
         }
@@ -853,7 +874,7 @@
         const seconds = Math.floor((diff % 60000) / 1000);
         const nextBlock = document.getElementById('nextBlock');
         if (nextBlock) {
-          nextBlock.textContent = `Далі: ${escapeHtml(myDay.next_class.subject_name)} через ${minutes} хв ${seconds} сек`;
+          nextBlock.textContent = `Далі: ${buildClassName(myDay.next_class)} через ${minutes} хв ${seconds} сек`;
         }
       }
 
@@ -880,7 +901,7 @@
           .map((cls) => `
             <div class="deadline-item">
               <div class="item-content">
-                <div class="item-title">${escapeHtml(cls.subject_name)}</div>
+                <div class="item-title">${escapeHtml(buildClassName(cls))}</div>
                 <div class="item-meta">Пара #${cls.class_number} · ${cls.start}–${cls.end}</div>
               </div>
               <span class="stat-pill">Група ${cls.group_number}</span>

@@ -6,6 +6,7 @@ const scheduleGeneratorMirror = require('./005_schedule_generator_mirror');
 const coursesLocation = require('./006_courses_location');
 const scheduleGeneratorRepair = require('./007_schedule_generator_repair');
 const scheduleGeneratorEntryItem = require('./008_schedule_generator_entry_item');
+const scheduleEntryLessonType = require('./009_schedule_entry_lesson_type');
 
 module.exports = [
   init,
@@ -16,4 +17,5 @@ module.exports = [
   coursesLocation,
   scheduleGeneratorRepair,
   scheduleGeneratorEntryItem,
+  scheduleEntryLessonType,
 ];

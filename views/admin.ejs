@@ -1080,6 +1080,15 @@
                     </select>
                   </div>
                   <div class="col-12 col-md-2">
+                    <select class="form-select" name="lesson_type">
+                      <option value="" selected>Type (auto)</option>
+                      <option value="lecture">Лекція</option>
+                      <option value="seminar">Семінар</option>
+                      <option value="lab">Лаб</option>
+                      <option value="practice">Практика</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-2">
                     <select class="form-select" name="semester_id" required>
                       <option value="" disabled selected>Semester</option>
                       <% (semesters || []).forEach(function(sem) { %>
@@ -1150,9 +1159,9 @@
                   <div class="import-card-header">
                     <div>
                       <div class="fw-semibold">Schedule CSV</div>
-                      <div class="small text-muted">Формат: subject, group_number, day_of_week, class_number, week_number</div>
+                      <div class="small text-muted">Формат: subject, group_number, day_of_week, class_number, week_number, lesson_type (опц.)</div>
                     </div>
-                    <button class="btn btn-outline-secondary btn-sm" type="button" data-template="subject,group_number,day_of_week,class_number,week_number">Download template</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-template="subject,group_number,day_of_week,class_number,week_number,lesson_type">Download template</button>
                   </div>
                   <form method="POST" action="/admin/import/schedule.csv" enctype="multipart/form-data" class="import-form">
                     <div class="import-step">

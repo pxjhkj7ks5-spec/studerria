@@ -637,6 +637,18 @@ const sanitizeCsvValue = (value) => {
 
 const escapeCsvValue = (value) => `"${sanitizeCsvValue(value).replace(/\"/g, '""')}"`;
 
+const normalizeLessonType = (value) => {
+  if (value === null || typeof value === 'undefined') return null;
+  const raw = String(value).trim().toLowerCase();
+  if (!raw) return null;
+  if (['lecture', 'seminar', 'lab', 'practice'].includes(raw)) return raw;
+  if (raw.startsWith('лек')) return 'lecture';
+  if (raw.startsWith('сем')) return 'seminar';
+  if (raw.startsWith('лаб')) return 'lab';
+  if (raw.startsWith('практ')) return 'practice';
+  return null;
+};
+
 const referenceCache = {
   courses: { data: null, expiresAt: 0 },
   subjects: new Map(),
@@ -2066,6 +2078,7 @@ async function buildMyDayData(user) {
         id: row.id,
         subject_id: row.subject_id,
         subject_name: row.subject_name,
+        lesson_type: row.lesson_type || null,
         class_number: row.class_number,
         group_number: row.group_number,
         day_of_week: row.day_of_week,
@@ -6300,7 +6313,7 @@ app.post('/admin/schedule-generator/:runId/publish', requireAdmin, async (req, r
   try {
     const entries = await db.all(
       `
-        SELECT run_id, course_id, semester_id, subject_id, group_number, day_of_week, class_number, week_number
+        SELECT run_id, course_id, semester_id, subject_id, group_number, day_of_week, class_number, week_number, lesson_type
         FROM schedule_generator_entries
         WHERE run_id = ?
       `,
@@ -6324,8 +6337,8 @@ app.post('/admin/schedule-generator/:runId/publish', requireAdmin, async (req, r
     }
     const stmt = db.prepare(
       `
-        INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id, lesson_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     );
     entries.forEach((entry) => {
@@ -6336,7 +6349,8 @@ app.post('/admin/schedule-generator/:runId/publish', requireAdmin, async (req, r
         entry.class_number,
         entry.week_number,
         entry.course_id,
-        entry.semester_id
+        entry.semester_id,
+        entry.lesson_type || null
       );
     });
     await stmt.finalize();
@@ -6735,7 +6749,7 @@ app.get('/admin/export/schedule.csv', requireAdmin, async (req, res) => {
   const activeSemester = await getActiveSemester(courseId);
   db.all(
     `
-      SELECT se.id, s.name AS subject, se.group_number, se.day_of_week, se.class_number, se.week_number
+      SELECT se.id, s.name AS subject, se.group_number, se.day_of_week, se.class_number, se.week_number, se.lesson_type
       FROM schedule_entries se
       JOIN subjects s ON s.id = se.subject_id
       WHERE se.course_id = ?${activeSemester ? ' AND se.semester_id = ?' : ''}
@@ -6746,9 +6760,9 @@ app.get('/admin/export/schedule.csv', requireAdmin, async (req, res) => {
       if (err) {
         return res.status(500).send('Database error');
       }
-      const header = 'id,subject,group_number,day_of_week,class_number,week_number';
+      const header = 'id,subject,group_number,day_of_week,class_number,week_number,lesson_type';
       const lines = rows.map((r) =>
-        [r.id, r.subject, r.group_number, r.day_of_week, r.class_number, r.week_number]
+        [r.id, r.subject, r.group_number, r.day_of_week, r.class_number, r.week_number, r.lesson_type || '']
           .map((v) => escapeCsvValue(v))
           .join(',')
       );
@@ -6803,6 +6817,7 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
     const classNumber = Number(row.class_number);
     const weekNumber = Number(row.week_number);
     const dayOfWeek = String(row.day_of_week || '').trim();
+    const lessonType = normalizeLessonType(row.lesson_type);
     if (!subject || Number.isNaN(groupNumber) || Number.isNaN(classNumber) || Number.isNaN(weekNumber) || !dayOfWeek) {
       skipped += 1;
       continue;
@@ -6814,14 +6829,18 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
       [courseId, activeSemester.id, weekNumber, dayOfWeek, classNumber, groupNumber]
     );
     if (existing && existing.id) {
-      await db.run('UPDATE schedule_entries SET subject_id = ? WHERE id = ?', [subject.id, existing.id]);
+      if (lessonType) {
+        await db.run('UPDATE schedule_entries SET subject_id = ?, lesson_type = ? WHERE id = ?', [subject.id, lessonType, existing.id]);
+      } else {
+        await db.run('UPDATE schedule_entries SET subject_id = ? WHERE id = ?', [subject.id, existing.id]);
+      }
       updated += 1;
     } else {
       await db.run(
         `INSERT INTO schedule_entries
-         (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [subject.id, groupNumber, dayOfWeek, classNumber, weekNumber, courseId, activeSemester.id]
+         (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id, lesson_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [subject.id, groupNumber, dayOfWeek, classNumber, weekNumber, courseId, activeSemester.id, lessonType]
       );
       inserted += 1;
     }
@@ -7990,9 +8009,10 @@ app.post('/subgroup/join', requireLogin, (req, res) => {
 });
 
 app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
-  const { subject_id, group_number, day_of_week, class_number, week_numbers, semester_id } = req.body;
+  const { subject_id, group_number, day_of_week, class_number, week_numbers, semester_id, lesson_type } = req.body;
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
+  const lessonType = normalizeLessonType(lesson_type);
   const courseId = getAdminCourse(req);
   const semesterId = Number(semester_id);
 
@@ -8022,10 +8042,10 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
     }
 
     const stmt = db.prepare(
-      'INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id, lesson_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     );
     uniqueWeeks.forEach((week) => {
-      stmt.run(subject_id, groupNum, day_of_week, classNum, week, courseId, semesterId);
+      stmt.run(subject_id, groupNum, day_of_week, classNum, week, courseId, semesterId, lessonType);
     });
     stmt.finalize((err) => {
       if (err) {
@@ -8057,10 +8077,11 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
 
 app.post('/admin/schedule/edit/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { subject_id, group_number, day_of_week, class_number, week_number, semester_id } = req.body;
+  const { subject_id, group_number, day_of_week, class_number, week_number, semester_id, lesson_type } = req.body;
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
   const weekNum = Number(week_number);
+  const lessonType = normalizeLessonType(lesson_type);
   const courseId = getAdminCourse(req);
   const semesterId = Number(semester_id);
 
@@ -8086,10 +8107,10 @@ app.post('/admin/schedule/edit/:id', requireAdmin, async (req, res) => {
     db.run(
       `
         UPDATE schedule_entries
-        SET subject_id = ?, group_number = ?, day_of_week = ?, class_number = ?, week_number = ?, semester_id = ?
+        SET subject_id = ?, group_number = ?, day_of_week = ?, class_number = ?, week_number = ?, semester_id = ?, lesson_type = ?
         WHERE id = ? AND course_id = ?
       `,
-      [subject_id, groupNum, day_of_week, classNum, weekNum, semesterId, id, courseId],
+      [subject_id, groupNum, day_of_week, classNum, weekNum, semesterId, lessonType, id, courseId],
       (err) => {
         if (err) {
           return res.redirect('/admin?err=Database%20error');
@@ -8364,8 +8385,8 @@ app.post('/admin/api/schedule/weeks/clone', requireAdminOrDeanery, async (req, r
       }
       await db.run(
         `INSERT INTO schedule_entries
-         (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id, lesson_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           row.subject_id,
           row.group_number,
@@ -8374,6 +8395,7 @@ app.post('/admin/api/schedule/weeks/clone', requireAdminOrDeanery, async (req, r
           tgtWeek,
           courseId,
           activeSemester ? activeSemester.id : null,
+          row.lesson_type || null,
         ]
       );
       inserted += 1;

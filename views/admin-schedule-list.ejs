@@ -187,6 +187,7 @@
                   <th><input type="checkbox" id="selectAllSchedule" /></th>
                   <th>ID</th>
                   <th>Subject</th>
+                  <th>Type</th>
                   <th>Group #</th>
                   <th>Day</th>
                   <th>Semester</th>
@@ -205,6 +206,15 @@
                         <% (subjects || []).forEach(function(s) { %>
                           <option value="<%= s.id %>" <%= item.subject_id === s.id ? 'selected' : '' %>><%= s.name %></option>
                         <% }); %>
+                      </select>
+                    </td>
+                    <td>
+                      <select class="form-select form-select-sm" name="lesson_type" form="edit-<%= item.id %>">
+                        <option value="" <%= !item.lesson_type ? 'selected' : '' %>>Auto</option>
+                        <option value="lecture" <%= item.lesson_type === 'lecture' ? 'selected' : '' %>>Лекція</option>
+                        <option value="seminar" <%= item.lesson_type === 'seminar' ? 'selected' : '' %>>Семінар</option>
+                        <option value="lab" <%= item.lesson_type === 'lab' ? 'selected' : '' %>>Лаб</option>
+                        <option value="practice" <%= item.lesson_type === 'practice' ? 'selected' : '' %>>Практика</option>
                       </select>
                     </td>
                     <td>
@@ -244,7 +254,7 @@
                   </tr>
                 <% }); %>
                 <% if (!(schedule || []).length) { %>
-                  <tr><td colspan="9" class="text-muted">Нічого не знайдено</td></tr>
+                  <tr><td colspan="10" class="text-muted">Нічого не знайдено</td></tr>
                 <% } %>
               </tbody>
             </table>

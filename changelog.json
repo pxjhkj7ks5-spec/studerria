@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.7.64",
+      "date": "2026-02-10",
+      "items": [
+        "feat: store lesson types on schedule entries and show lecture/seminar badges",
+        "feat: add lesson type controls to schedule editor and schedule list",
+        "feat: include lesson_type in schedule CSV import/export and generator publish"
+      ]
+    },
+    {
       "version": "0.7.63",
       "date": "2026-02-10",
       "items": [
