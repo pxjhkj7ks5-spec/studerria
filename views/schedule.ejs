@@ -1168,6 +1168,7 @@
       .day-name {
         font-size: 1.05rem;
         font-weight: 600;
+        color: var(--text-primary);
       }
       .day-date {
         font-size: 0.82rem;
@@ -1272,21 +1273,26 @@
       body.theme-dark .schedule-card {
         background: hsla(var(--subject-h), 30%, 18%, 0.6);
         border-color: hsla(var(--subject-h), 35%, 35%, 0.35);
+        color: var(--text-primary);
       }
       body.theme-light .schedule-card {
-        background: hsla(var(--subject-h), 55%, 92%, 0.9);
-        border-color: hsla(var(--subject-h), 45%, 72%, 0.55);
+        background: hsla(var(--subject-h), 60%, 88%, 0.95);
+        border-color: hsla(var(--subject-h), 45%, 70%, 0.65);
+        color: #0f172a;
       }
       .schedule-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
         border-color: hsla(var(--subject-h), 55%, 65%, 0.5);
+        color: var(--text-primary);
       }
       body.theme-dark .schedule-card:hover {
         background: hsla(var(--subject-h), 30%, 20%, 0.72);
+        color: #f8fafc;
       }
       body.theme-light .schedule-card:hover {
-        background: hsla(var(--subject-h), 55%, 94%, 0.95);
+        background: hsla(var(--subject-h), 60%, 90%, 0.98);
+        color: #0f172a;
       }
       body.theme-dark .schedule-card:hover {
         box-shadow: 0 18px 34px rgba(0, 0, 0, 0.4);
@@ -1439,57 +1445,32 @@
         gap: 10px;
         padding: 10px 14px;
       }
-      .week-rail {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        overflow-x: auto;
-        padding: 4px 2px;
-        scroll-behavior: smooth;
-        scrollbar-width: none;
-      }
-      .week-rail::-webkit-scrollbar {
-        display: none;
-      }
       .week-dot {
-        width: auto;
-        height: 28px;
-        padding: 0 10px;
+        width: 6px;
+        height: 6px;
         border-radius: 999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        color: var(--text-secondary);
-        opacity: 1;
-        transition: background 180ms ease, color 180ms ease, transform 180ms ease, border-color 180ms ease;
+        border: none;
+        background: rgba(255, 255, 255, 0.4);
+        opacity: 0.3;
+        cursor: pointer;
+        transition: transform 220ms ease, background 220ms ease, width 260ms ease, box-shadow 260ms ease;
       }
       .week-dot:hover {
-        transform: translateY(-1px);
-        background: rgba(255, 255, 255, 0.16);
-        border-color: rgba(148, 163, 184, 0.45);
+        transform: scale(1.15);
+        opacity: 0.6;
       }
       .week-dot.active {
-        background: rgba(59, 130, 246, 0.25);
-        border-color: rgba(59, 130, 246, 0.5);
-        color: #e2e8f0;
-        box-shadow: 0 8px 16px rgba(59, 130, 246, 0.25);
-      }
-      .week-dot.is-past {
-        opacity: 0.45;
-      }
-      .week-dot.is-future {
-        opacity: 0.8;
+        width: 28px;
+        height: 8px;
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.85);
+        box-shadow: 0 8px 18px rgba(148, 163, 184, 0.35);
       }
       body.theme-light .week-dot {
-        background: rgba(15, 23, 42, 0.08);
-        border-color: rgba(15, 23, 42, 0.12);
-        color: #475569;
+        background: rgba(15, 23, 42, 0.4);
       }
       body.theme-light .week-dot.active {
-        background: rgba(59, 130, 246, 0.18);
-        color: #1e293b;
-        border-color: rgba(59, 130, 246, 0.35);
+        background: rgba(15, 23, 42, 0.85);
       }
       .schedule-content.is-exiting {
         opacity: 0;
@@ -1936,16 +1917,14 @@
 
     <div class="week-slider" id="weekSlider">
       <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
-      <div class="week-rail">
-        <% for (let w = 1; w <= (totalWeeks || 15); w++) { %>
-          <button
-            type="button"
-            class="week-dot <%= w === currentWeek ? 'active' : '' %>"
-            data-week="<%= w %>"
-            aria-label="<%= t('schedule.week') %> <%= w %>"
-          ><span><%= w %></span></button>
-        <% } %>
-      </div>
+      <% for (let w = 1; w <= (totalWeeks || 15); w++) { %>
+        <button
+          type="button"
+          class="week-dot <%= w === currentWeek ? 'active' : '' %>"
+          data-week="<%= w %>"
+          aria-label="<%= t('schedule.week') %> <%= w %>"
+        ></button>
+      <% } %>
       <button class="week-nav-btn" type="button" id="weekNext" aria-label="Next week">›</button>
     </div>
 
@@ -2812,19 +2791,14 @@
       function updateMobileWeekDots() {
         if (!weekSlider) return;
         const dots = weekSlider.querySelectorAll('.week-dot');
-        dots.forEach((dot) => dot.classList.remove('hidden-mobile'));
-        const active = weekSlider.querySelector('.week-dot.active');
-        if (active && active.scrollIntoView) {
-          active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        if (window.innerWidth > 768) {
+          dots.forEach((dot) => dot.classList.remove('hidden-mobile'));
+          return;
         }
-      }
-      function updateWeekStates() {
-        if (!weekSlider) return;
-        const dots = weekSlider.querySelectorAll('.week-dot');
         dots.forEach((dot) => {
           const week = Number(dot.dataset.week);
-          dot.classList.toggle('is-past', week < currentWeek);
-          dot.classList.toggle('is-future', week > currentWeek);
+          const visible = week === currentWeek || week === currentWeek - 1 || week === currentWeek + 1;
+          dot.classList.toggle('hidden-mobile', !visible);
         });
       }
       function updateSchedule(week) {
@@ -2845,7 +2819,6 @@
         }
         currentWeek = safe;
         updateMobileWeekDots();
-        updateWeekStates();
         const scheduleContent = document.querySelector('.schedule-content');
         if (scheduleContent) {
           scheduleContent.classList.add('is-exiting');
@@ -2970,7 +2943,6 @@
         });
       }
       updateMobileWeekDots();
-      updateWeekStates();
       window.addEventListener('resize', updateMobileWeekDots);
 
       function updateUnreadBadges(count) {
