@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.60",
+      "date": "2026-02-09",
+      "items": [
+        "feat: keep each subject on a single day across schedule"
+      ]
+    },
+    {
       "version": "0.7.59",
       "date": "2026-02-09",
       "items": [

@@ -556,7 +556,7 @@
           <div class="card glass-panel mb-4">
             <div class="card-body">
               <div class="generator-section-title mb-2">Конфлікти після генерації</div>
-              <% const conflictLabels = { missing_course_context: 'Немає активного семестру', missing_weeks_count: 'Не задано кількість тижнів', no_available_weeks: 'Немає доступних тижнів', no_allowed_days: 'Немає доступних днів', no_slot_found: 'Немає слота', partial_schedule: 'Часткова генерація', unknown: 'Невідома причина' }; %>
+              <% const conflictLabels = { missing_course_context: 'Немає активного семестру', missing_weeks_count: 'Не задано кількість тижнів', no_available_weeks: 'Немає доступних тижнів', no_allowed_days: 'Немає доступних днів', no_slot_found: 'Немає слота', partial_schedule: 'Часткова генерація', subject_day_mismatch: 'Предмет має різні дні', unknown: 'Невідома причина' }; %>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const conflicts = conflictDetails && conflictDetails[location]; %>
                 <div class="d-grid gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
