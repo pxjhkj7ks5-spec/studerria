@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "version": "0.7.66",
+      "date": "2026-02-10",
+      "items": [
+        "fix: enforce lecture/seminar lesson types during subject merge",
+        "fix: align generator item lesson types with merged subjects"
+      ]
+    },
+    {
+      "version": "0.7.65",
+      "date": "2026-02-10",
+      "items": [
+        "feat: merge lecture/seminar duplicate subjects into one and backfill lesson types",
+        "feat: migrate subject references across schedule, homework, messages, and generator data"
+      ]
+    },
+    {
       "version": "0.7.64",
       "date": "2026-02-10",
       "items": [
