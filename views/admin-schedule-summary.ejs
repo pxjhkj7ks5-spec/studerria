@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Сводка семестру</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <style>
+      :root {
+        --accent: #3b82f6;
+        --radius: 16px;
+        --glass-border-dark: rgba(255, 255, 255, 0.14);
+        --glass-border-light: rgba(15, 23, 42, 0.12);
+        --glass-bg-dark: rgba(255, 255, 255, 0.06);
+        --glass-bg-light: rgba(255, 255, 255, 0.35);
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+          "Helvetica Neue", "Inter", Arial, sans-serif;
+        min-height: 100vh;
+      }
+      body.theme-light {
+        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.22), transparent 60%),
+          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.22), transparent 60%),
+          linear-gradient(135deg, #e6eef8 0%, #e9f0fb 45%, #eef2ff 100%);
+        color: #0f172a;
+      }
+      body.theme-dark {
+        background: radial-gradient(1200px 800px at 15% 10%, rgba(59, 130, 246, 0.22), transparent 60%),
+          radial-gradient(1000px 700px at 80% 20%, rgba(14, 165, 233, 0.18), transparent 60%),
+          linear-gradient(160deg, #0b0f1a 0%, #141b30 100%);
+        color: #f8fafc;
+      }
+      .admin-nav {
+        backdrop-filter: blur(14px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      body.theme-light .admin-nav {
+        background: rgba(255, 255, 255, 0.8);
+        border-bottom-color: rgba(15, 23, 42, 0.12);
+      }
+      body.theme-dark .admin-nav {
+        background: rgba(10, 10, 20, 0.6);
+      }
+      .card {
+        border-radius: var(--radius);
+        backdrop-filter: blur(18px);
+      }
+      body.theme-dark .card {
+        background: rgba(18, 24, 40, 0.72);
+        color: #f8fafc;
+        border-color: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      }
+      body.theme-light .card {
+        background: rgba(255, 255, 255, 0.72);
+        border-color: var(--glass-border-light);
+        box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+      }
+      .summary-list {
+        margin: 0;
+        padding-left: 0;
+        list-style: none;
+      }
+      .summary-list li + li {
+        margin-top: 6px;
+      }
+      .summary-note {
+        font-size: 0.85rem;
+        color: #94a3b8;
+      }
+    </style>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/pages/admin.css" />
+  </head>
+  <body class="theme-light schedule-summary-page">
+    <nav class="navbar navbar-expand-lg admin-nav">
+      <div class="container">
+        <span class="navbar-brand">Сводка семестру</span>
+        <div class="d-flex align-items-center">
+          <span class="me-3 text-muted">
+            <%= t('role.admin') %>: <%= username %>
+          </span>
+          <button
+            class="theme-toggle theme-toggle-min me-2"
+            type="button"
+            id="themeToggle"
+            aria-label="Toggle theme"
+            data-light-label="☀️"
+            data-dark-label="🌙"
+          >
+            🌙
+          </button>
+          <a class="btn btn-outline-primary btn-sm me-2" href="/admin/schedule-list">До списку пар</a>
+          <a class="btn btn-outline-secondary btn-sm me-2" href="/admin">Назад в адмінку</a>
+          <form method="POST" action="/logout">
+            <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
+          </form>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-4">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <h1 class="h3 mb-0">Сводка семестру</h1>
+        <div class="summary-note">Формат: предмет — тип — кількість</div>
+      </div>
+
+      <form class="mb-3" method="GET" action="/admin/schedule-summary">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-md-4">
+            <label class="form-label mb-0"><%= t('admin.course') %></label>
+            <select name="course" class="form-select" onchange="this.form.submit()">
+              <% (courses || []).forEach(function(c) { %>
+                <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
+                  <%= c.name %>
+                </option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label mb-0">Семестр</label>
+            <select name="semester_id" class="form-select" onchange="this.form.submit()">
+              <% (semesters || []).forEach(function(sem) { %>
+                <option value="<%= sem.id %>" <%= activeSemester && sem.id === activeSemester.id ? 'selected' : '' %>>
+                  <%= sem.title %> · <%= sem.weeks_count %> тижнів
+                </option>
+              <% }); %>
+            </select>
+          </div>
+        </div>
+      </form>
+
+      <div class="card">
+        <div class="card-body">
+          <% if (!activeSemester) { %>
+            <div class="text-muted">Немає активного семестру.</div>
+          <% } else if (!semesterSummary || !semesterSummary.length) { %>
+            <div class="text-muted">Немає даних для підсумку.</div>
+          <% } else { %>
+            <ul class="summary-list">
+              <% semesterSummary.forEach(function(row) { %>
+                <% const typeLabel = row.lesson_type === 'lecture' ? 'Лекція' : row.lesson_type === 'seminar' ? 'Семінар' : row.lesson_type === 'lab' ? 'Лаб' : row.lesson_type === 'practice' ? 'Практика' : 'Без типу'; %>
+                <li><%= row.subject_name %> — <%= typeLabel %> — <%= row.total %></li>
+              <% }); %>
+            </ul>
+          <% } %>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const themeToggle = document.getElementById('themeToggle');
+      const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
+      const labelLight = themeToggle.dataset.lightLabel || 'Light';
+      const labelDark = themeToggle.dataset.darkLabel || 'Dark';
+      document.body.classList.remove('theme-light', 'theme-dark');
+      document.body.classList.add(savedTheme);
+      themeToggle.textContent = savedTheme === 'theme-dark' ? labelLight : labelDark;
+      themeToggle.addEventListener('click', () => {
+        const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
+        document.body.classList.remove('theme-light', 'theme-dark');
+        document.body.classList.add(next);
+        localStorage.setItem('ui-theme', next);
+        themeToggle.textContent = next === 'theme-dark' ? labelLight : labelDark;
+      });
+    </script>
+  </body>
+</html>

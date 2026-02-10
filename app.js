@@ -5526,27 +5526,6 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
       [...scheduleParams, perPage, offset]
     );
 
-    const summaryFilters = ['se.course_id = ?'];
-    const summaryParams = [courseId];
-    if (activeSemester) {
-      summaryFilters.push('se.semester_id = ?');
-      summaryParams.push(activeSemester.id);
-    }
-    const summaryWhere = summaryFilters.length ? `WHERE ${summaryFilters.join(' AND ')}` : '';
-    const summaryRows = await db.all(
-      `
-        SELECT s.name AS subject_name,
-               COALESCE(se.lesson_type, '') AS lesson_type,
-               COUNT(*) AS total
-        FROM schedule_entries se
-        JOIN subjects s ON s.id = se.subject_id
-        ${summaryWhere}
-        GROUP BY s.name, COALESCE(se.lesson_type, '')
-        ORDER BY s.name, COALESCE(se.lesson_type, '')
-      `,
-      summaryParams
-    );
-
     const courses = await getCoursesCached();
     const semesters = await getSemestersCached(courseId);
     const subjects = await getSubjectsCached(courseId);
@@ -5568,7 +5547,6 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
       subjects,
       semesters,
       activeSemester,
-      semesterSummary: summaryRows || [],
       selectedCourseId: courseId,
       activeScheduleDays,
       schedule: rows || [],
@@ -5590,6 +5568,54 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleList');
+  }
+});
+
+app.get('/admin/schedule-summary', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleSummary.init');
+  }
+  const courseId = Number(req.query.course || getAdminCourse(req));
+  let activeSemester = null;
+  try {
+    const semesters = await getSemestersCached(courseId);
+    const requestedSemesterId = Number(req.query.semester_id);
+    if (Number.isFinite(requestedSemesterId) && requestedSemesterId > 0) {
+      activeSemester = semesters.find((sem) => Number(sem.id) === requestedSemesterId) || null;
+    }
+    if (!activeSemester) {
+      activeSemester = await getActiveSemester(courseId);
+    }
+    const summaryRows = activeSemester
+      ? await db.all(
+          `
+            SELECT s.name AS subject_name,
+                   COALESCE(se.lesson_type, '') AS lesson_type,
+                   COUNT(*) AS total
+            FROM schedule_entries se
+            JOIN subjects s ON s.id = se.subject_id
+            WHERE se.course_id = ? AND se.semester_id = ?
+            GROUP BY s.name, COALESCE(se.lesson_type, '')
+            ORDER BY s.name, COALESCE(se.lesson_type, '')
+          `,
+          [courseId, activeSemester.id]
+        )
+      : [];
+    const courses = await getCoursesCached();
+    const semesters = await getSemestersCached(courseId);
+    return res.render('admin-schedule-summary', {
+      username: req.session.user.username,
+      role: req.session.role,
+      courses,
+      semesters,
+      activeSemester,
+      selectedCourseId: courseId,
+      semesterSummary: summaryRows || [],
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleSummary');
   }
 });
 
