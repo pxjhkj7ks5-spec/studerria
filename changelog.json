@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.84",
+      "date": "2026-02-11",
+      "items": [
+        "feat: redesign schedule UI with calmer cards, day headers, and timeline week rail"
+      ]
+    },
+    {
       "version": "0.7.83",
       "date": "2026-02-11",
       "items": [
