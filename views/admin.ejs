@@ -1092,6 +1092,7 @@
                     </div>
                     <input type="hidden" name="group_numbers" id="addGroupNumbers" />
                     <div class="small text-muted mt-1" id="addGroupSelectionLabel"></div>
+                    <span class="badge text-bg-primary mt-2 d-none" id="addGroupMultiBadge">Мульти‑групи</span>
                   </div>
                   <div class="col-12 col-md-2">
                     <select class="form-select" name="semester_id" required>
@@ -3967,6 +3968,7 @@
       const addGroupMultiBtn = document.getElementById('addGroupMultiBtn');
       const addGroupNumbers = document.getElementById('addGroupNumbers');
       const addGroupSelectionLabel = document.getElementById('addGroupSelectionLabel');
+      const addGroupMultiBadge = document.getElementById('addGroupMultiBadge');
       const groupMultiModalEl = document.getElementById('groupMultiModal');
       const groupMultiModal = groupMultiModalEl ? new bootstrap.Modal(groupMultiModalEl) : null;
       const groupMultiChecks = groupMultiModalEl
@@ -3988,6 +3990,11 @@
         if (addGroupSelectionLabel) {
           addGroupSelectionLabel.textContent = text || '';
         }
+      };
+
+      const setGroupMultiBadge = (visible) => {
+        if (!addGroupMultiBadge) return;
+        addGroupMultiBadge.classList.toggle('d-none', !visible);
       };
 
       const updateGroupOptions = () => {
@@ -4012,15 +4019,18 @@
           addGroupSelect.value = String(unique[0]);
           addGroupSelect.classList.add('select-locked');
           setGroupSelectionLabel(`Обрано групи: ${unique.join(', ')}`);
+          setGroupMultiBadge(true);
         } else if (unique.length === 1) {
           addGroupNumbers.value = '';
           addGroupSelect.value = String(unique[0]);
           addGroupSelect.classList.remove('select-locked');
           setGroupSelectionLabel('');
+          setGroupMultiBadge(false);
         } else {
           addGroupNumbers.value = '';
           addGroupSelect.classList.remove('select-locked');
           setGroupSelectionLabel('');
+          setGroupMultiBadge(false);
         }
       };
 
@@ -4037,6 +4047,7 @@
           if (addGroupNumbers) addGroupNumbers.value = '';
           if (addGroupMultiBtn) addGroupMultiBtn.style.display = 'none';
           setGroupSelectionLabel('Група заблокована для лекції.');
+          setGroupMultiBadge(false);
           return;
         }
 
@@ -4046,6 +4057,7 @@
           if (addGroupNumbers) addGroupNumbers.value = '';
           if (addGroupMultiBtn) addGroupMultiBtn.style.display = 'none';
           setGroupSelectionLabel('');
+          setGroupMultiBadge(false);
           return;
         }
 
@@ -4058,6 +4070,7 @@
           applyGroupSelection(groups);
         } else {
           setGroupSelectionLabel('');
+          setGroupMultiBadge(false);
         }
 
         if (addGroupMultiBtn) {
@@ -4066,6 +4079,7 @@
         }
         if (isGeneral && addGroupNumbers) {
           addGroupNumbers.value = '';
+          setGroupMultiBadge(false);
         }
       }
 
@@ -4073,6 +4087,7 @@
         addSubjectSelect.addEventListener('change', () => {
           if (addGroupNumbers) addGroupNumbers.value = '';
           setGroupSelectionLabel('');
+          setGroupMultiBadge(false);
           syncAddGroupSelect();
         });
       }
