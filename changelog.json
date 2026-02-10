@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.57",
+      "date": "2026-02-09",
+      "items": [
+        "fix: prevent lecture overlap with seminars and balance day load across course"
+      ]
+    },
+    {
       "version": "0.7.56",
       "date": "2026-02-09",
       "items": [
