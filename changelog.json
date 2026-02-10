@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.80",
+      "date": "2026-02-10",
+      "items": [
+        "fix: resolve schedule summary redeclared variable and guard scheduler loop"
+      ]
+    },
+    {
       "version": "0.7.79",
       "date": "2026-02-10",
       "items": [

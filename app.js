@@ -5580,10 +5580,10 @@ app.get('/admin/schedule-summary', requireAdmin, async (req, res) => {
   const courseId = Number(req.query.course || getAdminCourse(req));
   let activeSemester = null;
   try {
-    const semesters = await getSemestersCached(courseId);
+    const semesterList = await getSemestersCached(courseId);
     const requestedSemesterId = Number(req.query.semester_id);
     if (Number.isFinite(requestedSemesterId) && requestedSemesterId > 0) {
-      activeSemester = semesters.find((sem) => Number(sem.id) === requestedSemesterId) || null;
+      activeSemester = semesterList.find((sem) => Number(sem.id) === requestedSemesterId) || null;
     }
     if (!activeSemester) {
       activeSemester = await getActiveSemester(courseId);
@@ -5604,12 +5604,11 @@ app.get('/admin/schedule-summary', requireAdmin, async (req, res) => {
         )
       : [];
     const courses = await getCoursesCached();
-    const semesters = await getSemestersCached(courseId);
     return res.render('admin-schedule-summary', {
       username: req.session.user.username,
       role: req.session.role,
       courses,
-      semesters,
+      semesters: semesterList,
       activeSemester,
       selectedCourseId: courseId,
       semesterSummary: summaryRows || [],
@@ -10564,6 +10563,9 @@ const startScheduler = () => {
     return;
   }
   setInterval(() => {
+    if (typeof publishScheduledItems !== 'function') {
+      return;
+    }
     publishScheduledItems().catch((err) => {
       console.error('Scheduler error', err);
     });
