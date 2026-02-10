@@ -4458,7 +4458,7 @@ app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
         groups.forEach((g) => params.push(g.subject_id, g.group_number));
         conditions.push(groupConditions);
       }
-      conditions.push('mt.user_id = ?');
+      conditions.push('EXISTS (SELECT 1 FROM message_targets mt WHERE mt.message_id = m.id AND mt.user_id = ?)');
       params.push(userId);
       const baseWhere = conditions.length ? `WHERE ${conditions.map((c) => `(${c})`).join(' OR ')}` : '';
       const courseFilter = ' AND m.course_id = ?';
@@ -4480,7 +4480,6 @@ app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
           LEFT JOIN subjects s ON s.id = m.subject_id
           LEFT JOIN users u ON u.id = m.created_by_id
           LEFT JOIN message_reads mr ON mr.message_id = m.id AND mr.user_id = ?
-          LEFT JOIN message_targets mt ON mt.message_id = m.id
           ${baseWhere}${courseFilter}${semesterFilter}${subjectFilter}${statusFilter}
           ORDER BY m.created_at DESC
           LIMIT 50

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.85",
+      "date": "2026-02-11",
+      "items": [
+        "fix: prevent duplicate messages when loading all-course announcements"
+      ]
+    },
+    {
       "version": "0.7.84",
       "date": "2026-02-11",
       "items": [
