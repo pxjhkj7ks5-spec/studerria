@@ -762,10 +762,14 @@ const DEFAULT_GENERATOR_CONFIG = {
   max_daily_pairs: 7,
   target_daily_pairs: 4,
   evenness_bias: 50,
+  late_slot_weight: 60,
   blocked_weeks: '',
   special_weeks_mode: 'block',
   prefer_compactness: true,
   mirror_groups: false,
+  auto_subject_days: true,
+  subject_single_day: true,
+  lecture_seminar_same_day: true,
   active_location: 'kyiv',
   course_semesters: {},
   course_semesters_by_location: {
@@ -5521,6 +5525,7 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
     const maxDailyRaw = Number(req.body.max_daily_pairs);
     const targetDailyRaw = Number(req.body.target_daily_pairs);
     const evennessRaw = Number(req.body.evenness_bias);
+    const lateSlotRaw = Number(req.body.late_slot_weight);
     const maxDailyPairs = Number.isNaN(maxDailyRaw)
       ? existing.max_daily_pairs
       : Math.min(Math.max(maxDailyRaw, 1), 7);
@@ -5530,6 +5535,9 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
     const evennessBias = Number.isNaN(evennessRaw)
       ? existing.evenness_bias
       : Math.min(Math.max(evennessRaw, 0), 100);
+    const lateSlotWeight = Number.isNaN(lateSlotRaw)
+      ? existing.late_slot_weight
+      : Math.min(Math.max(lateSlotRaw, 0), 100);
     const activeLocation = String(req.body.active_location || existing.active_location || 'kyiv').toLowerCase() === 'munich'
       ? 'munich'
       : 'kyiv';
@@ -5557,10 +5565,14 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
       max_daily_pairs: maxDailyPairs || 7,
       target_daily_pairs: targetDailyPairs || 4,
       evenness_bias: evennessBias,
+      late_slot_weight: Number.isFinite(lateSlotWeight) ? lateSlotWeight : 0,
       blocked_weeks: String(req.body.blocked_weeks || ''),
       special_weeks_mode: String(req.body.special_weeks_mode || existing.special_weeks_mode || 'block'),
       prefer_compactness: String(req.body.prefer_compactness || '') === 'on',
       mirror_groups: String(req.body.mirror_groups || '') === 'on',
+      auto_subject_days: String(req.body.auto_subject_days || '') === 'on',
+      subject_single_day: String(req.body.subject_single_day || '') === 'on',
+      lecture_seminar_same_day: String(req.body.lecture_seminar_same_day || '') === 'on',
       course_semesters: sanitizedCourseSemesters,
       course_semesters_by_location: nextCourseSemestersByLocation,
     };

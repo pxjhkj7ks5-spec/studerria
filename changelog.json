@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.61",
+      "date": "2026-02-10",
+      "items": [
+        "feat: add subject day auto-assign and lecture+seminar same-day controls",
+        "feat: add late-slot avoidance weight to generator"
+      ]
+    },
+    {
       "version": "0.7.60",
       "date": "2026-02-09",
       "items": [
