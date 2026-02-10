@@ -1067,26 +1067,31 @@
                     <select class="form-select" id="addSubjectSelect" name="subject_id" required>
                       <option value="" disabled selected>Subject</option>
                       <% (subjects || []).forEach(function(s) { %>
-                        <option value="<%= s.id %>" data-group-count="<%= s.group_count %>"><%= s.name %> (1–<%= s.group_count %>)</option>
+                        <option value="<%= s.id %>" data-group-count="<%= s.group_count %>" data-is-general="<%= s.is_general ? '1' : '0' %>"><%= s.name %> (1–<%= s.group_count %>)</option>
                       <% }); %>
                     </select>
                   </div>
                   <div class="col-12 col-md-2">
-                    <select class="form-select" id="addGroupSelect" name="group_number" required>
-                      <option value="" disabled selected>Group #</option>
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                    </select>
-                  </div>
-                  <div class="col-12 col-md-2">
-                    <select class="form-select" name="lesson_type">
+                    <select class="form-select" id="addLessonTypeSelect" name="lesson_type">
                       <option value="" selected>Type (auto)</option>
                       <option value="lecture">Лекція</option>
                       <option value="seminar">Семінар</option>
                       <option value="lab">Лаб</option>
                       <option value="practice">Практика</option>
                     </select>
+                  </div>
+                  <div class="col-12 col-md-2">
+                    <div class="d-flex gap-2">
+                      <select class="form-select" id="addGroupSelect" name="group_number" required>
+                        <option value="" disabled selected>Group #</option>
+                        <option value="1" data-group="1">1</option>
+                        <option value="2" data-group="2">2</option>
+                        <option value="3" data-group="3">3</option>
+                      </select>
+                      <button class="btn btn-outline-secondary" type="button" id="addGroupMultiBtn" style="display: none;">Групи</button>
+                    </div>
+                    <input type="hidden" name="group_numbers" id="addGroupNumbers" />
+                    <div class="small text-muted mt-1" id="addGroupSelectionLabel"></div>
                   </div>
                   <div class="col-12 col-md-2">
                     <select class="form-select" name="semester_id" required>
@@ -2626,6 +2631,36 @@
       </div>
     </div>
 
+    <div class="modal fade" id="groupMultiModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Обрати групи</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="form-check mb-2">
+              <input class="form-check-input group-multi-check" type="checkbox" value="1" id="groupMulti1">
+              <label class="form-check-label" for="groupMulti1">Група 1</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input group-multi-check" type="checkbox" value="2" id="groupMulti2">
+              <label class="form-check-label" for="groupMulti2">Група 2</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input group-multi-check" type="checkbox" value="3" id="groupMulti3">
+              <label class="form-check-label" for="groupMulti3">Група 3</label>
+            </div>
+            <div class="small text-muted mt-2">Для не загальних предметів можна обрати кілька груп одночасно.</div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Скасувати</button>
+            <button type="button" class="btn btn-primary" id="groupMultiApply">Застосувати</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="subjectGroupsModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
@@ -3914,25 +3949,162 @@
       }
 
       const addSubjectSelect = document.getElementById('addSubjectSelect');
+      const addLessonTypeSelect = document.getElementById('addLessonTypeSelect');
       const addGroupSelect = document.getElementById('addGroupSelect');
+      const addGroupMultiBtn = document.getElementById('addGroupMultiBtn');
+      const addGroupNumbers = document.getElementById('addGroupNumbers');
+      const addGroupSelectionLabel = document.getElementById('addGroupSelectionLabel');
+      const groupMultiModalEl = document.getElementById('groupMultiModal');
+      const groupMultiModal = groupMultiModalEl ? new bootstrap.Modal(groupMultiModalEl) : null;
+      const groupMultiChecks = groupMultiModalEl
+        ? Array.from(groupMultiModalEl.querySelectorAll('.group-multi-check'))
+        : [];
+      const groupMultiApply = document.getElementById('groupMultiApply');
+
+      const getAddSubjectMeta = () => {
+        if (!addSubjectSelect) return { groupCount: 3, isGeneral: true };
+        const selected = addSubjectSelect.options[addSubjectSelect.selectedIndex];
+        if (!selected) return { groupCount: 3, isGeneral: true };
+        return {
+          groupCount: Number(selected.dataset.groupCount || 3),
+          isGeneral: selected.dataset.isGeneral !== '0',
+        };
+      };
+
+      const setGroupSelectionLabel = (text) => {
+        if (addGroupSelectionLabel) {
+          addGroupSelectionLabel.textContent = text || '';
+        }
+      };
+
+      const updateGroupOptions = () => {
+        if (!addGroupSelect) return;
+        const { groupCount } = getAddSubjectMeta();
+        const options = Array.from(addGroupSelect.querySelectorAll('option[data-group]'));
+        options.forEach((opt) => {
+          const num = Number(opt.dataset.group || 0);
+          opt.disabled = num > groupCount;
+        });
+        if (Number(addGroupSelect.value) > groupCount) {
+          addGroupSelect.value = groupCount >= 1 ? '1' : '';
+        }
+      };
+
+      const applyGroupSelection = (groups) => {
+        if (!addGroupSelect || !addGroupNumbers) return;
+        const unique = Array.from(new Set((groups || []).map((g) => Number(g)).filter((g) => Number.isFinite(g))));
+        unique.sort((a, b) => a - b);
+        if (unique.length > 1) {
+          addGroupNumbers.value = unique.join(',');
+          addGroupSelect.value = String(unique[0]);
+          addGroupSelect.classList.add('select-locked');
+          setGroupSelectionLabel(`Обрано групи: ${unique.join(', ')}`);
+        } else if (unique.length === 1) {
+          addGroupNumbers.value = '';
+          addGroupSelect.value = String(unique[0]);
+          addGroupSelect.classList.remove('select-locked');
+          setGroupSelectionLabel('');
+        } else {
+          addGroupNumbers.value = '';
+          addGroupSelect.classList.remove('select-locked');
+          setGroupSelectionLabel('');
+        }
+      };
 
       function syncAddGroupSelect() {
         if (!addSubjectSelect || !addGroupSelect) return;
-        const selected = addSubjectSelect.options[addSubjectSelect.selectedIndex];
-        if (!selected) return;
-        const groupCount = Number(selected.dataset.groupCount || 3);
+        const { groupCount, isGeneral } = getAddSubjectMeta();
+        updateGroupOptions();
+        const lessonType = addLessonTypeSelect ? addLessonTypeSelect.value : '';
+        const isLecture = lessonType === 'lecture';
+
+        if (isLecture) {
+          addGroupSelect.value = '1';
+          addGroupSelect.classList.add('select-locked');
+          if (addGroupNumbers) addGroupNumbers.value = '';
+          if (addGroupMultiBtn) addGroupMultiBtn.style.display = 'none';
+          setGroupSelectionLabel('Група заблокована для лекції.');
+          return;
+        }
+
         if (groupCount <= 1) {
           addGroupSelect.value = '1';
           addGroupSelect.classList.add('select-locked');
+          if (addGroupNumbers) addGroupNumbers.value = '';
+          if (addGroupMultiBtn) addGroupMultiBtn.style.display = 'none';
+          setGroupSelectionLabel('');
+          return;
+        }
+
+        addGroupSelect.classList.remove('select-locked');
+        if (addGroupNumbers && addGroupNumbers.value) {
+          const groups = addGroupNumbers.value
+            .split(',')
+            .map((g) => Number(g.trim()))
+            .filter((g) => Number.isFinite(g));
+          applyGroupSelection(groups);
         } else {
-          addGroupSelect.classList.remove('select-locked');
+          setGroupSelectionLabel('');
+        }
+
+        if (addGroupMultiBtn) {
+          addGroupMultiBtn.style.display = isGeneral ? 'none' : '';
+          addGroupMultiBtn.disabled = isGeneral;
+        }
+        if (isGeneral && addGroupNumbers) {
+          addGroupNumbers.value = '';
         }
       }
 
-      if (addSubjectSelect && addGroupSelect) {
-        addSubjectSelect.addEventListener('change', syncAddGroupSelect);
-        syncAddGroupSelect();
+      if (addSubjectSelect) {
+        addSubjectSelect.addEventListener('change', () => {
+          if (addGroupNumbers) addGroupNumbers.value = '';
+          setGroupSelectionLabel('');
+          syncAddGroupSelect();
+        });
       }
+      if (addLessonTypeSelect) {
+        addLessonTypeSelect.addEventListener('change', syncAddGroupSelect);
+      }
+      if (addGroupSelect) {
+        addGroupSelect.addEventListener('change', () => {
+          if (addGroupNumbers && addGroupNumbers.value) {
+            addGroupNumbers.value = '';
+            setGroupSelectionLabel('');
+          }
+          syncAddGroupSelect();
+        });
+      }
+      if (addGroupMultiBtn && groupMultiModal && groupMultiChecks.length) {
+        addGroupMultiBtn.addEventListener('click', () => {
+          const { groupCount } = getAddSubjectMeta();
+          const selected = addGroupNumbers && addGroupNumbers.value
+            ? addGroupNumbers.value.split(',').map((g) => Number(g.trim()))
+            : [Number(addGroupSelect.value || 1)];
+          groupMultiChecks.forEach((checkbox) => {
+            const num = Number(checkbox.value);
+            const disabled = num > groupCount;
+            checkbox.disabled = disabled;
+            checkbox.checked = !disabled && selected.includes(num);
+          });
+          groupMultiModal.show();
+        });
+      }
+      if (groupMultiApply && groupMultiChecks.length) {
+        groupMultiApply.addEventListener('click', () => {
+          const selected = groupMultiChecks
+            .filter((checkbox) => checkbox.checked && !checkbox.disabled)
+            .map((checkbox) => Number(checkbox.value));
+          const { groupCount } = getAddSubjectMeta();
+          const fallback = Array.from({ length: groupCount }, (_, i) => i + 1);
+          const finalSelection = selected.length ? selected : fallback.slice(0, 1);
+          applyGroupSelection(finalSelection);
+          if (groupMultiModal) {
+            groupMultiModal.hide();
+          }
+        });
+      }
+      syncAddGroupSelect();
 
       const saveAllBtn = document.querySelector('.save-all-btn');
       if (saveAllBtn) {

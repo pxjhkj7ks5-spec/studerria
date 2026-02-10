@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.70",
+      "date": "2026-02-10",
+      "items": [
+        "feat: reorder schedule editor fields and lock group on lectures",
+        "feat: add multi-group modal for non-general subjects"
+      ]
+    },
+    {
       "version": "0.7.69",
       "date": "2026-02-10",
       "items": [

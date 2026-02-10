@@ -120,6 +120,24 @@ body.theme-light .table tbody tr {
   margin: 0;
 }
 
+.select-locked {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+body.theme-light .select-locked {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+body.theme-dark .select-locked {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.input-locked {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
 .admin-layout {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);

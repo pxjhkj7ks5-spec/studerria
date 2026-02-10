@@ -8177,14 +8177,14 @@ app.post('/subgroup/join', requireLogin, (req, res) => {
 });
 
 app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
-  const { subject_id, group_number, day_of_week, class_number, week_numbers, semester_id, lesson_type } = req.body;
+  const { subject_id, group_number, group_numbers, day_of_week, class_number, week_numbers, semester_id, lesson_type } = req.body;
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
   const lessonType = normalizeLessonType(lesson_type);
   const courseId = getAdminCourse(req);
   const semesterId = Number(semester_id);
 
-  if (!subject_id || !day_of_week || !week_numbers || Number.isNaN(groupNum) || Number.isNaN(classNum) || Number.isNaN(semesterId)) {
+  if (!subject_id || !day_of_week || !week_numbers || Number.isNaN(classNum) || Number.isNaN(semesterId)) {
     return res.redirect('/admin?err=Missing%20fields');
   }
   const dayAllowed = await isCourseDayActive(courseId, day_of_week);
@@ -8195,6 +8195,28 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
     return res.redirect('/admin?err=Invalid%20class%20number');
   }
   try {
+    const subjectRow = await db.get(
+      'SELECT course_id, group_count, is_general FROM subjects WHERE id = ?',
+      [subject_id]
+    );
+    if (!subjectRow || (subjectRow.course_id && Number(subjectRow.course_id) !== Number(courseId))) {
+      return res.redirect('/admin?err=Invalid%20subject');
+    }
+    const maxGroups = Number(subjectRow.group_count || 1);
+    const isGeneral = subjectRow.is_general === true || Number(subjectRow.is_general) === 1;
+    const parsedGroups = Array.isArray(group_numbers)
+      ? group_numbers
+      : typeof group_numbers === 'string' && group_numbers.trim().length
+      ? group_numbers.split(',')
+      : [];
+    const multiGroups = Array.from(
+      new Set(
+        parsedGroups
+          .map((value) => Number(String(value).trim()))
+          .filter((value) => Number.isFinite(value))
+      )
+    ).sort((a, b) => a - b);
+
     const semRow = await db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
     if (!semRow) {
       return res.redirect('/admin?err=Invalid%20semester');
@@ -8209,11 +8231,29 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
       return res.redirect('/admin?err=Invalid%20weeks');
     }
 
+    let targetGroups = [];
+    if (lessonType === 'lecture') {
+      targetGroups = [1];
+    } else if (multiGroups.length && !isGeneral) {
+      targetGroups = multiGroups;
+    } else {
+      if (Number.isNaN(groupNum)) {
+        return res.redirect('/admin?err=Missing%20fields');
+      }
+      targetGroups = [groupNum];
+    }
+
+    if (!targetGroups.length || targetGroups.some((g) => g < 1 || g > maxGroups)) {
+      return res.redirect('/admin?err=Invalid%20group');
+    }
+
     const stmt = db.prepare(
       'INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id, lesson_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     );
     uniqueWeeks.forEach((week) => {
-      stmt.run(subject_id, groupNum, day_of_week, classNum, week, courseId, semesterId, lessonType);
+      targetGroups.forEach((group) => {
+        stmt.run(subject_id, group, day_of_week, classNum, week, courseId, semesterId, lessonType);
+      });
     });
     stmt.finalize((err) => {
       if (err) {
@@ -8221,7 +8261,7 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
       }
       logAction(db, req, 'schedule_add', {
         subject_id,
-        group_number: groupNum,
+        group_numbers: targetGroups,
         day_of_week,
         class_number: classNum,
         weeks: uniqueWeeks,
@@ -8229,7 +8269,7 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
       });
       logActivity(db, req, 'schedule_add', 'schedule', null, {
         subject_id,
-        group_number: groupNum,
+        group_numbers: targetGroups,
         day_of_week,
         class_number: classNum,
         weeks: uniqueWeeks,

@@ -209,7 +209,7 @@
                       </select>
                     </td>
                     <td>
-                      <select class="form-select form-select-sm" name="lesson_type" form="edit-<%= item.id %>">
+                      <select class="form-select form-select-sm schedule-lesson-type" name="lesson_type" form="edit-<%= item.id %>">
                         <option value="" <%= !item.lesson_type ? 'selected' : '' %>>Auto</option>
                         <option value="lecture" <%= item.lesson_type === 'lecture' ? 'selected' : '' %>>Лекція</option>
                         <option value="seminar" <%= item.lesson_type === 'seminar' ? 'selected' : '' %>>Семінар</option>
@@ -218,7 +218,7 @@
                       </select>
                     </td>
                     <td>
-                      <input class="form-control form-control-sm" name="group_number" form="edit-<%= item.id %>" value="<%= item.group_number %>" type="number" min="1" max="3" required />
+                      <input class="form-control form-control-sm schedule-group-input" name="group_number" form="edit-<%= item.id %>" value="<%= item.group_number %>" type="number" min="1" max="3" required />
                     </td>
                     <td>
                       <select class="form-select form-select-sm" name="day_of_week" form="edit-<%= item.id %>" required>
@@ -316,6 +316,29 @@
       }
 
       wireSelectOpenState();
+
+      function syncScheduleGroupLocks(root = document) {
+        const rows = Array.from(root.querySelectorAll('tbody tr'));
+        rows.forEach((row) => {
+          const typeSelect = row.querySelector('.schedule-lesson-type');
+          const groupInput = row.querySelector('.schedule-group-input');
+          if (!typeSelect || !groupInput) return;
+          const isLecture = String(typeSelect.value || '') === 'lecture';
+          if (isLecture) {
+            groupInput.value = '1';
+            groupInput.readOnly = true;
+            groupInput.classList.add('input-locked');
+          } else {
+            groupInput.readOnly = false;
+            groupInput.classList.remove('input-locked');
+          }
+        });
+      }
+
+      document.querySelectorAll('.schedule-lesson-type').forEach((select) => {
+        select.addEventListener('change', () => syncScheduleGroupLocks());
+      });
+      syncScheduleGroupLocks();
 
       const selectAll = document.getElementById('selectAllSchedule');
       if (selectAll) {
