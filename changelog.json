@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.67",
+      "date": "2026-02-10",
+      "items": [
+        "fix: only merge subjects when lecture/seminar suffix is detected"
+      ]
+    },
+    {
       "version": "0.7.66",
       "date": "2026-02-10",
       "items": [

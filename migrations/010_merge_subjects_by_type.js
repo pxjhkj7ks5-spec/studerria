@@ -11,6 +11,9 @@ const parseSubjectType = (name) => {
   } else if (label.startsWith('сем') || label === 'seminar') {
     type = 'seminar';
   }
+  if (!type) {
+    return { base: raw, type: null };
+  }
   const base = raw.replace(match[0], '').trim();
   return { base, type };
 };
