@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.77",
+      "date": "2026-02-10",
+      "items": [
+        "fix: avoid DISTINCT string_agg order-by error in schedule list"
+      ]
+    },
+    {
       "version": "0.7.76",
       "date": "2026-02-10",
       "items": [

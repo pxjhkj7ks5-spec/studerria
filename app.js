@@ -5507,7 +5507,7 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
               AND COALESCE(se2.lesson_type, '') = COALESCE(se.lesson_type, '')
           ) AS slot_group_count,
           (
-            SELECT string_agg(DISTINCT se2.group_number::text, ', ' ORDER BY se2.group_number)
+            SELECT string_agg(DISTINCT se2.group_number::text, ', ' ORDER BY se2.group_number::text)
             FROM schedule_entries se2
             WHERE se2.subject_id = se.subject_id
               AND se2.day_of_week = se.day_of_week
