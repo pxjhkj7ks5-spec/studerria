@@ -1009,6 +1009,96 @@
       body.theme-light .panel-divider {
         background: rgba(15, 23, 42, 0.12);
       }
+      .panel-legend {
+        position: relative;
+      }
+      .legend-trigger {
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-secondary);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+      }
+      .legend-trigger:hover {
+        border-color: rgba(148, 163, 184, 0.45);
+        color: var(--text-primary);
+      }
+      body.theme-light .legend-trigger {
+        background: rgba(255, 255, 255, 0.8);
+        border-color: rgba(15, 23, 42, 0.12);
+        color: rgba(15, 23, 42, 0.6);
+      }
+      body.theme-light .legend-trigger:hover {
+        color: rgba(15, 23, 42, 0.85);
+      }
+      .legend-pop {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        min-width: 220px;
+        max-width: 280px;
+        background: rgba(17, 24, 39, 0.92);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 14px;
+        padding: 10px 12px;
+        box-shadow: 0 16px 30px rgba(0, 0, 0, 0.35);
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        transition: opacity 160ms ease, transform 160ms ease;
+        z-index: 20;
+      }
+      .legend-pop.visible {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      body.theme-light .legend-pop {
+        background: rgba(255, 255, 255, 0.96);
+        border-color: rgba(15, 23, 42, 0.12);
+        box-shadow: 0 14px 26px rgba(15, 23, 42, 0.18);
+      }
+      .legend-title {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+      }
+      .legend-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 180px;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+      }
+      .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: hsla(var(--subject-h, 220), 60%, 65%, 0.85);
+        box-shadow: 0 0 0 3px hsla(var(--subject-h, 220), 60%, 65%, 0.15);
+        flex-shrink: 0;
+      }
+      body.theme-light .legend-dot {
+        box-shadow: 0 0 0 3px hsla(var(--subject-h, 220), 60%, 45%, 0.12);
+      }
+      .legend-more {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
       .sync-pill {
         display: inline-flex;
         align-items: center;
@@ -1645,6 +1735,15 @@
               <span id="syncStatusLabel">Онлайн</span>
               <span class="sync-sep">•</span>
               <span id="syncStatusMeta">Щойно</span>
+            </div>
+          </div>
+        </div>
+        <div class="panel-section panel-legend">
+          <div class="panel-body">
+            <button class="legend-trigger" type="button" id="subjectLegendTrigger">Кольори предметів</button>
+            <div class="legend-pop" id="subjectLegend" aria-hidden="true">
+              <div class="legend-title">Subject colors</div>
+              <div class="legend-list" id="subjectLegendList"></div>
             </div>
           </div>
         </div>
@@ -2845,6 +2944,31 @@
           });
         });
       }
+      const legendTrigger = document.getElementById('subjectLegendTrigger');
+      const legendPop = document.getElementById('subjectLegend');
+      if (legendTrigger && legendPop) {
+        let legendTimer;
+        const showLegend = () => {
+          clearTimeout(legendTimer);
+          legendPop.classList.add('visible');
+          legendPop.setAttribute('aria-hidden', 'false');
+        };
+        const hideLegend = () => {
+          legendTimer = setTimeout(() => {
+            legendPop.classList.remove('visible');
+            legendPop.setAttribute('aria-hidden', 'true');
+          }, 160);
+        };
+        legendTrigger.addEventListener('mouseenter', showLegend);
+        legendTrigger.addEventListener('mouseleave', hideLegend);
+        legendPop.addEventListener('mouseenter', showLegend);
+        legendPop.addEventListener('mouseleave', hideLegend);
+        legendTrigger.addEventListener('click', (event) => {
+          event.preventDefault();
+          legendPop.classList.toggle('visible');
+          legendPop.setAttribute('aria-hidden', legendPop.classList.contains('visible') ? 'false' : 'true');
+        });
+      }
       updateMobileWeekDots();
       updateWeekStates();
       window.addEventListener('resize', updateMobileWeekDots);
@@ -3106,6 +3230,34 @@
         });
       }
 
+      function buildSubjectLegend(root = document) {
+        const legendList = document.getElementById('subjectLegendList');
+        if (!legendList) return;
+        const cards = Array.from(root.querySelectorAll('.schedule-card'));
+        const subjectMap = new Map();
+        cards.forEach((card) => {
+          const subject = card.dataset.subject || card.dataset.class || '';
+          if (!subject || subjectMap.has(subject)) return;
+          const hue = subject ? hashSubject(subject) : 220;
+          subjectMap.set(subject, hue);
+        });
+        legendList.innerHTML = '';
+        const entries = Array.from(subjectMap.entries());
+        const limit = 8;
+        entries.slice(0, limit).forEach(([subject, hue]) => {
+          const item = document.createElement('div');
+          item.className = 'legend-item';
+          item.innerHTML = `<span class="legend-dot" style="--subject-h:${hue}"></span><span>${subject}</span>`;
+          legendList.appendChild(item);
+        });
+        if (entries.length > limit) {
+          const more = document.createElement('div');
+          more.className = 'legend-more';
+          more.textContent = `+${entries.length - limit} ще`;
+          legendList.appendChild(more);
+        }
+      }
+
       async function refreshSchedule() {
         if (!weekGrid) return;
         if (document.hidden) return;
@@ -3126,6 +3278,7 @@
             applyLocalWeekTimes();
             updateSmartHighlights();
             applySubjectColors(weekGrid);
+            buildSubjectLegend(weekGrid);
             initTooltips(weekGrid);
             writeScheduleCache(weekGrid.innerHTML);
           }
@@ -3145,6 +3298,7 @@
       }
       updateSmartHighlights();
       applySubjectColors();
+      buildSubjectLegend();
       initTooltips();
 
       setInterval(updateSmartHighlights, 30000);
