@@ -326,6 +326,29 @@
 
           <div class="card glass-panel mb-4">
             <div class="card-body">
+              <div class="generator-section-title mb-2">Dry-run злиття предметів</div>
+              <div class="small text-muted mb-3">
+                Показує, які предмети будуть злиті перед міграцією. Дані лише для перегляду — базу не змінює.
+              </div>
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <select class="form-select form-select-sm w-auto" id="mergePreviewCourse">
+                  <option value="">Усі курси</option>
+                  <% ['kyiv', 'munich'].forEach(function(location) { %>
+                    <% const courseList = courseSemestersByLocation[location] || []; %>
+                    <% courseList.forEach(function(row) { %>
+                      <option value="<%= row.course.id %>" data-location="<%= location %>"><%= row.course.name %></option>
+                    <% }); %>
+                  <% }); %>
+                </select>
+                <button class="btn btn-outline-primary btn-sm" type="button" id="mergePreviewBtn">Показати dry-run</button>
+              </div>
+              <div id="mergePreviewMeta" class="small text-muted mt-2"></div>
+              <div id="mergePreviewList" class="merge-preview-list mt-3 d-grid gap-2"></div>
+            </div>
+          </div>
+
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
               <div class="generator-section-title mb-2">Остання генерація</div>
               <% if (lastStats) { %>
                 <div class="d-grid gap-2 mb-3">
@@ -938,6 +961,11 @@
       const mirrorAutoInputs = mirrorAutoModal
         ? Array.from(mirrorAutoModal.querySelectorAll('input[name="mirror_pairs[]"]'))
         : [];
+      const mergePreviewBtn = document.getElementById('mergePreviewBtn');
+      const mergePreviewCourse = document.getElementById('mergePreviewCourse');
+      const mergePreviewList = document.getElementById('mergePreviewList');
+      const mergePreviewMeta = document.getElementById('mergePreviewMeta');
+      const mergePreviewOptions = mergePreviewCourse ? Array.from(mergePreviewCourse.options) : [];
 
       const evennessRange = document.getElementById('evennessBiasRange');
       const evennessValue = document.getElementById('evennessBiasValue');
@@ -1032,6 +1060,87 @@
         });
       };
 
+      const setMergePreviewMeta = (text) => {
+        if (mergePreviewMeta) {
+          mergePreviewMeta.textContent = text || '';
+        }
+      };
+
+      const clearMergePreview = () => {
+        if (mergePreviewList) mergePreviewList.innerHTML = '';
+      };
+
+      const renderMergePreview = (payload) => {
+        clearMergePreview();
+        const total = Number(payload?.total || 0);
+        setMergePreviewMeta(total ? `Знайдено ${total} злиттів` : 'Немає предметів для злиття.');
+        if (!total || !mergePreviewList) return;
+        (payload.merges || []).forEach((item) => {
+          const card = document.createElement('div');
+          card.className = 'glass-inset p-3 merge-preview-item';
+
+          const title = document.createElement('div');
+          title.className = 'fw-semibold';
+          title.textContent = item.base_name || item.canonical_name || 'Без назви';
+
+          const meta = document.createElement('div');
+          meta.className = 'small text-muted';
+          const courseLabel = item.course_name ? `${item.course_name} • ` : '';
+          const lectureName = item.lecture?.name || '-';
+          const seminarName = item.seminar?.name || '-';
+          meta.textContent = `${courseLabel}Лекція: ${lectureName} • Семінар: ${seminarName}`;
+
+          const canonical = document.createElement('div');
+          canonical.className = 'small';
+          const sourceLabel = item.canonical_source || 'base';
+          canonical.textContent = `Канонічний: ${item.canonical_name || ''} (${sourceLabel})`;
+
+          card.append(title, meta, canonical);
+
+          if (item.rename && item.rename.from && item.rename.to) {
+            const rename = document.createElement('div');
+            rename.className = 'small text-muted';
+            rename.textContent = `Перейменування: ${item.rename.from} → ${item.rename.to}`;
+            card.append(rename);
+          }
+          if (item.rename_conflict) {
+            const warn = document.createElement('div');
+            warn.className = 'small text-warning';
+            warn.textContent = 'Конфлікт перейменування: назва вже існує.';
+            card.append(warn);
+          }
+
+          mergePreviewList.appendChild(card);
+        });
+      };
+
+      if (mergePreviewBtn) {
+        mergePreviewBtn.addEventListener('click', async () => {
+          const originalText = mergePreviewBtn.textContent;
+          mergePreviewBtn.disabled = true;
+          mergePreviewBtn.textContent = 'Завантаження...';
+          setMergePreviewMeta('Завантажуємо список...');
+          clearMergePreview();
+          try {
+            const params = new URLSearchParams();
+            const selectedCourse = mergePreviewCourse ? String(mergePreviewCourse.value || '') : '';
+            if (selectedCourse) params.set('course_id', selectedCourse);
+            const url = `/admin/schedule-generator/merge-preview${params.toString() ? `?${params.toString()}` : ''}`;
+            const response = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (!response.ok) {
+              throw new Error('Request failed');
+            }
+            const data = await response.json();
+            renderMergePreview(data);
+          } catch (err) {
+            setMergePreviewMeta('Не вдалося отримати dry-run. Спробуйте ще раз.');
+          } finally {
+            mergePreviewBtn.disabled = false;
+            mergePreviewBtn.textContent = originalText;
+          }
+        });
+      }
+
       function syncSubjects() {
         if (!courseSelect || !subjectSelect) return;
         const courseId = courseSelect.value;
@@ -1101,6 +1210,22 @@
             const targetLocation = input.dataset.location || 'kyiv';
             input.disabled = targetLocation !== safe;
           });
+        }
+        if (mergePreviewOptions.length) {
+          mergePreviewOptions.forEach((opt) => {
+            if (!opt.value) {
+              opt.hidden = false;
+              return;
+            }
+            const optLocation = opt.dataset.location || 'kyiv';
+            opt.hidden = optLocation !== safe;
+          });
+          if (mergePreviewCourse && mergePreviewCourse.selectedOptions.length) {
+            const selected = mergePreviewCourse.selectedOptions[0];
+            if (selected && selected.hidden) {
+              mergePreviewCourse.value = '';
+            }
+          }
         }
       }
 

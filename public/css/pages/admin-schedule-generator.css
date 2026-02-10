@@ -211,6 +211,15 @@ body.theme-dark.schedule-generator-page .form-check-label {
   color: rgba(248, 250, 252, 0.82);
 }
 
+.schedule-generator-page .merge-preview-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.schedule-generator-page .merge-preview-item .text-warning {
+  color: #fbbf24;
+}
+
 body.theme-dark.schedule-generator-page .teacher-day-pill {
   border-color: rgba(148, 197, 255, 0.18);
   background: rgba(15, 23, 42, 0.45);

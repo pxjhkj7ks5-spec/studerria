@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.69",
+      "date": "2026-02-10",
+      "items": [
+        "feat: add dry-run UI for subject merge preview in generator"
+      ]
+    },
+    {
       "version": "0.7.68",
       "date": "2026-02-10",
       "items": [
