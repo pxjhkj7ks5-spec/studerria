@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.89",
+      "date": "2026-02-11",
+      "items": [
+        "fix: show subject color legend in modal"
+      ]
+    },
+    {
       "version": "0.7.88",
       "date": "2026-02-11",
       "items": [

@@ -1035,32 +1035,20 @@
       body.theme-light .legend-trigger:hover {
         color: rgba(15, 23, 42, 0.85);
       }
-      .legend-pop {
-        position: absolute;
-        top: calc(100% + 10px);
-        right: 0;
-        min-width: 220px;
-        max-width: 280px;
-        background: rgba(17, 24, 39, 0.92);
+      .legend-modal .modal-content {
+        border-radius: 18px;
+        background: rgba(15, 23, 42, 0.85);
         border: 1px solid rgba(148, 163, 184, 0.25);
-        border-radius: 14px;
-        padding: 10px 12px;
-        box-shadow: 0 16px 30px rgba(0, 0, 0, 0.35);
-        opacity: 0;
-        transform: translateY(-6px);
-        pointer-events: none;
-        transition: opacity 160ms ease, transform 160ms ease;
-        z-index: 20;
       }
-      .legend-pop.visible {
-        opacity: 1;
-        transform: translateY(0);
-        pointer-events: auto;
-      }
-      body.theme-light .legend-pop {
+      body.theme-light .legend-modal .modal-content {
         background: rgba(255, 255, 255, 0.96);
         border-color: rgba(15, 23, 42, 0.12);
-        box-shadow: 0 14px 26px rgba(15, 23, 42, 0.18);
+      }
+      .legend-modal .modal-header {
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      }
+      body.theme-light .legend-modal .modal-header {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.12);
       }
       .legend-title {
         font-size: 0.72rem;
@@ -1073,7 +1061,7 @@
         display: flex;
         flex-direction: column;
         gap: 6px;
-        max-height: 180px;
+        max-height: 280px;
         overflow-y: auto;
         padding-right: 4px;
       }
@@ -1721,11 +1709,7 @@
         </div>
         <div class="panel-section panel-legend">
           <div class="panel-body">
-            <button class="legend-trigger" type="button" id="subjectLegendTrigger">Кольори предметів</button>
-            <div class="legend-pop" id="subjectLegend" aria-hidden="true">
-              <div class="legend-title">Subject colors</div>
-              <div class="legend-list" id="subjectLegendList"></div>
-            </div>
+            <button class="legend-trigger" type="button" data-bs-toggle="modal" data-bs-target="#subjectLegendModal">Кольори предметів</button>
           </div>
         </div>
       </div>
@@ -1943,6 +1927,20 @@
     </footer>
 
     <%- include('partials/changelog-modal') %>
+    <div class="modal fade legend-modal" id="subjectLegendModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Кольори предметів</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="legend-title">Subject colors</div>
+            <div class="legend-list" id="subjectLegendList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="modal fade" id="homeworkModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -2917,29 +2915,10 @@
           });
         });
       }
-      const legendTrigger = document.getElementById('subjectLegendTrigger');
-      const legendPop = document.getElementById('subjectLegend');
-      if (legendTrigger && legendPop) {
-        let legendTimer;
-        const showLegend = () => {
-          clearTimeout(legendTimer);
-          legendPop.classList.add('visible');
-          legendPop.setAttribute('aria-hidden', 'false');
-        };
-        const hideLegend = () => {
-          legendTimer = setTimeout(() => {
-            legendPop.classList.remove('visible');
-            legendPop.setAttribute('aria-hidden', 'true');
-          }, 160);
-        };
-        legendTrigger.addEventListener('mouseenter', showLegend);
-        legendTrigger.addEventListener('mouseleave', hideLegend);
-        legendPop.addEventListener('mouseenter', showLegend);
-        legendPop.addEventListener('mouseleave', hideLegend);
-        legendTrigger.addEventListener('click', (event) => {
-          event.preventDefault();
-          legendPop.classList.toggle('visible');
-          legendPop.setAttribute('aria-hidden', legendPop.classList.contains('visible') ? 'false' : 'true');
+      const legendModal = document.getElementById('subjectLegendModal');
+      if (legendModal) {
+        legendModal.addEventListener('show.bs.modal', () => {
+          buildSubjectLegend();
         });
       }
       updateMobileWeekDots();
