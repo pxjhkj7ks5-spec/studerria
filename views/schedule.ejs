@@ -1040,6 +1040,9 @@
         background: rgba(15, 23, 42, 0.85);
         border: 1px solid rgba(148, 163, 184, 0.25);
       }
+      .legend-modal .modal-dialog {
+        max-width: 360px;
+      }
       body.theme-light .legend-modal .modal-content {
         background: rgba(255, 255, 255, 0.96);
         border-color: rgba(15, 23, 42, 0.12);
@@ -1083,8 +1086,8 @@
       body.theme-light .legend-dot {
         box-shadow: 0 0 0 3px hsla(var(--subject-h, 220), 60%, 45%, 0.12);
       }
-      .legend-more {
-        font-size: 0.75rem;
+      .legend-empty {
+        font-size: 0.8rem;
         color: var(--text-muted);
       }
       .sync-pill {
@@ -1927,15 +1930,15 @@
     </footer>
 
     <%- include('partials/changelog-modal') %>
-    <div class="modal fade legend-modal" id="subjectLegendModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade legend-modal" id="subjectLegendModal" tabindex="-1" aria-labelledby="subjectLegendModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Кольори предметів</h5>
+            <h5 class="modal-title" id="subjectLegendModalLabel">Кольори предметів</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div class="legend-title">Subject colors</div>
+            <div class="legend-title">Легенда</div>
             <div class="legend-list" id="subjectLegendList"></div>
           </div>
         </div>
@@ -3193,20 +3196,20 @@
           subjectMap.set(subject, hue);
         });
         legendList.innerHTML = '';
-        const entries = Array.from(subjectMap.entries());
-        const limit = 8;
-        entries.slice(0, limit).forEach(([subject, hue]) => {
+        const entries = Array.from(subjectMap.entries()).sort((a, b) => a[0].localeCompare(b[0], 'uk', { sensitivity: 'base' }));
+        if (!entries.length) {
+          const empty = document.createElement('div');
+          empty.className = 'legend-empty';
+          empty.textContent = 'Немає предметів у цьому тижні.';
+          legendList.appendChild(empty);
+          return;
+        }
+        entries.forEach(([subject, hue]) => {
           const item = document.createElement('div');
           item.className = 'legend-item';
           item.innerHTML = `<span class="legend-dot" style="--subject-h:${hue}"></span><span>${subject}</span>`;
           legendList.appendChild(item);
         });
-        if (entries.length > limit) {
-          const more = document.createElement('div');
-          more.className = 'legend-more';
-          more.textContent = `+${entries.length - limit} ще`;
-          legendList.appendChild(more);
-        }
       }
 
       async function refreshSchedule() {
