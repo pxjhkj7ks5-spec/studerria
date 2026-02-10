@@ -424,9 +424,34 @@ body.theme-light .import-success-banner {
   gap: 12px;
 }
 
+.import-card.is-loading {
+  opacity: 0.7;
+}
+
+.import-scope {
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.12);
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+}
+
+.import-scope-summary {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.import-typed-confirm {
+  margin-top: 8px;
+}
+
 body.theme-light .import-card {
   background: rgba(255, 255, 255, 0.8);
   border-color: rgba(15, 23, 42, 0.1);
+}
+
+body.theme-light .import-scope {
+  background: rgba(15, 23, 42, 0.04);
 }
 
 .import-card-header {
@@ -465,6 +490,35 @@ body.theme-light .import-errors {
 
 .import-error + .import-error {
   margin-top: 4px;
+}
+
+.settings-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-error {
+  margin-top: 6px;
+}
+
+.role-access-summary {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.12);
+}
+
+body.theme-light .role-access-summary {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.role-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 .admin-toast {

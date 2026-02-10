@@ -70,7 +70,7 @@
           </div>
         </div>
         <div class="generator-actions mt-3">
-          <form method="POST" action="/admin/schedule-generator/run">
+          <form method="POST" action="/admin/schedule-generator/run" class="generator-run-form" data-scope-target>
             <input type="hidden" name="run_id" value="<%= run.id %>" />
             <input type="hidden" name="active_location" id="runLocationInput" value="<%= activeLocation %>" />
             <button
@@ -94,7 +94,7 @@
           <% ['kyiv', 'munich'].forEach(function(location) { %>
             <% const locationCourses = (courseSemestersByLocation && courseSemestersByLocation[location]) || []; %>
             <% if (locationCourses.length) { %>
-              <form method="POST" action="/admin/schedule-generator/run" class="d-flex flex-wrap align-items-center gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
+              <form method="POST" action="/admin/schedule-generator/run" class="d-flex flex-wrap align-items-center gap-2 generator-run-form" data-scope-target data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                 <input type="hidden" name="run_id" value="<%= run.id %>" />
                 <input type="hidden" name="active_location" value="<%= location %>" />
                 <input type="hidden" name="scope" value="course" />
@@ -289,6 +289,67 @@
             </div>
           </div>
 
+          <div class="card glass-panel mb-4" id="generatorScopeCard">
+            <div class="card-body">
+              <div class="generator-section-title mb-2">Scope controls</div>
+              <div class="small text-muted mb-3">Застосовується до Preview/Publish. Якщо порожньо — генеруємо весь семестр.</div>
+              <% const lastScope = lastStats && lastStats.scope ? lastStats.scope : {}; %>
+              <% const scopeWeeks = Array.isArray(lastScope.weeks) ? lastScope.weeks : []; %>
+              <% const scopeGroups = Array.isArray(lastScope.groups) ? lastScope.groups : []; %>
+              <% const scopeDays = Array.isArray(lastScope.days) ? lastScope.days : []; %>
+              <% const scopeFrom = scopeWeeks.length ? Math.min(...scopeWeeks) : ''; %>
+              <% const scopeTo = scopeWeeks.length ? Math.max(...scopeWeeks) : ''; %>
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">Semester (optional)</label>
+                  <select class="form-select" name="scope_semester_id" data-scope-field>
+                    <option value="">Усі семестри</option>
+                    <% const seenScopeSem = new Set(); %>
+                    <% Object.values(semestersByCourse || {}).forEach(function(list) { %>
+                      <% (list || []).forEach(function(sem) { %>
+                        <% if (!seenScopeSem.has(sem.id)) { seenScopeSem.add(sem.id); %>
+                          <option value="<%= sem.id %>" <%= lastScope.semester_id && Number(lastScope.semester_id) === Number(sem.id) ? 'selected' : '' %>>
+                            <%= sem.title %> · <%= sem.weeks_count %> тижнів
+                          </option>
+                        <% } %>
+                      <% }); %>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Week from</label>
+                  <input class="form-control" type="number" min="1" max="20" name="scope_week_from" value="<%= scopeFrom %>" data-scope-field />
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Week to</label>
+                  <input class="form-control" type="number" min="1" max="20" name="scope_week_to" value="<%= scopeTo %>" data-scope-field />
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Groups</label>
+                  <div class="d-flex flex-wrap gap-2">
+                    <% [1,2,3].forEach(function(group) { %>
+                      <label class="form-check">
+                        <input class="form-check-input" type="checkbox" name="scope_groups" value="<%= group %>" data-scope-field <%= scopeGroups.includes(group) ? 'checked' : '' %> />
+                        <span class="form-check-label"><%= group %></span>
+                      </label>
+                    <% }); %>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Days</label>
+                  <div class="d-flex flex-wrap gap-2">
+                    <% (dayOptions || []).forEach(function(day, idx) { %>
+                      <label class="form-check">
+                        <input class="form-check-input" type="checkbox" name="scope_days" value="<%= day %>" data-scope-field <%= scopeDays.includes(day) ? 'checked' : '' %> />
+                        <span class="form-check-label"><%= (dayLabels && dayLabels[idx]) || day %></span>
+                      </label>
+                    <% }); %>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="card glass-panel mb-4">
             <div class="card-body">
               <div class="generator-section-title mb-2">Перед запуском</div>
@@ -360,7 +421,16 @@
                     <div class="small text-muted">Конфліктів</div>
                     <div class="fw-semibold"><%= lastStats.conflicts %></div>
                   </div>
+                  <% if (lastStats.diff) { %>
+                    <div class="glass-inset p-3">
+                      <div class="small text-muted">Diff (Preview)</div>
+                      <div class="fw-semibold">+<%= lastStats.diff.added %> · ~<%= lastStats.diff.updated %> · −<%= lastStats.diff.removed %></div>
+                      <div class="small text-muted">Overwrite slots: <%= lastStats.diff.overwrite %></div>
+                      <div class="small text-muted">Manual overwrite: TODO (needs `is_manual`)</div>
+                    </div>
+                  <% } %>
                   <div class="small text-muted">Оновлено: <%= lastStats.generated_at ? new Date(lastStats.generated_at).toLocaleString('uk-UA') : '' %></div>
+                  <div class="small text-muted">Operation: <%= lastStats.operation_id || '—' %></div>
                   <% if (lastStats.scope) { %>
                     <div class="small text-muted">
                       <% if (lastStats.scope.type === 'course') { %>
@@ -966,6 +1036,9 @@
       const mergePreviewList = document.getElementById('mergePreviewList');
       const mergePreviewMeta = document.getElementById('mergePreviewMeta');
       const mergePreviewOptions = mergePreviewCourse ? Array.from(mergePreviewCourse.options) : [];
+      const scopeCard = document.getElementById('generatorScopeCard');
+      const scopeFields = scopeCard ? Array.from(scopeCard.querySelectorAll('[data-scope-field]')) : [];
+      const runForms = document.querySelectorAll('.generator-run-form');
 
       const evennessRange = document.getElementById('evennessBiasRange');
       const evennessValue = document.getElementById('evennessBiasValue');
@@ -990,6 +1063,47 @@
       const mirrorKeyInput = document.getElementById('mirrorKeyInput');
       const mirrorKeyGenerate = document.getElementById('mirrorKeyGenerate');
       const mirrorKeyCopy = document.getElementById('mirrorKeyCopy');
+
+      const collectScopeValues = () => {
+        const values = {};
+        scopeFields.forEach((field) => {
+          if (field.type === 'checkbox') {
+            if (!values[field.name]) values[field.name] = [];
+            if (field.checked) values[field.name].push(field.value);
+            return;
+          }
+          values[field.name] = field.value;
+        });
+        return values;
+      };
+
+      const syncScopeToForm = (form) => {
+        if (!form) return;
+        form.querySelectorAll('[data-scope-hidden]').forEach((el) => el.remove());
+        const values = collectScopeValues();
+        Object.keys(values).forEach((name) => {
+          const value = values[name];
+          if (Array.isArray(value)) {
+            value.forEach((val) => {
+              if (!val) return;
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = name;
+              input.value = val;
+              input.dataset.scopeHidden = '1';
+              form.appendChild(input);
+            });
+            return;
+          }
+          if (!value) return;
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = value;
+          input.dataset.scopeHidden = '1';
+          form.appendChild(input);
+        });
+      };
 
       const generateMirrorKey = () => {
         const seed = Math.random().toString(36).slice(2, 5).toUpperCase();
@@ -1138,6 +1252,14 @@
             mergePreviewBtn.disabled = false;
             mergePreviewBtn.textContent = originalText;
           }
+        });
+      }
+
+      if (runForms.length && scopeFields.length) {
+        runForms.forEach((form) => {
+          form.addEventListener('submit', () => {
+            syncScopeToForm(form);
+          });
         });
       }
 

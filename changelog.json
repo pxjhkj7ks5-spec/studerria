@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.7.75",
+      "date": "2026-02-10",
+      "items": [
+        "feat: add CSV import scope validation, dry-run errors, and injection-safe exports",
+        "feat: add generator preview/publish diff with backup and confirmations",
+        "feat: add role access guardrails and system settings manual save status"
+      ]
+    },
+    {
       "version": "0.7.74",
       "date": "2026-02-10",
       "items": [

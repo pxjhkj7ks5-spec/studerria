@@ -103,6 +103,8 @@ const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-overview', label: 'Огляд' },
   { id: 'admin-settings', label: 'Налаштування' },
   { id: 'admin-schedule', label: 'Розклад' },
+  { id: 'admin-import-export', label: 'Імпорт/Експорт' },
+  { id: 'admin-schedule-generator', label: 'Генератор' },
   { id: 'admin-homework', label: 'Домашні' },
   { id: 'admin-users', label: 'Користувачі' },
   { id: 'admin-teachers', label: 'Заявки викладачів' },
@@ -330,6 +332,17 @@ const refreshSettingsCache = async () => {
             normalized[role] = list
               .map((id) => String(id))
               .filter((id) => allowedIds.has(id));
+          });
+          const restrictedForStaff = new Set([
+            'admin-settings',
+            'admin-role-access',
+            'admin-users',
+            'admin-import-export',
+            'admin-schedule-generator',
+          ]);
+          ['teacher', 'student'].forEach((role) => {
+            if (!normalized[role]) return;
+            normalized[role] = normalized[role].filter((id) => !restrictedForStaff.has(id));
           });
           parsed.role_permissions = {
             ...DEFAULT_ROLE_PERMISSIONS,
@@ -637,6 +650,41 @@ const sanitizeCsvValue = (value) => {
 
 const escapeCsvValue = (value) => `"${sanitizeCsvValue(value).replace(/\"/g, '""')}"`;
 
+const IMPORT_CONFIRM_THRESHOLD = 20;
+const IMPORT_VALIDATION_TTL_MS = 15 * 60 * 1000;
+const IMPORT_REQUIRED_COLUMNS = {
+  schedule: ['subject', 'group_number', 'day_of_week', 'class_number', 'week_number'],
+  users: ['full_name', 'role', 'schedule_group', 'is_active', 'course_id'],
+  subjects: ['name', 'group_count', 'default_group', 'is_required', 'is_general'],
+};
+const importValidationCache = new Map();
+
+const setImportValidationCache = (operationId, payload) => {
+  importValidationCache.set(operationId, {
+    ...payload,
+    expiresAt: Date.now() + IMPORT_VALIDATION_TTL_MS,
+  });
+};
+
+const getImportValidationCache = (operationId) => {
+  const entry = importValidationCache.get(operationId);
+  if (!entry) return null;
+  if (entry.expiresAt < Date.now()) {
+    importValidationCache.delete(operationId);
+    return null;
+  }
+  return entry;
+};
+
+const pushImportError = (errors, rowNumber, column, value, reason) => {
+  errors.push({
+    row_number: rowNumber,
+    column,
+    value: value === undefined ? '' : String(value),
+    reason,
+  });
+};
+
 const normalizeLessonType = (value) => {
   if (value === null || typeof value === 'undefined') return null;
   const raw = String(value).trim().toLowerCase();
@@ -647,6 +695,37 @@ const normalizeLessonType = (value) => {
   if (raw.startsWith('лаб')) return 'lab';
   if (raw.startsWith('практ')) return 'practice';
   return null;
+};
+
+const resolveImportScope = async (req, type) => {
+  const courses = await getCoursesCached();
+  const fallbackCourseId = getAdminCourse(req);
+  const rawCourseId = Number(req.body.scope_course_id || req.body.course_id || fallbackCourseId);
+  const scopeCourse =
+    (courses || []).find((course) => Number(course.id) === Number(rawCourseId)) ||
+    (courses || []).find((course) => Number(course.id) === Number(fallbackCourseId)) ||
+    null;
+  if (!scopeCourse) {
+    return { error: 'Invalid course scope' };
+  }
+  let semester = null;
+  if (type === 'schedule') {
+    const rawSemesterId = Number(req.body.scope_semester_id || req.body.semester_id);
+    if (Number.isFinite(rawSemesterId) && rawSemesterId > 0) {
+      semester = await db.get('SELECT * FROM semesters WHERE id = ? AND course_id = ?', [rawSemesterId, scopeCourse.id]);
+    }
+    if (!semester) {
+      semester = await getActiveSemester(scopeCourse.id);
+    }
+    if (!semester) {
+      return { error: 'No active semester' };
+    }
+  }
+  return {
+    course: scopeCourse,
+    semester,
+    campus: scopeCourse.location || 'kyiv',
+  };
 };
 
 const referenceCache = {
@@ -1190,6 +1269,107 @@ const buildConflictContext = (conflicts, itemsById, courseById, courseLocationMa
     });
   });
   return { conflictDetails, conflictItemIds };
+};
+
+const buildScheduleDiff = async (entries) => {
+  const diff = { added: 0, updated: 0, removed: 0, unchanged: 0, overwrite: 0 };
+  if (!entries || !entries.length) {
+    return { diff, existing: [] };
+  }
+  const pairKeys = new Set();
+  const courseIds = new Set();
+  const semesterIds = new Set();
+  entries.forEach((entry) => {
+    pairKeys.add(`${entry.course_id}|${entry.semester_id}`);
+    courseIds.add(Number(entry.course_id));
+    semesterIds.add(Number(entry.semester_id));
+  });
+  const courseList = Array.from(courseIds).filter((id) => Number.isFinite(id));
+  const semesterList = Array.from(semesterIds).filter((id) => Number.isFinite(id));
+  if (!courseList.length || !semesterList.length) {
+    return { diff, existing: [] };
+  }
+  const coursePlaceholders = courseList.map(() => '?').join(',');
+  const semesterPlaceholders = semesterList.map(() => '?').join(',');
+  const existingRows = await db.all(
+    `
+      SELECT se.subject_id, se.course_id, se.semester_id, se.group_number, se.day_of_week,
+             se.class_number, se.week_number, se.lesson_type, s.name AS subject_name
+      FROM schedule_entries se
+      JOIN subjects s ON s.id = se.subject_id
+      WHERE se.course_id IN (${coursePlaceholders}) AND se.semester_id IN (${semesterPlaceholders})
+    `,
+    [...courseList, ...semesterList]
+  );
+  const existing = (existingRows || []).filter((row) => pairKeys.has(`${row.course_id}|${row.semester_id}`));
+  diff.overwrite = existing.length;
+
+  const existingMap = new Map();
+  existing.forEach((row) => {
+    const key = `${row.course_id}|${row.semester_id}|${row.week_number}|${row.day_of_week}|${row.class_number}|${row.group_number}`;
+    existingMap.set(key, row);
+  });
+  const generatedMap = new Map();
+  entries.forEach((entry) => {
+    const key = `${entry.course_id}|${entry.semester_id}|${entry.week_number}|${entry.day_of_week}|${entry.class_number}|${entry.group_number}`;
+    generatedMap.set(key, entry);
+  });
+
+  generatedMap.forEach((entry, key) => {
+    const prev = existingMap.get(key);
+    if (!prev) {
+      diff.added += 1;
+      return;
+    }
+    const prevType = normalizeLessonType(prev.lesson_type);
+    const nextType = normalizeLessonType(entry.lesson_type);
+    if (Number(prev.subject_id) !== Number(entry.subject_id) || prevType !== nextType) {
+      diff.updated += 1;
+    } else {
+      diff.unchanged += 1;
+    }
+  });
+  existingMap.forEach((_row, key) => {
+    if (!generatedMap.has(key)) {
+      diff.removed += 1;
+    }
+  });
+  return { diff, existing };
+};
+
+const writeGeneratorBackupCsv = (rows, operationId) => {
+  if (!rows || !rows.length) return null;
+  const backupDir = path.join(uploadsDir, 'generator-backups');
+  try {
+    fs.mkdirSync(backupDir, { recursive: true });
+  } catch (err) {
+    console.error('Failed to ensure backup directory', err);
+  }
+  const header = 'course_id,semester_id,subject,group_number,day_of_week,class_number,week_number,lesson_type';
+  const lines = rows.map((row) =>
+    [
+      row.course_id,
+      row.semester_id,
+      row.subject_name,
+      row.group_number,
+      row.day_of_week,
+      row.class_number,
+      row.week_number,
+      row.lesson_type || '',
+    ]
+      .map((value) => escapeCsvValue(value))
+      .join(',')
+  );
+  const csv = [header, ...lines].join('\n');
+  const filename = `schedule-backup-${operationId}.csv`;
+  const filePath = path.join(backupDir, filename);
+  try {
+    fs.writeFileSync(filePath, csv, 'utf8');
+    return { filename, path: filePath };
+  } catch (err) {
+    console.error('Failed to write backup CSV', err);
+    return null;
+  }
 };
 
 const { createRateLimiter, getClientIp } = require('./lib/rateLimit');
@@ -4985,6 +5165,8 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                     teamworkTasksRow,
                                     teamworkGroupsRow,
                                     teamworkMembersRow,
+                                    allSemestersRows,
+                                    settingsUpdateRow,
                                   ] = await Promise.all([
                                     db.get('SELECT COUNT(*) AS count FROM users WHERE course_id = ?', [courseId]),
                                     db.get('SELECT COUNT(*) AS count FROM subjects WHERE course_id = ?', [courseId]),
@@ -5014,6 +5196,11 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                        WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
                                       statsParams
                                     ),
+                                    db.all('SELECT id, title, weeks_count, course_id, start_date FROM semesters ORDER BY start_date DESC'),
+                                    db.get(
+                                      'SELECT actor_name, created_at FROM history_log WHERE action = ? ORDER BY created_at DESC LIMIT 1',
+                                      ['system_settings_update']
+                                    ),
                                   ]);
 
     const dashboardStats = {
@@ -5024,6 +5211,17 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
       teamworkGroups: Number(teamworkGroupsRow?.count || 0),
       teamworkMembers: Number(teamworkMembersRow?.count || 0),
     };
+
+    const semestersByCourse = {};
+    (allSemestersRows || []).forEach((row) => {
+      if (!semestersByCourse[row.course_id]) {
+        semestersByCourse[row.course_id] = [];
+      }
+      semestersByCourse[row.course_id].push(row);
+    });
+    const settingsMeta = settingsUpdateRow
+      ? { updated_at: settingsUpdateRow.created_at, updated_by: settingsUpdateRow.actor_name }
+      : null;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -5124,6 +5322,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                       courses,
                                       teacherRequests,
         semesters,
+        semestersByCourse,
         activeSemester,
         selectedCourseId: courseId,
         limitedStaffView: false,
@@ -5133,6 +5332,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         weeklyUserRoles,
         weeklyUserSeries,
                                       settings: settingsCache,
+                                      settingsMeta,
                                       rolePermissions: settingsCache.role_permissions || { ...DEFAULT_ROLE_PERMISSIONS },
                                       defaultRolePermissions: DEFAULT_ROLE_PERMISSIONS,
                                       adminSectionOptions: ADMIN_SECTION_OPTIONS,
@@ -5173,6 +5373,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                       messages: {
                                         error: req.query.err || '',
                                         success: req.query.ok || '',
+                                        operationId: req.query.op || '',
                                       },
                                     });
                                   } catch (renderErr) {
@@ -6208,6 +6409,32 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
   const runId = Number(req.body.run_id);
   const courseOnlyRaw = Number(req.body.course_id);
   const courseOnly = Number.isFinite(courseOnlyRaw) && courseOnlyRaw > 0 ? courseOnlyRaw : null;
+  const scopeWeekFromRaw = Number(req.body.scope_week_from);
+  const scopeWeekToRaw = Number(req.body.scope_week_to);
+  const scopeWeeksInput = String(req.body.scope_weeks || '').trim();
+  let scopeWeeks = [];
+  if (scopeWeeksInput) {
+    scopeWeeks = parseWeekSet(scopeWeeksInput, 0);
+  } else if (Number.isFinite(scopeWeekFromRaw) && Number.isFinite(scopeWeekToRaw)) {
+    const start = Math.max(1, Math.min(scopeWeekFromRaw, scopeWeekToRaw));
+    const end = Math.max(scopeWeekFromRaw, scopeWeekToRaw);
+    for (let week = start; week <= end; week += 1) {
+      scopeWeeks.push(week);
+    }
+  }
+  const scopeGroupsRaw = Array.isArray(req.body.scope_groups)
+    ? req.body.scope_groups
+    : req.body.scope_groups
+    ? [req.body.scope_groups]
+    : [];
+  const scopeGroups = scopeGroupsRaw
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const scopeDays = normalizeGeneratorDays(req.body.scope_days)
+    .map((day) => normalizeWeekdayName(day))
+    .filter(Boolean);
+  const scopeSemesterRaw = Number(req.body.scope_semester_id);
+  const scopeSemesterId = Number.isFinite(scopeSemesterRaw) && scopeSemesterRaw > 0 ? scopeSemesterRaw : null;
   if (!Number.isFinite(runId) || runId <= 0) {
     return res.redirect('/admin/schedule-generator?err=Invalid%20run');
   }
@@ -6310,6 +6537,22 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
       existingEntries,
     });
 
+    const scopeWeekSet = scopeWeeks.length ? new Set(scopeWeeks) : null;
+    const scopeGroupSet = scopeGroups.length ? new Set(scopeGroups) : null;
+    const scopeDaySet = scopeDays.length ? new Set(scopeDays) : null;
+    const filteredEntries = (result.entries || []).filter((entry) => {
+      if (scopeSemesterId && Number(entry.semester_id) !== Number(scopeSemesterId)) return false;
+      if (scopeWeekSet && !scopeWeekSet.has(Number(entry.week_number))) return false;
+      if (scopeGroupSet && !scopeGroupSet.has(Number(entry.group_number))) return false;
+      if (scopeDaySet && !scopeDaySet.has(entry.day_of_week)) return false;
+      return true;
+    });
+    if (!filteredEntries.length) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20entries%20for%20scope`);
+    }
+    const operationId = randomUUID();
+    const diffResult = await buildScheduleDiff(filteredEntries);
+
     if (courseOnly) {
       await db.run(
         'DELETE FROM schedule_generator_entries WHERE run_id = ? AND course_id = ?',
@@ -6322,7 +6565,7 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
         [runId, ...courseIds]
       );
     }
-    if (result.entries.length) {
+    if (filteredEntries.length) {
       const stmt = db.prepare(
         `
           INSERT INTO schedule_generator_entries
@@ -6330,7 +6573,7 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
       );
-      result.entries.forEach((entry) => {
+      filteredEntries.forEach((entry) => {
         stmt.run(
           runId,
           entry.item_id || null,
@@ -6355,9 +6598,19 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
       last_stats: {
         generated_at: new Date().toISOString(),
         items: normalizedItems.length,
-        entries: result.entries.length,
+        entries: filteredEntries.length,
         conflicts: result.conflicts.length,
-        scope: courseOnly ? { type: 'course', course_id: courseOnly } : { type: 'location', location: activeLocation },
+        diff: diffResult.diff,
+        operation_id: operationId,
+        scope: {
+          type: courseOnly ? 'course' : 'location',
+          location: activeLocation,
+          course_id: courseOnly,
+          semester_id: scopeSemesterId,
+          weeks: scopeWeeks,
+          groups: scopeGroups,
+          days: scopeDays,
+        },
       },
       last_conflicts: result.conflicts,
     };
@@ -6474,6 +6727,21 @@ app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, re
       scheduleByDay[day].sort((a, b) => a.class_number - b.class_number);
     });
 
+    const lastStats = config.last_stats || null;
+    const overwriteCount = lastStats && lastStats.diff ? Number(lastStats.diff.overwrite || 0) : 0;
+    const publishRequiresTyped = overwriteCount > IMPORT_CONFIRM_THRESHOLD;
+
+    const publishSummary = req.query.published
+      ? {
+          operation_id: req.query.op || '',
+          added: Number(req.query.added || 0),
+          updated: Number(req.query.updated || 0),
+          removed: Number(req.query.removed || 0),
+          overwrite: Number(req.query.overwrite || 0),
+          backup: req.query.backup || '',
+        }
+      : null;
+
     return res.render('admin-schedule-generator-preview', {
       username: req.session.user.username,
       role: req.session.role,
@@ -6488,10 +6756,27 @@ app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, re
       semester: activeSemester,
       bellSchedule,
       config,
+      lastStats,
+      publishRequiresTyped,
+      publishSummary,
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.preview');
   }
+});
+
+app.get('/admin/schedule-generator/backup.csv', requireAdmin, (req, res) => {
+  const operationId = String(req.query.op || '').trim();
+  if (!operationId) {
+    return res.status(400).send('Missing operation id');
+  }
+  const backupPath = path.join(uploadsDir, 'generator-backups', `schedule-backup-${operationId}.csv`);
+  if (!fs.existsSync(backupPath)) {
+    return res.status(404).send('Backup not found');
+  }
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="schedule-backup-${operationId}.csv"`);
+  return res.sendFile(backupPath);
 });
 
 app.post('/admin/schedule-generator/:runId/publish', requireAdmin, async (req, res) => {
@@ -6506,6 +6791,15 @@ app.post('/admin/schedule-generator/:runId/publish', requireAdmin, async (req, r
   }
   const replace = String(req.body.replace || '') === '1' || String(req.body.replace || '') === 'on';
   try {
+    const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
+    if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    const config = parseGeneratorConfig(run.config);
+    const lastOperationId = config && config.last_stats ? config.last_stats.operation_id : null;
+    const requestedOperationId = String(req.body.operation_id || '').trim();
+    if (lastOperationId && requestedOperationId && lastOperationId !== requestedOperationId) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Preview%20outdated`);
+    }
+    const operationId = requestedOperationId || lastOperationId || randomUUID();
     const entries = await db.all(
       `
         SELECT run_id, course_id, semester_id, subject_id, group_number, day_of_week, class_number, week_number, lesson_type
@@ -6516,6 +6810,29 @@ app.post('/admin/schedule-generator/:runId/publish', requireAdmin, async (req, r
     );
     if (!entries.length) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20entries`);
+    }
+    const diffResult = await buildScheduleDiff(entries);
+    const overwriteCount = diffResult.diff.overwrite;
+    const confirmOverwrite = String(req.body.confirm_overwrite || '') === '1' || String(req.body.confirm_overwrite || '') === 'on';
+    if (!confirmOverwrite) {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Confirm%20overwrite`);
+    }
+    const requiresTyped = overwriteCount > IMPORT_CONFIRM_THRESHOLD;
+    const confirmPhrase = String(req.body.confirm_phrase || '').trim().toUpperCase();
+    if (requiresTyped && confirmPhrase !== 'PUBLISH') {
+      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Type%20PUBLISH%20to%20confirm`);
+    }
+
+    let backupInfo = null;
+    if (diffResult.existing && diffResult.existing.length) {
+      backupInfo = writeGeneratorBackupCsv(diffResult.existing, operationId);
+      if (backupInfo) {
+        logAction(db, req, 'generator_backup_created', {
+          operation_id: operationId,
+          file: backupInfo.filename,
+          entries: diffResult.existing.length,
+        });
+      }
     }
     if (replace) {
       const pairs = new Map();
@@ -6550,8 +6867,26 @@ app.post('/admin/schedule-generator/:runId/publish', requireAdmin, async (req, r
     });
     await stmt.finalize();
     await db.run('UPDATE schedule_generator_runs SET status = ?, updated_at = NOW() WHERE id = ?', ['published', runId]);
-    logAction(db, req, 'schedule_generator_publish', { run_id: runId, replace });
-    return res.redirect('/admin?ok=Schedule%20published');
+    logAction(db, req, 'schedule_generator_publish', {
+      run_id: runId,
+      replace,
+      operation_id: operationId,
+      diff: diffResult.diff,
+    });
+    const courseId = Number(req.body.course_id) || Number(entries[0].course_id);
+    const week = Number(req.body.week) || 1;
+    const query = new URLSearchParams({
+      course: String(courseId),
+      week: String(week),
+      published: '1',
+      op: operationId,
+      added: String(diffResult.diff.added),
+      updated: String(diffResult.diff.updated),
+      removed: String(diffResult.diff.removed),
+      overwrite: String(diffResult.diff.overwrite),
+      backup: backupInfo ? operationId : '',
+    });
+    return res.redirect(`/admin/schedule-generator/${runId}/preview?${query.toString()}`);
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.publish');
   }
@@ -6623,18 +6958,40 @@ app.post('/admin/settings', requireAdmin, async (req, res) => {
   const allowCustomDeadlines = String(req.body.allow_custom_deadlines).toLowerCase() === 'true';
   const allowMessages = String(req.body.allow_messages).toLowerCase() === 'true';
   const scheduleRefreshMinutes = Number(req.body.schedule_refresh_minutes);
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   if (
     Number.isNaN(sessionDays) || sessionDays <= 0 ||
     Number.isNaN(maxFileSize) || maxFileSize <= 0 ||
     Number.isNaN(minTeamMembers) || minTeamMembers <= 0 ||
     Number.isNaN(scheduleRefreshMinutes) || scheduleRefreshMinutes <= 0
   ) {
+    if (wantsJson) {
+      return res.status(400).json({ error: 'Invalid settings' });
+    }
     return res.redirect('/admin?err=Invalid%20settings');
   }
   if (scheduleRefreshMinutes > 120) {
+    if (wantsJson) {
+      return res.status(400).json({ error: 'Invalid settings' });
+    }
     return res.redirect('/admin?err=Invalid%20settings');
   }
   try {
+    const nextSettings = {
+      session_duration_days: sessionDays,
+      max_file_size_mb: maxFileSize,
+      allow_homework_creation: allowHomework,
+      min_team_members: minTeamMembers,
+      allow_custom_deadlines: allowCustomDeadlines,
+      allow_messages: allowMessages,
+      schedule_refresh_minutes: scheduleRefreshMinutes,
+    };
+    const changes = Object.keys(nextSettings).reduce((acc, key) => {
+      if (String(settingsCache[key]) !== String(nextSettings[key])) {
+        acc.push({ key, from: settingsCache[key], to: nextSettings[key] });
+      }
+      return acc;
+    }, []);
     const stmt = db.prepare(
       'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value'
     );
@@ -6646,7 +7003,21 @@ app.post('/admin/settings', requireAdmin, async (req, res) => {
     stmt.run('allow_messages', allowMessages ? 'true' : 'false');
     stmt.run('schedule_refresh_minutes', String(scheduleRefreshMinutes));
     await refreshSettingsCache();
-    return res.redirect('/admin?ok=Settings%20saved');
+    const operationId = randomUUID();
+    logAction(db, req, 'system_settings_update', {
+      operation_id: operationId,
+      changes,
+    });
+    if (wantsJson) {
+      return res.json({
+        ok: true,
+        operation_id: operationId,
+        updated_at: new Date().toISOString(),
+        updated_by: req.session.user ? req.session.user.username : null,
+        changes,
+      });
+    }
+    return res.redirect(`/admin?ok=Settings%20saved&op=${operationId}`);
   } catch (err) {
     return handleDbError(res, err, 'admin.settings.save');
   }
@@ -6673,12 +7044,40 @@ app.post('/admin/role-access', requireAdmin, async (req, res) => {
         .map((id) => String(id))
         .filter((id) => allowedIds.has(id));
     });
+    const restrictedForStaff = new Set([
+      'admin-settings',
+      'admin-role-access',
+      'admin-users',
+      'admin-import-export',
+      'admin-schedule-generator',
+    ]);
+    ['teacher', 'student'].forEach((role) => {
+      if (!nextPermissions[role]) return;
+      nextPermissions[role] = nextPermissions[role].filter((id) => !restrictedForStaff.has(id));
+    });
+
+    const previous = settingsCache.role_permissions || {};
+    const changes = [];
+    Object.keys(nextPermissions).forEach((role) => {
+      const prevList = new Set(previous[role] || []);
+      const nextList = new Set(nextPermissions[role] || []);
+      const added = Array.from(nextList).filter((id) => !prevList.has(id));
+      const removed = Array.from(prevList).filter((id) => !nextList.has(id));
+      if (added.length || removed.length) {
+        changes.push({ role, added, removed });
+      }
+    });
+    const operationId = randomUUID();
     await db.run(
       'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
       ['role_permissions', JSON.stringify(nextPermissions)]
     );
     await refreshSettingsCache();
-    return res.redirect('/admin?ok=Role%20access%20saved');
+    logAction(db, req, 'role_access_update', {
+      operation_id: operationId,
+      changes,
+    });
+    return res.redirect(`/admin?ok=Role%20access%20saved&op=${operationId}`);
   } catch (err) {
     return handleDbError(res, err, 'admin.roleAccess.save');
   }
@@ -6939,6 +7338,258 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
   });
 });
 
+app.post('/admin/import/validate', requireAdmin, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.import.validate.init');
+  }
+  if (!req.file || !req.file.buffer) {
+    return res.status(400).json({ error: 'Missing CSV' });
+  }
+  const type = String(req.body.type || '').trim().toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(IMPORT_REQUIRED_COLUMNS, type)) {
+    return res.status(400).json({ error: 'Invalid import type' });
+  }
+  let rows = [];
+  try {
+    rows = parseCsvText(req.file.buffer.toString('utf8'));
+  } catch (err) {
+    return res.status(400).json({ error: 'Invalid CSV' });
+  }
+  if (!rows.length) {
+    return res.status(400).json({ error: 'Empty CSV' });
+  }
+
+  let scope = null;
+  try {
+    scope = await resolveImportScope(req, type);
+  } catch (err) {
+    return res.status(500).json({ error: 'Scope error' });
+  }
+  if (scope && scope.error) {
+    return res.status(400).json({ error: scope.error });
+  }
+  const scopeCourseId = scope.course.id;
+  const scopeSemesterId = scope.semester ? scope.semester.id : null;
+  const requiredCols = IMPORT_REQUIRED_COLUMNS[type] || [];
+
+  let subjectMap = null;
+  let existingSchedule = null;
+  let existingUsers = null;
+  let existingSubjects = null;
+  if (type === 'schedule') {
+    const subjects = await getSubjectsCached(scopeCourseId);
+    subjectMap = new Map((subjects || []).map((s) => [String(s.name || '').trim().toLowerCase(), s]));
+    const existingRows = await db.all(
+      `
+        SELECT subject_id, group_number, day_of_week, class_number, week_number, lesson_type
+        FROM schedule_entries
+        WHERE course_id = ? AND semester_id = ?
+      `,
+      [scopeCourseId, scopeSemesterId]
+    );
+    existingSchedule = new Map();
+    (existingRows || []).forEach((row) => {
+      const key = `${row.week_number}|${row.day_of_week}|${row.class_number}|${row.group_number}`;
+      existingSchedule.set(key, row);
+    });
+  } else if (type === 'users') {
+    const existingRows = await db.all('SELECT id, LOWER(full_name) AS full_name FROM users');
+    existingUsers = new Set((existingRows || []).map((row) => String(row.full_name)));
+  } else if (type === 'subjects') {
+    const existingRows = await db.all('SELECT name FROM subjects WHERE course_id = ?', [scopeCourseId]);
+    existingSubjects = new Set((existingRows || []).map((row) => String(row.name || '').trim().toLowerCase()));
+  }
+
+  const errors = [];
+  let createCount = 0;
+  let updateCount = 0;
+  let skipCount = 0;
+  let scopeMismatch = false;
+  rows.forEach((row, idx) => {
+    const rowNumber = idx + 2;
+    let rowInvalid = false;
+
+    requiredCols.forEach((col) => {
+      if (!(col in row)) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, col, '', 'Missing column');
+      }
+    });
+
+    if (row.course_id && Number(row.course_id) !== Number(scopeCourseId)) {
+      scopeMismatch = true;
+      rowInvalid = true;
+      pushImportError(errors, rowNumber, 'course_id', row.course_id, 'Does not match selected scope');
+    }
+    if (type === 'schedule' && row.semester_id && Number(row.semester_id) !== Number(scopeSemesterId)) {
+      scopeMismatch = true;
+      rowInvalid = true;
+      pushImportError(errors, rowNumber, 'semester_id', row.semester_id, 'Does not match selected scope');
+    }
+
+    if (type === 'schedule') {
+      const subjectName = String(row.subject || '').trim().toLowerCase();
+      const subject = subjectMap ? subjectMap.get(subjectName) : null;
+      const groupNumber = Number(row.group_number);
+      const classNumber = Number(row.class_number);
+      const weekNumber = Number(row.week_number);
+      const dayOfWeek = normalizeWeekdayName(row.day_of_week);
+      if (!subject) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'subject', row.subject, 'Unknown subject');
+      }
+      if (Number.isNaN(groupNumber)) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'group_number', row.group_number, 'Invalid group_number');
+      }
+      if (Number.isNaN(classNumber)) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'class_number', row.class_number, 'Invalid class_number');
+      }
+      if (Number.isNaN(weekNumber)) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'week_number', row.week_number, 'Invalid week_number');
+      } else if (scope.semester && weekNumber > Number(scope.semester.weeks_count || 15)) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'week_number', row.week_number, 'Week exceeds semester length');
+      }
+      if (!dayOfWeek) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'day_of_week', row.day_of_week, 'Invalid day');
+      }
+      if (rowInvalid) {
+        skipCount += 1;
+        return;
+      }
+      const key = `${weekNumber}|${dayOfWeek}|${classNumber}|${groupNumber}`;
+      if (existingSchedule && existingSchedule.has(key)) {
+        updateCount += 1;
+      } else {
+        createCount += 1;
+      }
+      return;
+    }
+
+    if (type === 'users') {
+      const fullName = String(row.full_name || '').trim();
+      if (!fullName) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'full_name', row.full_name, 'Missing full_name');
+      }
+      if (row.is_active !== '' && row.is_active !== undefined && row.is_active !== null && Number.isNaN(Number(row.is_active))) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'is_active', row.is_active, 'Invalid is_active');
+      }
+      if (row.course_id && Number.isNaN(Number(row.course_id))) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'course_id', row.course_id, 'Invalid course_id');
+      }
+      if (rowInvalid) {
+        skipCount += 1;
+        return;
+      }
+      if (existingUsers && existingUsers.has(fullName.toLowerCase())) {
+        updateCount += 1;
+      } else {
+        createCount += 1;
+      }
+      return;
+    }
+
+    if (type === 'subjects') {
+      const name = String(row.name || '').trim();
+      const groupCount = row.group_count ? Number(row.group_count) : NaN;
+      const defaultGroup = row.default_group ? Number(row.default_group) : NaN;
+      if (!name) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'name', row.name, 'Missing name');
+      }
+      if (Number.isNaN(groupCount) || groupCount < 1 || groupCount > 3) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'group_count', row.group_count, 'Invalid group_count');
+      }
+      if (Number.isNaN(defaultGroup) || defaultGroup < 1 || defaultGroup > groupCount) {
+        rowInvalid = true;
+        pushImportError(errors, rowNumber, 'default_group', row.default_group, 'Invalid default_group');
+      }
+      if (rowInvalid) {
+        skipCount += 1;
+        return;
+      }
+      if (existingSubjects && existingSubjects.has(name.toLowerCase())) {
+        updateCount += 1;
+      } else {
+        createCount += 1;
+      }
+    }
+  });
+
+  const operationId = randomUUID();
+  setImportValidationCache(operationId, {
+    errors,
+    type,
+    scope: {
+      course_id: scopeCourseId,
+      semester_id: scopeSemesterId,
+      campus: scope.campus,
+    },
+  });
+  logAction(db, req, `${type}_import_validate`, {
+    operation_id: operationId,
+    creates: createCount,
+    updates: updateCount,
+    skips: skipCount,
+    errors: errors.length,
+    scope: {
+      course_id: scopeCourseId,
+      semester_id: scopeSemesterId,
+      campus: scope.campus,
+    },
+  });
+  return res.json({
+    operation_id: operationId,
+    counts: {
+      creates: createCount,
+      updates: updateCount,
+      skips: skipCount,
+      errors: errors.length,
+    },
+    errors_preview: errors.slice(0, 20),
+    requires_confirm: type === 'users' || createCount + updateCount > IMPORT_CONFIRM_THRESHOLD,
+    blocked: scopeMismatch,
+    scope: {
+      course_id: scopeCourseId,
+      semester_id: scopeSemesterId,
+      campus: scope.campus,
+    },
+  });
+});
+
+app.get('/admin/import/errors.csv', requireAdmin, (req, res) => {
+  const operationId = String(req.query.op || '').trim();
+  if (!operationId) {
+    return res.status(400).send('Missing operation id');
+  }
+  const entry = getImportValidationCache(operationId);
+  if (!entry) {
+    return res.status(404).send('Error report expired');
+  }
+  const header = ['row_number', 'column', 'value', 'reason'];
+  const lines = [header.join(',')];
+  (entry.errors || []).forEach((err) => {
+    lines.push(
+      [err.row_number, err.column, err.value, err.reason]
+        .map((val) => escapeCsvValue(val))
+        .join(',')
+    );
+  });
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="import_errors_${operationId}.csv"`);
+  return res.send(lines.join('\n'));
+});
+
 app.get('/admin/export/schedule.csv', requireAdmin, async (req, res) => {
   const courseId = getAdminCourse(req);
   const activeSemester = await getActiveSemester(courseId);
@@ -6972,16 +7623,22 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
   if (!req.file || !req.file.buffer) {
     return res.redirect('/admin?err=Missing%20CSV');
   }
-  const courseId = getAdminCourse(req);
-  let activeSemester = null;
+  const confirmRequired = String(req.body.confirm_required || '') === '1';
+  const confirmPhrase = String(req.body.confirm_phrase || '').trim().toUpperCase();
+  if (confirmRequired && confirmPhrase !== 'IMPORT') {
+    return res.redirect('/admin?err=Type%20IMPORT%20to%20confirm');
+  }
+  let scope = null;
   try {
-    activeSemester = await getActiveSemester(courseId);
+    scope = await resolveImportScope(req, 'schedule');
   } catch (err) {
     return res.redirect('/admin?err=Semester%20error');
   }
-  if (!activeSemester) {
+  if (!scope || scope.error || !scope.semester) {
     return res.redirect('/admin?err=No%20active%20semester');
   }
+  const courseId = scope.course.id;
+  const activeSemester = scope.semester;
   let subjects = [];
   try {
     subjects = await getSubjectsCached(courseId);
@@ -7006,14 +7663,29 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
   let skipped = 0;
   const operationId = randomUUID();
   for (const row of rows) {
+    if (row.course_id && Number(row.course_id) !== Number(courseId)) {
+      skipped += 1;
+      continue;
+    }
+    if (row.semester_id && Number(row.semester_id) !== Number(activeSemester.id)) {
+      skipped += 1;
+      continue;
+    }
     const subjectName = String(row.subject || '').trim().toLowerCase();
     const subject = subjectMap.get(subjectName);
     const groupNumber = Number(row.group_number);
     const classNumber = Number(row.class_number);
     const weekNumber = Number(row.week_number);
-    const dayOfWeek = String(row.day_of_week || '').trim();
+    const dayOfWeek = normalizeWeekdayName(row.day_of_week);
     const lessonType = normalizeLessonType(row.lesson_type);
-    if (!subject || Number.isNaN(groupNumber) || Number.isNaN(classNumber) || Number.isNaN(weekNumber) || !dayOfWeek) {
+    if (
+      !subject ||
+      Number.isNaN(groupNumber) ||
+      Number.isNaN(classNumber) ||
+      Number.isNaN(weekNumber) ||
+      weekNumber > Number(activeSemester.weeks_count || 15) ||
+      !dayOfWeek
+    ) {
       skipped += 1;
       continue;
     }
@@ -7045,6 +7717,7 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
     updated,
     skipped,
     course_id: courseId,
+    semester_id: activeSemester.id,
     operation_id: operationId,
   });
   return res.redirect(`/admin?ok=Schedule%20imported%20(${inserted}%2F${updated}%2F${skipped})&op=${operationId}`);
@@ -7101,7 +7774,21 @@ app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single
   if (!req.file || !req.file.buffer) {
     return res.redirect('/admin?err=Missing%20CSV');
   }
-  const courseId = getAdminCourse(req);
+  const confirmRequired = String(req.body.confirm_required || '') === '1';
+  const confirmPhrase = String(req.body.confirm_phrase || '').trim().toUpperCase();
+  if (confirmRequired && confirmPhrase !== 'IMPORT') {
+    return res.redirect('/admin?err=Type%20IMPORT%20to%20confirm');
+  }
+  let scope = null;
+  try {
+    scope = await resolveImportScope(req, 'users');
+  } catch (err) {
+    return res.redirect('/admin?err=Invalid%20scope');
+  }
+  if (!scope || scope.error) {
+    return res.redirect('/admin?err=Invalid%20scope');
+  }
+  const courseId = scope.course.id;
   let rows = [];
   let courses = [];
   try {
@@ -7128,6 +7815,10 @@ app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single
     const role = String(row.role || 'student').trim().toLowerCase();
     const scheduleGroup = String(row.schedule_group || 'A').trim();
     const isActive = row.is_active === '' ? 1 : Number(row.is_active) ? 1 : 0;
+    if (row.course_id && Number(row.course_id) !== Number(courseId)) {
+      skipped += 1;
+      continue;
+    }
     const rowCourse = row.course_id ? Number(row.course_id) : courseId;
     const finalCourse = courseSet.has(rowCourse) ? rowCourse : courseId;
     const existing = await db.get('SELECT id FROM users WHERE LOWER(full_name) = LOWER(?)', [fullName]);
@@ -7184,7 +7875,21 @@ app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.sin
   if (!req.file || !req.file.buffer) {
     return res.redirect('/admin?err=Missing%20CSV');
   }
-  const courseId = getAdminCourse(req);
+  const confirmRequired = String(req.body.confirm_required || '') === '1';
+  const confirmPhrase = String(req.body.confirm_phrase || '').trim().toUpperCase();
+  if (confirmRequired && confirmPhrase !== 'IMPORT') {
+    return res.redirect('/admin?err=Type%20IMPORT%20to%20confirm');
+  }
+  let scope = null;
+  try {
+    scope = await resolveImportScope(req, 'subjects');
+  } catch (err) {
+    return res.redirect('/admin?err=Invalid%20scope');
+  }
+  if (!scope || scope.error) {
+    return res.redirect('/admin?err=Invalid%20scope');
+  }
+  const courseId = scope.course.id;
   let rows = [];
   try {
     const text = req.file.buffer.toString('utf8');
@@ -7200,6 +7905,10 @@ app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.sin
   let skipped = 0;
   const operationId = randomUUID();
   for (const row of rows) {
+    if (row.course_id && Number(row.course_id) !== Number(courseId)) {
+      skipped += 1;
+      continue;
+    }
     const name = String(row.name || '').trim();
     const groupCount = row.group_count ? Number(row.group_count) : 1;
     const defaultGroup = row.default_group ? Number(row.default_group) : 1;

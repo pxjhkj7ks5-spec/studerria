@@ -730,9 +730,13 @@
             <div class="admin-sidebar-title">Schedule</div>
             <% if (sectionAllowed('admin-schedule')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-schedule-editor">Schedule Editor</button>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-import-export">Import/Export (CSV)</button>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-schedule-generator">Semester Generator</button>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-schedule-validate">Validate Schedule</button>
+            <% } %>
+            <% if (sectionAllowed('admin-import-export')) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-import-export">Import/Export (CSV)</button>
+            <% } %>
+            <% if (sectionAllowed('admin-schedule-generator')) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-schedule-generator">Semester Generator</button>
             <% } %>
           </div>
           <div class="admin-sidebar-section">
@@ -795,6 +799,8 @@
 
       <% const msg = typeof messages !== 'undefined' && messages ? messages : (typeof locals !== 'undefined' ? locals.messages : {}); %>
       <% const importOperation = msg && msg.operationId ? msg.operationId : ''; %>
+      <% const semestersByCourseMap = typeof semestersByCourse !== 'undefined' && semestersByCourse ? semestersByCourse : { [(selectedCourseId || 1)]: (semesters || []) }; %>
+      <% const settingsMetaInfo = typeof settingsMeta !== 'undefined' && settingsMeta ? settingsMeta : null; %>
       <div id="toastContainer" data-toast-success="<%= msg && msg.success ? msg.success : '' %>" data-toast-error="<%= msg && msg.error ? msg.error : '' %>"></div>
 
       <% const adminSectionOptionsList = adminSectionOptions || []; %>
@@ -806,6 +812,7 @@
         { key: 'teacher', label: 'Викладач', editable: true },
         { key: 'student', label: 'Студент', editable: true },
       ]; %>
+      <% const roleAccessDefaultKey = roleAccessRoles.find((r) => r.key === 'deanery') ? 'deanery' : (roleAccessRoles[0] ? roleAccessRoles[0].key : 'deanery'); %>
 
       <% const groupMap = {}; %>
       <% (studentGroups || []).forEach(function(g) { %>
@@ -858,12 +865,20 @@
               <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                 <div>
                   <h5 class="mb-1"><%= t('admin.settings') %></h5>
-                  <div class="small text-muted">Останнє оновлення: — · Оновив(ла): —</div>
-                  <!-- TODO: hydrate Last updated / Updated by from history_log or settings metadata -->
+                  <% const settingsUpdatedAt = settingsMetaInfo && settingsMetaInfo.updated_at ? new Date(settingsMetaInfo.updated_at).toLocaleString('uk-UA') : '—'; %>
+                  <% const settingsUpdatedBy = settingsMetaInfo && settingsMetaInfo.updated_by ? settingsMetaInfo.updated_by : '—'; %>
+                  <div class="small text-muted" id="settingsMeta">
+                    Останнє оновлення: <span data-settings-updated-at><%= settingsUpdatedAt %></span>
+                    · Оновив(ла): <span data-settings-updated-by><%= settingsUpdatedBy %></span>
+                  </div>
                 </div>
                 <div class="badge admin-chip">System</div>
               </div>
-              <form method="POST" action="/admin/settings" class="row g-3 align-items-end">
+              <div class="settings-status mb-3">
+                <span class="badge text-bg-secondary" data-settings-status>Saved</span>
+                <span class="small text-muted d-none" data-settings-dirty>Unsaved changes</span>
+              </div>
+              <form method="POST" action="/admin/settings" class="row g-3 align-items-end" id="systemSettingsForm">
                 <div class="col-12">
                   <div class="settings-section">
                     <div class="settings-section-title">Security</div>
@@ -877,6 +892,7 @@
                           class="form-control"
                           name="session_duration_days"
                           value="<%= (settings && settings.session_duration_days) || 14 %>"
+                          data-settings-field
                           required
                         />
                       </div>
@@ -896,6 +912,7 @@
                           class="form-control"
                           name="max_file_size_mb"
                           value="<%= (settings && settings.max_file_size_mb) || 20 %>"
+                          data-settings-field
                           required
                         />
                       </div>
@@ -915,6 +932,7 @@
                           class="form-control"
                           name="min_team_members"
                           value="<%= (settings && settings.min_team_members) || 2 %>"
+                          data-settings-field
                           required
                         />
                       </div>
@@ -927,14 +945,14 @@
                     <div class="row g-3">
                       <div class="col-12 col-md-4">
                         <label class="form-label"><%= t('admin.allowHomework') %></label>
-                        <select class="form-select" name="allow_homework_creation">
+                        <select class="form-select" name="allow_homework_creation" data-settings-field>
                           <option value="true" <%= (settings && settings.allow_homework_creation) ? 'selected' : '' %>><%= t('admin.enabled') %></option>
                           <option value="false" <%= (settings && settings.allow_homework_creation) ? '' : 'selected' %>><%= t('admin.disabled') %></option>
                         </select>
                       </div>
                       <div class="col-12 col-md-4">
                         <label class="form-label"><%= t('admin.allowCustomDeadlines') %></label>
-                        <select class="form-select" name="allow_custom_deadlines">
+                        <select class="form-select" name="allow_custom_deadlines" data-settings-field>
                           <option value="true" <%= (settings && settings.allow_custom_deadlines) ? 'selected' : '' %>><%= t('admin.enabled') %></option>
                           <option value="false" <%= (settings && settings.allow_custom_deadlines) ? '' : 'selected' %>><%= t('admin.disabled') %></option>
                         </select>
@@ -948,7 +966,7 @@
                     <div class="row g-3">
                       <div class="col-12 col-md-4">
                         <label class="form-label"><%= t('admin.allowMessages') %></label>
-                        <select class="form-select" name="allow_messages">
+                        <select class="form-select" name="allow_messages" data-settings-field>
                           <option value="true" <%= (settings && settings.allow_messages) ? 'selected' : '' %>><%= t('admin.enabled') %></option>
                           <option value="false" <%= (settings && settings.allow_messages) ? '' : 'selected' %>><%= t('admin.disabled') %></option>
                         </select>
@@ -969,6 +987,7 @@
                           class="form-control"
                           name="schedule_refresh_minutes"
                           value="<%= (settings && settings.schedule_refresh_minutes) || 5 %>"
+                          data-settings-field
                           required
                         />
                       </div>
@@ -976,8 +995,8 @@
                   </div>
                 </div>
                 <div class="col-12 d-flex align-items-center gap-3">
-                  <button class="btn btn-primary" type="submit"><%= t('admin.saveSettings') %></button>
-                  <div class="small text-muted">Saved instantly · toast appears after save.</div>
+                  <button class="btn btn-primary" type="submit" data-settings-save disabled><%= t('admin.saveSettings') %></button>
+                  <div class="small text-muted">Manual save · changes are applied after clicking “Save”.</div>
                 </div>
               </form>
             </div>
@@ -1002,14 +1021,22 @@
               </div>
               <div class="role-access-toolbar mb-3">
                 <label class="form-label mb-0">Select role</label>
-                <select class="form-select form-select-sm w-auto" id="roleAccessFocus">
+                <select class="form-select form-select-sm w-auto" id="roleAccessFocus" data-default-role="<%= roleAccessDefaultKey %>">
                   <option value="all">All roles</option>
                   <% roleAccessRoles.forEach(function(roleRow) { %>
-                    <option value="<%= roleRow.key %>"><%= roleRow.label %></option>
+                    <option value="<%= roleRow.key %>" <%= roleRow.key === roleAccessDefaultKey ? 'selected' : '' %>><%= roleRow.label %></option>
                   <% }); %>
                 </select>
               </div>
-              <form method="POST" action="/admin/role-access" data-default-permissions='<%= JSON.stringify(defaultRolePermissions || {}) %>'>
+              <div class="role-access-summary mb-3" data-role-summary>
+                <div class="small text-muted">Change summary will appear here.</div>
+              </div>
+              <form
+                method="POST"
+                action="/admin/role-access"
+                data-default-permissions='<%= JSON.stringify(defaultRolePermissions || {}) %>'
+                data-initial-permissions='<%= JSON.stringify(rolePermissionsMap || {}) %>'
+              >
                 <div class="role-access-scroll">
                   <div class="role-access-grid" style="--role-access-cols: <%= adminSectionOptionsList.length %>;">
                     <div class="role-access-row role-access-head">
@@ -1040,6 +1067,7 @@
                 </div>
                 <div class="d-flex flex-wrap gap-2 mt-3">
                   <button class="btn btn-primary" type="submit">Зберегти доступи</button>
+                  <button class="btn btn-outline-secondary" type="button" data-role-revert>Revert unsaved changes</button>
                   <div class="small text-muted">Діє для панелей старости та деканату.</div>
                 </div>
               </form>
@@ -1137,6 +1165,7 @@
           </div>
         </div>
 
+        <% if (sectionAllowed('admin-import-export')) { %>
         <div id="admin-import-export" class="admin-panel" data-admin-title="Schedule / Import Export">
           <div class="card mb-4">
             <div class="card-body">
@@ -1170,6 +1199,32 @@
                     <button class="btn btn-outline-secondary btn-sm" type="button" data-template="subject,group_number,day_of_week,class_number,week_number,lesson_type">Download template</button>
                   </div>
                   <form method="POST" action="/admin/import/schedule.csv" enctype="multipart/form-data" class="import-form">
+                    <div class="import-scope">
+                      <div class="import-step-title">Import scope</div>
+                      <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-6">
+                          <label class="form-label">Курс</label>
+                          <select class="form-select form-select-sm" name="scope_course_id" data-import-scope-course>
+                            <% (courses || []).forEach(function(course) { %>
+                              <option value="<%= course.id %>" <%= Number(course.id) === Number(selectedCourseId) ? 'selected' : '' %>>
+                                <%= course.name %>
+                              </option>
+                            <% }); %>
+                          </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                          <label class="form-label">Семестр</label>
+                          <select class="form-select form-select-sm" name="scope_semester_id" data-import-scope-semester>
+                            <% ((semestersByCourseMap && semestersByCourseMap[selectedCourseId]) || []).forEach(function(sem) { %>
+                              <option value="<%= sem.id %>" <%= activeSemester && sem.id === activeSemester.id ? 'selected' : '' %>>
+                                <%= sem.title %> · <%= sem.weeks_count %> тижнів
+                              </option>
+                            <% }); %>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="import-scope-summary" data-import-scope-summary></div>
+                    </div>
                     <div class="import-step">
                       <div class="import-step-title">1. Upload file</div>
                       <input class="form-control" type="file" name="csv_file" accept=".csv" required />
@@ -1191,6 +1246,11 @@
                         <input class="form-check-input" type="checkbox" data-import-confirm-check />
                         <span class="form-check-label">I understand this will modify data.</span>
                       </label>
+                      <div class="import-typed-confirm d-none" data-import-typed-confirm>
+                        <label class="form-label">Type IMPORT to continue</label>
+                        <input class="form-control form-control-sm" name="confirm_phrase" data-import-confirm-phrase />
+                      </div>
+                      <input type="hidden" name="confirm_required" value="0" data-import-confirm-required />
                       <button class="btn btn-warning btn-sm" type="submit" data-confirm="Import schedule CSV? This will update existing schedule." data-confirm-level="warning">Confirm import</button>
                     </div>
                   </form>
@@ -1205,6 +1265,22 @@
                     <button class="btn btn-outline-secondary btn-sm" type="button" data-template="full_name,role,schedule_group,is_active,course_id">Download template</button>
                   </div>
                   <form method="POST" action="/admin/import/users.csv" enctype="multipart/form-data" class="import-form">
+                    <div class="import-scope">
+                      <div class="import-step-title">Import scope</div>
+                      <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-6">
+                          <label class="form-label">Курс</label>
+                          <select class="form-select form-select-sm" name="scope_course_id" data-import-scope-course>
+                            <% (courses || []).forEach(function(course) { %>
+                              <option value="<%= course.id %>" <%= Number(course.id) === Number(selectedCourseId) ? 'selected' : '' %>>
+                                <%= course.name %>
+                              </option>
+                            <% }); %>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="import-scope-summary" data-import-scope-summary></div>
+                    </div>
                     <div class="import-step">
                       <div class="import-step-title">1. Upload file</div>
                       <input class="form-control" type="file" name="csv_file" accept=".csv" required />
@@ -1226,6 +1302,11 @@
                         <input class="form-check-input" type="checkbox" data-import-confirm-check />
                         <span class="form-check-label">I understand this will modify data.</span>
                       </label>
+                      <div class="import-typed-confirm d-none" data-import-typed-confirm>
+                        <label class="form-label">Type IMPORT to continue</label>
+                        <input class="form-control form-control-sm" name="confirm_phrase" data-import-confirm-phrase />
+                      </div>
+                      <input type="hidden" name="confirm_required" value="0" data-import-confirm-required />
                       <button class="btn btn-warning btn-sm" type="submit" data-confirm="Import users CSV? This will update existing users." data-confirm-level="warning">Confirm import</button>
                     </div>
                   </form>
@@ -1240,6 +1321,22 @@
                     <button class="btn btn-outline-secondary btn-sm" type="button" data-template="name,group_count,default_group,is_required,is_general">Download template</button>
                   </div>
                   <form method="POST" action="/admin/import/subjects.csv" enctype="multipart/form-data" class="import-form">
+                    <div class="import-scope">
+                      <div class="import-step-title">Import scope</div>
+                      <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-6">
+                          <label class="form-label">Курс</label>
+                          <select class="form-select form-select-sm" name="scope_course_id" data-import-scope-course>
+                            <% (courses || []).forEach(function(course) { %>
+                              <option value="<%= course.id %>" <%= Number(course.id) === Number(selectedCourseId) ? 'selected' : '' %>>
+                                <%= course.name %>
+                              </option>
+                            <% }); %>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="import-scope-summary" data-import-scope-summary></div>
+                    </div>
                     <div class="import-step">
                       <div class="import-step-title">1. Upload file</div>
                       <input class="form-control" type="file" name="csv_file" accept=".csv" required />
@@ -1261,6 +1358,11 @@
                         <input class="form-check-input" type="checkbox" data-import-confirm-check />
                         <span class="form-check-label">I understand this will modify data.</span>
                       </label>
+                      <div class="import-typed-confirm d-none" data-import-typed-confirm>
+                        <label class="form-label">Type IMPORT to continue</label>
+                        <input class="form-control form-control-sm" name="confirm_phrase" data-import-confirm-phrase />
+                      </div>
+                      <input type="hidden" name="confirm_required" value="0" data-import-confirm-required />
                       <button class="btn btn-warning btn-sm" type="submit" data-confirm="Import subjects CSV? This will update existing subjects." data-confirm-level="warning">Confirm import</button>
                     </div>
                   </form>
@@ -1269,7 +1371,9 @@
             </div>
           </div>
         </div>
+        <% } %>
 
+        <% if (sectionAllowed('admin-schedule-generator')) { %>
         <div id="admin-schedule-generator" class="admin-panel" data-admin-title="Schedule / Semester Generator">
           <div class="card mb-4">
             <div class="card-body">
@@ -1287,6 +1391,7 @@
             </div>
           </div>
         </div>
+        <% } %>
 
         <div id="admin-schedule-validate" class="admin-panel" data-admin-title="Schedule / Validate">
           <div class="card mb-4">
@@ -3170,78 +3275,39 @@
         if (ok) form.submit();
       });
 
-      const parseCsv = (text) => {
-        const rows = [];
-        let row = [];
-        let field = '';
-        let inQuotes = false;
-        for (let i = 0; i < text.length; i += 1) {
-          const ch = text[i];
-          const next = text[i + 1];
-          if (inQuotes) {
-            if (ch === '"' && next === '"') {
-              field += '"';
-              i += 1;
-            } else if (ch === '"') {
-              inQuotes = false;
-            } else {
-              field += ch;
-            }
-          } else if (ch === '"') {
-            inQuotes = true;
-          } else if (ch === ',') {
-            row.push(field);
-            field = '';
-          } else if (ch === '\n') {
-            row.push(field);
-            field = '';
-            if (row.some((cell) => String(cell).trim().length)) rows.push(row);
-            row = [];
-          } else if (ch !== '\r') {
-            field += ch;
-          }
-        }
-        row.push(field);
-        if (row.some((cell) => String(cell).trim().length)) rows.push(row);
-        if (!rows.length) return [];
-        const headers = rows.shift().map((h) => String(h || '').replace(/^\uFEFF/, '').trim().toLowerCase());
-        return rows.map((r) => {
-          const obj = {};
-          headers.forEach((h, idx) => {
-            if (!h) return;
-            obj[h] = r[idx] !== undefined ? String(r[idx]).trim() : '';
-          });
-          return obj;
-        });
+      const importScopeData = {
+        courses: <%- JSON.stringify(courses || []) %>,
+        semestersByCourse: <%- JSON.stringify(semestersByCourseMap || {}) %>,
       };
-
-      const validateImportRow = (type, row) => {
-        const errors = [];
-        if (type === 'schedule') {
-          if (!row.subject) errors.push('Missing subject');
-          if (!row.group_number || Number.isNaN(Number(row.group_number))) errors.push('Invalid group_number');
-          if (!row.day_of_week) errors.push('Missing day_of_week');
-          if (!row.class_number || Number.isNaN(Number(row.class_number))) errors.push('Invalid class_number');
-          if (!row.week_number || Number.isNaN(Number(row.week_number))) errors.push('Invalid week_number');
+      const roleSectionLabels = <%- JSON.stringify((adminSectionOptionsList || []).reduce((acc, section) => {
+        acc[section.id] = section.label;
+        return acc;
+      }, {})) %>;
+      const importCourseMap = new Map(
+        (importScopeData.courses || []).map((course) => [String(course.id), course])
+      );
+      const importSemestersByCourse = importScopeData.semestersByCourse || {};
+      const getCampusLabel = (course) => {
+        if (!course) return '';
+        return String(course.location || 'kyiv').toLowerCase() === 'munich' ? 'Munich' : 'Kyiv';
+      };
+      const updateScopeSummary = (scopeSummary, courseId, semesterId) => {
+        if (!scopeSummary) return;
+        const course = importCourseMap.get(String(courseId || ''));
+        const campusLabel = getCampusLabel(course);
+        const parts = [];
+        if (course) parts.push(course.name);
+        if (campusLabel) parts.push(campusLabel);
+        if (semesterId) {
+          const list = importSemestersByCourse[String(courseId)] || [];
+          const sem = list.find((item) => String(item.id) === String(semesterId));
+          if (sem) parts.push(`Semester=${sem.title}`);
         }
-        if (type === 'users') {
-          if (!row.full_name) errors.push('Missing full_name');
-          if (row.is_active && Number.isNaN(Number(row.is_active))) errors.push('Invalid is_active');
-          if (row.course_id && Number.isNaN(Number(row.course_id))) errors.push('Invalid course_id');
-        }
-        if (type === 'subjects') {
-          if (!row.name) errors.push('Missing name');
-          const groupCount = row.group_count ? Number(row.group_count) : NaN;
-          const defaultGroup = row.default_group ? Number(row.default_group) : NaN;
-          if (Number.isNaN(groupCount) || groupCount < 1 || groupCount > 3) errors.push('Invalid group_count');
-          if (Number.isNaN(defaultGroup) || defaultGroup < 1 || defaultGroup > groupCount) errors.push('Invalid default_group');
-        }
-        return errors;
+        scopeSummary.textContent = parts.length ? `Import into: ${parts.join(' · ')}` : 'Select scope to validate.';
       };
 
       document.querySelectorAll('.import-card').forEach((card) => {
         const type = card.dataset.importType;
-        const requiredCols = (card.dataset.requiredColumns || '').split(',').map((c) => c.trim()).filter(Boolean);
         const form = card.querySelector('form.import-form');
         const fileInput = form ? form.querySelector('input[type="file"]') : null;
         const createEl = card.querySelector('[data-import-create]');
@@ -3251,8 +3317,17 @@
         const errorsContainer = card.querySelector('[data-import-errors]');
         const downloadBtn = card.querySelector('[data-import-error-download]');
         const confirmCheck = card.querySelector('[data-import-confirm-check]');
+        const confirmButton = form ? form.querySelector('button[type="submit"]') : null;
+        const confirmRequiredInput = card.querySelector('[data-import-confirm-required]');
+        const typedConfirmWrap = card.querySelector('[data-import-typed-confirm]');
+        const typedConfirmInput = card.querySelector('[data-import-confirm-phrase]');
         const templateBtn = card.querySelector('[data-template]');
-        let errorReport = [];
+        const scopeCourseSelect = card.querySelector('[data-import-scope-course]');
+        const scopeSemesterSelect = card.querySelector('[data-import-scope-semester]');
+        const scopeSummary = card.querySelector('[data-import-scope-summary]');
+        let operationId = '';
+        let validationBlocked = false;
+        let hasValidated = false;
 
         const syncSummary = ({ create = 0, update = 0, skip = 0, errors = 0 } = {}) => {
           if (createEl) createEl.textContent = create;
@@ -3260,6 +3335,33 @@
           if (skipEl) skipEl.textContent = skip;
           if (errorEl) errorEl.textContent = errors;
         };
+        const setLoading = (loading) => {
+          card.classList.toggle('is-loading', loading);
+        };
+        const scopeReady = () => {
+          if (!scopeCourseSelect || !scopeCourseSelect.value) return false;
+          if (scopeSemesterSelect && !scopeSemesterSelect.value) return false;
+          return true;
+        };
+        const updateConfirmState = () => {
+          if (!confirmButton) return;
+          const requiresTyped = confirmRequiredInput && confirmRequiredInput.value === '1';
+          const typedOk = !requiresTyped || (typedConfirmInput && typedConfirmInput.value.trim().toUpperCase() === 'IMPORT');
+          const checked = confirmCheck ? confirmCheck.checked : true;
+          const ready = hasValidated && !validationBlocked && scopeReady() && checked && typedOk;
+          confirmButton.disabled = !ready;
+        };
+        const refreshSemesterOptions = () => {
+          if (!scopeSemesterSelect || !scopeCourseSelect) return;
+          const list = importSemestersByCourse[String(scopeCourseSelect.value)] || [];
+          const selected = scopeSemesterSelect.value;
+          scopeSemesterSelect.innerHTML = list.length
+            ? list.map((sem) => `<option value="${sem.id}" ${String(sem.id) === String(selected) ? 'selected' : ''}>${sem.title} · ${sem.weeks_count} тижнів</option>`).join('')
+            : '<option value="">Немає семестрів</option>';
+        };
+        if (scopeCourseSelect) {
+          updateScopeSummary(scopeSummary, scopeCourseSelect.value, scopeSemesterSelect ? scopeSemesterSelect.value : '');
+        }
 
         if (templateBtn) {
           templateBtn.addEventListener('click', () => {
@@ -3276,55 +3378,117 @@
           });
         }
 
-        if (fileInput) {
-          fileInput.addEventListener('change', async () => {
-            if (!fileInput.files || !fileInput.files.length) return;
-            const text = await fileInput.files[0].text();
-            const rows = parseCsv(text);
-            errorReport = [];
-            let createCount = 0;
-            let updateCount = 0;
-            let skipCount = 0;
-            rows.forEach((row, idx) => {
-              const missingCols = requiredCols.filter((col) => !(col in row));
-              const errors = missingCols.length ? [`Missing columns: ${missingCols.join(', ')}`] : validateImportRow(type, row);
-              if (errors.length) {
-                skipCount += 1;
-                errorReport.push({ row: idx + 2, message: errors.join('; ') });
-              } else if (row.id) {
-                updateCount += 1;
-              } else {
-                createCount += 1;
-              }
-            });
-            syncSummary({ create: createCount, update: updateCount, skip: skipCount, errors: errorReport.length });
+        const runValidation = async () => {
+          if (!fileInput || !fileInput.files || !fileInput.files.length) return;
+          if (!scopeReady()) {
+            syncSummary();
             if (errorsContainer) {
-              errorsContainer.innerHTML = errorReport.length
-                ? errorReport.slice(0, 20).map((err) => `<div class="import-error">Row ${err.row}: ${err.message}</div>`).join('')
+              errorsContainer.innerHTML = '<div class="text-muted">Select scope to validate.</div>';
+            }
+            if (confirmRequiredInput) confirmRequiredInput.value = '0';
+            validationBlocked = true;
+            hasValidated = false;
+            updateConfirmState();
+            return;
+          }
+          const formData = new FormData();
+          formData.append('csv_file', fileInput.files[0]);
+          formData.append('type', type);
+          formData.append('scope_course_id', scopeCourseSelect ? scopeCourseSelect.value : '');
+          if (scopeSemesterSelect) {
+            formData.append('scope_semester_id', scopeSemesterSelect.value);
+          }
+          setLoading(true);
+          try {
+            const response = await fetch('/admin/import/validate', {
+              method: 'POST',
+              headers: { Accept: 'application/json' },
+              body: formData,
+            });
+            const data = await response.json();
+            if (!response.ok) {
+              throw new Error(data && data.error ? data.error : 'Validation failed');
+            }
+            operationId = data.operation_id || '';
+            hasValidated = true;
+            validationBlocked = Boolean(data.blocked);
+            const counts = data.counts || {};
+            syncSummary({
+              create: counts.creates || 0,
+              update: counts.updates || 0,
+              skip: counts.skips || 0,
+              errors: counts.errors || 0,
+            });
+            if (errorsContainer) {
+              const preview = data.errors_preview || [];
+              errorsContainer.innerHTML = preview.length
+                ? preview.map((err) => `<div class="import-error">Row ${err.row_number}: ${err.column} · ${err.reason}</div>`).join('')
                 : '<div class="text-muted">No errors found.</div>';
             }
             if (downloadBtn) {
-              downloadBtn.disabled = !errorReport.length;
+              downloadBtn.disabled = !(counts.errors > 0 && operationId);
+              downloadBtn.dataset.op = operationId;
             }
+            if (confirmRequiredInput) {
+              confirmRequiredInput.value = data.requires_confirm ? '1' : '0';
+            }
+            if (typedConfirmWrap) {
+              typedConfirmWrap.classList.toggle('d-none', !data.requires_confirm);
+            }
+            if (typedConfirmInput && !data.requires_confirm) {
+              typedConfirmInput.value = '';
+            }
+          } catch (err) {
+            hasValidated = false;
+            validationBlocked = true;
+            if (errorsContainer) {
+              errorsContainer.innerHTML = `<div class="text-danger">${err.message || 'Validation failed'}</div>`;
+            }
+            if (downloadBtn) {
+              downloadBtn.disabled = true;
+              downloadBtn.dataset.op = '';
+            }
+            showToast('error', err.message || 'Validation failed');
+          } finally {
+            setLoading(false);
+            updateConfirmState();
+          }
+        };
+
+        if (fileInput) {
+          fileInput.addEventListener('change', () => {
+            runValidation();
+          });
+        }
+        if (scopeCourseSelect) {
+          scopeCourseSelect.addEventListener('change', () => {
+            refreshSemesterOptions();
+            updateScopeSummary(scopeSummary, scopeCourseSelect.value, scopeSemesterSelect ? scopeSemesterSelect.value : '');
+            runValidation();
+          });
+        }
+        if (scopeSemesterSelect) {
+          scopeSemesterSelect.addEventListener('change', () => {
+            updateScopeSummary(scopeSummary, scopeCourseSelect ? scopeCourseSelect.value : '', scopeSemesterSelect.value);
+            runValidation();
+          });
+        }
+        if (typedConfirmInput) {
+          typedConfirmInput.addEventListener('input', () => {
+            updateConfirmState();
+          });
+        }
+        if (confirmCheck) {
+          confirmCheck.addEventListener('change', () => {
+            updateConfirmState();
           });
         }
 
         if (downloadBtn) {
           downloadBtn.addEventListener('click', () => {
-            if (!errorReport.length) return;
-            const lines = ['row,error'];
-            errorReport.forEach((err) => {
-              lines.push(`${err.row},"${err.message.replace(/\"/g, '""')}"`);
-            });
-            const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${type}_errors.csv`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(url);
+            const op = downloadBtn.dataset.op;
+            if (!op) return;
+            window.location.href = `/admin/import/errors.csv?op=${op}`;
           });
         }
 
@@ -3333,32 +3497,196 @@
             if (!confirmCheck.checked) {
               event.preventDefault();
               showToast('error', 'Please confirm before import.');
+              return;
+            }
+            const requiresTyped = confirmRequiredInput && confirmRequiredInput.value === '1';
+            if (requiresTyped && typedConfirmInput && typedConfirmInput.value.trim().toUpperCase() !== 'IMPORT') {
+              event.preventDefault();
+              showToast('error', 'Type IMPORT to continue.');
+              return;
+            }
+            if (validationBlocked || !hasValidated) {
+              event.preventDefault();
+              showToast('error', 'Resolve validation errors before import.');
             }
           });
         }
+        updateConfirmState();
       });
 
-      const roleAccessFocus = document.getElementById('roleAccessFocus');
-      if (roleAccessFocus) {
-        roleAccessFocus.addEventListener('change', () => {
-          const value = roleAccessFocus.value;
-          document.querySelectorAll('.role-access-row[data-role-row]').forEach((row) => {
-            row.style.display = value === 'all' || row.dataset.roleRow === value ? 'grid' : 'none';
+      const settingsForm = document.getElementById('systemSettingsForm');
+      if (settingsForm) {
+        const fields = Array.from(settingsForm.querySelectorAll('[data-settings-field]'));
+        const saveBtn = settingsForm.querySelector('[data-settings-save]');
+        const statusEl = document.querySelector('[data-settings-status]');
+        const dirtyEl = document.querySelector('[data-settings-dirty]');
+        const updatedAtEl = document.querySelector('[data-settings-updated-at]');
+        const updatedByEl = document.querySelector('[data-settings-updated-by]');
+        const initialValues = new Map(fields.map((field) => [field.name, field.value]));
+
+        const setStatus = (label, variant = 'secondary') => {
+          if (!statusEl) return;
+          statusEl.textContent = label;
+          statusEl.className = `badge text-bg-${variant}`;
+        };
+        const isDirty = () => fields.some((field) => String(field.value) !== String(initialValues.get(field.name)));
+        const setDirtyState = () => {
+          const dirty = isDirty();
+          if (dirtyEl) dirtyEl.classList.toggle('d-none', !dirty);
+          if (saveBtn) saveBtn.disabled = !dirty;
+        };
+        const setFieldError = (field, message) => {
+          if (!field) return;
+          field.classList.toggle('is-invalid', Boolean(message));
+          let errorEl = field.parentElement ? field.parentElement.querySelector('.settings-error') : null;
+          if (!errorEl && field.parentElement) {
+            errorEl = document.createElement('div');
+            errorEl.className = 'settings-error small text-danger';
+            field.parentElement.appendChild(errorEl);
+          }
+          if (errorEl) {
+            errorEl.textContent = message || '';
+            errorEl.style.display = message ? 'block' : 'none';
+          }
+        };
+        const validateField = (field) => {
+          if (!field || field.type !== 'number') return true;
+          const value = Number(field.value);
+          const min = field.min ? Number(field.min) : null;
+          const max = field.max ? Number(field.max) : null;
+          if (Number.isNaN(value)) {
+            setFieldError(field, 'Invalid number');
+            return false;
+          }
+          if (min !== null && value < min) {
+            setFieldError(field, `Min ${min}`);
+            return false;
+          }
+          if (max !== null && value > max) {
+            setFieldError(field, `Max ${max}`);
+            return false;
+          }
+          setFieldError(field, '');
+          return true;
+        };
+        const validateAll = () => {
+          let valid = true;
+          fields.forEach((field) => {
+            if (!validateField(field)) valid = false;
+          });
+          return valid;
+        };
+
+        fields.forEach((field) => {
+          field.addEventListener('input', () => {
+            validateField(field);
+            setDirtyState();
+            setStatus('Unsaved', 'secondary');
+          });
+          field.addEventListener('change', () => {
+            validateField(field);
+            setDirtyState();
+            setStatus('Unsaved', 'secondary');
           });
         });
+
+        settingsForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          if (!validateAll()) {
+            showToast('error', 'Fix validation errors before saving.');
+            return;
+          }
+          setStatus('Saving…', 'warning');
+          if (saveBtn) saveBtn.disabled = true;
+          try {
+            const formData = new FormData(settingsForm);
+            const response = await fetch(settingsForm.action, {
+              method: 'POST',
+              headers: { Accept: 'application/json' },
+              body: formData,
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+              throw new Error(data.error || 'Save failed');
+            }
+            fields.forEach((field) => {
+              initialValues.set(field.name, field.value);
+            });
+            setDirtyState();
+            setStatus('Saved', 'success');
+            if (updatedAtEl && data.updated_at) {
+              updatedAtEl.textContent = new Date(data.updated_at).toLocaleString('uk-UA');
+            }
+            if (updatedByEl && data.updated_by) {
+              updatedByEl.textContent = data.updated_by;
+            }
+            showToast('success', 'Settings saved.');
+          } catch (err) {
+            setStatus('Error', 'danger');
+            if (saveBtn) saveBtn.disabled = false;
+            showToast('error', err.message || 'Save failed.');
+          }
+        });
+
+        setDirtyState();
       }
 
+      const roleAccessFocus = document.getElementById('roleAccessFocus');
       const roleAccessForm = document.querySelector('#admin-role-access form');
       if (roleAccessForm) {
         const defaultPermissions = roleAccessForm.dataset.defaultPermissions
           ? JSON.parse(roleAccessForm.dataset.defaultPermissions)
           : {};
+        const initialPermissions = roleAccessForm.dataset.initialPermissions
+          ? JSON.parse(roleAccessForm.dataset.initialPermissions)
+          : {};
+        const summaryEl = document.querySelector('[data-role-summary]');
+        const revertBtn = roleAccessForm.querySelector('[data-role-revert]');
+        const applyRoleFilter = () => {
+          if (!roleAccessFocus) return;
+          const value = roleAccessFocus.value || roleAccessFocus.dataset.defaultRole || 'deanery';
+          document.querySelectorAll('.role-access-row[data-role-row]').forEach((row) => {
+            row.style.display = value === 'all' || row.dataset.roleRow === value ? 'grid' : 'none';
+          });
+        };
         const applyDefaults = (roleKey, permissions) => {
           const boxes = roleAccessForm.querySelectorAll(`input[name="role_permissions[${roleKey}]"]`);
           boxes.forEach((box) => {
             box.checked = permissions.includes(box.value);
           });
         };
+        const getCurrentPermissions = (roleKey) => Array.from(roleAccessForm.querySelectorAll(
+          `input[name="role_permissions[${roleKey}]"]:checked`
+        )).map((input) => input.value);
+        const updateSummary = () => {
+          if (!summaryEl || !roleAccessFocus) return;
+          const roleKey = roleAccessFocus.value;
+          if (roleKey === 'all') {
+            summaryEl.innerHTML = '<div class="small text-muted">Select a role to see change summary.</div>';
+            return;
+          }
+          const prev = new Set(initialPermissions[roleKey] || []);
+          const next = new Set(getCurrentPermissions(roleKey));
+          const added = Array.from(next).filter((id) => !prev.has(id));
+          const removed = Array.from(prev).filter((id) => !next.has(id));
+          if (!added.length && !removed.length) {
+            summaryEl.innerHTML = '<div class="small text-muted">No changes.</div>';
+            return;
+          }
+          const rows = [];
+          if (added.length) rows.push(`<div class="role-summary-item"><span class="badge text-bg-success">+</span> ${added.map((id) => roleSectionLabels[id] || id).join(', ')}</div>`);
+          if (removed.length) rows.push(`<div class="role-summary-item"><span class="badge text-bg-danger">−</span> ${removed.map((id) => roleSectionLabels[id] || id).join(', ')}</div>`);
+          summaryEl.innerHTML = rows.join('');
+        };
+        if (roleAccessFocus) {
+          roleAccessFocus.value = roleAccessFocus.value || roleAccessFocus.dataset.defaultRole || 'deanery';
+          applyRoleFilter();
+          updateSummary();
+          roleAccessFocus.addEventListener('change', () => {
+            applyRoleFilter();
+            updateSummary();
+          });
+        }
         document.querySelectorAll('[data-role-template]').forEach((btn) => {
           btn.addEventListener('click', () => {
             const template = btn.dataset.roleTemplate;
@@ -3366,12 +3694,32 @@
               Object.keys(defaultPermissions || {}).forEach((roleKey) => {
                 applyDefaults(roleKey, defaultPermissions[roleKey] || []);
               });
+              updateSummary();
               return;
             }
             const perms = defaultPermissions[template] || [];
             applyDefaults(template, perms);
+            updateSummary();
           });
         });
+        roleAccessForm.addEventListener('change', (event) => {
+          if (event.target && event.target.matches('input[type="checkbox"]')) {
+            updateSummary();
+          }
+        });
+        if (revertBtn) {
+          revertBtn.addEventListener('click', () => {
+            const roleKey = roleAccessFocus ? roleAccessFocus.value : 'all';
+            if (roleKey === 'all') {
+              Object.keys(initialPermissions || {}).forEach((key) => {
+                applyDefaults(key, initialPermissions[key] || []);
+              });
+            } else {
+              applyDefaults(roleKey, initialPermissions[roleKey] || []);
+            }
+            updateSummary();
+          });
+        }
       }
 
       const selectAll = document.getElementById('selectAllSchedule');

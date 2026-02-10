@@ -42,6 +42,21 @@
     </nav>
 
     <main class="container py-4 schedule-content">
+      <% if (publishSummary) { %>
+        <div class="alert alert-success">
+          <div class="fw-semibold">Розклад опубліковано</div>
+          <div class="small">
+            Додано: <%= publishSummary.added %> · Оновлено: <%= publishSummary.updated %> · Видалено: <%= publishSummary.removed %>
+          </div>
+          <div class="small mt-1">
+            <a href="/admin/schedule-list">Відкрити список пар</a>
+            · <a href="/admin?tab=admin-history&history_q=<%= publishSummary.operation_id %>">Переглянути в історії</a>
+            <% if (publishSummary.backup) { %>
+              · <a href="/admin/schedule-generator/backup.csv?op=<%= publishSummary.backup %>">Backup CSV</a>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
       <div class="glass schedule-panel mb-4">
         <div class="panel-section">
           <div class="panel-title">Курс</div>
@@ -62,15 +77,45 @@
             <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %> / <%= totalWeeks %></span>
           </div>
         </div>
+        <% const previewStats = lastStats && lastStats.diff ? lastStats : null; %>
+        <% const previewDiff = previewStats ? previewStats.diff : null; %>
+        <% const overwriteCount = previewDiff ? Number(previewDiff.overwrite || 0) : 0; %>
         <div class="panel-section panel-sync">
           <div class="panel-title">Публікація</div>
-          <form method="POST" action="/admin/schedule-generator/<%= run.id %>/publish" class="d-flex flex-column gap-2">
+          <% if (previewDiff) { %>
+            <div class="small text-muted">
+              Diff: +<%= previewDiff.added %> · ~<%= previewDiff.updated %> · −<%= previewDiff.removed %>
+            </div>
+            <div class="small text-muted">Overwrite slots: <%= overwriteCount %></div>
+            <div class="small text-muted">Manual overwrite: TODO (needs `is_manual`).</div>
+            <div class="small text-muted">Operation: <%= previewStats.operation_id || '—' %></div>
+          <% } else { %>
+            <div class="small text-muted">Немає даних превʼю. Спочатку згенеруйте розклад.</div>
+          <% } %>
+          <form
+            method="POST"
+            action="/admin/schedule-generator/<%= run.id %>/publish"
+            class="d-flex flex-column gap-2 mt-2"
+            id="publishForm"
+            data-has-preview="<%= previewDiff ? '1' : '0' %>"
+          >
+            <input type="hidden" name="operation_id" value="<%= previewStats ? (previewStats.operation_id || '') : '' %>" />
+            <input type="hidden" name="course_id" value="<%= selectedCourseId %>" />
+            <input type="hidden" name="week" value="<%= currentWeek %>" />
+            <label class="form-check small">
+              <input class="form-check-input" type="checkbox" name="confirm_overwrite" value="1" data-publish-confirm />
+              Я розумію, що це перезапише <%= overwriteCount %> слотів
+            </label>
+            <% if (publishRequiresTyped) { %>
+              <div class="small text-muted">Type PUBLISH to continue</div>
+              <input class="form-control form-control-sm" name="confirm_phrase" data-publish-phrase />
+            <% } %>
             <label class="form-check small">
               <input class="form-check-input" type="checkbox" name="replace" value="1" checked />
-              Замінити існуючий розклад
+              Замінити існуючий розклад для семестрів у превʼю
             </label>
-            <button class="btn btn-primary btn-sm" type="submit" data-confirm="Publish generated schedule? This will write to production schedule." data-confirm-level="warning">Опублікувати</button>
-            <div class="small text-muted">Публікує увесь згенерований розклад для Kyiv-курсів.</div>
+            <button class="btn btn-primary btn-sm" type="submit" id="publishBtn" <%= previewDiff ? '' : 'disabled' %>>Опублікувати</button>
+            <div class="small text-muted">Перед публікацією створимо backup CSV.</div>
           </form>
         </div>
       </div>
@@ -223,6 +268,31 @@
           localStorage.setItem('theme', next);
           applyTheme(next);
         });
+      }
+
+      const publishForm = document.getElementById('publishForm');
+      if (publishForm) {
+        const publishBtn = document.getElementById('publishBtn');
+        const confirmCheck = publishForm.querySelector('[data-publish-confirm]');
+        const confirmPhrase = publishForm.querySelector('[data-publish-phrase]');
+        const hasPreview = publishForm.dataset.hasPreview === '1';
+        const updatePublishState = () => {
+          if (!publishBtn) return;
+          if (!hasPreview) {
+            publishBtn.disabled = true;
+            return;
+          }
+          const confirmOk = confirmCheck ? confirmCheck.checked : true;
+          const typedOk = !confirmPhrase || confirmPhrase.value.trim().toUpperCase() === 'PUBLISH';
+          publishBtn.disabled = !(confirmOk && typedOk);
+        };
+        if (confirmCheck) {
+          confirmCheck.addEventListener('change', updatePublishState);
+        }
+        if (confirmPhrase) {
+          confirmPhrase.addEventListener('input', updatePublishState);
+        }
+        updatePublishState();
       }
 
       const weekSlider = document.getElementById('weekSlider');
