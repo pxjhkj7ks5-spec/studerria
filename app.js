@@ -5378,7 +5378,7 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
           && (groupNum === 1 || groupNum === 2)
           && !item.mirror_key
           && !(item.fixed_day || item.fixed_class_number || item.weeks_set)
-          && !generalFlag;
+          && generalFlag;
         if (!baseEligible) return;
         const key = `${item.course_id}|${item.semester_id || ''}|${String(item.lesson_type || '')}|${item.pairs_count || 0}`;
         if (!buckets.has(key)) {
@@ -5430,7 +5430,7 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
         if (!(groupNum === 1 || groupNum === 2)) reasons.push('Не група 1/2');
         if (item.mirror_key) reasons.push('Вже має ключ дзеркала');
         if (item.fixed_day || item.fixed_class_number || item.weeks_set) reasons.push('Є фіксований день/слот/тижні');
-        if (generalFlag) reasons.push('Загальний предмет');
+        if (!generalFlag) reasons.push('Не загальний предмет');
         if (!reasons.length && !matchedIds.has(item.id)) {
           if (sameSubjectOnly.has(item.id)) {
             reasons.push('У іншій групі лише такий самий предмет');

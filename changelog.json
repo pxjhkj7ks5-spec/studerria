@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.62",
+      "date": "2026-02-10",
+      "items": [
+        "fix: allow general subjects in auto mirror pairing"
+      ]
+    },
+    {
       "version": "0.7.61",
       "date": "2026-02-10",
       "items": [
