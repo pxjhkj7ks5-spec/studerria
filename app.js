@@ -5835,7 +5835,7 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
     }
     const itemsAll = await db.all(
       `
-        SELECT sgi.*, s.name AS subject_name, s.group_count
+        SELECT sgi.*, s.name AS subject_name, s.group_count, s.is_general
         FROM schedule_generator_items sgi
         JOIN subjects s ON s.id = sgi.subject_id
         WHERE sgi.run_id = ?

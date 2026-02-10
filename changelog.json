@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.56",
+      "date": "2026-02-09",
+      "items": [
+        "fix: prevent general-subject seminars from overlapping between groups"
+      ]
+    },
+    {
       "version": "0.7.55",
       "date": "2026-02-09",
       "items": [
