@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.87",
+      "date": "2026-02-11",
+      "items": [
+        "fix: delete broadcast messages across all courses"
+      ]
+    },
+    {
       "version": "0.7.86",
       "date": "2026-02-11",
       "items": [

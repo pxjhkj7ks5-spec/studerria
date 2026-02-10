@@ -4418,17 +4418,91 @@ app.post('/admin/messages/delete/:id', requireStaff, writeLimiter, (req, res) =>
   if (Number.isNaN(id)) {
     return res.redirect('/admin?err=Invalid%20message');
   }
-  db.run('DELETE FROM message_reads WHERE message_id = ?', [id], () => {
-    db.run('DELETE FROM message_targets WHERE message_id = ?', [id], () => {
-      db.run('DELETE FROM messages WHERE id = ?', [id], (err) => {
-        if (err) {
-          return res.redirect('/admin?err=Database%20error');
+  db.get(
+    `
+      SELECT id, body, created_by_id, created_at, subject_id, group_number, target_all, status, scheduled_at
+      FROM messages
+      WHERE id = ?
+    `,
+    [id],
+    (findErr, message) => {
+      if (findErr || !message) {
+        return res.redirect('/admin?err=Message%20not%20found');
+      }
+      const deleteIds = [id];
+      const isBroadcast =
+        Number(message.target_all) === 1 &&
+        (message.subject_id === null || typeof message.subject_id === 'undefined') &&
+        (message.group_number === null || typeof message.group_number === 'undefined');
+      if (!isBroadcast) {
+        const placeholders = deleteIds.map(() => '?').join(',');
+        const remove = () => {
+          db.run(`DELETE FROM message_reads WHERE message_id IN (${placeholders})`, deleteIds, () => {
+            db.run(`DELETE FROM message_targets WHERE message_id IN (${placeholders})`, deleteIds, () => {
+              db.run(`DELETE FROM message_reactions WHERE message_id IN (${placeholders})`, deleteIds, () => {
+                db.run(`DELETE FROM messages WHERE id IN (${placeholders})`, deleteIds, (err) => {
+                  if (err) {
+                    return res.redirect('/admin?err=Database%20error');
+                  }
+                  logAction(db, req, 'message_delete', { id, deleted_count: deleteIds.length });
+                  return res.redirect('/admin?ok=Message%20deleted');
+                });
+              });
+            });
+          });
+        };
+        return remove();
+      }
+      const statusKey = message.status || 'published';
+      const scheduledKey = message.scheduled_at ? String(message.scheduled_at) : '';
+      db.all(
+        `
+          SELECT id
+          FROM messages
+          WHERE target_all = 1
+            AND subject_id IS NULL
+            AND group_number IS NULL
+            AND body = ?
+            AND created_by_id = ?
+            AND created_at = ?
+            AND COALESCE(status, 'published') = ?
+            AND COALESCE(scheduled_at, '') = ?
+        `,
+        [
+          message.body,
+          message.created_by_id,
+          message.created_at,
+          statusKey,
+          scheduledKey,
+        ],
+        (listErr, rows) => {
+          if (!listErr && rows && rows.length) {
+            rows.forEach((row) => {
+              if (!deleteIds.includes(row.id)) deleteIds.push(row.id);
+            });
+          }
+          const placeholders = deleteIds.map(() => '?').join(',');
+          db.run(`DELETE FROM message_reads WHERE message_id IN (${placeholders})`, deleteIds, () => {
+            db.run(`DELETE FROM message_targets WHERE message_id IN (${placeholders})`, deleteIds, () => {
+              db.run(`DELETE FROM message_reactions WHERE message_id IN (${placeholders})`, deleteIds, () => {
+                db.run(`DELETE FROM messages WHERE id IN (${placeholders})`, deleteIds, (err) => {
+                  if (err) {
+                    return res.redirect('/admin?err=Database%20error');
+                  }
+                  logAction(db, req, 'message_delete', {
+                    id,
+                    deleted_count: deleteIds.length,
+                    broadcast: true,
+                  });
+                  return res.redirect('/admin?ok=Message%20deleted');
+                });
+              });
+            });
+          });
         }
-        logAction(db, req, 'message_delete', { id });
-        return res.redirect('/admin?ok=Message%20deleted');
-      });
-    });
-  });
+      );
+    }
+  );
 });
 
 app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
