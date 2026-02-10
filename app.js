@@ -3,6 +3,7 @@ const http = require('http');
 const session = require('express-session');
 const path = require('path');
 const fs = require('fs');
+const { randomUUID } = require('crypto');
 const multer = require('multer');
 const { Pool } = require('pg');
 const { WebSocketServer } = require('ws');
@@ -172,6 +173,7 @@ app.use((req, res, next) => {
   res.locals.messages = {
     error: req.query && req.query.err ? req.query.err : '',
     success: req.query && req.query.ok ? req.query.ok : '',
+    operationId: req.query && req.query.op ? req.query.op : '',
   };
   res.locals.appVersion = appVersion;
   res.locals.buildStamp = buildStamp;
@@ -623,6 +625,17 @@ const csvUpload = multer({
     return cb(null, true);
   },
 });
+
+const sanitizeCsvValue = (value) => {
+  const raw = String(value ?? '');
+  const safe = raw.replace(/\r?\n/g, ' ');
+  if (/^[=+\-@]/.test(safe)) {
+    return `'${safe}`;
+  }
+  return safe;
+};
+
+const escapeCsvValue = (value) => `"${sanitizeCsvValue(value).replace(/\"/g, '""')}"`;
 
 const referenceCache = {
   courses: { data: null, expiresAt: 0 },
@@ -4959,9 +4972,10 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         weeklyTeamwork,
         weeklyUserRoles,
         weeklyUserSeries,
-        settings: settingsCache,
-        rolePermissions: settingsCache.role_permissions || { ...DEFAULT_ROLE_PERMISSIONS },
-        adminSectionOptions: ADMIN_SECTION_OPTIONS,
+                                      settings: settingsCache,
+                                      rolePermissions: settingsCache.role_permissions || { ...DEFAULT_ROLE_PERMISSIONS },
+                                      defaultRolePermissions: DEFAULT_ROLE_PERMISSIONS,
+                                      adminSectionOptions: ADMIN_SECTION_OPTIONS,
         activeScheduleDays,
         filters: {
           group_number: group_number || '',
@@ -6735,7 +6749,7 @@ app.get('/admin/export/schedule.csv', requireAdmin, async (req, res) => {
       const header = 'id,subject,group_number,day_of_week,class_number,week_number';
       const lines = rows.map((r) =>
         [r.id, r.subject, r.group_number, r.day_of_week, r.class_number, r.week_number]
-          .map((v) => `"${String(v ?? '').replace(/\"/g, '""')}"`)
+          .map((v) => escapeCsvValue(v))
           .join(',')
       );
       res.setHeader('Content-Type', 'text/csv');
@@ -6781,6 +6795,7 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
+  const operationId = randomUUID();
   for (const row of rows) {
     const subjectName = String(row.subject || '').trim().toLowerCase();
     const subject = subjectMap.get(subjectName);
@@ -6811,8 +6826,14 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
       inserted += 1;
     }
   }
-  logAction(db, req, 'schedule_import_csv', { inserted, updated, skipped, course_id: courseId });
-  return res.redirect(`/admin?ok=Schedule%20imported%20(${inserted}%2F${updated}%2F${skipped})`);
+  logAction(db, req, 'schedule_import_csv', {
+    inserted,
+    updated,
+    skipped,
+    course_id: courseId,
+    operation_id: operationId,
+  });
+  return res.redirect(`/admin?ok=Schedule%20imported%20(${inserted}%2F${updated}%2F${skipped})&op=${operationId}`);
 });
 
 app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
@@ -6853,7 +6874,7 @@ app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
     const header = 'id,full_name,role,schedule_group,is_active,course_id';
     const lines = rows.map((r) =>
       [r.id, r.full_name, r.role, r.schedule_group, r.is_active, r.course_id]
-        .map((v) => `"${String(v ?? '').replace(/\"/g, '""')}"`)
+        .map((v) => escapeCsvValue(v))
         .join(',')
     );
     res.setHeader('Content-Type', 'text/csv');
@@ -6883,6 +6904,7 @@ app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
+  const operationId = randomUUID();
   for (const row of rows) {
     const fullName = String(row.full_name || '').trim().replace(/\s+/g, ' ');
     if (!fullName) {
@@ -6912,9 +6934,15 @@ app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single
       inserted += 1;
     }
   }
-  logAction(db, req, 'users_import_csv', { inserted, updated, skipped, course_id: courseId });
+  logAction(db, req, 'users_import_csv', {
+    inserted,
+    updated,
+    skipped,
+    course_id: courseId,
+    operation_id: operationId,
+  });
   broadcast('users_updated');
-  return res.redirect(`/admin?ok=Users%20imported%20(${inserted}%2F${updated}%2F${skipped})`);
+  return res.redirect(`/admin?ok=Users%20imported%20(${inserted}%2F${updated}%2F${skipped})&op=${operationId}`);
 });
 
 app.get('/admin/export/subjects.csv', requireAdmin, (req, res) => {
@@ -6929,7 +6957,7 @@ app.get('/admin/export/subjects.csv', requireAdmin, (req, res) => {
     const header = 'id,name,group_count,default_group,is_required,is_general';
     const lines = rows.map((r) =>
       [r.id, r.name, r.group_count, r.default_group, r.is_required ? 1 : 0, r.is_general ? 1 : 0]
-        .map((v) => `"${String(v ?? '').replace(/\"/g, '""')}"`)
+        .map((v) => escapeCsvValue(v))
         .join(',')
     );
     res.setHeader('Content-Type', 'text/csv');
@@ -6956,6 +6984,7 @@ app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.sin
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
+  const operationId = randomUUID();
   for (const row of rows) {
     const name = String(row.name || '').trim();
     const groupCount = row.group_count ? Number(row.group_count) : 1;
@@ -6984,8 +7013,14 @@ app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.sin
     }
   }
   invalidateSubjectsCache(courseId);
-  logAction(db, req, 'subjects_import_csv', { inserted, updated, skipped, course_id: courseId });
-  return res.redirect(`/admin?ok=Subjects%20imported%20(${inserted}%2F${updated}%2F${skipped})`);
+  logAction(db, req, 'subjects_import_csv', {
+    inserted,
+    updated,
+    skipped,
+    course_id: courseId,
+    operation_id: operationId,
+  });
+  return res.redirect(`/admin?ok=Subjects%20imported%20(${inserted}%2F${updated}%2F${skipped})&op=${operationId}`);
 });
 
 app.get('/admin/history.csv', requireAdmin, (req, res) => {
@@ -7022,7 +7057,7 @@ app.get('/admin/history.csv', requireAdmin, (req, res) => {
     const header = 'id,actor_name,action,details,created_at';
     const lines = rows.map((r) =>
       [r.id, r.actor_name, r.action, r.details, r.created_at]
-        .map((v) => `"${String(v ?? '').replace(/\"/g, '""')}"`)
+        .map((v) => escapeCsvValue(v))
         .join(',')
     );
     res.setHeader('Content-Type', 'text/csv');
@@ -8862,14 +8897,14 @@ app.post('/admin/api/homework/bulk', requireHomeworkBulkAccess, writeLimiter, as
         const isWeird = r.custom_due_date && r.custom_due_date !== r.class_date ? '1' : '0';
         const line = [
           r.id,
-          JSON.stringify(r.description || '').slice(1, -1),
-          JSON.stringify(r.subject_name || '').slice(1, -1),
+          r.description || '',
+          r.subject_name || '',
           r.group_number || '',
           deadline,
           isWeird,
-          JSON.stringify(r.created_by || '').slice(1, -1),
+          r.created_by || '',
           r.created_at || '',
-        ].join(',');
+        ].map((v) => escapeCsvValue(v)).join(',');
         csv.push(line);
       });
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
