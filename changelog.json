@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.76",
+      "date": "2026-02-10",
+      "items": [
+        "fix: use string_agg for schedule list group labels on Postgres"
+      ]
+    },
+    {
       "version": "0.7.75",
       "date": "2026-02-10",
       "items": [

@@ -5507,19 +5507,15 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
               AND COALESCE(se2.lesson_type, '') = COALESCE(se.lesson_type, '')
           ) AS slot_group_count,
           (
-            SELECT group_concat(group_number, ', ')
-            FROM (
-              SELECT DISTINCT se2.group_number AS group_number
-              FROM schedule_entries se2
-              WHERE se2.subject_id = se.subject_id
-                AND se2.day_of_week = se.day_of_week
-                AND se2.class_number = se.class_number
-                AND se2.week_number = se.week_number
-                AND COALESCE(se2.semester_id, 0) = COALESCE(se.semester_id, 0)
-                AND COALESCE(se2.course_id, 0) = COALESCE(se.course_id, 0)
-                AND COALESCE(se2.lesson_type, '') = COALESCE(se.lesson_type, '')
-              ORDER BY se2.group_number
-            )
+            SELECT string_agg(DISTINCT se2.group_number::text, ', ' ORDER BY se2.group_number)
+            FROM schedule_entries se2
+            WHERE se2.subject_id = se.subject_id
+              AND se2.day_of_week = se.day_of_week
+              AND se2.class_number = se.class_number
+              AND se2.week_number = se.week_number
+              AND COALESCE(se2.semester_id, 0) = COALESCE(se.semester_id, 0)
+              AND COALESCE(se2.course_id, 0) = COALESCE(se.course_id, 0)
+              AND COALESCE(se2.lesson_type, '') = COALESCE(se.lesson_type, '')
           ) AS slot_group_list
         FROM schedule_entries se
         JOIN subjects s ON s.id = se.subject_id
