@@ -6245,7 +6245,7 @@ app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) =
   }
 
   try {
-    const subjectRow = await db.get('SELECT id, group_count FROM subjects WHERE id = ? AND course_id = ?', [subjectId, courseId]);
+    const subjectRow = await db.get('SELECT id, group_count, is_general FROM subjects WHERE id = ? AND course_id = ?', [subjectId, courseId]);
     if (!subjectRow) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Subject%20not%20found`);
     }
@@ -6273,27 +6273,59 @@ app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) =
     if (!semester) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Semester%20not%20found`);
     }
-    await db.run(
-      `
-        INSERT INTO schedule_generator_items
-          (run_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, pairs_count, weeks_set, fixed_day, fixed_class_number, mirror_key)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        runId,
-        courseId,
-        semester.id,
-        subjectId,
-        teacherIdRaw || null,
-        lessonType,
-        groupNumber,
-        pairsCount,
-        weeksSet || null,
-        fixedDay,
-        fixedClass || null,
-        mirrorKey,
-      ]
-    );
+    const lessonTypeLower = String(lessonType || '').toLowerCase();
+    const isSeminar = lessonTypeLower.includes('seminar') || lessonTypeLower.includes('сем');
+    const isGeneral = subjectRow.is_general === true || Number(subjectRow.is_general) === 1;
+    const totalGroups = Math.max(1, Number(subjectRow.group_count || 1));
+    const shouldSplitAllGroups = !groupNumber && isGeneral && isSeminar && totalGroups > 1;
+    if (shouldSplitAllGroups) {
+      const stmt = db.prepare(
+        `
+          INSERT INTO schedule_generator_items
+            (run_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, pairs_count, weeks_set, fixed_day, fixed_class_number, mirror_key)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      );
+      for (let g = 1; g <= totalGroups; g += 1) {
+        stmt.run(
+          runId,
+          courseId,
+          semester.id,
+          subjectId,
+          teacherIdRaw || null,
+          lessonType,
+          g,
+          pairsCount,
+          weeksSet || null,
+          fixedDay,
+          fixedClass || null,
+          mirrorKey
+        );
+      }
+      await stmt.finalize();
+    } else {
+      await db.run(
+        `
+          INSERT INTO schedule_generator_items
+            (run_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, pairs_count, weeks_set, fixed_day, fixed_class_number, mirror_key)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          runId,
+          courseId,
+          semester.id,
+          subjectId,
+          teacherIdRaw || null,
+          lessonType,
+          groupNumber,
+          pairsCount,
+          weeksSet || null,
+          fixedDay,
+          fixedClass || null,
+          mirrorKey,
+        ]
+      );
+    }
     return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Item%20added`);
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.item.add');
@@ -6346,9 +6378,6 @@ app.post('/admin/schedule-generator/mirror-auto', requireAdmin, async (req, res)
     if (a.fixed_day || a.fixed_class_number || a.weeks_set) continue;
     if (b.fixed_day || b.fixed_class_number || b.weeks_set) continue;
     if (a.mirror_key || b.mirror_key) continue;
-    const generalA = a.is_general === true || Number(a.is_general) === 1;
-    const generalB = b.is_general === true || Number(b.is_general) === 1;
-    if (generalA || generalB) continue;
     const lessonType = String(a.lesson_type || '').toLowerCase();
     if (!(lessonType.includes('seminar') || lessonType.includes('сем'))) continue;
     if (Number(a.subject_id) === Number(b.subject_id)) continue;

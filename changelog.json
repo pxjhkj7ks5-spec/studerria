@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.92",
+      "date": "2026-02-11",
+      "items": [
+        "fix: split general seminars into per-group generator items when selecting all groups",
+        "fix: allow auto mirror pairing for general seminar items"
+      ]
+    },
+    {
       "version": "0.7.91",
       "date": "2026-02-11",
       "items": [
