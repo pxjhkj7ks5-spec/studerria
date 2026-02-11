@@ -1419,14 +1419,38 @@ const buildGeneratorValidation = ({
       baseWeeks = allWeeks.filter((week) => !blocked.has(week));
     }
     if (weeksCount && targetPairs > baseWeeks.length) {
-      pushIssue(
-        'warn',
-        `"${item.subject_name}" має ${targetPairs} пар, але доступно лише ${baseWeeks.length} тижнів для генерації.`,
-        item.id
-      );
+      const maxDailyPairs = Math.max(1, Math.min(7, Number(config.max_daily_pairs || 7)));
+      const allowedSlotsPerWeek = config.strict_no_evening ? Math.min(maxDailyPairs, 5) : maxDailyPairs;
+      const roughCapacity = baseWeeks.length * Math.max(1, allowedSlotsPerWeek);
+      if (item.fixed_class_number) {
+        pushIssue(
+          'warn',
+          `"${item.subject_name}" має ${targetPairs} пар при фіксованому слоті: за ${baseWeeks.length} тижнів це майже точно призведе до часткової генерації.`,
+          item.id
+        );
+      } else if (targetPairs > roughCapacity) {
+        pushIssue(
+          'warn',
+          `"${item.subject_name}" має ${targetPairs} пар, а груба місткість за період близько ${roughCapacity} (тижні × слоти). Ймовірна часткова генерація.`,
+          item.id
+        );
+      } else {
+        pushIssue(
+          'warn',
+          `"${item.subject_name}" має ${targetPairs} пар на ${baseWeeks.length} тижнів: генератору доведеться ставити більше ніж 1 пару на тиждень.`,
+          item.id
+        );
+      }
     }
     if (item.group_number && item.group_count && Number(item.group_number) > Number(item.group_count)) {
       pushIssue('error', `Група ${item.group_number} перевищує кількість груп у "${item.subject_name}".`, item.id);
+    }
+    const lessonType = String(item.lesson_type || '').toLowerCase();
+    const seminarAllGroups = (lessonType.includes('seminar') || lessonType.includes('сем'))
+      && !item.group_number
+      && Number(item.group_count || 1) > 1;
+    if (seminarAllGroups) {
+      pushIssue('warn', `"${item.subject_name}" як семінар для "Усі групи" буде автоматично розбитий на окремі групи.`, item.id);
     }
     if (config.strict_no_evening && item.fixed_class_number && Number(item.fixed_class_number) > 5) {
       pushIssue('error', `"${item.subject_name}" має фіксований слот ${item.fixed_class_number}, але strict no-evening забороняє 6-7 пари.`, item.id);
@@ -6839,9 +6863,8 @@ app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) =
     }
     const lessonTypeLower = String(lessonType || '').toLowerCase();
     const isSeminar = lessonTypeLower.includes('seminar') || lessonTypeLower.includes('сем');
-    const isGeneral = subjectRow.is_general === true || Number(subjectRow.is_general) === 1;
     const totalGroups = Math.max(1, Number(subjectRow.group_count || 1));
-    const shouldSplitAllGroups = !groupNumber && isGeneral && isSeminar && totalGroups > 1;
+    const shouldSplitAllGroups = !groupNumber && isSeminar && totalGroups > 1;
     if (shouldSplitAllGroups) {
       const stmt = db.prepare(
         `

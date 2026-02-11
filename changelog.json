@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.7.97",
+      "date": "2026-02-11",
+      "items": [
+        "fix: split all-group seminars into per-group generator items regardless of is_general flag",
+        "fix: schedule high pair counts across multiple slots per subject to reduce partial generation (e.g. 13/26 cases)",
+        "fix: prevent parallel same-subject seminars for shared/no-teacher multi-group cases",
+        "fix: strengthen day-balance and late-slot scoring so evening avoidance and Monday spread work more predictably",
+        "fix: improve generator validation messaging for multi-slot-per-week scenarios and fixed-slot overcommit"
+      ]
+    },
+    {
       "version": "0.7.96",
       "date": "2026-02-11",
       "items": [
