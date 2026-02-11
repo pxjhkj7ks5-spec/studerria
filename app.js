@@ -862,14 +862,14 @@ async function getSemestersCached(courseId) {
 
 const DEFAULT_GENERATOR_CONFIG = {
   distribution: 'even',
-  seminar_distribution: 'start',
+  seminar_distribution: 'even',
   max_daily_pairs: 7,
   target_daily_pairs: 4,
   evenness_bias: 50,
   late_slot_weight: 60,
   blocked_weeks: '',
   special_weeks_mode: 'block',
-  prefer_compactness: true,
+  prefer_compactness: false,
   mirror_groups: false,
   auto_subject_days: true,
   subject_single_day: true,
@@ -909,6 +909,11 @@ const parseGeneratorConfig = (raw) => {
         ...(merged.course_semesters_by_location.munich || {}),
       },
     };
+    merged.distribution = normalizeDistribution(merged.distribution, DEFAULT_GENERATOR_CONFIG.distribution);
+    merged.seminar_distribution = normalizeDistribution(
+      merged.seminar_distribution,
+      DEFAULT_GENERATOR_CONFIG.seminar_distribution
+    );
     merged.active_location = merged.active_location === 'munich' ? 'munich' : 'kyiv';
     return merged;
   } catch (err) {
@@ -940,6 +945,14 @@ async function getCoursesByLocation(location) {
 }
 
 const normalizeMirrorKey = (value) => String(value || '').trim().toLowerCase();
+const ALLOWED_DISTRIBUTIONS = new Set(['start', 'even', 'end']);
+const normalizeDistribution = (value, fallback = 'even') => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (ALLOWED_DISTRIBUTIONS.has(raw)) return raw;
+  return ALLOWED_DISTRIBUTIONS.has(String(fallback || '').trim().toLowerCase())
+    ? String(fallback).trim().toLowerCase()
+    : 'even';
+};
 
 const parseSubjectTypeSuffix = (name) => {
   const raw = String(name || '').trim();
@@ -1110,6 +1123,139 @@ const buildHeatmap = (entries, days, slots) => {
     });
   });
   return { counts, max };
+};
+
+const buildGenerationInsights = ({
+  validationByLocation,
+  conflictDetails,
+  heatmapByLocation,
+  mirrorSummaryByLocation,
+  config,
+}) => {
+  const reasonLabels = {
+    missing_course_context: 'Немає активного семестру',
+    missing_weeks_count: 'Не задано кількість тижнів',
+    no_available_weeks: 'Немає доступних тижнів',
+    no_allowed_days: 'Немає доступних днів',
+    no_slot_found: 'Немає слота',
+    partial_schedule: 'Часткова генерація',
+    subject_day_mismatch: 'Предмет має різні дні',
+    unknown: 'Невідома причина',
+  };
+  const result = { kyiv: null, munich: null };
+  ['kyiv', 'munich'].forEach((location) => {
+    const validation = validationByLocation && validationByLocation[location]
+      ? validationByLocation[location]
+      : { issues: [] };
+    const issues = Array.isArray(validation.issues) ? validation.issues : [];
+    const blockers = issues.filter((issue) => issue.level === 'error').length;
+    const warnings = issues.filter((issue) => issue.level !== 'error').length;
+    const conflicts = conflictDetails && conflictDetails[location] ? conflictDetails[location] : [];
+    const reasonCounts = {};
+    (conflicts || []).forEach((row) => {
+      const reason = String(row.reason || 'unknown');
+      reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
+    });
+    const conflictTop = Object.entries(reasonCounts)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 3)
+      .map(([reason, count]) => ({
+        reason,
+        label: reasonLabels[reason] || reasonLabels.unknown,
+        count,
+      }));
+
+    const heatmap = heatmapByLocation && heatmapByLocation[location] ? heatmapByLocation[location] : null;
+    const slotTotals = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
+    const dayTotals = (fullWeekDays || []).map((day) => {
+      const row = heatmap && heatmap.counts && heatmap.counts[day] ? heatmap.counts[day] : {};
+      let total = 0;
+      [1, 2, 3, 4, 5, 6, 7].forEach((slot) => {
+        const count = Number(row[slot] || 0);
+        slotTotals[slot] += count;
+        total += count;
+      });
+      return { day, total };
+    });
+    const totalEntries = dayTotals.reduce((sum, row) => sum + row.total, 0);
+    const lateEntries = slotTotals[5] + slotTotals[6] + slotTotals[7];
+    const lateShare = totalEntries ? lateEntries / totalEntries : 0;
+    const activeDayTotals = dayTotals.map((row) => row.total).filter((value) => value > 0);
+    const averageDayLoad = activeDayTotals.length
+      ? activeDayTotals.reduce((sum, value) => sum + value, 0) / activeDayTotals.length
+      : 0;
+    const dayVariance = activeDayTotals.length
+      ? activeDayTotals.reduce((sum, value) => sum + (value - averageDayLoad) ** 2, 0) / activeDayTotals.length
+      : 0;
+    const dayStd = Math.sqrt(dayVariance);
+    const dayImbalance = averageDayLoad ? dayStd / averageDayLoad : 0;
+    const peakDay = [...dayTotals].sort((a, b) => b.total - a.total)[0] || { day: null, total: 0 };
+    const peakSlot = Object.entries(slotTotals)
+      .sort((a, b) => b[1] - a[1] || Number(a[0]) - Number(b[0]))[0] || ['1', 0];
+
+    const mirrorSummary = mirrorSummaryByLocation && mirrorSummaryByLocation[location]
+      ? mirrorSummaryByLocation[location]
+      : [];
+    const mirrorWarn = (mirrorSummary || []).filter((row) => row.status && row.status !== 'ok').length;
+    const mirrorMissing = (mirrorSummary || []).filter((row) => row.status === 'missing').length;
+    const partialCount = Number(reasonCounts.partial_schedule || 0);
+    const noSlotCount = Number(reasonCounts.no_slot_found || 0);
+
+    const tips = [];
+    if (blockers > 0) {
+      tips.push('Спершу закрийте критичні пункти у блоці "Перед запуском".');
+    }
+    if (partialCount > 0) {
+      tips.push('Є часткова генерація: зменшіть к-сть пар або розширте доступні тижні/дні.');
+    }
+    if (noSlotCount > 0) {
+      tips.push('Для no-slot перевірте fixed-обмеження та ліміти викладачів.');
+    }
+    if (mirrorWarn > 0) {
+      tips.push('Перевірте дзеркальні ключі: A/B має формуватися між різними предметами.');
+    }
+    if (lateShare > 0.22 && Number(config.late_slot_weight || 0) > 0) {
+      tips.push('Багато вечірніх пар: зменшіть compactness або target пар/день.');
+    }
+    if (dayImbalance > 0.42) {
+      tips.push('Є перекіс по днях: підніміть evenness або вимкніть фіксацію дня для частини предметів.');
+    }
+    const finalTips = tips.length ? tips.slice(0, 3) : ['Поточна конфігурація виглядає збалансовано.'];
+
+    let healthScore = 100;
+    healthScore -= blockers * 22;
+    healthScore -= warnings * 6;
+    healthScore -= partialCount * 8;
+    healthScore -= noSlotCount * 10;
+    healthScore -= mirrorWarn * 7;
+    healthScore -= Math.round(lateShare * 35);
+    healthScore -= Math.round(Math.min(1, dayImbalance) * 25);
+    healthScore = Math.max(0, Math.min(100, healthScore));
+    const healthState = healthScore >= 75 ? 'good' : healthScore >= 45 ? 'warn' : 'critical';
+
+    result[location] = {
+      blockers,
+      warnings,
+      partialCount,
+      noSlotCount,
+      mirrorWarn,
+      mirrorMissing,
+      totalEntries,
+      lateEntries,
+      lateShare,
+      dayImbalance,
+      peakDay,
+      peakSlot: {
+        slot: Number(peakSlot[0]),
+        count: Number(peakSlot[1] || 0),
+      },
+      conflictTop,
+      tips: finalTips,
+      healthScore,
+      healthState,
+    };
+  });
+  return result;
 };
 
 const buildMirrorSummary = (items, courseById) => {
@@ -1286,6 +1432,16 @@ const buildGeneratorValidation = ({
 const buildConflictContext = (conflicts, itemsById, courseById, courseLocationMap) => {
   const conflictDetails = { kyiv: [], munich: [] };
   const conflictItemIds = { kyiv: new Set(), munich: new Set() };
+  const reasonPriority = {
+    missing_course_context: 0,
+    missing_weeks_count: 1,
+    no_available_weeks: 2,
+    no_allowed_days: 3,
+    no_slot_found: 4,
+    partial_schedule: 5,
+    subject_day_mismatch: 6,
+    unknown: 99,
+  };
   (conflicts || []).forEach((conflict) => {
     const rawId = String(conflict.item_id || '');
     const ids = rawId
@@ -1310,6 +1466,16 @@ const buildConflictContext = (conflicts, itemsById, courseById, courseLocationMa
         teacher: item.teacher_name,
         group: item.group_number ? `Група ${item.group_number}` : 'Усі групи',
       })),
+    });
+  });
+  Object.values(conflictDetails).forEach((list) => {
+    list.sort((a, b) => {
+      const pa = Object.prototype.hasOwnProperty.call(reasonPriority, a.reason) ? reasonPriority[a.reason] : reasonPriority.unknown;
+      const pb = Object.prototype.hasOwnProperty.call(reasonPriority, b.reason) ? reasonPriority[b.reason] : reasonPriority.unknown;
+      if (pa !== pb) return pa - pb;
+      const sa = String(a.subject || '');
+      const sb = String(b.subject || '');
+      return sa.localeCompare(sb, 'uk');
     });
   });
   return { conflictDetails, conflictItemIds };
@@ -6218,6 +6384,13 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       autoMirrorCandidatesByLocation[location] = candidates;
       autoMirrorExclusionsByLocation[location] = exclusions;
     });
+    const generationInsightsByLocation = buildGenerationInsights({
+      validationByLocation,
+      conflictDetails,
+      heatmapByLocation,
+      mirrorSummaryByLocation,
+      config,
+    });
 
     return res.render('admin-schedule-generator', {
       username: req.session.user.username,
@@ -6244,6 +6417,7 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
       conflictItemIds,
       problemItemLookupByLocation,
       heatmapByLocation,
+      generationInsightsByLocation,
       autoMirrorCandidatesByLocation,
       autoMirrorExclusionsByLocation,
       dayOptions: fullWeekDays,
@@ -6347,8 +6521,8 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
     const nextConfig = {
       ...existing,
       active_location: activeLocation,
-      distribution: String(req.body.distribution || existing.distribution || 'even'),
-      seminar_distribution: String(req.body.seminar_distribution || existing.seminar_distribution || 'start'),
+      distribution: normalizeDistribution(req.body.distribution, existing.distribution || 'even'),
+      seminar_distribution: normalizeDistribution(req.body.seminar_distribution, existing.seminar_distribution || 'even'),
       max_daily_pairs: maxDailyPairs || 7,
       target_daily_pairs: targetDailyPairs || 4,
       evenness_bias: evennessBias,

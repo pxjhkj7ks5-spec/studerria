@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.7.95",
+      "date": "2026-02-11",
+      "items": [
+        "feat: add per-location generator health insights with actionable recommendations",
+        "fix: normalize generator distribution settings and rebalance defaults for new drafts",
+        "fix: sort generation conflicts by severity and improve generator copy for multi-location flow"
+      ]
+    },
+    {
       "version": "0.7.94",
       "date": "2026-02-11",
       "items": [

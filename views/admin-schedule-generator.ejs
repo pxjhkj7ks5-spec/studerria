@@ -59,7 +59,7 @@
           <div>
             <h1 class="h3 mb-2">Семестровий генератор</h1>
             <div class="text-muted">
-              Формуємо повний розклад по київських курсах: фіксовані слоти, дзеркальні тижні, обмеження викладачів.
+              Формуємо повний розклад по вибраній локації: фіксовані слоти, дзеркальні тижні, обмеження викладачів.
             </div>
           </div>
           <div class="generator-status">
@@ -147,6 +147,53 @@
                     <% }); %>
                   <% } else { %>
                     <div class="generator-empty">Немає курсів для <%= location === 'kyiv' ? 'Kyiv' : 'Munich' %>.</div>
+                  <% } %>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
+              <div class="generator-section-title mb-2">Аналітика генератора</div>
+              <% ['kyiv', 'munich'].forEach(function(location) { %>
+                <% const insight = generationInsightsByLocation && generationInsightsByLocation[location]; %>
+                <div class="generator-insights" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
+                  <% if (!insight) { %>
+                    <div class="generator-empty">Аналітика недоступна.</div>
+                  <% } else { %>
+                    <div class="insight-header mb-2">
+                      <span class="insight-health <%= insight.healthState === 'good' ? 'is-good' : insight.healthState === 'warn' ? 'is-warn' : 'is-critical' %>">
+                        <%= insight.healthState === 'good' ? 'Стабільно' : insight.healthState === 'warn' ? 'Потрібна увага' : 'Ризиковано' %>
+                      </span>
+                      <span class="small text-muted">Score: <%= insight.healthScore %>/100</span>
+                    </div>
+                    <div class="insight-metrics mb-2">
+                      <div class="insight-metric"><span>Блокери</span><strong><%= insight.blockers %></strong></div>
+                      <div class="insight-metric"><span>Попередж.</span><strong><%= insight.warnings %></strong></div>
+                      <div class="insight-metric"><span>Partial</span><strong><%= insight.partialCount %></strong></div>
+                      <div class="insight-metric"><span>No slot</span><strong><%= insight.noSlotCount %></strong></div>
+                      <div class="insight-metric"><span>Пізні слоти</span><strong><%= Math.round((insight.lateShare || 0) * 100) %>%</strong></div>
+                      <div class="insight-metric"><span>Дисбаланс днів</span><strong><%= Math.round((insight.dayImbalance || 0) * 100) %>%</strong></div>
+                    </div>
+                    <div class="small text-muted mb-2">
+                      <% const peakDay = insight.peakDay && insight.peakDay.day ? insight.peakDay.day : null; %>
+                      <% const peakDayIdx = peakDay ? dayOptions.indexOf(peakDay) : -1; %>
+                      <% const peakDayLabel = peakDayIdx >= 0 ? (dayLabels[peakDayIdx] || peakDay) : (peakDay || '—'); %>
+                      Пік: <%= peakDayLabel %> (<%= insight.peakDay ? insight.peakDay.total : 0 %>) · Пара #<%= insight.peakSlot ? insight.peakSlot.slot : '—' %> (<%= insight.peakSlot ? insight.peakSlot.count : 0 %>)
+                    </div>
+                    <% if (insight.conflictTop && insight.conflictTop.length) { %>
+                      <div class="insight-top mb-2">
+                        <% insight.conflictTop.forEach(function(top) { %>
+                          <span class="insight-top-chip"><%= top.label %>: <%= top.count %></span>
+                        <% }); %>
+                      </div>
+                    <% } %>
+                    <div class="insight-tips">
+                      <% (insight.tips || []).forEach(function(tip) { %>
+                        <div class="insight-tip"><span class="insight-tip-dot"></span><span><%= tip %></span></div>
+                      <% }); %>
+                    </div>
                   <% } %>
                 </div>
               <% }); %>

@@ -589,6 +589,140 @@ body.theme-light.schedule-generator-page .validation-empty {
   box-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
 }
 
+.generator-insights {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.insight-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.insight-health {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.12);
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.insight-health.is-good {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.16);
+  color: #dcfce7;
+}
+
+.insight-health.is-warn {
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.16);
+  color: #fef3c7;
+}
+
+.insight-health.is-critical {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.16);
+  color: #fee2e2;
+}
+
+.insight-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.insight-metric {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.45rem 0.55rem;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.insight-metric span {
+  font-size: 0.68rem;
+  color: var(--muted);
+  line-height: 1.1;
+}
+
+.insight-metric strong {
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.insight-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.insight-top-chip {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--muted);
+}
+
+.insight-tips {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.insight-tip {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.insight-tip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: 0.35rem;
+  flex: 0 0 auto;
+  background: rgba(94, 176, 255, 0.95);
+  box-shadow: 0 0 6px rgba(94, 176, 255, 0.45);
+}
+
+.theme-light.schedule-generator-page .insight-metric,
+body.theme-light.schedule-generator-page .insight-metric {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+body.theme-light.schedule-generator-page .insight-health {
+  color: #0f172a;
+}
+
+body.theme-light.schedule-generator-page .insight-top-chip {
+  border-color: rgba(15, 23, 42, 0.18);
+  background: rgba(15, 23, 42, 0.06);
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.theme-light.schedule-generator-page .insight-tip,
+body.theme-light.schedule-generator-page .insight-tip {
+  color: rgba(15, 23, 42, 0.84);
+}
+
+@media (max-width: 480px) {
+  .insight-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .heatmap-grid {
   display: grid;
   gap: 0.45rem;
