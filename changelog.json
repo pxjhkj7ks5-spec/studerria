@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.7.96",
+      "date": "2026-02-11",
+      "items": [
+        "feat: add Safe auto-tune action for generator settings based on diagnostics",
+        "feat: add strict no-evening mode to hard-block 6-7 class slots",
+        "fix: surface no-allowed-classes conflicts in validation, analytics, and conflict priority sorting"
+      ]
+    },
+    {
       "version": "0.7.95",
       "date": "2026-02-11",
       "items": [

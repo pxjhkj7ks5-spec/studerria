@@ -173,6 +173,7 @@
                       <div class="insight-metric"><span>Попередж.</span><strong><%= insight.warnings %></strong></div>
                       <div class="insight-metric"><span>Partial</span><strong><%= insight.partialCount %></strong></div>
                       <div class="insight-metric"><span>No slot</span><strong><%= insight.noSlotCount %></strong></div>
+                      <div class="insight-metric"><span>No classes</span><strong><%= insight.noAllowedClassesCount || 0 %></strong></div>
                       <div class="insight-metric"><span>Пізні слоти</span><strong><%= Math.round((insight.lateShare || 0) * 100) %>%</strong></div>
                       <div class="insight-metric"><span>Дисбаланс днів</span><strong><%= Math.round((insight.dayImbalance || 0) * 100) %>%</strong></div>
                     </div>
@@ -202,7 +203,14 @@
 
           <div class="card glass-panel mb-4">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Налаштування генерації</div>
+              <div class="d-flex align-items-center justify-content-between mb-2 gap-2">
+                <div class="generator-section-title m-0">Налаштування генерації</div>
+                <form method="POST" action="/admin/schedule-generator/config/autotune" class="m-0">
+                  <input type="hidden" name="run_id" value="<%= run.id %>" />
+                  <input type="hidden" name="active_location" id="autoTuneLocationInput" value="<%= activeLocation %>" />
+                  <button class="btn btn-outline-primary btn-sm" type="submit">Safe auto-tune</button>
+                </form>
+              </div>
               <form method="POST" action="/admin/schedule-generator/config" class="row g-3">
                 <input type="hidden" name="run_id" value="<%= run.id %>" />
                 <input type="hidden" name="active_location" id="activeLocationInput" value="<%= activeLocation %>" />
@@ -263,6 +271,13 @@
                     value="<%= lateSlotValue %>"
                   />
                   <div class="small text-muted">0 — не враховувати, 100 — максимально уникати 5–7 пар.</div>
+                </div>
+                <div class="col-12">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="strict_no_evening" id="strictNoEvening" <%= config.strict_no_evening ? 'checked' : '' %> />
+                    <label class="form-check-label" for="strictNoEvening">Strict no-evening (заборонити 6-7 пари)</label>
+                  </div>
+                  <div class="small text-muted">Жорстка заборона вечірніх слотів. Якщо не вистачає місця — генератор покаже конфлікти.</div>
                 </div>
                 <div class="col-12">
                   <label class="form-label">Особливі тижні (1-3,8)</label>
@@ -733,7 +748,7 @@
           <div class="card glass-panel mb-4">
             <div class="card-body">
               <div class="generator-section-title mb-2">Конфлікти після генерації</div>
-              <% const conflictLabels = { missing_course_context: 'Немає активного семестру', missing_weeks_count: 'Не задано кількість тижнів', no_available_weeks: 'Немає доступних тижнів', no_allowed_days: 'Немає доступних днів', no_slot_found: 'Немає слота', partial_schedule: 'Часткова генерація', subject_day_mismatch: 'Предмет має різні дні', unknown: 'Невідома причина' }; %>
+              <% const conflictLabels = { missing_course_context: 'Немає активного семестру', missing_weeks_count: 'Не задано кількість тижнів', no_available_weeks: 'Немає доступних тижнів', no_allowed_days: 'Немає доступних днів', no_allowed_classes: 'Немає дозволених слотів', no_slot_found: 'Немає слота', partial_schedule: 'Часткова генерація', subject_day_mismatch: 'Предмет має різні дні', unknown: 'Невідома причина' }; %>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const conflicts = conflictDetails && conflictDetails[location]; %>
                 <div class="d-grid gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
@@ -1065,6 +1080,7 @@
       const locationButtons = document.querySelectorAll('.location-toggle');
       const locationInput = document.getElementById('activeLocationInput');
       const runLocationInput = document.getElementById('runLocationInput');
+      const autoTuneLocationInput = document.getElementById('autoTuneLocationInput');
       const locationSections = document.querySelectorAll('[data-location-section]');
       const locationRows = document.querySelectorAll('[data-location-row]');
 
@@ -1340,6 +1356,7 @@
         const safe = location === 'munich' ? 'munich' : 'kyiv';
         if (locationInput) locationInput.value = safe;
         if (runLocationInput) runLocationInput.value = safe;
+        if (autoTuneLocationInput) autoTuneLocationInput.value = safe;
         updateRunButtons(safe);
         locationButtons.forEach((btn) => {
           btn.classList.toggle('active', btn.dataset.location === safe);

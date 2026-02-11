@@ -871,6 +871,7 @@ const DEFAULT_GENERATOR_CONFIG = {
   special_weeks_mode: 'block',
   prefer_compactness: false,
   mirror_groups: false,
+  strict_no_evening: false,
   auto_subject_days: true,
   subject_single_day: true,
   lecture_seminar_same_day: true,
@@ -1137,6 +1138,7 @@ const buildGenerationInsights = ({
     missing_weeks_count: 'Не задано кількість тижнів',
     no_available_weeks: 'Немає доступних тижнів',
     no_allowed_days: 'Немає доступних днів',
+    no_allowed_classes: 'Немає дозволених слотів',
     no_slot_found: 'Немає слота',
     partial_schedule: 'Часткова генерація',
     subject_day_mismatch: 'Предмет має різні дні',
@@ -1200,6 +1202,7 @@ const buildGenerationInsights = ({
     const mirrorMissing = (mirrorSummary || []).filter((row) => row.status === 'missing').length;
     const partialCount = Number(reasonCounts.partial_schedule || 0);
     const noSlotCount = Number(reasonCounts.no_slot_found || 0);
+    const noAllowedClassesCount = Number(reasonCounts.no_allowed_classes || 0);
 
     const tips = [];
     if (blockers > 0) {
@@ -1210,6 +1213,9 @@ const buildGenerationInsights = ({
     }
     if (noSlotCount > 0) {
       tips.push('Для no-slot перевірте fixed-обмеження та ліміти викладачів.');
+    }
+    if (noAllowedClassesCount > 0) {
+      tips.push('Немає дозволених слотів: вимкніть strict no-evening або перегляньте fixed-слоти.');
     }
     if (mirrorWarn > 0) {
       tips.push('Перевірте дзеркальні ключі: A/B має формуватися між різними предметами.');
@@ -1227,6 +1233,7 @@ const buildGenerationInsights = ({
     healthScore -= warnings * 6;
     healthScore -= partialCount * 8;
     healthScore -= noSlotCount * 10;
+    healthScore -= noAllowedClassesCount * 12;
     healthScore -= mirrorWarn * 7;
     healthScore -= Math.round(lateShare * 35);
     healthScore -= Math.round(Math.min(1, dayImbalance) * 25);
@@ -1238,6 +1245,7 @@ const buildGenerationInsights = ({
       warnings,
       partialCount,
       noSlotCount,
+      noAllowedClassesCount,
       mirrorWarn,
       mirrorMissing,
       totalEntries,
@@ -1256,6 +1264,64 @@ const buildGenerationInsights = ({
     };
   });
   return result;
+};
+
+const buildSafeAutoTunePatch = (config, insight) => {
+  const clamp = (value, min, max, fallback) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(Math.max(n, min), max);
+  };
+  const maxDailyPairs = clamp(config.max_daily_pairs, 1, 7, 7);
+  const baseTarget = clamp(config.target_daily_pairs, 1, Math.min(7, maxDailyPairs), 4);
+  const patch = {
+    distribution: 'even',
+    seminar_distribution: 'even',
+    evenness_bias: clamp(Math.max(65, Number(config.evenness_bias || 50)), 45, 90, 70),
+    late_slot_weight: clamp(Math.max(70, Number(config.late_slot_weight || 60)), 0, 100, 80),
+    target_daily_pairs: clamp(Math.min(baseTarget, 4), 1, Math.min(7, maxDailyPairs), Math.min(4, maxDailyPairs)),
+    prefer_compactness: false,
+    strict_no_evening: Boolean(config.strict_no_evening),
+    auto_subject_days: true,
+    subject_single_day: true,
+    lecture_seminar_same_day: true,
+  };
+
+  if (!insight) {
+    if (patch.target_daily_pairs > maxDailyPairs) {
+      patch.target_daily_pairs = maxDailyPairs;
+    }
+    return patch;
+  }
+
+  if (Number(insight.dayImbalance || 0) > 0.42) {
+    patch.evenness_bias = clamp(Math.max(patch.evenness_bias, 82), 45, 90, patch.evenness_bias);
+  }
+  if (Number(insight.lateShare || 0) > 0.22) {
+    patch.late_slot_weight = clamp(Math.max(patch.late_slot_weight, 92), 0, 100, patch.late_slot_weight);
+  }
+
+  const hasCapacityPressure = Number(insight.noSlotCount || 0) > 0
+    || Number(insight.partialCount || 0) > 0
+    || Number(insight.noAllowedClassesCount || 0) > 0;
+  if (hasCapacityPressure) {
+    patch.prefer_compactness = false;
+    patch.evenness_bias = clamp(Math.max(60, patch.evenness_bias - 10), 45, 90, patch.evenness_bias);
+    patch.late_slot_weight = clamp(Math.min(patch.late_slot_weight, 80), 0, 100, patch.late_slot_weight);
+    patch.target_daily_pairs = clamp(Math.min(patch.target_daily_pairs, 4), 1, Math.min(7, maxDailyPairs), patch.target_daily_pairs);
+    patch.strict_no_evening = false;
+  } else if (Number(insight.lateShare || 0) <= 0.18 && Number(insight.healthScore || 0) >= 70) {
+    patch.strict_no_evening = true;
+  }
+
+  if (Number(insight.blockers || 0) > 0) {
+    patch.strict_no_evening = false;
+  }
+
+  if (patch.target_daily_pairs > maxDailyPairs) {
+    patch.target_daily_pairs = maxDailyPairs;
+  }
+  return patch;
 };
 
 const buildMirrorSummary = (items, courseById) => {
@@ -1362,6 +1428,9 @@ const buildGeneratorValidation = ({
     if (item.group_number && item.group_count && Number(item.group_number) > Number(item.group_count)) {
       pushIssue('error', `Група ${item.group_number} перевищує кількість груп у "${item.subject_name}".`, item.id);
     }
+    if (config.strict_no_evening && item.fixed_class_number && Number(item.fixed_class_number) > 5) {
+      pushIssue('error', `"${item.subject_name}" має фіксований слот ${item.fixed_class_number}, але strict no-evening забороняє 6-7 пари.`, item.id);
+    }
     if (item.fixed_class_number && Number(item.fixed_class_number) > Number(config.max_daily_pairs || 7)) {
       pushIssue('warn', `"${item.subject_name}" має фіксований слот поза max пар/день.`, item.id);
     }
@@ -1437,9 +1506,10 @@ const buildConflictContext = (conflicts, itemsById, courseById, courseLocationMa
     missing_weeks_count: 1,
     no_available_weeks: 2,
     no_allowed_days: 3,
-    no_slot_found: 4,
-    partial_schedule: 5,
-    subject_day_mismatch: 6,
+    no_allowed_classes: 4,
+    no_slot_found: 5,
+    partial_schedule: 6,
+    subject_day_mismatch: 7,
     unknown: 99,
   };
   (conflicts || []).forEach((conflict) => {
@@ -6530,6 +6600,7 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
       blocked_weeks: String(req.body.blocked_weeks || ''),
       special_weeks_mode: String(req.body.special_weeks_mode || existing.special_weeks_mode || 'block'),
       prefer_compactness: String(req.body.prefer_compactness || '') === 'on',
+      strict_no_evening: String(req.body.strict_no_evening || '') === 'on',
       mirror_groups: String(req.body.mirror_groups || '') === 'on',
       auto_subject_days: String(req.body.auto_subject_days || '') === 'on',
       subject_single_day: String(req.body.subject_single_day || '') === 'on',
@@ -6551,6 +6622,155 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
     return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Settings%20saved`);
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.config.save');
+  }
+});
+
+app.post('/admin/schedule-generator/config/autotune', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.config.autotune');
+  }
+  const runId = Number(req.body.run_id);
+  if (!Number.isFinite(runId) || runId <= 0) {
+    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+  }
+  try {
+    const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
+    if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    const existing = parseGeneratorConfig(run.config);
+    const activeLocation = String(req.body.active_location || existing.active_location || 'kyiv').toLowerCase() === 'munich'
+      ? 'munich'
+      : 'kyiv';
+
+    const coursesByLocation = {
+      kyiv: await getCoursesByLocation('kyiv'),
+      munich: await getCoursesByLocation('munich'),
+    };
+    const courseMetaById = {};
+    const courseById = {};
+    const courseLocationMap = {};
+    for (const location of ['kyiv', 'munich']) {
+      const courses = coursesByLocation[location] || [];
+      for (const course of courses) {
+        const semesters = await getSemestersCached(course.id);
+        const configuredId = existing.course_semesters_by_location
+          ? existing.course_semesters_by_location[location]?.[course.id]
+            || existing.course_semesters_by_location[location]?.[String(course.id)]
+          : null;
+        let semester = null;
+        if (configuredId) {
+          semester = (semesters || []).find((s) => Number(s.id) === Number(configuredId)) || null;
+        }
+        if (!semester) {
+          semester = await getActiveSemester(course.id);
+        }
+        const studyDays = await getCourseStudyDays(course.id);
+        const activeDays = (studyDays || [])
+          .filter((d) => d.is_active)
+          .map((d) => d.day_name)
+          .filter(Boolean);
+        courseMetaById[course.id] = {
+          weeks_count: semester ? Number(semester.weeks_count || 0) : 0,
+          active_days: activeDays.length ? activeDays : [...daysOfWeek],
+          location,
+        };
+        courseById[course.id] = course.name;
+        courseLocationMap[course.id] = location;
+      }
+    }
+
+    const items = await db.all(
+      `
+        SELECT sgi.*, s.name AS subject_name, s.group_count, s.is_general, u.full_name AS teacher_name
+        FROM schedule_generator_items sgi
+        JOIN subjects s ON s.id = sgi.subject_id
+        LEFT JOIN users u ON u.id = sgi.teacher_id
+        WHERE sgi.run_id = ?
+        ORDER BY sgi.id DESC
+      `,
+      [run.id]
+    );
+    const itemsByLocation = { kyiv: [], munich: [] };
+    const itemsById = {};
+    (items || []).forEach((item) => {
+      itemsById[item.id] = item;
+      const location = courseLocationMap[item.course_id] || 'kyiv';
+      itemsByLocation[location].push(item);
+    });
+
+    const limitsRows = await db.all(
+      'SELECT * FROM schedule_generator_teacher_limits WHERE run_id = ?',
+      [run.id]
+    );
+    const limitsByTeacher = {};
+    limitsRows.forEach((row) => {
+      limitsByTeacher[row.teacher_id] = {
+        allowed_weekdays: row.allowed_weekdays ? row.allowed_weekdays.split(',') : [],
+        max_pairs_per_week: row.max_pairs_per_week,
+      };
+    });
+
+    const validationByLocation = {
+      kyiv: buildGeneratorValidation({
+        items: itemsByLocation.kyiv,
+        courseMetaById,
+        teacherLimits: limitsByTeacher,
+        config: existing,
+        locationLabel: 'Kyiv',
+      }),
+      munich: buildGeneratorValidation({
+        items: itemsByLocation.munich,
+        courseMetaById,
+        teacherLimits: limitsByTeacher,
+        config: existing,
+        locationLabel: 'Munich',
+      }),
+    };
+    const mirrorSummaryByLocation = {
+      kyiv: buildMirrorSummary(itemsByLocation.kyiv, courseById),
+      munich: buildMirrorSummary(itemsByLocation.munich, courseById),
+    };
+    const lastConflicts = Array.isArray(existing.last_conflicts) ? existing.last_conflicts : [];
+    const { conflictDetails } = buildConflictContext(
+      lastConflicts,
+      itemsById,
+      courseById,
+      courseLocationMap
+    );
+    const entryRows = await db.all(
+      'SELECT course_id, day_of_week, class_number FROM schedule_generator_entries WHERE run_id = ?',
+      [run.id]
+    );
+    const entriesByLocation = { kyiv: [], munich: [] };
+    (entryRows || []).forEach((row) => {
+      const location = courseLocationMap[row.course_id] || 'kyiv';
+      entriesByLocation[location].push(row);
+    });
+    const heatmapByLocation = {
+      kyiv: buildHeatmap(entriesByLocation.kyiv, fullWeekDays, [1, 2, 3, 4, 5, 6, 7]),
+      munich: buildHeatmap(entriesByLocation.munich, fullWeekDays, [1, 2, 3, 4, 5, 6, 7]),
+    };
+    const insightsByLocation = buildGenerationInsights({
+      validationByLocation,
+      conflictDetails,
+      heatmapByLocation,
+      mirrorSummaryByLocation,
+      config: existing,
+    });
+    const patch = buildSafeAutoTunePatch(existing, insightsByLocation[activeLocation]);
+    const nextConfig = {
+      ...existing,
+      ...patch,
+      active_location: activeLocation,
+    };
+    await db.run(
+      'UPDATE schedule_generator_runs SET config = ?, updated_at = NOW() WHERE id = ?',
+      [serializeGeneratorConfig(nextConfig), runId]
+    );
+    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Safe%20auto-tune%20applied`);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.config.autotune.save');
   }
 });
 
