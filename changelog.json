@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.7.98",
+      "date": "2026-02-11",
+      "items": [
+        "fix: allow parallel seminars for non-general subjects across different groups (unless teacher conflict exists)",
+        "fix: keep parallel-slot block only for general seminars where one shared teacher is assumed"
+      ]
+    },
+    {
       "version": "0.7.97",
       "date": "2026-02-11",
       "items": [
