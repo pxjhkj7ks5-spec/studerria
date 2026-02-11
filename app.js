@@ -1124,11 +1124,31 @@ const buildMirrorSummary = (items, courseById) => {
   });
   const summary = [];
   groups.forEach((group) => {
-    const group1 = group.items.filter((item) => Number(item.group_number) === 1).length;
-    const group2 = group.items.filter((item) => Number(item.group_number) === 2).length;
+    const group1Items = group.items.filter((item) => Number(item.group_number) === 1);
+    const group2Items = group.items.filter((item) => Number(item.group_number) === 2);
+    const group1 = group1Items.length;
+    const group2 = group2Items.length;
     const subjects = Array.from(new Set(group.items.map((item) => item.subject_name).filter(Boolean)));
     const courses = Array.from(new Set(group.items.map((item) => courseById[item.course_id]).filter(Boolean)));
-    const status = group1 && group2 ? (group1 === group2 ? 'ok' : 'warn') : 'missing';
+    const canPairCrossSubject = () => {
+      if (!group1 || !group2 || group1 !== group2) return false;
+      const sortedG1 = [...group1Items].sort((a, b) => Number(a.id) - Number(b.id));
+      const sortedG2 = [...group2Items].sort((a, b) => Number(a.id) - Number(b.id));
+      const used = new Set();
+      let matched = 0;
+      sortedG1.forEach((left) => {
+        const idx = sortedG2.findIndex((right, pos) =>
+          !used.has(pos) && Number(right.subject_id) !== Number(left.subject_id)
+        );
+        if (idx === -1) return;
+        used.add(idx);
+        matched += 1;
+      });
+      return matched === group1;
+    };
+    const status = group1 && group2
+      ? (group1 === group2 && canPairCrossSubject() ? 'ok' : 'warn')
+      : 'missing';
     summary.push({
       key: group.raw || group.key,
       group1,
@@ -1151,6 +1171,8 @@ const buildGeneratorValidation = ({
 }) => {
   const issues = [];
   const itemIssues = {};
+  const specialWeeksMode = String(config.special_weeks_mode || 'block') === 'overlay' ? 'overlay' : 'block';
+  const blockedWeeksRaw = String(config.blocked_weeks || '');
 
   const pushIssue = (level, message, itemId) => {
     issues.push({ level, message, itemId });
@@ -1177,6 +1199,20 @@ const buildGeneratorValidation = ({
     if (!weeksCount) {
       pushIssue('error', `Курс "${item.subject_name}" без кількості тижнів.`, item.id);
     }
+    const targetPairs = Number(item.pairs_count || 0);
+    const allWeeks = weeksCount ? Array.from({ length: weeksCount }, (_, idx) => idx + 1) : [];
+    let baseWeeks = allWeeks;
+    if (weeksCount && specialWeeksMode === 'block') {
+      const blocked = new Set(parseWeekSet(blockedWeeksRaw, weeksCount));
+      baseWeeks = allWeeks.filter((week) => !blocked.has(week));
+    }
+    if (weeksCount && targetPairs > baseWeeks.length) {
+      pushIssue(
+        'warn',
+        `"${item.subject_name}" має ${targetPairs} пар, але доступно лише ${baseWeeks.length} тижнів для генерації.`,
+        item.id
+      );
+    }
     if (item.group_number && item.group_count && Number(item.group_number) > Number(item.group_count)) {
       pushIssue('error', `Група ${item.group_number} перевищує кількість груп у "${item.subject_name}".`, item.id);
     }
@@ -1187,8 +1223,16 @@ const buildGeneratorValidation = ({
       const parsedWeeks = parseWeekSet(item.weeks_set, weeksCount);
       if (!parsedWeeks.length) {
         pushIssue('warn', `"${item.subject_name}" має некоректний набір тижнів.`, item.id);
-      } else if (parsedWeeks.length < Number(item.pairs_count || 0)) {
-        pushIssue('warn', `"${item.subject_name}" має менше тижнів ніж пар (${parsedWeeks.length}).`, item.id);
+      } else {
+        const parsedSet = new Set(parsedWeeks);
+        const effectiveWeeks = baseWeeks.filter((week) => parsedSet.has(week));
+        if (effectiveWeeks.length < targetPairs) {
+          pushIssue(
+            'warn',
+            `"${item.subject_name}" має менше доступних тижнів (${effectiveWeeks.length}) ніж пар (${targetPairs}).`,
+            item.id
+          );
+        }
       }
     }
     if (item.fixed_day && meta.active_days && meta.active_days.length && !meta.active_days.includes(item.fixed_day)) {
