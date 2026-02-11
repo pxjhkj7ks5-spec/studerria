@@ -383,9 +383,44 @@ body.theme-light .table-striped > tbody > tr:nth-of-type(odd) > * {
   position: relative;
 }
 
+body.theme-dark .topbar .btn-glass,
+body.theme-dark .topbar .theme-toggle-min,
+body.theme-dark .topbar .msg-btn,
+body.theme-dark .topbar .mobile-menu-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #f8fafc;
+}
+
+body.theme-dark .topbar .btn-glass:hover,
+body.theme-dark .topbar .theme-toggle-min:hover,
+body.theme-dark .topbar .msg-btn:hover,
+body.theme-dark .topbar .mobile-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+
 body.theme-light .topbar,
 body.theme-light .admin-nav {
   background: rgba(255, 255, 255, 0.8);
+}
+
+body.theme-light .topbar .btn-glass,
+body.theme-light .topbar .theme-toggle-min,
+body.theme-light .topbar .msg-btn,
+body.theme-light .topbar .mobile-menu-btn {
+  background: rgba(15, 23, 42, 0.08);
+  border-color: rgba(15, 23, 42, 0.16);
+  color: #0f172a;
+}
+
+body.theme-light .topbar .btn-glass:hover,
+body.theme-light .topbar .theme-toggle-min:hover,
+body.theme-light .topbar .msg-btn:hover,
+body.theme-light .topbar .mobile-menu-btn:hover {
+  background: rgba(15, 23, 42, 0.12);
+  border-color: rgba(15, 23, 42, 0.22);
 }
 
 /* Utility */

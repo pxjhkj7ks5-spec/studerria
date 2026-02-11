@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.91",
+      "date": "2026-02-11",
+      "items": [
+        "fix: improve topbar button contrast in dark theme"
+      ]
+    },
+    {
       "version": "0.7.90",
       "date": "2026-02-11",
       "items": [
