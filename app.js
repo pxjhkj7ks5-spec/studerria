@@ -5722,6 +5722,132 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
   }
 });
 
+app.post('/admin/schedule-windows', requireAdmin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleWindows.init');
+  }
+  const courseIdsRaw = req.body.course_ids || req.body.course_id || [];
+  const courseIds = (Array.isArray(courseIdsRaw) ? courseIdsRaw : [courseIdsRaw])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const weekNumber = Number(req.body.week_number || req.body.week);
+  if (!courseIds.length || !Number.isFinite(weekNumber) || weekNumber < 1) {
+    return res.status(400).json({ ok: false, error: 'Invalid input' });
+  }
+  try {
+    const courses = await getCoursesCached();
+    const courseMap = new Map((courses || []).map((c) => [Number(c.id), c]));
+    const warnings = [];
+    const freeSets = [];
+    const validCourses = [];
+    for (const courseId of courseIds) {
+      const course = courseMap.get(Number(courseId));
+      if (!course) {
+        warnings.push(`Курс ${courseId} не знайдено.`);
+        continue;
+      }
+      const semester = await getActiveSemester(courseId);
+      if (!semester) {
+        warnings.push(`${course.name}: немає активного семестру.`);
+        continue;
+      }
+      if (Number(weekNumber) > Number(semester.weeks_count || 0)) {
+        warnings.push(`${course.name}: тиждень ${weekNumber} поза межами семестру (${semester.weeks_count}).`);
+      }
+      let activeDays = [];
+      try {
+        const studyDays = await getCourseStudyDays(courseId);
+        activeDays = (studyDays || [])
+          .filter((d) => d.is_active)
+          .map((d) => normalizeWeekdayName(d.day_name))
+          .filter(Boolean);
+      } catch (dayErr) {
+        activeDays = [];
+      }
+      if (!activeDays.length) {
+        activeDays = [...daysOfWeek];
+      }
+      const rows = await db.all(
+        `
+          SELECT day_of_week, class_number
+          FROM schedule_entries
+          WHERE course_id = ? AND semester_id = ? AND week_number = ?
+        `,
+        [courseId, semester.id, weekNumber]
+      );
+      const busy = new Set(
+        (rows || [])
+          .map((row) => {
+            const day = normalizeWeekdayName(row.day_of_week);
+            const classNum = Number(row.class_number);
+            if (!day || !Number.isFinite(classNum)) return null;
+            return `${day}|${classNum}`;
+          })
+          .filter(Boolean)
+      );
+      const free = new Set();
+      activeDays.forEach((day) => {
+        for (let classNum = 1; classNum <= 7; classNum += 1) {
+          const key = `${day}|${classNum}`;
+          if (!busy.has(key)) free.add(key);
+        }
+      });
+      freeSets.push(free);
+      validCourses.push({ id: courseId, name: course.name });
+    }
+    if (!freeSets.length) {
+      return res.status(200).json({ ok: false, error: 'No valid courses', warnings });
+    }
+    let commonSet = null;
+    freeSets.forEach((set) => {
+      if (!commonSet) {
+        commonSet = new Set(set);
+      } else {
+        commonSet = new Set([...commonSet].filter((key) => set.has(key)));
+      }
+    });
+    const dayOrder = fullWeekDays || daysOfWeek;
+    const dayIndex = new Map(dayOrder.map((day, idx) => [day, idx]));
+    const slots = [...(commonSet || [])]
+      .map((key) => {
+        const [day, classNumRaw] = key.split('|');
+        const classNum = Number(classNumRaw);
+        const time = bellSchedule[classNum]
+          ? `${bellSchedule[classNum].start}–${bellSchedule[classNum].end}`
+          : `${classNum} пара`;
+        return { day, class_number: classNum, time };
+      })
+      .sort((a, b) => {
+        const idxA = dayIndex.get(a.day) ?? 99;
+        const idxB = dayIndex.get(b.day) ?? 99;
+        if (idxA !== idxB) return idxA - idxB;
+        return a.class_number - b.class_number;
+      });
+    const windows = [];
+    const grouped = new Map();
+    slots.forEach((slot) => {
+      if (!grouped.has(slot.day)) grouped.set(slot.day, []);
+      grouped.get(slot.day).push(slot);
+    });
+    dayOrder.forEach((day) => {
+      if (!grouped.has(day)) return;
+      windows.push({ day, slots: grouped.get(day) });
+    });
+    const summaryCourses = validCourses.map((c) => c.name).join(' · ');
+    const summary = `Курси: ${summaryCourses} · Тиждень ${weekNumber} · Спільних вікон: ${slots.length}`;
+    return res.json({
+      ok: true,
+      summary,
+      warnings,
+      windows,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleWindows');
+  }
+});
+
 app.get('/admin/schedule-summary', requireAdmin, async (req, res) => {
   try {
     await ensureDbReady();

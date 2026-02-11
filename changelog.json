@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.7.93",
+      "date": "2026-02-11",
+      "items": [
+        "feat: add admin modal to find shared free slots across courses"
+      ]
+    },
+    {
       "version": "0.7.92",
       "date": "2026-02-11",
       "items": [
