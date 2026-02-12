@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.01",
+      "date": "2026-02-12",
+      "items": [
+        "feat: redesign schedule density block with clearer language and quick visual guidance",
+        "feat: add heatmap summary chips for evening load, day balance, and peak day",
+        "feat: add intensity legend (low/medium/high) and clearer slot/day labels in heatmap tooltips"
+      ]
+    },
+    {
       "version": "0.8.00",
       "date": "2026-02-12",
       "items": [

@@ -166,16 +166,16 @@
                       <span class="insight-health <%= insight.healthState === 'good' ? 'is-good' : insight.healthState === 'warn' ? 'is-warn' : 'is-critical' %>">
                         <%= insight.healthState === 'good' ? 'Стабільно' : insight.healthState === 'warn' ? 'Потрібна увага' : 'Ризиковано' %>
                       </span>
-                      <span class="small text-muted">Score: <%= insight.healthScore %>/100</span>
+                      <span class="small text-muted">Індекс якості: <%= insight.healthScore %>/100</span>
                     </div>
                     <div class="insight-metrics mb-2">
                       <div class="insight-metric"><span>Блокери</span><strong><%= insight.blockers %></strong></div>
-                      <div class="insight-metric"><span>Попередж.</span><strong><%= insight.warnings %></strong></div>
-                      <div class="insight-metric"><span>Partial</span><strong><%= insight.partialCount %></strong></div>
-                      <div class="insight-metric"><span>No slot</span><strong><%= insight.noSlotCount %></strong></div>
-                      <div class="insight-metric"><span>No classes</span><strong><%= insight.noAllowedClassesCount || 0 %></strong></div>
-                      <div class="insight-metric"><span>Пізні слоти</span><strong><%= Math.round((insight.lateShare || 0) * 100) %>%</strong></div>
-                      <div class="insight-metric"><span>Дисбаланс днів</span><strong><%= Math.round((insight.dayImbalance || 0) * 100) %>%</strong></div>
+                      <div class="insight-metric"><span>Попередження</span><strong><%= insight.warnings %></strong></div>
+                      <div class="insight-metric"><span>Частково заплан.</span><strong><%= insight.partialCount %></strong></div>
+                      <div class="insight-metric"><span>Без слота</span><strong><%= insight.noSlotCount %></strong></div>
+                      <div class="insight-metric"><span>Немає дозвол. слотів</span><strong><%= insight.noAllowedClassesCount || 0 %></strong></div>
+                      <div class="insight-metric"><span>Вечірні пари</span><strong><%= Math.round((insight.lateShare || 0) * 100) %>%</strong></div>
+                      <div class="insight-metric"><span>Перекіс по днях</span><strong><%= Math.round((insight.dayImbalance || 0) * 100) %>%</strong></div>
                     </div>
                     <div class="small text-muted mb-2">
                       <% const peakDay = insight.peakDay && insight.peakDay.day ? insight.peakDay.day : null; %>
@@ -529,30 +529,51 @@
 
           <div class="card glass-panel mb-4">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Щільність розкладу</div>
+              <div class="generator-section-title mb-1">Карта завантаження (день × пара)</div>
+              <div class="small text-muted mb-2">Чим темніша клітинка, тим більше занять у цьому слоті. Цифра в клітинці — кількість занять.</div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const heatmap = heatmapByLocation && heatmapByLocation[location]; %>
+                <% const insight = generationInsightsByLocation && generationInsightsByLocation[location]; %>
                 <div class="heatmap" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                   <% if (!heatmap || !heatmap.max) { %>
                     <div class="generator-empty">Немає даних для теплової карти.</div>
                   <% } else { %>
+                    <% const latePercent = insight ? Math.round((insight.lateShare || 0) * 100) : 0; %>
+                    <% const imbalancePercent = insight ? Math.round((insight.dayImbalance || 0) * 100) : 0; %>
+                    <% const lateLevel = latePercent >= 30 ? 'високе навантаження' : latePercent >= 18 ? 'помірне' : 'низьке'; %>
+                    <% const balanceLevel = imbalancePercent >= 45 ? 'сильний перекіс' : imbalancePercent >= 25 ? 'помірний перекіс' : 'рівномірно'; %>
+                    <% const peakDay = insight && insight.peakDay && insight.peakDay.day ? insight.peakDay.day : null; %>
+                    <% const peakDayIdx = peakDay ? dayOptions.indexOf(peakDay) : -1; %>
+                    <% const peakDayLabel = peakDayIdx >= 0 ? (dayLabels[peakDayIdx] || peakDay) : (peakDay || '—'); %>
+                    <div class="heatmap-summary mb-2">
+                      <span class="heatmap-summary-chip">Вечірні пари: <strong><%= latePercent %>%</strong> (<%= lateLevel %>)</span>
+                      <span class="heatmap-summary-chip">Рівномірність по днях: <strong><%= balanceLevel %></strong></span>
+                      <span class="heatmap-summary-chip">Найбільше навантаження: <strong><%= peakDayLabel %></strong></span>
+                    </div>
+                    <div class="heatmap-legend mb-2">
+                      <span class="heatmap-legend-label">Інтенсивність:</span>
+                      <span class="heatmap-legend-chip is-low">Низька</span>
+                      <span class="heatmap-legend-chip is-mid">Середня</span>
+                      <span class="heatmap-legend-chip is-high">Висока</span>
+                    </div>
                     <div class="heatmap-grid">
                       <div class="heatmap-row heatmap-head">
                         <span class="heatmap-label"></span>
                         <% classOptions.forEach(function(slot) { %>
-                          <span class="heatmap-head-cell"><%= slot %></span>
+                          <span class="heatmap-head-cell">#<%= slot %></span>
                         <% }); %>
                       </div>
                       <% dayOptions.forEach(function(day) { %>
+                        <% const dayLabel = dayLabels[dayOptions.indexOf(day)] || day.slice(0, 2); %>
                         <div class="heatmap-row">
-                          <span class="heatmap-label"><%= dayLabels[dayOptions.indexOf(day)] || day.slice(0, 2) %></span>
+                          <span class="heatmap-label"><%= dayLabel %></span>
                           <% classOptions.forEach(function(slot) { %>
                             <% const count = heatmap.counts && heatmap.counts[day] ? heatmap.counts[day][slot] : 0; %>
                             <% const intensity = heatmap.max ? (count / heatmap.max) : 0; %>
                             <span
                               class="heatmap-cell"
                               style="--heat:<%= intensity.toFixed(2) %>;"
-                              title="<%= day %>, пара <%= slot %>: <%= count %> записів"
+                              title="<%= dayLabel %>, пара <%= slot %>: <%= count %> занять"
                             >
                               <%= count ? count : '' %>
                             </span>
