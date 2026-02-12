@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.03",
+      "date": "2026-02-12",
+      "items": [
+        "style: redesign week carousel into a scroll-snap capsule rail with subtle edge fades and W1..W15 labels",
+        "style: refine day header hierarchy, spacing rhythm, and divider clarity for calmer section anchors",
+        "style: soften schedule status area, collapse deadline blocks by default, and minimalize footer metadata presentation"
+      ]
+    },
+    {
       "version": "0.8.02",
       "date": "2026-02-12",
       "items": [

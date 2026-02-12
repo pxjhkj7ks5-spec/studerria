@@ -1712,7 +1712,7 @@
             <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
             <% if ((role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') && settings && settings.allow_custom_deadlines) { %>
               <button class="btn btn-glass btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
-                🪄 Дивні дедлайни
+                Дивні дедлайни
               </button>
             <% } %>
           </div>
@@ -1747,31 +1747,32 @@
               </div>
             </div>
           </div>
-          <div class="panel-section panel-focus">
-            <div class="panel-body">
-              <label class="control-toggle focus-toggle" for="focusWeekToggle">
-                <input class="toggle-input" type="checkbox" id="focusWeekToggle" />
-                <span class="toggle">
-                  <span class="toggle-knob"></span>
-                </span>
-                <span class="toggle-text">Focus week</span>
-              </label>
-            </div>
-          </div>
         </div>
 
-        <section class="density-block mb-4" id="densityBlock">
+        <section class="status-stack mb-4" id="densityBlock">
+          <div class="status-focus">
+            <label class="control-toggle focus-toggle" for="focusWeekToggle">
+              <input class="toggle-input" type="checkbox" id="focusWeekToggle" />
+              <span class="toggle">
+                <span class="toggle-knob"></span>
+              </span>
+              <span class="toggle-text">Focus week</span>
+            </label>
+          </div>
           <details class="density-summary" id="densitySummary">
             <summary>
               <span>Week pulse</span>
               <span class="density-summary-hint">Hover chips for details</span>
             </summary>
-            <div class="density-chip-row">
-              <span class="density-chip" id="densityChipBalance" data-bs-toggle="tooltip" data-bs-placement="top">Day balance</span>
-              <span class="density-chip" id="densityChipEvening" data-bs-toggle="tooltip" data-bs-placement="top">Evening intensity</span>
-              <span class="density-chip" id="densityChipPeak" data-bs-toggle="tooltip" data-bs-placement="top">Most intense day</span>
+            <div class="density-summary-copy">
+              <span>Calm view of the week density without aggressive warning colors.</span>
             </div>
           </details>
+          <div class="density-chip-row">
+            <span class="density-chip" id="densityChipBalance" data-bs-toggle="tooltip" data-bs-placement="top">Day balance</span>
+            <span class="density-chip" id="densityChipEvening" data-bs-toggle="tooltip" data-bs-placement="top">Evening intensity</span>
+            <span class="density-chip" id="densityChipPeak" data-bs-toggle="tooltip" data-bs-placement="top">Most intense day</span>
+          </div>
         </section>
 
         <% if (viewAs === 'student') { %>
@@ -1792,7 +1793,7 @@
 
         <div id="scheduleWeekGrid">
         <% daysOfWeek.forEach(function(day) { %>
-          <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString('uk-UA') : ''; %>
+          <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
           <% const dayEntries = scheduleByDay[day] || []; %>
           <% let maxStreak = 0; let currentStreak = 0; let hasOverlap = false; const seenSlots = {}; %>
           <% for (let i = 0; i < dayEntries.length; i++) { %>
@@ -1910,26 +1911,28 @@
             <% const dateKey = dayDates && dayDates[day] ? dayDates[day] : null; %>
             <% const customItems = dateKey && customDeadlinesByDate ? customDeadlinesByDate[dateKey] : null; %>
             <% if (settings && settings.allow_custom_deadlines && customItems && customItems.length) { %>
-              <div class="deadline-block">
-                <div class="deadline-title">🪄 Дивні дедлайни</div>
-                <% customItems.forEach(function(item) { %>
-                  <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
-                  <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
-                  <div
-                    class="deadline-item"
-                    data-custom-id="<%= item.id %>"
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="top"
-                    title="<%= shortDesc %>"
-                  >
-                    <div>
-                      <div class="fw-semibold"><%= item.subject_name %></div>
-                      <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
-                      <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+              <details class="deadline-block">
+                <summary class="deadline-title">Дивні дедлайни</summary>
+                <div class="deadline-content">
+                  <% customItems.forEach(function(item) { %>
+                    <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
+                    <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
+                    <div
+                      class="deadline-item"
+                      data-custom-id="<%= item.id %>"
+                      data-bs-toggle="tooltip"
+                      data-bs-placement="top"
+                      title="<%= shortDesc %>"
+                    >
+                      <div>
+                        <div class="fw-semibold"><%= item.subject_name %></div>
+                        <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
+                        <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+                      </div>
                     </div>
-                  </div>
-                <% }); %>
-              </div>
+                  <% }); %>
+                </div>
+              </details>
             <% } %>
           </div>
         <% }); %>
@@ -1937,34 +1940,38 @@
         <% if (settings && settings.allow_custom_deadlines && weekendDeadlineCards && weekendDeadlineCards.length) { %>
           <% weekendDeadlineCards.forEach(function(card) { %>
             <% if (activeDaySet.has(card.day)) { return; } %>
-            <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString('uk-UA') : ''; %>
+            <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
             <div class="card mb-3 glass day-card" data-day-date="<%= card.date || '' %>">
-              <div class="card-header fw-semibold text-white d-flex justify-content-between align-items-center">
-                <span><%= card.day %></span>
-                <% if (dateLabel) { %>
-                  <span class="small muted"><%= dateLabel %></span>
-                <% } %>
+              <div class="day-header">
+                <div class="day-title">
+                  <span class="day-name"><%= card.day %></span>
+                  <% if (dateLabel) { %>
+                    <span class="day-date"><%= dateLabel %></span>
+                  <% } %>
+                </div>
               </div>
-              <div class="deadline-block">
-                <div class="deadline-title">🪄 Дивні дедлайни</div>
-                <% card.items.forEach(function(item) { %>
-                  <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
-                  <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
-                  <div
-                    class="deadline-item"
-                    data-custom-id="<%= item.id %>"
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="top"
-                    title="<%= shortDesc %>"
-                  >
-                    <div>
-                      <div class="fw-semibold"><%= item.subject_name %></div>
-                      <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
-                      <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+              <details class="deadline-block">
+                <summary class="deadline-title">Дивні дедлайни</summary>
+                <div class="deadline-content">
+                  <% card.items.forEach(function(item) { %>
+                    <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
+                    <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
+                    <div
+                      class="deadline-item"
+                      data-custom-id="<%= item.id %>"
+                      data-bs-toggle="tooltip"
+                      data-bs-placement="top"
+                      title="<%= shortDesc %>"
+                    >
+                      <div>
+                        <div class="fw-semibold"><%= item.subject_name %></div>
+                        <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
+                        <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+                      </div>
                     </div>
-                  </div>
-                <% }); %>
-              </div>
+                  <% }); %>
+                </div>
+              </details>
             </div>
           <% }); %>
         <% } %>
@@ -1972,7 +1979,6 @@
       </main>
 
       <div class="week-rail" id="weekRail">
-        <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
         <div class="week-slider" id="weekSlider" role="tablist" aria-label="Week selector">
           <% for (let w = 1; w <= (totalWeeks || 15); w++) { %>
             <button
@@ -1983,20 +1989,28 @@
               aria-selected="<%= w === currentWeek ? 'true' : 'false' %>"
               aria-label="<%= t('schedule.week') %> <%= w %>"
             >
-              <span class="week-pill-label"><%= t('schedule.week') %></span>
-              <span class="week-pill-value"><%= w %></span>
+              <span class="week-pill-value">W<%= w %></span>
             </button>
           <% } %>
         </div>
-        <button class="week-nav-btn" type="button" id="weekNext" aria-label="Next week">›</button>
       </div>
 
       <footer class="app-footer text-center py-4">
-        <small>
-          © <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %> ·
+        <small class="footer-meta">
+          <span class="footer-version">v<%= appVersion %></span>
           <button
             type="button"
-            class="btn btn-link btn-sm p-0 align-baseline"
+            class="footer-build"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            data-bs-title="<%= buildStamp %>"
+            aria-label="Build timestamp"
+          >
+            build
+          </button>
+          <button
+            type="button"
+            class="footer-link"
             data-bs-toggle="modal"
             data-bs-target="#changelogModal"
           >
@@ -2151,7 +2165,7 @@
         <div class="modal-content">
           <form method="POST" action="/homework/custom" enctype="multipart/form-data" autocomplete="off">
             <div class="modal-header">
-              <h5 class="modal-title">🪄 Дивні дедлайни</h5>
+              <h5 class="modal-title">Дивні дедлайни</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -2274,7 +2288,7 @@
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">🪄 Дивні дедлайни</h5>
+            <h5 class="modal-title">Дивні дедлайни</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -2929,7 +2943,7 @@
         if (scheduleContent) {
           scheduleContent.classList.add('is-exiting');
         }
-        setTimeout(() => updateSchedule(safe), 200);
+        setTimeout(() => updateSchedule(safe), 180);
       }
       if (weekSlider) {
         weekSlider.addEventListener('click', (event) => {
