@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.02",
+      "date": "2026-02-12",
+      "items": [
+        "feat: refactor My Schedule cards to calm semantic surfaces using div role=button, soft motion, and subtle now/next emphasis",
+        "feat: replace multi-color subject mapping with single-hue tonal HSL system and per-day repeat lightness variation",
+        "feat: add desktop slide-out action drawer, scroll-snap week rail, collapsed density summary chips, and optional Focus week mode"
+      ]
+    },
+    {
       "version": "0.8.01",
       "date": "2026-02-12",
       "items": [

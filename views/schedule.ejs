@@ -1664,286 +1664,349 @@
 </head>
   <body class="theme-dark">
     <%- include('partials/topbar', { role, username, t, activePage: 'schedule' }) %>
-
-    <main class="container py-4 schedule-content enter">
-      <div class="glass week-hero mb-4">
-        <div>
-          <h1 class="hero-title mb-1"><%= t('schedule.header') %></h1>
-          <div class="hero-sub" id="daily-phrase">Your rhythm, your focus — let’s make this week count.</div>
-        </div>
-        <div class="hero-actions">
-          <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
-          <% if ((role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') && settings && settings.allow_custom_deadlines) { %>
-            <button class="btn btn-glass btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
-              🪄 Дивні дедлайни
-            </button>
-          <% } %>
-        </div>
+    <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
+      <div class="drawer-head">
+        <div class="drawer-title">Меню</div>
+        <button class="drawer-close" type="button" id="scheduleDrawerClose" aria-label="Close menu">✕</button>
       </div>
+      <div class="drawer-actions">
+        <% if (role === 'admin') { %>
+          <form method="POST" action="/admin/switch-to-admin" class="drawer-action-wrap">
+            <button class="drawer-action" type="submit"><%= t('schedule.backToAdmin') %></button>
+          </form>
+        <% } %>
+        <% if (role === 'starosta') { %>
+          <a class="drawer-action" href="/starosta"><%= t('menu.starosta') %></a>
+        <% } %>
+        <% if (role === 'deanery') { %>
+          <a class="drawer-action" href="/deanery"><%= t('menu.deanery') %></a>
+        <% } %>
+        <% if (settings && settings.allow_messages) { %>
+          <button class="drawer-action" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">💬 Повідомлення</button>
+        <% } %>
+        <a class="drawer-action" href="/teamwork"><%= t('menu.teamwork') %></a>
+        <a class="drawer-action" href="/my-day">Мій день</a>
+        <a class="drawer-action" href="/profile"><%= t('schedule.profile') %></a>
+        <button
+          class="drawer-action theme-toggle"
+          type="button"
+          data-light-label="☀️"
+          data-dark-label="🌙"
+        >
+          🌙
+        </button>
+        <form method="POST" action="/logout" class="drawer-action-wrap">
+          <button class="drawer-action" type="submit"><%= t('schedule.logout') %></button>
+        </form>
+      </div>
+    </aside>
 
-      <% const hasCourseFilters = role === 'teacher' && teacherCourses && teacherCourses.length > 1; %>
-      <div class="glass schedule-panel mb-4 <%= hasCourseFilters ? '' : 'single-panel' %>">
-        <% if (hasCourseFilters) { %>
-          <div class="panel-section">
-            <div class="panel-title">Фільтри</div>
+    <div class="schedule-shell" id="scheduleShell">
+      <main class="container py-4 schedule-content enter">
+        <div class="glass week-hero mb-4">
+          <div>
+            <h1 class="hero-title mb-1"><%= t('schedule.header') %></h1>
+            <div class="hero-sub" id="daily-phrase">Your rhythm, your focus — let’s make this week count.</div>
+          </div>
+          <div class="hero-actions">
+            <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
+            <% if ((role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') && settings && settings.allow_custom_deadlines) { %>
+              <button class="btn btn-glass btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
+                🪄 Дивні дедлайни
+              </button>
+            <% } %>
+          </div>
+        </div>
+
+        <% const hasCourseFilters = role === 'teacher' && teacherCourses && teacherCourses.length > 1; %>
+        <div class="glass schedule-panel mb-4 <%= hasCourseFilters ? '' : 'single-panel' %>">
+          <% if (hasCourseFilters) { %>
+            <div class="panel-section">
+              <div class="panel-title">Фільтри</div>
+              <div class="panel-body">
+                <form method="GET" action="/schedule" class="d-inline">
+                  <input type="hidden" name="week" value="<%= currentWeek %>" />
+                  <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
+                    <option value="">Усі курси</option>
+                    <% teacherCourses.forEach(function(c) { %>
+                      <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
+                    <% }); %>
+                  </select>
+                </form>
+              </div>
+            </div>
+            <div class="panel-divider"></div>
+          <% } %>
+          <div class="panel-section panel-sync">
             <div class="panel-body">
-              <form method="GET" action="/schedule" class="d-inline">
-                <input type="hidden" name="week" value="<%= currentWeek %>" />
-                <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
-                  <option value="">Усі курси</option>
-                  <% teacherCourses.forEach(function(c) { %>
-                    <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
-                  <% }); %>
-                </select>
-              </form>
+              <div class="sync-pill">
+                <span class="sync-dot" id="syncDot"></span>
+                <span id="syncStatusLabel">Онлайн</span>
+                <span class="sync-sep">•</span>
+                <span id="syncStatusMeta">Щойно</span>
+              </div>
             </div>
           </div>
-          <div class="panel-divider"></div>
+          <div class="panel-section panel-focus">
+            <div class="panel-body">
+              <label class="control-toggle focus-toggle" for="focusWeekToggle">
+                <input class="toggle-input" type="checkbox" id="focusWeekToggle" />
+                <span class="toggle">
+                  <span class="toggle-knob"></span>
+                </span>
+                <span class="toggle-text">Focus week</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <section class="density-block mb-4" id="densityBlock">
+          <details class="density-summary" id="densitySummary">
+            <summary>
+              <span>Week pulse</span>
+              <span class="density-summary-hint">Hover chips for details</span>
+            </summary>
+            <div class="density-chip-row">
+              <span class="density-chip" id="densityChipBalance" data-bs-toggle="tooltip" data-bs-placement="top">Day balance</span>
+              <span class="density-chip" id="densityChipEvening" data-bs-toggle="tooltip" data-bs-placement="top">Evening intensity</span>
+              <span class="density-chip" id="densityChipPeak" data-bs-toggle="tooltip" data-bs-placement="top">Most intense day</span>
+            </div>
+          </details>
+        </section>
+
+        <% if (viewAs === 'student') { %>
+          <div class="test-view-banner">
+            Тестовий перегляд: <%= viewAsCourse && viewAsCourse.name ? viewAsCourse.name : 'Курс' %> · <%= viewAsLabel || (`Група ${viewAsGroupNumber || 1}`) %>
+          </div>
+        <% } else if (role === 'admin') { %>
+          <div class="test-view-banner">
+            <%= t('schedule.adminViewNotice') %>
+          </div>
         <% } %>
-        <div class="panel-section panel-sync">
-          <div class="panel-body">
-            <div class="sync-pill">
-              <span class="sync-dot" id="syncDot"></span>
-              <span id="syncStatusLabel">Онлайн</span>
-              <span class="sync-sep">•</span>
-              <span id="syncStatusMeta">Щойно</span>
-            </div>
+
+        <% if (subgroupError === 'exists') { %>
+          <div class="alert alert-warning glass text-white border-0">
+            You are already in a subgroup for this homework.
           </div>
-        </div>
-        <div class="panel-section panel-legend">
-          <div class="panel-body">
-            <button class="legend-trigger" type="button" data-bs-toggle="modal" data-bs-target="#subjectLegendModal">Кольори предметів</button>
-          </div>
-        </div>
-      </div>
-
-      <% if (viewAs === 'student') { %>
-        <div class="test-view-banner">
-          Тестовий перегляд: <%= viewAsCourse && viewAsCourse.name ? viewAsCourse.name : 'Курс' %> · <%= viewAsLabel || (`Група ${viewAsGroupNumber || 1}`) %>
-        </div>
-      <% } else if (role === 'admin') { %>
-        <div class="test-view-banner">
-          <%= t('schedule.adminViewNotice') %>
-        </div>
-      <% } %>
-
-      <% if (subgroupError === 'exists') { %>
-        <div class="alert alert-warning glass text-white border-0">
-          You are already in a subgroup for this homework.
-        </div>
-      <% } %>
-
-      <div id="scheduleWeekGrid">
-      <% daysOfWeek.forEach(function(day) { %>
-        <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString('uk-UA') : ''; %>
-        <% const dayEntries = scheduleByDay[day] || []; %>
-        <% let maxStreak = 0; let currentStreak = 0; %>
-        <% for (let i = 0; i < dayEntries.length; i++) { %>
-          <% if (i === 0 || dayEntries[i].class_number === dayEntries[i - 1].class_number + 1) { %>
-            <% currentStreak += 1; %>
-          <% } else { %>
-            <% currentStreak = 1; %>
-          <% } %>
-          <% if (currentStreak > maxStreak) { maxStreak = currentStreak; } %>
         <% } %>
-        <% const isHighLoad = maxStreak >= 3; %>
-        <div class="card mb-3 glass day-card" data-day-date="<%= dayDates && dayDates[day] ? dayDates[day] : '' %>">
-          <div class="day-header">
-            <div class="day-title">
-              <span class="day-name"><%= day %></span>
-              <% if (dateLabel) { %>
-                <span class="day-date"><%= dateLabel %></span>
-              <% } %>
-            </div>
-            <div class="day-indicators">
-              <% if (isHighLoad) { %>
-                <span class="day-chip day-chip--load">High load</span>
-              <% } %>
-              <span class="day-chip day-chip--ghost" data-conflict="overlap" aria-hidden="true">Conflict</span>
-            </div>
-          </div>
-          <div class="list-group list-group-flush">
-            <% if (!dayEntries || dayEntries.length === 0) { %>
-              <div class="list-group-item empty-state">No classes</div>
+
+        <div id="scheduleWeekGrid">
+        <% daysOfWeek.forEach(function(day) { %>
+          <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString('uk-UA') : ''; %>
+          <% const dayEntries = scheduleByDay[day] || []; %>
+          <% let maxStreak = 0; let currentStreak = 0; let hasOverlap = false; const seenSlots = {}; %>
+          <% for (let i = 0; i < dayEntries.length; i++) { %>
+            <% const slotKey = String(dayEntries[i].class_number || ''); %>
+            <% seenSlots[slotKey] = (seenSlots[slotKey] || 0) + 1; %>
+            <% if (seenSlots[slotKey] > 1) { hasOverlap = true; } %>
+            <% if (i === 0 || dayEntries[i].class_number === dayEntries[i - 1].class_number + 1) { %>
+              <% currentStreak += 1; %>
             <% } else { %>
-              <% dayEntries.forEach(function(cls, idx) { %>
-                <% const slot = bellSchedule[cls.class_number]; %>
-                <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : ''; %>
-                <% const subjectName = cls.subject_name || ''; %>
-                <% const subjectNameLower = subjectName.toLowerCase(); %>
-                <% const inlineType = /(лекц|семін|лаб|практ|lecture|seminar|lab|practice)/.test(subjectNameLower); %>
-                <% const typeLabel = cls.lesson_type === 'lecture' ? 'Лекція' : cls.lesson_type === 'seminar' ? 'Семінар' : cls.lesson_type === 'lab' ? 'Лаб' : cls.lesson_type === 'practice' ? 'Практика' : ''; %>
-                <% const showTypeBadge = cls.lesson_type && !inlineType && typeLabel; %>
-                <% const legacyKey = `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}`; %>
-                <% const datedKey = cls.class_date ? `${legacyKey}|${cls.class_date}` : null; %>
-                <% const baseKey = cls.class_date ? `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}|${cls.class_date}` : `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}`; %>
-                <% const hwMeta = cls.is_general && homeworkMetaAll ? homeworkMetaAll[baseKey] : (homeworkMeta ? (datedKey ? homeworkMeta[datedKey] : homeworkMeta[legacyKey]) : null); %>
-                <% const groupLabel = cls.group_label ? cls.group_label : `Group ${cls.group_number}`; %>
-                <% const courseLabel = cls.course_name ? ` · ${cls.course_name}` : ''; %>
-                <% const prev = idx > 0 ? dayEntries[idx - 1] : null; %>
-                <% const next = idx < dayEntries.length - 1 ? dayEntries[idx + 1] : null; %>
-                <% const chainPrev = prev && prev.subject_id === cls.subject_id && cls.class_number === prev.class_number + 1; %>
-                <% const chainNext = next && next.subject_id === cls.subject_id && next.class_number === cls.class_number + 1; %>
-                <button
-                  class="list-group-item list-group-item-action schedule-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %>"
-                  type="button"
-                  data-bs-toggle="modal"
-                  data-bs-target="#homeworkModal"
-                  data-class="<%= cls.subject_name %>"
-                  data-subject="<%= subjectName %>"
-                  data-subjectid="<%= cls.subject_id %>"
-                  data-day="<%= cls.day_of_week %>"
-                  data-time="<%= timeLabel %>"
-                  data-time-base="<%= timeLabel %>"
-                  data-classnum="<%= cls.class_number %>"
-                  data-groupnum="<%= cls.group_number %>"
-                  data-courseid="<%= cls.course_id || '' %>"
-                  data-date="<%= cls.class_date %>"
-                  data-is-general="<%= cls.is_general ? 1 : 0 %>"
-                  data-use-local-time="<%= cls.use_local_time ? 1 : 0 %>"
+              <% currentStreak = 1; %>
+            <% } %>
+            <% if (currentStreak > maxStreak) { maxStreak = currentStreak; } %>
+          <% } %>
+          <% const isDenseDay = maxStreak >= 3; %>
+          <div class="card mb-3 glass day-card" data-day-date="<%= dayDates && dayDates[day] ? dayDates[day] : '' %>">
+            <div class="day-header">
+              <div class="day-title">
+                <span class="day-name"><%= day %></span>
+                <% if (dateLabel) { %>
+                  <span class="day-date"><%= dateLabel %></span>
+                <% } %>
+              </div>
+              <div class="day-indicators">
+                <% if (isDenseDay) { %>
+                  <span class="day-chip day-chip--primary">Dense day</span>
+                <% } %>
+                <% if (hasOverlap) { %>
+                  <button
+                    class="day-secondary-signal"
+                    type="button"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    data-bs-title="Overlapping slots detected"
+                    aria-label="Overlapping slots detected"
+                  >
+                    i
+                  </button>
+                <% } %>
+              </div>
+            </div>
+            <div class="list-group list-group-flush">
+              <% if (!dayEntries || dayEntries.length === 0) { %>
+                <div class="list-group-item empty-state">No classes</div>
+              <% } else { %>
+                <% dayEntries.forEach(function(cls, idx) { %>
+                  <% const slot = bellSchedule[cls.class_number]; %>
+                  <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : ''; %>
+                  <% const subjectName = cls.subject_name || ''; %>
+                  <% const subjectNameLower = subjectName.toLowerCase(); %>
+                  <% const inlineType = /(лекц|семін|лаб|практ|lecture|seminar|lab|practice)/.test(subjectNameLower); %>
+                  <% const typeLabel = cls.lesson_type === 'lecture' ? 'Лекція' : cls.lesson_type === 'seminar' ? 'Семінар' : cls.lesson_type === 'lab' ? 'Лаб' : cls.lesson_type === 'practice' ? 'Практика' : ''; %>
+                  <% const showTypeBadge = cls.lesson_type && !inlineType && typeLabel; %>
+                  <% const legacyKey = `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}`; %>
+                  <% const datedKey = cls.class_date ? `${legacyKey}|${cls.class_date}` : null; %>
+                  <% const baseKey = cls.class_date ? `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}|${cls.class_date}` : `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}`; %>
+                  <% const hwMeta = cls.is_general && homeworkMetaAll ? homeworkMetaAll[baseKey] : (homeworkMeta ? (datedKey ? homeworkMeta[datedKey] : homeworkMeta[legacyKey]) : null); %>
+                  <% const groupLabel = cls.group_label ? cls.group_label : `Group ${cls.group_number}`; %>
+                  <% const courseLabel = cls.course_name ? ` · ${cls.course_name}` : ''; %>
+                  <% const prev = idx > 0 ? dayEntries[idx - 1] : null; %>
+                  <% const next = idx < dayEntries.length - 1 ? dayEntries[idx + 1] : null; %>
+                  <% const chainPrev = prev && prev.subject_id === cls.subject_id && cls.class_number === prev.class_number + 1; %>
+                  <% const chainNext = next && next.subject_id === cls.subject_id && next.class_number === cls.class_number + 1; %>
                   <% const tooltipParts = [subjectName, groupLabel, `Class ${cls.class_number}`, timeLabel]; %>
                   <% if (showTypeBadge) { tooltipParts.push(typeLabel); } %>
                   <% if (cls.course_name) { tooltipParts.push(cls.course_name); } %>
                   <% if (hwMeta && hwMeta.preview && hwMeta.preview.length) { tooltipParts.push(...hwMeta.preview); } %>
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  data-bs-title="<%= tooltipParts.join(' • ') %>"
-                >
-                  <div class="schedule-card-inner">
-                    <div class="schedule-main">
-                      <div class="schedule-title-row">
-                        <div class="schedule-title"><%= subjectName %></div>
-                        <% if (showTypeBadge) { %>
-                          <span class="lesson-pill"><%= typeLabel %></span>
-                        <% } %>
+                  <div
+                    class="list-group-item schedule-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %>"
+                    role="button"
+                    tabindex="0"
+                    data-bs-toggle="modal"
+                    data-bs-target="#homeworkModal"
+                    data-class="<%= cls.subject_name %>"
+                    data-subject="<%= subjectName %>"
+                    data-subjectid="<%= cls.subject_id %>"
+                    data-day="<%= cls.day_of_week %>"
+                    data-time="<%= timeLabel %>"
+                    data-time-base="<%= timeLabel %>"
+                    data-classnum="<%= cls.class_number %>"
+                    data-groupnum="<%= cls.group_number %>"
+                    data-courseid="<%= cls.course_id || '' %>"
+                    data-date="<%= cls.class_date %>"
+                    data-is-general="<%= cls.is_general ? 1 : 0 %>"
+                    data-use-local-time="<%= cls.use_local_time ? 1 : 0 %>"
+                    data-detail="<%= tooltipParts.join(' • ') %>"
+                  >
+                    <div class="schedule-card-inner">
+                      <div class="schedule-main">
+                        <div class="schedule-title-row">
+                          <div class="schedule-title"><%= subjectName %></div>
+                          <% if (showTypeBadge) { %>
+                            <span class="lesson-pill"><%= typeLabel %></span>
+                          <% } %>
+                        </div>
+                        <div class="schedule-meta"><%= groupLabel %> · Пара <%= cls.class_number %><%= courseLabel %></div>
                       </div>
-                      <div class="schedule-meta"><%= groupLabel %> · Пара <%= cls.class_number %><%= courseLabel %></div>
-                    </div>
-                    <div class="schedule-aside">
-                      <div class="schedule-time"><%= timeLabel %></div>
-                      <div class="schedule-flags">
-                        <% if (hwMeta && hwMeta.control) { %>
-                          <span class="control-chip">Контроль</span>
-                        <% } %>
-                        <% if (hwMeta) { %>
-                          <span class="hw-chip">ДЗ <%= hwMeta.count %></span>
-                        <% } %>
-                        <span class="schedule-chip chip-now">Зараз</span>
-                        <span class="schedule-chip chip-next">Далі</span>
-                        <span class="conflict-badge" aria-hidden="true">Conflict</span>
+                      <div class="schedule-aside">
+                        <div class="schedule-time"><%= timeLabel %></div>
+                        <div class="schedule-flags">
+                          <% if (hwMeta && hwMeta.control) { %>
+                            <span class="control-chip">Контроль</span>
+                          <% } %>
+                          <% if (hwMeta) { %>
+                            <span class="hw-chip">ДЗ <%= hwMeta.count %></span>
+                          <% } %>
+                          <span class="schedule-chip chip-now">Зараз</span>
+                          <span class="schedule-chip chip-next">Далі</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </button>
-              <% }); %>
-            <% } %>
-          </div>
-          <% const dateKey = dayDates && dayDates[day] ? dayDates[day] : null; %>
-          <% const customItems = dateKey && customDeadlinesByDate ? customDeadlinesByDate[dateKey] : null; %>
-          <% if (settings && settings.allow_custom_deadlines && customItems && customItems.length) { %>
-            <div class="deadline-block">
-              <div class="deadline-title">🪄 Дивні дедлайни</div>
-              <% customItems.forEach(function(item) { %>
-                <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
-                <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
-                <div
-                  class="deadline-item"
-                  data-custom-id="<%= item.id %>"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  title="<%= shortDesc %>"
-                >
-                  <div>
-                    <div class="fw-semibold"><%= item.subject_name %></div>
-                    <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
-                    <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
-                  </div>
-                </div>
-              <% }); %>
-            </div>
-          <% } %>
-        </div>
-      <% }); %>
-      <% const activeDaySet = new Set(daysOfWeek || []); %>
-      <% if (settings && settings.allow_custom_deadlines && weekendDeadlineCards && weekendDeadlineCards.length) { %>
-        <% weekendDeadlineCards.forEach(function(card) { %>
-          <% if (activeDaySet.has(card.day)) { return; } %>
-          <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString('uk-UA') : ''; %>
-          <div class="card mb-3 glass day-card" data-day-date="<%= card.date || '' %>">
-            <div class="card-header fw-semibold text-white d-flex justify-content-between align-items-center">
-              <span><%= card.day %></span>
-              <% if (dateLabel) { %>
-                <span class="small muted"><%= dateLabel %></span>
+                <% }); %>
               <% } %>
             </div>
-            <div class="deadline-block">
-              <div class="deadline-title">🪄 Дивні дедлайни</div>
-              <% card.items.forEach(function(item) { %>
-                <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
-                <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
-                <div
-                  class="deadline-item"
-                  data-custom-id="<%= item.id %>"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  title="<%= shortDesc %>"
-                >
-                  <div>
-                    <div class="fw-semibold"><%= item.subject_name %></div>
-                    <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
-                    <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+            <% const dateKey = dayDates && dayDates[day] ? dayDates[day] : null; %>
+            <% const customItems = dateKey && customDeadlinesByDate ? customDeadlinesByDate[dateKey] : null; %>
+            <% if (settings && settings.allow_custom_deadlines && customItems && customItems.length) { %>
+              <div class="deadline-block">
+                <div class="deadline-title">🪄 Дивні дедлайни</div>
+                <% customItems.forEach(function(item) { %>
+                  <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
+                  <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
+                  <div
+                    class="deadline-item"
+                    data-custom-id="<%= item.id %>"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="<%= shortDesc %>"
+                  >
+                    <div>
+                      <div class="fw-semibold"><%= item.subject_name %></div>
+                      <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
+                      <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+                    </div>
                   </div>
-                </div>
-              <% }); %>
-            </div>
+                <% }); %>
+              </div>
+            <% } %>
           </div>
         <% }); %>
-      <% } %>
+        <% const activeDaySet = new Set(daysOfWeek || []); %>
+        <% if (settings && settings.allow_custom_deadlines && weekendDeadlineCards && weekendDeadlineCards.length) { %>
+          <% weekendDeadlineCards.forEach(function(card) { %>
+            <% if (activeDaySet.has(card.day)) { return; } %>
+            <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString('uk-UA') : ''; %>
+            <div class="card mb-3 glass day-card" data-day-date="<%= card.date || '' %>">
+              <div class="card-header fw-semibold text-white d-flex justify-content-between align-items-center">
+                <span><%= card.day %></span>
+                <% if (dateLabel) { %>
+                  <span class="small muted"><%= dateLabel %></span>
+                <% } %>
+              </div>
+              <div class="deadline-block">
+                <div class="deadline-title">🪄 Дивні дедлайни</div>
+                <% card.items.forEach(function(item) { %>
+                  <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
+                  <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
+                  <div
+                    class="deadline-item"
+                    data-custom-id="<%= item.id %>"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="<%= shortDesc %>"
+                  >
+                    <div>
+                      <div class="fw-semibold"><%= item.subject_name %></div>
+                      <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
+                      <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          <% }); %>
+        <% } %>
+        </div>
+      </main>
+
+      <div class="week-rail" id="weekRail">
+        <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
+        <div class="week-slider" id="weekSlider" role="tablist" aria-label="Week selector">
+          <% for (let w = 1; w <= (totalWeeks || 15); w++) { %>
+            <button
+              type="button"
+              class="week-pill <%= w === currentWeek ? 'active' : '' %>"
+              data-week="<%= w %>"
+              role="tab"
+              aria-selected="<%= w === currentWeek ? 'true' : 'false' %>"
+              aria-label="<%= t('schedule.week') %> <%= w %>"
+            >
+              <span class="week-pill-label"><%= t('schedule.week') %></span>
+              <span class="week-pill-value"><%= w %></span>
+            </button>
+          <% } %>
+        </div>
+        <button class="week-nav-btn" type="button" id="weekNext" aria-label="Next week">›</button>
       </div>
-    </main>
 
-    <div class="week-slider" id="weekSlider">
-      <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
-      <% for (let w = 1; w <= (totalWeeks || 15); w++) { %>
-        <button
-          type="button"
-          class="week-dot <%= w === currentWeek ? 'active' : '' %>"
-          data-week="<%= w %>"
-          aria-label="<%= t('schedule.week') %> <%= w %>"
-        ></button>
-      <% } %>
-      <button class="week-nav-btn" type="button" id="weekNext" aria-label="Next week">›</button>
+      <footer class="app-footer text-center py-4">
+        <small>
+          © <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %> ·
+          <button
+            type="button"
+            class="btn btn-link btn-sm p-0 align-baseline"
+            data-bs-toggle="modal"
+            data-bs-target="#changelogModal"
+          >
+            Changelog
+          </button>
+        </small>
+      </footer>
     </div>
-
-    <footer class="app-footer text-center py-4">
-      <small>
-        © <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %> ·
-        <button
-          type="button"
-          class="btn btn-link btn-sm p-0 align-baseline"
-          data-bs-toggle="modal"
-          data-bs-target="#changelogModal"
-        >
-          Changelog
-        </button>
-      </small>
-    </footer>
 
     <%- include('partials/changelog-modal') %>
-    <div class="modal fade legend-modal" id="subjectLegendModal" tabindex="-1" aria-labelledby="subjectLegendModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="subjectLegendModalLabel">Кольори предметів</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="legend-title">Легенда</div>
-            <div class="legend-list" id="subjectLegendList"></div>
-          </div>
-        </div>
-      </div>
-    </div>
     <div class="modal fade" id="homeworkModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -2787,21 +2850,70 @@
       const messagesSubjectFilter = document.getElementById('messagesSubjectFilter');
       const weekPrev = document.getElementById('weekPrev');
       const weekNext = document.getElementById('weekNext');
+      const scheduleDrawer = document.getElementById('scheduleActionDrawer');
+      const scheduleDrawerToggle = document.getElementById('scheduleDrawerToggle');
+      const scheduleDrawerClose = document.getElementById('scheduleDrawerClose');
+      const focusWeekToggle = document.getElementById('focusWeekToggle');
+      const densityChipBalance = document.getElementById('densityChipBalance');
+      const densityChipEvening = document.getElementById('densityChipEvening');
+      const densityChipPeak = document.getElementById('densityChipPeak');
       const totalWeeks = <%= totalWeeks || 15 %>;
       let currentWeek = <%= currentWeek %>;
-      function updateMobileWeekDots() {
-        if (!weekSlider) return;
-        const dots = weekSlider.querySelectorAll('.week-dot');
-        if (window.innerWidth > 768) {
-          dots.forEach((dot) => dot.classList.remove('hidden-mobile'));
-          return;
+      function setDrawerOpen(open) {
+        if (!scheduleDrawer) return;
+        document.body.classList.toggle('schedule-drawer-open', open);
+        scheduleDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+        if (scheduleDrawerToggle) {
+          scheduleDrawerToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
         }
-        dots.forEach((dot) => {
-          const week = Number(dot.dataset.week);
-          const visible = week === currentWeek || week === currentWeek - 1 || week === currentWeek + 1;
-          dot.classList.toggle('hidden-mobile', !visible);
+      }
+
+      if (scheduleDrawerToggle && scheduleDrawer) {
+        scheduleDrawerToggle.addEventListener('click', () => {
+          const isOpen = document.body.classList.contains('schedule-drawer-open');
+          setDrawerOpen(!isOpen);
         });
       }
+
+      if (scheduleDrawerClose && scheduleDrawer) {
+        scheduleDrawerClose.addEventListener('click', () => setDrawerOpen(false));
+      }
+
+      document.addEventListener('click', (event) => {
+        if (!scheduleDrawer || !document.body.classList.contains('schedule-drawer-open')) return;
+        const insideDrawer = scheduleDrawer.contains(event.target);
+        const onToggle = scheduleDrawerToggle && scheduleDrawerToggle.contains(event.target);
+        if (!insideDrawer && !onToggle) {
+          setDrawerOpen(false);
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        if (window.innerWidth < 992) {
+          setDrawerOpen(false);
+        }
+      });
+
+      function setWeekActiveState(week) {
+        if (!weekSlider) return null;
+        const pills = weekSlider.querySelectorAll('.week-pill');
+        let target = null;
+        pills.forEach((pill) => {
+          const isActive = Number(pill.dataset.week) === week;
+          pill.classList.toggle('active', isActive);
+          pill.setAttribute('aria-selected', isActive ? 'true' : 'false');
+          if (isActive) target = pill;
+        });
+        return target;
+      }
+
+      function centerWeekPill(week, behavior = 'smooth') {
+        if (!weekSlider) return;
+        const target = weekSlider.querySelector(`.week-pill[data-week="${week}"]`);
+        if (!target) return;
+        target.scrollIntoView({ behavior, block: 'nearest', inline: 'center' });
+      }
+
       function updateSchedule(week) {
         const safe = Math.max(1, Math.min(totalWeeks, week));
         const params = new URLSearchParams(window.location.search);
@@ -2810,25 +2922,18 @@
       }
       function animateWeekChange(nextWeek) {
         const safe = Math.max(1, Math.min(totalWeeks, nextWeek));
-        const active = weekSlider ? weekSlider.querySelector('.week-dot.active') : null;
-        const target = weekSlider
-          ? weekSlider.querySelector(`.week-dot[data-week="${safe}"]`)
-          : null;
-        if (active && target && active !== target) {
-          active.classList.remove('active');
-          target.classList.add('active');
-        }
+        setWeekActiveState(safe);
+        centerWeekPill(safe, 'smooth');
         currentWeek = safe;
-        updateMobileWeekDots();
         const scheduleContent = document.querySelector('.schedule-content');
         if (scheduleContent) {
           scheduleContent.classList.add('is-exiting');
         }
-        setTimeout(() => updateSchedule(safe), 220);
+        setTimeout(() => updateSchedule(safe), 200);
       }
       if (weekSlider) {
         weekSlider.addEventListener('click', (event) => {
-          const btn = event.target.closest('.week-dot');
+          const btn = event.target.closest('.week-pill');
           if (!btn) return;
           const week = Number(btn.dataset.week);
           if (!Number.isNaN(week)) animateWeekChange(week);
@@ -2851,6 +2956,8 @@
           if (delta < 0) animateWeekChange(currentWeek + 1);
           if (delta > 0) animateWeekChange(currentWeek - 1);
         });
+        setWeekActiveState(currentWeek);
+        centerWeekPill(currentWeek, 'auto');
       }
 
       if (messagesBtnMobile) {
@@ -2906,9 +3013,15 @@
         }
       }
 
-      if (customDeadlineItems && customDeadlineItems.length) {
-        const customMap = new Map(customDeadlineItems.map((item) => [String(item.id), item]));
-        document.querySelectorAll('.deadline-item[data-custom-id]').forEach((el) => {
+      const customMap = customDeadlineItems && customDeadlineItems.length
+        ? new Map(customDeadlineItems.map((item) => [String(item.id), item]))
+        : null;
+
+      function bindCustomDeadlineCards(root = document) {
+        if (!customMap) return;
+        root.querySelectorAll('.deadline-item[data-custom-id]').forEach((el) => {
+          if (el.dataset.deadlineBound === '1') return;
+          el.dataset.deadlineBound = '1';
           el.addEventListener('click', () => {
             const item = customMap.get(String(el.dataset.customId));
             if (!item || !customDeadlineModal) return;
@@ -2918,14 +3031,23 @@
           });
         });
       }
-      const legendModal = document.getElementById('subjectLegendModal');
-      if (legendModal) {
-        legendModal.addEventListener('show.bs.modal', () => {
-          buildSubjectLegend();
+
+      bindCustomDeadlineCards();
+
+      function applyFocusMode(enabled) {
+        document.body.classList.toggle('focus-week', enabled);
+      }
+
+      if (focusWeekToggle) {
+        const storedFocus = localStorage.getItem('schedule-focus-week') === '1';
+        focusWeekToggle.checked = storedFocus;
+        applyFocusMode(storedFocus);
+        focusWeekToggle.addEventListener('change', () => {
+          const enabled = focusWeekToggle.checked;
+          localStorage.setItem('schedule-focus-week', enabled ? '1' : '0');
+          applyFocusMode(enabled);
         });
       }
-      updateMobileWeekDots();
-      window.addEventListener('resize', updateMobileWeekDots);
 
       function updateUnreadBadges(count) {
         const targets = [messagesBadge, mobileMenuBadge].filter(Boolean);
@@ -2963,6 +3085,10 @@
       }
 
       window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && document.body.classList.contains('schedule-drawer-open')) {
+          setDrawerOpen(false);
+          return;
+        }
         if (event.key === 'ArrowRight') {
           animateWeekChange(currentWeek + 1);
         }
@@ -3061,12 +3187,12 @@
           const label = btn.querySelector('.schedule-time');
           if (label) label.textContent = localRange;
           btn.dataset.time = localRange;
-          const title = btn.getAttribute('data-bs-title');
-          if (title) {
-            const parts = title.split(' • ');
-            if (parts.length) {
-              parts[parts.length - 1] = localRange;
-              btn.setAttribute('data-bs-title', parts.join(' • '));
+          const detail = btn.dataset.detail || '';
+          if (detail) {
+            const parts = detail.split(' • ');
+            if (parts.length >= 4) {
+              parts[3] = localRange;
+              btn.dataset.detail = parts.join(' • ');
             }
           }
         });
@@ -3167,49 +3293,113 @@
         if (next) next.el.classList.add('is-next');
       }
 
-      function hashSubject(value) {
-        let hash = 0;
-        for (let i = 0; i < value.length; i++) {
-          hash = (hash * 31 + value.charCodeAt(i)) % 360;
-        }
-        return hash;
-      }
-
-      function applySubjectColors(root = document) {
-        const cards = root.querySelectorAll('.schedule-card');
-        cards.forEach((card) => {
-          const subject = card.dataset.subject || card.dataset.class || '';
-          const hue = subject ? hashSubject(subject) : 220;
-          card.style.setProperty('--subject-h', hue);
+      function bindScheduleCardInteractions(root = document) {
+        root.querySelectorAll('.schedule-card[role="button"]').forEach((card) => {
+          if (card.dataset.keyboardBound === '1') return;
+          card.dataset.keyboardBound = '1';
+          card.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            card.click();
+          });
         });
       }
 
-      function buildSubjectLegend(root = document) {
-        const legendList = document.getElementById('subjectLegendList');
-        if (!legendList) return;
-        const cards = Array.from(root.querySelectorAll('.schedule-card'));
-        const subjectMap = new Map();
-        cards.forEach((card) => {
-          const subject = card.dataset.subject || card.dataset.class || '';
-          if (!subject || subjectMap.has(subject)) return;
-          const hue = subject ? hashSubject(subject) : 220;
-          subjectMap.set(subject, hue);
+      function applySubjectTones(root = document) {
+        const dayCards = root.querySelectorAll('.day-card');
+        dayCards.forEach((dayCard) => {
+          const cards = Array.from(dayCard.querySelectorAll('.schedule-card'));
+          const groups = new Map();
+          cards.forEach((card) => {
+            card.style.setProperty('--subject-shift', '0');
+            const subjectKey = (card.dataset.subject || card.dataset.class || '').trim().toLowerCase();
+            if (!subjectKey) return;
+            if (!groups.has(subjectKey)) groups.set(subjectKey, []);
+            groups.get(subjectKey).push(card);
+          });
+          groups.forEach((subjectCards) => {
+            const total = subjectCards.length;
+            subjectCards.forEach((card, index) => {
+              let shift = 0;
+              if (total > 1) {
+                const progress = total === 1 ? 0 : index / (total - 1);
+                shift = Math.round((progress - 0.5) * 16);
+              }
+              card.style.setProperty('--subject-shift', String(shift));
+            });
+          });
         });
-        legendList.innerHTML = '';
-        const entries = Array.from(subjectMap.entries()).sort((a, b) => a[0].localeCompare(b[0], 'uk', { sensitivity: 'base' }));
-        if (!entries.length) {
-          const empty = document.createElement('div');
-          empty.className = 'legend-empty';
-          empty.textContent = 'Немає предметів у цьому тижні.';
-          legendList.appendChild(empty);
+      }
+
+      function setDensityChip(chip, label, detail, opacity) {
+        if (!chip) return;
+        chip.textContent = label;
+        chip.style.setProperty('--chip-opacity', String(Math.max(0.12, Math.min(0.36, opacity))));
+        chip.setAttribute('data-bs-title', detail);
+        const tooltip = bootstrap.Tooltip.getInstance(chip);
+        if (tooltip) tooltip.dispose();
+        new bootstrap.Tooltip(chip);
+      }
+
+      function updateDensitySummary(root = document) {
+        const dayCards = Array.from(root.querySelectorAll('.day-card'));
+        const dayStats = dayCards.map((card) => {
+          const dayName = card.querySelector('.day-name') ? card.querySelector('.day-name').textContent.trim() : 'Day';
+          const classCards = Array.from(card.querySelectorAll('.schedule-card'));
+          const count = classCards.length;
+          const eveningCount = classCards.filter((entry) => Number(entry.dataset.classnum || 0) >= 6).length;
+          return { dayName, count, eveningCount };
+        }).filter((stat) => stat.count > 0);
+
+        if (!dayStats.length) {
+          setDensityChip(densityChipBalance, 'Day balance: no classes yet', 'No classes are scheduled for this week.', 0.14);
+          setDensityChip(densityChipEvening, 'Evenings feel light this week', 'Evening intensity appears after classes are added.', 0.14);
+          setDensityChip(densityChipPeak, 'Most intense day: —', 'Most intense day appears once there are classes.', 0.14);
           return;
         }
-        entries.forEach(([subject, hue]) => {
-          const item = document.createElement('div');
-          item.className = 'legend-item';
-          item.innerHTML = `<span class="legend-dot" style="--subject-h:${hue}"></span><span>${subject}</span>`;
-          legendList.appendChild(item);
-        });
+
+        const counts = dayStats.map((stat) => stat.count);
+        const totalClasses = counts.reduce((sum, value) => sum + value, 0);
+        const average = totalClasses / dayStats.length;
+        const maxCount = Math.max(...counts);
+        const minCount = Math.min(...counts);
+        const spread = maxCount - minCount;
+        const eveningClasses = dayStats.reduce((sum, stat) => sum + stat.eveningCount, 0);
+        const eveningRatio = totalClasses ? eveningClasses / totalClasses : 0;
+        const peak = dayStats.reduce((best, stat) => (stat.count > best.count ? stat : best), dayStats[0]);
+
+        let balanceLabel = 'Day balance: steady rhythm';
+        if (spread >= 3) {
+          balanceLabel = 'Day balance: uneven rhythm';
+        } else if (spread >= 2) {
+          balanceLabel = 'Day balance: mixed rhythm';
+        }
+
+        let eveningLabel = 'Evenings feel light this week';
+        if (eveningRatio >= 0.28) {
+          eveningLabel = 'Evenings feel heavy this week';
+        } else if (eveningRatio >= 0.14) {
+          eveningLabel = 'Evenings feel moderate this week';
+        }
+
+        setDensityChip(
+          densityChipBalance,
+          balanceLabel,
+          `Average ${average.toFixed(1)} classes/day. Spread: ${minCount} to ${maxCount}.`,
+          0.14 + Math.min(0.18, spread * 0.06)
+        );
+        setDensityChip(
+          densityChipEvening,
+          eveningLabel,
+          `${eveningClasses} of ${totalClasses} classes are in 6th–7th slots.`,
+          0.14 + Math.min(0.2, eveningRatio * 0.6)
+        );
+        setDensityChip(
+          densityChipPeak,
+          `Most intense day: ${peak.dayName}`,
+          `${peak.dayName} has ${peak.count} classes this week.`,
+          0.14 + Math.min(0.18, peak.count / Math.max(1, maxCount) * 0.18)
+        );
       }
 
       async function refreshSchedule() {
@@ -3230,9 +3420,11 @@
           if (nextGrid) {
             weekGrid.innerHTML = nextGrid.innerHTML;
             applyLocalWeekTimes();
+            bindCustomDeadlineCards(weekGrid);
+            bindScheduleCardInteractions(weekGrid);
             updateSmartHighlights();
-            applySubjectColors(weekGrid);
-            buildSubjectLegend(weekGrid);
+            applySubjectTones(weekGrid);
+            updateDensitySummary(weekGrid);
             initTooltips(weekGrid);
             writeScheduleCache(weekGrid.innerHTML);
           }
@@ -3250,9 +3442,10 @@
       if (weekGrid) {
         writeScheduleCache(weekGrid.innerHTML);
       }
+      bindScheduleCardInteractions();
       updateSmartHighlights();
-      applySubjectColors();
-      buildSubjectLegend();
+      applySubjectTones();
+      updateDensitySummary();
       initTooltips();
 
       setInterval(updateSmartHighlights, 30000);
@@ -3346,6 +3539,7 @@
 
       if (messagesBtn) {
         messagesBtn.addEventListener('click', () => {
+          setDrawerOpen(false);
           const modal = new bootstrap.Modal(document.getElementById('messagesModal'));
           modal.show();
           loadMessages();

@@ -9,20 +9,7 @@
   <div class="container">
     <span class="navbar-brand text-white me-auto"><%= brandTitle %></span>
     <div class="d-flex align-items-center gap-2 topbar-actions flex-wrap justify-content-end">
-      <% if (isTeamwork) { %>
-        <button
-          class="theme-toggle theme-toggle-min"
-          type="button"
-          id="themeToggle"
-          aria-label="Toggle theme"
-          data-light-label="☀️"
-          data-dark-label="🌙"
-        >
-          🌙
-        </button>
-        <a class="btn btn-glass" href="/schedule">Повернутись до розкладу</a>
-      <% } else { %>
-      <% if (!isMyDay) { %>
+      <% if (isSchedule) { %>
         <span class="me-2 muted desktop-only text-nowrap">
           <% if (role === 'admin') { %>
             <%= t('role.admin') %>: <%= username %>
@@ -36,60 +23,102 @@
             <%= t('role.student') %>: <%= username %>
           <% } %>
         </span>
-        <% if (role === 'admin') { %>
-          <form method="POST" action="/admin/switch-to-admin" class="me-1 desktop-only">
-            <button class="btn btn-glass" type="submit"><%= t('schedule.backToAdmin') %></button>
-          </form>
-        <% } %>
-        <% if (role === 'starosta') { %>
-          <a class="btn btn-glass me-1 desktop-only" href="/starosta"><%= t('menu.starosta') %></a>
-        <% } %>
-        <% if (role === 'deanery') { %>
-          <a class="btn btn-glass me-1 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
-        <% } %>
-      <% } %>
-      <button
-        class="theme-toggle theme-toggle-min me-1 desktop-only"
-        type="button"
-        id="themeToggle"
-        aria-label="Toggle theme"
-        data-light-label="☀️"
-        data-dark-label="🌙"
-      >
-        🌙
-      </button>
-      <% if (activePage === 'schedule' && settings && settings.allow_messages) { %>
-        <button class="theme-toggle-min msg-btn me-1 desktop-only" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">
-          💬
+        <button
+          class="theme-toggle-min drawer-menu-btn desktop-only"
+          type="button"
+          id="scheduleDrawerToggle"
+          aria-label="Open menu"
+          aria-controls="scheduleActionDrawer"
+          aria-expanded="false"
+        >
+          ☰
           <span class="msg-badge d-none" id="messagesBadge">0</span>
         </button>
-      <% } %>
-      <% if (!isMyDay && !isTeamwork) { %>
-        <a class="btn btn-glass me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
-      <% } %>
-      <% if (isMyDay) { %>
-        <a class="btn btn-glass me-1 desktop-only" href="/schedule">Повернутись до розкладу</a>
+        <button
+          class="theme-toggle-min mobile-menu-btn"
+          type="button"
+          data-bs-toggle="modal"
+          data-bs-target="#mobileMenuModal"
+          aria-label="Menu"
+        >
+          ☰
+          <span class="msg-badge d-none" id="mobileMenuBadge">0</span>
+        </button>
+      <% } else if (isTeamwork) { %>
+        <button
+          class="theme-toggle theme-toggle-min"
+          type="button"
+          id="themeToggle"
+          aria-label="Toggle theme"
+          data-light-label="☀️"
+          data-dark-label="🌙"
+        >
+          🌙
+        </button>
+        <a class="btn btn-glass" href="/schedule">Повернутись до розкладу</a>
       <% } else { %>
-        <a class="btn btn-glass me-1 desktop-only" href="/my-day">Мій день</a>
-      <% } %>
-      <% if (!isMyDay && !isProfile) { %>
-        <a class="btn btn-glass me-1 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
-      <% } %>
-      <% if (!isMyDay) { %>
-        <form method="POST" action="/logout" class="desktop-only">
-          <button class="btn btn-glass" type="submit"><%= t('schedule.logout') %></button>
-        </form>
-      <% } %>
-      <button
-        class="theme-toggle-min mobile-menu-btn"
-        type="button"
-        data-bs-toggle="modal"
-        data-bs-target="#mobileMenuModal"
-        aria-label="Menu"
-      >
-        ☰
-        <span class="msg-badge d-none" id="mobileMenuBadge">0</span>
-      </button>
+        <% if (!isMyDay) { %>
+          <span class="me-2 muted desktop-only text-nowrap">
+            <% if (role === 'admin') { %>
+              <%= t('role.admin') %>: <%= username %>
+            <% } else if (role === 'starosta') { %>
+              <%= t('role.starosta') %>: <%= username %>
+            <% } else if (role === 'deanery') { %>
+              <%= t('role.deanery') %>: <%= username %>
+            <% } else if (role === 'teacher') { %>
+              <%= t('role.teacher') %>: <%= username %>
+            <% } else { %>
+              <%= t('role.student') %>: <%= username %>
+            <% } %>
+          </span>
+          <% if (role === 'admin') { %>
+            <form method="POST" action="/admin/switch-to-admin" class="me-1 desktop-only">
+              <button class="btn btn-glass" type="submit"><%= t('schedule.backToAdmin') %></button>
+            </form>
+          <% } %>
+          <% if (role === 'starosta') { %>
+            <a class="btn btn-glass me-1 desktop-only" href="/starosta"><%= t('menu.starosta') %></a>
+          <% } %>
+          <% if (role === 'deanery') { %>
+            <a class="btn btn-glass me-1 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
+          <% } %>
+        <% } %>
+        <button
+          class="theme-toggle theme-toggle-min me-1 desktop-only"
+          type="button"
+          id="themeToggle"
+          aria-label="Toggle theme"
+          data-light-label="☀️"
+          data-dark-label="🌙"
+        >
+          🌙
+        </button>
+        <% if (!isMyDay && !isTeamwork) { %>
+          <a class="btn btn-glass me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
+        <% } %>
+        <% if (isMyDay) { %>
+          <a class="btn btn-glass me-1 desktop-only" href="/schedule">Повернутись до розкладу</a>
+        <% } else { %>
+          <a class="btn btn-glass me-1 desktop-only" href="/my-day">Мій день</a>
+        <% } %>
+        <% if (!isMyDay && !isProfile) { %>
+          <a class="btn btn-glass me-1 desktop-only" href="/profile"><%= t('schedule.profile') %></a>
+        <% } %>
+        <% if (!isMyDay) { %>
+          <form method="POST" action="/logout" class="desktop-only">
+            <button class="btn btn-glass" type="submit"><%= t('schedule.logout') %></button>
+          </form>
+        <% } %>
+        <button
+          class="theme-toggle-min mobile-menu-btn"
+          type="button"
+          data-bs-toggle="modal"
+          data-bs-target="#mobileMenuModal"
+          aria-label="Menu"
+        >
+          ☰
+          <span class="msg-badge d-none" id="mobileMenuBadge">0</span>
+        </button>
       <% } %>
     </div>
   </div>
