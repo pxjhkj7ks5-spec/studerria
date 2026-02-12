@@ -8,6 +8,7 @@ const scheduleGeneratorRepair = require('./007_schedule_generator_repair');
 const scheduleGeneratorEntryItem = require('./008_schedule_generator_entry_item');
 const scheduleEntryLessonType = require('./009_schedule_entry_lesson_type');
 const mergeSubjectsByType = require('./010_merge_subjects_by_type');
+const scheduleGeneratorIndexes = require('./011_schedule_generator_indexes');
 
 module.exports = [
   init,
@@ -20,4 +21,5 @@ module.exports = [
   scheduleGeneratorEntryItem,
   scheduleEntryLessonType,
   mergeSubjectsByType,
+  scheduleGeneratorIndexes,
 ];

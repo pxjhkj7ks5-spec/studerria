@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.7.99",
+      "date": "2026-02-12",
+      "items": [
+        "fix: use location-aware semester mapping consistently in generator run and preview flows",
+        "fix: wrap generator preview/publish write paths in DB transactions to avoid partial delete/insert states",
+        "fix: recalculate slot scores on each scheduling pass to improve day balancing and late-slot control",
+        "feat: expose top no-slot rejection reasons in conflict diagnostics UI",
+        "feat: add generator indexes and slot-level uniqueness guard migration for schedule_generator_entries"
+      ]
+    },
+    {
       "version": "0.7.98",
       "date": "2026-02-11",
       "items": [

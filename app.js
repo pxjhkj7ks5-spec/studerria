@@ -290,6 +290,31 @@ const db = {
   },
 };
 
+const txRun = async (client, sql, params = []) => {
+  const result = await client.query(convertPlaceholders(sql), params);
+  const lastID = result.rows && result.rows[0] ? result.rows[0].id : undefined;
+  return { changes: result.rowCount, lastID };
+};
+
+const withTransaction = async (work) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (_) {
+      // ignore rollback errors and return original error
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 let usersHasIsActive = true;
 
 const refreshSettingsCache = async () => {
@@ -935,6 +960,22 @@ const normalizeWeekdayName = (value) => {
   return match || null;
 };
 
+const normalizeGeneratorLocation = (value) =>
+  String(value || '').toLowerCase() === 'munich' ? 'munich' : 'kyiv';
+
+const getConfiguredCourseSemesterId = (config, courseId, location) => {
+  const loc = normalizeGeneratorLocation(location || config?.active_location);
+  const byLocation = config && config.course_semesters_by_location
+    ? config.course_semesters_by_location[loc]
+    : null;
+  if (byLocation && Object.keys(byLocation).length) {
+    return byLocation[courseId] || byLocation[String(courseId)] || null;
+  }
+  const fallback = config && config.course_semesters ? config.course_semesters : null;
+  if (!fallback) return null;
+  return fallback[courseId] || fallback[String(courseId)] || null;
+};
+
 async function getCoursesByLocation(location) {
   const target = String(location || 'kyiv').toLowerCase();
   const courses = await getCoursesCached();
@@ -1553,6 +1594,7 @@ const buildConflictContext = (conflicts, itemsById, courseById, courseLocationMa
       subject: conflict.subject,
       scheduled: conflict.scheduled,
       target: conflict.target,
+      diagnostics: conflict.diagnostics || null,
       items: items.map((item) => ({
         id: item.id,
         subject: item.subject_name,
@@ -7282,9 +7324,7 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
     const courseContexts = new Map();
     const courseIds = Array.from(new Set(items.map((item) => String(item.course_id))));
     for (const courseId of courseIds) {
-      const configuredSemesterId = config.course_semesters
-        ? config.course_semesters[courseId] || config.course_semesters[String(courseId)]
-        : null;
+      const configuredSemesterId = getConfiguredCourseSemesterId(config, courseId, activeLocation);
       let semester = null;
       if (configuredSemesterId) {
         semester = await db.get('SELECT * FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, courseId]);
@@ -7362,47 +7402,6 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
     }
     const operationId = randomUUID();
     const diffResult = await buildScheduleDiff(filteredEntries);
-
-    if (courseOnly) {
-      await db.run(
-        'DELETE FROM schedule_generator_entries WHERE run_id = ? AND course_id = ?',
-        [runId, courseOnly]
-      );
-    } else if (courseIds.length) {
-      const placeholders = courseIds.map(() => '?').join(',');
-      await db.run(
-        `DELETE FROM schedule_generator_entries WHERE run_id = ? AND course_id IN (${placeholders})`,
-        [runId, ...courseIds]
-      );
-    }
-    if (filteredEntries.length) {
-      const stmt = db.prepare(
-        `
-          INSERT INTO schedule_generator_entries
-            (run_id, item_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, day_of_week, class_number, week_number, is_mirror, mirror_key)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `
-      );
-      filteredEntries.forEach((entry) => {
-        stmt.run(
-          runId,
-          entry.item_id || null,
-          entry.course_id,
-          entry.semester_id,
-          entry.subject_id,
-          entry.teacher_id,
-          entry.lesson_type || null,
-          entry.group_number,
-          entry.day_of_week,
-          entry.class_number,
-          entry.week_number,
-          Boolean(entry.is_mirror),
-          entry.mirror_key || null
-        );
-      });
-      await stmt.finalize();
-    }
-
     const nextConfig = {
       ...config,
       last_stats: {
@@ -7424,10 +7423,53 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
       },
       last_conflicts: result.conflicts,
     };
-    await db.run(
-      'UPDATE schedule_generator_runs SET config = ?, updated_at = NOW() WHERE id = ?',
-      [serializeGeneratorConfig(nextConfig), runId]
-    );
+    await withTransaction(async (client) => {
+      if (courseOnly) {
+        await txRun(
+          client,
+          'DELETE FROM schedule_generator_entries WHERE run_id = ? AND course_id = ?',
+          [runId, courseOnly]
+        );
+      } else if (courseIds.length) {
+        const placeholders = courseIds.map(() => '?').join(',');
+        await txRun(
+          client,
+          `DELETE FROM schedule_generator_entries WHERE run_id = ? AND course_id IN (${placeholders})`,
+          [runId, ...courseIds]
+        );
+      }
+      const insertSql = `
+        INSERT INTO schedule_generator_entries
+          (run_id, item_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, day_of_week, class_number, week_number, is_mirror, mirror_key)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      for (const entry of filteredEntries) {
+        await txRun(
+          client,
+          insertSql,
+          [
+            runId,
+            entry.item_id || null,
+            entry.course_id,
+            entry.semester_id,
+            entry.subject_id,
+            entry.teacher_id,
+            entry.lesson_type || null,
+            entry.group_number,
+            entry.day_of_week,
+            entry.class_number,
+            entry.week_number,
+            Boolean(entry.is_mirror),
+            entry.mirror_key || null,
+          ]
+        );
+      }
+      await txRun(
+        client,
+        'UPDATE schedule_generator_runs SET config = ?, updated_at = NOW() WHERE id = ?',
+        [serializeGeneratorConfig(nextConfig), runId]
+      );
+    });
 
     const firstCourse = courseOnly || (normalizedItems[0] ? normalizedItems[0].course_id : courseIds[0]);
     return res.redirect(`/admin/schedule-generator/${runId}/preview?course=${firstCourse}&week=1`);
@@ -7464,9 +7506,9 @@ app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, re
     if (!selectedCourseId) {
       return res.redirect('/admin/schedule-generator?run=' + runId);
     }
-    const configuredSemesterId = config.course_semesters
-      ? config.course_semesters[selectedCourseId] || config.course_semesters[String(selectedCourseId)]
-      : null;
+    const selectedCourse = allCourses.find((course) => Number(course.id) === Number(selectedCourseId));
+    const selectedLocation = normalizeGeneratorLocation(selectedCourse?.location || activeLocation);
+    const configuredSemesterId = getConfiguredCourseSemesterId(config, selectedCourseId, selectedLocation);
     let activeSemester = null;
     if (configuredSemesterId) {
       activeSemester = await db.get('SELECT * FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, selectedCourseId]);
@@ -7644,39 +7686,47 @@ app.post('/admin/schedule-generator/:runId/publish', requireAdmin, async (req, r
         });
       }
     }
-    if (replace) {
-      const pairs = new Map();
-      entries.forEach((entry) => {
-        const key = `${entry.course_id}|${entry.semester_id}`;
-        pairs.set(key, { course_id: entry.course_id, semester_id: entry.semester_id });
-      });
-      for (const pair of pairs.values()) {
-        await db.run(
-          'DELETE FROM schedule_entries WHERE course_id = ? AND semester_id = ?',
-          [pair.course_id, pair.semester_id]
-        );
+    await withTransaction(async (client) => {
+      if (replace) {
+        const pairs = new Map();
+        entries.forEach((entry) => {
+          const key = `${entry.course_id}|${entry.semester_id}`;
+          pairs.set(key, { course_id: entry.course_id, semester_id: entry.semester_id });
+        });
+        for (const pair of pairs.values()) {
+          await txRun(
+            client,
+            'DELETE FROM schedule_entries WHERE course_id = ? AND semester_id = ?',
+            [pair.course_id, pair.semester_id]
+          );
+        }
       }
-    }
-    const stmt = db.prepare(
-      `
+      const insertSql = `
         INSERT INTO schedule_entries (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id, lesson_type)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `
-    );
-    entries.forEach((entry) => {
-      stmt.run(
-        entry.subject_id,
-        entry.group_number,
-        entry.day_of_week,
-        entry.class_number,
-        entry.week_number,
-        entry.course_id,
-        entry.semester_id,
-        entry.lesson_type || null
+      `;
+      for (const entry of entries) {
+        await txRun(
+          client,
+          insertSql,
+          [
+            entry.subject_id,
+            entry.group_number,
+            entry.day_of_week,
+            entry.class_number,
+            entry.week_number,
+            entry.course_id,
+            entry.semester_id,
+            entry.lesson_type || null,
+          ]
+        );
+      }
+      await txRun(
+        client,
+        'UPDATE schedule_generator_runs SET status = ?, updated_at = NOW() WHERE id = ?',
+        ['published', runId]
       );
     });
-    await stmt.finalize();
-    await db.run('UPDATE schedule_generator_runs SET status = ?, updated_at = NOW() WHERE id = ?', ['published', runId]);
     logAction(db, req, 'schedule_generator_publish', {
       run_id: runId,
       replace,

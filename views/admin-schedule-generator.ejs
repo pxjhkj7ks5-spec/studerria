@@ -749,6 +749,7 @@
             <div class="card-body">
               <div class="generator-section-title mb-2">Конфлікти після генерації</div>
               <% const conflictLabels = { missing_course_context: 'Немає активного семестру', missing_weeks_count: 'Не задано кількість тижнів', no_available_weeks: 'Немає доступних тижнів', no_allowed_days: 'Немає доступних днів', no_allowed_classes: 'Немає дозволених слотів', no_slot_found: 'Немає слота', partial_schedule: 'Часткова генерація', subject_day_mismatch: 'Предмет має різні дні', unknown: 'Невідома причина' }; %>
+              <% const rejectionLabels = { course_slot_busy: 'Слот зайнятий лекцією/курсом', lecture_slot_busy: 'Слот блокує лекція', subject_slot_busy: 'Предмет уже стоїть у цей слот', teacher_slot_busy: 'Викладач зайнятий', group_slot_busy: 'Група зайнята', group_day_limit: 'Ліміт пар/день у групи', teacher_week_limit: 'Ліміт викладача на тиждень', unknown: 'Інше' }; %>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const conflicts = conflictDetails && conflictDetails[location]; %>
                 <div class="d-grid gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
@@ -770,6 +771,14 @@
                           <div class="small text-muted mt-1">
                             <% conflict.items.forEach(function(item, idx) { %>
                               <span><%= item.course %> · <%= item.group %> · <%= item.teacher || 'Без викладача' %></span><%= idx < conflict.items.length - 1 ? ' · ' : '' %>
+                            <% }); %>
+                          </div>
+                        <% } %>
+                        <% if (conflict.diagnostics && conflict.diagnostics.top_rejections && conflict.diagnostics.top_rejections.length) { %>
+                          <div class="small text-muted mt-1">
+                            Причини відсіву слотів:
+                            <% conflict.diagnostics.top_rejections.forEach(function(reason, idx) { %>
+                              <span><%= rejectionLabels[reason.reason] || reason.reason %> (<%= reason.count %>)</span><%= idx < conflict.diagnostics.top_rejections.length - 1 ? ' · ' : '' %>
                             <% }); %>
                           </div>
                         <% } %>
