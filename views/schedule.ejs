@@ -1745,20 +1745,18 @@
                 <span class="sync-sep">•</span>
                 <span id="syncStatusMeta">Щойно</span>
               </div>
+              <label class="control-toggle focus-toggle panel-focus-inline" for="focusWeekToggle">
+                <input class="toggle-input" type="checkbox" id="focusWeekToggle" />
+                <span class="toggle">
+                  <span class="toggle-knob"></span>
+                </span>
+                <span class="toggle-text">Focus week</span>
+              </label>
             </div>
           </div>
         </div>
 
         <section class="status-stack mb-4" id="densityBlock">
-          <div class="status-focus">
-            <label class="control-toggle focus-toggle" for="focusWeekToggle">
-              <input class="toggle-input" type="checkbox" id="focusWeekToggle" />
-              <span class="toggle">
-                <span class="toggle-knob"></span>
-              </span>
-              <span class="toggle-text">Focus week</span>
-            </label>
-          </div>
           <details class="density-summary" id="densitySummary">
             <summary>
               <span>Week pulse</span>
@@ -1767,12 +1765,12 @@
             <div class="density-summary-copy">
               <span>Calm view of the week density without aggressive warning colors.</span>
             </div>
+            <div class="density-chip-row">
+              <span class="density-chip" id="densityChipBalance" data-bs-toggle="tooltip" data-bs-placement="top">Day balance</span>
+              <span class="density-chip" id="densityChipEvening" data-bs-toggle="tooltip" data-bs-placement="top">Evening intensity</span>
+              <span class="density-chip" id="densityChipPeak" data-bs-toggle="tooltip" data-bs-placement="top">Most intense day</span>
+            </div>
           </details>
-          <div class="density-chip-row">
-            <span class="density-chip" id="densityChipBalance" data-bs-toggle="tooltip" data-bs-placement="top">Day balance</span>
-            <span class="density-chip" id="densityChipEvening" data-bs-toggle="tooltip" data-bs-placement="top">Evening intensity</span>
-            <span class="density-chip" id="densityChipPeak" data-bs-toggle="tooltip" data-bs-placement="top">Most intense day</span>
-          </div>
         </section>
 
         <% if (viewAs === 'student') { %>
@@ -1979,20 +1977,20 @@
       </main>
 
       <div class="week-rail" id="weekRail">
+        <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
         <div class="week-slider" id="weekSlider" role="tablist" aria-label="Week selector">
           <% for (let w = 1; w <= (totalWeeks || 15); w++) { %>
             <button
               type="button"
-              class="week-pill <%= w === currentWeek ? 'active' : '' %>"
+              class="week-dot <%= w === currentWeek ? 'active' : '' %>"
               data-week="<%= w %>"
               role="tab"
               aria-selected="<%= w === currentWeek ? 'true' : 'false' %>"
               aria-label="<%= t('schedule.week') %> <%= w %>"
-            >
-              <span class="week-pill-value">W<%= w %></span>
-            </button>
+            ></button>
           <% } %>
         </div>
+        <button class="week-nav-btn" type="button" id="weekNext" aria-label="Next week">›</button>
       </div>
 
       <footer class="app-footer text-center py-4">
@@ -2906,26 +2904,53 @@
         if (window.innerWidth < 992) {
           setDrawerOpen(false);
         }
+        updateVisibleWeekDots();
       });
 
       function setWeekActiveState(week) {
         if (!weekSlider) return null;
-        const pills = weekSlider.querySelectorAll('.week-pill');
+        const dots = weekSlider.querySelectorAll('.week-dot');
         let target = null;
-        pills.forEach((pill) => {
-          const isActive = Number(pill.dataset.week) === week;
-          pill.classList.toggle('active', isActive);
-          pill.setAttribute('aria-selected', isActive ? 'true' : 'false');
-          if (isActive) target = pill;
+        dots.forEach((dot) => {
+          const isActive = Number(dot.dataset.week) === week;
+          dot.classList.toggle('active', isActive);
+          dot.setAttribute('aria-selected', isActive ? 'true' : 'false');
+          if (isActive) target = dot;
         });
         return target;
       }
 
-      function centerWeekPill(week, behavior = 'smooth') {
+      function centerWeekDot(week, behavior = 'smooth') {
         if (!weekSlider) return;
-        const target = weekSlider.querySelector(`.week-pill[data-week="${week}"]`);
+        const target = weekSlider.querySelector(`.week-dot[data-week="${week}"]`);
         if (!target) return;
         target.scrollIntoView({ behavior, block: 'nearest', inline: 'center' });
+      }
+
+      function updateVisibleWeekDots() {
+        if (!weekSlider) return;
+        const dots = Array.from(weekSlider.querySelectorAll('.week-dot'));
+        if (!dots.length) return;
+        let minWeek = 1;
+        let maxWeek = totalWeeks;
+        if (totalWeeks > 5) {
+          if (currentWeek === 1) {
+            minWeek = 1;
+            maxWeek = Math.min(totalWeeks, 3);
+          } else if (currentWeek === totalWeeks) {
+            minWeek = Math.max(1, totalWeeks - 2);
+            maxWeek = totalWeeks;
+          } else {
+            minWeek = Math.max(1, currentWeek - 2);
+            maxWeek = Math.min(totalWeeks, currentWeek + 2);
+          }
+        }
+        dots.forEach((dot) => {
+          const week = Number(dot.dataset.week);
+          const hidden = week < minWeek || week > maxWeek;
+          dot.classList.toggle('is-hidden', hidden);
+          dot.tabIndex = hidden ? -1 : 0;
+        });
       }
 
       function updateSchedule(week) {
@@ -2936,9 +2961,16 @@
       }
       function animateWeekChange(nextWeek) {
         const safe = Math.max(1, Math.min(totalWeeks, nextWeek));
+        if (safe === currentWeek) {
+          updateVisibleWeekDots();
+          setWeekActiveState(currentWeek);
+          centerWeekDot(currentWeek, 'smooth');
+          return;
+        }
         setWeekActiveState(safe);
-        centerWeekPill(safe, 'smooth');
         currentWeek = safe;
+        updateVisibleWeekDots();
+        centerWeekDot(safe, 'smooth');
         const scheduleContent = document.querySelector('.schedule-content');
         if (scheduleContent) {
           scheduleContent.classList.add('is-exiting');
@@ -2947,7 +2979,7 @@
       }
       if (weekSlider) {
         weekSlider.addEventListener('click', (event) => {
-          const btn = event.target.closest('.week-pill');
+          const btn = event.target.closest('.week-dot');
           if (!btn) return;
           const week = Number(btn.dataset.week);
           if (!Number.isNaN(week)) animateWeekChange(week);
@@ -2970,8 +3002,9 @@
           if (delta < 0) animateWeekChange(currentWeek + 1);
           if (delta > 0) animateWeekChange(currentWeek - 1);
         });
+        updateVisibleWeekDots();
         setWeekActiveState(currentWeek);
-        centerWeekPill(currentWeek, 'auto');
+        centerWeekDot(currentWeek, 'auto');
       }
 
       if (messagesBtnMobile) {
@@ -3337,7 +3370,7 @@
               let shift = 0;
               if (total > 1) {
                 const progress = total === 1 ? 0 : index / (total - 1);
-                shift = Math.round((progress - 0.5) * 16);
+                shift = Math.round((progress - 0.5) * 6);
               }
               card.style.setProperty('--subject-shift', String(shift));
             });

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.04",
+      "date": "2026-02-12",
+      "items": [
+        "style: restore compact week-dot carousel with smooth transitions and adaptive nearby-week visibility",
+        "style: move Focus week toggle into sync status row and show week-pulse chips only inside expanded details",
+        "style: soften class tonal contrast, improve Dense day readability in dark theme, remove left card stripe, and return yellow deadline styling"
+      ]
+    },
+    {
       "version": "0.8.03",
       "date": "2026-02-12",
       "items": [
