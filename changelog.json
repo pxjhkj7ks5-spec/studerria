@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.7.100",
+      "date": "2026-02-12",
+      "items": [
+        "fix: remove stray scheduler route braces that could break app.js route parsing",
+        "fix: rebalance generator day-load scoring to reduce Monday-first clustering",
+        "fix: strengthen late-slot penalty response to the evening-avoidance slider",
+        "fix: prefer same-slot placement for non-general seminars across groups (parallel teachers)"
+      ]
+    },
+    {
       "version": "0.7.99",
       "date": "2026-02-12",
       "items": [

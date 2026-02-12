@@ -7799,11 +7799,6 @@ app.post('/admin/api/scheduler/run', requireAdmin, async (req, res) => {
     return res.status(500).json({ error: 'Database error' });
   }
 });
-      }
-    );
-  });
-});
-});
 
 app.post('/admin/settings', requireAdmin, async (req, res) => {
   try {
