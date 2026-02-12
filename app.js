@@ -900,6 +900,7 @@ const DEFAULT_GENERATOR_CONFIG = {
   auto_subject_days: true,
   subject_single_day: true,
   lecture_seminar_same_day: true,
+  lecture_before_seminar: true,
   active_location: 'kyiv',
   course_semesters: {},
   course_semesters_by_location: {
@@ -1326,6 +1327,7 @@ const buildSafeAutoTunePatch = (config, insight) => {
     auto_subject_days: true,
     subject_single_day: true,
     lecture_seminar_same_day: true,
+    lecture_before_seminar: true,
   };
 
   if (!insight) {
@@ -6671,6 +6673,7 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
       auto_subject_days: String(req.body.auto_subject_days || '') === 'on',
       subject_single_day: String(req.body.subject_single_day || '') === 'on',
       lecture_seminar_same_day: String(req.body.lecture_seminar_same_day || '') === 'on',
+      lecture_before_seminar: String(req.body.lecture_before_seminar || '') === 'on',
       course_semesters: sanitizedCourseSemesters,
       course_semesters_by_location: nextCourseSemestersByLocation,
     };
