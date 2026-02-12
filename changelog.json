@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.00",
+      "date": "2026-02-12",
+      "items": [
+        "fix: restore missing closing blocks near scheduler route to prevent app.js parse failure on startup",
+        "fix: update patch versioning rule to roll over at .99 (example: 0.7.99 -> 0.8.00)",
+        "fix: normalize version formatter to major.minor.XX for patch output"
+      ]
+    },
+    {
       "version": "0.7.101",
       "date": "2026-02-12",
       "items": [

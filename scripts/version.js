@@ -9,33 +9,32 @@ function parseVersion(value) {
   if (parts.length !== 3 || parts.some((p) => Number.isNaN(p))) {
     throw new Error(`Invalid version: ${value}`);
   }
-  const widths = raw.map((p) => p.length);
-  return { parts, widths };
+  return { parts };
 }
 
-function pad(num, width) {
-  return String(num).padStart(width, '0');
-}
-
-function formatVersion([major, minor, patch], widths) {
-  const [wMajor, wMinor, wPatch] = widths;
-  return `${pad(major, wMajor)}.${pad(minor, wMinor)}.${pad(patch, wPatch)}`;
+function formatVersion([major, minor, patch]) {
+  return `${major}.${minor}.${String(patch).padStart(2, '0')}`;
 }
 
 function bumpVersion(current, mode) {
-  const { parts, widths } = parseVersion(current);
+  const { parts } = parseVersion(current);
   let [major, minor, patch] = parts;
   if (mode === 'release') {
-    return formatVersion([1, 0, 0], widths);
+    return formatVersion([1, 0, 0]);
   }
   if (mode === 'minor') {
     minor += 1;
     patch = 0;
-    return formatVersion([major, minor, patch], widths);
+    return formatVersion([major, minor, patch]);
   }
   if (mode === 'patch') {
-    patch += 1;
-    return formatVersion([major, minor, patch], widths);
+    if (patch >= 99) {
+      minor += 1;
+      patch = 0;
+    } else {
+      patch += 1;
+    }
+    return formatVersion([major, minor, patch]);
   }
   throw new Error(`Unknown mode: ${mode}`);
 }
