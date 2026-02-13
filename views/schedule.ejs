@@ -2924,6 +2924,7 @@
         if (!weekSlider) return;
         const target = weekSlider.querySelector(`.week-dot[data-week="${week}"]`);
         if (!target) return;
+        if (weekSlider.scrollWidth <= weekSlider.clientWidth + 2) return;
         target.scrollIntoView({ behavior, block: 'nearest', inline: 'center' });
       }
 

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.06",
+      "date": "2026-02-13",
+      "items": [
+        "style: expand schedule page background gradients for a fuller but still calm atmosphere",
+        "style: add subtle transparency to class cards while preserving dark-theme contrast and hover lift",
+        "fix: tighten week carousel width, reduce dot-scroll jitter, and restore neat semi-transparent arrow controls with improved horizontal alignment"
+      ]
+    },
+    {
       "version": "0.8.05",
       "date": "2026-02-13",
       "items": [
