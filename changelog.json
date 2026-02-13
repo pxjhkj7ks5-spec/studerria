@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.36",
+      "date": "2026-02-13",
+      "items": [
+        "fix: add asymmetric last-week indicator clamp with slight extra right allowance so active oval fully fits at the final edge state",
+        "fix: centralize indicator min/max bounds logic to keep initial geometry and runtime transform clamping consistent"
+      ]
+    },
+    {
       "version": "0.8.35",
       "date": "2026-02-13",
       "items": [
