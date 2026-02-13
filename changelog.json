@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.32",
+      "date": "2026-02-13",
+      "items": [
+        "fix: add dedicated week-carousel edge-gap token and apply small nearest-dot clearance in edge-biased states to prevent dot-over-oval overlap",
+        "fix: keep balanced 2+2 states on larger mid-split while using only minimal split near edges for cleaner geometry"
+      ]
+    },
+    {
       "version": "0.8.31",
       "date": "2026-02-13",
       "items": [

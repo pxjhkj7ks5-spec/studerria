@@ -2832,6 +2832,7 @@
         dotSize: 8,
         gap: 10,
         midGap: 14,
+        edgeGap: 4,
         visibleCount: 5,
         rowHeight: 16,
         ovalWidth: 28,
@@ -2880,6 +2881,7 @@
         const dotSize = parseFloat(rootStyles.getPropertyValue('--wc-dot')) || 8;
         const gap = parseFloat(rootStyles.getPropertyValue('--wc-gap')) || 10;
         const midGap = parseFloat(rootStyles.getPropertyValue('--wc-mid-gap')) || 14;
+        const edgeGap = parseFloat(rootStyles.getPropertyValue('--wc-edge-gap')) || 4;
         const visibleCountToken = parseInt(rootStyles.getPropertyValue('--wc-visible'), 10) || 5;
         const rowHeight = parseFloat(rootStyles.getPropertyValue('--wc-row-h')) || 16;
         const ovalWidth = parseFloat(rootStyles.getPropertyValue('--wc-oval-w')) || 28;
@@ -2892,6 +2894,7 @@
         carouselGeometry.dotSize = Number.isFinite(dotSize) ? dotSize : 8;
         carouselGeometry.gap = Number.isFinite(gap) ? gap : 10;
         carouselGeometry.midGap = Number.isFinite(midGap) ? midGap : 14;
+        carouselGeometry.edgeGap = Number.isFinite(edgeGap) ? edgeGap : 4;
         carouselGeometry.visibleCount = Math.max(1, Number.isFinite(visibleCountToken) ? visibleCountToken : 5);
         carouselGeometry.rowHeight = Number.isFinite(rowHeight) ? rowHeight : 16;
         carouselGeometry.ovalHeight = carouselGeometry.dotSize;
@@ -3057,12 +3060,27 @@
         const centerDotIndex = getCenterDotIndex(railX, indicatorX);
         const leftCandidates = visibleIndices.filter((index) => index < centerDotIndex);
         const rightCandidates = visibleIndices.filter((index) => index > centerDotIndex);
-        // Apply middle split only for true balanced (2+2) states.
-        // For edge-biased (1+3 / 3+1 / 0+4 / 4+0) keep dots unshifted.
+        // Use larger split only for true balanced (2+2) states.
+        // For edge-biased states apply only tiny clearance from the oval.
         const hasBalancedSides = leftCandidates.length >= 2 && rightCandidates.length >= 2;
-        const leftSplitIndex = hasBalancedSides ? leftCandidates[leftCandidates.length - 1] : null;
-        const rightSplitIndex = hasBalancedSides ? rightCandidates[0] : null;
-        const halfShift = alignToDevicePixel((carouselGeometry.midGap || 14) / 2);
+        const nearestLeftIndex = leftCandidates.length ? leftCandidates[leftCandidates.length - 1] : null;
+        const nearestRightIndex = rightCandidates.length ? rightCandidates[0] : null;
+
+        let leftSplitIndex = null;
+        let rightSplitIndex = null;
+        let halfShift = 0;
+
+        if (hasBalancedSides) {
+          leftSplitIndex = nearestLeftIndex;
+          rightSplitIndex = nearestRightIndex;
+          halfShift = alignToDevicePixel((carouselGeometry.midGap || 14) / 2);
+        } else {
+          // Edge states still need a small clearance to avoid visual overlap
+          // between oval and nearest dots when width/step are near-equal.
+          leftSplitIndex = nearestLeftIndex;
+          rightSplitIndex = nearestRightIndex;
+          halfShift = alignToDevicePixel((carouselGeometry.edgeGap || 4) / 2);
+        }
 
         dots.forEach((dot, index) => {
           dot.classList.remove('mid-split-left', 'mid-split-right');
