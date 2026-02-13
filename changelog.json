@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.16",
+      "date": "2026-02-13",
+      "items": [
+        "fix: increase middle spacing between week-dot pairs (1-2 / 3-4) so the centered active oval no longer overlaps neighboring dots",
+        "fix: synchronize carousel geometry and slot math with a dedicated middle-gap token for stable indicator and morph target alignment",
+        "feat: restore edge enter/exit dot motion during week switches with directional fade-slide while keeping 4-dot rail and one active oval"
+      ]
+    },
+    {
       "version": "0.8.15",
       "date": "2026-02-13",
       "items": [

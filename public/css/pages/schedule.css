@@ -18,13 +18,18 @@
   --week-rail-shift: 10px;
   --week-dot-size: 8px;
   --week-dot-gap: 10px;
+  --week-dot-middle-gap-extra: 22px;
   --week-visible-count: 4;
   --week-row-height: 16px;
   --week-active-height: 8px;
   --week-active-width: 28px;
   --week-pad-x: 10px;
   --week-pad-y: 4px;
-  --week-window-width: calc((var(--week-visible-count) * var(--week-dot-size)) + ((var(--week-visible-count) - 1) * var(--week-dot-gap)));
+  --week-window-width: calc(
+    (var(--week-visible-count) * var(--week-dot-size)) +
+    ((var(--week-visible-count) - 1) * var(--week-dot-gap)) +
+    var(--week-dot-middle-gap-extra)
+  );
   --week-slider-width: calc(var(--week-window-width) + (var(--week-pad-x) * 2));
   --week-edge-fade: 8px;
   --week-motion-curve: cubic-bezier(0.22, 1, 0.36, 1);
@@ -1063,6 +1068,10 @@ body.theme-light .week-nav-btn:hover {
   will-change: opacity, transform;
 }
 
+.week-dot[data-slot="2"] {
+  margin-left: var(--week-dot-middle-gap-extra);
+}
+
 body.theme-light .week-dot {
   background: rgba(100, 116, 139, 0.42);
 }
@@ -1094,6 +1103,31 @@ body.theme-light .week-dot {
 .week-dot[data-active="true"][data-visible="true"],
 .week-dot.active.is-window-visible {
   opacity: 0;
+}
+
+.week-dot.is-exit-left {
+  opacity: 0 !important;
+  transform: translateX(-12px) scale(0.95) !important;
+}
+
+.week-dot.is-exit-right {
+  opacity: 0 !important;
+  transform: translateX(12px) scale(0.95) !important;
+}
+
+.week-dot.is-enter-left {
+  opacity: 0 !important;
+  transform: translateX(-12px) scale(0.95) !important;
+}
+
+.week-dot.is-enter-right {
+  opacity: 0 !important;
+  transform: translateX(12px) scale(0.95) !important;
+}
+
+.week-dot.is-enter-active {
+  opacity: 0.42 !important;
+  transform: translateX(0) scale(1) !important;
 }
 
 body.focus-week #densityBlock,

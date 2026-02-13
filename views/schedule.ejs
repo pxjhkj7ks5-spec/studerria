@@ -2935,6 +2935,7 @@
       const carouselGeometry = {
         dotSize: 8,
         gap: 10,
+        middleGapExtra: 22,
         pitch: 18,
         rowHeight: 16,
         ovalWidth: 28,
@@ -2981,6 +2982,7 @@
         const rootStyles = window.getComputedStyle(document.documentElement);
         const dotSize = parseFloat(rootStyles.getPropertyValue('--week-dot-size')) || 8;
         const gap = parseFloat(rootStyles.getPropertyValue('--week-dot-gap')) || 10;
+        const middleGapExtra = parseFloat(rootStyles.getPropertyValue('--week-dot-middle-gap-extra')) || 22;
         const visibleCountToken = parseInt(rootStyles.getPropertyValue('--week-visible-count'), 10) || 4;
         const rowHeight = parseFloat(rootStyles.getPropertyValue('--week-row-height')) || 16;
         const ovalHeight = parseFloat(rootStyles.getPropertyValue('--week-active-height')) || 8;
@@ -2988,20 +2990,23 @@
         const padX = parseFloat(rootStyles.getPropertyValue('--week-pad-x')) || 10;
         const padY = parseFloat(rootStyles.getPropertyValue('--week-pad-y')) || 4;
 
-        carouselState.visibleCount = Math.max(1, Math.min(visibleCountToken, 4));
+        carouselState.visibleCount = Math.max(1, Math.min(visibleCountToken, 4, carouselState.totalCount));
         carouselGeometry.dotSize = dotSize;
         carouselGeometry.gap = Number.isFinite(gap) ? gap : 10;
+        carouselGeometry.middleGapExtra = Number.isFinite(middleGapExtra) ? middleGapExtra : 22;
         carouselGeometry.pitch = carouselGeometry.dotSize + carouselGeometry.gap;
         carouselGeometry.rowHeight = rowHeight;
         carouselGeometry.ovalHeight = ovalHeight;
         carouselGeometry.ovalWidth = ovalWidth;
         carouselGeometry.railWindowWidth =
           (carouselState.visibleCount * carouselGeometry.dotSize) +
-          ((carouselState.visibleCount - 1) * carouselGeometry.gap);
-        carouselGeometry.slotPositions = Array.from(
-          { length: carouselState.visibleCount },
-          (_, slot) => alignToDevicePixel(slot * carouselGeometry.pitch)
-        );
+          ((carouselState.visibleCount - 1) * carouselGeometry.gap) +
+          (carouselState.visibleCount >= 4 ? carouselGeometry.middleGapExtra : 0);
+        carouselGeometry.slotPositions = Array.from({ length: carouselState.visibleCount }, (_, slot) => {
+          const base = slot * carouselGeometry.pitch;
+          const offset = slot >= 2 ? carouselGeometry.middleGapExtra : 0;
+          return alignToDevicePixel(base + offset);
+        });
 
         const maxIndicatorX = Math.max(0, carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth);
         carouselGeometry.indicatorX = alignToDevicePixel(
@@ -3074,12 +3079,17 @@
       }
 
       function renderDots(visibleIndices = carouselState.visibleIndices, options = {}) {
-        const { animateSwap = false } = options;
+        const { animateSwap = false, direction = 0 } = options;
         const dots = getWeekDots();
         if (!dots.length) return;
 
+        const clearMotion = (dot) => {
+          dot.classList.remove('is-exit-left', 'is-exit-right', 'is-enter-left', 'is-enter-right', 'is-enter-active');
+        };
+
         const apply = () => {
           dots.forEach((dot, slot) => {
+            clearMotion(dot);
             const weekIndex = visibleIndices[slot];
             const hasWeek = Number.isInteger(weekIndex) && weekIndex >= 0 && weekIndex < carouselState.totalCount;
             if (!hasWeek) {
@@ -3098,7 +3108,7 @@
             dot.dataset.week = String(weekNumber);
             dot.dataset.weekIndex = String(weekIndex);
             dot.dataset.visible = 'true';
-            dot.dataset.active = weekIndex === carouselState.activeIndex ? 'true' : 'false';
+            dot.dataset.active = 'false';
             dot.tabIndex = 0;
             dot.disabled = false;
             dot.setAttribute('aria-selected', weekIndex === carouselState.activeIndex ? 'true' : 'false');
@@ -3106,15 +3116,30 @@
           });
         };
 
-        if (!animateSwap || !weekDotRail) {
+        if (!animateSwap || !weekDotRail || direction === 0) {
           apply();
           return;
         }
 
-        weekDotRail.classList.add('is-swapping');
+        const exitSlot = direction > 0 ? 0 : Math.max(0, dots.length - 1);
+        const enterSlot = direction > 0 ? Math.max(0, dots.length - 1) : 0;
+        const exitClass = direction > 0 ? 'is-exit-left' : 'is-exit-right';
+        const enterClass = direction > 0 ? 'is-enter-right' : 'is-enter-left';
+        const exitDot = dots[exitSlot];
+        const enterDot = dots[enterSlot];
+
+        dots.forEach(clearMotion);
+        if (exitDot) exitDot.classList.add(exitClass);
+
         requestAnimationFrame(() => {
-          apply();
-          requestAnimationFrame(() => weekDotRail.classList.remove('is-swapping'));
+          setTimeout(() => {
+            apply();
+            if (enterDot) {
+              enterDot.classList.add(enterClass);
+              requestAnimationFrame(() => enterDot.classList.add('is-enter-active'));
+              setTimeout(() => clearMotion(enterDot), 170);
+            }
+          }, 90);
         });
       }
 
@@ -3199,6 +3224,7 @@
         carouselDebounceUntil = now + carouselDebounceMs;
 
         isCarouselAnimating = true;
+        const direction = safeTarget > carouselState.activeIndex ? 1 : -1;
         const nextWindowStart = computeWindowStart(safeTarget, carouselState.totalCount);
         const nextVisibleIndices = buildVisibleIndices(safeTarget, carouselState.totalCount);
 
@@ -3206,13 +3232,16 @@
           carouselState.activeIndex = safeTarget;
           carouselState.windowStart = nextWindowStart;
           carouselState.visibleIndices = nextVisibleIndices;
-          renderDots(nextVisibleIndices, { animateSwap: carouselHasRendered });
+          renderDots(nextVisibleIndices, { animateSwap: carouselHasRendered, direction });
           positionIndicator(true);
           carouselHasRendered = true;
-          updateWeekContent();
+          const contentDelay = carouselHasRendered ? 170 : 0;
+          setTimeout(() => {
+            updateWeekContent();
+          }, contentDelay);
           setTimeout(() => {
             isCarouselAnimating = false;
-          }, 220);
+          }, Math.max(220, contentDelay + 80));
         };
 
         const scheduleContent = document.querySelector('.schedule-content');
