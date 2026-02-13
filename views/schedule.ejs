@@ -2833,6 +2833,7 @@
         gap: 10,
         midGap: 14,
         edgeGap: 4,
+        indicatorEdgeTravel: 8,
         visibleCount: 5,
         rowHeight: 16,
         ovalWidth: 28,
@@ -2911,11 +2912,12 @@
         carouselGeometry.windowCenterX = carouselGeometry.railWindowWidth / 2;
         carouselGeometry.padX = padX;
         carouselGeometry.padY = padY;
+        carouselGeometry.indicatorEdgeTravel = Math.max(0, (carouselGeometry.padX || 0) - 2);
         carouselGeometry.indicatorX = alignToDevicePixel(
           clampValue(
             (carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth) / 2,
-            -Math.max(0, carouselGeometry.padX),
-            Math.max(0, carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth) + Math.max(0, carouselGeometry.padX)
+            -Math.max(0, carouselGeometry.indicatorEdgeTravel || 0),
+            Math.max(0, carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth) + Math.max(0, carouselGeometry.indicatorEdgeTravel || 0)
           )
         );
         carouselGeometry.indicatorY = alignToDevicePixel(
@@ -2965,7 +2967,7 @@
         const safeIndex = clampValue(focusIndex, 0, Math.max(0, carouselState.totalCount - 1));
         const dotCenterX = (safeIndex * carouselGeometry.step) + (carouselGeometry.dotSize / 2) + railX;
         const rawIndicatorX = dotCenterX - (carouselGeometry.ovalWidth / 2);
-        const edgePad = Math.max(0, carouselGeometry.padX || 0);
+        const edgePad = Math.max(0, carouselGeometry.indicatorEdgeTravel || 0);
         const minX = -edgePad;
         const maxX = Math.max(0, carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth) + edgePad;
         return alignToDevicePixel(clampValue(rawIndicatorX, minX, maxX));

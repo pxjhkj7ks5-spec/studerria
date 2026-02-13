@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.33",
+      "date": "2026-02-13",
+      "items": [
+        "fix: reduce week-carousel indicator edge travel by a safety inset so the active oval no longer appears clipped on the last week",
+        "fix: lock active oval and morph-blob height to exact dot size for consistent 1:1 vertical geometry"
+      ]
+    },
+    {
       "version": "0.8.32",
       "date": "2026-02-13",
       "items": [

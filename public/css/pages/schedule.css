@@ -29,7 +29,7 @@
   --week-dot-gap: var(--wc-gap);
   --week-dot-middle-gap-extra: 0px;
   --week-row-height: var(--wc-row-h);
-  --week-active-height: var(--wc-oval-h);
+  --week-active-height: var(--week-dot-size);
   --week-active-width: var(--wc-oval-w);
   --week-pad-x: 10px;
   --week-pad-y: 4px;
@@ -960,6 +960,8 @@ body.theme-light .deadline-meta {
   left: 0;
   top: 0;
   height: var(--week-active-height);
+  min-height: var(--week-dot-size);
+  max-height: var(--week-dot-size);
   width: var(--week-active-width);
   border-radius: 999px;
   transform: translate3d(var(--indicator-x), var(--indicator-y), 0);
@@ -998,6 +1000,8 @@ body.theme-light .week-active-indicator {
   left: 0;
   top: 0;
   height: var(--week-active-height);
+  min-height: var(--week-dot-size);
+  max-height: var(--week-dot-size);
   width: var(--week-active-width);
   border-radius: 999px;
   transform: translate3d(0, 0, 0);
