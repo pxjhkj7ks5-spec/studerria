@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.41",
+      "date": "2026-02-13",
+      "items": [
+        "ui: move \"Дивні дедлайни\" entry point from week hero action row into the left drawer menu",
+        "ui: keep custom deadlines modal behavior unchanged while simplifying hero action area to week badge only"
+      ]
+    },
+    {
       "version": "0.8.40",
       "date": "2026-02-13",
       "items": [

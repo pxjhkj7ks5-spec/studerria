@@ -1594,6 +1594,11 @@
         <% if (settings && settings.allow_messages) { %>
           <button class="drawer-action" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">💬 Повідомлення</button>
         <% } %>
+        <% if ((role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') && settings && settings.allow_custom_deadlines) { %>
+          <button class="drawer-action" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
+            Дивні дедлайни
+          </button>
+        <% } %>
         <a class="drawer-action" href="/teamwork"><%= t('menu.teamwork') %></a>
         <a class="drawer-action" href="/my-day">Мій день</a>
         <a class="drawer-action" href="/profile"><%= t('schedule.profile') %></a>
@@ -1620,11 +1625,6 @@
           </div>
           <div class="hero-actions">
             <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
-            <% if ((role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') && settings && settings.allow_custom_deadlines) { %>
-              <button class="btn btn-glass btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
-                Дивні дедлайни
-              </button>
-            <% } %>
           </div>
         </div>
 
