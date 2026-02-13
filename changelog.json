@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.42",
+      "date": "2026-02-13",
+      "items": [
+        "fix: improve dark-theme readability for \"Дивні дедлайни\" by replacing low-contrast brown text with light amber/yellow text tones",
+        "style: increase dark-theme deadline block/item contrast while preserving yellow visual identity and existing layout"
+      ]
+    },
+    {
       "version": "0.8.41",
       "date": "2026-02-13",
       "items": [

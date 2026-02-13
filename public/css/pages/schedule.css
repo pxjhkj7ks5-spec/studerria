@@ -850,6 +850,11 @@ body.theme-light .empty-state {
   padding: 12px;
 }
 
+body.theme-dark .deadline-block {
+  background: rgba(250, 204, 21, 0.2);
+  border: 1px solid rgba(250, 204, 21, 0.28);
+}
+
 body.theme-light .deadline-block {
   background: rgba(250, 204, 21, 0.14);
 }
@@ -897,7 +902,7 @@ body.theme-light .deadline-title {
 }
 
 body.theme-dark .deadline-item .fw-semibold {
-  color: #3f2f0f;
+  color: #fff8db;
 }
 
 body.theme-light .deadline-item .fw-semibold {
@@ -905,7 +910,12 @@ body.theme-light .deadline-item .fw-semibold {
 }
 
 body.theme-dark .deadline-meta {
-  color: #7c4a03;
+  color: #fcd34d;
+}
+
+body.theme-dark .deadline-item {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(252, 211, 77, 0.36);
 }
 
 .deadline-item + .deadline-item {
@@ -914,6 +924,10 @@ body.theme-dark .deadline-meta {
 
 .deadline-item:hover {
   background: rgba(250, 204, 21, 0.24);
+}
+
+body.theme-dark .deadline-item:hover {
+  background: rgba(252, 211, 77, 0.28);
 }
 
 .deadline-meta {
