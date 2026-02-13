@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.15",
+      "date": "2026-02-13",
+      "items": [
+        "fix: restore week-carousel navigation with single source of truth state and explicit goToWeek flow for arrows and dots",
+        "fix: rebind dot clicks via data-week-index on stable dot nodes to prevent dead interactions after carousel refactor",
+        "fix: re-center active indicator by fixed window geometry and keep morph animation bounded before week content switch"
+      ]
+    },
+    {
       "version": "0.8.14",
       "date": "2026-02-13",
       "items": [

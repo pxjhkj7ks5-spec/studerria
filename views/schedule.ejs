@@ -2005,6 +2005,7 @@
               class="week-dot"
               data-slot="<%= slot %>"
               data-week="<%= weekNumber %>"
+              data-week-index="<%= weekIndex %>"
               data-active="false"
               data-visible="true"
               role="tab"
@@ -2931,17 +2932,7 @@
         }
       });
 
-      window.addEventListener('resize', () => {
-        if (window.innerWidth < 992) {
-          setDrawerOpen(false);
-        }
-        weekState.geometryReady = false;
-        ensureWeekGeometry(true);
-        syncWeekCarousel(currentWeek, { animate: false });
-      });
-
-      const weekState = {
-        visibleCount: 4,
+      const carouselGeometry = {
         dotSize: 8,
         gap: 10,
         pitch: 18,
@@ -2949,23 +2940,26 @@
         ovalWidth: 28,
         ovalHeight: 8,
         railWindowWidth: 0,
-        totalDotsWidth: 0,
-        translateX: 0,
-        geometryReady: false,
-        slotPositions: [],
         indicatorX: 0,
         indicatorY: 0,
-        visibleIndices: [],
-        activeIndex: 0,
-        pendingActiveIndex: null,
-        isAnimating: false,
-        morphBlob: null,
-        morphFallbackTimer: null,
-        transitionDebounceMs: 250,
-        transitionLockUntil: 0,
-        transitionTimer: null,
-        hasRendered: false,
+        slotPositions: [],
+        ready: false,
       };
+
+      let carouselState = {
+        activeIndex: 0,
+        windowStart: 0,
+        totalCount: Math.max(1, totalWeeks),
+        visibleCount: 4,
+        visibleIndices: [],
+      };
+
+      let isCarouselAnimating = false;
+      let carouselDebounceUntil = 0;
+      const carouselDebounceMs = 250;
+      let carouselMorphBlob = null;
+      let carouselMorphTimer = null;
+      let carouselHasRendered = false;
 
       function clampValue(value, min, max) {
         return Math.max(min, Math.min(max, value));
@@ -2976,120 +2970,110 @@
         return Math.round(value * dpr) / dpr;
       }
 
-      // Carousel findings before this refactor:
-      // 1) Dot token was already 8px, but spacing drift came from mixed token math and unclamped translate.
-      // 2) Right-side blank area appeared because rail translate used start*pitch without maxTranslate clamp.
-      // 3) Indicator clipping happened because the oval lived inside the overflow-hidden dot window.
-      function readWeekGeometryTokens() {
-        if (!weekDotRail || !weekSlider || !weekWindow) return;
+      function getWeekDots() {
+        if (!weekDotRail) return [];
+        return Array.from(weekDotRail.querySelectorAll('.week-dot'));
+      }
+
+      function readCarouselGeometryTokens() {
+        if (!weekDotRail || !weekWindow) return;
+
         const rootStyles = window.getComputedStyle(document.documentElement);
         const dotSize = parseFloat(rootStyles.getPropertyValue('--week-dot-size')) || 8;
-        const gapValue = parseFloat(rootStyles.getPropertyValue('--week-dot-gap')) || 10;
-        const visibleCount = parseInt(rootStyles.getPropertyValue('--week-visible-count'), 10) || 4;
+        const gap = parseFloat(rootStyles.getPropertyValue('--week-dot-gap')) || 10;
+        const visibleCountToken = parseInt(rootStyles.getPropertyValue('--week-visible-count'), 10) || 4;
         const rowHeight = parseFloat(rootStyles.getPropertyValue('--week-row-height')) || 16;
         const ovalHeight = parseFloat(rootStyles.getPropertyValue('--week-active-height')) || 8;
         const ovalWidth = parseFloat(rootStyles.getPropertyValue('--week-active-width')) || 28;
         const padX = parseFloat(rootStyles.getPropertyValue('--week-pad-x')) || 10;
         const padY = parseFloat(rootStyles.getPropertyValue('--week-pad-y')) || 4;
 
-        weekState.dotSize = dotSize;
-        weekState.gap = Number.isFinite(gapValue) ? gapValue : 10;
-        weekState.visibleCount = Math.max(1, Math.min(visibleCount, totalWeeks || visibleCount));
-        weekState.rowHeight = rowHeight;
-        weekState.ovalHeight = ovalHeight;
-        weekState.ovalWidth = ovalWidth;
-        weekState.pitch = weekState.dotSize + weekState.gap;
-        weekState.railWindowWidth = (weekState.visibleCount * weekState.dotSize) + ((weekState.visibleCount - 1) * weekState.gap);
-        weekState.totalDotsWidth = totalWeeks > 0
-          ? (totalWeeks * weekState.dotSize) + ((totalWeeks - 1) * weekState.gap)
-          : 0;
-        weekState.slotPositions = Array.from(
-          { length: weekState.visibleCount },
-          (_, slot) => alignToDevicePixel(slot * weekState.pitch)
+        carouselState.visibleCount = Math.max(1, Math.min(visibleCountToken, 4));
+        carouselGeometry.dotSize = dotSize;
+        carouselGeometry.gap = Number.isFinite(gap) ? gap : 10;
+        carouselGeometry.pitch = carouselGeometry.dotSize + carouselGeometry.gap;
+        carouselGeometry.rowHeight = rowHeight;
+        carouselGeometry.ovalHeight = ovalHeight;
+        carouselGeometry.ovalWidth = ovalWidth;
+        carouselGeometry.railWindowWidth =
+          (carouselState.visibleCount * carouselGeometry.dotSize) +
+          ((carouselState.visibleCount - 1) * carouselGeometry.gap);
+        carouselGeometry.slotPositions = Array.from(
+          { length: carouselState.visibleCount },
+          (_, slot) => alignToDevicePixel(slot * carouselGeometry.pitch)
         );
-        weekState.indicatorX = alignToDevicePixel(clampValue(
-          (weekState.railWindowWidth - weekState.ovalWidth) / 2,
-          0,
-          Math.max(0, weekState.railWindowWidth - weekState.ovalWidth)
-        ));
-        weekState.indicatorY = alignToDevicePixel(Math.max(0, (weekState.rowHeight - weekState.ovalHeight) / 2));
 
-        const railWidth = `${Math.max(0, weekState.railWindowWidth)}px`;
+        const maxIndicatorX = Math.max(0, carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth);
+        carouselGeometry.indicatorX = alignToDevicePixel(
+          clampValue((carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth) / 2, 0, maxIndicatorX)
+        );
+        carouselGeometry.indicatorY = alignToDevicePixel(
+          Math.max(0, (carouselGeometry.rowHeight - carouselGeometry.ovalHeight) / 2)
+        );
+
+        const railWidth = `${Math.max(0, carouselGeometry.railWindowWidth)}px`;
         weekDotRail.style.width = railWidth;
         weekDotRail.style.minWidth = railWidth;
         weekDotRail.style.maxWidth = railWidth;
         weekDotRail.style.transform = 'translate3d(0, 0, 0)';
 
-        const windowWidth = `${Math.max(0, weekState.railWindowWidth)}px`;
-        weekWindow.style.width = windowWidth;
-        weekWindow.style.minWidth = windowWidth;
-        weekWindow.style.maxWidth = windowWidth;
+        weekWindow.style.width = railWidth;
+        weekWindow.style.minWidth = railWidth;
+        weekWindow.style.maxWidth = railWidth;
 
         if (weekIndicatorLayer) {
-          weekIndicatorLayer.style.width = windowWidth;
-          weekIndicatorLayer.style.minWidth = windowWidth;
-          weekIndicatorLayer.style.maxWidth = windowWidth;
-          weekIndicatorLayer.style.height = `${weekState.rowHeight}px`;
-          weekIndicatorLayer.style.minHeight = `${weekState.rowHeight}px`;
-          weekIndicatorLayer.style.maxHeight = `${weekState.rowHeight}px`;
+          weekIndicatorLayer.style.width = railWidth;
+          weekIndicatorLayer.style.minWidth = railWidth;
+          weekIndicatorLayer.style.maxWidth = railWidth;
+          weekIndicatorLayer.style.height = `${carouselGeometry.rowHeight}px`;
+          weekIndicatorLayer.style.minHeight = `${carouselGeometry.rowHeight}px`;
+          weekIndicatorLayer.style.maxHeight = `${carouselGeometry.rowHeight}px`;
           weekIndicatorLayer.style.left = `${padX}px`;
           weekIndicatorLayer.style.top = `${padY}px`;
         }
+
+        carouselGeometry.ready = true;
       }
 
-      function ensureWeekGeometry(force = false) {
-        if (!force && weekState.geometryReady) return;
-        readWeekGeometryTokens();
-        weekState.geometryReady = true;
+      function ensureCarouselGeometry(force = false) {
+        if (!force && carouselGeometry.ready) return;
+        readCarouselGeometryTokens();
       }
 
-      function getWeekDots() {
-        if (!weekDotRail) return [];
-        return Array.from(weekDotRail.querySelectorAll('.week-dot'));
+      function computeWindowStart(targetIndex, totalCount = carouselState.totalCount) {
+        const safeTotal = Math.max(1, totalCount);
+        const safeIndex = clampValue(targetIndex, 0, safeTotal - 1);
+        const maxStart = Math.max(0, safeTotal - carouselState.visibleCount);
+        if (safeIndex <= 1) return 0;
+        if (safeIndex >= safeTotal - 2) return maxStart;
+        return clampValue(safeIndex - 2, 0, maxStart);
       }
 
-      function buildVisibleIndices(activeIndex, totalCount) {
-        const safeTotal = Math.max(0, totalCount);
-        const safeActive = clampValue(activeIndex, 0, Math.max(0, safeTotal - 1));
-        const visibleCount = Math.max(1, Math.min(weekState.visibleCount, safeTotal || weekState.visibleCount));
-        if (safeTotal <= visibleCount) {
-          return Array.from({ length: visibleCount }, (_, idx) => idx);
+      function buildVisibleIndices(activeIndex, totalCount = carouselState.totalCount) {
+        const safeTotal = Math.max(1, totalCount);
+        const safeIndex = clampValue(activeIndex, 0, safeTotal - 1);
+        if (safeTotal <= carouselState.visibleCount) {
+          return Array.from({ length: safeTotal }, (_, idx) => idx);
         }
-        if (visibleCount !== 4) {
-          const start = clampValue(
-            safeActive - Math.floor(visibleCount / 2),
-            0,
-            Math.max(0, safeTotal - visibleCount)
-          );
-          return Array.from({ length: visibleCount }, (_, idx) => start + idx);
-        }
-        if (safeActive <= 1) {
-          return [0, 1, 2, 3];
-        }
-        if (safeActive >= safeTotal - 2) {
-          return [safeTotal - 4, safeTotal - 3, safeTotal - 2, safeTotal - 1];
-        }
-        return [safeActive - 2, safeActive - 1, safeActive + 1, safeActive + 2];
+        if (safeIndex <= 1) return [0, 1, 2, 3];
+        if (safeIndex >= safeTotal - 2) return [safeTotal - 4, safeTotal - 3, safeTotal - 2, safeTotal - 1];
+        return [safeIndex - 2, safeIndex - 1, safeIndex + 1, safeIndex + 2];
       }
 
-      function setIndicatorPosition(options = {}) {
-        const { animate = true } = options;
+      function positionIndicator(animate = true) {
         if (!weekActiveIndicator) return;
         if (!animate) weekActiveIndicator.classList.add('no-motion');
 
         requestAnimationFrame(() => {
-          weekActiveIndicator.style.setProperty('--indicator-x', `${weekState.indicatorX}px`);
-          weekActiveIndicator.style.setProperty('--indicator-y', `${weekState.indicatorY}px`);
-
+          weekActiveIndicator.style.setProperty('--indicator-x', `${carouselGeometry.indicatorX}px`);
+          weekActiveIndicator.style.setProperty('--indicator-y', `${carouselGeometry.indicatorY}px`);
           if (!animate) {
-            requestAnimationFrame(() => {
-              weekActiveIndicator.classList.remove('no-motion');
-            });
+            requestAnimationFrame(() => weekActiveIndicator.classList.remove('no-motion'));
           }
         });
       }
 
-      function renderDots(visibleIndices, options = {}) {
+      function renderDots(visibleIndices = carouselState.visibleIndices, options = {}) {
         const { animateSwap = false } = options;
         const dots = getWeekDots();
         if (!dots.length) return;
@@ -3097,9 +3081,10 @@
         const apply = () => {
           dots.forEach((dot, slot) => {
             const weekIndex = visibleIndices[slot];
-            const hasWeek = Number.isInteger(weekIndex) && weekIndex >= 0 && weekIndex < totalWeeks;
+            const hasWeek = Number.isInteger(weekIndex) && weekIndex >= 0 && weekIndex < carouselState.totalCount;
             if (!hasWeek) {
               dot.dataset.week = '';
+              dot.dataset.weekIndex = '';
               dot.dataset.visible = 'false';
               dot.dataset.active = 'false';
               dot.tabIndex = -1;
@@ -3111,13 +3096,14 @@
 
             const weekNumber = weekIndex + 1;
             dot.dataset.week = String(weekNumber);
+            dot.dataset.weekIndex = String(weekIndex);
             dot.dataset.visible = 'true';
-            dot.dataset.active = 'false';
+            dot.dataset.active = weekIndex === carouselState.activeIndex ? 'true' : 'false';
             dot.tabIndex = 0;
             dot.disabled = false;
-            dot.setAttribute('aria-selected', weekIndex === weekState.activeIndex ? 'true' : 'false');
+            dot.setAttribute('aria-selected', weekIndex === carouselState.activeIndex ? 'true' : 'false');
             dot.setAttribute('aria-label', `${weekAriaLabelPrefix} ${weekNumber}`);
-          }
+          });
         };
 
         if (!animateSwap || !weekDotRail) {
@@ -3128,73 +3114,53 @@
         weekDotRail.classList.add('is-swapping');
         requestAnimationFrame(() => {
           apply();
-          requestAnimationFrame(() => {
-            weekDotRail.classList.remove('is-swapping');
-          });
+          requestAnimationFrame(() => weekDotRail.classList.remove('is-swapping'));
         });
       }
 
-      function setActiveAfterMorph() {
-        const nextIndex = Number(weekState.pendingActiveIndex);
-        weekState.pendingActiveIndex = null;
-
-        if (weekState.morphFallbackTimer) {
-          clearTimeout(weekState.morphFallbackTimer);
-          weekState.morphFallbackTimer = null;
+      function clearMorphBlob() {
+        if (carouselMorphTimer) {
+          clearTimeout(carouselMorphTimer);
+          carouselMorphTimer = null;
         }
-
-        if (weekState.morphBlob && weekState.morphBlob.parentNode) {
-          weekState.morphBlob.parentNode.removeChild(weekState.morphBlob);
+        if (carouselMorphBlob && carouselMorphBlob.parentNode) {
+          carouselMorphBlob.parentNode.removeChild(carouselMorphBlob);
         }
-        weekState.morphBlob = null;
-        weekState.isAnimating = false;
+        carouselMorphBlob = null;
         weekActiveIndicator?.classList.remove('is-hidden');
-
-        if (!Number.isFinite(nextIndex)) return;
-
-        weekState.activeIndex = clampValue(nextIndex, 0, Math.max(0, totalWeeks - 1));
-        currentWeek = weekState.activeIndex + 1;
-        weekState.visibleIndices = buildVisibleIndices(weekState.activeIndex, totalWeeks);
-        renderDots(weekState.visibleIndices, { animateSwap: true });
-        setIndicatorPosition({ animate: false });
-        requestAnimationFrame(() => updateSchedule(currentWeek));
       }
 
-      function animateMorphTo(targetIndex) {
-        const safeTarget = clampValue(Number(targetIndex), 0, Math.max(0, totalWeeks - 1));
-        if (safeTarget === weekState.activeIndex) return;
-        if (weekState.isAnimating) return;
-
-        const targetSlot = weekState.visibleIndices.indexOf(safeTarget);
-        weekState.pendingActiveIndex = safeTarget;
-
-        if (targetSlot === -1 || !weekIndicatorLayer) {
-          setActiveAfterMorph();
+      function animateMorphIfNeeded(targetIndex, onDone) {
+        if (!weekIndicatorLayer || !weekActiveIndicator) {
+          onDone();
           return;
         }
 
-        weekState.isAnimating = true;
-        weekActiveIndicator?.classList.add('is-hidden');
-
-        if (weekState.morphBlob && weekState.morphBlob.parentNode) {
-          weekState.morphBlob.parentNode.removeChild(weekState.morphBlob);
+        const targetSlot = carouselState.visibleIndices.indexOf(targetIndex);
+        if (targetSlot === -1) {
+          onDone();
+          return;
         }
 
-        const startX = weekState.indicatorX;
-        const startY = weekState.indicatorY;
-        const targetX = alignToDevicePixel(weekState.slotPositions[targetSlot] ?? startX);
+        clearMorphBlob();
+        weekActiveIndicator.classList.add('is-hidden');
+
+        const startX = carouselGeometry.indicatorX;
+        const startY = carouselGeometry.indicatorY;
+        const targetX = alignToDevicePixel(carouselGeometry.slotPositions[targetSlot] ?? startX);
         const blob = document.createElement('span');
         blob.className = 'morph-blob';
         blob.style.transform = `translate3d(${startX}px, ${startY}px, 0)`;
-        blob.style.width = `${weekState.ovalWidth}px`;
+        blob.style.width = `${carouselGeometry.ovalWidth}px`;
         weekIndicatorLayer.appendChild(blob);
-        weekState.morphBlob = blob;
+        carouselMorphBlob = blob;
 
         let finished = false;
         const finish = () => {
           if (finished) return;
           finished = true;
-          setActiveAfterMorph();
+          clearMorphBlob();
+          onDone();
         };
 
         blob.addEventListener('transitionend', (event) => {
@@ -3203,63 +3169,109 @@
           }
         }, { once: true });
 
-        weekState.morphFallbackTimer = setTimeout(finish, 260);
+        carouselMorphTimer = setTimeout(finish, 260);
 
         requestAnimationFrame(() => {
           blob.style.transform = `translate3d(${targetX}px, ${startY}px, 0)`;
-          blob.style.width = `${weekState.dotSize}px`;
+          blob.style.width = `${carouselGeometry.dotSize}px`;
         });
       }
 
-      function syncWeekCarousel(week, options = {}) {
-        const { animate = true } = options;
-        if (!weekSlider || !weekDotRail || !weekWindow) return;
-        ensureWeekGeometry(false);
-        weekState.activeIndex = clampValue(Number(week) - 1, 0, Math.max(0, totalWeeks - 1));
-        weekState.visibleIndices = buildVisibleIndices(weekState.activeIndex, totalWeeks);
-        renderDots(weekState.visibleIndices, { animateSwap: animate && weekState.hasRendered });
-        setIndicatorPosition({ animate });
-        weekState.hasRendered = true;
-      }
-
       function updateSchedule(week) {
-        const safe = Math.max(1, Math.min(totalWeeks, week));
+        const safe = Math.max(1, Math.min(carouselState.totalCount, week));
         const params = new URLSearchParams(window.location.search);
         params.set('week', safe);
         window.location.search = params.toString();
       }
-      function animateWeekChange(nextWeek) {
-        const safe = Math.max(1, Math.min(totalWeeks, nextWeek));
-        if (safe === currentWeek) {
-          syncWeekCarousel(currentWeek, { animate: true });
-          return;
-        }
+
+      function updateWeekContent() {
+        currentWeek = carouselState.activeIndex + 1;
+        requestAnimationFrame(() => updateSchedule(currentWeek));
+      }
+
+      function goToWeek(targetIndex) {
+        const safeTarget = clampValue(Number(targetIndex), 0, carouselState.totalCount - 1);
+        if (Number.isNaN(safeTarget) || safeTarget === carouselState.activeIndex) return;
+        if (isCarouselAnimating) return;
+
         const now = Date.now();
-        if (weekState.isAnimating || now < weekState.transitionLockUntil) return;
-        weekState.transitionLockUntil = now + weekState.transitionDebounceMs;
-        if (weekState.transitionTimer) clearTimeout(weekState.transitionTimer);
-        weekState.transitionTimer = setTimeout(() => {
-          weekState.transitionLockUntil = 0;
-        }, weekState.transitionDebounceMs);
+        if (now < carouselDebounceUntil) return;
+        carouselDebounceUntil = now + carouselDebounceMs;
+
+        isCarouselAnimating = true;
+        const nextWindowStart = computeWindowStart(safeTarget, carouselState.totalCount);
+        const nextVisibleIndices = buildVisibleIndices(safeTarget, carouselState.totalCount);
+
+        const finalize = () => {
+          carouselState.activeIndex = safeTarget;
+          carouselState.windowStart = nextWindowStart;
+          carouselState.visibleIndices = nextVisibleIndices;
+          renderDots(nextVisibleIndices, { animateSwap: carouselHasRendered });
+          positionIndicator(true);
+          carouselHasRendered = true;
+          updateWeekContent();
+          setTimeout(() => {
+            isCarouselAnimating = false;
+          }, 220);
+        };
 
         const scheduleContent = document.querySelector('.schedule-content');
         if (scheduleContent) {
           scheduleContent.classList.add('is-exiting');
         }
-        animateMorphTo(safe - 1);
+
+        animateMorphIfNeeded(safeTarget, finalize);
       }
-      if (weekSlider) {
-        weekSlider.addEventListener('click', (event) => {
-          const btn = event.target.closest('.week-dot');
-          if (!btn) return;
-          const week = Number(btn.dataset.week);
-          if (!Number.isNaN(week)) animateWeekChange(week);
+
+      function syncWeekCarousel(week, options = {}) {
+        const { animate = true } = options;
+        if (!weekSlider || !weekDotRail || !weekWindow) return;
+        ensureCarouselGeometry(false);
+
+        carouselState.activeIndex = clampValue(Number(week) - 1, 0, carouselState.totalCount - 1);
+        carouselState.windowStart = computeWindowStart(carouselState.activeIndex, carouselState.totalCount);
+        carouselState.visibleIndices = buildVisibleIndices(carouselState.activeIndex, carouselState.totalCount);
+        renderDots(carouselState.visibleIndices, { animateSwap: false });
+        positionIndicator(animate);
+        carouselHasRendered = true;
+      }
+
+      function animateWeekChange(nextWeek) {
+        const safeWeek = clampValue(Number(nextWeek), 1, carouselState.totalCount);
+        goToWeek(safeWeek - 1);
+      }
+
+      function bindDotWeekHandlers() {
+        getWeekDots().forEach((dot) => {
+          if (dot.dataset.boundClick === '1') return;
+          dot.dataset.boundClick = '1';
+          dot.addEventListener('click', (event) => {
+            const rawIndex = event.currentTarget.dataset.weekIndex;
+            if (rawIndex === undefined || rawIndex === '') return;
+            const index = Number(rawIndex);
+            if (Number.isNaN(index)) return;
+            goToWeek(index);
+          });
         });
+      }
+
+      if (weekSlider) {
+        bindDotWeekHandlers();
+
         if (weekPrev) {
-          weekPrev.addEventListener('click', () => animateWeekChange(currentWeek - 1));
+          weekPrev.addEventListener('click', () => {
+            if (carouselState.activeIndex > 0) {
+              goToWeek(carouselState.activeIndex - 1);
+            }
+          });
         }
+
         if (weekNext) {
-          weekNext.addEventListener('click', () => animateWeekChange(currentWeek + 1));
+          weekNext.addEventListener('click', () => {
+            if (carouselState.activeIndex < carouselState.totalCount - 1) {
+              goToWeek(carouselState.activeIndex + 1);
+            }
+          });
         }
 
         let startX = 0;
@@ -3270,12 +3282,25 @@
           const endX = event.changedTouches[0].clientX;
           const delta = endX - startX;
           if (Math.abs(delta) < 40) return;
-          if (delta < 0) animateWeekChange(currentWeek + 1);
-          if (delta > 0) animateWeekChange(currentWeek - 1);
+          if (delta < 0 && carouselState.activeIndex < carouselState.totalCount - 1) {
+            goToWeek(carouselState.activeIndex + 1);
+          }
+          if (delta > 0 && carouselState.activeIndex > 0) {
+            goToWeek(carouselState.activeIndex - 1);
+          }
         });
+
         syncWeekCarousel(currentWeek, { animate: false });
       }
 
+      window.addEventListener('resize', () => {
+        if (window.innerWidth < 992) {
+          setDrawerOpen(false);
+        }
+        carouselGeometry.ready = false;
+        ensureCarouselGeometry(true);
+        syncWeekCarousel(currentWeek, { animate: false });
+      });
       if (messagesBtnMobile) {
         messagesBtnMobile.addEventListener('click', () => {
           const mobileMenu = document.getElementById('mobileMenuModal');
