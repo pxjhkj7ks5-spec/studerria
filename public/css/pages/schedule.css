@@ -18,7 +18,7 @@
   --week-rail-shift: 10px;
   --week-dot-size: 8px;
   --week-dot-gap: 10px;
-  --week-visible-count: 7;
+  --week-visible-count: 4;
   --week-row-height: 16px;
   --week-active-height: 8px;
   --week-active-width: 28px;
@@ -918,6 +918,10 @@ body.theme-light .deadline-meta {
   transition: none;
 }
 
+.week-dot-rail.is-swapping .week-dot {
+  opacity: 0.16;
+}
+
 .week-active-indicator {
   --indicator-x: 0px;
   --indicator-y: 0px;
@@ -944,6 +948,32 @@ body.theme-light .week-active-indicator {
 
 .week-active-indicator.no-motion {
   transition: none;
+}
+
+.week-active-indicator.is-hidden {
+  opacity: 0;
+}
+
+.morph-blob {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: var(--week-active-height);
+  width: var(--week-active-width);
+  border-radius: 999px;
+  transform: translate3d(0, 0, 0);
+  transition: transform 220ms var(--week-motion-curve), width 220ms var(--week-motion-curve), opacity 150ms ease-out;
+  will-change: transform, width;
+  pointer-events: none;
+  z-index: 3;
+}
+
+body.theme-dark .morph-blob {
+  background: hsl(var(--accent-h) var(--accent-s) 58% / 0.42);
+}
+
+body.theme-light .morph-blob {
+  background: hsl(var(--accent-h) var(--accent-s) 48% / 0.46);
 }
 
 .week-slider::-webkit-scrollbar {

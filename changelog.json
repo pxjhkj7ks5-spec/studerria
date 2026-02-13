@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.14",
+      "date": "2026-02-13",
+      "items": [
+        "fix: refactor week-carousel windowing to a stable 4-dot rail with constant geometry and no trailing blank space",
+        "feat: restore Apple-like pour morph using a temporary morph-blob from centered indicator to target dot before week switch",
+        "fix: harden vanilla JS carousel transitions with animation lock, 250ms debounce, pixel-snapped transforms, and stable dot node reuse"
+      ]
+    },
+    {
       "version": "0.8.13",
       "date": "2026-02-13",
       "items": [
