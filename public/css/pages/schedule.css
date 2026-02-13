@@ -21,6 +21,8 @@
   --wc-mid-gap: 12px;
   --wc-edge-gap: 4px;
   --wc-edge-gap-extreme: 8px;
+  --wc-content-shift-x: 2px;
+  --wc-indicator-y-shift: -1px;
   --wc-visible: 5;
   --wc-row-h: 16px;
   --wc-oval-h: var(--wc-dot);

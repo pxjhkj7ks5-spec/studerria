@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.37",
+      "date": "2026-02-13",
+      "items": [
+        "fix: add subtle global week-carousel content x-shift so oval and dots sit slightly further right inside the rail window",
+        "fix: apply indicator y-offset token and clamp so active oval aligns higher with dot centerline"
+      ]
+    },
+    {
       "version": "0.8.36",
       "date": "2026-02-13",
       "items": [

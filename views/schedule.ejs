@@ -2835,6 +2835,8 @@
         edgeGap: 4,
         edgeGapExtreme: 8,
         indicatorEdgeTravel: 8,
+        contentShiftX: 2,
+        indicatorYOffset: -1,
         visibleCount: 5,
         rowHeight: 16,
         ovalWidth: 28,
@@ -2885,6 +2887,8 @@
         const midGap = parseFloat(rootStyles.getPropertyValue('--wc-mid-gap')) || 14;
         const edgeGap = parseFloat(rootStyles.getPropertyValue('--wc-edge-gap')) || 4;
         const edgeGapExtreme = parseFloat(rootStyles.getPropertyValue('--wc-edge-gap-extreme')) || 8;
+        const contentShiftX = parseFloat(rootStyles.getPropertyValue('--wc-content-shift-x')) || 2;
+        const indicatorYOffset = parseFloat(rootStyles.getPropertyValue('--wc-indicator-y-shift')) || -1;
         const visibleCountToken = parseInt(rootStyles.getPropertyValue('--wc-visible'), 10) || 5;
         const rowHeight = parseFloat(rootStyles.getPropertyValue('--wc-row-h')) || 16;
         const ovalWidth = parseFloat(rootStyles.getPropertyValue('--wc-oval-w')) || 28;
@@ -2899,6 +2903,8 @@
         carouselGeometry.midGap = Number.isFinite(midGap) ? midGap : 14;
         carouselGeometry.edgeGap = Number.isFinite(edgeGap) ? edgeGap : 4;
         carouselGeometry.edgeGapExtreme = Number.isFinite(edgeGapExtreme) ? edgeGapExtreme : 8;
+        carouselGeometry.contentShiftX = Number.isFinite(contentShiftX) ? contentShiftX : 2;
+        carouselGeometry.indicatorYOffset = Number.isFinite(indicatorYOffset) ? indicatorYOffset : -1;
         carouselGeometry.visibleCount = Math.max(1, Number.isFinite(visibleCountToken) ? visibleCountToken : 5);
         carouselGeometry.rowHeight = Number.isFinite(rowHeight) ? rowHeight : 16;
         carouselGeometry.ovalHeight = carouselGeometry.dotSize;
@@ -2916,16 +2922,14 @@
         carouselGeometry.padX = padX;
         carouselGeometry.padY = padY;
         carouselGeometry.indicatorEdgeTravel = Math.max(0, (carouselGeometry.padX || 0) - 2);
-        const indicatorBounds = computeIndicatorBounds(carouselState.activeIndex);
-        carouselGeometry.indicatorX = alignToDevicePixel(
-          clampValue(
-            (carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth) / 2,
-            indicatorBounds.minX,
-            indicatorBounds.maxX
-          )
-        );
+        const initialRailX = computeRailX(carouselState.activeIndex);
+        carouselGeometry.indicatorX = computeIndicatorX(initialRailX, carouselState.activeIndex);
         carouselGeometry.indicatorY = alignToDevicePixel(
-          Math.max(0, (carouselGeometry.rowHeight - carouselGeometry.ovalHeight) / 2)
+          clampValue(
+            ((carouselGeometry.rowHeight - carouselGeometry.ovalHeight) / 2) + carouselGeometry.indicatorYOffset,
+            0,
+            Math.max(0, carouselGeometry.rowHeight - carouselGeometry.ovalHeight)
+          )
         );
 
         const railWidth = `${Math.max(0, carouselGeometry.totalDotsWidth)}px`;
@@ -2961,7 +2965,7 @@
       function computeRailX(activeIndex = carouselState.activeIndex) {
         const safeIndex = clampValue(activeIndex, 0, Math.max(0, carouselState.totalCount - 1));
         const dotCenterX = (safeIndex * carouselGeometry.step) + (carouselGeometry.dotSize / 2);
-        const rawRailX = carouselGeometry.windowCenterX - dotCenterX;
+        const rawRailX = (carouselGeometry.windowCenterX - dotCenterX) + (carouselGeometry.contentShiftX || 0);
         const maxRailX = 0;
         const minRailX = Math.min(0, carouselGeometry.railWindowWidth - carouselGeometry.totalDotsWidth);
         return alignToDevicePixel(clampValue(rawRailX, minRailX, maxRailX));
