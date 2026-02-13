@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.26",
+      "date": "2026-02-13",
+      "items": [
+        "fix: allow week-carousel active oval to use slider side padding as edge travel so first/last week transitions move with full logical step instead of appearing static",
+        "fix: keep center split spacing anchored to indicator-focused dot center while rail is clamped, preserving smooth edge behavior without redesign"
+      ]
+    },
+    {
       "version": "0.8.25",
       "date": "2026-02-13",
       "items": [

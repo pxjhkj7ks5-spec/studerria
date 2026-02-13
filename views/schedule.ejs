@@ -3001,8 +3001,8 @@
         carouselGeometry.indicatorX = alignToDevicePixel(
           clampValue(
             (carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth) / 2,
-            0,
-            Math.max(0, carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth)
+            -Math.max(0, carouselGeometry.padX),
+            Math.max(0, carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth) + Math.max(0, carouselGeometry.padX)
           )
         );
         carouselGeometry.indicatorY = alignToDevicePixel(
@@ -3048,21 +3048,34 @@
         return alignToDevicePixel(clampValue(rawRailX, minRailX, maxRailX));
       }
 
-      function getCenterDotIndex(railX = carouselState.railX) {
-        let nearestIndex = 0;
+      function computeIndicatorX(railX = carouselState.railX, focusIndex = carouselState.activeIndex) {
+        const safeIndex = clampValue(focusIndex, 0, Math.max(0, carouselState.totalCount - 1));
+        const dotCenterX = (safeIndex * carouselGeometry.step) + (carouselGeometry.dotSize / 2) + railX;
+        const rawIndicatorX = dotCenterX - (carouselGeometry.ovalWidth / 2);
+        const edgePad = Math.max(0, carouselGeometry.padX || 0);
+        const minX = -edgePad;
+        const maxX = Math.max(0, carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth) + edgePad;
+        return alignToDevicePixel(clampValue(rawIndicatorX, minX, maxX));
+      }
+
+      function getCenterDotIndex(railX = carouselState.railX, indicatorX = computeIndicatorX(railX)) {
         let nearestDistance = Number.POSITIVE_INFINITY;
+        let nearestIndex = 0;
+        const focusCenterX = indicatorX + (carouselGeometry.ovalWidth / 2);
+
         for (let index = 0; index < carouselState.totalCount; index += 1) {
-          const dotCenter = (index * carouselGeometry.step) + (carouselGeometry.dotSize / 2) + railX;
-          const distance = Math.abs(dotCenter - carouselGeometry.windowCenterX);
+          const dotCenterX = (index * carouselGeometry.step) + (carouselGeometry.dotSize / 2) + railX;
+          const distance = Math.abs(dotCenterX - focusCenterX);
           if (distance < nearestDistance) {
             nearestDistance = distance;
             nearestIndex = index;
           }
         }
+
         return nearestIndex;
       }
 
-      function updateMidSplitDots(railX = carouselState.railX) {
+      function updateMidSplitDots(railX = carouselState.railX, indicatorX = computeIndicatorX(railX)) {
         const dots = getWeekDots();
         if (!dots.length) return;
 
@@ -3075,12 +3088,11 @@
           }
         }
 
-        const centerDotIndex = getCenterDotIndex(railX);
-        const nonCenterVisible = visibleIndices.filter((index) => index !== centerDotIndex);
-        const leftSplitPos = Math.floor((nonCenterVisible.length - 1) / 2);
-        const rightSplitPos = leftSplitPos + 1;
-        const leftSplitIndex = nonCenterVisible[leftSplitPos];
-        const rightSplitIndex = nonCenterVisible[rightSplitPos];
+        const centerDotIndex = getCenterDotIndex(railX, indicatorX);
+        const leftCandidates = visibleIndices.filter((index) => index < centerDotIndex);
+        const rightCandidates = visibleIndices.filter((index) => index > centerDotIndex);
+        const leftSplitIndex = leftCandidates.length ? leftCandidates[leftCandidates.length - 1] : null;
+        const rightSplitIndex = rightCandidates.length ? rightCandidates[0] : null;
         const halfShift = alignToDevicePixel((carouselGeometry.midGap || 14) / 2);
 
         dots.forEach((dot, index) => {
@@ -3096,10 +3108,11 @@
         });
       }
 
-      function applyCarouselFrame(railX, animate = true) {
+      function applyCarouselFrame(railX, options = {}) {
         if (!weekDotRail || !weekActiveIndicator) return;
+        const { animate = true, indicatorIndex = carouselState.activeIndex } = options;
         const snappedRailX = alignToDevicePixel(railX);
-        const snappedIndicatorX = alignToDevicePixel(carouselGeometry.indicatorX);
+        const snappedIndicatorX = computeIndicatorX(snappedRailX, indicatorIndex);
         const snappedIndicatorY = alignToDevicePixel(carouselGeometry.indicatorY);
 
         if (!animate) {
@@ -3111,7 +3124,7 @@
           weekDotRail.style.transform = `translate3d(${snappedRailX}px, 0, 0)`;
           weekActiveIndicator.style.setProperty('--indicator-x', `${snappedIndicatorX}px`);
           weekActiveIndicator.style.setProperty('--indicator-y', `${snappedIndicatorY}px`);
-          updateMidSplitDots(snappedRailX);
+          updateMidSplitDots(snappedRailX, snappedIndicatorX);
 
           if (!animate) {
             requestAnimationFrame(() => {
@@ -3213,7 +3226,7 @@
         weekDotRail?.addEventListener('transitionend', onRailTransitionEnd);
         carouselUnlockTimer = setTimeout(unlock, 240);
 
-        applyCarouselFrame(nextRailX, true);
+        applyCarouselFrame(nextRailX, { animate: true, indicatorIndex: safeTarget });
 
         setTimeout(() => {
           updateWeekContent(safeTarget);
@@ -3228,7 +3241,10 @@
         carouselState.activeIndex = clampValue(Number(week) - 1, 0, carouselState.totalCount - 1);
         setActiveDot(carouselState.activeIndex);
         carouselState.railX = computeRailX(carouselState.activeIndex);
-        applyCarouselFrame(carouselState.railX, animate);
+        applyCarouselFrame(carouselState.railX, {
+          animate,
+          indicatorIndex: carouselState.activeIndex,
+        });
       }
 
       function animateWeekChange(nextWeek) {
