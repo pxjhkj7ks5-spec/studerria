@@ -1,6 +1,7 @@
 (() => {
   const THEME_ATTR = 'data-theme';
   const THEME_VALUES = new Set(['dark', 'light']);
+  let isThemeSyncing = false;
 
   function normalizeText(value) {
     return (value || '').replace(/\s+/g, ' ').trim();
@@ -33,8 +34,25 @@
       return;
     }
     const theme = detectTheme();
-    document.documentElement.setAttribute(THEME_ATTR, theme);
-    body.setAttribute(THEME_ATTR, theme);
+    const root = document.documentElement;
+    const rootTheme = root.getAttribute(THEME_ATTR);
+    const bodyTheme = body.getAttribute(THEME_ATTR);
+
+    if (rootTheme === theme && bodyTheme === theme) {
+      return;
+    }
+
+    isThemeSyncing = true;
+    try {
+      if (rootTheme !== theme) {
+        root.setAttribute(THEME_ATTR, theme);
+      }
+      if (bodyTheme !== theme) {
+        body.setAttribute(THEME_ATTR, theme);
+      }
+    } finally {
+      isThemeSyncing = false;
+    }
   }
 
   function applySemanticBadge(el) {
@@ -74,6 +92,9 @@
     }
 
     const observer = new MutationObserver(() => {
+      if (isThemeSyncing) {
+        return;
+      }
       syncThemeAttribute();
     });
 

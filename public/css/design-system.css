@@ -437,7 +437,6 @@ button.btn:active,
 .badge--hw,
 .badge--control,
 .priority-chip {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
@@ -451,6 +450,15 @@ button.btn:active,
   font-weight: var(--w-medium);
   letter-spacing: var(--trk-chip);
   line-height: 1;
+}
+
+.tag-pill,
+.hw-chip,
+.control-chip,
+.badge--hw,
+.badge--control,
+.priority-chip {
+  display: inline-flex;
 }
 
 .badge--control,

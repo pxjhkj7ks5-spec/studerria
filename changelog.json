@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.46",
+      "date": "2026-02-13",
+      "items": [
+        "fix: restore schedule status-chip behavior by removing global inline-flex override from generic .chip tokens (prevents simultaneous \"Зараз\"/\"Далі\" visibility)",
+        "fix: eliminate theme-sync mutation loop in design-system.js by guarding data-theme writes and skipping observer callbacks during sync",
+        "perf: reduce UI freeze risk on dynamic pages by avoiding redundant theme attribute updates"
+      ]
+    },
+    {
       "version": "0.8.45",
       "date": "2026-02-13",
       "items": [
