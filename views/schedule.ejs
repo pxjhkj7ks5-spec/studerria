@@ -1802,10 +1802,10 @@
                         <div class="schedule-time classTime"><%= timeLabel %></div>
                         <div class="schedule-flags">
                           <% if (hwMeta && hwMeta.control) { %>
-                            <span class="control-chip chip">Контроль</span>
+                            <span class="control-chip chip badge--control">Контроль</span>
                           <% } %>
                           <% if (hwMeta) { %>
-                            <span class="hw-chip chip">ДЗ <%= hwMeta.count %></span>
+                            <span class="hw-chip chip badge--hw">ДЗ <%= hwMeta.count %></span>
                           <% } %>
                           <span class="schedule-chip chip chip-now">Зараз</span>
                           <span class="schedule-chip chip chip-next">Далі</span>

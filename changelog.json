@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.8.43",
+      "date": "2026-02-13",
+      "items": [
+        "style: refine calm \"No classes\" state with lighter 12px medium text, soft hairline rhythm, subtle glyph prefix, and extra vertical breathing",
+        "style: polish class-card micro-motion with 200ms Apple-like cubic timing, smoother hover/press shadows, and paint containment to reduce scroll flicker",
+        "style: quiet footer metadata (v/build/changelog) to 12px medium low-contrast text with subtle text-link hover behavior",
+        "style: add semantic badge styles for Контроль and ДЗ with distinct dark-theme accents (amber control, blue homework) while preserving layout geometry"
+      ]
+    },
+    {
       "version": "0.8.42",
       "date": "2026-02-13",
       "items": [
