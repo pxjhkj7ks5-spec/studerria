@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.11",
+      "date": "2026-02-13",
+      "items": [
+        "fix: align carousel glass container tone with arrow controls using shared rgba/border/shadow/blur tokens",
+        "fix: enforce symmetric 5-dot (+2 active +2) windowing with stable edge pinning and no spacing drift",
+        "fix: snap rail and indicator transforms to device pixels to remove micro-jitter while preserving transform-only motion"
+      ]
+    },
+    {
       "version": "0.8.10",
       "date": "2026-02-13",
       "items": [

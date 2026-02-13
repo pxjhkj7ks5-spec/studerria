@@ -18,7 +18,7 @@
   --week-rail-shift: 10px;
   --week-dot-size: 8px;
   --week-dot-gap: 10px;
-  --week-visible-count: 7;
+  --week-visible-count: 5;
   --week-row-height: 16px;
   --week-active-height: 8px;
   --week-active-width: 28px;
@@ -26,7 +26,14 @@
   --week-pad-y: 4px;
   --week-window-width: calc((var(--week-visible-count) * var(--week-dot-size)) + ((var(--week-visible-count) - 1) * var(--week-dot-gap)));
   --week-slider-width: calc(var(--week-window-width) + (var(--week-pad-x) * 2));
+  --week-edge-fade: 8px;
   --week-motion-curve: cubic-bezier(0.22, 1, 0.36, 1);
+  --week-glass-blur: 12px;
+  --week-glass-shadow: 0 4px 12px rgba(2, 6, 23, 0.2);
+  --week-glass-dark-bg: rgba(15, 23, 42, 0.36);
+  --week-glass-dark-border: rgba(148, 163, 184, 0.36);
+  --week-glass-light-bg: rgba(255, 255, 255, 0.82);
+  --week-glass-light-border: rgba(148, 163, 184, 0.44);
 }
 
 .topbar {
@@ -853,8 +860,8 @@ body.theme-light .deadline-meta {
   min-height: calc(var(--week-row-height) + (var(--week-pad-y) * 2));
   max-height: calc(var(--week-row-height) + (var(--week-pad-y) * 2));
   padding: var(--week-pad-y) var(--week-pad-x);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(var(--week-glass-blur));
+  box-shadow: var(--week-glass-shadow);
   contain: layout paint;
 }
 
@@ -894,7 +901,7 @@ body.theme-light .deadline-meta {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 14px;
+  width: var(--week-edge-fade);
   pointer-events: none;
   z-index: 5;
 }
@@ -908,25 +915,26 @@ body.theme-light .deadline-meta {
 }
 
 body.theme-dark .week-window::before {
-  background: linear-gradient(90deg, rgba(10, 16, 25, 0.9), rgba(10, 16, 25, 0));
+  background: linear-gradient(90deg, var(--week-glass-dark-bg), rgba(15, 23, 42, 0));
 }
 
 body.theme-dark .week-window::after {
-  background: linear-gradient(270deg, rgba(10, 16, 25, 0.9), rgba(10, 16, 25, 0));
+  background: linear-gradient(270deg, var(--week-glass-dark-bg), rgba(15, 23, 42, 0));
 }
 
 body.theme-light .week-window::before {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
+  background: linear-gradient(90deg, var(--week-glass-light-bg), rgba(255, 255, 255, 0));
 }
 
 body.theme-light .week-window::after {
-  background: linear-gradient(270deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
+  background: linear-gradient(270deg, var(--week-glass-light-bg), rgba(255, 255, 255, 0));
 }
 
 .week-dot-rail {
   position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   height: var(--week-row-height);
   line-height: 0;
   gap: var(--week-dot-gap);
@@ -977,22 +985,23 @@ body.theme-light .week-active-indicator {
 }
 
 body.theme-dark .week-slider {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--week-glass-dark-bg);
+  border: 1px solid var(--week-glass-dark-border);
 }
 
 body.theme-light .week-slider {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.68));
-  border: 1px solid rgba(148, 163, 184, 0.34);
+  background: var(--week-glass-light-bg);
+  border: 1px solid var(--week-glass-light-border);
 }
 
 .week-nav-btn {
   width: 34px;
   height: 34px;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.36);
-  background: rgba(15, 23, 42, 0.32) !important;
-  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.24);
+  border: 1px solid var(--week-glass-dark-border);
+  background: var(--week-glass-dark-bg) !important;
+  box-shadow: var(--week-glass-shadow);
+  backdrop-filter: blur(var(--week-glass-blur));
   color: inherit;
   display: inline-flex;
   align-items: center;
@@ -1011,18 +1020,18 @@ body.theme-light .week-slider {
 
 body.theme-dark .week-nav-btn,
 body.theme-light .week-nav-btn {
-  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.2);
+  box-shadow: var(--week-glass-shadow);
 }
 
 body.theme-dark .week-nav-btn {
-  border-color: rgba(148, 163, 184, 0.36);
-  background: rgba(15, 23, 42, 0.36) !important;
+  border-color: var(--week-glass-dark-border);
+  background: var(--week-glass-dark-bg) !important;
   color: rgba(241, 245, 249, 0.94);
 }
 
 body.theme-light .week-nav-btn {
-  border-color: rgba(148, 163, 184, 0.44);
-  background: rgba(255, 255, 255, 0.82) !important;
+  border-color: var(--week-glass-light-border);
+  background: var(--week-glass-light-bg) !important;
   color: rgba(30, 41, 59, 0.92);
 }
 
