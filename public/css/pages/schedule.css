@@ -909,7 +909,7 @@ body.theme-light .deadline-meta {
   line-height: 0;
   gap: var(--week-dot-gap);
   transform: translate3d(0, 0, 0);
-  transition: transform 200ms ease-out;
+  transition: transform 220ms var(--week-motion-curve);
   will-change: transform;
   contain: layout paint;
 }
@@ -928,8 +928,8 @@ body.theme-light .deadline-meta {
   width: var(--week-active-width);
   border-radius: 999px;
   transform: translate3d(var(--indicator-x), var(--indicator-y), 0);
-  transition: transform 220ms var(--week-motion-curve), width 220ms var(--week-motion-curve);
-  will-change: transform, width;
+  transition: transform 220ms var(--week-motion-curve);
+  will-change: transform;
   z-index: 1;
   pointer-events: none;
 }
@@ -940,10 +940,6 @@ body.theme-dark .week-active-indicator {
 
 body.theme-light .week-active-indicator {
   background: hsl(var(--accent-h) var(--accent-s) 48% / 0.46);
-}
-
-.week-active-indicator.is-moving {
-  width: var(--week-dot-size);
 }
 
 .week-active-indicator.no-motion {
@@ -1031,7 +1027,8 @@ body.theme-light .week-nav-btn:hover {
   -webkit-appearance: none;
   opacity: 0.42;
   transform: scale(1);
-  transition: opacity 150ms ease-out, transform 150ms ease-out, background 150ms ease-out;
+  visibility: visible;
+  transition: opacity 150ms ease-out, transform 150ms ease-out, background 150ms ease-out, visibility 0s linear 150ms;
   margin: 0;
   will-change: opacity, transform;
 }
@@ -1040,6 +1037,7 @@ body.theme-light .week-dot {
   background: rgba(100, 116, 139, 0.42);
 }
 
+.week-dot[data-active="true"],
 .week-dot.active {
   opacity: 0;
   transform: scale(1);
@@ -1047,17 +1045,23 @@ body.theme-light .week-dot {
   box-shadow: none;
 }
 
+.week-dot[data-visible="false"],
 .week-dot.is-window-hidden {
   opacity: 0;
   transform: scale(0.95);
+  visibility: hidden;
   pointer-events: none;
 }
 
+.week-dot[data-visible="true"],
 .week-dot.is-window-visible {
   opacity: 0.42;
   transform: scale(1);
+  visibility: visible;
+  transition-delay: 0ms, 0ms, 0ms, 0ms;
 }
 
+.week-dot[data-active="true"][data-visible="true"],
 .week-dot.active.is-window-visible {
   opacity: 0;
 }

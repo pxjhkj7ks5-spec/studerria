@@ -1996,14 +1996,16 @@
           <% } %>
           <% for (let w = 1; w <= weekTotal; w++) { %>
             <% const dotHidden = w < visibleMin || w > visibleMax; %>
-            <% const dotHiddenClass = dotHidden ? 'is-window-hidden' : 'is-window-visible'; %>
+            <% const dotVisible = !dotHidden; %>
             <button
               type="button"
-              class="week-dot <%= w === currentWeek ? 'active' : '' %> <%= dotHiddenClass %>"
+              class="week-dot"
               data-week="<%= w %>"
+              data-active="<%= w === currentWeek ? 'true' : 'false' %>"
+              data-visible="<%= dotVisible ? 'true' : 'false' %>"
               role="tab"
               aria-selected="<%= w === currentWeek ? 'true' : 'false' %>"
-              tabindex="<%= dotHidden ? -1 : 0 %>"
+              tabindex="<%= dotVisible ? 0 : -1 %>"
               aria-label="<%= t('schedule.week') %> <%= w %>"
             ></button>
           <% } %>
@@ -2930,7 +2932,7 @@
         }
         weekState.geometryReady = false;
         ensureWeekGeometry(true);
-        syncWeekCarousel(currentWeek, { animate: false, morph: false });
+        syncWeekCarousel(currentWeek, { animate: false });
       });
 
       const weekState = {
@@ -2946,7 +2948,17 @@
         translateX: 0,
         geometryReady: false,
         dotCenters: [],
-        morphTimer: null,
+        transitionDebounceMs: 250,
+        transitionLockUntil: 0,
+        transitionTimer: null,
+        transitionState: {
+          activeIndex: 0,
+          windowStart: 0,
+          windowEnd: 0,
+          railX: 0,
+          indicatorX: 0,
+          indicatorY: 0,
+        },
       };
 
       function clampValue(value, min, max) {
@@ -3040,82 +3052,76 @@
         return { weekIndex, start, end };
       }
 
-      function setWeekActiveState(week) {
-        const dots = getWeekDots();
-        let activeIndex = 0;
-        dots.forEach((dot, index) => {
-          const isActive = Number(dot.dataset.week) === week;
-          dot.classList.toggle('active', isActive);
-          dot.setAttribute('aria-selected', isActive ? 'true' : 'false');
-          if (isActive) activeIndex = index;
-        });
-        return activeIndex;
+      function computeWeekTransitionState(week) {
+        const { weekIndex, start, end } = getWeekBounds(week);
+        const rawRailX = start * weekState.pitch;
+        const maxTranslate = Math.max(0, weekState.totalDotsWidth - weekState.railWindowWidth);
+        const railX = alignToDevicePixel(clampValue(rawRailX, 0, maxTranslate));
+        const dotCenter = weekState.dotCenters[weekIndex] ?? ((weekIndex * weekState.pitch) + (weekState.dotSize / 2));
+        const centerX = alignToDevicePixel(dotCenter - railX);
+        const rawIndicatorX = centerX - (weekState.ovalWidth / 2);
+        // Hard-bound the oval to the visible window so it never relies on clipping.
+        const minIndicatorX = 0;
+        const maxIndicatorX = Math.max(0, weekState.railWindowWidth - weekState.ovalWidth);
+        const indicatorX = alignToDevicePixel(clampValue(rawIndicatorX, minIndicatorX, maxIndicatorX));
+        const indicatorY = alignToDevicePixel(Math.max(0, (weekState.rowHeight - weekState.ovalHeight) / 2));
+
+        return {
+          activeIndex: weekIndex,
+          windowStart: start,
+          windowEnd: end,
+          railX,
+          indicatorX,
+          indicatorY,
+        };
       }
 
-      function setWeekWindow(week, options = {}) {
-        const { animate = true } = options;
+      function applyWeekDotState(state) {
         const dots = getWeekDots();
-        if (!weekDotRail || !dots.length) return;
-        const { start, end } = getWeekBounds(week);
-        if (!animate) weekDotRail.classList.add('no-motion');
-
-        const rawTranslate = start * weekState.pitch;
-        const maxTranslate = Math.max(0, weekState.totalDotsWidth - weekState.railWindowWidth);
-        weekState.translateX = alignToDevicePixel(clampValue(rawTranslate, 0, maxTranslate));
-        weekDotRail.style.transform = `translate3d(${-weekState.translateX}px, 0, 0)`;
-
+        if (!dots.length) return;
         dots.forEach((dot, index) => {
-          const visible = index >= start && index <= end;
-          dot.classList.toggle('is-window-visible', visible);
-          dot.classList.toggle('is-window-hidden', !visible);
+          const visible = index >= state.windowStart && index <= state.windowEnd;
+          const isActive = index === state.activeIndex;
+          dot.dataset.visible = visible ? 'true' : 'false';
+          dot.dataset.active = isActive ? 'true' : 'false';
+          dot.setAttribute('aria-selected', isActive ? 'true' : 'false');
           dot.tabIndex = visible ? 0 : -1;
         });
-
-        if (!animate) {
-          requestAnimationFrame(() => weekDotRail.classList.remove('no-motion'));
-        }
       }
 
-      function moveWeekIndicator(activeIndex, options = {}) {
-        const { animate = true, morph = false } = options;
-        if (!weekActiveIndicator) return;
-
-        if (!animate) weekActiveIndicator.classList.add('no-motion');
-
-        const dotCenter = weekState.dotCenters[activeIndex] ?? ((activeIndex * weekState.pitch) + (weekState.dotSize / 2));
-        const centerX = alignToDevicePixel(dotCenter - weekState.translateX);
-        const y = alignToDevicePixel(Math.max(0, (weekState.rowHeight - weekState.ovalHeight) / 2));
-        const ovalX = alignToDevicePixel(centerX - (weekState.ovalWidth / 2));
-        const dotX = alignToDevicePixel(centerX - (weekState.dotSize / 2));
-
-        if (morph) {
-          weekActiveIndicator.classList.add('is-moving');
-          weekActiveIndicator.style.setProperty('--indicator-x', `${dotX}px`);
-          weekActiveIndicator.style.setProperty('--indicator-y', `${y}px`);
-          if (weekState.morphTimer) clearTimeout(weekState.morphTimer);
-          weekState.morphTimer = setTimeout(() => {
-            weekActiveIndicator.classList.remove('is-moving');
-            weekActiveIndicator.style.setProperty('--indicator-x', `${ovalX}px`);
-            weekActiveIndicator.style.setProperty('--indicator-y', `${y}px`);
-          }, 220);
-        } else {
-          weekActiveIndicator.classList.remove('is-moving');
-          weekActiveIndicator.style.setProperty('--indicator-x', `${ovalX}px`);
-          weekActiveIndicator.style.setProperty('--indicator-y', `${y}px`);
-        }
-
+      function applyWeekTransitionState(state, options = {}) {
+        const { animate = true } = options;
+        if (!weekDotRail || !weekActiveIndicator) return;
         if (!animate) {
-          requestAnimationFrame(() => weekActiveIndicator.classList.remove('no-motion'));
+          weekDotRail.classList.add('no-motion');
+          weekActiveIndicator.classList.add('no-motion');
         }
+
+        weekState.transitionState = state;
+        weekState.translateX = state.railX;
+        applyWeekDotState(state);
+
+        // Rail + indicator are applied in one frame to avoid desync.
+        requestAnimationFrame(() => {
+          weekDotRail.style.transform = `translate3d(${-state.railX}px, 0, 0)`;
+          weekActiveIndicator.style.setProperty('--indicator-x', `${state.indicatorX}px`);
+          weekActiveIndicator.style.setProperty('--indicator-y', `${state.indicatorY}px`);
+
+          if (!animate) {
+            requestAnimationFrame(() => {
+              weekDotRail.classList.remove('no-motion');
+              weekActiveIndicator.classList.remove('no-motion');
+            });
+          }
+        });
       }
 
       function syncWeekCarousel(week, options = {}) {
-        const { animate = true, morph = false } = options;
+        const { animate = true } = options;
         if (!weekSlider || !weekDotRail || !weekWindow) return;
         ensureWeekGeometry(false);
-        const activeIndex = setWeekActiveState(week);
-        setWeekWindow(week, { animate });
-        moveWeekIndicator(activeIndex, { animate, morph });
+        const state = computeWeekTransitionState(week);
+        applyWeekTransitionState(state, { animate });
       }
 
       function updateSchedule(week) {
@@ -3127,16 +3133,24 @@
       function animateWeekChange(nextWeek) {
         const safe = Math.max(1, Math.min(totalWeeks, nextWeek));
         if (safe === currentWeek) {
-          syncWeekCarousel(currentWeek, { animate: true, morph: false });
+          syncWeekCarousel(currentWeek, { animate: true });
           return;
         }
+        const now = Date.now();
+        if (now < weekState.transitionLockUntil) return;
+        weekState.transitionLockUntil = now + weekState.transitionDebounceMs;
+        if (weekState.transitionTimer) clearTimeout(weekState.transitionTimer);
+        weekState.transitionTimer = setTimeout(() => {
+          weekState.transitionLockUntil = 0;
+        }, weekState.transitionDebounceMs);
+
         currentWeek = safe;
-        syncWeekCarousel(safe, { animate: true, morph: true });
+        syncWeekCarousel(safe, { animate: true });
         const scheduleContent = document.querySelector('.schedule-content');
         if (scheduleContent) {
           scheduleContent.classList.add('is-exiting');
         }
-        setTimeout(() => updateSchedule(safe), 180);
+        setTimeout(() => updateSchedule(safe), 220);
       }
       if (weekSlider) {
         weekSlider.addEventListener('click', (event) => {
@@ -3163,7 +3177,7 @@
           if (delta < 0) animateWeekChange(currentWeek + 1);
           if (delta > 0) animateWeekChange(currentWeek - 1);
         });
-        syncWeekCarousel(currentWeek, { animate: false, morph: false });
+        syncWeekCarousel(currentWeek, { animate: false });
       }
 
       if (messagesBtnMobile) {

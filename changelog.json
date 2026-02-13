@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.13",
+      "date": "2026-02-13",
+      "items": [
+        "fix: refactor week-carousel to atomic transition state so rail and active indicator update in one frame without desync",
+        "fix: hard-clamp indicator position inside the visible rail window to prevent edge overflow and half-cut oval states",
+        "fix: switch dot visibility/active state to stable data-attributes with 250ms transition debounce to reduce intermittent jerk during rapid switching"
+      ]
+    },
+    {
       "version": "0.8.12",
       "date": "2026-02-13",
       "items": [
