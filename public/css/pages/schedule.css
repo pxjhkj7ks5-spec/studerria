@@ -17,6 +17,10 @@
   --accent-s: 10%;
   --week-rail-shift: 10px;
   --week-slider-width: 108px;
+  --week-dot-size: 7px;
+  --week-dot-gap: 8px;
+  --week-active-width: 28px;
+  --week-motion-curve: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .topbar {
@@ -830,9 +834,9 @@ body.theme-light .deadline-meta {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-1);
-  overflow-x: hidden;
-  scroll-snap-type: x mandatory;
+  gap: 0;
+  overflow: visible;
+  scroll-snap-type: none;
   scrollbar-width: none;
   width: var(--week-slider-width);
   min-width: var(--week-slider-width);
@@ -840,7 +844,97 @@ body.theme-light .deadline-meta {
   padding: 8px 10px;
   backdrop-filter: none;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-  contain: content;
+  contain: layout paint;
+}
+
+.week-window {
+  position: relative;
+  overflow: hidden;
+  width: calc(var(--week-slider-width) - 20px);
+  min-width: calc(var(--week-slider-width) - 20px);
+  max-width: calc(var(--week-slider-width) - 20px);
+  contain: layout paint;
+}
+
+.week-window::before,
+.week-window::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.week-window::before {
+  left: 0;
+}
+
+.week-window::after {
+  right: 0;
+}
+
+body.theme-dark .week-window::before {
+  background: linear-gradient(90deg, rgba(10, 16, 25, 0.9), rgba(10, 16, 25, 0));
+}
+
+body.theme-dark .week-window::after {
+  background: linear-gradient(270deg, rgba(10, 16, 25, 0.9), rgba(10, 16, 25, 0));
+}
+
+body.theme-light .week-window::before {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
+}
+
+body.theme-light .week-window::after {
+  background: linear-gradient(270deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
+}
+
+.week-dot-rail {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--week-dot-gap);
+  transform: translate3d(0, 0, 0);
+  transition: transform 200ms var(--week-motion-curve);
+  will-change: transform;
+  contain: layout paint;
+}
+
+.week-dot-rail.no-motion {
+  transition: none;
+}
+
+.week-active-indicator {
+  --indicator-center: 0px;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 8px;
+  width: var(--week-active-width);
+  border-radius: 999px;
+  transform: translate3d(var(--indicator-center), -50%, 0) translateX(-50%);
+  transition: transform 220ms var(--week-motion-curve), width 220ms var(--week-motion-curve);
+  will-change: transform, width;
+  z-index: 1;
+  pointer-events: none;
+}
+
+body.theme-dark .week-active-indicator {
+  background: hsl(var(--accent-h) var(--accent-s) 58% / 0.42);
+}
+
+body.theme-light .week-active-indicator {
+  background: hsl(var(--accent-h) var(--accent-s) 48% / 0.46);
+}
+
+.week-active-indicator.is-moving {
+  width: var(--week-dot-size);
+}
+
+.week-active-indicator.no-motion {
+  transition: none;
 }
 
 .week-slider::-webkit-scrollbar {
@@ -901,23 +995,26 @@ body.theme-light .week-nav-btn:hover {
 }
 
 .week-dot {
-  scroll-snap-align: center;
+  position: relative;
+  z-index: 2;
+  scroll-snap-align: none;
   border-radius: 999px;
   border: 0;
   background: rgba(148, 163, 184, 0.45);
-  width: 7px;
-  height: 7px;
+  width: var(--week-dot-size);
+  height: var(--week-dot-size);
   padding: 0;
-  min-width: 7px;
-  min-height: 7px;
+  min-width: var(--week-dot-size);
+  min-height: var(--week-dot-size);
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   opacity: 0.42;
-  transition: transform 180ms ease-out, opacity 160ms ease-out, background var(--motion-fast), width 180ms ease-out, min-width 180ms ease-out;
+  transform: scale(1);
+  transition: opacity 150ms var(--week-motion-curve), transform 150ms var(--week-motion-curve), background 150ms var(--week-motion-curve);
   margin: 0;
-  will-change: transform, opacity, width;
+  will-change: opacity, transform;
 }
 
 body.theme-light .week-dot {
@@ -925,27 +1022,29 @@ body.theme-light .week-dot {
 }
 
 .week-dot.active {
-  opacity: 1;
-  transform: scale(1.08);
-  width: 28px;
-  background: hsl(var(--accent-h) var(--accent-s) 58% / 0.42);
-}
-
-.week-dot.is-hidden {
+  width: var(--week-dot-size);
+  min-width: var(--week-dot-size);
+  height: var(--week-dot-size);
+  min-height: var(--week-dot-size);
   opacity: 0;
-  width: 0;
-  min-width: 0;
-  overflow: hidden;
+  transform: scale(1);
+  background: transparent;
+  box-shadow: none;
+}
+
+.week-dot.is-window-hidden {
+  opacity: 0;
+  transform: scale(0.95);
   pointer-events: none;
-  margin: 0;
 }
 
-.week-dot.is-hidden-left {
-  transform: translateX(-12px) scale(0.72);
+.week-dot.is-window-visible {
+  opacity: 0.42;
+  transform: scale(1);
 }
 
-.week-dot.is-hidden-right {
-  transform: translateX(12px) scale(0.72);
+.week-dot.active.is-window-visible {
+  opacity: 0;
 }
 
 body.focus-week #densityBlock,

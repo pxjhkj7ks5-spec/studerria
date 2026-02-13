@@ -1978,7 +1978,10 @@
 
       <div class="week-rail" id="weekRail">
         <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
-        <div class="week-slider" id="weekSlider" role="tablist" aria-label="Week selector">
+        <div class="week-slider" id="weekSlider">
+          <div class="week-window" id="weekWindow">
+            <div class="week-dot-rail" id="weekDotRail" role="tablist" aria-label="Week selector">
+              <span class="week-active-indicator" id="weekActiveIndicator" aria-hidden="true"></span>
           <% const weekTotal = totalWeeks || 15; %>
           <% let visibleMin = 1; let visibleMax = weekTotal; %>
           <% if (weekTotal > 5) { %>
@@ -1992,7 +1995,7 @@
           <% } %>
           <% for (let w = 1; w <= weekTotal; w++) { %>
             <% const dotHidden = w < visibleMin || w > visibleMax; %>
-            <% const dotHiddenClass = dotHidden ? (w < visibleMin ? 'is-hidden is-hidden-left' : 'is-hidden is-hidden-right') : ''; %>
+            <% const dotHiddenClass = dotHidden ? 'is-window-hidden' : 'is-window-visible'; %>
             <button
               type="button"
               class="week-dot <%= w === currentWeek ? 'active' : '' %> <%= dotHiddenClass %>"
@@ -2003,6 +2006,8 @@
               aria-label="<%= t('schedule.week') %> <%= w %>"
             ></button>
           <% } %>
+            </div>
+          </div>
         </div>
         <button class="week-nav-btn" type="button" id="weekNext" aria-label="Next week">›</button>
       </div>
@@ -2868,6 +2873,9 @@
       window.addEventListener('load', openModalFromHash);
 
       const weekSlider = document.getElementById('weekSlider');
+      const weekWindow = document.getElementById('weekWindow');
+      const weekDotRail = document.getElementById('weekDotRail');
+      const weekActiveIndicator = document.getElementById('weekActiveIndicator');
       const messagesBtn = document.getElementById('messagesBtn');
       const messagesBtnMobile = document.getElementById('messagesBtnMobile');
       const messagesList = document.getElementById('messagesList');
@@ -2918,61 +2926,107 @@
         if (window.innerWidth < 992) {
           setDrawerOpen(false);
         }
-        updateVisibleWeekDots();
+        syncWeekCarousel(currentWeek, { animate: false, morph: false });
       });
 
+      const weekState = {
+        visibleCount: 5,
+        dotSize: 7,
+        gap: 8,
+        pitch: 15,
+        activeWidth: 28,
+        morphTimer: null,
+      };
+
+      function getWeekDots() {
+        if (!weekDotRail) return [];
+        return Array.from(weekDotRail.querySelectorAll('.week-dot'));
+      }
+
+      function measureWeekRail() {
+        const dots = getWeekDots();
+        if (!weekDotRail || !dots.length) return;
+        const firstDot = dots[0];
+        const dotRect = firstDot.getBoundingClientRect();
+        const railStyles = window.getComputedStyle(weekDotRail);
+        const gapValue = parseFloat(railStyles.gap || railStyles.columnGap || '0');
+        const rootStyles = window.getComputedStyle(document.documentElement);
+        const activeWidth = parseFloat(rootStyles.getPropertyValue('--week-active-width')) || 28;
+        weekState.dotSize = dotRect.width || 7;
+        weekState.gap = Number.isFinite(gapValue) ? gapValue : 8;
+        weekState.pitch = weekState.dotSize + weekState.gap;
+        weekState.activeWidth = activeWidth;
+        const totalWidth = dots.length > 0 ? (dots.length * weekState.pitch) - weekState.gap : 0;
+        weekDotRail.style.width = `${Math.max(0, totalWidth)}px`;
+      }
+
+      function getWeekBounds(week) {
+        const weekIndex = Math.max(0, Math.min(totalWeeks - 1, Number(week) - 1));
+        const visibleCount = Math.max(1, Math.min(weekState.visibleCount, totalWeeks));
+        const maxStart = Math.max(0, totalWeeks - visibleCount);
+        const start = Math.max(0, Math.min(maxStart, weekIndex - Math.floor(visibleCount / 2)));
+        const end = Math.min(totalWeeks - 1, start + visibleCount - 1);
+        return { weekIndex, start, end };
+      }
+
       function setWeekActiveState(week) {
-        if (!weekSlider) return null;
-        const dots = weekSlider.querySelectorAll('.week-dot');
-        let target = null;
-        dots.forEach((dot) => {
+        const dots = getWeekDots();
+        let activeIndex = 0;
+        dots.forEach((dot, index) => {
           const isActive = Number(dot.dataset.week) === week;
           dot.classList.toggle('active', isActive);
           dot.setAttribute('aria-selected', isActive ? 'true' : 'false');
-          if (isActive) target = dot;
+          if (isActive) activeIndex = index;
         });
-        return target;
+        return activeIndex;
       }
 
-      function centerWeekDot(week, behavior = 'smooth') {
-        if (!weekSlider) return;
-        const target = weekSlider.querySelector(`.week-dot[data-week="${week}"]`);
-        if (!target) return;
-        if (weekSlider.scrollWidth <= weekSlider.clientWidth + 2) return;
-        target.scrollIntoView({ behavior, block: 'nearest', inline: 'center' });
-      }
-
-      function updateVisibleWeekDots() {
-        if (!weekSlider) return;
-        const dots = Array.from(weekSlider.querySelectorAll('.week-dot'));
-        if (!dots.length) return;
-        let minWeek = 1;
-        let maxWeek = totalWeeks;
-        if (totalWeeks > 5) {
-          if (currentWeek === 1) {
-            minWeek = 1;
-            maxWeek = Math.min(totalWeeks, 3);
-          } else if (currentWeek === totalWeeks) {
-            minWeek = Math.max(1, totalWeeks - 2);
-            maxWeek = totalWeeks;
-          } else {
-            minWeek = Math.max(1, currentWeek - 2);
-            maxWeek = Math.min(totalWeeks, currentWeek + 2);
-          }
+      function setWeekWindow(week, options = {}) {
+        const { animate = true } = options;
+        const dots = getWeekDots();
+        if (!weekDotRail || !dots.length) return;
+        const { start, end } = getWeekBounds(week);
+        if (!animate) weekDotRail.classList.add('no-motion');
+        const offset = -(start * weekState.pitch);
+        weekDotRail.style.transform = `translate3d(${offset}px, 0, 0)`;
+        dots.forEach((dot, index) => {
+          const visible = index >= start && index <= end;
+          dot.classList.toggle('is-window-visible', visible);
+          dot.classList.toggle('is-window-hidden', !visible);
+          dot.tabIndex = visible ? 0 : -1;
+        });
+        if (!animate) {
+          requestAnimationFrame(() => weekDotRail.classList.remove('no-motion'));
         }
-        dots.forEach((dot) => {
-          const week = Number(dot.dataset.week);
-          const hidden = week < minWeek || week > maxWeek;
-          if (hidden) {
-            dot.classList.add('is-hidden');
-            dot.classList.toggle('is-hidden-left', week < minWeek);
-            dot.classList.toggle('is-hidden-right', week > maxWeek);
-            dot.tabIndex = -1;
-            return;
-          }
-          dot.classList.remove('is-hidden', 'is-hidden-left', 'is-hidden-right');
-          dot.tabIndex = 0;
-        });
+      }
+
+      function moveWeekIndicator(activeIndex, options = {}) {
+        const { animate = true, morph = false } = options;
+        if (!weekActiveIndicator) return;
+        if (!animate) weekActiveIndicator.classList.add('no-motion');
+        const center = (activeIndex * weekState.pitch) + (weekState.dotSize / 2);
+        weekActiveIndicator.style.setProperty('--indicator-center', `${center}px`);
+        if (morph) {
+          weekActiveIndicator.classList.add('is-moving');
+          if (weekState.morphTimer) clearTimeout(weekState.morphTimer);
+          weekState.morphTimer = setTimeout(() => {
+            weekActiveIndicator.classList.remove('is-moving');
+          }, 220);
+        } else {
+          weekActiveIndicator.classList.remove('is-moving');
+        }
+        if (!animate) {
+          requestAnimationFrame(() => weekActiveIndicator.classList.remove('no-motion'));
+        }
+      }
+
+      function syncWeekCarousel(week, options = {}) {
+        const { animate = true, morph = false } = options;
+        if (!weekSlider || !weekDotRail || !weekWindow) return;
+        measureWeekRail();
+        const activeIndex = setWeekActiveState(week);
+        setWeekWindow(week, { animate });
+        moveWeekIndicator(activeIndex, { animate, morph });
       }
 
       function updateSchedule(week) {
@@ -2984,15 +3038,11 @@
       function animateWeekChange(nextWeek) {
         const safe = Math.max(1, Math.min(totalWeeks, nextWeek));
         if (safe === currentWeek) {
-          updateVisibleWeekDots();
-          setWeekActiveState(currentWeek);
-          centerWeekDot(currentWeek, 'smooth');
+          syncWeekCarousel(currentWeek, { animate: true, morph: false });
           return;
         }
-        setWeekActiveState(safe);
         currentWeek = safe;
-        updateVisibleWeekDots();
-        centerWeekDot(safe, 'smooth');
+        syncWeekCarousel(safe, { animate: true, morph: true });
         const scheduleContent = document.querySelector('.schedule-content');
         if (scheduleContent) {
           scheduleContent.classList.add('is-exiting');
@@ -3024,9 +3074,7 @@
           if (delta < 0) animateWeekChange(currentWeek + 1);
           if (delta > 0) animateWeekChange(currentWeek - 1);
         });
-        updateVisibleWeekDots();
-        setWeekActiveState(currentWeek);
-        centerWeekDot(currentWeek, 'auto');
+        syncWeekCarousel(currentWeek, { animate: false, morph: false });
       }
 
       if (messagesBtnMobile) {

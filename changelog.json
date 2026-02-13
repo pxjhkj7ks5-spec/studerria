@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.08",
+      "date": "2026-02-13",
+      "items": [
+        "fix: refactor week carousel to fixed-geometry window + transform-only rail shifting with no scroll-snap jitter",
+        "feat: add floating active indicator morph animation (220ms ease-out) so active oval slides without resizing dots",
+        "fix: smooth edge dot enter/exit via opacity-scale transitions while keeping DOM nodes stable and avoiding layout reflow"
+      ]
+    },
+    {
       "version": "0.8.07",
       "date": "2026-02-13",
       "items": [
