@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.20",
+      "date": "2026-02-13",
+      "items": [
+        "refactor: switch week-carousel from 4-slot virtual windowing to a full-dot rail that renders all weeks",
+        "fix: animate navigation by moving the entire rail with clamped translate3d geometry so every dot scrolls with no edge blank space",
+        "fix: preserve centered active oval overlay with stable 250ms debounce + transition lock for arrows, dot clicks, and swipes"
+      ]
+    },
+    {
       "version": "0.8.19",
       "date": "2026-02-13",
       "items": [
