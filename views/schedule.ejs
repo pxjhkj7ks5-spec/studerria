@@ -3952,10 +3952,19 @@
         "Begin again — always welcome."
       ];
 
-      function getKyivDayOfYear() {
+      const specialPhrasesByDate = {
+        "02-14": "Happy Valentine’s Day — let care and focus guide your day."
+      };
+
+      function getKyivDateParts() {
         const now = new Date();
         const dateString = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
         const [year, month, day] = dateString.split('-').map(Number);
+        return { year, month, day };
+      }
+
+      function getKyivDayOfYear() {
+        const { year, month, day } = getKyivDateParts();
         const start = Date.UTC(year, 0, 1);
         const current = Date.UTC(year, month - 1, day);
         return Math.floor((current - start) / 86400000);
@@ -3964,8 +3973,10 @@
       function updateDailyPhrase() {
         const el = document.getElementById('daily-phrase');
         if (!el) return;
+        const { month, day } = getKyivDateParts();
+        const dateKey = `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dayOfYear = getKyivDayOfYear();
-        const phrase = phrases[dayOfYear % phrases.length];
+        const phrase = specialPhrasesByDate[dateKey] || phrases[dayOfYear % phrases.length];
         if (el.textContent === phrase) return;
         el.classList.add('fade-out');
         setTimeout(() => {

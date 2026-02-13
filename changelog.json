@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.47",
+      "date": "2026-02-13",
+      "items": [
+        "feat: add a one-day special daily-phrase override for February 14 (Kyiv time) in the schedule hero block",
+        "fix: keep normal rotating phrase list behavior for all non-special dates without changing existing phrase timing"
+      ]
+    },
+    {
       "version": "0.8.46",
       "date": "2026-02-13",
       "items": [
