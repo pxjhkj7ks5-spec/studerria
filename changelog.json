@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.44",
+      "date": "2026-02-13",
+      "items": [
+        "style: introduce shared Apple-like design system at /public/css/design-system.css with unified typography (400/500/600), calm glass surfaces, spacing/radius/motion tokens, hairlines, and accessibility focus/reduced-motion rules",
+        "style: apply the shared design system across all EJS pages (schedule, my-day, teamwork, profile, admin, generator, auth, deanery, landing) by loading design-system.css as a global visual layer",
+        "style: add lightweight /public/js/design-system.js helper to sync data-theme with existing dark/light class toggles and auto-apply semantic badge styling for Контроль (amber) and ДЗ (blue) labels"
+      ]
+    },
+    {
       "version": "0.8.43",
       "date": "2026-02-13",
       "items": [

@@ -658,7 +658,8 @@
       <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/my-day.css" />
-</head>
+    <link rel="stylesheet" href="/css/design-system.css" />
+  </head>
   <body class="theme-dark">
     <!-- Top Navigation -->
     <%- include('partials/topbar', { role, username, t, activePage: 'my-day', pageTitle: 'Мій день' }) %>
@@ -1201,5 +1202,6 @@
       renderPriorities();
       renderReminders(reminders);
     </script>
+      <script src="/js/design-system.js" defer></script>
   </body>
 </html>

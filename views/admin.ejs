@@ -672,7 +672,8 @@
       <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/admin.css" />
-</head>
+    <link rel="stylesheet" href="/css/design-system.css" />
+  </head>
   <body class="theme-light">
     <% const isLimitedView = typeof limitedStaffView !== 'undefined' && limitedStaffView; %>
     <% const allowedSectionsList = typeof locals !== 'undefined' && typeof locals.allowedSections !== 'undefined' ? locals.allowedSections : (typeof allowedSections !== 'undefined' ? allowedSections : null); %>
@@ -5003,5 +5004,6 @@
 
       initInputTracking();
     </script>
+      <script src="/js/design-system.js" defer></script>
   </body>
 </html>
