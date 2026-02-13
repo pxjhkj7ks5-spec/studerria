@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.28",
+      "date": "2026-02-13",
+      "items": [
+        "fix: add explicit penultimate-week visibility rule in week carousel so the clamped edge state shows 3 dots instead of 4",
+        "fix: route dot visibility and mid-split logic through shared visible-index computation to keep spacing consistent during transition"
+      ]
+    },
+    {
       "version": "0.8.27",
       "date": "2026-02-13",
       "items": [

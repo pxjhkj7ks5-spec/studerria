@@ -3058,6 +3058,42 @@
         return alignToDevicePixel(clampValue(rawIndicatorX, minX, maxX));
       }
 
+      function getWindowDotIndices(railX = carouselState.railX) {
+        const indices = [];
+        for (let index = 0; index < carouselState.totalCount; index += 1) {
+          const dotLeft = (index * carouselGeometry.step) + railX;
+          const dotRight = dotLeft + carouselGeometry.dotSize;
+          if (dotRight > 0 && dotLeft < carouselGeometry.railWindowWidth) {
+            indices.push(index);
+          }
+        }
+        return indices;
+      }
+
+      function computeVisibleDotIndices(activeIndex = carouselState.activeIndex, railX = carouselState.railX) {
+        const safeActive = clampValue(activeIndex, 0, Math.max(0, carouselState.totalCount - 1));
+        const visibleIndices = getWindowDotIndices(railX);
+        const penultimateIndex = Math.max(0, carouselState.totalCount - 2);
+
+        // Edge tuning requested by user: on penultimate week show 3 dots.
+        // We hide the far-left slot in the clamped-end window.
+        if (safeActive === penultimateIndex && visibleIndices.length > 0) {
+          const removable = visibleIndices.find((index) => index < safeActive);
+          if (removable !== undefined) {
+            return visibleIndices.filter((index) => index !== removable);
+          }
+        }
+
+        return visibleIndices;
+      }
+
+      function updateDotVisibility(activeIndex = carouselState.activeIndex, railX = carouselState.railX) {
+        const visibleSet = new Set(computeVisibleDotIndices(activeIndex, railX));
+        getWeekDots().forEach((dot, index) => {
+          dot.dataset.visible = visibleSet.has(index) ? 'true' : 'false';
+        });
+      }
+
       function getCenterDotIndex(railX = carouselState.railX, indicatorX = computeIndicatorX(railX)) {
         let nearestDistance = Number.POSITIVE_INFINITY;
         let nearestIndex = 0;
@@ -3075,18 +3111,15 @@
         return nearestIndex;
       }
 
-      function updateMidSplitDots(railX = carouselState.railX, indicatorX = computeIndicatorX(railX)) {
+      function updateMidSplitDots(
+        railX = carouselState.railX,
+        indicatorX = computeIndicatorX(railX),
+        activeIndex = carouselState.activeIndex
+      ) {
         const dots = getWeekDots();
         if (!dots.length) return;
 
-        const visibleIndices = [];
-        for (let index = 0; index < carouselState.totalCount; index += 1) {
-          const dotLeft = (index * carouselGeometry.step) + railX;
-          const dotRight = dotLeft + carouselGeometry.dotSize;
-          if (dotRight > 0 && dotLeft < carouselGeometry.railWindowWidth) {
-            visibleIndices.push(index);
-          }
-        }
+        const visibleIndices = computeVisibleDotIndices(activeIndex, railX);
 
         const centerDotIndex = getCenterDotIndex(railX, indicatorX);
         const leftCandidates = visibleIndices.filter((index) => index < centerDotIndex);
@@ -3128,7 +3161,8 @@
           weekDotRail.style.transform = `translate3d(${snappedRailX}px, 0, 0)`;
           weekActiveIndicator.style.setProperty('--indicator-x', `${snappedIndicatorX}px`);
           weekActiveIndicator.style.setProperty('--indicator-y', `${snappedIndicatorY}px`);
-          updateMidSplitDots(snappedRailX, snappedIndicatorX);
+          updateDotVisibility(indicatorIndex, snappedRailX);
+          updateMidSplitDots(snappedRailX, snappedIndicatorX, indicatorIndex);
 
           if (!animate) {
             requestAnimationFrame(() => {
