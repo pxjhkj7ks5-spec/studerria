@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.07",
+      "date": "2026-02-13",
+      "items": [
+        "fix: stabilize week carousel geometry to remove right-side empty space and prevent background stretching during dot transitions",
+        "fix: pre-render visible week-dot window on server to avoid flash of all dots before animation state applies",
+        "style: fine-tune carousel horizontal offset and align arrow group closer to schedule card start line"
+      ]
+    },
+    {
       "version": "0.8.06",
       "date": "2026-02-13",
       "items": [

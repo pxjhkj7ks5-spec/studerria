@@ -15,7 +15,8 @@
   --text-muted-light: rgba(51, 65, 85, 0.62);
   --accent-h: 210;
   --accent-s: 10%;
-  --week-rail-shift: 18px;
+  --week-rail-shift: 10px;
+  --week-slider-width: 108px;
 }
 
 .topbar {
@@ -804,7 +805,7 @@ body.theme-light .deadline-meta {
   transform: translateX(calc(-50% + var(--week-rail-shift)));
   bottom: 16px;
   width: fit-content;
-  max-width: calc(100vw - 20px);
+  max-width: calc(100vw - 12px);
   padding: 16px 8px;
   z-index: 1050;
   display: grid;
@@ -820,21 +821,26 @@ body.theme-light .deadline-meta {
 }
 
 .week-slider {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  z-index: auto;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: var(--space-1);
   overflow-x: hidden;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
-  width: fit-content;
-  max-width: calc(100vw - 124px);
-  min-width: 0;
+  width: var(--week-slider-width);
+  min-width: var(--week-slider-width);
+  max-width: var(--week-slider-width);
   padding: 8px 10px;
   backdrop-filter: none;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-  contain: layout paint;
+  contain: content;
 }
 
 .week-slider::-webkit-scrollbar {
@@ -909,7 +915,7 @@ body.theme-light .week-nav-btn:hover {
   align-items: center;
   justify-content: center;
   opacity: 0.42;
-  transition: transform 200ms ease-out, opacity 180ms ease-out, background var(--motion-fast), width 200ms ease-out, min-width 200ms ease-out, margin 200ms ease-out;
+  transition: transform 180ms ease-out, opacity 160ms ease-out, background var(--motion-fast), width 180ms ease-out, min-width 180ms ease-out;
   margin: 0;
   will-change: transform, opacity, width;
 }
@@ -931,7 +937,7 @@ body.theme-light .week-dot {
   min-width: 0;
   overflow: hidden;
   pointer-events: none;
-  margin: 0 -2px;
+  margin: 0;
 }
 
 .week-dot.is-hidden-left {
@@ -1027,11 +1033,7 @@ body.theme-light .footer-meta {
 
   .week-rail {
     max-width: calc(100vw - 16px);
-    transform: translateX(calc(-50% + 12px));
-  }
-
-  .week-slider {
-    max-width: calc(100vw - 106px);
+    transform: translateX(calc(-50% + 8px));
   }
 }
 
@@ -1047,10 +1049,6 @@ body.theme-light .footer-meta {
   .week-rail {
     padding: 12px 4px;
     bottom: 12px;
-    transform: translateX(calc(-50% + 6px));
-  }
-
-  .week-slider {
-    max-width: calc(100vw - 96px);
+    transform: translateX(calc(-50% + 4px));
   }
 }

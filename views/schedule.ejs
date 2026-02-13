@@ -1979,13 +1979,27 @@
       <div class="week-rail" id="weekRail">
         <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
         <div class="week-slider" id="weekSlider" role="tablist" aria-label="Week selector">
-          <% for (let w = 1; w <= (totalWeeks || 15); w++) { %>
+          <% const weekTotal = totalWeeks || 15; %>
+          <% let visibleMin = 1; let visibleMax = weekTotal; %>
+          <% if (weekTotal > 5) { %>
+            <% if (currentWeek === 1) { %>
+              <% visibleMin = 1; visibleMax = Math.min(weekTotal, 3); %>
+            <% } else if (currentWeek === weekTotal) { %>
+              <% visibleMin = Math.max(1, weekTotal - 2); visibleMax = weekTotal; %>
+            <% } else { %>
+              <% visibleMin = Math.max(1, currentWeek - 2); visibleMax = Math.min(weekTotal, currentWeek + 2); %>
+            <% } %>
+          <% } %>
+          <% for (let w = 1; w <= weekTotal; w++) { %>
+            <% const dotHidden = w < visibleMin || w > visibleMax; %>
+            <% const dotHiddenClass = dotHidden ? (w < visibleMin ? 'is-hidden is-hidden-left' : 'is-hidden is-hidden-right') : ''; %>
             <button
               type="button"
-              class="week-dot <%= w === currentWeek ? 'active' : '' %>"
+              class="week-dot <%= w === currentWeek ? 'active' : '' %> <%= dotHiddenClass %>"
               data-week="<%= w %>"
               role="tab"
               aria-selected="<%= w === currentWeek ? 'true' : 'false' %>"
+              tabindex="<%= dotHidden ? -1 : 0 %>"
               aria-label="<%= t('schedule.week') %> <%= w %>"
             ></button>
           <% } %>
