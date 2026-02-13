@@ -2948,8 +2948,15 @@
         dots.forEach((dot) => {
           const week = Number(dot.dataset.week);
           const hidden = week < minWeek || week > maxWeek;
-          dot.classList.toggle('is-hidden', hidden);
-          dot.tabIndex = hidden ? -1 : 0;
+          if (hidden) {
+            dot.classList.add('is-hidden');
+            dot.classList.toggle('is-hidden-left', week < minWeek);
+            dot.classList.toggle('is-hidden-right', week > maxWeek);
+            dot.tabIndex = -1;
+            return;
+          }
+          dot.classList.remove('is-hidden', 'is-hidden-left', 'is-hidden-right');
+          dot.tabIndex = 0;
         });
       }
 

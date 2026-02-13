@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.05",
+      "date": "2026-02-13",
+      "items": [
+        "fix: hide test-preview banner together with week pulse in Focus week mode without leaving blank spacing",
+        "fix: remove week-arrow background artifacts, align week rail offset, and polish edge dot enter/exit motion",
+        "fix: rebalance dark-theme schedule tones with darker base cards, lighter hover, improved deadline subject contrast, and light-style week badge/test-preview accents"
+      ]
+    },
+    {
       "version": "0.8.04",
       "date": "2026-02-12",
       "items": [
