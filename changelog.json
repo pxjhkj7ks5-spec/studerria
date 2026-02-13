@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.8.23",
+      "date": "2026-02-13",
+      "items": [
+        "fix: restore week-carousel active oval width to 28px to prevent oversized center pill overlap after token refactor"
+      ]
+    },
+    {
       "version": "0.8.22",
       "date": "2026-02-13",
       "items": [

@@ -22,7 +22,7 @@
   --wc-visible: 5;
   --wc-row-h: 16px;
   --wc-oval-h: var(--wc-dot);
-  --wc-oval-w: calc(var(--wc-dot) * 3 + var(--wc-gap) * 2);
+  --wc-oval-w: 28px;
   --week-visible-count: var(--wc-visible);
   --week-dot-size: var(--wc-dot);
   --week-dot-gap: var(--wc-gap);
