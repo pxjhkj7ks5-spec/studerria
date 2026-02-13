@@ -2983,7 +2983,9 @@
         const safeIndex = clampValue(focusIndex, 0, maxIndex);
         const basePad = Math.max(0, carouselGeometry.indicatorEdgeTravel || 0);
         const edgeNudge = Math.max(0, carouselGeometry.edgeContentNudge || 0);
-        const leftPad = basePad;
+        const leftPad = safeIndex === 0
+          ? Math.max(0, basePad - edgeNudge)
+          : basePad;
         // On the last week we keep a tiny extra right allowance so the oval
         // fully settles at the edge and does not visually crop.
         const rightPad = safeIndex === maxIndex ? (basePad + 2 + edgeNudge) : basePad;

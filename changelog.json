@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.39",
+      "date": "2026-02-13",
+      "items": [
+        "fix: increase extreme-state edge content nudge to shift dots and active oval further right for cleaner first/last week fit",
+        "fix: reduce first-week indicator left allowance using edge-aware bounds so the oval no longer appears cut at the start edge"
+      ]
+    },
+    {
       "version": "0.8.38",
       "date": "2026-02-13",
       "items": [
