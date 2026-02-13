@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.24",
+      "date": "2026-02-13",
+      "items": [
+        "fix: synchronize week-carousel morph by delaying active-dot swap until transition end and running oval shrink + target-dot stretch in one timed phase",
+        "fix: stabilize center split spacing by anchoring mid-gap to the physically centered dot index during rail movement",
+        "style: slightly tighten center split distance (wc-mid-gap 12px) to bring neighbor dots a bit closer to the active oval"
+      ]
+    },
+    {
       "version": "0.8.23",
       "date": "2026-02-13",
       "items": [

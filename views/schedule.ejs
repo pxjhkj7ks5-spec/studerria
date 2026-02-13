@@ -2947,6 +2947,8 @@
       let carouselDebounceUntil = 0;
       const carouselDebounceMs = 250;
       let carouselUnlockTimer = null;
+      let carouselMorphHalfTimer = null;
+      let carouselMorphTargetDot = null;
 
       function clampValue(value, min, max) {
         return Math.max(min, Math.min(max, value));
@@ -3047,6 +3049,20 @@
         return alignToDevicePixel(clampValue(rawRailX, minRailX, maxRailX));
       }
 
+      function getCenterDotIndex(railX = carouselState.railX) {
+        let nearestIndex = 0;
+        let nearestDistance = Number.POSITIVE_INFINITY;
+        for (let index = 0; index < carouselState.totalCount; index += 1) {
+          const dotCenter = (index * carouselGeometry.step) + (carouselGeometry.dotSize / 2) + railX;
+          const distance = Math.abs(dotCenter - carouselGeometry.windowCenterX);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestIndex = index;
+          }
+        }
+        return nearestIndex;
+      }
+
       function updateMidSplitDots(railX = carouselState.railX) {
         const dots = getWeekDots();
         if (!dots.length) return;
@@ -3060,11 +3076,12 @@
           }
         }
 
-        const nonActiveVisible = visibleIndices.filter((index) => index !== carouselState.activeIndex);
-        const leftSplitPos = Math.floor((nonActiveVisible.length - 1) / 2);
+        const centerDotIndex = getCenterDotIndex(railX);
+        const nonCenterVisible = visibleIndices.filter((index) => index !== centerDotIndex);
+        const leftSplitPos = Math.floor((nonCenterVisible.length - 1) / 2);
         const rightSplitPos = leftSplitPos + 1;
-        const leftSplitIndex = nonActiveVisible[leftSplitPos];
-        const rightSplitIndex = nonActiveVisible[rightSplitPos];
+        const leftSplitIndex = nonCenterVisible[leftSplitPos];
+        const rightSplitIndex = nonCenterVisible[rightSplitPos];
         const halfShift = alignToDevicePixel((carouselGeometry.midGap || 14) / 2);
 
         dots.forEach((dot, index) => {
@@ -3123,6 +3140,20 @@
         }
       }
 
+      function clearMorphState() {
+        if (carouselMorphHalfTimer) {
+          clearTimeout(carouselMorphHalfTimer);
+          carouselMorphHalfTimer = null;
+        }
+        if (weekActiveIndicator) {
+          weekActiveIndicator.classList.remove('is-morph-shrink');
+        }
+        if (carouselMorphTargetDot) {
+          carouselMorphTargetDot.classList.remove('is-morph-grow');
+          carouselMorphTargetDot = null;
+        }
+      }
+
       function updateSchedule(week) {
         const safe = Math.max(1, Math.min(carouselState.totalCount, week));
         const params = new URLSearchParams(window.location.search);
@@ -3130,8 +3161,9 @@
         window.location.search = params.toString();
       }
 
-      function updateWeekContent() {
-        currentWeek = carouselState.activeIndex + 1;
+      function updateWeekContent(targetIndex = carouselState.activeIndex) {
+        const safeTarget = clampValue(Number(targetIndex), 0, carouselState.totalCount - 1);
+        currentWeek = safeTarget + 1;
         requestAnimationFrame(() => updateSchedule(currentWeek));
       }
 
@@ -3146,9 +3178,25 @@
         carouselDebounceUntil = now + carouselDebounceMs;
         isCarouselAnimating = true;
 
-        carouselState.activeIndex = safeTarget;
-        setActiveDot(safeTarget);
-        carouselState.railX = computeRailX(safeTarget);
+        const nextRailX = computeRailX(safeTarget);
+        carouselState.railX = nextRailX;
+
+        clearMorphState();
+        if (weekActiveIndicator) {
+          weekActiveIndicator.classList.add('is-morph-shrink');
+        }
+        carouselMorphTargetDot = getWeekDots()[safeTarget] || null;
+        if (carouselMorphTargetDot) {
+          carouselMorphTargetDot.classList.add('is-morph-grow');
+        }
+        carouselMorphHalfTimer = setTimeout(() => {
+          if (weekActiveIndicator) {
+            weekActiveIndicator.classList.remove('is-morph-shrink');
+          }
+          if (carouselMorphTargetDot) {
+            carouselMorphTargetDot.classList.remove('is-morph-grow');
+          }
+        }, 120);
 
         const scheduleContent = document.querySelector('.schedule-content');
         if (scheduleContent) {
@@ -3158,6 +3206,10 @@
         const unlock = () => {
           if (!isCarouselAnimating) return;
           isCarouselAnimating = false;
+          clearMorphState();
+          carouselState.activeIndex = safeTarget;
+          setActiveDot(safeTarget);
+          updateMidSplitDots(carouselState.railX);
           clearCarouselUnlockTimer();
           weekDotRail?.removeEventListener('transitionend', onRailTransitionEnd);
         };
@@ -3170,10 +3222,10 @@
         weekDotRail?.addEventListener('transitionend', onRailTransitionEnd);
         carouselUnlockTimer = setTimeout(unlock, 240);
 
-        applyCarouselFrame(carouselState.railX, true);
+        applyCarouselFrame(nextRailX, true);
 
         setTimeout(() => {
-          updateWeekContent();
+          updateWeekContent(safeTarget);
         }, 170);
       }
 

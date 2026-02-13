@@ -18,7 +18,7 @@
   --week-rail-shift: 10px;
   --wc-dot: 8px;
   --wc-gap: 10px;
-  --wc-mid-gap: 14px;
+  --wc-mid-gap: 12px;
   --wc-visible: 5;
   --wc-row-h: 16px;
   --wc-oval-h: var(--wc-dot);
@@ -971,6 +971,11 @@ body.theme-light .deadline-meta {
   pointer-events: none;
 }
 
+.week-active-indicator.is-morph-shrink {
+  width: var(--wc-dot);
+  opacity: 0.9;
+}
+
 body.theme-dark .week-active-indicator {
   background: hsl(var(--accent-h) var(--accent-s) 58% / 0.42);
 }
@@ -1136,6 +1141,12 @@ body.theme-light .week-dot {
 .week-dot[data-active="true"][data-visible="true"],
 .week-dot.active.is-window-visible {
   opacity: 0;
+}
+
+.week-dot.is-morph-grow {
+  z-index: 3;
+  opacity: 0.58 !important;
+  transform: translate3d(var(--week-dot-shift-x), 0, 0) scale(calc(var(--wc-oval-w) / var(--wc-dot)), 1) !important;
 }
 
 .week-dot[data-motion="exit-left"],
