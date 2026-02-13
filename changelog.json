@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.12",
+      "date": "2026-02-13",
+      "items": [
+        "fix: expand week-carousel window to stable symmetric 7-dot visibility (3 before + active + 3 after) with edge pinning",
+        "fix: reduce micro-lag by caching carousel geometry, precomputing dot centers, and keeping transform math device-pixel aligned",
+        "style: make carousel glass tone uniform by removing internal gradient overlays and keeping a single semi-transparent container surface"
+      ]
+    },
+    {
       "version": "0.8.11",
       "date": "2026-02-13",
       "items": [

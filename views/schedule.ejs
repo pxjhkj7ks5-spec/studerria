@@ -1985,7 +1985,7 @@
           <div class="week-window" id="weekWindow">
             <div class="week-dot-rail" id="weekDotRail" role="tablist" aria-label="Week selector">
           <% const weekTotal = totalWeeks || 15; %>
-          <% const visibleDots = 5; %>
+          <% const visibleDots = 7; %>
           <% let visibleMin = 1; let visibleMax = weekTotal; %>
           <% if (weekTotal > visibleDots) { %>
             <% const visibleHalf = Math.floor(visibleDots / 2); %>
@@ -2928,11 +2928,13 @@
         if (window.innerWidth < 992) {
           setDrawerOpen(false);
         }
+        weekState.geometryReady = false;
+        ensureWeekGeometry(true);
         syncWeekCarousel(currentWeek, { animate: false, morph: false });
       });
 
       const weekState = {
-        visibleCount: 5,
+        visibleCount: 7,
         dotSize: 8,
         gap: 10,
         pitch: 18,
@@ -2942,6 +2944,8 @@
         railWindowWidth: 0,
         totalDotsWidth: 0,
         translateX: 0,
+        geometryReady: false,
+        dotCenters: [],
         morphTimer: null,
       };
 
@@ -2963,7 +2967,7 @@
         const rootStyles = window.getComputedStyle(document.documentElement);
         const dotSize = parseFloat(rootStyles.getPropertyValue('--week-dot-size')) || 8;
         const gapValue = parseFloat(rootStyles.getPropertyValue('--week-dot-gap')) || 10;
-        const visibleCount = parseInt(rootStyles.getPropertyValue('--week-visible-count'), 10) || 5;
+        const visibleCount = parseInt(rootStyles.getPropertyValue('--week-visible-count'), 10) || 7;
         const rowHeight = parseFloat(rootStyles.getPropertyValue('--week-row-height')) || 16;
         const ovalHeight = parseFloat(rootStyles.getPropertyValue('--week-active-height')) || 8;
         const ovalWidth = parseFloat(rootStyles.getPropertyValue('--week-active-width')) || 28;
@@ -2981,6 +2985,7 @@
         weekState.totalDotsWidth = totalWeeks > 0
           ? (totalWeeks * weekState.dotSize) + ((totalWeeks - 1) * weekState.gap)
           : 0;
+        weekState.dotCenters = Array.from({ length: totalWeeks }, (_, index) => ((index * weekState.pitch) + (weekState.dotSize / 2)));
 
         const railWidth = `${Math.max(0, weekState.totalDotsWidth)}px`;
         weekDotRail.style.width = railWidth;
@@ -3004,6 +3009,12 @@
         }
       }
 
+      function ensureWeekGeometry(force = false) {
+        if (!force && weekState.geometryReady) return;
+        readWeekGeometryTokens();
+        weekState.geometryReady = true;
+      }
+
       function getWeekDots() {
         if (!weekDotRail) return [];
         return Array.from(weekDotRail.querySelectorAll('.week-dot'));
@@ -3013,9 +3024,18 @@
         const weekIndex = clampValue(Number(week) - 1, 0, Math.max(0, totalWeeks - 1));
         const visibleCount = Math.max(1, Math.min(weekState.visibleCount, totalWeeks));
         const maxStart = Math.max(0, totalWeeks - visibleCount);
-        // Symmetric +2/+2 window around active and edge pinning.
-        const centeredStart = weekIndex - Math.floor(visibleCount / 2);
-        const start = clampValue(centeredStart, 0, maxStart);
+        const sideDots = Math.floor(visibleCount / 2);
+        // For a 7-dot window this maps to:
+        // weekIndex < 3 => start = 0
+        // weekIndex > totalWeeks - 4 => start = totalWeeks - 7
+        // otherwise start = weekIndex - 3
+        let start = weekIndex - sideDots;
+        if (weekIndex < sideDots) {
+          start = 0;
+        } else if (weekIndex > (totalWeeks - (sideDots + 1))) {
+          start = maxStart;
+        }
+        start = clampValue(start, 0, maxStart);
         const end = Math.min(totalWeeks - 1, start + visibleCount - 1);
         return { weekIndex, start, end };
       }
@@ -3062,7 +3082,8 @@
 
         if (!animate) weekActiveIndicator.classList.add('no-motion');
 
-        const centerX = alignToDevicePixel((activeIndex * weekState.pitch) + (weekState.dotSize / 2) - weekState.translateX);
+        const dotCenter = weekState.dotCenters[activeIndex] ?? ((activeIndex * weekState.pitch) + (weekState.dotSize / 2));
+        const centerX = alignToDevicePixel(dotCenter - weekState.translateX);
         const y = alignToDevicePixel(Math.max(0, (weekState.rowHeight - weekState.ovalHeight) / 2));
         const ovalX = alignToDevicePixel(centerX - (weekState.ovalWidth / 2));
         const dotX = alignToDevicePixel(centerX - (weekState.dotSize / 2));
@@ -3091,7 +3112,7 @@
       function syncWeekCarousel(week, options = {}) {
         const { animate = true, morph = false } = options;
         if (!weekSlider || !weekDotRail || !weekWindow) return;
-        readWeekGeometryTokens();
+        ensureWeekGeometry(false);
         const activeIndex = setWeekActiveState(week);
         setWeekWindow(week, { animate });
         moveWeekIndicator(activeIndex, { animate, morph });

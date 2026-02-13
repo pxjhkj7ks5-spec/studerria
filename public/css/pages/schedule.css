@@ -18,7 +18,7 @@
   --week-rail-shift: 10px;
   --week-dot-size: 8px;
   --week-dot-gap: 10px;
-  --week-visible-count: 5;
+  --week-visible-count: 7;
   --week-row-height: 16px;
   --week-active-height: 8px;
   --week-active-width: 28px;
@@ -897,37 +897,7 @@ body.theme-light .deadline-meta {
 
 .week-window::before,
 .week-window::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: var(--week-edge-fade);
-  pointer-events: none;
-  z-index: 5;
-}
-
-.week-window::before {
-  left: 0;
-}
-
-.week-window::after {
-  right: 0;
-}
-
-body.theme-dark .week-window::before {
-  background: linear-gradient(90deg, var(--week-glass-dark-bg), rgba(15, 23, 42, 0));
-}
-
-body.theme-dark .week-window::after {
-  background: linear-gradient(270deg, var(--week-glass-dark-bg), rgba(15, 23, 42, 0));
-}
-
-body.theme-light .week-window::before {
-  background: linear-gradient(90deg, var(--week-glass-light-bg), rgba(255, 255, 255, 0));
-}
-
-body.theme-light .week-window::after {
-  background: linear-gradient(270deg, var(--week-glass-light-bg), rgba(255, 255, 255, 0));
+  display: none;
 }
 
 .week-dot-rail {
