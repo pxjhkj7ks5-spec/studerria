@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.45",
+      "date": "2026-02-13",
+      "items": [
+        "style: remove hover/press jump on cards and buttons by disabling translate/scale transforms in shared design-system interactions",
+        "style: keep calm Apple-like feedback through shadow and border transitions only, without block repositioning on hover/active"
+      ]
+    },
+    {
       "version": "0.8.44",
       "date": "2026-02-13",
       "items": [

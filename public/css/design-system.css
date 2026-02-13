@@ -291,11 +291,9 @@ hr,
 .panel,
 .list-card {
   transition:
-    transform var(--dur-slow) var(--ease-apple),
     box-shadow var(--dur-slow) var(--ease-apple),
     border-color var(--dur-med) var(--ease-apple),
     background-color var(--dur-med) var(--ease-apple);
-  will-change: transform;
   contain: paint;
 }
 
@@ -318,7 +316,7 @@ hr,
   .admin-panel:hover,
   .panel:hover,
   .list-card:hover {
-    transform: translateY(-2px);
+    transform: none;
     box-shadow: 0 14px 30px rgba(2, 6, 23, 0.2);
   }
 }
@@ -341,7 +339,7 @@ hr,
 .admin-panel:active,
 .panel:active,
 .list-card:active {
-  transform: translateY(0) scale(0.99);
+  transform: none;
   box-shadow: 0 8px 18px rgba(2, 6, 23, 0.16);
 }
 
@@ -362,7 +360,6 @@ button.btn,
   letter-spacing: 0;
   box-shadow: none;
   transition:
-    transform var(--dur-med) var(--ease-apple),
     border-color var(--dur-med) var(--ease-apple),
     background-color var(--dur-med) var(--ease-apple),
     opacity var(--dur-fast) ease-out,
@@ -416,7 +413,7 @@ button.btn-link:hover {
   .mobile-menu-action:hover,
   .theme-toggle-min:hover,
   .mobile-menu-btn:hover {
-    transform: translateY(-1px);
+    transform: none;
     border-color: rgba(120, 167, 255, 0.38);
     box-shadow: 0 8px 18px rgba(2, 6, 23, 0.16);
   }
@@ -429,7 +426,7 @@ button.btn:active,
 .mobile-menu-action:active,
 .theme-toggle-min:active,
 .mobile-menu-btn:active {
-  transform: translateY(0) scale(0.99);
+  transform: none;
 }
 
 .chip,
