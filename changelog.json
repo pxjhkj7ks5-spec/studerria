@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.35",
+      "date": "2026-02-13",
+      "items": [
+        "fix: update extreme week-carousel distribution to 0+3 at first week and 3+0 at last week for cleaner edge states",
+        "fix: keep existing near-edge and middle distribution unchanged while reducing visual crowding at both ends"
+      ]
+    },
+    {
       "version": "0.8.34",
       "date": "2026-02-13",
       "items": [
