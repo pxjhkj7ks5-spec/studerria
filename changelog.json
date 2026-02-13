@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.31",
+      "date": "2026-02-13",
+      "items": [
+        "fix: remove duplicated legacy week-carousel inline styles that were overriding token-based dot geometry and causing dot overlap artifacts",
+        "fix: keep week dots controlled only by unified wc-token CSS system for stable spacing and active indicator layering"
+      ]
+    },
+    {
       "version": "0.8.30",
       "date": "2026-02-13",
       "items": [

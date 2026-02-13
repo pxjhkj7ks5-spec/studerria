@@ -286,65 +286,6 @@
         flex-wrap: wrap;
         gap: 6px;
       }
-      .week-slider {
-        position: fixed;
-        left: 50%;
-        bottom: 22px;
-        transform: translateX(-50%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 12px;
-        padding: 10px 16px;
-        border-radius: 20px;
-        backdrop-filter: blur(8px);
-        z-index: 1050;
-      }
-      body.theme-dark .week-slider {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
-      }
-      body.theme-light .week-slider {
-        background: rgba(255, 255, 255, 0.6);
-        border: 1px solid rgba(15, 23, 42, 0.12);
-        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
-      }
-      @media (max-width: 576px) {
-        .week-slider {
-          bottom: 16px;
-        }
-      }
-      .week-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 999px;
-        border: none;
-        background: rgba(255, 255, 255, 0.4);
-        opacity: 0.3;
-        cursor: pointer;
-        transition: transform 220ms ease, background 220ms ease, width 260ms ease, box-shadow 260ms ease;
-      }
-      .week-dot:hover {
-        transform: scale(1.15);
-        opacity: 0.6;
-      }
-      .week-dot.active {
-        width: 28px;
-        height: 8px;
-        opacity: 1;
-        background: rgba(255, 255, 255, 0.85);
-        box-shadow: 0 8px 18px rgba(148, 163, 184, 0.35);
-      }
-      .week-dot.active {
-        transform: scale(1.05);
-      }
-      body.theme-light .week-dot {
-        background: rgba(15, 23, 42, 0.4);
-      }
-      body.theme-light .week-dot.active {
-        background: rgba(15, 23, 42, 0.85);
-      }
       body.modal-open {
         overflow: hidden;
       }
@@ -1431,37 +1372,6 @@
       }
       body.theme-light .empty-state {
         background: rgba(15, 23, 42, 0.04);
-      }
-      .week-slider {
-        gap: 10px;
-        padding: 10px 14px;
-      }
-      .week-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 999px;
-        border: none;
-        background: rgba(255, 255, 255, 0.4);
-        opacity: 0.3;
-        cursor: pointer;
-        transition: transform 220ms ease, background 220ms ease, width 260ms ease, box-shadow 260ms ease;
-      }
-      .week-dot:hover {
-        transform: scale(1.15);
-        opacity: 0.6;
-      }
-      .week-dot.active {
-        width: 28px;
-        height: 8px;
-        opacity: 1;
-        background: rgba(255, 255, 255, 0.85);
-        box-shadow: 0 8px 18px rgba(148, 163, 184, 0.35);
-      }
-      body.theme-light .week-dot {
-        background: rgba(15, 23, 42, 0.4);
-      }
-      body.theme-light .week-dot.active {
-        background: rgba(15, 23, 42, 0.85);
       }
       .schedule-content.is-exiting {
         opacity: 0;
