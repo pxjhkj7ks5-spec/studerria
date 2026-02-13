@@ -16,20 +16,27 @@
   --accent-h: 210;
   --accent-s: 10%;
   --week-rail-shift: 10px;
-  --week-dot-size: 8px;
-  --week-dot-gap: 10px;
-  --week-dot-middle-gap-extra: 22px;
+  --wc-dot: 8px;
+  --wc-gap: 10px;
+  --wc-mid-gap: 36px;
+  --wc-row-h: 16px;
+  --wc-oval-h: 8px;
+  --wc-oval-w: 28px;
   --week-visible-count: 4;
-  --week-row-height: 16px;
-  --week-active-height: 8px;
-  --week-active-width: 28px;
+  --week-dot-size: var(--wc-dot);
+  --week-dot-gap: var(--wc-gap);
+  --week-dot-middle-gap-extra: calc(var(--wc-mid-gap) - var(--wc-gap));
+  --week-row-height: var(--wc-row-h);
+  --week-active-height: var(--wc-oval-h);
+  --week-active-width: var(--wc-oval-w);
   --week-pad-x: 10px;
   --week-pad-y: 4px;
-  --week-window-width: calc(
-    (var(--week-visible-count) * var(--week-dot-size)) +
-    ((var(--week-visible-count) - 1) * var(--week-dot-gap)) +
-    var(--week-dot-middle-gap-extra)
+  --wc-window-w: calc(
+    (4 * var(--wc-dot)) +
+    (2 * var(--wc-gap)) +
+    var(--wc-mid-gap)
   );
+  --week-window-width: var(--wc-window-w);
   --week-slider-width: calc(var(--week-window-width) + (var(--week-pad-x) * 2));
   --week-edge-fade: 8px;
   --week-motion-curve: cubic-bezier(0.22, 1, 0.36, 1);

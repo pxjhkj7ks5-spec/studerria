@@ -2935,7 +2935,7 @@
       const carouselGeometry = {
         dotSize: 8,
         gap: 10,
-        middleGapExtra: 22,
+        middleGap: 36,
         pitch: 18,
         rowHeight: 16,
         ovalWidth: 28,
@@ -2976,37 +2976,53 @@
         return Array.from(weekDotRail.querySelectorAll('.week-dot'));
       }
 
+      function computeSlotX(visibleCount = carouselState.visibleCount) {
+        if (visibleCount <= 0) return [];
+        if (visibleCount !== 4) {
+          return Array.from({ length: visibleCount }, (_, slot) =>
+            alignToDevicePixel(slot * (carouselGeometry.dotSize + carouselGeometry.gap))
+          );
+        }
+
+        const slotPositions = [];
+        slotPositions[0] = 0;
+        slotPositions[1] = carouselGeometry.dotSize + carouselGeometry.gap;
+        slotPositions[2] = slotPositions[1] + carouselGeometry.dotSize + carouselGeometry.middleGap;
+        slotPositions[3] = slotPositions[2] + carouselGeometry.dotSize + carouselGeometry.gap;
+        return slotPositions.map((x) => alignToDevicePixel(x));
+      }
+
       function readCarouselGeometryTokens() {
         if (!weekDotRail || !weekWindow) return;
 
         const rootStyles = window.getComputedStyle(document.documentElement);
-        const dotSize = parseFloat(rootStyles.getPropertyValue('--week-dot-size')) || 8;
-        const gap = parseFloat(rootStyles.getPropertyValue('--week-dot-gap')) || 10;
-        const middleGapExtra = parseFloat(rootStyles.getPropertyValue('--week-dot-middle-gap-extra')) || 22;
+        // Findings: drift/overlap came from mixing legacy --week-* tokens with JS constants.
+        // Fix: geometry now resolves from one token set (--wc-*) and one slot formula.
+        const dotSize = parseFloat(rootStyles.getPropertyValue('--wc-dot')) || 8;
+        const gap = parseFloat(rootStyles.getPropertyValue('--wc-gap')) || 10;
+        const middleGap = parseFloat(rootStyles.getPropertyValue('--wc-mid-gap')) || 36;
         const visibleCountToken = parseInt(rootStyles.getPropertyValue('--week-visible-count'), 10) || 4;
-        const rowHeight = parseFloat(rootStyles.getPropertyValue('--week-row-height')) || 16;
-        const ovalHeight = parseFloat(rootStyles.getPropertyValue('--week-active-height')) || 8;
-        const ovalWidth = parseFloat(rootStyles.getPropertyValue('--week-active-width')) || 28;
+        const rowHeight = parseFloat(rootStyles.getPropertyValue('--wc-row-h')) || 16;
+        const ovalHeight = parseFloat(rootStyles.getPropertyValue('--wc-oval-h')) || 8;
+        const ovalWidth = parseFloat(rootStyles.getPropertyValue('--wc-oval-w')) || 28;
+        const railWindowWidthToken = parseFloat(rootStyles.getPropertyValue('--wc-window-w'));
         const padX = parseFloat(rootStyles.getPropertyValue('--week-pad-x')) || 10;
         const padY = parseFloat(rootStyles.getPropertyValue('--week-pad-y')) || 4;
 
-        carouselState.visibleCount = Math.max(1, Math.min(visibleCountToken, 4, carouselState.totalCount));
+        carouselState.visibleCount = Math.max(1, Math.min(visibleCountToken, 4));
         carouselGeometry.dotSize = dotSize;
         carouselGeometry.gap = Number.isFinite(gap) ? gap : 10;
-        carouselGeometry.middleGapExtra = Number.isFinite(middleGapExtra) ? middleGapExtra : 22;
+        carouselGeometry.middleGap = Number.isFinite(middleGap) ? middleGap : 36;
         carouselGeometry.pitch = carouselGeometry.dotSize + carouselGeometry.gap;
         carouselGeometry.rowHeight = rowHeight;
         carouselGeometry.ovalHeight = ovalHeight;
         carouselGeometry.ovalWidth = ovalWidth;
-        carouselGeometry.railWindowWidth =
-          (carouselState.visibleCount * carouselGeometry.dotSize) +
-          ((carouselState.visibleCount - 1) * carouselGeometry.gap) +
-          (carouselState.visibleCount >= 4 ? carouselGeometry.middleGapExtra : 0);
-        carouselGeometry.slotPositions = Array.from({ length: carouselState.visibleCount }, (_, slot) => {
-          const base = slot * carouselGeometry.pitch;
-          const offset = slot >= 2 ? carouselGeometry.middleGapExtra : 0;
-          return alignToDevicePixel(base + offset);
-        });
+        carouselGeometry.railWindowWidth = Number.isFinite(railWindowWidthToken)
+          ? railWindowWidthToken
+          : (carouselState.visibleCount === 4
+            ? ((4 * carouselGeometry.dotSize) + (2 * carouselGeometry.gap) + carouselGeometry.middleGap)
+            : ((carouselState.visibleCount * carouselGeometry.dotSize) + ((carouselState.visibleCount - 1) * carouselGeometry.gap)));
+        carouselGeometry.slotPositions = computeSlotX(carouselState.visibleCount);
 
         const maxIndicatorX = Math.max(0, carouselGeometry.railWindowWidth - carouselGeometry.ovalWidth);
         carouselGeometry.indicatorX = alignToDevicePixel(
@@ -3137,9 +3153,9 @@
             if (enterDot) {
               enterDot.classList.add(enterClass);
               requestAnimationFrame(() => enterDot.classList.add('is-enter-active'));
-              setTimeout(() => clearMotion(enterDot), 170);
+              setTimeout(() => clearMotion(enterDot), 180);
             }
-          }, 90);
+          }, 80);
         });
       }
 
@@ -3172,7 +3188,9 @@
 
         const startX = carouselGeometry.indicatorX;
         const startY = carouselGeometry.indicatorY;
-        const targetX = alignToDevicePixel(carouselGeometry.slotPositions[targetSlot] ?? startX);
+        const maxTargetX = Math.max(0, carouselGeometry.railWindowWidth - carouselGeometry.dotSize);
+        const rawTargetX = carouselGeometry.slotPositions[targetSlot] ?? startX;
+        const targetX = alignToDevicePixel(clampValue(rawTargetX, 0, maxTargetX));
         const blob = document.createElement('span');
         blob.className = 'morph-blob';
         blob.style.transform = `translate3d(${startX}px, ${startY}px, 0)`;
@@ -3194,12 +3212,12 @@
           }
         }, { once: true });
 
-        carouselMorphTimer = setTimeout(finish, 260);
+        carouselMorphTimer = setTimeout(finish, 280);
 
-        requestAnimationFrame(() => {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
           blob.style.transform = `translate3d(${targetX}px, ${startY}px, 0)`;
           blob.style.width = `${carouselGeometry.dotSize}px`;
-        });
+        }));
       }
 
       function updateSchedule(week) {
@@ -3227,21 +3245,25 @@
         const direction = safeTarget > carouselState.activeIndex ? 1 : -1;
         const nextWindowStart = computeWindowStart(safeTarget, carouselState.totalCount);
         const nextVisibleIndices = buildVisibleIndices(safeTarget, carouselState.totalCount);
+        const shouldAnimateSwap = carouselHasRendered;
 
         const finalize = () => {
-          carouselState.activeIndex = safeTarget;
-          carouselState.windowStart = nextWindowStart;
-          carouselState.visibleIndices = nextVisibleIndices;
-          renderDots(nextVisibleIndices, { animateSwap: carouselHasRendered, direction });
-          positionIndicator(true);
-          carouselHasRendered = true;
-          const contentDelay = carouselHasRendered ? 170 : 0;
-          setTimeout(() => {
-            updateWeekContent();
-          }, contentDelay);
-          setTimeout(() => {
-            isCarouselAnimating = false;
-          }, Math.max(220, contentDelay + 80));
+          requestAnimationFrame(() => {
+            carouselState.activeIndex = safeTarget;
+            carouselState.windowStart = nextWindowStart;
+            carouselState.visibleIndices = nextVisibleIndices;
+            renderDots(nextVisibleIndices, { animateSwap: shouldAnimateSwap, direction });
+            positionIndicator(true);
+            carouselHasRendered = true;
+
+            const contentDelay = shouldAnimateSwap ? 180 : 0;
+            setTimeout(() => {
+              updateWeekContent();
+            }, contentDelay);
+            setTimeout(() => {
+              isCarouselAnimating = false;
+            }, Math.max(carouselDebounceMs, 220, contentDelay + 70));
+          });
         };
 
         const scheduleContent = document.querySelector('.schedule-content');

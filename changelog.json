@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.17",
+      "date": "2026-02-13",
+      "items": [
+        "fix: unify week-carousel geometry via shared --wc-* tokens and compute slot positions from one 4-dot spacing formula",
+        "fix: widen center gap and clamp morph target positions so the active oval remains centered and no longer overlaps adjacent dots",
+        "fix: stabilize week-switch animation pipeline with rAF-batched state commit, morph lock, and smoother enter/exit timing"
+      ]
+    },
+    {
       "version": "0.8.16",
       "date": "2026-02-13",
       "items": [
