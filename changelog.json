@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.22",
+      "date": "2026-02-13",
+      "items": [
+        "fix: enforce single-source carousel tokens with wc-mid-gap and oval height locked to dot size for stable 8px indicator geometry",
+        "fix: synchronize rail and indicator transform updates in one animation frame with device-pixel snapping to remove oval jitter",
+        "fix: add dynamic mid-split spacing classes for the two center-visible dots so the active oval no longer visually overlaps them"
+      ]
+    },
+    {
       "version": "0.8.21",
       "date": "2026-02-13",
       "items": [

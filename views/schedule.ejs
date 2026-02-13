@@ -2921,6 +2921,7 @@
       const carouselGeometry = {
         dotSize: 8,
         gap: 10,
+        midGap: 14,
         visibleCount: 5,
         rowHeight: 16,
         ovalWidth: 28,
@@ -2967,9 +2968,9 @@
         const rootStyles = window.getComputedStyle(document.documentElement);
         const dotSize = parseFloat(rootStyles.getPropertyValue('--wc-dot')) || 8;
         const gap = parseFloat(rootStyles.getPropertyValue('--wc-gap')) || 10;
+        const midGap = parseFloat(rootStyles.getPropertyValue('--wc-mid-gap')) || 14;
         const visibleCountToken = parseInt(rootStyles.getPropertyValue('--wc-visible'), 10) || 5;
         const rowHeight = parseFloat(rootStyles.getPropertyValue('--wc-row-h')) || 16;
-        const ovalHeight = parseFloat(rootStyles.getPropertyValue('--wc-oval-h')) || 8;
         const ovalWidth = parseFloat(rootStyles.getPropertyValue('--wc-oval-w')) || 28;
         const padX = parseFloat(rootStyles.getPropertyValue('--week-pad-x')) || 10;
         const padY = parseFloat(rootStyles.getPropertyValue('--week-pad-y')) || 4;
@@ -2979,10 +2980,13 @@
 
         carouselGeometry.dotSize = Number.isFinite(dotSize) ? dotSize : 8;
         carouselGeometry.gap = Number.isFinite(gap) ? gap : 10;
+        carouselGeometry.midGap = Number.isFinite(midGap) ? midGap : 14;
         carouselGeometry.visibleCount = Math.max(1, Number.isFinite(visibleCountToken) ? visibleCountToken : 5);
         carouselGeometry.rowHeight = Number.isFinite(rowHeight) ? rowHeight : 16;
-        carouselGeometry.ovalHeight = Number.isFinite(ovalHeight) ? ovalHeight : 8;
-        carouselGeometry.ovalWidth = Number.isFinite(ovalWidth) ? ovalWidth : 28;
+        carouselGeometry.ovalHeight = carouselGeometry.dotSize;
+        carouselGeometry.ovalWidth = Number.isFinite(ovalWidth)
+          ? ovalWidth
+          : ((carouselGeometry.dotSize * 3) + (carouselGeometry.gap * 2));
         carouselGeometry.step = carouselGeometry.dotSize + carouselGeometry.gap;
         carouselGeometry.railWindowWidth =
           (carouselGeometry.dotSize * carouselGeometry.visibleCount) +
@@ -3043,26 +3047,61 @@
         return alignToDevicePixel(clampValue(rawRailX, minRailX, maxRailX));
       }
 
-      function positionIndicator(animate = true) {
-        if (!weekActiveIndicator) return;
-        if (!animate) weekActiveIndicator.classList.add('no-motion');
+      function updateMidSplitDots(railX = carouselState.railX) {
+        const dots = getWeekDots();
+        if (!dots.length) return;
 
-        requestAnimationFrame(() => {
-          weekActiveIndicator.style.setProperty('--indicator-x', `${carouselGeometry.indicatorX}px`);
-          weekActiveIndicator.style.setProperty('--indicator-y', `${carouselGeometry.indicatorY}px`);
-          if (!animate) {
-            requestAnimationFrame(() => weekActiveIndicator.classList.remove('no-motion'));
+        const visibleIndices = [];
+        for (let index = 0; index < carouselState.totalCount; index += 1) {
+          const dotLeft = (index * carouselGeometry.step) + railX;
+          const dotRight = dotLeft + carouselGeometry.dotSize;
+          if (dotRight > 0 && dotLeft < carouselGeometry.railWindowWidth) {
+            visibleIndices.push(index);
+          }
+        }
+
+        const nonActiveVisible = visibleIndices.filter((index) => index !== carouselState.activeIndex);
+        const leftSplitPos = Math.floor((nonActiveVisible.length - 1) / 2);
+        const rightSplitPos = leftSplitPos + 1;
+        const leftSplitIndex = nonActiveVisible[leftSplitPos];
+        const rightSplitIndex = nonActiveVisible[rightSplitPos];
+        const halfShift = alignToDevicePixel((carouselGeometry.midGap || 14) / 2);
+
+        dots.forEach((dot, index) => {
+          dot.classList.remove('mid-split-left', 'mid-split-right');
+          dot.style.removeProperty('--week-dot-shift-x');
+          if (index === leftSplitIndex) {
+            dot.classList.add('mid-split-left');
+            dot.style.setProperty('--week-dot-shift-x', `${-halfShift}px`);
+          } else if (index === rightSplitIndex) {
+            dot.classList.add('mid-split-right');
+            dot.style.setProperty('--week-dot-shift-x', `${halfShift}px`);
           }
         });
       }
 
-      function applyRailTransform(railX, animate = true) {
-        if (!weekDotRail) return;
-        if (!animate) weekDotRail.classList.add('no-motion');
+      function applyCarouselFrame(railX, animate = true) {
+        if (!weekDotRail || !weekActiveIndicator) return;
+        const snappedRailX = alignToDevicePixel(railX);
+        const snappedIndicatorX = alignToDevicePixel(carouselGeometry.indicatorX);
+        const snappedIndicatorY = alignToDevicePixel(carouselGeometry.indicatorY);
+
+        if (!animate) {
+          weekDotRail.classList.add('no-motion');
+          weekActiveIndicator.classList.add('no-motion');
+        }
+
         requestAnimationFrame(() => {
-          weekDotRail.style.transform = `translate3d(${railX}px, 0, 0)`;
+          weekDotRail.style.transform = `translate3d(${snappedRailX}px, 0, 0)`;
+          weekActiveIndicator.style.setProperty('--indicator-x', `${snappedIndicatorX}px`);
+          weekActiveIndicator.style.setProperty('--indicator-y', `${snappedIndicatorY}px`);
+          updateMidSplitDots(snappedRailX);
+
           if (!animate) {
-            requestAnimationFrame(() => weekDotRail.classList.remove('no-motion'));
+            requestAnimationFrame(() => {
+              weekDotRail.classList.remove('no-motion');
+              weekActiveIndicator.classList.remove('no-motion');
+            });
           }
         });
       }
@@ -3131,10 +3170,7 @@
         weekDotRail?.addEventListener('transitionend', onRailTransitionEnd);
         carouselUnlockTimer = setTimeout(unlock, 240);
 
-        requestAnimationFrame(() => {
-          applyRailTransform(carouselState.railX, true);
-          positionIndicator(true);
-        });
+        applyCarouselFrame(carouselState.railX, true);
 
         setTimeout(() => {
           updateWeekContent();
@@ -3149,8 +3185,7 @@
         carouselState.activeIndex = clampValue(Number(week) - 1, 0, carouselState.totalCount - 1);
         setActiveDot(carouselState.activeIndex);
         carouselState.railX = computeRailX(carouselState.activeIndex);
-        positionIndicator(animate);
-        applyRailTransform(carouselState.railX, animate);
+        applyCarouselFrame(carouselState.railX, animate);
       }
 
       function animateWeekChange(nextWeek) {

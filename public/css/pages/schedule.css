@@ -18,10 +18,11 @@
   --week-rail-shift: 10px;
   --wc-dot: 8px;
   --wc-gap: 10px;
+  --wc-mid-gap: 14px;
   --wc-visible: 5;
   --wc-row-h: 16px;
-  --wc-oval-h: 8px;
-  --wc-oval-w: 28px;
+  --wc-oval-h: var(--wc-dot);
+  --wc-oval-w: calc(var(--wc-dot) * 3 + var(--wc-gap) * 2);
   --week-visible-count: var(--wc-visible);
   --week-dot-size: var(--wc-dot);
   --week-dot-gap: var(--wc-gap);
@@ -961,8 +962,11 @@ body.theme-light .deadline-meta {
   width: var(--week-active-width);
   border-radius: 999px;
   transform: translate3d(var(--indicator-x), var(--indicator-y), 0);
-  transition: transform 220ms var(--week-motion-curve);
-  will-change: transform;
+  transition:
+    transform 220ms var(--week-motion-curve),
+    width 220ms var(--week-motion-curve),
+    opacity 150ms ease-out;
+  will-change: transform, width, opacity;
   z-index: 1;
   pointer-events: none;
 }
@@ -1065,6 +1069,7 @@ body.theme-light .week-nav-btn:hover {
 }
 
 .week-dot {
+  --week-dot-shift-x: 0px;
   position: relative;
   z-index: 2;
   scroll-snap-align: none;
@@ -1085,11 +1090,19 @@ body.theme-light .week-nav-btn:hover {
   appearance: none;
   -webkit-appearance: none;
   opacity: 0.42;
-  transform: scale(1);
+  transform: translate3d(var(--week-dot-shift-x), 0, 0) scale(1);
   visibility: visible;
   transition: opacity 150ms ease-out, transform 150ms ease-out, background 150ms ease-out, visibility 0s linear 150ms;
   margin: 0;
   will-change: opacity, transform;
+}
+
+.week-dot.mid-split-left {
+  --week-dot-shift-x: calc(var(--wc-mid-gap) * -0.5);
+}
+
+.week-dot.mid-split-right {
+  --week-dot-shift-x: calc(var(--wc-mid-gap) * 0.5);
 }
 
 body.theme-light .week-dot {
@@ -1099,7 +1112,7 @@ body.theme-light .week-dot {
 .week-dot[data-active="true"],
 .week-dot.active {
   opacity: 0;
-  transform: scale(1);
+  transform: translate3d(var(--week-dot-shift-x), 0, 0) scale(1);
   background: transparent;
   box-shadow: none;
 }
@@ -1107,7 +1120,7 @@ body.theme-light .week-dot {
 .week-dot[data-visible="false"],
 .week-dot.is-window-hidden {
   opacity: 0;
-  transform: scale(0.95);
+  transform: translate3d(var(--week-dot-shift-x), 0, 0) scale(0.95);
   visibility: hidden;
   pointer-events: none;
 }
@@ -1115,7 +1128,7 @@ body.theme-light .week-dot {
 .week-dot[data-visible="true"],
 .week-dot.is-window-visible {
   opacity: 0.42;
-  transform: scale(1);
+  transform: translate3d(var(--week-dot-shift-x), 0, 0) scale(1);
   visibility: visible;
   transition-delay: 0ms, 0ms, 0ms, 0ms;
 }
