@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.8.21",
+      "date": "2026-02-13",
+      "items": [
+        "style: add static iOS-like edge fade mask to the week-dot window so dots softly fade near left/right bounds without affecting rail geometry"
+      ]
+    },
+    {
       "version": "0.8.20",
       "date": "2026-02-13",
       "items": [
