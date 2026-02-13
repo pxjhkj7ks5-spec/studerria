@@ -1112,24 +1112,28 @@ body.theme-light .week-dot {
   opacity: 0;
 }
 
+.week-dot[data-motion="exit-left"],
 .week-dot.is-exit-left {
   opacity: 0 !important;
-  transform: translateX(-12px) scale(0.95) !important;
+  transform: translateX(-6px) scale(0.96) !important;
 }
 
+.week-dot[data-motion="exit-right"],
 .week-dot.is-exit-right {
   opacity: 0 !important;
-  transform: translateX(12px) scale(0.95) !important;
+  transform: translateX(6px) scale(0.96) !important;
 }
 
+.week-dot[data-motion="enter-left"],
 .week-dot.is-enter-left {
   opacity: 0 !important;
-  transform: translateX(-12px) scale(0.95) !important;
+  transform: translateX(-6px) scale(0.96) !important;
 }
 
+.week-dot[data-motion="enter-right"],
 .week-dot.is-enter-right {
   opacity: 0 !important;
-  transform: translateX(12px) scale(0.95) !important;
+  transform: translateX(6px) scale(0.96) !important;
 }
 
 .week-dot.is-enter-active {

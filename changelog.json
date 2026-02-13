@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.18",
+      "date": "2026-02-13",
+      "items": [
+        "fix: add edge-biased 4-dot distribution logic (0/4, 1/3, 2/2, 3/1, 4/0) so week-carousel pins naturally near start/end",
+        "fix: rebuild visible week indices from left/right dot counts with bounded backfill to keep stable 4-slot nodes without jitter",
+        "fix: animate entering/exiting dots by old/new index diff and include directional edge-slot motion using data-motion attributes"
+      ]
+    },
+    {
       "version": "0.8.17",
       "date": "2026-02-13",
       "items": [
