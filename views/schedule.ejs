@@ -1615,7 +1615,7 @@
       <main class="container py-4 schedule-content enter">
         <div class="glass week-hero mb-4">
           <div>
-            <h1 class="hero-title mb-1"><%= t('schedule.header') %></h1>
+            <h1 class="hero-title weekHeadline mb-1"><%= t('schedule.header') %></h1>
             <div class="hero-sub" id="daily-phrase">Your rhythm, your focus — let’s make this week count.</div>
           </div>
           <div class="hero-actions">
@@ -1676,9 +1676,9 @@
               <span>Calm view of the week density without aggressive warning colors.</span>
             </div>
             <div class="density-chip-row">
-              <span class="density-chip" id="densityChipBalance" data-bs-toggle="tooltip" data-bs-placement="top">Day balance</span>
-              <span class="density-chip" id="densityChipEvening" data-bs-toggle="tooltip" data-bs-placement="top">Evening intensity</span>
-              <span class="density-chip" id="densityChipPeak" data-bs-toggle="tooltip" data-bs-placement="top">Most intense day</span>
+              <span class="density-chip chip" id="densityChipBalance" data-bs-toggle="tooltip" data-bs-placement="top">Day balance</span>
+              <span class="density-chip chip" id="densityChipEvening" data-bs-toggle="tooltip" data-bs-placement="top">Evening intensity</span>
+              <span class="density-chip chip" id="densityChipPeak" data-bs-toggle="tooltip" data-bs-placement="top">Most intense day</span>
             </div>
           </details>
         </section>
@@ -1719,14 +1719,14 @@
           <div class="card mb-3 glass day-card" data-day-date="<%= dayDates && dayDates[day] ? dayDates[day] : '' %>">
             <div class="day-header">
               <div class="day-title">
-                <span class="day-name"><%= day %></span>
+                <span class="day-name dayTitle"><%= day %></span>
                 <% if (dateLabel) { %>
-                  <span class="day-date"><%= dateLabel %></span>
+                  <span class="day-date dayDate"><%= dateLabel %></span>
                 <% } %>
               </div>
               <div class="day-indicators">
                 <% if (isDenseDay) { %>
-                  <span class="day-chip day-chip--primary">Dense day</span>
+                  <span class="day-chip day-chip--primary chip">Dense day</span>
                 <% } %>
                 <% if (hasOverlap) { %>
                   <button
@@ -1791,24 +1791,24 @@
                     <div class="schedule-card-inner">
                       <div class="schedule-main">
                         <div class="schedule-title-row">
-                          <div class="schedule-title"><%= subjectName %></div>
+                          <div class="schedule-title classSubject"><%= subjectName %></div>
                           <% if (showTypeBadge) { %>
                             <span class="lesson-pill"><%= typeLabel %></span>
                           <% } %>
                         </div>
-                        <div class="schedule-meta"><%= groupLabel %> · Пара <%= cls.class_number %><%= courseLabel %></div>
+                        <div class="schedule-meta classMeta"><%= groupLabel %> · Пара <%= cls.class_number %><%= courseLabel %></div>
                       </div>
                       <div class="schedule-aside">
-                        <div class="schedule-time"><%= timeLabel %></div>
+                        <div class="schedule-time classTime"><%= timeLabel %></div>
                         <div class="schedule-flags">
                           <% if (hwMeta && hwMeta.control) { %>
-                            <span class="control-chip">Контроль</span>
+                            <span class="control-chip chip">Контроль</span>
                           <% } %>
                           <% if (hwMeta) { %>
-                            <span class="hw-chip">ДЗ <%= hwMeta.count %></span>
+                            <span class="hw-chip chip">ДЗ <%= hwMeta.count %></span>
                           <% } %>
-                          <span class="schedule-chip chip-now">Зараз</span>
-                          <span class="schedule-chip chip-next">Далі</span>
+                          <span class="schedule-chip chip chip-now">Зараз</span>
+                          <span class="schedule-chip chip chip-next">Далі</span>
                         </div>
                       </div>
                     </div>
@@ -1852,9 +1852,9 @@
             <div class="card mb-3 glass day-card" data-day-date="<%= card.date || '' %>">
               <div class="day-header">
                 <div class="day-title">
-                  <span class="day-name"><%= card.day %></span>
+                  <span class="day-name dayTitle"><%= card.day %></span>
                   <% if (dateLabel) { %>
-                    <span class="day-date"><%= dateLabel %></span>
+                    <span class="day-date dayDate"><%= dateLabel %></span>
                   <% } %>
                 </div>
               </div>

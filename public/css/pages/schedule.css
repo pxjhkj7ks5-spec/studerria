@@ -1,4 +1,19 @@
 :root {
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+  --t-display: 22px;
+  --t-h1: 18px;
+  --t-h2: 16px;
+  --t-body: 14px;
+  --t-meta: 12px;
+  --t-chip: 12px;
+  --lh-tight: 1.2;
+  --lh-base: 1.35;
+  --lh-meta: 1.25;
+  --w-regular: 400;
+  --w-medium: 500;
+  --w-semibold: 600;
+  --trk-tight: 0.01em;
+  --trk-chip: 0.02em;
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
@@ -51,6 +66,21 @@
   --week-glass-dark-border: rgba(148, 163, 184, 0.36);
   --week-glass-light-bg: rgba(255, 255, 255, 0.82);
   --week-glass-light-border: rgba(148, 163, 184, 0.44);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--t-body);
+  line-height: var(--lh-base);
+  font-weight: var(--w-regular);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.topbar .navbar-brand {
+  font-size: var(--t-h1);
+  font-weight: var(--w-semibold);
+  letter-spacing: var(--trk-tight);
 }
 
 .topbar {
@@ -137,10 +167,11 @@ body.schedule-drawer-open .schedule-shell {
 }
 
 .drawer-title {
-  font-size: 0.78rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  font-weight: 600;
+  font-size: var(--t-meta);
+  letter-spacing: var(--trk-chip);
+  text-transform: none;
+  font-weight: var(--w-medium);
+  opacity: 0.72;
   color: rgba(148, 163, 184, 0.9);
 }
 
@@ -225,10 +256,27 @@ body.theme-dark .week-hero .hero-sub {
   color: rgba(226, 232, 240, 0.68);
 }
 
+.hero-title,
+.weekHeadline {
+  font-size: var(--t-h1);
+  font-weight: var(--w-semibold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--trk-tight);
+}
+
+.hero-sub {
+  font-size: var(--t-body);
+  line-height: var(--lh-base);
+  font-weight: var(--w-regular);
+  opacity: 0.68;
+}
+
 .badge-glow {
   background: linear-gradient(135deg, rgba(191, 219, 254, 0.9), rgba(196, 181, 253, 0.82));
   border: 1px solid rgba(147, 197, 253, 0.62);
   color: #16213b;
+  font-weight: var(--w-medium);
+  letter-spacing: var(--trk-chip);
   box-shadow: 0 8px 18px rgba(100, 116, 139, 0.12);
 }
 
@@ -276,9 +324,11 @@ body.theme-light .schedule-panel {
 }
 
 .panel-title {
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--t-meta);
+  letter-spacing: var(--trk-chip);
+  text-transform: none;
+  font-weight: var(--w-medium);
+  opacity: 0.72;
   color: rgba(148, 163, 184, 0.95);
 }
 
@@ -350,8 +400,9 @@ body.theme-light .density-summary {
 }
 
 .focus-toggle .toggle-text {
-  font-size: 0.84rem;
-  font-weight: 600;
+  font-size: var(--t-body);
+  font-weight: var(--w-medium);
+  line-height: var(--lh-base);
 }
 
 .density-summary {
@@ -365,8 +416,9 @@ body.theme-light .density-summary {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-1);
-  font-weight: 600;
-  font-size: 0.88rem;
+  font-weight: var(--w-medium);
+  font-size: var(--t-body);
+  line-height: var(--lh-base);
 }
 
 .density-summary summary::-webkit-details-marker {
@@ -374,14 +426,20 @@ body.theme-light .density-summary {
 }
 
 .density-summary-hint {
-  font-size: 0.74rem;
+  font-size: var(--t-meta);
+  font-weight: var(--w-regular);
+  line-height: var(--lh-meta);
+  opacity: 0.64;
   color: rgba(148, 163, 184, 0.95);
 }
 
 .density-summary-copy {
   margin-top: 6px;
+  font-size: var(--t-meta);
+  font-weight: var(--w-regular);
+  line-height: var(--lh-meta);
+  opacity: 0.66;
   color: rgba(148, 163, 184, 0.95);
-  font-size: 0.76rem;
 }
 
 .density-summary .density-chip-row {
@@ -412,11 +470,25 @@ body.theme-light .density-summary .density-chip-row {
   padding: 4px 10px;
   display: inline-flex;
   align-items: center;
-  font-size: 0.74rem;
-  font-weight: 600;
+  font-size: var(--t-chip);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--trk-chip);
+  line-height: 1;
   border: 1px solid hsl(var(--accent-h) var(--accent-s) 56% / calc(var(--chip-opacity) + 0.12));
   background: hsl(var(--accent-h) var(--accent-s) 56% / var(--chip-opacity));
   color: inherit;
+}
+
+.chip {
+  font-size: var(--t-chip);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--trk-chip);
+  line-height: 1;
+}
+
+.chip.is-uppercase {
+  letter-spacing: 0.04em;
+  opacity: 0.9;
 }
 
 .test-view-banner {
@@ -496,15 +568,21 @@ body.theme-light .day-card {
   gap: 2px;
 }
 
-.day-name {
-  font-size: 1.02rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.day-name,
+.dayTitle {
+  font-size: var(--t-display);
+  font-weight: var(--w-semibold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--trk-tight);
+  text-transform: none;
 }
 
-.day-date {
-  font-size: 0.78rem;
+.day-date,
+.dayDate {
+  font-size: var(--t-meta);
+  font-weight: var(--w-regular);
+  line-height: var(--lh-meta);
+  opacity: 0.75;
   color: var(--text-muted-dark);
 }
 
@@ -522,8 +600,10 @@ body.theme-light .day-date {
   border-radius: 999px;
   min-height: 22px;
   padding: 2px 8px;
-  font-size: 0.64rem;
-  font-weight: 600;
+  font-size: var(--t-chip);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--trk-chip);
+  line-height: 1;
   border: 1px solid transparent;
 }
 
@@ -629,10 +709,11 @@ body.theme-light .schedule-card {
   flex-wrap: wrap;
 }
 
-.schedule-title {
-  font-size: 0.98rem;
-  font-weight: 600;
-  line-height: 1.34;
+.schedule-title,
+.classSubject {
+  font-size: var(--t-h2);
+  font-weight: var(--w-semibold);
+  line-height: var(--lh-base);
 }
 
 .lesson-pill {
@@ -640,14 +721,21 @@ body.theme-light .schedule-card {
   border: 1px solid rgba(148, 163, 184, 0.34);
   background: rgba(148, 163, 184, 0.14);
   color: inherit;
-  font-size: 0.62rem;
-  font-weight: 500;
+  font-size: var(--t-meta);
+  font-weight: var(--w-medium);
+  line-height: var(--lh-meta);
+  letter-spacing: var(--trk-chip);
+  opacity: 0.82;
   padding: 2px 8px;
 }
 
-.schedule-meta {
+.schedule-meta,
+.classMeta {
   margin-top: 2px;
-  font-size: 0.76rem;
+  font-size: var(--t-meta);
+  font-weight: var(--w-medium);
+  line-height: var(--lh-meta);
+  opacity: 0.78;
   color: var(--text-muted-dark);
 }
 
@@ -662,10 +750,12 @@ body.theme-light .schedule-meta {
   gap: 6px;
 }
 
-.schedule-time {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+.schedule-time,
+.classTime {
+  font-size: var(--t-body);
+  font-weight: var(--w-medium);
+  line-height: var(--lh-base);
+  letter-spacing: var(--trk-tight);
   color: inherit;
 }
 
@@ -685,8 +775,10 @@ body.theme-light .schedule-meta {
   border: 1px solid rgba(148, 163, 184, 0.34);
   background: rgba(148, 163, 184, 0.14);
   color: inherit;
-  font-size: 0.64rem;
-  font-weight: 600;
+  font-size: var(--t-chip);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--trk-chip);
+  line-height: 1;
 }
 
 .schedule-chip {

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.40",
+      "date": "2026-02-13",
+      "items": [
+        "style: refactor schedule typography to Apple-like system stack with shared size/weight/line-height tokens (400/500/600 hierarchy only)",
+        "style: rebalance hierarchy for hero/day/subject/time/meta/chips and remove uppercase-heavy day headers for calmer visual rhythm",
+        "style: soften secondary system copy and align week-density/day/status chips to lighter medium-weight typography"
+      ]
+    },
+    {
       "version": "0.8.39",
       "date": "2026-02-13",
       "items": [
