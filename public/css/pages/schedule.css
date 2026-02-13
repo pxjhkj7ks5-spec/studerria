@@ -17,7 +17,7 @@
   --accent-s: 10%;
   --week-rail-shift: 10px;
   --week-slider-width: 108px;
-  --week-dot-size: 7px;
+  --week-dot-size: 8px;
   --week-dot-gap: 8px;
   --week-active-width: 28px;
   --week-motion-curve: cubic-bezier(0.22, 1, 0.36, 1);
@@ -838,6 +838,8 @@ body.theme-light .deadline-meta {
   overflow: visible;
   scroll-snap-type: none;
   scrollbar-width: none;
+  line-height: 0;
+  font-size: 0;
   width: var(--week-slider-width);
   min-width: var(--week-slider-width);
   max-width: var(--week-slider-width);
@@ -850,6 +852,7 @@ body.theme-light .deadline-meta {
 .week-window {
   position: relative;
   overflow: hidden;
+  line-height: 0;
   width: calc(var(--week-slider-width) - 20px);
   min-width: calc(var(--week-slider-width) - 20px);
   max-width: calc(var(--week-slider-width) - 20px);
@@ -895,9 +898,10 @@ body.theme-light .week-window::after {
   position: relative;
   display: flex;
   align-items: center;
+  line-height: 0;
   gap: var(--week-dot-gap);
   transform: translate3d(0, 0, 0);
-  transition: transform 200ms var(--week-motion-curve);
+  transition: transform 200ms ease-out;
   will-change: transform;
   contain: layout paint;
 }
@@ -965,6 +969,7 @@ body.theme-light .week-slider {
   appearance: none;
   -webkit-appearance: none;
   padding: 0;
+  line-height: 1;
   transition: transform var(--motion-fast), background var(--motion-fast);
 }
 
@@ -1010,9 +1015,13 @@ body.theme-light .week-nav-btn:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  line-height: 0;
+  font-size: 0;
+  appearance: none;
+  -webkit-appearance: none;
   opacity: 0.42;
   transform: scale(1);
-  transition: opacity 150ms var(--week-motion-curve), transform 150ms var(--week-motion-curve), background 150ms var(--week-motion-curve);
+  transition: opacity 150ms ease-out, transform 150ms ease-out, background 150ms ease-out;
   margin: 0;
   will-change: opacity, transform;
 }

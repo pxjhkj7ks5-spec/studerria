@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.09",
+      "date": "2026-02-13",
+      "items": [
+        "fix: lock week-carousel dot geometry to fixed 8px circles and remove baseline drift during transitions",
+        "fix: stabilize rail math using CSS token dimensions to avoid indicator misalignment and width jitter",
+        "fix: enforce transform-only rail movement with smooth 200/220/150ms timing and non-destructive dot fade windowing"
+      ]
+    },
+    {
       "version": "0.8.08",
       "date": "2026-02-13",
       "items": [

@@ -2944,20 +2944,20 @@
       }
 
       function measureWeekRail() {
-        const dots = getWeekDots();
-        if (!weekDotRail || !dots.length) return;
-        const firstDot = dots[0];
-        const dotRect = firstDot.getBoundingClientRect();
-        const railStyles = window.getComputedStyle(weekDotRail);
-        const gapValue = parseFloat(railStyles.gap || railStyles.columnGap || '0');
+        if (!weekDotRail) return;
         const rootStyles = window.getComputedStyle(document.documentElement);
+        const dotSize = parseFloat(rootStyles.getPropertyValue('--week-dot-size')) || 8;
+        const gapValue = parseFloat(rootStyles.getPropertyValue('--week-dot-gap')) || 8;
         const activeWidth = parseFloat(rootStyles.getPropertyValue('--week-active-width')) || 28;
-        weekState.dotSize = dotRect.width || 7;
+        weekState.dotSize = dotSize;
         weekState.gap = Number.isFinite(gapValue) ? gapValue : 8;
         weekState.pitch = weekState.dotSize + weekState.gap;
         weekState.activeWidth = activeWidth;
-        const totalWidth = dots.length > 0 ? (dots.length * weekState.pitch) - weekState.gap : 0;
-        weekDotRail.style.width = `${Math.max(0, totalWidth)}px`;
+        const totalWidth = totalWeeks > 0 ? (totalWeeks * weekState.pitch) - weekState.gap : 0;
+        const railWidth = `${Math.max(0, totalWidth)}px`;
+        weekDotRail.style.width = railWidth;
+        weekDotRail.style.minWidth = railWidth;
+        weekDotRail.style.maxWidth = railWidth;
       }
 
       function getWeekBounds(week) {
