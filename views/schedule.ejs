@@ -2836,6 +2836,7 @@
         edgeGapExtreme: 8,
         indicatorEdgeTravel: 8,
         contentShiftX: 2,
+        edgeContentNudge: 4,
         indicatorYOffset: -1,
         visibleCount: 5,
         rowHeight: 16,
@@ -2888,6 +2889,7 @@
         const edgeGap = parseFloat(rootStyles.getPropertyValue('--wc-edge-gap')) || 4;
         const edgeGapExtreme = parseFloat(rootStyles.getPropertyValue('--wc-edge-gap-extreme')) || 8;
         const contentShiftX = parseFloat(rootStyles.getPropertyValue('--wc-content-shift-x')) || 2;
+        const edgeContentNudge = parseFloat(rootStyles.getPropertyValue('--wc-edge-content-nudge')) || 4;
         const indicatorYOffset = parseFloat(rootStyles.getPropertyValue('--wc-indicator-y-shift')) || -1;
         const visibleCountToken = parseInt(rootStyles.getPropertyValue('--wc-visible'), 10) || 5;
         const rowHeight = parseFloat(rootStyles.getPropertyValue('--wc-row-h')) || 16;
@@ -2904,6 +2906,7 @@
         carouselGeometry.edgeGap = Number.isFinite(edgeGap) ? edgeGap : 4;
         carouselGeometry.edgeGapExtreme = Number.isFinite(edgeGapExtreme) ? edgeGapExtreme : 8;
         carouselGeometry.contentShiftX = Number.isFinite(contentShiftX) ? contentShiftX : 2;
+        carouselGeometry.edgeContentNudge = Number.isFinite(edgeContentNudge) ? edgeContentNudge : 4;
         carouselGeometry.indicatorYOffset = Number.isFinite(indicatorYOffset) ? indicatorYOffset : -1;
         carouselGeometry.visibleCount = Math.max(1, Number.isFinite(visibleCountToken) ? visibleCountToken : 5);
         carouselGeometry.rowHeight = Number.isFinite(rowHeight) ? rowHeight : 16;
@@ -2966,8 +2969,12 @@
         const safeIndex = clampValue(activeIndex, 0, Math.max(0, carouselState.totalCount - 1));
         const dotCenterX = (safeIndex * carouselGeometry.step) + (carouselGeometry.dotSize / 2);
         const rawRailX = (carouselGeometry.windowCenterX - dotCenterX) + (carouselGeometry.contentShiftX || 0);
-        const maxRailX = 0;
-        const minRailX = Math.min(0, carouselGeometry.railWindowWidth - carouselGeometry.totalDotsWidth);
+        const baseMaxRailX = 0;
+        const baseMinRailX = Math.min(0, carouselGeometry.railWindowWidth - carouselGeometry.totalDotsWidth);
+        const maxIndex = Math.max(0, carouselState.totalCount - 1);
+        const edgeNudge = Math.max(0, carouselGeometry.edgeContentNudge || 0);
+        const maxRailX = safeIndex === 0 ? (baseMaxRailX + edgeNudge) : baseMaxRailX;
+        const minRailX = safeIndex === maxIndex ? (baseMinRailX + edgeNudge) : baseMinRailX;
         return alignToDevicePixel(clampValue(rawRailX, minRailX, maxRailX));
       }
 
@@ -2975,10 +2982,11 @@
         const maxIndex = Math.max(0, carouselState.totalCount - 1);
         const safeIndex = clampValue(focusIndex, 0, maxIndex);
         const basePad = Math.max(0, carouselGeometry.indicatorEdgeTravel || 0);
+        const edgeNudge = Math.max(0, carouselGeometry.edgeContentNudge || 0);
         const leftPad = basePad;
         // On the last week we keep a tiny extra right allowance so the oval
         // fully settles at the edge and does not visually crop.
-        const rightPad = safeIndex === maxIndex ? (basePad + 2) : basePad;
+        const rightPad = safeIndex === maxIndex ? (basePad + 2 + edgeNudge) : basePad;
 
         return {
           minX: -leftPad,

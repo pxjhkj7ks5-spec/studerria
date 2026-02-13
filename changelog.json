@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.38",
+      "date": "2026-02-13",
+      "items": [
+        "fix: add dedicated edge-content nudge token and apply it to first/last rail clamp bounds so dots and oval shift right together on extreme weeks",
+        "fix: extend last-week indicator right bound by edge nudge to prevent oval clipping while preserving existing animation flow"
+      ]
+    },
+    {
       "version": "0.8.37",
       "date": "2026-02-13",
       "items": [
