@@ -3091,8 +3091,12 @@
         const centerDotIndex = getCenterDotIndex(railX, indicatorX);
         const leftCandidates = visibleIndices.filter((index) => index < centerDotIndex);
         const rightCandidates = visibleIndices.filter((index) => index > centerDotIndex);
-        const leftSplitIndex = leftCandidates.length ? leftCandidates[leftCandidates.length - 1] : null;
-        const rightSplitIndex = rightCandidates.length ? rightCandidates[0] : null;
+        // Keep split symmetric around the indicator. On edge-pinned states
+        // (no candidates on one side) disable one-sided split to avoid
+        // visual dead-space between oval and nearest dot.
+        const hasBalancedSides = leftCandidates.length > 0 && rightCandidates.length > 0;
+        const leftSplitIndex = hasBalancedSides ? leftCandidates[leftCandidates.length - 1] : null;
+        const rightSplitIndex = hasBalancedSides ? rightCandidates[0] : null;
         const halfShift = alignToDevicePixel((carouselGeometry.midGap || 14) / 2);
 
         dots.forEach((dot, index) => {

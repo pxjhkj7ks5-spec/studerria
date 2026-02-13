@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.27",
+      "date": "2026-02-13",
+      "items": [
+        "fix: disable one-sided week-dot mid-split on edge-pinned states so nearest dots no longer get pushed away from the active oval",
+        "fix: keep center-gap split only when both sides exist around indicator, improving first/last week transition consistency"
+      ]
+    },
+    {
       "version": "0.8.26",
       "date": "2026-02-13",
       "items": [
