@@ -1143,12 +1143,6 @@ body.theme-light .week-dot {
   opacity: 0;
 }
 
-.week-dot.is-morph-grow {
-  z-index: 3;
-  opacity: 0.58 !important;
-  transform: translate3d(var(--week-dot-shift-x), 0, 0) scale(calc(var(--wc-oval-w) / var(--wc-dot)), 1) !important;
-}
-
 .week-dot[data-motion="exit-left"],
 .week-dot.is-exit-left {
   opacity: 0 !important;

@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.25",
+      "date": "2026-02-13",
+      "items": [
+        "fix: remove target-dot stretch morph so switching dots no longer visually fly into the center oval during rail movement",
+        "fix: move oval re-expand phase to transition-end timing so morph remains synchronized with the rail finish instead of ending early"
+      ]
+    },
+    {
       "version": "0.8.24",
       "date": "2026-02-13",
       "items": [

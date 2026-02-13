@@ -2947,8 +2947,7 @@
       let carouselDebounceUntil = 0;
       const carouselDebounceMs = 250;
       let carouselUnlockTimer = null;
-      let carouselMorphHalfTimer = null;
-      let carouselMorphTargetDot = null;
+      let carouselMorphPhaseTimer = null;
 
       function clampValue(value, min, max) {
         return Math.max(min, Math.min(max, value));
@@ -3141,16 +3140,12 @@
       }
 
       function clearMorphState() {
-        if (carouselMorphHalfTimer) {
-          clearTimeout(carouselMorphHalfTimer);
-          carouselMorphHalfTimer = null;
+        if (carouselMorphPhaseTimer) {
+          clearTimeout(carouselMorphPhaseTimer);
+          carouselMorphPhaseTimer = null;
         }
         if (weekActiveIndicator) {
           weekActiveIndicator.classList.remove('is-morph-shrink');
-        }
-        if (carouselMorphTargetDot) {
-          carouselMorphTargetDot.classList.remove('is-morph-grow');
-          carouselMorphTargetDot = null;
         }
       }
 
@@ -3185,18 +3180,6 @@
         if (weekActiveIndicator) {
           weekActiveIndicator.classList.add('is-morph-shrink');
         }
-        carouselMorphTargetDot = getWeekDots()[safeTarget] || null;
-        if (carouselMorphTargetDot) {
-          carouselMorphTargetDot.classList.add('is-morph-grow');
-        }
-        carouselMorphHalfTimer = setTimeout(() => {
-          if (weekActiveIndicator) {
-            weekActiveIndicator.classList.remove('is-morph-shrink');
-          }
-          if (carouselMorphTargetDot) {
-            carouselMorphTargetDot.classList.remove('is-morph-grow');
-          }
-        }, 120);
 
         const scheduleContent = document.querySelector('.schedule-content');
         if (scheduleContent) {
@@ -3205,13 +3188,21 @@
 
         const unlock = () => {
           if (!isCarouselAnimating) return;
-          isCarouselAnimating = false;
-          clearMorphState();
+          clearCarouselUnlockTimer();
+          weekDotRail?.removeEventListener('transitionend', onRailTransitionEnd);
+
+          if (weekActiveIndicator) {
+            weekActiveIndicator.classList.remove('is-morph-shrink');
+          }
           carouselState.activeIndex = safeTarget;
           setActiveDot(safeTarget);
           updateMidSplitDots(carouselState.railX);
-          clearCarouselUnlockTimer();
-          weekDotRail?.removeEventListener('transitionend', onRailTransitionEnd);
+
+          carouselMorphPhaseTimer = setTimeout(() => {
+            if (!isCarouselAnimating) return;
+            isCarouselAnimating = false;
+            clearMorphState();
+          }, 140);
         };
 
         const onRailTransitionEnd = (event) => {
