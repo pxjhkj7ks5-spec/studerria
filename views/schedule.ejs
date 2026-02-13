@@ -2833,6 +2833,7 @@
         gap: 10,
         midGap: 14,
         edgeGap: 4,
+        edgeGapExtreme: 8,
         indicatorEdgeTravel: 8,
         visibleCount: 5,
         rowHeight: 16,
@@ -2883,6 +2884,7 @@
         const gap = parseFloat(rootStyles.getPropertyValue('--wc-gap')) || 10;
         const midGap = parseFloat(rootStyles.getPropertyValue('--wc-mid-gap')) || 14;
         const edgeGap = parseFloat(rootStyles.getPropertyValue('--wc-edge-gap')) || 4;
+        const edgeGapExtreme = parseFloat(rootStyles.getPropertyValue('--wc-edge-gap-extreme')) || 8;
         const visibleCountToken = parseInt(rootStyles.getPropertyValue('--wc-visible'), 10) || 5;
         const rowHeight = parseFloat(rootStyles.getPropertyValue('--wc-row-h')) || 16;
         const ovalWidth = parseFloat(rootStyles.getPropertyValue('--wc-oval-w')) || 28;
@@ -2896,6 +2898,7 @@
         carouselGeometry.gap = Number.isFinite(gap) ? gap : 10;
         carouselGeometry.midGap = Number.isFinite(midGap) ? midGap : 14;
         carouselGeometry.edgeGap = Number.isFinite(edgeGap) ? edgeGap : 4;
+        carouselGeometry.edgeGapExtreme = Number.isFinite(edgeGapExtreme) ? edgeGapExtreme : 8;
         carouselGeometry.visibleCount = Math.max(1, Number.isFinite(visibleCountToken) ? visibleCountToken : 5);
         carouselGeometry.rowHeight = Number.isFinite(rowHeight) ? rowHeight : 16;
         carouselGeometry.ovalHeight = carouselGeometry.dotSize;
@@ -3081,7 +3084,11 @@
           // between oval and nearest dots when width/step are near-equal.
           leftSplitIndex = nearestLeftIndex;
           rightSplitIndex = nearestRightIndex;
-          halfShift = alignToDevicePixel((carouselGeometry.edgeGap || 4) / 2);
+          const isExtremeEdge = leftCandidates.length === 0 || rightCandidates.length === 0;
+          const edgeGap = isExtremeEdge
+            ? (carouselGeometry.edgeGapExtreme || carouselGeometry.edgeGap || 8)
+            : (carouselGeometry.edgeGap || 4);
+          halfShift = alignToDevicePixel(edgeGap / 2);
         }
 
         dots.forEach((dot, index) => {

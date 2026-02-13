@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.34",
+      "date": "2026-02-13",
+      "items": [
+        "fix: add extreme-edge carousel gap token and apply stronger nearest-dot clearance in 0+4 and 4+0 states",
+        "fix: keep moderate edge clearance for 1+3 and 3+1 states while preserving existing balanced 2+2 split behavior"
+      ]
+    },
+    {
       "version": "0.8.33",
       "date": "2026-02-13",
       "items": [
