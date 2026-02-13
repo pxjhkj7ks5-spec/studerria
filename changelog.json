@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.29",
+      "date": "2026-02-13",
+      "items": [
+        "fix: enforce edge-biased week-dot visibility distribution (0/4, 1/3, 2/2, 3/1, 4/0) around active oval",
+        "fix: align visible-dot selection with clipped rail window so near-edge states keep expected left/right counts consistently"
+      ]
+    },
+    {
       "version": "0.8.28",
       "date": "2026-02-13",
       "items": [
