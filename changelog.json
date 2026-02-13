@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.8.19",
+      "date": "2026-02-13",
+      "items": [
+        "fix: resolve schedule.ejs compile error (Unexpected token else) by merging week-carousel edge-count else-if chain into a single EJS scriptlet block"
+      ]
+    },
+    {
       "version": "0.8.18",
       "date": "2026-02-13",
       "items": [

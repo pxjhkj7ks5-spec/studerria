@@ -1991,11 +1991,11 @@
           <% if (weekTotal <= visibleDots) { %>
             <% initialVisibleIndices = Array.from({ length: visibleDots }, (_, i) => i); %>
           <% } else { %>
-            <% let leftDots = 2; let rightDots = 2; %>
-            <% if (currentIndex === 0) { leftDots = 0; rightDots = 4; } %>
-            <% else if (currentIndex === 1) { leftDots = 1; rightDots = 3; } %>
-            <% else if (currentIndex === weekTotal - 2) { leftDots = 3; rightDots = 1; } %>
-            <% else if (currentIndex === weekTotal - 1) { leftDots = 4; rightDots = 0; } %>
+            <% let leftDots = 2; let rightDots = 2;
+               if (currentIndex === 0) { leftDots = 0; rightDots = 4; }
+               else if (currentIndex === 1) { leftDots = 1; rightDots = 3; }
+               else if (currentIndex === weekTotal - 2) { leftDots = 3; rightDots = 1; }
+               else if (currentIndex === weekTotal - 1) { leftDots = 4; rightDots = 0; } %>
 
             <% const left = []; %>
             <% for (let k = leftDots; k >= 1; k--) { left.push(currentIndex - k); } %>
