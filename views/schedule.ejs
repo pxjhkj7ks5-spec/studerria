@@ -1979,19 +1979,20 @@
       <div class="week-rail" id="weekRail">
         <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
         <div class="week-slider" id="weekSlider">
+          <div class="week-indicator-layer" id="weekIndicatorLayer" aria-hidden="true">
+            <span class="week-active-indicator" id="weekActiveIndicator" aria-hidden="true"></span>
+          </div>
           <div class="week-window" id="weekWindow">
             <div class="week-dot-rail" id="weekDotRail" role="tablist" aria-label="Week selector">
-              <span class="week-active-indicator" id="weekActiveIndicator" aria-hidden="true"></span>
           <% const weekTotal = totalWeeks || 15; %>
+          <% const visibleDots = 7; %>
           <% let visibleMin = 1; let visibleMax = weekTotal; %>
-          <% if (weekTotal > 5) { %>
-            <% if (currentWeek === 1) { %>
-              <% visibleMin = 1; visibleMax = Math.min(weekTotal, 3); %>
-            <% } else if (currentWeek === weekTotal) { %>
-              <% visibleMin = Math.max(1, weekTotal - 2); visibleMax = weekTotal; %>
-            <% } else { %>
-              <% visibleMin = Math.max(1, currentWeek - 2); visibleMax = Math.min(weekTotal, currentWeek + 2); %>
-            <% } %>
+          <% if (weekTotal > visibleDots) { %>
+            <% const visibleHalf = Math.floor(visibleDots / 2); %>
+            <% const maxVisibleStart = Math.max(1, weekTotal - visibleDots + 1); %>
+            <% const visibleStart = Math.max(1, Math.min(currentWeek - visibleHalf, maxVisibleStart)); %>
+            <% visibleMin = visibleStart; %>
+            <% visibleMax = Math.min(weekTotal, visibleStart + visibleDots - 1); %>
           <% } %>
           <% for (let w = 1; w <= weekTotal; w++) { %>
             <% const dotHidden = w < visibleMin || w > visibleMax; %>
@@ -2875,6 +2876,7 @@
       const weekSlider = document.getElementById('weekSlider');
       const weekWindow = document.getElementById('weekWindow');
       const weekDotRail = document.getElementById('weekDotRail');
+      const weekIndicatorLayer = document.getElementById('weekIndicatorLayer');
       const weekActiveIndicator = document.getElementById('weekActiveIndicator');
       const messagesBtn = document.getElementById('messagesBtn');
       const messagesBtnMobile = document.getElementById('messagesBtnMobile');
@@ -2926,45 +2928,102 @@
         if (window.innerWidth < 992) {
           setDrawerOpen(false);
         }
-        syncWeekCarousel(currentWeek, { animate: false, morph: false });
+        syncWeekCarousel(currentWeek, { animate: false, morph: false, direction: 0 });
       });
 
       const weekState = {
-        visibleCount: 5,
-        dotSize: 7,
-        gap: 8,
-        pitch: 15,
-        activeWidth: 28,
+        visibleCount: 7,
+        dotSize: 8,
+        gap: 10,
+        pitch: 18,
+        rowHeight: 16,
+        ovalWidth: 28,
+        ovalHeight: 8,
+        railWindowWidth: 0,
+        totalDotsWidth: 0,
+        translateX: 0,
+        lastDirection: 0,
+        lookAheadDots: 2,
+        ovalSideDots: 1,
         morphTimer: null,
       };
+
+      function clampValue(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      // Carousel findings before this refactor:
+      // 1) Dot token was already 8px, but spacing drift came from mixed token math and unclamped translate.
+      // 2) Right-side blank area appeared because rail translate used start*pitch without maxTranslate clamp.
+      // 3) Indicator clipping happened because the oval lived inside the overflow-hidden dot window.
+      function readWeekGeometryTokens() {
+        if (!weekDotRail || !weekSlider || !weekWindow) return;
+        const rootStyles = window.getComputedStyle(document.documentElement);
+        const dotSize = parseFloat(rootStyles.getPropertyValue('--week-dot-size')) || 8;
+        const gapValue = parseFloat(rootStyles.getPropertyValue('--week-dot-gap')) || 10;
+        const visibleCount = parseInt(rootStyles.getPropertyValue('--week-visible-count'), 10) || 7;
+        const rowHeight = parseFloat(rootStyles.getPropertyValue('--week-row-height')) || 16;
+        const ovalHeight = parseFloat(rootStyles.getPropertyValue('--week-active-height')) || 8;
+        const ovalWidth = parseFloat(rootStyles.getPropertyValue('--week-active-width')) || 28;
+        const padX = parseFloat(rootStyles.getPropertyValue('--week-pad-x')) || 10;
+        const padY = parseFloat(rootStyles.getPropertyValue('--week-pad-y')) || 4;
+
+        weekState.dotSize = dotSize;
+        weekState.gap = Number.isFinite(gapValue) ? gapValue : 10;
+        weekState.visibleCount = Math.max(1, Math.min(visibleCount, totalWeeks || visibleCount));
+        weekState.rowHeight = rowHeight;
+        weekState.ovalHeight = ovalHeight;
+        weekState.ovalWidth = ovalWidth;
+        weekState.pitch = weekState.dotSize + weekState.gap;
+        weekState.railWindowWidth = (weekState.visibleCount * weekState.dotSize) + ((weekState.visibleCount - 1) * weekState.gap);
+        weekState.totalDotsWidth = totalWeeks > 0
+          ? (totalWeeks * weekState.dotSize) + ((totalWeeks - 1) * weekState.gap)
+          : 0;
+
+        const railWidth = `${Math.max(0, weekState.totalDotsWidth)}px`;
+        weekDotRail.style.width = railWidth;
+        weekDotRail.style.minWidth = railWidth;
+        weekDotRail.style.maxWidth = railWidth;
+
+        const windowWidth = `${Math.max(0, weekState.railWindowWidth)}px`;
+        weekWindow.style.width = windowWidth;
+        weekWindow.style.minWidth = windowWidth;
+        weekWindow.style.maxWidth = windowWidth;
+
+        if (weekIndicatorLayer) {
+          weekIndicatorLayer.style.width = windowWidth;
+          weekIndicatorLayer.style.minWidth = windowWidth;
+          weekIndicatorLayer.style.maxWidth = windowWidth;
+          weekIndicatorLayer.style.height = `${weekState.rowHeight}px`;
+          weekIndicatorLayer.style.minHeight = `${weekState.rowHeight}px`;
+          weekIndicatorLayer.style.maxHeight = `${weekState.rowHeight}px`;
+          weekIndicatorLayer.style.left = `${padX}px`;
+          weekIndicatorLayer.style.top = `${padY}px`;
+        }
+      }
 
       function getWeekDots() {
         if (!weekDotRail) return [];
         return Array.from(weekDotRail.querySelectorAll('.week-dot'));
       }
 
-      function measureWeekRail() {
-        if (!weekDotRail) return;
-        const rootStyles = window.getComputedStyle(document.documentElement);
-        const dotSize = parseFloat(rootStyles.getPropertyValue('--week-dot-size')) || 8;
-        const gapValue = parseFloat(rootStyles.getPropertyValue('--week-dot-gap')) || 8;
-        const activeWidth = parseFloat(rootStyles.getPropertyValue('--week-active-width')) || 28;
-        weekState.dotSize = dotSize;
-        weekState.gap = Number.isFinite(gapValue) ? gapValue : 8;
-        weekState.pitch = weekState.dotSize + weekState.gap;
-        weekState.activeWidth = activeWidth;
-        const totalWidth = totalWeeks > 0 ? (totalWeeks * weekState.pitch) - weekState.gap : 0;
-        const railWidth = `${Math.max(0, totalWidth)}px`;
-        weekDotRail.style.width = railWidth;
-        weekDotRail.style.minWidth = railWidth;
-        weekDotRail.style.maxWidth = railWidth;
-      }
-
-      function getWeekBounds(week) {
-        const weekIndex = Math.max(0, Math.min(totalWeeks - 1, Number(week) - 1));
+      function getWeekBounds(week, direction = 0) {
+        const weekIndex = clampValue(Number(week) - 1, 0, Math.max(0, totalWeeks - 1));
         const visibleCount = Math.max(1, Math.min(weekState.visibleCount, totalWeeks));
         const maxStart = Math.max(0, totalWeeks - visibleCount);
-        const start = Math.max(0, Math.min(maxStart, weekIndex - Math.floor(visibleCount / 2)));
+        const centeredStart = weekIndex - Math.floor(visibleCount / 2);
+        const aheadNeeded = weekState.lookAheadDots + weekState.ovalSideDots;
+
+        let preferredStart = centeredStart;
+        if (direction > 0) {
+          const minForwardStart = weekIndex - (visibleCount - 1 - aheadNeeded);
+          preferredStart = Math.max(preferredStart, minForwardStart);
+        } else if (direction < 0) {
+          const maxBackwardStart = weekIndex - aheadNeeded;
+          preferredStart = Math.min(preferredStart, maxBackwardStart);
+        }
+
+        const start = clampValue(preferredStart, 0, maxStart);
         const end = Math.min(totalWeeks - 1, start + visibleCount - 1);
         return { weekIndex, start, end };
       }
@@ -2982,19 +3041,24 @@
       }
 
       function setWeekWindow(week, options = {}) {
-        const { animate = true } = options;
+        const { animate = true, direction = 0 } = options;
         const dots = getWeekDots();
         if (!weekDotRail || !dots.length) return;
-        const { start, end } = getWeekBounds(week);
+        const { start, end } = getWeekBounds(week, direction);
         if (!animate) weekDotRail.classList.add('no-motion');
-        const offset = -(start * weekState.pitch);
-        weekDotRail.style.transform = `translate3d(${offset}px, 0, 0)`;
+
+        const rawTranslate = start * weekState.pitch;
+        const maxTranslate = Math.max(0, weekState.totalDotsWidth - weekState.railWindowWidth);
+        weekState.translateX = clampValue(rawTranslate, 0, maxTranslate);
+        weekDotRail.style.transform = `translate3d(${-weekState.translateX}px, 0, 0)`;
+
         dots.forEach((dot, index) => {
           const visible = index >= start && index <= end;
           dot.classList.toggle('is-window-visible', visible);
           dot.classList.toggle('is-window-hidden', !visible);
           dot.tabIndex = visible ? 0 : -1;
         });
+
         if (!animate) {
           requestAnimationFrame(() => weekDotRail.classList.remove('no-motion'));
         }
@@ -3003,29 +3067,41 @@
       function moveWeekIndicator(activeIndex, options = {}) {
         const { animate = true, morph = false } = options;
         if (!weekActiveIndicator) return;
+
         if (!animate) weekActiveIndicator.classList.add('no-motion');
-        const center = (activeIndex * weekState.pitch) + (weekState.dotSize / 2);
-        weekActiveIndicator.style.setProperty('--indicator-center', `${center}px`);
+
+        const centerX = (activeIndex * weekState.pitch) + (weekState.dotSize / 2) - weekState.translateX;
+        const y = Math.max(0, (weekState.rowHeight - weekState.ovalHeight) / 2);
+        const ovalX = centerX - (weekState.ovalWidth / 2);
+        const dotX = centerX - (weekState.dotSize / 2);
+
         if (morph) {
           weekActiveIndicator.classList.add('is-moving');
+          weekActiveIndicator.style.setProperty('--indicator-x', `${dotX}px`);
+          weekActiveIndicator.style.setProperty('--indicator-y', `${y}px`);
           if (weekState.morphTimer) clearTimeout(weekState.morphTimer);
           weekState.morphTimer = setTimeout(() => {
             weekActiveIndicator.classList.remove('is-moving');
+            weekActiveIndicator.style.setProperty('--indicator-x', `${ovalX}px`);
+            weekActiveIndicator.style.setProperty('--indicator-y', `${y}px`);
           }, 220);
         } else {
           weekActiveIndicator.classList.remove('is-moving');
+          weekActiveIndicator.style.setProperty('--indicator-x', `${ovalX}px`);
+          weekActiveIndicator.style.setProperty('--indicator-y', `${y}px`);
         }
+
         if (!animate) {
           requestAnimationFrame(() => weekActiveIndicator.classList.remove('no-motion'));
         }
       }
 
       function syncWeekCarousel(week, options = {}) {
-        const { animate = true, morph = false } = options;
+        const { animate = true, morph = false, direction = 0 } = options;
         if (!weekSlider || !weekDotRail || !weekWindow) return;
-        measureWeekRail();
+        readWeekGeometryTokens();
         const activeIndex = setWeekActiveState(week);
-        setWeekWindow(week, { animate });
+        setWeekWindow(week, { animate, direction });
         moveWeekIndicator(activeIndex, { animate, morph });
       }
 
@@ -3037,12 +3113,14 @@
       }
       function animateWeekChange(nextWeek) {
         const safe = Math.max(1, Math.min(totalWeeks, nextWeek));
+        const direction = safe === currentWeek ? weekState.lastDirection : (safe > currentWeek ? 1 : -1);
         if (safe === currentWeek) {
-          syncWeekCarousel(currentWeek, { animate: true, morph: false });
+          syncWeekCarousel(currentWeek, { animate: true, morph: false, direction });
           return;
         }
+        weekState.lastDirection = direction;
         currentWeek = safe;
-        syncWeekCarousel(safe, { animate: true, morph: true });
+        syncWeekCarousel(safe, { animate: true, morph: true, direction });
         const scheduleContent = document.querySelector('.schedule-content');
         if (scheduleContent) {
           scheduleContent.classList.add('is-exiting');
@@ -3074,7 +3152,7 @@
           if (delta < 0) animateWeekChange(currentWeek + 1);
           if (delta > 0) animateWeekChange(currentWeek - 1);
         });
-        syncWeekCarousel(currentWeek, { animate: false, morph: false });
+        syncWeekCarousel(currentWeek, { animate: false, morph: false, direction: weekState.lastDirection });
       }
 
       if (messagesBtnMobile) {

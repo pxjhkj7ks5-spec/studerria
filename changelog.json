@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.10",
+      "date": "2026-02-13",
+      "items": [
+        "fix: rebuild week-carousel geometry from single 8px/10px dot-gap tokens with explicit rail/window width math and translate clamping",
+        "fix: move active oval to a separate overlay layer and center it by row-height math so it no longer drifts or clips at edges",
+        "fix: stabilize near-edge pin behavior with constant 7-dot windowing, direction-aware bounds, and smooth non-destructive dot fade transitions"
+      ]
+    },
+    {
       "version": "0.8.09",
       "date": "2026-02-13",
       "items": [

@@ -16,10 +16,16 @@
   --accent-h: 210;
   --accent-s: 10%;
   --week-rail-shift: 10px;
-  --week-slider-width: 108px;
   --week-dot-size: 8px;
-  --week-dot-gap: 8px;
+  --week-dot-gap: 10px;
+  --week-visible-count: 7;
+  --week-row-height: 16px;
+  --week-active-height: 8px;
   --week-active-width: 28px;
+  --week-pad-x: 10px;
+  --week-pad-y: 4px;
+  --week-window-width: calc((var(--week-visible-count) * var(--week-dot-size)) + ((var(--week-visible-count) - 1) * var(--week-dot-gap)));
+  --week-slider-width: calc(var(--week-window-width) + (var(--week-pad-x) * 2));
   --week-motion-curve: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -843,19 +849,42 @@ body.theme-light .deadline-meta {
   width: var(--week-slider-width);
   min-width: var(--week-slider-width);
   max-width: var(--week-slider-width);
-  padding: 8px 10px;
-  backdrop-filter: none;
+  height: calc(var(--week-row-height) + (var(--week-pad-y) * 2));
+  min-height: calc(var(--week-row-height) + (var(--week-pad-y) * 2));
+  max-height: calc(var(--week-row-height) + (var(--week-pad-y) * 2));
+  padding: var(--week-pad-y) var(--week-pad-x);
+  backdrop-filter: blur(12px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  contain: layout paint;
+}
+
+.week-indicator-layer {
+  position: absolute;
+  left: var(--week-pad-x);
+  top: var(--week-pad-y);
+  width: var(--week-window-width);
+  min-width: var(--week-window-width);
+  max-width: var(--week-window-width);
+  height: var(--week-row-height);
+  min-height: var(--week-row-height);
+  max-height: var(--week-row-height);
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1;
   contain: layout paint;
 }
 
 .week-window {
   position: relative;
+  z-index: 2;
   overflow: hidden;
   line-height: 0;
-  width: calc(var(--week-slider-width) - 20px);
-  min-width: calc(var(--week-slider-width) - 20px);
-  max-width: calc(var(--week-slider-width) - 20px);
+  width: var(--week-window-width);
+  min-width: var(--week-window-width);
+  max-width: var(--week-window-width);
+  height: var(--week-row-height);
+  min-height: var(--week-row-height);
+  max-height: var(--week-row-height);
   contain: layout paint;
 }
 
@@ -898,6 +927,7 @@ body.theme-light .week-window::after {
   position: relative;
   display: flex;
   align-items: center;
+  height: var(--week-row-height);
   line-height: 0;
   gap: var(--week-dot-gap);
   transform: translate3d(0, 0, 0);
@@ -911,14 +941,15 @@ body.theme-light .week-window::after {
 }
 
 .week-active-indicator {
-  --indicator-center: 0px;
+  --indicator-x: 0px;
+  --indicator-y: 0px;
   position: absolute;
-  top: 50%;
   left: 0;
-  height: 8px;
+  top: 0;
+  height: var(--week-active-height);
   width: var(--week-active-width);
   border-radius: 999px;
-  transform: translate3d(var(--indicator-center), -50%, 0) translateX(-50%);
+  transform: translate3d(var(--indicator-x), var(--indicator-y), 0);
   transition: transform 220ms var(--week-motion-curve), width 220ms var(--week-motion-curve);
   will-change: transform, width;
   z-index: 1;
@@ -946,13 +977,13 @@ body.theme-light .week-active-indicator {
 }
 
 body.theme-dark .week-slider {
-  background: rgba(10, 16, 25, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.26);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 body.theme-light .week-slider {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.42);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.68));
+  border: 1px solid rgba(148, 163, 184, 0.34);
 }
 
 .week-nav-btn {
@@ -1031,10 +1062,6 @@ body.theme-light .week-dot {
 }
 
 .week-dot.active {
-  width: var(--week-dot-size);
-  min-width: var(--week-dot-size);
-  height: var(--week-dot-size);
-  min-height: var(--week-dot-size);
   opacity: 0;
   transform: scale(1);
   background: transparent;
