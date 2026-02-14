@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.49",
+      "date": "2026-02-14",
+      "items": [
+        "ux: add shared modal behavior helper in design-system.js to consistently close the top visible modal on Escape",
+        "ux: support closing the top visible modal by clicking the backdrop area (while respecting static backdrop configuration)",
+        "a11y: restore keyboard focus to the original modal trigger after the modal closes for better navigation flow"
+      ]
+    },
+    {
       "version": "0.8.48",
       "date": "2026-02-13",
       "items": [

@@ -133,11 +133,105 @@
     });
   }
 
+  function getTopVisibleModal() {
+    const visibleModals = document.querySelectorAll('.modal.show');
+    return visibleModals.length ? visibleModals[visibleModals.length - 1] : null;
+  }
+
+  function initModalBehavior() {
+    if (!window.bootstrap || !window.bootstrap.Modal) {
+      return;
+    }
+
+    const modalTriggerMap = new WeakMap();
+
+    document.addEventListener('show.bs.modal', (event) => {
+      const modal = event.target;
+      if (!(modal instanceof HTMLElement) || !modal.classList.contains('modal')) {
+        return;
+      }
+
+      const relatedTarget = event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
+      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const trigger = relatedTarget || activeElement;
+
+      if (trigger && trigger !== document.body && trigger !== modal && !modal.contains(trigger)) {
+        modalTriggerMap.set(modal, trigger);
+      }
+    });
+
+    document.addEventListener('hidden.bs.modal', (event) => {
+      const modal = event.target;
+      if (!(modal instanceof HTMLElement) || !modal.classList.contains('modal')) {
+        return;
+      }
+
+      const trigger = modalTriggerMap.get(modal);
+      modalTriggerMap.delete(modal);
+
+      if (trigger && trigger.isConnected && typeof trigger.focus === 'function') {
+        requestAnimationFrame(() => {
+          try {
+            trigger.focus({ preventScroll: true });
+          } catch (_error) {
+            trigger.focus();
+          }
+        });
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) {
+        return;
+      }
+
+      const topModal = getTopVisibleModal();
+      if (!(topModal instanceof HTMLElement)) {
+        return;
+      }
+
+      if (topModal.getAttribute('data-bs-keyboard') === 'false') {
+        return;
+      }
+
+      const instance = window.bootstrap.Modal.getInstance(topModal);
+      if (instance) {
+        instance.hide();
+      }
+    });
+
+    document.addEventListener('mousedown', (event) => {
+      const modal = event.target;
+      if (!(modal instanceof HTMLElement)) {
+        return;
+      }
+
+      if (!modal.classList.contains('modal') || !modal.classList.contains('show')) {
+        return;
+      }
+
+      const topModal = getTopVisibleModal();
+      if (modal !== topModal) {
+        return;
+      }
+
+      if (modal.getAttribute('data-bs-backdrop') === 'static') {
+        return;
+      }
+
+      const instance = window.bootstrap.Modal.getInstance(modal);
+      if (instance) {
+        instance.hide();
+      }
+    });
+  }
+
   function init() {
     syncThemeAttribute();
     applySemanticBadges(document);
     observeThemeChanges();
     observeDynamicBadges();
+    initModalBehavior();
   }
 
   if (document.readyState === 'loading') {
