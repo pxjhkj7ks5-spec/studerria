@@ -119,6 +119,9 @@
         if (!(node instanceof HTMLElement)) {
           return;
         }
+        if (node.classList.contains('glass-tab')) {
+          return;
+        }
         node.classList.add('focus-halo');
       });
   }

@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.52",
+      "date": "2026-02-15",
+      "items": [
+        "fix: remove duplicated oval highlight on schedule Glass Tabs by excluding tab buttons from global Focus Halo treatment",
+        "fix: disable generic focus ring shadow on glass tabs so only the moving tab indicator remains visible during click/focus"
+      ]
+    },
+    {
       "version": "0.8.51",
       "date": "2026-02-15",
       "items": [

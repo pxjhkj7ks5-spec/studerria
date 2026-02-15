@@ -342,6 +342,12 @@ body.theme-dark .glass-tab.is-active {
   color: rgba(241, 245, 249, 0.92);
 }
 
+.glass-tab:focus-visible,
+.glass-tab.focus-halo.is-focus-halo {
+  outline: none;
+  box-shadow: none !important;
+}
+
 .month-summary {
   border-radius: var(--radius-lg);
   padding: 18px;
