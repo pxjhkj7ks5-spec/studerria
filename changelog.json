@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.66",
+      "date": "2026-02-15",
+      "items": [
+        "fix: make admin tab script resilient when browser blocks `localStorage` by using safe get/set wrappers",
+        "fix: restore one-section-at-a-time admin tab behavior in restricted storage environments (no script abort before tab init)"
+      ]
+    },
+    {
       "version": "0.8.65",
       "date": "2026-02-15",
       "items": [

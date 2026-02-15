@@ -3281,8 +3281,24 @@
 
       attachValidationTooltips();
 
+      const safeStorageGet = (key, fallback = '') => {
+        try {
+          const value = window.localStorage.getItem(key);
+          return value === null || typeof value === 'undefined' ? fallback : value;
+        } catch (_) {
+          return fallback;
+        }
+      };
+      const safeStorageSet = (key, value) => {
+        try {
+          window.localStorage.setItem(key, value);
+        } catch (_) {
+          // ignore storage failures
+        }
+      };
+
       const themeToggle = document.getElementById('themeToggle');
-      const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
+      const savedTheme = safeStorageGet('ui-theme', 'theme-light') || 'theme-light';
       const labelLight = themeToggle ? (themeToggle.dataset.lightLabel || 'Light') : 'Light';
       const labelDark = themeToggle ? (themeToggle.dataset.darkLabel || 'Dark') : 'Dark';
       document.body.classList.remove('theme-light', 'theme-dark');
@@ -3293,7 +3309,7 @@
           const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
           document.body.classList.remove('theme-light', 'theme-dark');
           document.body.classList.add(next);
-          localStorage.setItem('ui-theme', next);
+          safeStorageSet('ui-theme', next);
           themeToggle.textContent = next === 'theme-dark' ? labelLight : labelDark;
         });
       }
@@ -3410,7 +3426,7 @@
         });
         const activePanel = adminPanels.find((panel) => panel.id === target);
         updateBreadcrumbs(activePanel);
-        localStorage.setItem('admin:tab', target);
+        safeStorageSet('admin:tab', target);
         if (push) {
           const url = new URL(window.location.href);
           url.searchParams.set('tab', target);
@@ -3419,7 +3435,7 @@
       };
 
       const initialTab = new URLSearchParams(window.location.search).get('tab')
-        || localStorage.getItem('admin:tab')
+        || safeStorageGet('admin:tab', '')
         || getDefaultTab();
       if (adminLayoutEl) {
         adminLayoutEl.classList.add('admin-tabs-ready');
