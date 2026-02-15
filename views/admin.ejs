@@ -854,6 +854,7 @@
 
       <% const adminSectionOptionsList = typeof adminSectionOptions !== 'undefined' && Array.isArray(adminSectionOptions) ? adminSectionOptions : []; %>
       <% const rolePermissionsMap = typeof rolePermissions !== 'undefined' && rolePermissions ? rolePermissions : {}; %>
+      <% const dashboardStatsData = typeof dashboardStats !== 'undefined' && dashboardStats ? dashboardStats : null; %>
       <% const roleAccessRoles = [
         { key: 'admin', label: 'Адмін', editable: false },
         { key: 'deanery', label: 'Деканат', editable: true },
@@ -889,19 +890,19 @@
                 <div class="admin-overview-grid">
                   <div class="admin-metric-card">
                     <div class="small text-muted">Users</div>
-                    <div class="admin-metric-value"><%= dashboardStats ? dashboardStats.users : '—' %></div>
+                    <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.users : '—' %></div>
                   </div>
                   <div class="admin-metric-card">
                     <div class="small text-muted">Subjects</div>
-                    <div class="admin-metric-value"><%= dashboardStats ? dashboardStats.subjects : '—' %></div>
+                    <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.subjects : '—' %></div>
                   </div>
                   <div class="admin-metric-card">
                     <div class="small text-muted">Homework</div>
-                    <div class="admin-metric-value"><%= dashboardStats ? dashboardStats.homework : '—' %></div>
+                    <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.homework : '—' %></div>
                   </div>
                   <div class="admin-metric-card">
                     <div class="small text-muted">Teamwork tasks</div>
-                    <div class="admin-metric-value"><%= dashboardStats ? dashboardStats.teamworkTasks : '—' %></div>
+                    <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.teamworkTasks : '—' %></div>
                   </div>
                 </div>
               </div>

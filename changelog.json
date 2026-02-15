@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.8.59",
+      "date": "2026-02-15",
+      "items": [
+        "fix: prevent `ReferenceError` in admin overview for starosta/deanery by adding a safe `dashboardStats` fallback in `admin.ejs`"
+      ]
+    },
+    {
       "version": "0.8.58",
       "date": "2026-02-15",
       "items": [
