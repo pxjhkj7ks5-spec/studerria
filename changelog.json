@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.8.56",
+      "date": "2026-02-15",
+      "items": [
+        "refactor: replace dot-based week carousel with a new Week Pager concept (prev/next + central week pill + progress line) for more stable desktop rendering",
+        "refactor: remove complex carousel geometry/state animation pipeline and switch week navigation to a compact deterministic flow with debounce and directional feedback",
+        "ux: keep swipe week switching using the new pager control while preserving keyboard arrows and existing schedule content transitions",
+        "style: add Apple-like glass week pill micro-motion and progress indicator, plus disabled states for week navigation buttons"
+      ]
+    },
+    {
       "version": "0.8.55",
       "date": "2026-02-15",
       "items": [
