@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.55",
+      "date": "2026-02-15",
+      "items": [
+        "fix: restore smooth desktop tab motion by removing bounce transform conflict with indicator translate animation",
+        "fix: keep glass-tab bounce as opacity/shadow pulse only, preserving single-oval rendering and stable movement"
+      ]
+    },
+    {
       "version": "0.8.54",
       "date": "2026-02-15",
       "items": [
