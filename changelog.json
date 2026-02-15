@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.8.64",
+      "date": "2026-02-15",
+      "items": [
+        "fix: force full section visibility for `admin` in `admin.ejs` by ignoring `allowedSections` filtering for admin role"
+      ]
+    },
+    {
       "version": "0.8.63",
       "date": "2026-02-15",
       "items": [

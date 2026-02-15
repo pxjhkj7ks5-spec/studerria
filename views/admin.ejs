@@ -676,7 +676,8 @@
   </head>
   <body class="theme-light">
     <% const isLimitedView = typeof limitedStaffView !== 'undefined' && limitedStaffView; %>
-    <% const allowedSectionsList = typeof locals !== 'undefined' && typeof locals.allowedSections !== 'undefined' ? locals.allowedSections : (typeof allowedSections !== 'undefined' ? allowedSections : null); %>
+    <% const allowedSectionsRaw = typeof locals !== 'undefined' && typeof locals.allowedSections !== 'undefined' ? locals.allowedSections : (typeof allowedSections !== 'undefined' ? allowedSections : null); %>
+    <% const allowedSectionsList = role === 'admin' ? null : (Array.isArray(allowedSectionsRaw) ? allowedSectionsRaw : null); %>
     <% const sectionAllowed = (id) => !allowedSectionsList || allowedSectionsList.includes(id); %>
     <% const courseMap = {}; %>
     <% (courses || []).forEach(function(c) { courseMap[c.id] = c.name; }); %>
