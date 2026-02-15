@@ -265,7 +265,7 @@ body.theme-light .admin-campus-badge {
   min-width: 160px;
 }
 
-.admin-panels .admin-panel {
+.admin-layout.admin-tabs-ready .admin-panels .admin-panel {
   display: none;
 }
 

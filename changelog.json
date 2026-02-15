@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.65",
+      "date": "2026-02-15",
+      "items": [
+        "fix: make admin tab panels fail-safe by hiding panels only after JS tab system is initialized (`admin-tabs-ready`)",
+        "fix: harden admin tab activation with fallback to an existing tab (or show all panels if no valid target)",
+        "fix: guard `themeToggle` initialization against null to prevent early script crash that blocked left-menu tab switching"
+      ]
+    },
+    {
       "version": "0.8.64",
       "date": "2026-02-15",
       "items": [

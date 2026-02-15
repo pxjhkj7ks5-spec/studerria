@@ -3283,18 +3283,20 @@
 
       const themeToggle = document.getElementById('themeToggle');
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
-      const labelLight = themeToggle.dataset.lightLabel || 'Light';
-      const labelDark = themeToggle.dataset.darkLabel || 'Dark';
+      const labelLight = themeToggle ? (themeToggle.dataset.lightLabel || 'Light') : 'Light';
+      const labelDark = themeToggle ? (themeToggle.dataset.darkLabel || 'Dark') : 'Dark';
       document.body.classList.remove('theme-light', 'theme-dark');
       document.body.classList.add(savedTheme);
-      themeToggle.textContent = savedTheme === 'theme-dark' ? labelLight : labelDark;
-      themeToggle.addEventListener('click', () => {
-        const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
-        document.body.classList.remove('theme-light', 'theme-dark');
-        document.body.classList.add(next);
-        localStorage.setItem('ui-theme', next);
-        themeToggle.textContent = next === 'theme-dark' ? labelLight : labelDark;
-      });
+      if (themeToggle) {
+        themeToggle.textContent = savedTheme === 'theme-dark' ? labelLight : labelDark;
+        themeToggle.addEventListener('click', () => {
+          const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
+          document.body.classList.remove('theme-light', 'theme-dark');
+          document.body.classList.add(next);
+          localStorage.setItem('ui-theme', next);
+          themeToggle.textContent = next === 'theme-dark' ? labelLight : labelDark;
+        });
+      }
 
       document.querySelectorAll('.file-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -3322,6 +3324,7 @@
 
       const adminNavLinks = Array.from(document.querySelectorAll('[data-admin-nav]'));
       const adminPanels = Array.from(document.querySelectorAll('.admin-panel'));
+      const adminLayoutEl = document.querySelector('.admin-layout');
       const breadcrumbsEl = document.getElementById('adminBreadcrumbs');
       const confirmModalEl = document.getElementById('confirmActionModal');
       const confirmModal = confirmModalEl ? new bootstrap.Modal(confirmModalEl) : null;
@@ -3392,19 +3395,25 @@
       };
 
       const setActiveTab = (tab, { push = true } = {}) => {
-        if (!tab) return;
+        const target = adminPanels.some((panel) => panel.id === tab) ? tab : getDefaultTab();
+        if (!target) {
+          adminPanels.forEach((panel) => {
+            panel.style.display = 'block';
+          });
+          return;
+        }
         adminPanels.forEach((panel) => {
-          panel.style.display = panel.id === tab ? 'block' : 'none';
+          panel.style.display = panel.id === target ? 'block' : 'none';
         });
         adminNavLinks.forEach((link) => {
-          link.classList.toggle('is-active', link.dataset.adminNav === tab);
+          link.classList.toggle('is-active', link.dataset.adminNav === target);
         });
-        const activePanel = adminPanels.find((panel) => panel.id === tab);
+        const activePanel = adminPanels.find((panel) => panel.id === target);
         updateBreadcrumbs(activePanel);
-        localStorage.setItem('admin:tab', tab);
+        localStorage.setItem('admin:tab', target);
         if (push) {
           const url = new URL(window.location.href);
-          url.searchParams.set('tab', tab);
+          url.searchParams.set('tab', target);
           window.history.replaceState({}, '', url);
         }
       };
@@ -3412,6 +3421,9 @@
       const initialTab = new URLSearchParams(window.location.search).get('tab')
         || localStorage.getItem('admin:tab')
         || getDefaultTab();
+      if (adminLayoutEl) {
+        adminLayoutEl.classList.add('admin-tabs-ready');
+      }
       setActiveTab(initialTab, { push: false });
 
       adminNavLinks.forEach((link) => {
