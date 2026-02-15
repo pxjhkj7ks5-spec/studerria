@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.57",
+      "date": "2026-02-15",
+      "items": [
+        "fix: remove Week Pager block-shift animation on swipe/click (week pill now updates without motion translation)",
+        "fix: remove pre-navigation schedule fade-out during week switches to eliminate brief full-black flash before page reload",
+        "ux: keep deterministic week navigation behavior while simplifying visual state changes for cleaner desktop feel"
+      ]
+    },
+    {
       "version": "0.8.56",
       "date": "2026-02-15",
       "items": [

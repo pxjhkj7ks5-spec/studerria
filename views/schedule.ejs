@@ -1374,10 +1374,6 @@
       body.theme-light .empty-state {
         background: rgba(15, 23, 42, 0.04);
       }
-      .schedule-content.is-exiting {
-        opacity: 0;
-        transform: translateY(8px);
-      }
       @media (max-width: 768px) {
         .day-card .list-group {
           padding: 12px 14px 16px;
@@ -2840,19 +2836,6 @@
         window.location.search = params.toString();
       }
 
-      function animateWeekPill(direction) {
-        if (!weekPager) return;
-        weekPager.dataset.shift = direction > 0 ? 'next' : 'prev';
-        weekPager.classList.remove('is-shifting');
-        requestAnimationFrame(() => {
-          weekPager.classList.add('is-shifting');
-        });
-        setTimeout(() => {
-          weekPager.classList.remove('is-shifting');
-          weekPager.removeAttribute('data-shift');
-        }, 260);
-      }
-
       function syncWeekPager(week) {
         const safe = clampWeek(week);
         currentWeek = safe;
@@ -2877,20 +2860,11 @@
         weekDebounceUntil = now + weekDebounceMs;
         isWeekSwitching = true;
 
-        const direction = safeWeek > currentWeek ? 1 : -1;
         syncWeekPager(safeWeek);
-        animateWeekPill(direction);
-
-        const scheduleContent = document.querySelector('.schedule-content');
-        if (scheduleContent) {
-          scheduleContent.style.setProperty('--week-shift-x', direction > 0 ? '-14px' : '14px');
-          scheduleContent.classList.add('is-exiting');
-        }
-
         setTimeout(() => {
           isWeekSwitching = false;
-        }, 420);
-        setTimeout(() => updateSchedule(safeWeek), 170);
+        }, 260);
+        requestAnimationFrame(() => updateSchedule(safeWeek));
       }
 
       function animateWeekChange(nextWeek) {
