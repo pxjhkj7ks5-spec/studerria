@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.53",
+      "date": "2026-02-15",
+      "items": [
+        "refactor: rework week carousel switching logic to a single requestAnimationFrame-based animation path for more stable frame pacing",
+        "ux: add Apple-like eased spring interpolation for week transitions, replacing timer/transitionend race-prone flow",
+        "style: tune week rail and active indicator timing curves/durations for smoother iOS-like movement"
+      ]
+    },
+    {
       "version": "0.8.52",
       "date": "2026-02-15",
       "items": [

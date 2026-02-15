@@ -1179,6 +1179,7 @@ body.theme-light .deadline-meta {
 }
 
 .week-rail {
+  --week-apple-curve: cubic-bezier(0.22, 1, 0.36, 1);
   position: fixed;
   left: 50%;
   transform: translateX(calc(-50% + var(--week-rail-shift)));
@@ -1289,7 +1290,7 @@ body.theme-light .deadline-meta {
   line-height: 0;
   gap: var(--week-dot-gap);
   transform: translate3d(0, 0, 0);
-  transition: transform 220ms var(--week-motion-curve);
+  transition: transform 300ms var(--week-apple-curve);
   will-change: transform;
   contain: layout paint;
 }
@@ -1315,9 +1316,9 @@ body.theme-light .deadline-meta {
   border-radius: 999px;
   transform: translate3d(var(--indicator-x), var(--indicator-y), 0);
   transition:
-    transform 220ms var(--week-motion-curve),
-    width 220ms var(--week-motion-curve),
-    opacity 150ms ease-out;
+    transform 300ms var(--week-apple-curve),
+    width 260ms var(--week-apple-curve),
+    opacity 180ms ease-out;
   will-change: transform, width, opacity;
   z-index: 1;
   pointer-events: none;

@@ -2873,8 +2873,8 @@
       let isCarouselAnimating = false;
       let carouselDebounceUntil = 0;
       const carouselDebounceMs = 250;
-      let carouselUnlockTimer = null;
-      let carouselMorphPhaseTimer = null;
+      let carouselRafId = null;
+      let carouselAnimationToken = 0;
 
       function clampValue(value, min, max) {
         return Math.max(min, Math.min(max, value));
@@ -3181,21 +3181,76 @@
         });
       }
 
-      function clearCarouselUnlockTimer() {
-        if (carouselUnlockTimer) {
-          clearTimeout(carouselUnlockTimer);
-          carouselUnlockTimer = null;
-        }
+      function easeOutApple(t) {
+        const p = clampValue(t, 0, 1);
+        return 1 - Math.pow(1 - p, 3.2);
       }
 
-      function clearMorphState() {
-        if (carouselMorphPhaseTimer) {
-          clearTimeout(carouselMorphPhaseTimer);
-          carouselMorphPhaseTimer = null;
+      function stopCarouselMotion() {
+        if (carouselRafId) {
+          cancelAnimationFrame(carouselRafId);
+          carouselRafId = null;
         }
-        if (weekActiveIndicator) {
-          weekActiveIndicator.classList.remove('is-morph-shrink');
+        carouselAnimationToken += 1;
+      }
+
+      function renderCarouselFrame(railX, indicatorIndex = carouselState.activeIndex) {
+        if (!weekDotRail || !weekActiveIndicator) return;
+        const snappedRailX = alignToDevicePixel(railX);
+        const snappedIndicatorX = computeIndicatorX(snappedRailX, indicatorIndex);
+        const snappedIndicatorY = alignToDevicePixel(carouselGeometry.indicatorY);
+
+        weekDotRail.style.transform = `translate3d(${snappedRailX}px, 0, 0)`;
+        weekActiveIndicator.style.setProperty('--indicator-x', `${snappedIndicatorX}px`);
+        weekActiveIndicator.style.setProperty('--indicator-y', `${snappedIndicatorY}px`);
+        updateDotVisibility(indicatorIndex, snappedRailX);
+        updateMidSplitDots(snappedRailX, snappedIndicatorX, indicatorIndex);
+      }
+
+      function animateCarouselTo(railTarget, indicatorIndex, durationMs = 320) {
+        if (!weekDotRail || !weekActiveIndicator) return Promise.resolve();
+
+        const startRail = carouselState.railX;
+        const delta = railTarget - startRail;
+        if (Math.abs(delta) < 0.2) {
+          renderCarouselFrame(railTarget, indicatorIndex);
+          return Promise.resolve();
         }
+
+        stopCarouselMotion();
+        const token = carouselAnimationToken;
+        const startAt = performance.now();
+        weekDotRail.classList.add('no-motion');
+        weekActiveIndicator.classList.add('no-motion');
+
+        return new Promise((resolve) => {
+          const step = (now) => {
+            if (token !== carouselAnimationToken) {
+              resolve();
+              return;
+            }
+
+            const t = clampValue((now - startAt) / durationMs, 0, 1);
+            const eased = easeOutApple(t);
+            const spring = Math.sin(t * Math.PI) * (1 - t) * 0.08;
+            const progress = clampValue(eased + spring, 0, 1.04);
+            const nextRail = t >= 1 ? railTarget : startRail + (delta * progress);
+            renderCarouselFrame(nextRail, indicatorIndex);
+
+            if (t < 1) {
+              carouselRafId = requestAnimationFrame(step);
+              return;
+            }
+
+            renderCarouselFrame(railTarget, indicatorIndex);
+            weekDotRail.classList.remove('no-motion');
+            weekActiveIndicator.classList.remove('no-motion');
+            carouselRafId = null;
+            resolve();
+          };
+
+          carouselRafId = requestAnimationFrame(step);
+        });
       }
 
       function updateSchedule(week) {
@@ -3211,7 +3266,7 @@
         requestAnimationFrame(() => updateSchedule(currentWeek));
       }
 
-      function goToWeek(targetIndex) {
+      async function goToWeek(targetIndex) {
         ensureCarouselGeometry(false);
         const safeTarget = clampValue(Number(targetIndex), 0, carouselState.totalCount - 1);
         if (Number.isNaN(safeTarget) || safeTarget === carouselState.activeIndex) return;
@@ -3225,48 +3280,20 @@
         const nextRailX = computeRailX(safeTarget);
         carouselState.railX = nextRailX;
 
-        clearMorphState();
-        if (weekActiveIndicator) {
-          weekActiveIndicator.classList.add('is-morph-shrink');
-        }
-
         const scheduleContent = document.querySelector('.schedule-content');
         if (scheduleContent) {
           scheduleContent.classList.add('is-exiting');
         }
+        await animateCarouselTo(nextRailX, safeTarget, 320);
 
-        const unlock = () => {
-          if (!isCarouselAnimating) return;
-          clearCarouselUnlockTimer();
-          weekDotRail?.removeEventListener('transitionend', onRailTransitionEnd);
+        carouselState.activeIndex = safeTarget;
+        setActiveDot(safeTarget);
+        updateMidSplitDots(carouselState.railX, computeIndicatorX(carouselState.railX, safeTarget), safeTarget);
+        isCarouselAnimating = false;
 
-          if (weekActiveIndicator) {
-            weekActiveIndicator.classList.remove('is-morph-shrink');
-          }
-          carouselState.activeIndex = safeTarget;
-          setActiveDot(safeTarget);
-          updateMidSplitDots(carouselState.railX);
-
-          carouselMorphPhaseTimer = setTimeout(() => {
-            if (!isCarouselAnimating) return;
-            isCarouselAnimating = false;
-            clearMorphState();
-          }, 140);
-        };
-
-        const onRailTransitionEnd = (event) => {
-          if (event.target !== weekDotRail || event.propertyName !== 'transform') return;
-          unlock();
-        };
-
-        weekDotRail?.addEventListener('transitionend', onRailTransitionEnd);
-        carouselUnlockTimer = setTimeout(unlock, 240);
-
-        applyCarouselFrame(nextRailX, { animate: true, indicatorIndex: safeTarget });
-
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           updateWeekContent(safeTarget);
-        }, 170);
+        });
       }
 
       function syncWeekCarousel(week, options = {}) {
