@@ -303,9 +303,9 @@ body.theme-light .glass-tabs {
   left: 4px;
   width: calc(33.333% - 3px);
   border-radius: 999px;
-  background: linear-gradient(160deg, rgba(191, 219, 254, 0.42), rgba(125, 211, 252, 0.22));
-  border: 1px solid rgba(148, 163, 184, 0.34);
-  box-shadow: 0 10px 18px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  background: linear-gradient(160deg, rgba(191, 219, 254, 0.44), rgba(125, 211, 252, 0.26));
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.18);
   transition: transform 360ms cubic-bezier(0.22, 1.36, 0.36, 1), width 220ms ease-out;
   pointer-events: none;
 }
@@ -315,15 +315,17 @@ body.theme-light .glass-tabs {
 }
 
 @keyframes glass-tab-bounce {
-  0% { box-shadow: 0 6px 12px rgba(59, 130, 246, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.26); }
-  65% { box-shadow: 0 16px 24px rgba(59, 130, 246, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.42); }
-  100% { box-shadow: 0 10px 18px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.34); }
+  0% { transform: translateZ(0) scale(0.985); }
+  65% { transform: translateZ(0) scale(1.02); }
+  100% { transform: translateZ(0) scale(1); }
 }
 
 .glass-tab {
   position: relative;
   z-index: 1;
   min-height: 36px;
+  appearance: none;
+  -webkit-appearance: none;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -346,6 +348,13 @@ body.theme-dark .glass-tab.is-active {
 .glass-tab.focus-halo.is-focus-halo {
   outline: none;
   box-shadow: none !important;
+}
+
+.glass-tab:focus,
+.glass-tab:active {
+  outline: none;
+  box-shadow: none !important;
+  background: transparent;
 }
 
 .month-summary {

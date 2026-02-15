@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.54",
+      "date": "2026-02-15",
+      "items": [
+        "fix: remove desktop glass-tab dual-oval artifact by simplifying active tab indicator shadow model to a single clean contour",
+        "fix: switch tab bounce animation from shadow morphing to subtle scale motion for consistent oval size rendering on desktop GPUs",
+        "fix: enforce neutral native button rendering for glass tabs (appearance/focus/active) to prevent extra browser-drawn outlines"
+      ]
+    },
+    {
       "version": "0.8.53",
       "date": "2026-02-15",
       "items": [
