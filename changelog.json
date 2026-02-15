@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.51",
+      "date": "2026-02-15",
+      "items": [
+        "fix: reduce dark-theme Liquid Card glare on schedule cards by removing oversized reflection overlays and softening gradient rim intensity",
+        "fix: rebalance schedule card border/shadow treatment in dark mode for cleaner color rendering without bright wash artifacts",
+        "fix: add explicit Changelog button fallback handler in schedule page so modal opens reliably on click"
+      ]
+    },
+    {
       "version": "0.8.50",
       "date": "2026-02-15",
       "items": [

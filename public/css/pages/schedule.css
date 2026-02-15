@@ -406,6 +406,41 @@ body.schedule-mode-month .week-rail {
   display: none;
 }
 
+/* Soften Liquid Card visuals on schedule page to avoid bright glare artifacts in dark theme. */
+.week-hero.liquid-card::after,
+.schedule-panel.liquid-card::after {
+  left: 26%;
+  right: 26%;
+  top: -58%;
+  height: 46%;
+  opacity: 0.34;
+}
+
+.day-card.liquid-card::after,
+.schedule-card.liquid-card::after,
+.month-summary.liquid-card::after {
+  display: none;
+}
+
+.day-card.liquid-card::before,
+.schedule-card.liquid-card::before,
+.month-summary.liquid-card::before {
+  background: linear-gradient(130deg, rgba(148, 163, 184, 0.26), rgba(148, 163, 184, 0.08) 38%, rgba(148, 163, 184, 0.2) 100%);
+  opacity: 0.6;
+}
+
+body.theme-dark .day-card.liquid-card,
+body.theme-dark .schedule-card.liquid-card,
+body.theme-dark .month-summary.liquid-card {
+  border-color: rgba(100, 116, 139, 0.24);
+  box-shadow: 0 10px 20px rgba(2, 6, 23, 0.26);
+}
+
+.app-footer .footer-meta.glass-dock {
+  position: relative;
+  z-index: 1061;
+}
+
 .badge-glow {
   background: linear-gradient(135deg, rgba(191, 219, 254, 0.9), rgba(196, 181, 253, 0.82));
   border: 1px solid rgba(147, 197, 253, 0.62);

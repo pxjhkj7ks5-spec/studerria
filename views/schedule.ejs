@@ -4066,6 +4066,16 @@
         messagesSubjectFilter.addEventListener('change', loadMessages);
       }
 
+      const changelogTrigger = document.querySelector('.footer-link[data-bs-target="#changelogModal"]');
+      const changelogModalEl = document.getElementById('changelogModal');
+      if (changelogTrigger && changelogModalEl && window.bootstrap && window.bootstrap.Modal) {
+        changelogTrigger.addEventListener('click', (event) => {
+          event.preventDefault();
+          const modal = window.bootstrap.Modal.getOrCreateInstance(changelogModalEl);
+          modal.show();
+        });
+      }
+
       loadMessages();
 
       const phrases = [
