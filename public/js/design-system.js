@@ -85,6 +85,44 @@
     nodes.forEach((node) => applySemanticBadge(node));
   }
 
+  function ensureAmbientLayer() {
+    if (!document.body) {
+      return;
+    }
+    if (document.querySelector('.ambient-layer')) {
+      return;
+    }
+    const layer = document.createElement('div');
+    layer.className = 'ambient-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    document.body.prepend(layer);
+  }
+
+  function applyGlassDock(root) {
+    const scope = root instanceof HTMLElement || root instanceof Document ? root : document;
+    if (!scope.querySelectorAll) {
+      return;
+    }
+    scope.querySelectorAll('.app-footer .footer-meta').forEach((meta) => {
+      meta.classList.add('glass-dock');
+    });
+  }
+
+  function applyFocusHalo(root) {
+    const scope = root instanceof HTMLElement || root instanceof Document ? root : document;
+    if (!scope.querySelectorAll) {
+      return;
+    }
+    scope
+      .querySelectorAll('button, a.btn, .btn-link, input, select, textarea, [role="button"], .drawer-action, .week-dot, .week-nav-btn')
+      .forEach((node) => {
+        if (!(node instanceof HTMLElement)) {
+          return;
+        }
+        node.classList.add('focus-halo');
+      });
+  }
+
   function observeThemeChanges() {
     const body = document.body;
     if (!body) {
@@ -123,6 +161,8 @@
           }
           applySemanticBadge(node);
           applySemanticBadges(node);
+          applyGlassDock(node);
+          applyFocusHalo(node);
         });
       });
     });
@@ -228,10 +268,31 @@
 
   function init() {
     syncThemeAttribute();
+    ensureAmbientLayer();
     applySemanticBadges(document);
+    applyGlassDock(document);
+    applyFocusHalo(document);
     observeThemeChanges();
     observeDynamicBadges();
     initModalBehavior();
+
+    document.addEventListener('focusin', (event) => {
+      if (!(event.target instanceof HTMLElement)) {
+        return;
+      }
+      if (event.target.classList.contains('focus-halo')) {
+        event.target.classList.add('is-focus-halo');
+      }
+    });
+
+    document.addEventListener('focusout', (event) => {
+      if (!(event.target instanceof HTMLElement)) {
+        return;
+      }
+      if (event.target.classList.contains('focus-halo')) {
+        event.target.classList.remove('is-focus-halo');
+      }
+    });
   }
 
   if (document.readyState === 'loading') {

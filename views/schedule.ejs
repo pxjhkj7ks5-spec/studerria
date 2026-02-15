@@ -1619,7 +1619,7 @@
 
     <div class="schedule-shell" id="scheduleShell">
       <main class="container py-4 schedule-content enter">
-        <div class="glass week-hero mb-4">
+        <div class="glass week-hero liquid-card mb-4">
           <div>
             <h1 class="hero-title weekHeadline mb-1"><%= t('schedule.header') %></h1>
             <div class="hero-sub" id="daily-phrase">Your rhythm, your focus — let’s make this week count.</div>
@@ -1630,7 +1630,7 @@
         </div>
 
         <% const hasCourseFilters = role === 'teacher' && teacherCourses && teacherCourses.length > 1; %>
-        <div class="glass schedule-panel mb-4 <%= hasCourseFilters ? '' : 'single-panel' %>">
+        <div class="glass schedule-panel liquid-card mb-4 <%= hasCourseFilters ? '' : 'single-panel' %>">
           <% if (hasCourseFilters) { %>
             <div class="panel-section">
               <div class="panel-title">Фільтри</div>
@@ -1666,6 +1666,15 @@
             </div>
           </div>
         </div>
+
+        <section class="glass-tabs-wrap mb-4" id="scheduleModeTabsWrap" aria-label="Schedule views">
+          <div class="glass-tabs" id="scheduleModeTabs" role="tablist" aria-label="Schedule mode">
+            <span class="glass-tabs-indicator" id="scheduleModeIndicator" aria-hidden="true"></span>
+            <button type="button" class="glass-tab" data-mode="day" role="tab" aria-selected="false">Day</button>
+            <button type="button" class="glass-tab is-active" data-mode="week" role="tab" aria-selected="true">Week</button>
+            <button type="button" class="glass-tab" data-mode="month" role="tab" aria-selected="false">Month</button>
+          </div>
+        </section>
 
         <section class="status-stack mb-4" id="densityBlock">
           <details class="density-summary" id="densitySummary">
@@ -1717,7 +1726,7 @@
             <% if (currentStreak > maxStreak) { maxStreak = currentStreak; } %>
           <% } %>
           <% const isDenseDay = maxStreak >= 3; %>
-          <div class="card mb-3 glass day-card" data-day-date="<%= dayDates && dayDates[day] ? dayDates[day] : '' %>">
+          <div class="card mb-3 glass day-card liquid-card" data-day-date="<%= dayDates && dayDates[day] ? dayDates[day] : '' %>">
             <div class="day-header">
               <div class="day-title">
                 <span class="day-name dayTitle"><%= day %></span>
@@ -1770,7 +1779,7 @@
                   <% if (cls.course_name) { tooltipParts.push(cls.course_name); } %>
                   <% if (hwMeta && hwMeta.preview && hwMeta.preview.length) { tooltipParts.push(...hwMeta.preview); } %>
                   <div
-                    class="list-group-item schedule-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %>"
+                    class="list-group-item schedule-card liquid-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %>"
                     role="button"
                     tabindex="0"
                     data-bs-toggle="modal"
@@ -1850,7 +1859,7 @@
           <% weekendDeadlineCards.forEach(function(card) { %>
             <% if (activeDaySet.has(card.day)) { return; } %>
             <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
-            <div class="card mb-3 glass day-card" data-day-date="<%= card.date || '' %>">
+            <div class="card mb-3 glass day-card liquid-card" data-day-date="<%= card.date || '' %>">
               <div class="day-header">
                 <div class="day-title">
                   <span class="day-name dayTitle"><%= card.day %></span>
@@ -1885,6 +1894,7 @@
           <% }); %>
         <% } %>
         </div>
+        <section class="month-summary glass liquid-card d-none" id="scheduleMonthSummary" aria-live="polite"></section>
       </main>
 
       <div class="week-rail" id="weekRail">
@@ -3417,6 +3427,145 @@
         });
       }
 
+      const weekGrid = document.getElementById('scheduleWeekGrid');
+      const scheduleModes = ['day', 'week', 'month'];
+      const scheduleModeTabs = document.getElementById('scheduleModeTabs');
+      const scheduleModeIndicator = document.getElementById('scheduleModeIndicator');
+      const scheduleModeButtons = scheduleModeTabs ? Array.from(scheduleModeTabs.querySelectorAll('.glass-tab[data-mode]')) : [];
+      const monthSummary = document.getElementById('scheduleMonthSummary');
+      const densityBlock = document.getElementById('densityBlock');
+      let currentScheduleMode = scheduleModes.includes(localStorage.getItem('schedule-view-mode'))
+        ? localStorage.getItem('schedule-view-mode')
+        : 'week';
+
+      function getPreferredDayCard(dayCards) {
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
+        return dayCards.find((card) => card.dataset.dayDate === today) || dayCards.find((card) => card.querySelector('.schedule-card')) || dayCards[0] || null;
+      }
+
+      function buildMonthSummary() {
+        if (!monthSummary || !weekGrid) return;
+        const rows = Array.from(weekGrid.querySelectorAll('.day-card')).map((dayCard) => {
+          const dayName = dayCard.querySelector('.day-name') ? dayCard.querySelector('.day-name').textContent.trim() : 'Day';
+          const dayDate = dayCard.querySelector('.day-date') ? dayCard.querySelector('.day-date').textContent.trim() : '';
+          const classesCount = dayCard.querySelectorAll('.schedule-card').length;
+          const hwCount = dayCard.querySelectorAll('.hw-chip, .badge--hw').length;
+          return { dayName, dayDate, classesCount, hwCount };
+        }).filter((row) => row.classesCount || row.hwCount);
+
+        if (!rows.length) {
+          monthSummary.innerHTML = '<div class="month-summary-empty">No data yet for month summary.</div>';
+          return;
+        }
+
+        monthSummary.innerHTML = `
+          <div class="month-summary-head">
+            <h2 class="month-summary-title">Month Snapshot</h2>
+            <p class="month-summary-sub">Prototype view based on current visible week data.</p>
+          </div>
+          <div class="month-summary-grid">
+            ${rows.map((row) => `
+              <article class="month-summary-item">
+                <div class="month-summary-day">${row.dayName}</div>
+                <div class="month-summary-date">${row.dayDate || '—'}</div>
+                <div class="month-summary-metrics">
+                  <span>${row.classesCount} classes</span>
+                  <span>${row.hwCount} homework</span>
+                </div>
+              </article>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      function updateScheduleModeIndicator(mode, bounce) {
+        if (!scheduleModeTabs || !scheduleModeIndicator) return;
+        const activeButton = scheduleModeButtons.find((button) => button.dataset.mode === mode);
+        if (!activeButton) return;
+        scheduleModeIndicator.style.width = `${activeButton.offsetWidth}px`;
+        scheduleModeIndicator.style.transform = `translateX(${activeButton.offsetLeft}px)`;
+        if (bounce) {
+          scheduleModeIndicator.classList.remove('is-bounce');
+          requestAnimationFrame(() => scheduleModeIndicator.classList.add('is-bounce'));
+          setTimeout(() => scheduleModeIndicator.classList.remove('is-bounce'), 340);
+        }
+      }
+
+      function applyScheduleMode(mode, options = {}) {
+        const { persist = true, bounce = false } = options;
+        if (!scheduleModes.includes(mode) || !weekGrid) return;
+        currentScheduleMode = mode;
+        document.body.setAttribute('data-schedule-mode', mode);
+        document.body.classList.toggle('schedule-mode-day', mode === 'day');
+        document.body.classList.toggle('schedule-mode-week', mode === 'week');
+        document.body.classList.toggle('schedule-mode-month', mode === 'month');
+
+        scheduleModeButtons.forEach((button) => {
+          const active = button.dataset.mode === mode;
+          button.classList.toggle('is-active', active);
+          button.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        updateScheduleModeIndicator(mode, bounce);
+
+        const dayCards = Array.from(weekGrid.querySelectorAll('.day-card'));
+        dayCards.forEach((card) => card.classList.remove('d-none'));
+        if (densityBlock) {
+          densityBlock.classList.toggle('d-none', mode !== 'week');
+        }
+
+        if (mode === 'month') {
+          weekGrid.classList.add('d-none');
+          if (monthSummary) {
+            buildMonthSummary();
+            monthSummary.classList.remove('d-none');
+          }
+        } else {
+          weekGrid.classList.remove('d-none');
+          if (monthSummary) {
+            monthSummary.classList.add('d-none');
+          }
+          if (mode === 'day') {
+            const activeCard = getPreferredDayCard(dayCards);
+            dayCards.forEach((card) => card.classList.toggle('d-none', card !== activeCard));
+          }
+        }
+
+        if (persist) {
+          localStorage.setItem('schedule-view-mode', mode);
+        }
+      }
+
+      if (scheduleModeTabs && scheduleModeButtons.length) {
+        scheduleModeButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            const mode = button.dataset.mode;
+            applyScheduleMode(mode, { persist: true, bounce: true });
+          });
+        });
+
+        let tabsTouchStartX = 0;
+        let tabsTouchStartY = 0;
+        scheduleModeTabs.addEventListener('touchstart', (event) => {
+          const touch = event.touches[0];
+          tabsTouchStartX = touch.clientX;
+          tabsTouchStartY = touch.clientY;
+        }, { passive: true });
+        scheduleModeTabs.addEventListener('touchend', (event) => {
+          const touch = event.changedTouches[0];
+          const dx = touch.clientX - tabsTouchStartX;
+          const dy = touch.clientY - tabsTouchStartY;
+          if (Math.abs(dx) < 44 || Math.abs(dx) < Math.abs(dy)) return;
+          const index = scheduleModes.indexOf(currentScheduleMode);
+          const nextIndex = dx < 0 ? Math.min(scheduleModes.length - 1, index + 1) : Math.max(0, index - 1);
+          if (nextIndex !== index) {
+            applyScheduleMode(scheduleModes[nextIndex], { persist: true, bounce: true });
+          }
+        }, { passive: true });
+      }
+
+      window.addEventListener('resize', () => updateScheduleModeIndicator(currentScheduleMode, false));
+      applyScheduleMode(currentScheduleMode, { persist: false, bounce: false });
+
       function updateUnreadBadges(count) {
         const targets = [messagesBadge, mobileMenuBadge].filter(Boolean);
         if (!targets.length) return;
@@ -3568,7 +3717,6 @@
 
       applyLocalWeekTimes();
 
-      const weekGrid = document.getElementById('scheduleWeekGrid');
       const syncDot = document.getElementById('syncDot');
       const syncStatusLabel = document.getElementById('syncStatusLabel');
       const syncStatusMeta = document.getElementById('syncStatusMeta');
@@ -3793,6 +3941,7 @@
             updateSmartHighlights();
             applySubjectTones(weekGrid);
             updateDensitySummary(weekGrid);
+            applyScheduleMode(currentScheduleMode, { persist: false, bounce: false });
             initTooltips(weekGrid);
             writeScheduleCache(weekGrid.innerHTML);
           }

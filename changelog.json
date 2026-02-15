@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.8.50",
+      "date": "2026-02-15",
+      "items": [
+        "style: add new design-system components for Ambient Layer background, Glass Dock footer action panel, Liquid Card surface, and Focus Halo interactive focus animation",
+        "ux: automatically apply Glass Dock and Focus Halo behavior via design-system.js, plus inject Ambient Layer globally without per-page markup duplication",
+        "ui: implement schedule view Glass Tabs (Day/Week/Month) with spring-like animated indicator, swipe switching, and persisted mode in localStorage",
+        "ui: add Month Snapshot prototype panel and apply Liquid Card treatment to week hero, schedule panel, day cards, and class cards"
+      ]
+    },
+    {
       "version": "0.8.49",
       "date": "2026-02-14",
       "items": [
