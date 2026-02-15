@@ -852,8 +852,8 @@
       <% const settingsMetaInfo = typeof settingsMeta !== 'undefined' && settingsMeta ? settingsMeta : null; %>
       <div id="toastContainer" data-toast-success="<%= msg && msg.success ? msg.success : '' %>" data-toast-error="<%= msg && msg.error ? msg.error : '' %>"></div>
 
-      <% const adminSectionOptionsList = adminSectionOptions || []; %>
-      <% const rolePermissionsMap = rolePermissions || {}; %>
+      <% const adminSectionOptionsList = typeof adminSectionOptions !== 'undefined' && Array.isArray(adminSectionOptions) ? adminSectionOptions : []; %>
+      <% const rolePermissionsMap = typeof rolePermissions !== 'undefined' && rolePermissions ? rolePermissions : {}; %>
       <% const roleAccessRoles = [
         { key: 'admin', label: 'Адмін', editable: false },
         { key: 'deanery', label: 'Деканат', editable: true },
