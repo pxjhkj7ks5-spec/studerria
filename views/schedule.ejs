@@ -2789,6 +2789,7 @@
       const densityChipEvening = document.getElementById('densityChipEvening');
       const densityChipPeak = document.getElementById('densityChipPeak');
       const totalWeeks = <%= totalWeeks || 15 %>;
+      const semesterStartDate = <%- JSON.stringify(semester && semester.start_date ? semester.start_date : null) %>;
       let currentWeek = <%= currentWeek %>;
       function setDrawerOpen(open) {
         if (!scheduleDrawer) return;
@@ -2827,6 +2828,32 @@
         const parsed = Number(value);
         if (Number.isNaN(parsed)) return 1;
         return Math.max(1, Math.min(totalWeeks, parsed));
+      }
+
+      function parseDateUtc(dateStr) {
+        if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+        const [y, m, d] = dateStr.split('-').map((n) => Number(n));
+        if (!y || !m || !d) return null;
+        return Date.UTC(y, m - 1, d);
+      }
+
+      function getKyivAcademicWeek() {
+        if (!semesterStartDate) return clampWeek(currentWeek);
+        const startUtc = parseDateUtc(semesterStartDate);
+        if (startUtc === null) return clampWeek(currentWeek);
+        const { year, month, day } = getKyivDateParts();
+        const kyivDayUtc = Date.UTC(year, month - 1, day);
+        const diffDays = Math.floor((kyivDayUtc - startUtc) / 86400000);
+        let week = Math.floor(diffDays / 7) + 1;
+        if (diffDays < 0) week = 1;
+        return clampWeek(week);
+      }
+
+      function syncWeekAtKyivMidnight() {
+        const actualWeek = getKyivAcademicWeek();
+        if (actualWeek !== currentWeek) {
+          updateSchedule(actualWeek);
+        }
       }
 
       function updateSchedule(week) {
@@ -3726,8 +3753,9 @@
         const ms = nextMidnight.getTime() - kyivNow.getTime();
         setTimeout(() => {
           updateDailyPhrase();
+          syncWeekAtKyivMidnight();
           scheduleNextMidnight();
-        }, ms + 500);
+        }, Math.max(0, ms));
       }
 
       updateDailyPhrase();

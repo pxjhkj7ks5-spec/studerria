@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.60",
+      "date": "2026-02-15",
+      "items": [
+        "fix: auto-switch schedule to the actual week exactly at Kyiv midnight by recalculating week from semester start and updating `?week=` when stale",
+        "fix: align midnight timer trigger to fire at boundary time (removed +500ms delay) for precise day/week rollover behavior"
+      ]
+    },
+    {
       "version": "0.8.59",
       "date": "2026-02-15",
       "items": [
