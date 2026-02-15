@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.8.61",
+      "date": "2026-02-15",
+      "items": [
+        "fix: prevent `ReferenceError` in deanery schedule form by guarding optional `activeScheduleDays` local with `typeof` fallback in `admin.ejs`"
+      ]
+    },
+    {
       "version": "0.8.60",
       "date": "2026-02-15",
       "items": [

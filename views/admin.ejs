@@ -1187,7 +1187,7 @@
                   <div class="col-12 col-md-2">
                     <select class="form-select" name="day_of_week" required>
                       <option value="" disabled selected>Day</option>
-                      <% (activeScheduleDays || ['Monday','Tuesday','Wednesday','Thursday','Friday']).forEach(function(d) { %>
+                      <% (typeof activeScheduleDays !== 'undefined' && Array.isArray(activeScheduleDays) && activeScheduleDays.length ? activeScheduleDays : ['Monday','Tuesday','Wednesday','Thursday','Friday']).forEach(function(d) { %>
                         <option value="<%= d %>"><%= d %></option>
                       <% }); %>
                     </select>
