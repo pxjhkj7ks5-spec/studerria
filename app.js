@@ -124,6 +124,33 @@ const DEFAULT_ROLE_PERMISSIONS = {
   student: [],
 };
 
+const LEGACY_SESSION_ROLES = new Set(['admin', 'teacher', 'deanery', 'starosta', 'student']);
+const ROLE_KEY_ALIASES = {
+  admin: 'admin',
+  administrator: 'admin',
+  адмін: 'admin',
+  администратор: 'admin',
+  starosta: 'starosta',
+  староста: 'starosta',
+  deanery: 'deanery',
+  деканат: 'deanery',
+  teacher: 'teacher',
+  викладач: 'teacher',
+  student: 'student',
+  студент: 'student',
+};
+
+const ADMIN_SECTION_PERMISSION_OPTIONS = ADMIN_SECTION_OPTIONS.map((section) => ({
+  key: section.id,
+  label: section.label,
+  category: 'admin_section',
+}));
+
+const COURSE_KIND_OPTIONS = [
+  { key: 'regular', label: 'Regular courses' },
+  { key: 'teacher', label: 'Teacher courses' },
+];
+
 const DEFAULT_SETTINGS = {
   session_duration_days: 14,
   max_file_size_mb: 20,
@@ -382,6 +409,99 @@ const refreshSettingsCache = async () => {
   settingsCache = parsed;
 };
 
+function normalizeRoleKey(rawRole) {
+  const normalized = String(rawRole || 'student').trim().toLowerCase();
+  return ROLE_KEY_ALIASES[normalized] || normalized || 'student';
+}
+
+function normalizeRoleList(input) {
+  const list = Array.isArray(input) ? input : (typeof input === 'string' ? [input] : []);
+  const seen = new Set();
+  const normalized = [];
+  list.forEach((role) => {
+    const key = normalizeRoleKey(role);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    normalized.push(key);
+  });
+  return normalized;
+}
+
+function getSessionRoleList(req) {
+  if (!req || !req.session) return ['student'];
+  const roleList = normalizeRoleList(req.session.roles);
+  if (roleList.length) return roleList;
+  if (req.session.role) return normalizeRoleList([req.session.role]);
+  return ['student'];
+}
+
+function hasSessionRole(req, roleKey) {
+  return getSessionRoleList(req).includes(normalizeRoleKey(roleKey));
+}
+
+async function getUserRoleKeys(userId, fallbackRole = 'student') {
+  const fallback = normalizeRoleKey(fallbackRole);
+  if (!Number.isFinite(Number(userId))) {
+    return [fallback];
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT ar.key, ur.is_primary
+        FROM user_roles ur
+        JOIN access_roles ar ON ar.id = ur.role_id
+        WHERE ur.user_id = ? AND ar.is_active = true
+        ORDER BY ur.is_primary DESC, ar.key ASC
+      `,
+      [userId]
+    );
+    const keys = normalizeRoleList((rows || []).map((row) => row.key));
+    if (keys.length) return keys;
+  } catch (err) {
+    // fallback to legacy single-role field if RBAC tables are not available yet
+  }
+  return [fallback];
+}
+
+async function getRoleAllowedSectionsForRoleKeys(roleKeys = [], fallbackRole = 'student') {
+  const normalizedRoles = normalizeRoleList(roleKeys);
+  if (normalizedRoles.includes('admin')) return null;
+  if (!normalizedRoles.length) {
+    return getRoleAllowedSections(fallbackRole);
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT DISTINCT p.key
+        FROM access_role_permissions rp
+        JOIN access_roles ar ON ar.id = rp.role_id
+        JOIN access_permissions p ON p.id = rp.permission_id
+        WHERE rp.allowed = true
+          AND ar.is_active = true
+          AND p.category = 'admin_section'
+          AND ar.key = ANY(?)
+        ORDER BY p.key
+      `,
+      [normalizedRoles]
+    );
+    const list = (rows || []).map((row) => String(row.key));
+    if (list.length) return list;
+  } catch (err) {
+    // fallback below
+  }
+  if (normalizedRoles.length === 1) {
+    return getRoleAllowedSections(normalizedRoles[0]);
+  }
+  const merged = new Set();
+  normalizedRoles.forEach((role) => {
+    const sections = getRoleAllowedSections(role);
+    if (Array.isArray(sections)) {
+      sections.forEach((section) => merged.add(section));
+    }
+  });
+  return Array.from(merged);
+}
+
 const getRoleAllowedSections = (role) => {
   if (role === 'admin') return null;
   const permissions = settingsCache.role_permissions || {};
@@ -394,27 +514,290 @@ const getRoleAllowedSections = (role) => {
 const isTeacherCourseRow = (course) =>
   course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
 
-const buildStaffCourseAccess = (userCourseId, courses, role = '') => {
-  const normalizedRole = String(role || '').toLowerCase();
-  const denyTeacherCourses = normalizedRole === 'starosta' || normalizedRole === 'deanery';
+async function getAllowedCourseKindsForRoleKeys(roleKeys = []) {
+  const normalizedRoles = normalizeRoleList(roleKeys);
+  if (!normalizedRoles.length) {
+    return new Set(['regular']);
+  }
+  if (normalizedRoles.includes('admin')) {
+    return new Set(['regular', 'teacher']);
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT DISTINCT rca.course_kind
+        FROM access_role_course_access rca
+        JOIN access_roles ar ON ar.id = rca.role_id
+        WHERE rca.allowed = true
+          AND ar.is_active = true
+          AND ar.key = ANY(?)
+      `,
+      [normalizedRoles]
+    );
+    const courseKinds = new Set((rows || []).map((row) => String(row.course_kind)));
+    if (courseKinds.size) return courseKinds;
+  } catch (err) {
+    // fallback below
+  }
+  if (normalizedRoles.includes('teacher')) {
+    return new Set(['regular', 'teacher']);
+  }
+  return new Set(['regular']);
+}
+
+async function buildStaffCourseAccess(userCourseId, courses, roleOrRoles = '') {
+  const roleKeys = normalizeRoleList(roleOrRoles);
+  const allowedKinds = await getAllowedCourseKindsForRoleKeys(roleKeys);
   const allowedCourseIds = new Set();
   const baseCourseId = Number(userCourseId);
   if (Number.isFinite(baseCourseId)) {
     const baseCourse = (courses || []).find((course) => Number(course.id) === baseCourseId);
-    if (!denyTeacherCourses || !isTeacherCourseRow(baseCourse)) {
+    const baseKind = isTeacherCourseRow(baseCourse) ? 'teacher' : 'regular';
+    if (allowedKinds.has(baseKind)) {
       allowedCourseIds.add(baseCourseId);
     }
   }
-  if (!denyTeacherCourses) {
-    (courses || []).forEach((course) => {
-      if (isTeacherCourseRow(course)) {
-        allowedCourseIds.add(Number(course.id));
+  (courses || []).forEach((course) => {
+    const courseKind = isTeacherCourseRow(course) ? 'teacher' : 'regular';
+    if (allowedKinds.has(courseKind)) {
+      allowedCourseIds.add(Number(course.id));
+    }
+  });
+  const allowedCourses = (courses || []).filter((course) => allowedCourseIds.has(Number(course.id)));
+  return { allowedCourseIds, allowedCourses, allowedKinds };
+}
+
+async function getRbacRolesDetailed() {
+  try {
+    const [roleRows, permissionRows, courseRows, memberRows] = await Promise.all([
+      db.all(
+        `
+          SELECT id, key, label, description, is_system, is_active
+          FROM access_roles
+          ORDER BY is_system DESC, key ASC
+        `
+      ),
+      db.all(
+        `
+          SELECT ar.key AS role_key, p.key AS permission_key
+          FROM access_role_permissions rp
+          JOIN access_roles ar ON ar.id = rp.role_id
+          JOIN access_permissions p ON p.id = rp.permission_id
+          WHERE rp.allowed = true
+        `
+      ),
+      db.all(
+        `
+          SELECT ar.key AS role_key, rca.course_kind
+          FROM access_role_course_access rca
+          JOIN access_roles ar ON ar.id = rca.role_id
+          WHERE rca.allowed = true
+        `
+      ),
+      db.all(
+        `
+          SELECT ar.key AS role_key, COUNT(*)::int AS members_count
+          FROM user_roles ur
+          JOIN access_roles ar ON ar.id = ur.role_id
+          GROUP BY ar.key
+        `
+      ),
+    ]);
+    const permissionsByRole = {};
+    (permissionRows || []).forEach((row) => {
+      if (!permissionsByRole[row.role_key]) permissionsByRole[row.role_key] = new Set();
+      permissionsByRole[row.role_key].add(String(row.permission_key));
+    });
+    const courseByRole = {};
+    (courseRows || []).forEach((row) => {
+      if (!courseByRole[row.role_key]) courseByRole[row.role_key] = new Set();
+      courseByRole[row.role_key].add(String(row.course_kind));
+    });
+    const membersByRole = {};
+    (memberRows || []).forEach((row) => {
+      membersByRole[row.role_key] = Number(row.members_count || 0);
+    });
+    return (roleRows || []).map((row) => ({
+      id: Number(row.id),
+      key: String(row.key),
+      label: String(row.label || row.key),
+      description: String(row.description || ''),
+      is_system: row.is_system === true || Number(row.is_system) === 1,
+      is_active: row.is_active === true || Number(row.is_active) === 1,
+      permission_keys: Array.from(permissionsByRole[row.key] || []).sort(),
+      course_kinds: Array.from(courseByRole[row.key] || []).sort(),
+      members_count: membersByRole[row.key] || 0,
+    }));
+  } catch (err) {
+    return [];
+  }
+}
+
+async function getUserRoleAssignmentsForUserIds(userIds = []) {
+  const numericIds = Array.from(
+    new Set(
+      (Array.isArray(userIds) ? userIds : [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id))
+    )
+  );
+  const roleKeysByUser = {};
+  const primaryRoleByUser = {};
+  if (!numericIds.length) {
+    return { roleKeysByUser, primaryRoleByUser };
+  }
+  try {
+    const rows = await pool.query(
+      `
+        SELECT ur.user_id, ar.key, ur.is_primary
+        FROM user_roles ur
+        JOIN access_roles ar ON ar.id = ur.role_id
+        WHERE ur.user_id = ANY($1::int[])
+          AND ar.is_active = true
+        ORDER BY ur.user_id ASC, ur.is_primary DESC, ar.key ASC
+      `,
+      [numericIds]
+    );
+    rows.rows.forEach((row) => {
+      const userId = Number(row.user_id);
+      if (!roleKeysByUser[userId]) roleKeysByUser[userId] = [];
+      const key = normalizeRoleKey(row.key);
+      if (!roleKeysByUser[userId].includes(key)) {
+        roleKeysByUser[userId].push(key);
+      }
+      if (!primaryRoleByUser[userId] && (row.is_primary === true || Number(row.is_primary) === 1)) {
+        primaryRoleByUser[userId] = key;
       }
     });
+  } catch (err) {
+    // fallback below
   }
-  const allowedCourses = (courses || []).filter((course) => allowedCourseIds.has(Number(course.id)));
-  return { allowedCourseIds, allowedCourses };
-};
+  if (Object.keys(roleKeysByUser).length !== numericIds.length) {
+    const missing = numericIds.filter((id) => !roleKeysByUser[id]);
+    if (missing.length) {
+      const fallbackRows = await pool.query(
+        'SELECT id, role FROM users WHERE id = ANY($1::int[])',
+        [missing]
+      );
+      fallbackRows.rows.forEach((row) => {
+        const userId = Number(row.id);
+        const key = normalizeRoleKey(row.role || 'student');
+        roleKeysByUser[userId] = [key];
+        primaryRoleByUser[userId] = key;
+      });
+    }
+  }
+  return { roleKeysByUser, primaryRoleByUser };
+}
+
+async function assignUserRoles(userId, roleKeysInput, options = {}) {
+  const userIdNum = Number(userId);
+  if (!Number.isFinite(userIdNum) || userIdNum < 1) {
+    throw new Error('Invalid user');
+  }
+  let roleKeys = normalizeRoleList(roleKeysInput);
+  if (!roleKeys.length) {
+    throw new Error('At least one role is required');
+  }
+  if (!roleKeys.some((role) => LEGACY_SESSION_ROLES.has(role))) {
+    roleKeys.push('student');
+  }
+  roleKeys = normalizeRoleList(roleKeys);
+
+  const preferredPrimary = options.preferredPrimary ? normalizeRoleKey(options.preferredPrimary) : '';
+  let primaryRoleKey = preferredPrimary && roleKeys.includes(preferredPrimary)
+    ? preferredPrimary
+    : (roleKeys.find((role) => LEGACY_SESSION_ROLES.has(role)) || roleKeys[0]);
+  if (!primaryRoleKey) {
+    primaryRoleKey = 'student';
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const currentRows = await client.query(
+      `
+        SELECT ar.key
+        FROM user_roles ur
+        JOIN access_roles ar ON ar.id = ur.role_id
+        WHERE ur.user_id = $1
+      `,
+      [userIdNum]
+    );
+    const currentRoles = normalizeRoleList(currentRows.rows.map((row) => row.key));
+    const currentHasAdmin = currentRoles.includes('admin');
+    const nextHasAdmin = roleKeys.includes('admin');
+    if (currentHasAdmin && !nextHasAdmin) {
+      const adminCountRow = await client.query(
+        `
+          SELECT COUNT(DISTINCT ur.user_id)::int AS count
+          FROM user_roles ur
+          JOIN access_roles ar ON ar.id = ur.role_id
+          WHERE ar.key = 'admin'
+        `
+      );
+      if (Number(adminCountRow.rows[0]?.count || 0) <= 1) {
+        throw new Error('At least one admin required');
+      }
+    }
+    const roleRows = await client.query(
+      `
+        SELECT id, key
+        FROM access_roles
+        WHERE is_active = true
+          AND key = ANY($1::text[])
+      `,
+      [roleKeys]
+    );
+    if (roleRows.rows.length !== roleKeys.length) {
+      throw new Error('Invalid role selection');
+    }
+    const roleIdByKey = new Map(roleRows.rows.map((row) => [String(row.key), Number(row.id)]));
+    const roleIds = roleKeys.map((key) => roleIdByKey.get(key)).filter((id) => Number.isFinite(id));
+    const primaryRoleId = roleIdByKey.get(primaryRoleKey);
+    if (!Number.isFinite(primaryRoleId)) {
+      throw new Error('Invalid primary role');
+    }
+
+    await client.query(
+      'DELETE FROM user_roles WHERE user_id = $1 AND NOT (role_id = ANY($2::int[]))',
+      [userIdNum, roleIds]
+    );
+    for (const roleId of roleIds) {
+      await client.query(
+        `
+          INSERT INTO user_roles (user_id, role_id, is_primary, created_at, updated_at)
+          VALUES ($1, $2, false, NOW(), NOW())
+          ON CONFLICT (user_id, role_id)
+          DO UPDATE SET updated_at = EXCLUDED.updated_at
+        `,
+        [userIdNum, roleId]
+      );
+    }
+    await client.query(
+      'UPDATE user_roles SET is_primary = false, updated_at = NOW() WHERE user_id = $1',
+      [userIdNum]
+    );
+    await client.query(
+      'UPDATE user_roles SET is_primary = true, updated_at = NOW() WHERE user_id = $1 AND role_id = $2',
+      [userIdNum, primaryRoleId]
+    );
+    const legacyRole = LEGACY_SESSION_ROLES.has(primaryRoleKey)
+      ? primaryRoleKey
+      : (roleKeys.find((key) => LEGACY_SESSION_ROLES.has(key)) || 'student');
+    await client.query(
+      'UPDATE users SET role = $1 WHERE id = $2',
+      [legacyRole, userIdNum]
+    );
+    await client.query('COMMIT');
+    return { roleKeys, primaryRoleKey, legacyRole };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
 const ensureUser = async (fullName, role, passwordHash, options = {}) => {
   const { courseId = 1 } = options;
@@ -567,7 +950,27 @@ app.use(async (req, res, next) => {
   if (!req.session || !req.session.user) {
     return next();
   }
-  if (req.session.role === 'admin') {
+  try {
+    await ensureDbReady();
+    const roleKeys = await getUserRoleKeys(req.session.user.id, req.session.role || 'student');
+    req.session.roles = roleKeys;
+    const legacyRole = roleKeys.find((key) => LEGACY_SESSION_ROLES.has(key))
+      || normalizeRoleKey(req.session.role || 'student');
+    req.session.role = legacyRole;
+    res.locals.userRoles = roleKeys;
+  } catch (err) {
+    req.session.roles = getSessionRoleList(req);
+    req.session.role = normalizeRoleKey(req.session.role || req.session.roles[0] || 'student');
+    res.locals.userRoles = req.session.roles;
+  }
+  return next();
+});
+
+app.use(async (req, res, next) => {
+  if (!req.session || !req.session.user) {
+    return next();
+  }
+  if (hasSessionRole(req, 'admin')) {
     return next();
   }
   const allowedPrefixes = [
@@ -585,7 +988,6 @@ app.use(async (req, res, next) => {
     return next();
   }
   try {
-    await ensureDbReady();
     const courseId = req.session.user.course_id;
     if (!courseId) {
       return next();
@@ -599,7 +1001,10 @@ app.use(async (req, res, next) => {
       return next();
     }
     if (request.status === 'approved') {
-      if (req.session.role !== 'teacher') {
+      if (!hasSessionRole(req, 'teacher')) {
+        req.session.roles = normalizeRoleList([...getSessionRoleList(req), 'teacher']);
+      }
+      if (!hasSessionRole(req, 'admin') && !hasSessionRole(req, 'deanery') && !hasSessionRole(req, 'starosta')) {
         req.session.role = 'teacher';
       }
       return next();
@@ -2141,22 +2546,6 @@ app.post('/login', authLimiter, async (req, res) => {
   ensureUsersSchema(() => {
     const normalizedName = full_name.trim().replace(/\s+/g, ' ');
     const activeClause = usersHasIsActive ? ' AND is_active = 1' : '';
-    const normalizeRole = (rawRole) => {
-      const normalized = String(rawRole || 'student').trim().toLowerCase();
-      const map = {
-        admin: 'admin',
-        administrator: 'admin',
-        адмін: 'admin',
-        администратор: 'admin',
-        starosta: 'starosta',
-        староста: 'starosta',
-        deanery: 'deanery',
-        деканат: 'deanery',
-        student: 'student',
-        студент: 'student',
-      };
-      return map[normalized] || 'student';
-    };
     db.get(
       `SELECT id, full_name, role, password_hash, schedule_group, course_id, language FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
       [normalizedName],
@@ -2165,7 +2554,7 @@ app.post('/login', authLimiter, async (req, res) => {
         if (err || !user || !validHash) {
           return res.redirect('/login?error=1');
         }
-        const role = normalizeRole(user.role);
+        const role = normalizeRoleKey(user.role);
         if (role !== user.role) {
           db.run('UPDATE users SET role = ? WHERE id = ?', [role, user.id]);
         }
@@ -3209,7 +3598,7 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
 
 app.get('/schedule', requireLogin, async (req, res) => {
   const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
-  if (req.session.role === 'teacher') {
+  if (hasSessionRole(req, 'teacher')) {
     try {
       await ensureDbReady();
       const teacherSubjects = await db.all(
@@ -3694,7 +4083,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
       return handleDbError(res, err, 'teacher.schedule');
     }
   }
-  const isAdminViewAs = req.session.role === 'admin' && req.session.viewAs === 'student';
+  const isAdminViewAs = hasSessionRole(req, 'admin') && req.session.viewAs === 'student';
   const viewAsMode = isAdminViewAs ? (req.session.viewAsMode || 'manual') : null;
   let viewAsCourseId = isAdminViewAs ? Number(req.session.viewAsCourseId) : null;
   let viewAsGroupNumber = isAdminViewAs ? Number(req.session.viewAsGroupNumber) : null;
@@ -4645,8 +5034,8 @@ app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) =>
   }
   const createdAt = new Date().toISOString();
   const createdBy = req.session.user.id;
-  const isAdmin = req.session.role === 'admin';
-  const baseCourseId = getAdminCourse(req);
+  const isAdmin = hasSessionRole(req, 'admin');
+  const baseCourseId = isAdmin ? getAdminCourse(req) : Number(req.session.user.course_id || 1);
   const activeSemester = await getActiveSemester(baseCourseId);
   const target = target_type || (String(target_all) === '1' ? 'all' : 'subject');
   const isAllCourses = target === 'all_courses';
@@ -5000,7 +5389,7 @@ app.get('/admin/api/messages/:id/reads', requireStaff, readLimiter, async (req, 
   if (Number.isNaN(messageId)) {
     return res.status(400).json({ error: 'Invalid message' });
   }
-  const courseId = getAdminCourse(req);
+  const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : Number(req.session.user.course_id || 1);
   let activeSemester = null;
   try {
     activeSemester = await getActiveSemester(courseId);
@@ -5809,15 +6198,41 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
       console.error('Database error (admin.overview.weekly)', weeklyErr);
     }
 
+    let rbacRoles = [];
+    let roleKeysByUser = {};
+    let primaryRoleByUser = {};
+    try {
+      const userIds = (users || []).map((user) => Number(user.id)).filter((id) => Number.isFinite(id));
+      const [rolesDetailed, assignment] = await Promise.all([
+        getRbacRolesDetailed(),
+        getUserRoleAssignmentsForUserIds(userIds),
+      ]);
+      rbacRoles = rolesDetailed || [];
+      roleKeysByUser = assignment.roleKeysByUser || {};
+      primaryRoleByUser = assignment.primaryRoleByUser || {};
+    } catch (rbacErr) {
+      console.error('Database error (admin.rbac)', rbacErr);
+    }
+    const usersWithRoles = (users || []).map((user) => {
+      const userId = Number(user.id);
+      const roleKeys = roleKeysByUser[userId] || [normalizeRoleKey(user.role || 'student')];
+      const primaryRole = primaryRoleByUser[userId] || normalizeRoleKey(user.role || roleKeys[0] || 'student');
+      return {
+        ...user,
+        role_keys: roleKeys,
+        primary_role: primaryRole,
+      };
+    });
+
     try {
         res.render('admin', {
           username: req.session.user.username,
           userId: req.session.user.id,
-          role: req.session.role,
+          role: 'admin',
                                       schedule,
                                       homework,
                                       homeworkTags,
-                                      users,
+                                      users: usersWithRoles,
                                       subjects,
                                       studentGroups,
                                       logs,
@@ -5843,6 +6258,11 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
                                       rolePermissions: settingsCache.role_permissions || { ...DEFAULT_ROLE_PERMISSIONS },
                                       defaultRolePermissions: DEFAULT_ROLE_PERMISSIONS,
                                       adminSectionOptions: ADMIN_SECTION_OPTIONS,
+                                      rbacRoles,
+                                      rbacPermissionOptions: ADMIN_SECTION_PERMISSION_OPTIONS,
+                                      courseKindOptions: COURSE_KIND_OPTIONS,
+                                      userRoleAssignments: roleKeysByUser,
+                                      userPrimaryRoleMap: primaryRoleByUser,
         activeScheduleDays,
         filters: {
           group_number: group_number || '',
@@ -6049,7 +6469,7 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
 
     return res.render('admin-schedule-list', {
       username: req.session.user.username,
-      role: req.session.role,
+      role: 'admin',
       courses,
       subjects,
       semesters,
@@ -7960,10 +8380,10 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.init');
   }
-  const role = req.session.role;
-  const isAdmin = role === 'admin';
-  const isDeanery = role === 'deanery';
-  const isStarosta = role === 'starosta';
+  const roleKeys = getSessionRoleList(req);
+  const isAdmin = roleKeys.includes('admin');
+  const isDeanery = roleKeys.includes('deanery');
+  const isStarosta = roleKeys.includes('starosta');
   let courses = [];
   try {
     courses = await getCoursesCached();
@@ -7974,7 +8394,7 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
   let allowCourseSelect = isAdmin;
   if (!isAdmin) {
     const baseCourseId = Number(req.session.user.course_id || 1);
-    const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, courses, role);
+    const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
     if (!allowedCourses.length) {
       return res.status(403).send('Forbidden (course access)');
     }
@@ -8120,7 +8540,7 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
 
     return res.render('admin-overview', {
       username: req.session.user.username,
-      role: req.session.role,
+      role: isAdmin ? 'admin' : (isDeanery ? 'deanery' : 'starosta'),
       courses,
       selectedCourseId: courseId,
       dashboardStats,
@@ -8194,7 +8614,25 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
                       console.error('Database error (admin.users.json.studentGroups)', sgErr);
                       return res.status(500).json({ error: 'Database error' });
                     }
-                    res.json({ users, subjects, studentGroups, courses, selectedCourseId: courseId });
+                    (async () => {
+                      const userIds = (users || []).map((user) => Number(user.id)).filter((id) => Number.isFinite(id));
+                      const assignment = await getUserRoleAssignmentsForUserIds(userIds);
+                      const usersWithRoles = (users || []).map((user) => {
+                        const userId = Number(user.id);
+                        const roleKeys = assignment.roleKeysByUser[userId] || [normalizeRoleKey(user.role || 'student')];
+                        const primaryRole = assignment.primaryRoleByUser[userId]
+                          || normalizeRoleKey(user.role || roleKeys[0] || 'student');
+                        return {
+                          ...user,
+                          role_keys: roleKeys,
+                          primary_role: primaryRole,
+                        };
+                      });
+                      res.json({ users: usersWithRoles, subjects, studentGroups, courses, selectedCourseId: courseId });
+                    })().catch((roleErr) => {
+                      console.error('Database error (admin.users.json.roles)', roleErr);
+                      return res.status(500).json({ error: 'Database error' });
+                    });
                   }
                 );
               })
@@ -8937,7 +9375,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   const isControl = String(is_control || '').toLowerCase() === '1' ? 1 : 0;
   const sessionCourseId = req.session.user?.course_id || 1;
   const inputCourseId = Number(req.body.course_id);
-  const isTeacher = req.session.role === 'teacher';
+  const isTeacher = hasSessionRole(req, 'teacher');
   const courseId = isTeacher && !Number.isNaN(inputCourseId) ? inputCourseId : sessionCourseId;
 
   if (
@@ -8964,7 +9402,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   const { schedule_group: group, username, id: userId } = req.session.user;
   const createdAt = new Date().toISOString();
   const activeSemester = await getActiveSemester(courseId || 1);
-  const isStaff = ['admin', 'deanery', 'starosta', 'teacher'].includes(req.session.role);
+  const isStaff = getSessionRoleList(req).some((role) => ['admin', 'deanery', 'starosta', 'teacher'].includes(role));
   let homeworkStatus = isStaff ? String(req.body.status || 'published').toLowerCase() : 'published';
   if (!['draft', 'scheduled', 'published'].includes(homeworkStatus)) {
     homeworkStatus = 'published';
@@ -8985,7 +9423,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   if (homeworkStatus === 'draft') {
     publishedAt = null;
   }
-  if (!settingsCache.allow_homework_creation && req.session.role !== 'admin') {
+  if (!settingsCache.allow_homework_creation && !hasSessionRole(req, 'admin')) {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
     }
@@ -9136,7 +9574,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
 });
 
 app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachment'), async (req, res) => {
-  if (!settingsCache.allow_custom_deadlines && req.session.role !== 'admin') {
+  if (!settingsCache.allow_custom_deadlines && !hasSessionRole(req, 'admin')) {
     return res.status(403).send('Custom deadlines disabled');
   }
   const { description, link_url, meeting_url, subject_id, custom_due_date } = req.body;
@@ -9160,11 +9598,11 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
 
   const { schedule_group: group, username, id: userId } = req.session.user;
   const sessionCourseId = req.session.user.course_id || 1;
-  const isTeacher = req.session.role === 'teacher';
+  const isTeacher = hasSessionRole(req, 'teacher');
   const courseId = isTeacher && !Number.isNaN(Number(req.body.course_id)) ? Number(req.body.course_id) : sessionCourseId;
   const createdAt = new Date().toISOString();
   const activeSemester = await getActiveSemester(courseId || 1);
-  const isStaff = ['admin', 'deanery', 'starosta', 'teacher'].includes(req.session.role);
+  const isStaff = getSessionRoleList(req).some((role) => ['admin', 'deanery', 'starosta', 'teacher'].includes(role));
   let homeworkStatus = isStaff ? String(req.body.status || 'published').toLowerCase() : 'published';
   if (!['draft', 'scheduled', 'published'].includes(homeworkStatus)) {
     homeworkStatus = 'published';
@@ -9185,7 +9623,7 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
   if (homeworkStatus === 'draft') {
     publishedAt = null;
   }
-  if (!settingsCache.allow_homework_creation && req.session.role !== 'admin') {
+  if (!settingsCache.allow_homework_creation && !hasSessionRole(req, 'admin')) {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
     }
@@ -9369,7 +9807,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
     return handleDbError(res, err, 'starosta.courses');
   }
 
-  const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, allCourses, req.session.role);
+  const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, allCourses, getSessionRoleList(req));
   if (!allowedCourses.length) {
     return res.status(403).send('Forbidden (course access)');
   }
@@ -9571,11 +10009,18 @@ app.get('/starosta', requireStaff, async (req, res) => {
     return handleDbError(res, err, 'starosta.messages');
   }
 
+  let allowedSections = null;
+  try {
+    allowedSections = await getRoleAllowedSectionsForRoleKeys(getSessionRoleList(req), 'starosta');
+  } catch (err) {
+    allowedSections = getRoleAllowedSections('starosta');
+  }
+
   try {
     return res.render('admin', {
       username: req.session.user.username,
       userId: req.session.user.id,
-      role: req.session.role,
+      role: 'starosta',
       schedule: [],
       homework,
       homeworkTags,
@@ -9590,7 +10035,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
       activeSemester,
       selectedCourseId: courseId,
       limitedStaffView: true,
-      allowedSections: getRoleAllowedSections('starosta'),
+      allowedSections,
       allowCourseSelect,
       filters: {
         group_number: group_number || '',
@@ -9626,7 +10071,7 @@ app.get('/deanery', requireDeanery, (req, res) => {
     } catch (err) {
       return handleDbError(res, err, 'deanery.courses');
     }
-    const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, allCourses, req.session.role);
+    const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, allCourses, getSessionRoleList(req));
     if (!allowedCourses.length) {
       return res.status(403).send('Forbidden (course access)');
     }
@@ -9636,6 +10081,12 @@ app.get('/deanery', requireDeanery, (req, res) => {
       courseId = Number(allowedCourses[0].id);
     }
     const allowCourseSelect = allowedCourses.length > 1;
+    let allowedSections = null;
+    try {
+      allowedSections = await getRoleAllowedSectionsForRoleKeys(getSessionRoleList(req), 'deanery');
+    } catch (err) {
+      allowedSections = getRoleAllowedSections('deanery');
+    }
     const { group_number, day, subject, sort_schedule, schedule_date } = req.query;
     let activeSemester = null;
     try {
@@ -9701,7 +10152,7 @@ app.get('/deanery', requireDeanery, (req, res) => {
               return res.render('admin', {
                 username: req.session.user.username,
                 userId: req.session.user.id,
-                role: req.session.role,
+                role: 'deanery',
                 schedule,
                 homework: [],
                 users: [],
@@ -9715,7 +10166,7 @@ app.get('/deanery', requireDeanery, (req, res) => {
                 activeSemester,
                 selectedCourseId: courseId,
                 limitedStaffView: true,
-                allowedSections: getRoleAllowedSections('deanery'),
+                allowedSections,
                 allowCourseSelect,
                 filters: {
                   group_number: group_number || '',
@@ -10143,8 +10594,7 @@ app.post('/admin/api/subjects/:subjectId/clone', requireAdminOrDeanery, async (r
   if (Number.isNaN(subjectId) || !new_name || !new_name.trim()) {
     return res.status(400).json({ error: 'Invalid input' });
   }
-  const role = req.session.role;
-  const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
   try {
     const subject = await db.get('SELECT * FROM subjects WHERE id = ? AND course_id = ?', [subjectId, courseId]);
     if (!subject) return res.status(404).json({ error: 'Subject not found' });
@@ -10176,8 +10626,7 @@ app.post('/admin/api/schedule/weeks/clone', requireAdminOrDeanery, async (req, r
   if (Number.isNaN(srcWeek) || Number.isNaN(tgtWeek) || srcWeek < 1 || tgtWeek < 1) {
     return res.status(400).json({ error: 'Invalid week' });
   }
-  const role = req.session.role;
-  const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
   let activeSemester = null;
   try {
     activeSemester = await getActiveSemester(courseId);
@@ -10233,8 +10682,7 @@ app.post('/admin/api/schedule/weeks/clone', requireAdminOrDeanery, async (req, r
 app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkBulkAccess, async (req, res) => {
   const homeworkId = Number(req.params.homeworkId);
   if (Number.isNaN(homeworkId)) return res.status(400).json({ error: 'Invalid homework' });
-  const role = req.session.role;
-  const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
   let activeSemester = null;
   try {
     activeSemester = await getActiveSemester(courseId);
@@ -10459,7 +10907,7 @@ app.get('/admin/api/courses/:courseId/study-days', requireAdminOrDeanery, async 
   if (Number.isNaN(courseId) || courseId < 1) {
     return res.status(400).json({ error: 'Invalid course' });
   }
-  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+  if (hasSessionRole(req, 'deanery') && !hasSessionRole(req, 'admin') && Number(req.session.user.course_id) !== courseId) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
@@ -10481,7 +10929,7 @@ app.patch('/admin/api/courses/:courseId/study-days/:weekday', requireAdminOrDean
   if (Number.isNaN(courseId) || courseId < 1 || Number.isNaN(weekday) || weekday < 1 || weekday > 7) {
     return res.status(400).json({ error: 'Invalid input' });
   }
-  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+  if (hasSessionRole(req, 'deanery') && !hasSessionRole(req, 'admin') && Number(req.session.user.course_id) !== courseId) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
@@ -10507,7 +10955,7 @@ app.post('/admin/api/courses/:courseId/study-days/:weekday/subjects', requireAdm
   if (Number.isNaN(courseId) || Number.isNaN(weekday) || Number.isNaN(subjectId) || weekday < 1 || weekday > 7) {
     return res.status(400).json({ error: 'Invalid input' });
   }
-  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+  if (hasSessionRole(req, 'deanery') && !hasSessionRole(req, 'admin') && Number(req.session.user.course_id) !== courseId) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
@@ -10541,7 +10989,7 @@ app.delete('/admin/api/courses/:courseId/study-days/:weekday/subjects/:subjectId
   if (Number.isNaN(courseId) || Number.isNaN(weekday) || Number.isNaN(subjectId) || weekday < 1 || weekday > 7) {
     return res.status(400).json({ error: 'Invalid input' });
   }
-  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+  if (hasSessionRole(req, 'deanery') && !hasSessionRole(req, 'admin') && Number(req.session.user.course_id) !== courseId) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
@@ -10566,7 +11014,7 @@ app.get('/admin/api/courses/:courseId/week-time', requireAdminOrDeanery, async (
   if (Number.isNaN(courseId) || courseId < 1) {
     return res.status(400).json({ error: 'Invalid course' });
   }
-  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+  if (hasSessionRole(req, 'deanery') && !hasSessionRole(req, 'admin') && Number(req.session.user.course_id) !== courseId) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
@@ -10593,7 +11041,7 @@ app.patch('/admin/api/courses/:courseId/week-time/:weekNumber', requireAdminOrDe
   if (Number.isNaN(courseId) || courseId < 1 || Number.isNaN(weekNumber) || weekNumber < 1) {
     return res.status(400).json({ error: 'Invalid input' });
   }
-  if (req.session.role === 'deanery' && Number(req.session.user.course_id) !== courseId) {
+  if (hasSessionRole(req, 'deanery') && !hasSessionRole(req, 'admin') && Number(req.session.user.course_id) !== courseId) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
@@ -10628,8 +11076,7 @@ app.post('/admin/api/homework/bulk', requireHomeworkBulkAccess, writeLimiter, as
   if (!list.length || !action) {
     return res.status(400).json({ error: 'Invalid input' });
   }
-  const role = req.session.role;
-  const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
   let activeSemester = null;
   try {
     activeSemester = await getActiveSemester(courseId);
@@ -10765,8 +11212,7 @@ app.post('/admin/api/homework/bulk', requireHomeworkBulkAccess, writeLimiter, as
 });
 
 app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) => {
-  const role = req.session.role;
-  const courseId = role === 'admin' ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
   let activeSemester = null;
   try {
     activeSemester = await getActiveSemester(courseId);
@@ -11102,48 +11548,298 @@ app.post('/admin/group/remove', requireAdmin, (req, res) => {
   );
 });
 
-app.post('/admin/users/role', requireAdmin, (req, res) => {
-  const { user_id, role } = req.body;
+app.get('/admin/users/:id/roles.json', requireAdmin, async (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isFinite(userId) || userId < 1) {
+    return res.status(400).json({ error: 'Invalid user' });
+  }
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
   const courseId = getAdminCourse(req);
-  if (!user_id || !role || !['student', 'admin', 'starosta', 'deanery', 'teacher'].includes(role)) {
-    return res.redirect('/admin?err=Invalid%20role');
+  try {
+    const userRow = await db.get('SELECT id, role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    if (!userRow) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const [roles, assignment] = await Promise.all([
+      getRbacRolesDetailed(),
+      getUserRoleAssignmentsForUserIds([userId]),
+    ]);
+    const roleKeys = assignment.roleKeysByUser[userId] || [normalizeRoleKey(userRow.role || 'student')];
+    const primaryRole = assignment.primaryRoleByUser[userId] || normalizeRoleKey(userRow.role || roleKeys[0] || 'student');
+    return res.json({
+      user_id: userId,
+      role_keys: roleKeys,
+      primary_role: primaryRole,
+      roles,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
   }
-  const currentId = req.session.user.id;
-  if (Number(user_id) === Number(currentId)) {
-    return res.redirect('/admin?err=Cannot%20change%20your%20own%20role');
+});
+
+app.post('/admin/users/roles', requireAdmin, async (req, res) => {
+  const userId = Number(req.body.user_id);
+  const courseId = getAdminCourse(req);
+  const selectedRoles = normalizeRoleList(
+    Array.isArray(req.body.role_keys) ? req.body.role_keys : (req.body.role_keys ? [req.body.role_keys] : [])
+  );
+  if (!Number.isFinite(userId) || userId < 1 || !selectedRoles.length) {
+    return res.redirect('/admin?err=Invalid%20role%20selection');
   }
-  db.get('SELECT role FROM users WHERE id = ? AND course_id = ?', [user_id, courseId], (err, user) => {
-    if (err || !user) {
+  try {
+    await ensureDbReady();
+    const user = await db.get('SELECT id, role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    if (!user) {
       return res.redirect('/admin?err=User%20not%20found');
     }
-    if (user.role === 'admin' && role !== 'admin') {
-      db.get('SELECT COUNT(*) AS count FROM users WHERE role = ?', ['admin'], (countErr, row) => {
-        if (countErr) {
-          return res.redirect('/admin?err=Database%20error');
-        }
-        if (Number(row.count) <= 1) {
-          return res.redirect('/admin?err=At%20least%20one%20admin%20required');
-        }
-        db.run('UPDATE users SET role = ? WHERE id = ?', [role, user_id], (updErr) => {
-          if (updErr) {
-            return res.redirect('/admin?err=Database%20error');
-          }
-          logAction(db, req, 'user_role_change', { user_id, role });
-          broadcast('users_updated');
-          return res.redirect('/admin?ok=Role%20updated');
-        });
-      });
-      return;
+    if (Number(userId) === Number(req.session.user.id) && !selectedRoles.includes('admin')) {
+      return res.redirect('/admin?err=Cannot%20remove%20your%20own%20admin%20role');
     }
-    db.run('UPDATE users SET role = ? WHERE id = ?', [role, user_id], (updErr) => {
-      if (updErr) {
-        return res.redirect('/admin?err=Database%20error');
+    const preferredPrimary = req.body.primary_role || user.role || 'student';
+    const result = await assignUserRoles(userId, selectedRoles, { preferredPrimary });
+    logAction(db, req, 'user_roles_change', { user_id: userId, role_keys: result.roleKeys, primary_role: result.primaryRoleKey });
+    broadcast('users_updated');
+    return res.redirect('/admin?ok=Roles%20updated');
+  } catch (err) {
+    if (String(err.message || '').includes('At least one admin required')) {
+      return res.redirect('/admin?err=At%20least%20one%20admin%20required');
+    }
+    if (String(err.message || '').includes('Invalid role')) {
+      return res.redirect('/admin?err=Invalid%20role%20selection');
+    }
+    return res.redirect('/admin?err=Database%20error');
+  }
+});
+
+app.post('/admin/users/role', requireAdmin, async (req, res) => {
+  const { user_id, role } = req.body;
+  const roleKey = normalizeRoleKey(role);
+  if (!user_id || !roleKey || !['student', 'admin', 'starosta', 'deanery', 'teacher'].includes(roleKey)) {
+    return res.redirect('/admin?err=Invalid%20role');
+  }
+  const userId = Number(user_id);
+  const courseId = getAdminCourse(req);
+  if (!Number.isFinite(userId) || userId < 1) {
+    return res.redirect('/admin?err=Invalid%20role');
+  }
+  if (userId === Number(req.session.user.id)) {
+    return res.redirect('/admin?err=Cannot%20change%20your%20own%20role');
+  }
+  try {
+    await ensureDbReady();
+    const user = await db.get('SELECT id, role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    if (!user) {
+      return res.redirect('/admin?err=User%20not%20found');
+    }
+    await assignUserRoles(userId, [roleKey], { preferredPrimary: roleKey });
+    logAction(db, req, 'user_role_change', { user_id: userId, role: roleKey });
+    broadcast('users_updated');
+    return res.redirect('/admin?ok=Role%20updated');
+  } catch (err) {
+    if (String(err.message || '').includes('At least one admin required')) {
+      return res.redirect('/admin?err=At%20least%20one%20admin%20required');
+    }
+    return res.redirect('/admin?err=Database%20error');
+  }
+});
+
+app.post('/admin/rbac/roles/create', requireAdmin, async (req, res) => {
+  const key = String(req.body.key || '').trim().toLowerCase();
+  const label = String(req.body.label || '').trim();
+  const description = String(req.body.description || '').trim();
+  const cloneFrom = String(req.body.clone_from || '').trim().toLowerCase();
+  if (!/^[a-z][a-z0-9_-]{1,31}$/.test(key) || !label) {
+    return res.redirect('/admin?err=Invalid%20role%20data');
+  }
+  try {
+    await ensureDbReady();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const inserted = await client.query(
+        `
+          INSERT INTO access_roles (key, label, description, is_system, is_active, created_at, updated_at)
+          VALUES ($1, $2, $3, false, true, NOW(), NOW())
+          RETURNING id
+        `,
+        [key, label, description]
+      );
+      const roleId = Number(inserted.rows[0].id);
+      if (cloneFrom) {
+        await client.query(
+          `
+            INSERT INTO access_role_permissions (role_id, permission_id, allowed, created_at, updated_at)
+            SELECT $1, rp.permission_id, rp.allowed, NOW(), NOW()
+            FROM access_role_permissions rp
+            JOIN access_roles src ON src.id = rp.role_id
+            WHERE src.key = $2
+            ON CONFLICT (role_id, permission_id) DO NOTHING
+          `,
+          [roleId, cloneFrom]
+        );
+        await client.query(
+          `
+            INSERT INTO access_role_course_access (role_id, course_kind, allowed, created_at, updated_at)
+            SELECT $1, rca.course_kind, rca.allowed, NOW(), NOW()
+            FROM access_role_course_access rca
+            JOIN access_roles src ON src.id = rca.role_id
+            WHERE src.key = $2
+            ON CONFLICT (role_id, course_kind) DO NOTHING
+          `,
+          [roleId, cloneFrom]
+        );
+      } else {
+        await client.query(
+          `
+            INSERT INTO access_role_course_access (role_id, course_kind, allowed, created_at, updated_at)
+            VALUES ($1, 'regular', true, NOW(), NOW())
+            ON CONFLICT (role_id, course_kind) DO NOTHING
+          `,
+          [roleId]
+        );
       }
-      logAction(db, req, 'user_role_change', { user_id, role });
+      await client.query('COMMIT');
+      logAction(db, req, 'rbac_role_create', { key, label, clone_from: cloneFrom || null });
+      broadcast('users_updated');
+      return res.redirect('/admin?ok=Role%20created');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      if (err && err.code === '23505') {
+        return res.redirect('/admin?err=Role%20key%20already%20exists');
+      }
+      return res.redirect('/admin?err=Database%20error');
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
+});
+
+app.post('/admin/rbac/roles/:key/save', requireAdmin, async (req, res) => {
+  const roleKey = String(req.params.key || '').trim().toLowerCase();
+  if (!roleKey) {
+    return res.redirect('/admin?err=Invalid%20role');
+  }
+  const label = String(req.body.label || '').trim();
+  const description = String(req.body.description || '').trim();
+  const selectedPermissions = normalizeRoleList(
+    Array.isArray(req.body.permission_keys)
+      ? req.body.permission_keys
+      : (req.body.permission_keys ? [req.body.permission_keys] : [])
+  );
+  const selectedCourseKinds = Array.from(
+    new Set(
+      (Array.isArray(req.body.course_kinds) ? req.body.course_kinds : (req.body.course_kinds ? [req.body.course_kinds] : []))
+        .map((kind) => String(kind))
+        .filter((kind) => kind === 'regular' || kind === 'teacher')
+    )
+  );
+  if (!label) {
+    return res.redirect('/admin?err=Role%20label%20required');
+  }
+  try {
+    await ensureDbReady();
+    const roleRow = await db.get('SELECT id, key, is_system FROM access_roles WHERE key = ?', [roleKey]);
+    if (!roleRow) {
+      return res.redirect('/admin?err=Role%20not%20found');
+    }
+    const requestedActive = String(req.body.is_active || '').toLowerCase();
+    let isActive = requestedActive === '1' || requestedActive === 'true' || requestedActive === 'on';
+    if (roleRow.key === 'admin') isActive = true;
+    const courseKinds = selectedCourseKinds.length
+      ? selectedCourseKinds
+      : (roleRow.key === 'admin' ? ['regular', 'teacher'] : ['regular']);
+    const permissionRows = await db.all('SELECT key FROM access_permissions WHERE category = ?', ['admin_section']);
+    const validPermissions = new Set((permissionRows || []).map((row) => String(row.key)));
+    const permissionKeys = selectedPermissions.filter((key) => validPermissions.has(key));
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `
+          UPDATE access_roles
+          SET label = $1,
+              description = $2,
+              is_active = $3,
+              updated_at = NOW()
+          WHERE id = $4
+        `,
+        [label, description, isActive, roleRow.id]
+      );
+      await client.query('DELETE FROM access_role_permissions WHERE role_id = $1', [roleRow.id]);
+      if (permissionKeys.length) {
+        await client.query(
+          `
+            INSERT INTO access_role_permissions (role_id, permission_id, allowed, created_at, updated_at)
+            SELECT $1, p.id, true, NOW(), NOW()
+            FROM access_permissions p
+            WHERE p.key = ANY($2::text[])
+            ON CONFLICT (role_id, permission_id) DO NOTHING
+          `,
+          [roleRow.id, permissionKeys]
+        );
+      }
+      await client.query('DELETE FROM access_role_course_access WHERE role_id = $1', [roleRow.id]);
+      await client.query(
+        `
+          INSERT INTO access_role_course_access (role_id, course_kind, allowed, created_at, updated_at)
+          SELECT $1, kind.kind, true, NOW(), NOW()
+          FROM (SELECT UNNEST($2::text[]) AS kind) kind
+          ON CONFLICT (role_id, course_kind) DO NOTHING
+        `,
+        [roleRow.id, courseKinds]
+      );
+      await client.query('COMMIT');
+      logAction(db, req, 'rbac_role_update', {
+        key: roleRow.key,
+        label,
+        is_active: isActive,
+        permission_keys: permissionKeys,
+        course_kinds: courseKinds,
+      });
       broadcast('users_updated');
       return res.redirect('/admin?ok=Role%20updated');
-    });
-  });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      return res.redirect('/admin?err=Database%20error');
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
+});
+
+app.post('/admin/rbac/roles/:key/delete', requireAdmin, async (req, res) => {
+  const roleKey = String(req.params.key || '').trim().toLowerCase();
+  if (!roleKey) {
+    return res.redirect('/admin?err=Invalid%20role');
+  }
+  try {
+    await ensureDbReady();
+    const roleRow = await db.get('SELECT id, key, is_system FROM access_roles WHERE key = ?', [roleKey]);
+    if (!roleRow) {
+      return res.redirect('/admin?err=Role%20not%20found');
+    }
+    if (roleRow.is_system === true || Number(roleRow.is_system) === 1) {
+      return res.redirect('/admin?err=Cannot%20delete%20system%20role');
+    }
+    const usageRow = await db.get('SELECT COUNT(*) AS count FROM user_roles WHERE role_id = ?', [roleRow.id]);
+    if (Number(usageRow?.count || 0) > 0) {
+      return res.redirect('/admin?err=Role%20is%20assigned%20to%20users');
+    }
+    await db.run('DELETE FROM access_roles WHERE id = ?', [roleRow.id]);
+    logAction(db, req, 'rbac_role_delete', { key: roleRow.key });
+    broadcast('users_updated');
+    return res.redirect('/admin?ok=Role%20deleted');
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
 });
 
 app.post('/admin/users/course', requireAdmin, (req, res) => {

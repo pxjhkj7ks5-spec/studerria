@@ -855,6 +855,23 @@
       <% const adminSectionOptionsList = typeof adminSectionOptions !== 'undefined' && Array.isArray(adminSectionOptions) ? adminSectionOptions : []; %>
       <% const rolePermissionsMap = typeof rolePermissions !== 'undefined' && rolePermissions ? rolePermissions : {}; %>
       <% const dashboardStatsData = typeof dashboardStats !== 'undefined' && dashboardStats ? dashboardStats : null; %>
+      <% const rbacRolesList = typeof rbacRoles !== 'undefined' && Array.isArray(rbacRoles) ? rbacRoles : []; %>
+      <% const rbacPermissionOptionsList = typeof rbacPermissionOptions !== 'undefined' && Array.isArray(rbacPermissionOptions) ? rbacPermissionOptions : []; %>
+      <% const courseKindOptionsList = typeof courseKindOptions !== 'undefined' && Array.isArray(courseKindOptions) ? courseKindOptions : []; %>
+      <% const userRoleAssignmentsMap = typeof userRoleAssignments !== 'undefined' && userRoleAssignments ? userRoleAssignments : {}; %>
+      <% const userPrimaryRoleMapData = typeof userPrimaryRoleMap !== 'undefined' && userPrimaryRoleMap ? userPrimaryRoleMap : {}; %>
+      <% const roleLabelMapData = Object.assign({
+        admin: 'Адмін',
+        teacher: 'Викладач',
+        deanery: 'Деканат',
+        starosta: 'Староста',
+        student: 'Студент',
+      }, (rbacRolesList || []).reduce((acc, roleRow) => {
+        if (roleRow && roleRow.key) {
+          acc[roleRow.key] = roleRow.label || roleRow.key;
+        }
+        return acc;
+      }, {})); %>
       <% const roleAccessRoles = [
         { key: 'admin', label: 'Адмін', editable: false },
         { key: 'deanery', label: 'Деканат', editable: true },
@@ -1050,6 +1067,109 @@
                   <div class="small text-muted">Manual save · changes are applied after clicking “Save”.</div>
                 </div>
               </form>
+            </div>
+          </div>
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                  <h5 class="mb-1">Role Studio (beta)</h5>
+                  <div class="small text-muted">Кастомні ролі, секційні права та доступ до типів курсів.</div>
+                </div>
+              </div>
+              <form method="POST" action="/admin/rbac/roles/create" class="row g-2 align-items-end mb-4">
+                <div class="col-12 col-md-3">
+                  <label class="form-label">Key</label>
+                  <input class="form-control" name="key" placeholder="assistant" pattern="[a-z][a-z0-9_-]{1,31}" required />
+                </div>
+                <div class="col-12 col-md-3">
+                  <label class="form-label">Label</label>
+                  <input class="form-control" name="label" placeholder="Асистент" required />
+                </div>
+                <div class="col-12 col-md-3">
+                  <label class="form-label">Clone from</label>
+                  <select class="form-select" name="clone_from">
+                    <option value="">Порожня роль</option>
+                    <% rbacRolesList.forEach(function(roleRow) { %>
+                      <option value="<%= roleRow.key %>"><%= roleRow.label %> (<%= roleRow.key %>)</option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-12 col-md-3">
+                  <label class="form-label">Description</label>
+                  <input class="form-control" name="description" placeholder="Короткий опис" />
+                </div>
+                <div class="col-12 d-flex gap-2">
+                  <button class="btn btn-primary" type="submit">Створити роль</button>
+                </div>
+              </form>
+
+              <% if (rbacRolesList.length) { %>
+                <div class="d-grid gap-3">
+                  <% rbacRolesList.forEach(function(roleRow) { %>
+                    <form method="POST" action="/admin/rbac/roles/<%= roleRow.key %>/save" class="border rounded-3 p-3">
+                      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                        <div>
+                          <div class="fw-semibold"><%= roleRow.label %> <span class="text-muted">(<%= roleRow.key %>)</span></div>
+                          <div class="small text-muted">Users: <%= roleRow.members_count || 0 %> · <%= roleRow.is_system ? 'System role' : 'Custom role' %></div>
+                        </div>
+                        <div class="form-check form-switch">
+                          <input class="form-check-input" type="checkbox" name="is_active" value="1" id="rbacActive_<%= roleRow.key %>" <%= roleRow.is_active ? 'checked' : '' %> <%= roleRow.key === 'admin' ? 'disabled' : '' %> />
+                          <label class="form-check-label" for="rbacActive_<%= roleRow.key %>">Active</label>
+                        </div>
+                      </div>
+                      <div class="row g-2 mb-3">
+                        <div class="col-12 col-md-4">
+                          <label class="form-label">Label</label>
+                          <input class="form-control" name="label" value="<%= roleRow.label %>" required />
+                        </div>
+                        <div class="col-12 col-md-8">
+                          <label class="form-label">Description</label>
+                          <input class="form-control" name="description" value="<%= roleRow.description || '' %>" />
+                        </div>
+                      </div>
+                      <div class="mb-3">
+                        <div class="small fw-semibold mb-2">Course access</div>
+                        <div class="d-flex flex-wrap gap-3">
+                          <% courseKindOptionsList.forEach(function(courseKind) { %>
+                            <label class="form-check-label d-flex align-items-center gap-2">
+                              <input class="form-check-input" type="checkbox" name="course_kinds" value="<%= courseKind.key %>" <%= (roleRow.course_kinds || []).includes(courseKind.key) ? 'checked' : '' %> />
+                              <span><%= courseKind.label %></span>
+                            </label>
+                          <% }); %>
+                        </div>
+                      </div>
+                      <div class="mb-3">
+                        <div class="small fw-semibold mb-2">Admin sections</div>
+                        <div class="d-flex flex-wrap gap-3">
+                          <% rbacPermissionOptionsList.forEach(function(permission) { %>
+                            <label class="form-check-label d-flex align-items-center gap-2">
+                              <input class="form-check-input" type="checkbox" name="permission_keys" value="<%= permission.key %>" <%= (roleRow.permission_keys || []).includes(permission.key) ? 'checked' : '' %> />
+                              <span><%= permission.label %></span>
+                            </label>
+                          <% }); %>
+                        </div>
+                      </div>
+                      <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-outline-primary" type="submit">Зберегти роль</button>
+                        <% if (!roleRow.is_system) { %>
+                          <button
+                            class="btn btn-outline-danger"
+                            type="submit"
+                            formaction="/admin/rbac/roles/<%= roleRow.key %>/delete"
+                            data-confirm="Delete role <%= roleRow.key %>? This cannot be undone."
+                            data-confirm-level="danger"
+                          >
+                            Видалити роль
+                          </button>
+                        <% } %>
+                      </div>
+                    </form>
+                  <% }); %>
+                </div>
+              <% } else { %>
+                <div class="small text-muted">RBAC ролі ще не ініціалізовані.</div>
+              <% } %>
             </div>
           </div>
         </div>
@@ -1736,11 +1856,18 @@
                 data-group="<%= (filters && filters.users_group) || '' %>"
               >
                 <% (users || []).forEach(function(u) { %>
+                  <% const rowRoleKeys = Array.isArray(u.role_keys) && u.role_keys.length
+                    ? u.role_keys
+                    : (userRoleAssignmentsMap[u.id] || [userPrimaryRoleMapData[u.id] || u.primary_role || u.role || 'student']); %>
+                  <% const rowPrimaryRole = u.primary_role || userPrimaryRoleMapData[u.id] || rowRoleKeys[0] || u.role || 'student'; %>
+                  <% const hasAdminRole = rowRoleKeys.includes('admin'); %>
+                  <% const rowRolesLabel = rowRoleKeys.map((key) => roleLabelMapData[key] || key).join(', '); %>
                   <tr
                     class="user-row"
                     data-user-id="<%= u.id %>"
                     data-user-name="<%= u.full_name %>"
-                    data-user-role="<%= u.role %>"
+                    data-user-role="<%= rowPrimaryRole %>"
+                    data-user-roles="<%= rowRoleKeys.join(',') %>"
                     data-user-group="<%= u.schedule_group %>"
                     data-user-course="<%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %>"
                     data-user-course-id="<%= u.course_id || 1 %>"
@@ -1750,12 +1877,16 @@
                     data-user-login="<%= u.last_login_at || '' %>"
                   >
                     <td>
-                      <% if (u.role !== 'admin') { %>
+                      <% if (!hasAdminRole) { %>
                         <input type="checkbox" name="delete_user_ids" value="<%= u.id %>" form="deleteUsersForm" />
                       <% } %>
                     </td>
                     <td><%= u.full_name %></td>
-                    <td><span class="badge text-bg-<%= u.role === 'admin' ? 'primary' : (u.role === 'starosta' ? 'warning' : (u.role === 'deanery' ? 'info' : 'secondary')) %>"><%= u.role %></span></td>
+                    <td>
+                      <span class="badge text-bg-<%= rowPrimaryRole === 'admin' ? 'primary' : (rowPrimaryRole === 'starosta' ? 'warning' : (rowPrimaryRole === 'deanery' ? 'info' : 'secondary')) %>">
+                        <%= rowRolesLabel %>
+                      </span>
+                    </td>
                     <td><%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %></td>
                     <td><%= u.schedule_group %></td>
                     <td>
@@ -1807,7 +1938,7 @@
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
                           <li><button class="dropdown-item user-manage-btn" type="button"><%= t('admin.manage') %></button></li>
-                          <% if (u.role !== 'admin' && u.is_active === 0) { %>
+                          <% if (!hasAdminRole && u.is_active === 0) { %>
                             <li><hr class="dropdown-divider" /></li>
                             <li>
                               <button
@@ -2621,7 +2752,12 @@
                   <div class="col-12">
                     <label class="form-label">Specific users</label>
                     <select class="form-select" name="user_ids" id="messageUsersSelect" multiple size="5">
-                      <% (users || []).filter(u => u.role === 'student').forEach(function(u) { %>
+                      <% (users || []).filter(function(u) {
+                        const keys = Array.isArray(u.role_keys) && u.role_keys.length
+                          ? u.role_keys
+                          : [u.primary_role || u.role || 'student'];
+                        return keys.includes('student');
+                      }).forEach(function(u) { %>
                         <option value="<%= u.id %>"><%= u.full_name %></option>
                       <% }); %>
                     </select>
@@ -2735,7 +2871,8 @@
           </div>
           <div class="modal-body">
             <div class="mb-2"><strong>Name:</strong> <span id="uaName"></span></div>
-            <div class="mb-2"><strong>Role:</strong> <span id="uaRole"></span></div>
+            <div class="mb-2"><strong>Primary Role:</strong> <span id="uaRole"></span></div>
+            <div class="mb-2"><strong>Roles:</strong> <span id="uaRoles"></span></div>
             <div class="mb-2"><strong>Active:</strong> <span id="uaActive"></span></div>
             <div class="mb-2"><strong>Schedule Group:</strong> <span id="uaGroup"></span></div>
             <div class="mb-2"><strong>Course:</strong> <span id="uaCourse"></span></div>
@@ -2747,17 +2884,13 @@
               <ul id="uaLoginHistory" class="list-group list-group-flush mt-2"></ul>
             </div>
 
-            <form method="POST" action="/admin/users/role" class="mb-3">
-              <input type="hidden" name="user_id" id="uaRoleUserId" />
-              <label class="form-label">Change role</label>
+            <form method="POST" action="/admin/users/roles" class="mb-3" id="uaRolesForm">
+              <input type="hidden" name="user_id" id="uaRolesUserId" />
+              <label class="form-label">Assign roles</label>
+              <select class="form-select mb-2" name="role_keys[]" id="uaRolesSelect" multiple size="6" required></select>
+              <label class="form-label">Primary role</label>
               <div class="d-flex gap-2">
-                <select class="form-select" name="role" id="uaRoleSelect" required>
-                  <option value="student">student</option>
-                  <option value="starosta">starosta</option>
-                  <option value="deanery">deanery</option>
-                  <option value="teacher">teacher</option>
-                  <option value="admin">admin</option>
-                </select>
+                <select class="form-select" name="primary_role" id="uaPrimaryRole" required></select>
                 <button class="btn btn-outline-primary glass" type="submit">Save</button>
               </div>
             </form>
@@ -3335,6 +3468,126 @@
         acc[section.id] = section.label;
         return acc;
       }, {})) %>;
+      const roleLabelMap = <%- JSON.stringify(roleLabelMapData || {}) %>;
+      const roleCatalogBootstrap = <%- JSON.stringify((rbacRolesList || []).map((roleRow) => ({
+        key: roleRow.key,
+        label: roleRow.label || roleRow.key,
+        is_active: roleRow.is_active !== false && Number(roleRow.is_active) !== 0,
+      }))) %>;
+      const normalizeRoleKeyClient = (value) => String(value || '').trim().toLowerCase();
+      const escapeHtml = (value) =>
+        String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      const getRoleLabel = (roleKey) => roleLabelMap[normalizeRoleKeyClient(roleKey)] || String(roleKey || 'student');
+      const parseRoleKeys = (value, fallback = ['student']) => {
+        const input = Array.isArray(value) ? value : (typeof value === 'string' ? value.split(',') : []);
+        const seen = new Set();
+        const keys = [];
+        input.forEach((item) => {
+          const normalized = normalizeRoleKeyClient(item);
+          if (!normalized || seen.has(normalized)) return;
+          seen.add(normalized);
+          keys.push(normalized);
+        });
+        return keys.length ? keys : fallback;
+      };
+      const mapRoleKeysToLabels = (roleKeys) =>
+        parseRoleKeys(roleKeys).map((key) => getRoleLabel(key)).join(', ');
+      const getPrimaryRoleClass = (primaryRole) => (
+        primaryRole === 'admin'
+          ? 'primary'
+          : (primaryRole === 'starosta'
+            ? 'warning'
+            : (primaryRole === 'deanery' ? 'info' : 'secondary'))
+      );
+      const getSelectedRoleKeys = () => {
+        const rolesSelect = document.getElementById('uaRolesSelect');
+        if (!rolesSelect) return [];
+        return Array.from(rolesSelect.selectedOptions || [])
+          .map((opt) => normalizeRoleKeyClient(opt.value))
+          .filter(Boolean);
+      };
+      const setPrimaryRoleOptions = (roleKeys, preferredPrimary = '') => {
+        const primarySelect = document.getElementById('uaPrimaryRole');
+        if (!primarySelect) return;
+        const keys = parseRoleKeys(roleKeys, []);
+        if (!keys.length) {
+          primarySelect.innerHTML = '';
+          return;
+        }
+        primarySelect.innerHTML = keys
+          .map((key) => `<option value="${escapeHtml(key)}">${escapeHtml(getRoleLabel(key))}</option>`)
+          .join('');
+        const normalizedPreferred = normalizeRoleKeyClient(preferredPrimary);
+        primarySelect.value = keys.includes(normalizedPreferred) ? normalizedPreferred : keys[0];
+      };
+      const populateRoleEditor = (roleCatalog, roleKeys, preferredPrimary = '') => {
+        const rolesSelect = document.getElementById('uaRolesSelect');
+        if (!rolesSelect) return;
+        const selectedKeys = parseRoleKeys(roleKeys, ['student']);
+        const catalogRows = Array.isArray(roleCatalog) ? roleCatalog : [];
+        const byKey = new Map();
+        catalogRows.forEach((row) => {
+          const key = normalizeRoleKeyClient(row && row.key);
+          if (!key || byKey.has(key)) return;
+          byKey.set(key, {
+            key,
+            label: row && row.label ? String(row.label) : getRoleLabel(key),
+            is_active: row ? (row.is_active !== false && Number(row.is_active) !== 0) : true,
+          });
+        });
+        selectedKeys.forEach((key) => {
+          if (!byKey.has(key)) {
+            byKey.set(key, { key, label: getRoleLabel(key), is_active: true });
+          }
+        });
+        const options = Array.from(byKey.values())
+          .filter((row) => row.is_active || selectedKeys.includes(row.key) || row.key === 'admin')
+          .sort((a, b) => a.label.localeCompare(b.label, 'uk'));
+        rolesSelect.innerHTML = options
+          .map((row) => {
+            const suffix = row.is_active ? '' : ' (inactive)';
+            const selected = selectedKeys.includes(row.key) ? ' selected' : '';
+            return `<option value="${escapeHtml(row.key)}"${selected}>${escapeHtml(`${row.label}${suffix}`)}</option>`;
+          })
+          .join('');
+        setPrimaryRoleOptions(selectedKeys, preferredPrimary);
+      };
+      let userRolesModalRequestToken = 0;
+      const hydrateUserRoleEditor = async (userId, fallbackRoleKeys, fallbackPrimaryRole) => {
+        const token = ++userRolesModalRequestToken;
+        try {
+          const res = await fetch(`/admin/users/${encodeURIComponent(userId)}/roles.json`, {
+            headers: { Accept: 'application/json' },
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (token !== userRolesModalRequestToken) return;
+          const roleCatalog = Array.isArray(data.roles) && data.roles.length
+            ? data.roles.map((row) => ({
+                key: row.key,
+                label: row.label || row.key,
+                is_active: row.is_active !== false && Number(row.is_active) !== 0,
+              }))
+            : roleCatalogBootstrap;
+          roleCatalog.forEach((row) => {
+            const key = normalizeRoleKeyClient(row && row.key);
+            if (!key) return;
+            roleLabelMap[key] = row && row.label ? String(row.label) : key;
+          });
+          const roleKeys = parseRoleKeys(data.role_keys, fallbackRoleKeys);
+          const primaryRole = normalizeRoleKeyClient(data.primary_role || fallbackPrimaryRole || roleKeys[0] || 'student');
+          populateRoleEditor(roleCatalog, roleKeys, primaryRole);
+          document.getElementById('uaRole').textContent = getRoleLabel(primaryRole);
+          document.getElementById('uaRoles').textContent = mapRoleKeysToLabels(roleKeys);
+        } catch (err) {
+          // keep fallback role data
+        }
+      };
       const importCourseMap = new Map(
         (importScopeData.courses || []).map((course) => [String(course.id), course])
       );
@@ -3824,7 +4077,14 @@
         tbody.innerHTML = data.users
           .map((u) => {
             const isActive = typeof u.is_active === 'undefined' ? 1 : u.is_active;
-            const checkbox = u.role !== 'admin'
+            const roleKeys = Array.isArray(u.role_keys) && u.role_keys.length
+              ? parseRoleKeys(u.role_keys, [u.primary_role || u.role || 'student'])
+              : parseRoleKeys([u.primary_role || u.role || 'student']);
+            const primaryRole = normalizeRoleKeyClient(u.primary_role || roleKeys[0] || 'student');
+            const rolesLabel = mapRoleKeysToLabels(roleKeys);
+            const hasAdminRole = roleKeys.includes('admin');
+            const badgeClass = getPrimaryRoleClass(primaryRole);
+            const checkbox = !hasAdminRole
               ? `<input type="checkbox" name="delete_user_ids" value="${u.id}" form="deleteUsersForm" />`
               : '';
             const subjectList = groupMap[u.id]
@@ -3850,28 +4110,12 @@
               .map((s) => `<option value="${s.id}">${s.name} (1–${s.group_count})</option>`)
               .join('');
 
-            const roleEditor =
-              String(u.id) === String(currentUserId)
-                ? '<span class="text-muted">—</span>'
-                : `
-                  <form method="POST" action="/admin/users/role" class="d-flex gap-2">
-                    <input type="hidden" name="user_id" value="${u.id}" />
-                    <select class="form-select form-select-sm" name="role" required>
-                      <option value="student" ${u.role === 'student' ? 'selected' : ''}>student</option>
-                      <option value="starosta" ${u.role === 'starosta' ? 'selected' : ''}>starosta</option>
-                      <option value="deanery" ${u.role === 'deanery' ? 'selected' : ''}>deanery</option>
-                      <option value="teacher" ${u.role === 'teacher' ? 'selected' : ''}>teacher</option>
-                      <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
-                    </select>
-                    <button class="btn btn-sm btn-outline-primary" type="submit">Save</button>
-                  </form>
-                `;
-
             return `
               <tr class="user-row"
                   data-user-id="${u.id}"
                   data-user-name="${u.full_name}"
-                  data-user-role="${u.role}"
+                  data-user-role="${primaryRole}"
+                  data-user-roles="${roleKeys.join(',')}"
                   data-user-group="${u.schedule_group}"
                   data-user-course="${courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}"
                   data-user-course-id="${u.course_id || 1}"
@@ -3881,7 +4125,7 @@
                   data-user-login="${u.last_login_at || ''}">
                 <td>${checkbox}</td>
                 <td>${u.full_name}</td>
-                <td><span class="badge text-bg-${u.role === 'admin' ? 'primary' : (u.role === 'starosta' ? 'warning' : (u.role === 'deanery' ? 'info' : 'secondary'))}">${u.role}</span></td>
+                <td><span class="badge text-bg-${badgeClass}">${escapeHtml(rolesLabel)}</span></td>
                 <td>${courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}</td>
                 <td>${u.schedule_group}</td>
                 <td>${subjectsBtn}</td>
@@ -3908,7 +4152,7 @@
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">⋯</button>
                     <ul class="dropdown-menu dropdown-menu-end">
                       <li><button class="dropdown-item user-manage-btn" type="button">Manage</button></li>
-                      ${u.role !== 'admin' && isActive === 0 ? `
+                      ${!hasAdminRole && isActive === 0 ? `
                         <li><hr class="dropdown-divider" /></li>
                         <li>
                           <button class="dropdown-item text-danger" type="submit" form="user-delete-${u.id}" data-confirm="Permanently delete this user? This cannot be undone." data-confirm-level="danger">
@@ -3955,7 +4199,15 @@
           const roleFilter = tbodyEl.dataset.roleFilter || 'all';
           const filtered = roleFilter === 'all'
             ? data
-            : { ...data, users: data.users.filter((u) => u.role === roleFilter) };
+            : {
+                ...data,
+                users: data.users.filter((u) => {
+                  const roleKeys = Array.isArray(u.role_keys) && u.role_keys.length
+                    ? parseRoleKeys(u.role_keys, [u.primary_role || u.role || 'student'])
+                    : parseRoleKeys([u.primary_role || u.role || 'student']);
+                  return roleKeys.includes(roleFilter);
+                }),
+              };
           renderUsersTable(filtered);
           bindUserRowClicks();
           bindSubjectButtons();
@@ -4037,7 +4289,8 @@
             if (['input', 'select', 'button', 'a', 'form', 'label'].includes(tag) && !isManage) return;
             const userId = row.dataset.userId;
             const userName = row.dataset.userName;
-            const userRole = row.dataset.userRole;
+            const userRole = normalizeRoleKeyClient(row.dataset.userRole || 'student');
+            const userRoleKeys = parseRoleKeys(row.dataset.userRoles || userRole, [userRole || 'student']);
             const userGroup = row.dataset.userGroup;
             const userActive = row.dataset.userActive === '1' ? 'Yes' : 'No';
             const userCourse = row.dataset.userCourse || '';
@@ -4046,18 +4299,20 @@
             const userLogin = row.dataset.userLogin || '-';
 
             document.getElementById('uaName').textContent = userName;
-            document.getElementById('uaRole').textContent = userRole;
+            document.getElementById('uaRole').textContent = getRoleLabel(userRole);
+            document.getElementById('uaRoles').textContent = mapRoleKeysToLabels(userRoleKeys);
             document.getElementById('uaGroup').textContent = userGroup;
             document.getElementById('uaActive').textContent = userActive;
             document.getElementById('uaCourse').textContent = userCourse;
             document.getElementById('uaIp').textContent = userIp;
             document.getElementById('uaAgent').textContent = userAgent;
             document.getElementById('uaLoginAt').textContent = userLogin;
-            document.getElementById('uaRoleUserId').value = userId;
+            document.getElementById('uaRolesUserId').value = userId;
             document.getElementById('uaPassUserId').value = userId;
-            document.getElementById('uaRoleSelect').value = userRole;
             document.getElementById('uaDeleteUserId').value = userId;
             document.getElementById('uaCourseUserId').value = userId;
+            populateRoleEditor(roleCatalogBootstrap, userRoleKeys, userRole);
+            hydrateUserRoleEditor(userId, userRoleKeys, userRole);
             if (document.getElementById('uaCourseSelect')) {
               document.getElementById('uaCourseSelect').value = row.dataset.userCourseId || '';
             }
@@ -4181,6 +4436,14 @@
           refreshUsers();
         });
       });
+
+      const uaRolesSelect = document.getElementById('uaRolesSelect');
+      if (uaRolesSelect) {
+        uaRolesSelect.addEventListener('change', () => {
+          const primarySelect = document.getElementById('uaPrimaryRole');
+          setPrimaryRoleOptions(getSelectedRoleKeys(), primarySelect ? primarySelect.value : '');
+        });
+      }
 
       function updateMessageTargetFields() {
         const type = document.getElementById('messageTargetType');

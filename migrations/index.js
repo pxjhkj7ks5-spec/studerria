@@ -9,6 +9,7 @@ const scheduleGeneratorEntryItem = require('./008_schedule_generator_entry_item'
 const scheduleEntryLessonType = require('./009_schedule_entry_lesson_type');
 const mergeSubjectsByType = require('./010_merge_subjects_by_type');
 const scheduleGeneratorIndexes = require('./011_schedule_generator_indexes');
+const rbacRoles = require('./012_rbac_roles');
 
 module.exports = [
   init,
@@ -22,4 +23,5 @@ module.exports = [
   scheduleEntryLessonType,
   mergeSubjectsByType,
   scheduleGeneratorIndexes,
+  rbacRoles,
 ];

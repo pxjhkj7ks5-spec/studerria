@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.8.63",
+      "date": "2026-02-15",
+      "items": [
+        "feat: add RBAC foundation with `access_roles`, `access_permissions`, `access_role_permissions`, `access_role_course_access`, and `user_roles` via migration `012_rbac_roles` (including seeds/backfill)",
+        "feat: add multi-role user management in admin with new APIs (`/admin/users/:id/roles.json`, `/admin/users/roles`) and replace modal single-role editor with primary-role + role-set editing",
+        "feat: add Role Studio in admin for creating/updating/deleting roles and configuring admin-section permissions + course-kind access",
+        "fix: update admin users table/filter/render to rely on `role_keys`/`primary_role`, remove stale modal fields, and prevent admin-row destructive actions based on any assigned role",
+        "fix: apply role-aware permission/course access in staff flows (starosta/deanery/admin-or-deanery APIs, starosta/deanery panel permissions, and admin checks via multi-role session state)"
+      ]
+    },
+    {
       "version": "0.8.62",
       "date": "2026-02-15",
       "items": [
