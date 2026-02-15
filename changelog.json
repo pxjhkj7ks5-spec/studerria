@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.62",
+      "date": "2026-02-15",
+      "items": [
+        "fix: block `starosta` and `deanery` roles from accessing teacher courses by role-aware filtering in `buildStaffCourseAccess`",
+        "fix: add explicit 403 guard on starosta/deanery overview routes when no allowed non-teacher course is available"
+      ]
+    },
+    {
       "version": "0.8.61",
       "date": "2026-02-15",
       "items": [

@@ -394,16 +394,24 @@ const getRoleAllowedSections = (role) => {
 const isTeacherCourseRow = (course) =>
   course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
 
-const buildStaffCourseAccess = (userCourseId, courses) => {
+const buildStaffCourseAccess = (userCourseId, courses, role = '') => {
+  const normalizedRole = String(role || '').toLowerCase();
+  const denyTeacherCourses = normalizedRole === 'starosta' || normalizedRole === 'deanery';
   const allowedCourseIds = new Set();
-  if (Number.isFinite(Number(userCourseId))) {
-    allowedCourseIds.add(Number(userCourseId));
-  }
-  (courses || []).forEach((course) => {
-    if (isTeacherCourseRow(course)) {
-      allowedCourseIds.add(Number(course.id));
+  const baseCourseId = Number(userCourseId);
+  if (Number.isFinite(baseCourseId)) {
+    const baseCourse = (courses || []).find((course) => Number(course.id) === baseCourseId);
+    if (!denyTeacherCourses || !isTeacherCourseRow(baseCourse)) {
+      allowedCourseIds.add(baseCourseId);
     }
-  });
+  }
+  if (!denyTeacherCourses) {
+    (courses || []).forEach((course) => {
+      if (isTeacherCourseRow(course)) {
+        allowedCourseIds.add(Number(course.id));
+      }
+    });
+  }
   const allowedCourses = (courses || []).filter((course) => allowedCourseIds.has(Number(course.id)));
   return { allowedCourseIds, allowedCourses };
 };
@@ -7966,7 +7974,10 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
   let allowCourseSelect = isAdmin;
   if (!isAdmin) {
     const baseCourseId = Number(req.session.user.course_id || 1);
-    const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, courses);
+    const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, courses, role);
+    if (!allowedCourses.length) {
+      return res.status(403).send('Forbidden (course access)');
+    }
     courses = allowedCourses;
     const requested = Number(req.query.course);
     courseId = allowedCourseIds.has(requested) ? requested : baseCourseId;
@@ -9358,7 +9369,10 @@ app.get('/starosta', requireStaff, async (req, res) => {
     return handleDbError(res, err, 'starosta.courses');
   }
 
-  const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, allCourses);
+  const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, allCourses, req.session.role);
+  if (!allowedCourses.length) {
+    return res.status(403).send('Forbidden (course access)');
+  }
   const requestedCourse = Number(req.query.course);
   let courseId = allowedCourseIds.has(requestedCourse) ? requestedCourse : baseCourseId;
   if (allowedCourses.length && !allowedCourses.some((course) => Number(course.id) === Number(courseId))) {
@@ -9612,7 +9626,10 @@ app.get('/deanery', requireDeanery, (req, res) => {
     } catch (err) {
       return handleDbError(res, err, 'deanery.courses');
     }
-    const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, allCourses);
+    const { allowedCourseIds, allowedCourses } = buildStaffCourseAccess(baseCourseId, allCourses, req.session.role);
+    if (!allowedCourses.length) {
+      return res.status(403).send('Forbidden (course access)');
+    }
     const requestedCourse = Number(req.query.course);
     let courseId = allowedCourseIds.has(requestedCourse) ? requestedCourse : baseCourseId;
     if (allowedCourses.length && !allowedCourses.some((course) => Number(course.id) === Number(courseId))) {
