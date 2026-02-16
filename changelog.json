@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.88",
+      "date": "2026-02-16",
+      "items": [
+        "ux(students): removed explanatory deanery-mode banner from Students section to reduce visual noise",
+        "fix(students): replaced missing i18n label output (`admin.status`) with explicit `Статус` in Students filter",
+        "ux(students): removed status column and active/inactive badges from Students table, keeping only action controls"
+      ]
+    },
+    {
       "version": "0.8.87",
       "date": "2026-02-16",
       "items": [
