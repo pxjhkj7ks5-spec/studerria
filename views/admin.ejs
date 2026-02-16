@@ -808,6 +808,9 @@
           </div>
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">People</div>
+            <% if (sectionAllowed('admin-students')) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-students">Students</button>
+            <% } %>
             <% if (sectionAllowed('admin-users')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-users">Users</button>
             <% } %>
@@ -1914,6 +1917,197 @@
             >
               <%= t('admin.deleteAllStudents') %>
             </button>
+          </div>
+        </div>
+
+        <% } %>
+
+        <% if (sectionAllowed('admin-students')) { %>
+        <div id="admin-students" class="admin-panel" data-admin-title="People / Students">
+          <% const hasStudentsFilters = filters && (filters.users_q || filters.users_group || usersStatus); %>
+          <div class="accordion admin-filter-accordion mb-3" id="studentsFilterAccordion">
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="studentsFilterHeading">
+                <button
+                  class="accordion-button <%= hasStudentsFilters ? '' : 'collapsed' %>"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#studentsFilterCollapse"
+                  aria-expanded="<%= hasStudentsFilters ? 'true' : 'false' %>"
+                  aria-controls="studentsFilterCollapse"
+                >
+                  Фільтри students
+                </button>
+              </h2>
+              <div
+                id="studentsFilterCollapse"
+                class="accordion-collapse collapse <%= hasStudentsFilters ? 'show' : '' %>"
+                data-bs-parent="#studentsFilterAccordion"
+              >
+                <div class="accordion-body">
+                  <form method="GET" action="/admin">
+                    <input type="hidden" name="tab" value="admin-students" />
+                    <div class="row g-2 align-items-end">
+                      <div class="col-12 col-md-4">
+                        <label class="form-label"><%= t('admin.searchByName') %></label>
+                        <input
+                          class="form-control"
+                          name="users_q"
+                          placeholder="<%= t('admin.searchByNamePlaceholder') %>"
+                          value="<%= (filters && filters.users_q) || '' %>"
+                        />
+                      </div>
+                      <div class="col-12 col-md-3">
+                        <label class="form-label"><%= t('admin.scheduleGroup') %></label>
+                        <input
+                          class="form-control"
+                          name="users_group"
+                          placeholder="<%= t('admin.scheduleGroupPlaceholder') %>"
+                          value="<%= (filters && filters.users_group) || '' %>"
+                        />
+                      </div>
+                      <div class="col-12 col-md-3">
+                        <label class="form-label"><%= t('admin.status') %></label>
+                        <select class="form-select" name="users_status">
+                          <option value="active" <%= (usersStatus || 'active') === 'active' ? 'selected' : '' %>><%= t('admin.active') %></option>
+                          <option value="inactive" <%= usersStatus === 'inactive' ? 'selected' : '' %>><%= t('admin.inactive') %></option>
+                          <option value="all" <%= usersStatus === 'all' ? 'selected' : '' %>><%= t('admin.all') %></option>
+                        </select>
+                      </div>
+                      <div class="col-12 col-md-2 d-grid">
+                        <button class="btn btn-outline-primary" type="submit"><%= t('admin.filter') %></button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="card-body py-2">
+              <div class="small text-muted">
+                Students-режим для деканату: без IP, девайсів, історії входів і перманентного видалення.
+              </div>
+            </div>
+          </div>
+
+          <% const studentRows = (users || []).filter(function(u) {
+            const roleKeys = Array.isArray(u.role_keys) && u.role_keys.length
+              ? u.role_keys
+              : (userRoleAssignmentsMap[u.id] || [userPrimaryRoleMapData[u.id] || u.primary_role || u.role || 'student']);
+            const primaryRole = u.primary_role || userPrimaryRoleMapData[u.id] || roleKeys[0] || u.role || 'student';
+            return ['student', 'starosta'].includes(String(primaryRole || '').toLowerCase());
+          }); %>
+
+          <div class="table-responsive">
+            <table class="table table-striped align-middle">
+              <thead>
+                <tr>
+                  <th><%= t('admin.name') %></th>
+                  <th><%= t('admin.role') %></th>
+                  <th><%= t('admin.course') %></th>
+                  <th><%= t('admin.scheduleGroup') %></th>
+                  <th><%= t('admin.subjectGroup') %></th>
+                  <th><%= t('admin.setGroup') %></th>
+                  <th><%= t('admin.status') %></th>
+                  <th><%= t('admin.actions') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% studentRows.forEach(function(u) { %>
+                  <% const rowRoleKeys = Array.isArray(u.role_keys) && u.role_keys.length
+                    ? u.role_keys
+                    : (userRoleAssignmentsMap[u.id] || [userPrimaryRoleMapData[u.id] || u.primary_role || u.role || 'student']); %>
+                  <% const rowPrimaryRole = u.primary_role || userPrimaryRoleMapData[u.id] || rowRoleKeys[0] || u.role || 'student'; %>
+                  <% const rowRolesLabel = rowRoleKeys.map((key) => roleLabelMapData[key] || key).join(', '); %>
+                  <tr>
+                    <td><%= u.full_name %></td>
+                    <td>
+                      <span class="badge text-bg-<%= rowPrimaryRole === 'starosta' ? 'warning' : 'secondary' %>">
+                        <%= rowRolesLabel %>
+                      </span>
+                    </td>
+                    <td><%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %></td>
+                    <td><%= u.schedule_group %></td>
+                    <td>
+                      <%
+                        const subjectList = [];
+                        if (groupMap[u.id]) {
+                          Object.keys(groupMap[u.id]).forEach(function(subjectId) {
+                            const subj = (subjects || []).find(function(s) { return String(s.id) === String(subjectId); });
+                            if (subj) {
+                              subjectList.push({ subject_id: subj.id, name: subj.name, group_number: groupMap[u.id][subjectId] });
+                            }
+                          });
+                        }
+                      %>
+                      <button
+                        class="btn btn-sm btn-outline-primary subject-groups-btn"
+                        type="button"
+                        data-user-id="<%= u.id %>"
+                        data-user-name="<%= u.full_name %>"
+                        data-remove-action="/admin/students/group/remove"
+                        data-subjects='<%- JSON.stringify(subjectList) %>'
+                      >
+                        <%= t('admin.subjects') %> (<%= subjectList.length %>)
+                      </button>
+                    </td>
+                    <td>
+                      <form method="POST" action="/admin/students/groups/set" class="row g-2">
+                        <input type="hidden" name="student_id" value="<%= u.id %>" />
+                        <div class="col-12 col-md-6">
+                          <select class="form-select form-select-sm" name="subject_id" required>
+                            <option value="" disabled selected><%= t('admin.subject') %></option>
+                            <% (subjects || []).forEach(function(s) { %>
+                              <option value="<%= s.id %>"><%= s.name %> (1–<%= s.group_count %>)</option>
+                            <% }); %>
+                          </select>
+                        </div>
+                        <div class="col-12 col-md-3">
+                          <input class="form-control form-control-sm" name="group_number" type="number" min="1" max="3" required />
+                        </div>
+                        <div class="col-12 col-md-3 d-grid">
+                          <button class="btn btn-sm btn-outline-primary" type="submit"><%= t('admin.save') %></button>
+                        </div>
+                      </form>
+                    </td>
+                    <td>
+                      <% if (u.is_active === 0) { %>
+                        <span class="badge text-bg-danger"><%= t('admin.inactive') %></span>
+                      <% } else { %>
+                        <span class="badge text-bg-success"><%= t('admin.active') %></span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <% if (u.is_active === 0) { %>
+                        <form method="POST" action="/admin/students/activate">
+                          <input type="hidden" name="user_id" value="<%= u.id %>" />
+                          <button class="btn btn-sm btn-outline-success" type="submit">Відновити</button>
+                        </form>
+                      <% } else { %>
+                        <form method="POST" action="/admin/students/deactivate">
+                          <input type="hidden" name="user_id" value="<%= u.id %>" />
+                          <button
+                            class="btn btn-sm btn-outline-danger"
+                            type="submit"
+                            data-confirm="Деактивувати цього студента?"
+                            data-confirm-level="warning"
+                          >
+                            Деактивувати
+                          </button>
+                        </form>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }); %>
+                <% if (!studentRows.length) { %>
+                  <tr>
+                    <td colspan="8" class="text-muted">Students не знайдено за поточними фільтрами.</td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -4862,6 +5056,7 @@
           btn.addEventListener('click', () => {
             const userId = btn.dataset.userId;
             const userName = btn.dataset.userName;
+            const removeAction = btn.dataset.removeAction || '/admin/group/remove';
             const raw = btn.dataset.subjects || '[]';
             let items = [];
             try {
@@ -4880,7 +5075,7 @@
                 row.className = 'list-group-item d-flex justify-content-between align-items-center';
                 row.innerHTML = `
                   <div>${item.name} — Group ${item.group_number}</div>
-                  <form method="POST" action="/admin/group/remove" class="ms-2">
+                  <form method="POST" action="${removeAction}" class="ms-2">
                     <input type="hidden" name="student_id" value="${userId}">
                     <input type="hidden" name="subject_id" value="${item.subject_id}">
                     <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>

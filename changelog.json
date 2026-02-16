@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.87",
+      "date": "2026-02-16",
+      "items": [
+        "feat(admin): added new reduced `Students` section (separate from full `Users`) for deanery/student management without sensitive login telemetry UI",
+        "feat(rbac): added `admin-students` permission to Role Studio catalog and deanery default template, with dedicated sidebar tab",
+        "feat(students): introduced scoped students routes for group assignment/removal and activate/deactivate actions, explicitly excluding permanent delete flow"
+      ]
+    },
+    {
       "version": "0.8.86",
       "date": "2026-02-16",
       "items": [

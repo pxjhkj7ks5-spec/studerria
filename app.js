@@ -105,6 +105,7 @@ const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-settings', label: 'Налаштування' },
   { id: 'admin-role-access', label: 'Role Studio' },
   { id: 'admin-visit-analytics', label: 'Відвідування' },
+  { id: 'admin-students', label: 'Students' },
   { id: 'admin-schedule', label: 'Розклад' },
   { id: 'admin-import-export', label: 'Імпорт/Експорт' },
   { id: 'admin-schedule-generator', label: 'Генератор' },
@@ -122,7 +123,7 @@ const ADMIN_SECTION_OPTIONS = [
 
 const DEFAULT_ROLE_PERMISSIONS = {
   starosta: ['admin-homework', 'admin-teamwork', 'admin-messages', 'admin-overview'],
-  deanery: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-overview'],
+  deanery: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-students', 'admin-overview'],
   teacher: [],
   student: [],
 };
@@ -534,6 +535,7 @@ const refreshSettingsCache = async () => {
             'admin-settings',
             'admin-role-access',
             'admin-users',
+            'admin-students',
             'admin-import-export',
             'admin-schedule-generator',
           ]);
@@ -1164,6 +1166,30 @@ function requireAdminSectionAccess(sectionId) {
     }
     return next();
   };
+}
+
+function hasUsersSectionAccess(req) {
+  return hasAdminSectionAccess(req, 'admin-users');
+}
+
+function hasStudentsSectionAccess(req) {
+  return hasAdminSectionAccess(req, 'admin-students');
+}
+
+function requireUsersOrStudentsSectionAccess(req, res, next) {
+  if (hasUsersSectionAccess(req) || hasStudentsSectionAccess(req)) {
+    return next();
+  }
+  return res.status(403).send('Forbidden (update page)');
+}
+
+function isStudentLikeLegacyRole(rawRole) {
+  const normalized = normalizeRoleKey(rawRole);
+  return normalized === 'student' || normalized === 'starosta';
+}
+
+function canManageStudentOnlyScope(req) {
+  return !hasUsersSectionAccess(req) && hasStudentsSectionAccess(req);
 }
 
 const requireOverviewSectionAccess = requireAdminSectionAccess('admin-overview');
@@ -8935,6 +8961,7 @@ app.post('/admin/role-access', requireRoleAccessSectionAccess, async (req, res) 
       'admin-settings',
       'admin-role-access',
       'admin-users',
+      'admin-students',
       'admin-import-export',
       'admin-schedule-generator',
     ]);
@@ -12296,6 +12323,167 @@ app.post('/admin/group/remove', requireUsersSectionAccess, (req, res) => {
     broadcast('users_updated');
     return res.redirect('/admin?ok=Subject%20removed');
   }
+  );
+});
+
+app.post('/admin/students/groups/set', requireUsersOrStudentsSectionAccess, (req, res) => {
+  const { student_id, subject_id, group_number } = req.body;
+  const groupNum = Number(group_number);
+  const courseId = getAdminCourse(req);
+  if (!student_id || !subject_id || Number.isNaN(groupNum)) {
+    return res.redirect('/admin?tab=admin-students&err=Invalid%20group%20assignment');
+  }
+  db.get(
+    'SELECT id, role FROM users WHERE id = ? AND course_id = ?',
+    [student_id, courseId],
+    (userErr, user) => {
+      if (userErr || !user) {
+        return res.redirect('/admin?tab=admin-students&err=User%20not%20found');
+      }
+      if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
+        return res.redirect('/admin?tab=admin-students&err=Forbidden%20student%20scope');
+      }
+      db.get(
+        'SELECT group_count FROM subjects WHERE id = ? AND course_id = ?',
+        [subject_id, courseId],
+        (err, subject) => {
+          if (err || !subject) {
+            return res.redirect('/admin?tab=admin-students&err=Database%20error');
+          }
+          if (groupNum < 1 || groupNum > subject.group_count) {
+            return res.redirect('/admin?tab=admin-students&err=Group%20out%20of%20range');
+          }
+          db.run(
+            `
+              INSERT INTO student_groups (student_id, subject_id, group_number)
+              VALUES (?, ?, ?)
+              ON CONFLICT(student_id, subject_id)
+              DO UPDATE SET group_number = excluded.group_number
+            `,
+            [student_id, subject_id, groupNum],
+            (setErr) => {
+              if (setErr) {
+                return res.redirect('/admin?tab=admin-students&err=Database%20error');
+              }
+              logAction(db, req, 'student_group_set', { student_id, subject_id, group_number: groupNum });
+              logActivity(
+                db,
+                req,
+                'group_set',
+                'student_group',
+                null,
+                { student_id, subject_id, group_number: groupNum, scope: 'students' },
+                courseId
+              );
+              broadcast('users_updated');
+              return res.redirect('/admin?tab=admin-students&ok=Group%20updated');
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+app.post('/admin/students/group/remove', requireUsersOrStudentsSectionAccess, (req, res) => {
+  const { student_id, subject_id } = req.body;
+  const courseId = getAdminCourse(req);
+  if (!student_id || !subject_id) {
+    return res.redirect('/admin?tab=admin-students&err=Invalid%20remove%20request');
+  }
+  db.get(
+    'SELECT id, role FROM users WHERE id = ? AND course_id = ?',
+    [student_id, courseId],
+    (userErr, user) => {
+      if (userErr || !user) {
+        return res.redirect('/admin?tab=admin-students&err=User%20not%20found');
+      }
+      if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
+        return res.redirect('/admin?tab=admin-students&err=Forbidden%20student%20scope');
+      }
+      db.run(
+        'DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?',
+        [student_id, subject_id],
+        (err) => {
+          if (err) {
+            return res.redirect('/admin?tab=admin-students&err=Database%20error');
+          }
+          logAction(db, req, 'student_group_remove', { student_id, subject_id });
+          logActivity(
+            db,
+            req,
+            'group_remove',
+            'student_group',
+            null,
+            { student_id, subject_id, scope: 'students' },
+            courseId
+          );
+          broadcast('users_updated');
+          return res.redirect('/admin?tab=admin-students&ok=Subject%20removed');
+        }
+      );
+    }
+  );
+});
+
+app.post('/admin/students/deactivate', requireUsersOrStudentsSectionAccess, (req, res) => {
+  const { user_id } = req.body;
+  const courseId = getAdminCourse(req);
+  const userId = Number(user_id);
+  if (!Number.isFinite(userId)) {
+    return res.redirect('/admin?tab=admin-students&err=Invalid%20user');
+  }
+  db.get(
+    'SELECT id, role, full_name FROM users WHERE id = ? AND course_id = ?',
+    [userId, courseId],
+    (err, user) => {
+      if (err || !user) {
+        return res.redirect('/admin?tab=admin-students&err=User%20not%20found');
+      }
+      if (normalizeRoleKey(user.role) === 'admin') {
+        return res.redirect('/admin?tab=admin-students&err=Cannot%20deactivate%20admin');
+      }
+      if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
+        return res.redirect('/admin?tab=admin-students&err=Forbidden%20student%20scope');
+      }
+      db.run('UPDATE users SET is_active = 0 WHERE id = ?', [userId], (updErr) => {
+        if (updErr) {
+          return res.redirect('/admin?tab=admin-students&err=Database%20error');
+        }
+        logAction(db, req, 'student_deactivate', { user_id: userId, full_name: user.full_name });
+        broadcast('users_updated');
+        return res.redirect('/admin?tab=admin-students&ok=Student%20deactivated');
+      });
+    }
+  );
+});
+
+app.post('/admin/students/activate', requireUsersOrStudentsSectionAccess, (req, res) => {
+  const { user_id } = req.body;
+  const courseId = getAdminCourse(req);
+  const userId = Number(user_id);
+  if (!Number.isFinite(userId)) {
+    return res.redirect('/admin?tab=admin-students&err=Invalid%20user');
+  }
+  db.get(
+    'SELECT id, role FROM users WHERE id = ? AND course_id = ?',
+    [userId, courseId],
+    (err, user) => {
+      if (err || !user) {
+        return res.redirect('/admin?tab=admin-students&err=User%20not%20found');
+      }
+      if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
+        return res.redirect('/admin?tab=admin-students&err=Forbidden%20student%20scope');
+      }
+      db.run('UPDATE users SET is_active = 1 WHERE id = ?', [userId], (updErr) => {
+        if (updErr) {
+          return res.redirect('/admin?tab=admin-students&err=Database%20error');
+        }
+        logAction(db, req, 'student_activate', { user_id: userId });
+        broadcast('users_updated');
+        return res.redirect('/admin?tab=admin-students&ok=Student%20restored');
+      });
+    }
   );
 });
 
