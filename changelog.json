@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.71",
+      "date": "2026-02-16",
+      "items": [
+        "refactor: remove legacy Role Access matrix UI and keep a single Role Studio section in admin",
+        "feat: add Role Studio presets (Default Deanery, Default Starosta, Reset system defaults) with unsaved revert action for RBAC role forms",
+        "fix: keep backward compatibility for old tab key admin-role-access by redirecting it to admin-role-studio"
+      ]
+    },
+    {
       "version": "0.8.70",
       "date": "2026-02-16",
       "items": [

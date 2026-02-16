@@ -854,7 +854,6 @@
       <div id="toastContainer" data-toast-success="<%= msg && msg.success ? msg.success : '' %>" data-toast-error="<%= msg && msg.error ? msg.error : '' %>"></div>
 
       <% const adminSectionOptionsList = typeof adminSectionOptions !== 'undefined' && Array.isArray(adminSectionOptions) ? adminSectionOptions : []; %>
-      <% const rolePermissionsMap = typeof rolePermissions !== 'undefined' && rolePermissions ? rolePermissions : {}; %>
       <% const dashboardStatsData = typeof dashboardStats !== 'undefined' && dashboardStats ? dashboardStats : null; %>
       <% const rbacRolesList = typeof rbacRoles !== 'undefined' && Array.isArray(rbacRoles) ? rbacRoles : []; %>
       <% const rbacPermissionOptionsList = typeof rbacPermissionOptions !== 'undefined' && Array.isArray(rbacPermissionOptions) ? rbacPermissionOptions : []; %>
@@ -873,14 +872,6 @@
         }
         return acc;
       }, {})); %>
-      <% const roleAccessRoles = [
-        { key: 'admin', label: 'Адмін', editable: false },
-        { key: 'deanery', label: 'Деканат', editable: true },
-        { key: 'starosta', label: 'Староста', editable: true },
-        { key: 'teacher', label: 'Викладач', editable: true },
-        { key: 'student', label: 'Студент', editable: true },
-      ]; %>
-      <% const roleAccessDefaultKey = roleAccessRoles.find((r) => r.key === 'deanery') ? 'deanery' : (roleAccessRoles[0] ? roleAccessRoles[0].key : 'deanery'); %>
 
       <% const groupMap = {}; %>
       <% (studentGroups || []).forEach(function(g) { %>
@@ -1079,78 +1070,17 @@
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                 <div>
-                  <h5 class="mb-1">Role Access</h5>
-                  <div class="small text-muted">Адмін має повний доступ до всіх секцій.</div>
-                </div>
-                <div class="d-flex gap-2 flex-wrap">
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-role-template="deanery">Default: Deanery</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-role-template="starosta">Default: Starosta</button>
-                  <button class="btn btn-outline-danger btn-sm" type="button" data-role-template="reset">Reset to defaults</button>
-                </div>
-              </div>
-              <div class="role-access-toolbar mb-3">
-                <label class="form-label mb-0">Select role</label>
-                <select class="form-select form-select-sm w-auto" id="roleAccessFocus" data-default-role="<%= roleAccessDefaultKey %>">
-                  <option value="all">All roles</option>
-                  <% roleAccessRoles.forEach(function(roleRow) { %>
-                    <option value="<%= roleRow.key %>" <%= roleRow.key === roleAccessDefaultKey ? 'selected' : '' %>><%= roleRow.label %></option>
-                  <% }); %>
-                </select>
-              </div>
-              <div class="role-access-summary mb-3" data-role-summary>
-                <div class="small text-muted">Change summary will appear here.</div>
-              </div>
-              <form
-                method="POST"
-                action="/admin/role-access"
-                data-role-access-form
-                data-default-permissions='<%= JSON.stringify(defaultRolePermissions || {}) %>'
-                data-initial-permissions='<%= JSON.stringify(rolePermissionsMap || {}) %>'
-              >
-                <div class="role-access-scroll">
-                  <div class="role-access-grid" style="--role-access-cols: <%= adminSectionOptionsList.length %>;">
-                    <div class="role-access-row role-access-head">
-                      <div class="role-access-cell">Роль</div>
-                      <% adminSectionOptionsList.forEach(function(section) { %>
-                        <div class="role-access-cell"><span class="small text-muted"><%= section.label %></span></div>
-                      <% }); %>
-                    </div>
-                    <% roleAccessRoles.forEach(function(roleRow) { %>
-                      <% const selections = roleRow.key === 'admin' ? adminSectionOptionsList.map((s) => s.id) : (rolePermissionsMap[roleRow.key] || []); %>
-                      <div class="role-access-row <%= roleRow.editable ? '' : 'is-disabled' %>" data-role-row="<%= roleRow.key %>">
-                        <div class="role-access-cell fw-semibold"><%= roleRow.label %></div>
-                        <% adminSectionOptionsList.forEach(function(section) { %>
-                          <div class="role-access-cell">
-                            <input
-                              class="form-check-input"
-                              type="checkbox"
-                              name="role_permissions[<%= roleRow.key %>]"
-                              value="<%= section.id %>"
-                              <%= selections.includes(section.id) ? 'checked' : '' %>
-                              <%= roleRow.editable ? '' : 'disabled' %>
-                            />
-                          </div>
-                        <% }); %>
-                      </div>
-                    <% }); %>
-                  </div>
-                </div>
-                <div class="d-flex flex-wrap gap-2 mt-3">
-                  <button class="btn btn-primary" type="submit">Зберегти доступи</button>
-                  <button class="btn btn-outline-secondary" type="button" data-role-revert>Revert unsaved changes</button>
-                  <div class="small text-muted">Діє для панелей старости та деканату.</div>
-                </div>
-              </form>
-            </div>
-          </div>
-          <div class="card mb-4">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-                <div>
-                  <h5 class="mb-1">Role Studio (beta)</h5>
+                  <h5 class="mb-1">Role Studio</h5>
                   <div class="small text-muted">Кастомні ролі, секційні права та доступ до типів курсів.</div>
                 </div>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-rbac-template="deanery">Default: Deanery</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-rbac-template="starosta">Default: Starosta</button>
+                  <button class="btn btn-outline-danger btn-sm" type="button" data-rbac-template="reset">Reset system defaults</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-rbac-revert>Revert unsaved</button>
+                </div>
               </div>
+              <div class="small text-muted mb-3">Застосуй шаблон, потім натисни “Зберегти роль” у потрібних ролях.</div>
               <form method="POST" action="/admin/rbac/roles/create" class="row g-2 align-items-end mb-4">
                 <div class="col-12 col-md-3">
                   <label class="form-label">Key</label>
@@ -1181,7 +1111,7 @@
               <% if (rbacRolesList.length) { %>
                 <div class="d-grid gap-3">
                   <% rbacRolesList.forEach(function(roleRow) { %>
-                    <form method="POST" action="/admin/rbac/roles/<%= roleRow.key %>/save" class="border rounded-3 p-3">
+                    <form method="POST" action="/admin/rbac/roles/<%= roleRow.key %>/save" class="border rounded-3 p-3" data-rbac-role-form data-role-key="<%= roleRow.key %>">
                       <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                         <div>
                           <div class="fw-semibold"><%= roleRow.label %> <span class="text-muted">(<%= roleRow.key %>)</span></div>
@@ -3499,10 +3429,6 @@
         courses: <%- JSON.stringify(courses || []) %>,
         semestersByCourse: <%- JSON.stringify(semestersByCourseMap || {}) %>,
       };
-      const roleSectionLabels = <%- JSON.stringify((adminSectionOptionsList || []).reduce((acc, section) => {
-        acc[section.id] = section.label;
-        return acc;
-      }, {})) %>;
       const roleLabelMap = <%- JSON.stringify(roleLabelMapData || {}) %>;
       const roleCatalogBootstrap = <%- JSON.stringify((rbacRolesList || []).map((roleRow) => ({
         key: roleRow.key,
@@ -3971,93 +3897,98 @@
         setDirtyState();
       }
 
-      const roleAccessFocus = document.getElementById('roleAccessFocus');
-      const roleAccessForm = document.querySelector('#admin-role-studio [data-role-access-form]');
-      if (roleAccessForm) {
-        const defaultPermissions = roleAccessForm.dataset.defaultPermissions
-          ? JSON.parse(roleAccessForm.dataset.defaultPermissions)
-          : {};
-        const initialPermissions = roleAccessForm.dataset.initialPermissions
-          ? JSON.parse(roleAccessForm.dataset.initialPermissions)
-          : {};
-        const summaryEl = document.querySelector('[data-role-summary]');
-        const revertBtn = roleAccessForm.querySelector('[data-role-revert]');
-        const applyRoleFilter = () => {
-          if (!roleAccessFocus) return;
-          const value = roleAccessFocus.value || roleAccessFocus.dataset.defaultRole || 'deanery';
-          document.querySelectorAll('.role-access-row[data-role-row]').forEach((row) => {
-            row.style.display = value === 'all' || row.dataset.roleRow === value ? 'grid' : 'none';
+      const rbacRoleForms = Array.from(document.querySelectorAll('[data-rbac-role-form]'));
+      const rbacTemplateButtons = Array.from(document.querySelectorAll('[data-rbac-template]'));
+      const rbacRevertBtn = document.querySelector('[data-rbac-revert]');
+      if (rbacRoleForms.length) {
+        const rbacPermissionDefaults = <%- JSON.stringify(defaultRolePermissions || {}) %>;
+        const allAdminSectionKeys = <%- JSON.stringify((adminSectionOptionsList || []).map((section) => section.id)) %>;
+        const rbacCourseDefaults = {
+          admin: ['regular', 'teacher'],
+          teacher: ['regular', 'teacher'],
+          deanery: ['regular'],
+          starosta: ['regular'],
+          student: ['regular'],
+        };
+        const roleSnapshots = new Map();
+
+        const getRoleForm = (roleKey) =>
+          rbacRoleForms.find((form) => normalizeRoleKeyClient(form.dataset.roleKey) === normalizeRoleKeyClient(roleKey));
+        const getCheckedValues = (form, name) =>
+          Array.from(form.querySelectorAll(`input[name="${name}"]:checked`)).map((input) => input.value);
+        const setCheckedValues = (form, name, values) => {
+          const allowed = new Set(Array.isArray(values) ? values : []);
+          form.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+            input.checked = allowed.has(input.value);
           });
         };
-        const applyDefaults = (roleKey, permissions) => {
-          const boxes = roleAccessForm.querySelectorAll(`input[name="role_permissions[${roleKey}]"]`);
-          boxes.forEach((box) => {
-            box.checked = permissions.includes(box.value);
+        const captureRoleSnapshots = () => {
+          roleSnapshots.clear();
+          rbacRoleForms.forEach((form) => {
+            const key = normalizeRoleKeyClient(form.dataset.roleKey);
+            if (!key) return;
+            roleSnapshots.set(key, {
+              permission_keys: getCheckedValues(form, 'permission_keys'),
+              course_kinds: getCheckedValues(form, 'course_kinds'),
+              is_active: (() => {
+                const activeField = form.querySelector('input[name="is_active"]');
+                return !!(activeField && activeField.checked);
+              })(),
+            });
           });
         };
-        const getCurrentPermissions = (roleKey) => Array.from(roleAccessForm.querySelectorAll(
-          `input[name="role_permissions[${roleKey}]"]:checked`
-        )).map((input) => input.value);
-        const updateSummary = () => {
-          if (!summaryEl || !roleAccessFocus) return;
-          const roleKey = roleAccessFocus.value;
-          if (roleKey === 'all') {
-            summaryEl.innerHTML = '<div class="small text-muted">Select a role to see change summary.</div>';
-            return;
-          }
-          const prev = new Set(initialPermissions[roleKey] || []);
-          const next = new Set(getCurrentPermissions(roleKey));
-          const added = Array.from(next).filter((id) => !prev.has(id));
-          const removed = Array.from(prev).filter((id) => !next.has(id));
-          if (!added.length && !removed.length) {
-            summaryEl.innerHTML = '<div class="small text-muted">No changes.</div>';
-            return;
-          }
-          const rows = [];
-          if (added.length) rows.push(`<div class="role-summary-item"><span class="badge text-bg-success">+</span> ${added.map((id) => roleSectionLabels[id] || id).join(', ')}</div>`);
-          if (removed.length) rows.push(`<div class="role-summary-item"><span class="badge text-bg-danger">−</span> ${removed.map((id) => roleSectionLabels[id] || id).join(', ')}</div>`);
-          summaryEl.innerHTML = rows.join('');
+        const applyRolePreset = (roleKey) => {
+          const form = getRoleForm(roleKey);
+          if (!form) return false;
+          const normalizedRole = normalizeRoleKeyClient(roleKey);
+          const permissions = normalizedRole === 'admin'
+            ? allAdminSectionKeys
+            : (rbacPermissionDefaults[normalizedRole] || []);
+          const courseKinds = rbacCourseDefaults[normalizedRole] || ['regular'];
+          setCheckedValues(form, 'permission_keys', permissions);
+          setCheckedValues(form, 'course_kinds', courseKinds);
+          const activeField = form.querySelector('input[name="is_active"]');
+          if (activeField && !activeField.disabled) activeField.checked = true;
+          return true;
         };
-        if (roleAccessFocus) {
-          roleAccessFocus.value = roleAccessFocus.value || roleAccessFocus.dataset.defaultRole || 'deanery';
-          applyRoleFilter();
-          updateSummary();
-          roleAccessFocus.addEventListener('change', () => {
-            applyRoleFilter();
-            updateSummary();
+        const revertRoleSnapshots = () => {
+          rbacRoleForms.forEach((form) => {
+            const key = normalizeRoleKeyClient(form.dataset.roleKey);
+            const snapshot = roleSnapshots.get(key);
+            if (!snapshot) return;
+            setCheckedValues(form, 'permission_keys', snapshot.permission_keys || []);
+            setCheckedValues(form, 'course_kinds', snapshot.course_kinds || []);
+            const activeField = form.querySelector('input[name="is_active"]');
+            if (activeField && !activeField.disabled) activeField.checked = !!snapshot.is_active;
           });
-        }
-        document.querySelectorAll('[data-role-template]').forEach((btn) => {
+        };
+        const applySystemDefaults = () => {
+          ['admin', 'deanery', 'starosta', 'teacher', 'student'].forEach((roleKey) => {
+            applyRolePreset(roleKey);
+          });
+        };
+
+        captureRoleSnapshots();
+
+        rbacTemplateButtons.forEach((btn) => {
           btn.addEventListener('click', () => {
-            const template = btn.dataset.roleTemplate;
+            const template = normalizeRoleKeyClient(btn.dataset.rbacTemplate);
+            if (!template) return;
             if (template === 'reset') {
-              Object.keys(defaultPermissions || {}).forEach((roleKey) => {
-                applyDefaults(roleKey, defaultPermissions[roleKey] || []);
-              });
-              updateSummary();
+              applySystemDefaults();
+              showToast('success', 'System defaults applied in Role Studio.');
               return;
             }
-            const perms = defaultPermissions[template] || [];
-            applyDefaults(template, perms);
-            updateSummary();
+            if (applyRolePreset(template)) {
+              showToast('success', `Default preset applied for ${template}.`);
+            }
           });
         });
-        roleAccessForm.addEventListener('change', (event) => {
-          if (event.target && event.target.matches('input[type="checkbox"]')) {
-            updateSummary();
-          }
-        });
-        if (revertBtn) {
-          revertBtn.addEventListener('click', () => {
-            const roleKey = roleAccessFocus ? roleAccessFocus.value : 'all';
-            if (roleKey === 'all') {
-              Object.keys(initialPermissions || {}).forEach((key) => {
-                applyDefaults(key, initialPermissions[key] || []);
-              });
-            } else {
-              applyDefaults(roleKey, initialPermissions[roleKey] || []);
-            }
-            updateSummary();
+
+        if (rbacRevertBtn) {
+          rbacRevertBtn.addEventListener('click', () => {
+            revertRoleSnapshots();
+            showToast('success', 'Unsaved role changes reverted.');
           });
         }
       }
