@@ -976,6 +976,27 @@ function requireAdminPanelAccess(req, res, next) {
   return res.status(403).send('Forbidden (update page)');
 }
 
+function hasAdminSectionAccess(req, sectionId) {
+  if (!req || !req.session || !req.session.user) return false;
+  if (hasSessionRole(req, 'admin')) return true;
+  const allowedSections = Array.isArray(req.allowedAdminSections) ? req.allowedAdminSections : [];
+  if (!sectionId) {
+    return allowedSections.length > 0;
+  }
+  return allowedSections.includes(sectionId);
+}
+
+function requireAdminSectionAccess(sectionId) {
+  return (req, res, next) => {
+    if (!hasAdminSectionAccess(req, sectionId)) {
+      return res.status(403).send('Forbidden (update page)');
+    }
+    return next();
+  };
+}
+
+const requireScheduleSectionAccess = requireAdminSectionAccess('admin-schedule');
+
 app.use(async (req, res, next) => {
   if (!req.session || !req.session.user) {
     req.allowedAdminSections = [];
@@ -2180,7 +2201,6 @@ const {
   requireStaff,
   requireOverviewAccess,
   requireDeanery,
-  requireAdminOrDeanery,
   requireHomeworkBulkAccess,
 } = require('./lib/auth');
 const {
@@ -2328,6 +2348,13 @@ function getStaffCourse(req) {
   }
   const userCourse = Number(req?.session?.user?.course_id || 1);
   return Number.isNaN(userCourse) ? 1 : userCourse;
+}
+
+function getStaffPanelBase(req, courseId) {
+  if (hasSessionRole(req, 'deanery') && !hasSessionRole(req, 'admin')) {
+    return `/deanery?course=${courseId}`;
+  }
+  return `/admin?course=${courseId}`;
 }
 
 async function getActiveSemester(courseId) {
@@ -10311,13 +10338,13 @@ app.post('/subgroup/join', requireLogin, (req, res) => {
   );
 });
 
-app.post('/admin/schedule/add', requireAdminOrDeanery, async (req, res) => {
+app.post('/admin/schedule/add', requireScheduleSectionAccess, async (req, res) => {
   const { subject_id, group_number, group_numbers, day_of_week, class_number, week_numbers, semester_id, lesson_type } = req.body;
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
   const lessonType = normalizeLessonType(lesson_type);
   const courseId = getStaffCourse(req);
-  const panelBase = hasSessionRole(req, 'admin') ? `/admin?course=${courseId}` : `/deanery?course=${courseId}`;
+  const panelBase = getStaffPanelBase(req, courseId);
   const withStatus = (status) => `${panelBase}&${status}`;
   const semesterId = Number(semester_id);
 
@@ -10420,7 +10447,7 @@ app.post('/admin/schedule/add', requireAdminOrDeanery, async (req, res) => {
   }
 });
 
-app.post('/admin/schedule/edit/:id', requireAdminOrDeanery, async (req, res) => {
+app.post('/admin/schedule/edit/:id', requireScheduleSectionAccess, async (req, res) => {
   const { id } = req.params;
   const { subject_id, group_number, day_of_week, class_number, week_number, semester_id, lesson_type } = req.body;
   const groupNum = Number(group_number);
@@ -10428,7 +10455,7 @@ app.post('/admin/schedule/edit/:id', requireAdminOrDeanery, async (req, res) => 
   const weekNum = Number(week_number);
   const lessonType = normalizeLessonType(lesson_type);
   const courseId = getStaffCourse(req);
-  const panelBase = hasSessionRole(req, 'admin') ? `/admin?course=${courseId}` : `/deanery?course=${courseId}`;
+  const panelBase = getStaffPanelBase(req, courseId);
   const withStatus = (status) => `${panelBase}&${status}`;
   const semesterId = Number(semester_id);
 
@@ -10480,11 +10507,11 @@ app.post('/admin/schedule/edit/:id', requireAdminOrDeanery, async (req, res) => 
   }
 });
 
-app.post('/admin/schedule/delete/:id', requireAdminOrDeanery, (req, res) => {
+app.post('/admin/schedule/delete/:id', requireScheduleSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getStaffCourse(req);
   const referer = req.get('referer');
-  const fallbackBase = hasSessionRole(req, 'admin') ? `/admin?course=${courseId}` : `/deanery?course=${courseId}`;
+  const fallbackBase = getStaffPanelBase(req, courseId);
   const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : fallbackBase;
   const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
   db.run('DELETE FROM schedule_entries WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
@@ -10497,12 +10524,12 @@ app.post('/admin/schedule/delete/:id', requireAdminOrDeanery, (req, res) => {
   });
 });
 
-app.post('/admin/schedule/delete-multiple', requireAdminOrDeanery, (req, res) => {
+app.post('/admin/schedule/delete-multiple', requireScheduleSectionAccess, (req, res) => {
   const ids = req.body.delete_ids;
   const returnTo = req.body.return_to || req.query.return_to || '';
   const referer = req.get('referer');
   const courseId = getStaffCourse(req);
-  const fallback = hasSessionRole(req, 'admin') ? `/admin?course=${courseId}` : `/deanery?course=${courseId}`;
+  const fallback = getStaffPanelBase(req, courseId);
   const redirectBase =
     (returnTo && returnTo.startsWith('/admin/schedule-list') ? returnTo : null) ||
     (referer && referer.includes('/admin/schedule-list') ? referer : null) ||
@@ -10523,10 +10550,10 @@ app.post('/admin/schedule/delete-multiple', requireAdminOrDeanery, (req, res) =>
   });
 });
 
-app.post('/admin/schedule/clear-all', requireAdminOrDeanery, (req, res) => {
+app.post('/admin/schedule/clear-all', requireScheduleSectionAccess, (req, res) => {
   const courseId = getStaffCourse(req);
   const referer = req.get('referer');
-  const fallbackBase = hasSessionRole(req, 'admin') ? `/admin?course=${courseId}` : `/deanery?course=${courseId}`;
+  const fallbackBase = getStaffPanelBase(req, courseId);
   const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : fallbackBase;
   const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
   db.run('DELETE FROM schedule_entries WHERE course_id = ?', [courseId], (err) => {
@@ -10662,7 +10689,7 @@ app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
   );
 });
 
-app.post('/admin/api/subjects/:subjectId/clone', requireAdminOrDeanery, async (req, res) => {
+app.post('/admin/api/subjects/:subjectId/clone', requireScheduleSectionAccess, async (req, res) => {
   const subjectId = Number(req.params.subjectId);
   const { new_name, copy_settings } = req.body || {};
   if (Number.isNaN(subjectId) || !new_name || !new_name.trim()) {
@@ -10693,7 +10720,7 @@ app.post('/admin/api/subjects/:subjectId/clone', requireAdminOrDeanery, async (r
   }
 });
 
-app.post('/admin/api/schedule/weeks/clone', requireAdminOrDeanery, async (req, res) => {
+app.post('/admin/api/schedule/weeks/clone', requireScheduleSectionAccess, async (req, res) => {
   const { source_week, target_week, mode } = req.body || {};
   const srcWeek = Number(source_week);
   const tgtWeek = Number(target_week);
@@ -10976,7 +11003,7 @@ app.post('/admin/teacher-requests/:userId/reject', requireAdmin, async (req, res
   }
 });
 
-app.get('/admin/api/courses/:courseId/study-days', requireAdminOrDeanery, async (req, res) => {
+app.get('/admin/api/courses/:courseId/study-days', requireScheduleSectionAccess, async (req, res) => {
   const courseId = Number(req.params.courseId);
   if (Number.isNaN(courseId) || courseId < 1) {
     return res.status(400).json({ error: 'Invalid course' });
@@ -10996,7 +11023,7 @@ app.get('/admin/api/courses/:courseId/study-days', requireAdminOrDeanery, async 
   }
 });
 
-app.patch('/admin/api/courses/:courseId/study-days/:weekday', requireAdminOrDeanery, async (req, res) => {
+app.patch('/admin/api/courses/:courseId/study-days/:weekday', requireScheduleSectionAccess, async (req, res) => {
   const courseId = Number(req.params.courseId);
   const weekday = Number(req.params.weekday);
   const { is_active } = req.body || {};
@@ -11022,7 +11049,7 @@ app.patch('/admin/api/courses/:courseId/study-days/:weekday', requireAdminOrDean
   }
 });
 
-app.post('/admin/api/courses/:courseId/study-days/:weekday/subjects', requireAdminOrDeanery, async (req, res) => {
+app.post('/admin/api/courses/:courseId/study-days/:weekday/subjects', requireScheduleSectionAccess, async (req, res) => {
   const courseId = Number(req.params.courseId);
   const weekday = Number(req.params.weekday);
   const subjectId = Number(req.body?.subject_id);
@@ -11056,7 +11083,7 @@ app.post('/admin/api/courses/:courseId/study-days/:weekday/subjects', requireAdm
   }
 });
 
-app.delete('/admin/api/courses/:courseId/study-days/:weekday/subjects/:subjectId', requireAdminOrDeanery, async (req, res) => {
+app.delete('/admin/api/courses/:courseId/study-days/:weekday/subjects/:subjectId', requireScheduleSectionAccess, async (req, res) => {
   const courseId = Number(req.params.courseId);
   const weekday = Number(req.params.weekday);
   const subjectId = Number(req.params.subjectId);
@@ -11083,7 +11110,7 @@ app.delete('/admin/api/courses/:courseId/study-days/:weekday/subjects/:subjectId
   }
 });
 
-app.get('/admin/api/courses/:courseId/week-time', requireAdminOrDeanery, async (req, res) => {
+app.get('/admin/api/courses/:courseId/week-time', requireScheduleSectionAccess, async (req, res) => {
   const courseId = Number(req.params.courseId);
   if (Number.isNaN(courseId) || courseId < 1) {
     return res.status(400).json({ error: 'Invalid course' });
@@ -11108,7 +11135,7 @@ app.get('/admin/api/courses/:courseId/week-time', requireAdminOrDeanery, async (
   }
 });
 
-app.patch('/admin/api/courses/:courseId/week-time/:weekNumber', requireAdminOrDeanery, async (req, res) => {
+app.patch('/admin/api/courses/:courseId/week-time/:weekNumber', requireScheduleSectionAccess, async (req, res) => {
   const courseId = Number(req.params.courseId);
   const weekNumber = Number(req.params.weekNumber);
   const { use_local_time } = req.body || {};
@@ -11285,8 +11312,8 @@ app.post('/admin/api/homework/bulk', requireHomeworkBulkAccess, writeLimiter, as
   }
 });
 
-app.get('/admin/api/schedule/validate', requireAdminOrDeanery, async (req, res) => {
-  const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
+app.get('/admin/api/schedule/validate', requireScheduleSectionAccess, async (req, res) => {
+  const courseId = getStaffCourse(req);
   let activeSemester = null;
   try {
     activeSemester = await getActiveSemester(courseId);

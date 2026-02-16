@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.79",
+      "date": "2026-02-16",
+      "items": [
+        "fix(rbac): allow custom roles with `admin-schedule` permission from Role Studio to use schedule write routes (`/admin/schedule/add|edit|delete|delete-multiple|clear-all`) without `Forbidden (update page)`",
+        "fix(rbac): apply section-based access check (`admin-schedule`) to related schedule APIs (week clone, subject clone, study days, week time, validate) so custom schedule managers can use full schedule tooling",
+        "fix(ux): redirect non-deanery custom staff schedule actions back to `/admin?course=...` instead of `/deanery`, while deanery keeps deanery redirect"
+      ]
+    },
+    {
       "version": "0.8.78",
       "date": "2026-02-16",
       "items": [
