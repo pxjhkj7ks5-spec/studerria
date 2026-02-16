@@ -11,6 +11,7 @@ const mergeSubjectsByType = require('./010_merge_subjects_by_type');
 const scheduleGeneratorIndexes = require('./011_schedule_generator_indexes');
 const rbacRoles = require('./012_rbac_roles');
 const siteVisitEvents = require('./013_site_visit_events');
+const teamworkTeacherTaskConfig = require('./014_teamwork_teacher_task_config');
 
 module.exports = [
   init,
@@ -26,4 +27,5 @@ module.exports = [
   scheduleGeneratorIndexes,
   rbacRoles,
   siteVisitEvents,
+  teamworkTeacherTaskConfig,
 ];

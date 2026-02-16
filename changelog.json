@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.8.89",
+      "date": "2026-02-16",
+      "items": [
+        "feat(teamwork): added teacher-focused teamwork flow with subject cards that show course/group labels and separate teacher/student behavior on the page",
+        "feat(teamwork): expanded task creation settings with random distribution, configurable group count, and optional min/max team size using a dual-handle slider",
+        "fix(teamwork): restricted task/group access by teacher assignments so students only see and join tasks from teachers who teach their subject group",
+        "ux(teamwork): added footer Changelog button and modal on the teamwork page"
+      ]
+    },
+    {
       "version": "0.8.88",
       "date": "2026-02-16",
       "items": [

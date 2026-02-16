@@ -632,16 +632,20 @@
 
       <div class="glass p-3 mb-4">
         <h5 class="mb-3">Ваші предмети</h5>
-        <div class="d-flex flex-wrap gap-2">
+        <div class="d-flex flex-wrap gap-2 subject-pills-wrap">
           <% if (!subjects.length) { %>
             <span class="text-muted">Немає предметів для вибору</span>
           <% } else { %>
             <% subjects.forEach(function(s) { %>
               <a
-                class="btn btn-sm <%= selectedSubjectId === s.subject_id ? 'btn-primary' : 'btn-outline-light' %> subject-pill"
+                class="btn btn-sm <%= selectedSubjectId === s.subject_id ? 'btn-primary' : 'btn-outline-light' %> subject-pill subject-pill-card"
                 href="/teamwork?subject_id=<%= s.subject_id %>"
               >
-                <%= s.subject_name %>
+                <span class="subject-pill-title"><%= s.subject_name %></span>
+                <span class="subject-pill-meta"><%= s.course_name %></span>
+                <% if (isTeacherMode && s.group_label) { %>
+                  <span class="subject-pill-meta"><%= s.group_label %></span>
+                <% } %>
               </a>
             <% }); %>
           <% } %>
@@ -650,10 +654,22 @@
 
       <% if (selectedSubjectId) { %>
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h4 class="mb-0">Завдання по предмету</h4>
-          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createTaskModal">
-            Створити завдання
-          </button>
+          <div>
+            <h4 class="mb-0">Завдання по предмету</h4>
+            <% if (selectedSubject) { %>
+              <div class="text-muted small mt-1">
+                <span class="course-badge"><%= selectedSubject.course_name %></span>
+                <% if (isTeacherMode && selectedSubject.group_label) { %>
+                  <span class="ms-2"><%= selectedSubject.group_label %></span>
+                <% } %>
+              </div>
+            <% } %>
+          </div>
+          <% if (isTeacherMode) { %>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createTaskModal">
+              Створити завдання
+            </button>
+          <% } %>
         </div>
 
         <% if (!tasks.length) { %>
@@ -666,6 +682,16 @@
               <div>
                 <h5 class="mb-1"><%= task.title %></h5>
                 <div class="text-muted">Предмет: <%= task.subject_name %></div>
+                <% if (!isTeacherMode) { %>
+                  <div class="text-muted small">Викладач: <%= task.created_by_name %></div>
+                <% } %>
+                <div class="d-flex flex-wrap gap-2 mt-2 task-settings-line">
+                  <span class="task-setting-pill"><%= task.random_distribution ? 'Рандомний розподіл' : 'Вільний вибір групи' %></span>
+                  <span class="task-setting-pill">Груп: <%= task.group_count || 1 %></span>
+                  <% if (task.member_limits_enabled) { %>
+                    <span class="task-setting-pill">Команда: <%= task.min_members %> - <%= task.max_members %></span>
+                  <% } %>
+                </div>
                 <div class="d-flex gap-2 mt-2 task-reactions">
                   <% const reactMap = task.reactions || {}; %>
                   <% const reactedMap = task.reacted || {}; %>
@@ -695,12 +721,16 @@
               <div class="col-12 col-lg-8">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                   <h6 class="mb-0">Підгрупи</h6>
-                  <form method="POST" action="/teamwork/group/create" class="d-flex gap-2">
-                    <input type="hidden" name="task_id" value="<%= task.id %>" />
-                    <input class="form-control form-control-sm" name="name" placeholder="Назва групи" />
-                    <input class="form-control form-control-sm" name="max_members" placeholder="Макс." type="number" min="1" />
-                    <button class="btn btn-outline-light btn-sm" type="submit">+ Нова</button>
-                  </form>
+                  <% if (task.is_owner && task.can_create_groups) { %>
+                    <form method="POST" action="/teamwork/group/create" class="d-flex gap-2">
+                      <input type="hidden" name="task_id" value="<%= task.id %>" />
+                      <input class="form-control form-control-sm" name="name" placeholder="Назва групи" />
+                      <% if (!task.member_limits_enabled) { %>
+                        <input class="form-control form-control-sm" name="max_members" placeholder="Макс." type="number" min="1" />
+                      <% } %>
+                      <button class="btn btn-outline-light btn-sm" type="submit">+ Нова</button>
+                    </form>
+                  <% } %>
                 </div>
 
                 <% if (!task.groups.length) { %>
@@ -719,16 +749,18 @@
                           <% } %>
                         </div>
                         <div class="d-flex gap-2">
-                          <% if (!group.is_member) { %>
-                            <form method="POST" action="/teamwork/group/join">
-                              <input type="hidden" name="group_id" value="<%= group.id %>" />
-                              <button class="btn btn-outline-light btn-sm" type="submit">Приєднатися</button>
-                            </form>
-                          <% } else { %>
-                            <form method="POST" action="/teamwork/group/leave">
-                              <input type="hidden" name="group_id" value="<%= group.id %>" />
-                              <button class="btn btn-outline-secondary btn-sm" type="submit">Вийти</button>
-                            </form>
+                          <% if (!isTeacherMode) { %>
+                            <% if (!group.is_member) { %>
+                              <form method="POST" action="/teamwork/group/join">
+                                <input type="hidden" name="group_id" value="<%= group.id %>" />
+                                <button class="btn btn-outline-light btn-sm" type="submit">Приєднатися</button>
+                              </form>
+                            <% } else { %>
+                              <form method="POST" action="/teamwork/group/leave">
+                                <input type="hidden" name="group_id" value="<%= group.id %>" />
+                                <button class="btn btn-outline-secondary btn-sm" type="submit">Вийти</button>
+                              </form>
+                            <% } %>
                           <% } %>
                         </div>
                       </div>
@@ -742,10 +774,22 @@
                             <label class="form-label">Назва</label>
                             <input class="form-control form-control-sm" name="name" placeholder="<%= group.name %>" />
                           </div>
-                          <div class="col-12 col-md-3">
-                            <label class="form-label">Макс. учасників</label>
-                            <input class="form-control form-control-sm" name="max_members" type="number" min="1" placeholder="без ліміту" />
-                          </div>
+                          <% if (!task.member_limits_enabled) { %>
+                            <div class="col-12 col-md-3">
+                              <label class="form-label">Макс. учасників</label>
+                              <input class="form-control form-control-sm" name="max_members" type="number" min="1" placeholder="без ліміту" />
+                            </div>
+                          <% } else { %>
+                            <div class="col-12 col-md-3">
+                              <label class="form-label">Макс. учасників</label>
+                              <input
+                                class="form-control form-control-sm"
+                                type="number"
+                                value="<%= task.max_members || '' %>"
+                                disabled
+                              />
+                            </div>
+                          <% } %>
                           <div class="col-12 col-md-4 d-flex gap-2">
                             <button class="btn btn-outline-primary btn-sm" type="submit">Оновити</button>
                           </div>
@@ -779,32 +823,103 @@
       <% } %>
     </main>
 
-    <div class="modal fade" id="createTaskModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content glass p-3">
-          <div class="modal-header">
-            <h5 class="modal-title">Нове завдання</h5>
-            <button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <form method="POST" action="/teamwork/task/create">
-              <input type="hidden" name="subject_id" value="<%= selectedSubjectId %>" />
-              <div class="mb-3">
-                <label class="form-label">Назва завдання</label>
-                <input class="form-control" name="title" placeholder="Наприклад: Практика 1" required />
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Дедлайн (опц.)</label>
-                <input class="form-control" type="date" name="due_date" />
-              </div>
-              <button class="btn btn-primary glass w-100" type="submit">Створити</button>
-            </form>
+    <footer class="app-footer text-center py-4">
+      <small class="footer-meta">
+        <span class="footer-version">v<%= appVersion %></span>
+        <% if (buildStamp) { %>
+          <span class="footer-build">build <%= new Date(buildStamp).toLocaleString('uk-UA') %></span>
+        <% } %>
+        <button
+          type="button"
+          class="btn btn-link footer-link p-0 align-baseline"
+          data-bs-toggle="modal"
+          data-bs-target="#changelogModal"
+        >
+          Changelog
+        </button>
+      </small>
+    </footer>
+
+    <% if (isTeacherMode) { %>
+      <div class="modal fade" id="createTaskModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content glass p-3">
+            <div class="modal-header">
+              <h5 class="modal-title">Нове завдання</h5>
+              <button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <form method="POST" action="/teamwork/task/create">
+                <input type="hidden" name="subject_id" value="<%= selectedSubjectId %>" />
+                <div class="mb-3">
+                  <label class="form-label">Назва завдання</label>
+                  <input class="form-control" name="title" placeholder="Наприклад: Практика 1" required />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Дедлайн (опц.)</label>
+                  <input class="form-control" type="date" name="due_date" />
+                </div>
+
+                <div class="glass p-3 mb-3 task-options-block">
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="randomDistributionToggle" name="random_distribution" value="1" checked />
+                    <label class="form-check-label" for="randomDistributionToggle">Рандомний розподіл студентів</label>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label" for="groupCountInput">Кількість груп</label>
+                    <input class="form-control" id="groupCountInput" type="number" name="group_count" min="1" max="12" value="4" required />
+                  </div>
+
+                  <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="memberLimitsToggle" name="limit_members_enabled" value="1" />
+                    <label class="form-check-label" for="memberLimitsToggle">Обмеження учасників в команді</label>
+                  </div>
+
+                  <div id="memberLimitsPanel" class="member-limits-panel is-disabled">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <span class="small text-muted">Розмір команди</span>
+                      <span class="range-value-chip"><span id="rangeMinValue">2</span> - <span id="rangeMaxValue">4</span></span>
+                    </div>
+                    <div class="double-range" id="doubleRangeBox">
+                      <div class="double-range-track"></div>
+                      <div class="double-range-fill" id="doubleRangeFill"></div>
+                      <input
+                        class="double-range-input"
+                        type="range"
+                        id="minMembersInput"
+                        name="min_members"
+                        min="1"
+                        max="12"
+                        value="2"
+                        disabled
+                      />
+                      <input
+                        class="double-range-input"
+                        type="range"
+                        id="maxMembersInput"
+                        name="max_members"
+                        min="1"
+                        max="12"
+                        value="4"
+                        disabled
+                      />
+                      <output class="range-bubble" id="minRangeBubble">2</output>
+                      <output class="range-bubble" id="maxRangeBubble">4</output>
+                    </div>
+                  </div>
+                </div>
+
+                <button class="btn btn-primary glass w-100" type="submit">Створити</button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    <% } %>
 
     <%- include('partials/mobile-menu-modal', { role, t, activePage: 'teamwork' }) %>
+    <%- include('partials/changelog-modal') %>
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
@@ -879,6 +994,73 @@
       }
 
       attachValidationTooltips();
+
+      function initTeamSizeRange() {
+        const limitsToggle = document.getElementById('memberLimitsToggle');
+        const limitsPanel = document.getElementById('memberLimitsPanel');
+        const minInput = document.getElementById('minMembersInput');
+        const maxInput = document.getElementById('maxMembersInput');
+        const minValueEl = document.getElementById('rangeMinValue');
+        const maxValueEl = document.getElementById('rangeMaxValue');
+        const minBubble = document.getElementById('minRangeBubble');
+        const maxBubble = document.getElementById('maxRangeBubble');
+        const rangeFill = document.getElementById('doubleRangeFill');
+        if (!limitsToggle || !limitsPanel || !minInput || !maxInput || !rangeFill) return;
+
+        const alignBubble = (input, bubble) => {
+          if (!input || !bubble) return;
+          const min = Number(input.min) || 0;
+          const max = Number(input.max) || 100;
+          const value = Number(input.value) || min;
+          const percent = max === min ? 0 : ((value - min) / (max - min)) * 100;
+          bubble.style.left = `calc(${percent}% + (${8 - percent * 0.16}px))`;
+          bubble.textContent = String(value);
+        };
+
+        const syncRange = (source) => {
+          let minValue = Number(minInput.value);
+          let maxValue = Number(maxInput.value);
+          if (minValue > maxValue) {
+            if (source === 'min') {
+              maxValue = minValue;
+            } else {
+              minValue = maxValue;
+            }
+          }
+
+          minInput.value = String(minValue);
+          maxInput.value = String(maxValue);
+          if (minValueEl) minValueEl.textContent = String(minValue);
+          if (maxValueEl) maxValueEl.textContent = String(maxValue);
+
+          const rangeMin = Number(minInput.min) || 1;
+          const rangeMax = Number(minInput.max) || 12;
+          const left = ((minValue - rangeMin) / (rangeMax - rangeMin)) * 100;
+          const right = ((maxValue - rangeMin) / (rangeMax - rangeMin)) * 100;
+          rangeFill.style.left = `${left}%`;
+          rangeFill.style.width = `${Math.max(right - left, 0)}%`;
+
+          alignBubble(minInput, minBubble);
+          alignBubble(maxInput, maxBubble);
+        };
+
+        const applyLimitsState = () => {
+          const enabled = limitsToggle.checked;
+          minInput.disabled = !enabled;
+          maxInput.disabled = !enabled;
+          limitsPanel.classList.toggle('is-disabled', !enabled);
+          syncRange('max');
+        };
+
+        limitsToggle.addEventListener('change', applyLimitsState);
+        minInput.addEventListener('input', () => syncRange('min'));
+        maxInput.addEventListener('input', () => syncRange('max'));
+        window.addEventListener('resize', () => syncRange('max'));
+
+        applyLimitsState();
+      }
+
+      initTeamSizeRange();
 
       function updateReactionButtons(container, reactions, reacted) {
         const buttons = container.querySelectorAll('.react-btn');
