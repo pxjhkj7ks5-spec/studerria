@@ -1177,6 +1177,24 @@ try {
   console.error('Failed to ensure uploads directory', err);
 }
 
+function normalizeUploadedOriginalName(rawName, fallbackName = null) {
+  const initial = String(rawName || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
+  if (!initial) return fallbackName;
+  let normalized = initial;
+  try {
+    const decoded = Buffer.from(initial, 'latin1').toString('utf8');
+    const hasMojibakeMarkers = /[ÐÑÃÂ]/.test(initial);
+    const hasCyrillic = /[\u0400-\u04FF]/.test(decoded);
+    const hasReplacement = decoded.includes('\uFFFD');
+    if (hasMojibakeMarkers && hasCyrillic && !hasReplacement) {
+      normalized = decoded;
+    }
+  } catch (err) {
+    normalized = initial;
+  }
+  return normalized.replace(/[\u0000-\u001F\u007F]/g, '').trim() || fallbackName;
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     try {
@@ -1187,8 +1205,15 @@ const storage = multer.diskStorage({
     return cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9-_]/g, '_');
+    const originalName = normalizeUploadedOriginalName(file.originalname, 'file');
+    file.originalname = originalName;
+    const ext = path.extname(originalName);
+    const base = path
+      .basename(originalName, ext)
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9-_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'file';
     const stamp = Date.now();
     cb(null, `${base}-${stamp}${ext}`);
   },
@@ -2660,8 +2685,13 @@ function sortSchedule(schedule, sortKey) {
 }
 
 function sortHomework(homework, sortKey) {
-  if (!sortKey) return homework;
-  const copy = [...homework];
+  const normalized = (Array.isArray(homework) ? homework : []).map((item) => (
+    item && item.file_name
+      ? { ...item, file_name: normalizeUploadedOriginalName(item.file_name) }
+      : item
+  ));
+  if (!sortKey) return normalized;
+  const copy = [...normalized];
   if (sortKey === 'created') {
     copy.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   } else if (sortKey === 'subject') {
@@ -4024,7 +4054,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               meeting_url: row.meeting_url,
               link_url: row.link_url,
               file_path: row.file_path,
-              file_name: row.file_name,
+              file_name: normalizeUploadedOriginalName(row.file_name),
               created_by: row.created_by,
               created_at: row.created_at,
               is_control: Number(row.is_control || 0),
@@ -4564,7 +4594,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                   meeting_url: row.meeting_url,
                   link_url: row.link_url,
                   file_path: row.file_path,
-                  file_name: row.file_name,
+                  file_name: normalizeUploadedOriginalName(row.file_name),
                   created_by: row.created_by,
                   created_at: row.created_at,
                   is_control: Number(row.is_control || 0),

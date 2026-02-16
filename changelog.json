@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.82",
+      "date": "2026-02-16",
+      "items": [
+        "fix(upload): decode mojibake filenames from multipart uploads (UTF-8 names shown as `Ð...`) so Ukrainian attachment names display correctly",
+        "fix(upload): normalize stored upload filenames with safer fallback while preserving decoded `originalname` for homework attachment labels",
+        "fix(ui): normalize previously saved homework `file_name` values at render time to recover readable attachment titles in schedule/admin views"
+      ]
+    },
+    {
       "version": "0.8.81",
       "date": "2026-02-16",
       "items": [
