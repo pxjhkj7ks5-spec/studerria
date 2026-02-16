@@ -705,8 +705,8 @@
             <% } %>
           </div>
         </div>
-        <div class="admin-topbar-right d-flex align-items-center">
-          <span class="me-3 text-muted">
+        <div class="admin-topbar-right">
+          <span class="admin-topbar-user text-muted">
             <% if (role === 'admin') { %>
               <%= t('role.admin') %>: <%= username %>
             <% } else if (role === 'starosta') { %>
@@ -718,7 +718,7 @@
             <% } %>
           </span>
           <button
-            class="session-health-chip is-loading me-2"
+            class="session-health-chip is-loading"
             type="button"
             id="sessionHealthChip"
             aria-label="Session store status"
@@ -728,7 +728,7 @@
             <span id="sessionHealthLabel">Session…</span>
           </button>
           <button
-            class="theme-toggle-min me-2"
+            class="theme-toggle-min"
             type="button"
             id="themeToggle"
             aria-label="Toggle theme"
@@ -738,31 +738,19 @@
             🌙
           </button>
           <% if (!isLimitedView && role === 'admin') { %>
-            <form method="POST" action="/admin/switch-to-student" class="admin-viewas-form me-2">
-              <input type="hidden" name="mode" value="manual" />
-              <select name="course_id" class="form-select form-select-sm" aria-label="Select course">
-                <% (courses || []).forEach(function(c) { %>
-                  <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
-                    <%= c.name %>
-                  </option>
-                <% }); %>
-              </select>
-              <select name="group_number" class="form-select form-select-sm" aria-label="Select group">
-                <option value="1">Група 1</option>
-                <option value="2">Група 2</option>
-                <option value="3">Група 3</option>
-              </select>
-              <button class="btn btn-outline-primary btn-sm" type="submit"><%= t('admin.viewAsStudent') %></button>
-            </form>
-            <form method="POST" action="/admin/switch-to-student" class="me-2">
-              <input type="hidden" name="mode" value="self" />
-              <button class="btn btn-outline-secondary btn-sm" type="submit">Мій розклад</button>
-            </form>
+            <button
+              class="btn btn-outline-primary btn-sm admin-topbar-btn"
+              type="button"
+              data-bs-toggle="modal"
+              data-bs-target="#adminPreviewModal"
+            >
+              Превʼю
+            </button>
           <% } else if (isLimitedView) { %>
-            <a class="btn btn-outline-primary btn-sm me-2" href="/schedule"><%= t('admin.backToSchedule') %></a>
+            <a class="btn btn-outline-primary btn-sm admin-topbar-btn" href="/schedule"><%= t('admin.backToSchedule') %></a>
           <% } %>
           <form method="POST" action="/logout">
-            <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
+            <button class="btn btn-outline-secondary btn-sm admin-topbar-btn" type="submit"><%= t('admin.logout') %></button>
           </form>
         </div>
       </div>
@@ -2802,6 +2790,44 @@
     </footer>
     <% if (!isLimitedView) { %>
       <button class="btn btn-primary save-all-btn" type="button">Зберегти все</button>
+    <% } %>
+
+    <% if (!isLimitedView && role === 'admin') { %>
+      <div class="modal fade admin-preview-modal" id="adminPreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Тестовий перегляд</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <form method="POST" action="/admin/switch-to-student" class="admin-preview-form">
+                <input type="hidden" name="mode" value="manual" />
+                <label class="form-label mb-1">Курс</label>
+                <select name="course_id" class="form-select mb-2" aria-label="Select preview course">
+                  <% (courses || []).forEach(function(c) { %>
+                    <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
+                      <%= c.name %>
+                    </option>
+                  <% }); %>
+                </select>
+                <label class="form-label mb-1">Група</label>
+                <select name="group_number" class="form-select mb-3" aria-label="Select preview group">
+                  <option value="1">Група 1</option>
+                  <option value="2">Група 2</option>
+                  <option value="3">Група 3</option>
+                </select>
+                <button class="btn btn-outline-primary admin-topbar-btn w-100" type="submit"><%= t('admin.viewAsStudent') %></button>
+              </form>
+              <form method="POST" action="/admin/switch-to-student" class="admin-preview-form">
+                <input type="hidden" name="mode" value="self" />
+                <div class="small text-muted mb-2">Швидкий перехід у твій власний студентський розклад.</div>
+                <button class="btn btn-outline-secondary admin-topbar-btn w-100" type="submit">Мій розклад</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
     <% } %>
 
     <%- include('partials/changelog-modal') %>

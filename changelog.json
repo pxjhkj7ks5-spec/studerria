@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.84",
+      "date": "2026-02-16",
+      "items": [
+        "ui(admin): unified topbar control sizing (buttons, theme toggle, session chip) for consistent Liquid Glass rhythm",
+        "ux(admin): moved bulky admin test-preview controls into a dedicated modal and replaced them with a single compact `Превʼю` trigger button in topbar",
+        "style(admin): added glass-styled preview modal cards with cleaner course/group selectors and quick access to personal schedule"
+      ]
+    },
+    {
       "version": "0.8.83",
       "date": "2026-02-16",
       "items": [
