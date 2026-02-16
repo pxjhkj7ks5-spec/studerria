@@ -5115,6 +5115,114 @@ app.get('/schedule', requireLogin, async (req, res) => {
   );
 });
 
+const normalizeTeamworkLessonScope = (value) => {
+  return String(value || '').toLowerCase() === 'seminar' ? 'seminar' : 'lecture';
+};
+
+const parseTeamworkGroupNumbers = (rawValue, maxGroupCount = 1) => {
+  const safeMaxGroupCount = Math.max(1, Number(maxGroupCount) || 1);
+  if (rawValue === null || typeof rawValue === 'undefined') {
+    return { all: true, groups: [] };
+  }
+
+  const rawTokens = Array.isArray(rawValue) ? rawValue : String(rawValue).split(',');
+  const groups = new Set();
+  let all = false;
+
+  rawTokens.forEach((tokenValue) => {
+    const token = String(tokenValue || '').trim().toLowerCase();
+    if (!token) return;
+    if (token === 'all') {
+      all = true;
+      return;
+    }
+    const groupNum = Number(token);
+    if (Number.isInteger(groupNum) && groupNum >= 1 && groupNum <= safeMaxGroupCount) {
+      groups.add(groupNum);
+    }
+  });
+
+  return {
+    all,
+    groups: Array.from(groups).sort((a, b) => a - b),
+  };
+};
+
+const serializeTeamworkGroupNumbers = (groupNumbers) => {
+  if (!Array.isArray(groupNumbers) || !groupNumbers.length) {
+    return null;
+  }
+  return groupNumbers.join(',');
+};
+
+const buildTeacherSubjectAccess = (rows, maxGroupCount = 1) => {
+  const safeMaxGroupCount = Math.max(1, Number(maxGroupCount) || 1);
+  const hasRows = Array.isArray(rows) && rows.length > 0;
+  if (!hasRows) {
+    return { hasRows: false, allowAll: false, groups: new Set() };
+  }
+
+  const allowAll = rows.some((row) => row.group_number === null || typeof row.group_number === 'undefined');
+  if (allowAll) {
+    return {
+      hasRows: true,
+      allowAll: true,
+      groups: new Set(Array.from({ length: safeMaxGroupCount }, (_v, index) => index + 1)),
+    };
+  }
+
+  const groups = new Set();
+  rows.forEach((row) => {
+    const groupNum = Number(row.group_number);
+    if (Number.isInteger(groupNum) && groupNum >= 1 && groupNum <= safeMaxGroupCount) {
+      groups.add(groupNum);
+    }
+  });
+
+  return {
+    hasRows: true,
+    allowAll: false,
+    groups,
+  };
+};
+
+const buildTeamworkTaskAudience = (task, teacherAccess, maxGroupCount = 1) => {
+  const safeMaxGroupCount = Math.max(1, Number(maxGroupCount) || 1);
+  const allGroups = Array.from({ length: safeMaxGroupCount }, (_value, index) => index + 1);
+  const baseAccess = teacherAccess && teacherAccess.hasRows
+    ? teacherAccess
+    : { hasRows: false, allowAll: true, groups: new Set(allGroups) };
+
+  const lessonScope = normalizeTeamworkLessonScope(task.lesson_scope);
+  const baseGroups = baseAccess.allowAll
+    ? [...allGroups]
+    : Array.from(baseAccess.groups || []).filter((groupNum) => groupNum >= 1 && groupNum <= safeMaxGroupCount).sort((a, b) => a - b);
+
+  if (lessonScope !== 'seminar') {
+    const lectureAllowAll = baseAccess.allowAll || baseGroups.length === safeMaxGroupCount;
+    return {
+      lessonScope,
+      allowAll: lectureAllowAll,
+      groups: new Set(lectureAllowAll ? allGroups : baseGroups),
+      label: lectureAllowAll ? 'Усі групи' : `Групи ${baseGroups.join(', ')}`,
+    };
+  }
+
+  const parsedSeminarGroups = parseTeamworkGroupNumbers(task.seminar_group_numbers, safeMaxGroupCount);
+  const requestedSeminarGroups = parsedSeminarGroups.all || !parsedSeminarGroups.groups.length
+    ? [...allGroups]
+    : parsedSeminarGroups.groups;
+  const finalGroups = requestedSeminarGroups.filter((groupNum) => baseAccess.allowAll || baseGroups.includes(groupNum));
+  const seminarAllowAll = finalGroups.length === safeMaxGroupCount;
+
+  return {
+    lessonScope,
+    allowAll: seminarAllowAll,
+    groups: new Set(finalGroups),
+    label: seminarAllowAll ? 'Усі групи' : (finalGroups.length ? `Групи ${finalGroups.join(', ')}` : 'Немає груп'),
+  };
+};
+
 app.get('/teamwork', requireLogin, async (req, res) => {
   const { id: userId, username, role, course_id: fallbackCourseId } = req.session.user;
   const selectedSubjectIdRaw = req.query.subject_id ? Number(req.query.subject_id) : null;
@@ -5209,6 +5317,12 @@ app.get('/teamwork', requireLogin, async (req, res) => {
     const activeSemester = await getActiveSemester(selectedCourseId);
     const taskFilters = ['t.subject_id = ?', 't.course_id = ?'];
     const taskParams = [selectedSubject.subject_id, selectedCourseId];
+    const studentSubjectGroups = isTeacherMode
+      ? []
+      : (subjectRows || [])
+          .filter((row) => Number(row.subject_id) === Number(selectedSubject.subject_id))
+          .map((row) => Number(row.group_number))
+          .filter((groupNum) => Number.isFinite(groupNum) && groupNum > 0);
 
     if (activeSemester && activeSemester.id) {
       taskFilters.push('t.semester_id = ?');
@@ -5221,11 +5335,6 @@ app.get('/teamwork', requireLogin, async (req, res) => {
       taskFilters.push('t.created_by = ?');
       taskParams.push(userId);
     } else {
-      const studentSubjectGroups = (subjectRows || [])
-        .filter((row) => Number(row.subject_id) === Number(selectedSubject.subject_id))
-        .map((row) => Number(row.group_number))
-        .filter((groupNum) => Number.isFinite(groupNum) && groupNum > 0);
-
       if (!studentSubjectGroups.length) {
         return res.render('teamwork', {
           subjects,
@@ -5375,57 +5484,66 @@ app.get('/teamwork', requireLogin, async (req, res) => {
       reactedMap[row.task_id][row.emoji] = true;
     });
 
+    const selectedSubjectGroupCount = Math.max(1, Number(selectedSubject.group_count || 1));
+    const visibilityRowsByTask = {};
+    (visibilityRows || []).forEach((row) => {
+      if (!visibilityRowsByTask[row.task_id]) visibilityRowsByTask[row.task_id] = [];
+      visibilityRowsByTask[row.task_id].push(row);
+    });
+
     const visibilityByTask = {};
     taskIds.forEach((taskId) => {
-      visibilityByTask[taskId] = { hasRows: false, allowAll: false, groups: new Set() };
-    });
-    (visibilityRows || []).forEach((row) => {
-      if (!visibilityByTask[row.task_id]) {
-        visibilityByTask[row.task_id] = { hasRows: false, allowAll: false, groups: new Set() };
-      }
-      const access = visibilityByTask[row.task_id];
-      access.hasRows = true;
-      if (row.group_number === null || typeof row.group_number === 'undefined') {
-        access.allowAll = true;
-      } else {
-        const groupNum = Number(row.group_number);
-        if (!Number.isNaN(groupNum) && groupNum > 0) {
-          access.groups.add(groupNum);
-        }
-      }
+      visibilityByTask[taskId] = buildTeacherSubjectAccess(visibilityRowsByTask[taskId] || [], selectedSubjectGroupCount);
     });
 
     const freeStudents = {};
-    const taskData = tasks.map((task) => {
-      const access = visibilityByTask[task.id] || { hasRows: false, allowAll: true, groups: new Set() };
-      if (!access.hasRows) access.allowAll = true;
-      const used = membersByTask[task.id] || new Set();
-      const allowedStudents = (students || []).filter((student) => {
-        if (access.allowAll) return true;
-        return access.groups.has(Number(student.group_number));
-      });
-      freeStudents[task.id] = allowedStudents.filter((student) => !used.has(student.id));
+    const taskData = tasks
+      .map((task) => {
+        const access = visibilityByTask[task.id] || { hasRows: false, allowAll: true, groups: new Set() };
+        const audience = buildTeamworkTaskAudience(task, access, selectedSubjectGroupCount);
+        if (!isTeacherMode && !audience.allowAll) {
+          const canViewTask = studentSubjectGroups.some((groupNum) => audience.groups.has(Number(groupNum)));
+          if (!canViewTask) {
+            return null;
+          }
+        }
 
-      const taskGroups = (groupsByTask[task.id] || []).map((group) => ({
-        ...group,
-        is_leader: Number(group.leader_id) === Number(userId),
-        is_member: group.members.some((member) => Number(member.user_id) === Number(userId)),
-      }));
+        const used = membersByTask[task.id] || new Set();
+        const allowedStudents = (students || []).filter((student) => {
+          if (audience.allowAll) return true;
+          return audience.groups.has(Number(student.group_number));
+        });
+        freeStudents[task.id] = allowedStudents.filter((student) => !used.has(student.id));
 
-      const parsedGroupCount = Number(task.group_count || 0);
-      return {
-        ...task,
-        groups: taskGroups,
-        random_distribution: Number(task.random_distribution) === 1 || task.random_distribution === true,
-        member_limits_enabled: Number(task.member_limits_enabled) === 1 || task.member_limits_enabled === true,
-        group_count: Number.isFinite(parsedGroupCount) && parsedGroupCount > 0 ? parsedGroupCount : 1,
-        is_owner: Number(task.created_by) === Number(userId),
-        can_create_groups: Number(task.created_by) === Number(userId)
-          && (!parsedGroupCount || taskGroups.length < parsedGroupCount),
-        reactions: reactionMap[task.id] || {},
-        reacted: reactedMap[task.id] || {},
-      };
-    });
+        const taskGroups = (groupsByTask[task.id] || []).map((group) => ({
+          ...group,
+          is_leader: Number(group.leader_id) === Number(userId),
+          is_member: group.members.some((member) => Number(member.user_id) === Number(userId)),
+        }));
+
+        const currentUserGroup = taskGroups.find((group) => group.is_member);
+        const parsedGroupCount = Number(task.group_count || 0);
+        const normalizedGroupCount = Number.isFinite(parsedGroupCount) && parsedGroupCount > 0 ? parsedGroupCount : 1;
+        const lockEnabled = Number(task.group_lock_enabled) === 1 || task.group_lock_enabled === true;
+
+        return {
+          ...task,
+          groups: taskGroups,
+          random_distribution: Number(task.random_distribution) === 1 || task.random_distribution === true,
+          member_limits_enabled: Number(task.member_limits_enabled) === 1 || task.member_limits_enabled === true,
+          group_lock_enabled: lockEnabled,
+          lesson_scope: audience.lessonScope,
+          audience_label: audience.label,
+          group_count: normalizedGroupCount,
+          current_user_group_id: currentUserGroup ? Number(currentUserGroup.id) : null,
+          is_owner: Number(task.created_by) === Number(userId),
+          can_create_groups: Number(task.created_by) === Number(userId)
+            && (!parsedGroupCount || taskGroups.length < parsedGroupCount),
+          reactions: reactionMap[task.id] || {},
+          reacted: reactedMap[task.id] || {},
+        };
+      })
+      .filter(Boolean);
 
     return res.render('teamwork', {
       subjects,
@@ -5457,15 +5575,22 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
     limit_members_enabled,
     min_members,
     max_members,
+    lesson_scope,
+    seminar_group_numbers,
+    group_lock_enabled,
   } = req.body;
   const subjectId = Number(subject_id);
   const groupCount = Number(group_count);
+  const lessonScope = normalizeTeamworkLessonScope(lesson_scope);
   const randomDistributionEnabled = String(random_distribution || '').toLowerCase() === 'on'
     || String(random_distribution || '').toLowerCase() === '1'
     || String(random_distribution || '').toLowerCase() === 'true';
   const limitsEnabled = String(limit_members_enabled || '').toLowerCase() === 'on'
     || String(limit_members_enabled || '').toLowerCase() === '1'
     || String(limit_members_enabled || '').toLowerCase() === 'true';
+  const groupLockEnabled = String(group_lock_enabled || '').toLowerCase() === 'on'
+    || String(group_lock_enabled || '').toLowerCase() === '1'
+    || String(group_lock_enabled || '').toLowerCase() === 'true';
   const minMembers = limitsEnabled ? Number(min_members) : null;
   const maxMembers = limitsEnabled ? Number(max_members) : null;
 
@@ -5498,24 +5623,30 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
       return res.redirect('/teamwork?err=Subject%20access%20denied');
     }
 
-    const maxSubjectGroups = Number(subjectRow.group_count || 1);
-    const hasAllGroupsAccess = teacherRows.some((row) => row.group_number === null || typeof row.group_number === 'undefined');
-    const targetGroupsSet = new Set();
-    if (hasAllGroupsAccess) {
-      for (let groupIndex = 1; groupIndex <= maxSubjectGroups; groupIndex += 1) {
-        targetGroupsSet.add(groupIndex);
-      }
-    } else {
-      teacherRows.forEach((row) => {
-        const groupNum = Number(row.group_number);
-        if (!Number.isNaN(groupNum) && groupNum >= 1 && groupNum <= maxSubjectGroups) {
-          targetGroupsSet.add(groupNum);
-        }
-      });
-    }
-    const targetGroups = Array.from(targetGroupsSet).sort((a, b) => a - b);
-    if (!targetGroups.length) {
+    const maxSubjectGroups = Math.max(1, Number(subjectRow.group_count || 1));
+    const teacherAccess = buildTeacherSubjectAccess(teacherRows, maxSubjectGroups);
+    const baseTargetGroups = teacherAccess.allowAll
+      ? Array.from({ length: maxSubjectGroups }, (_value, index) => index + 1)
+      : Array.from(teacherAccess.groups || []).sort((a, b) => a - b);
+    if (!baseTargetGroups.length) {
       return res.redirect('/teamwork?err=No%20target%20groups');
+    }
+
+    let targetGroups = [...baseTargetGroups];
+    let seminarGroupNumbersValue = null;
+    if (lessonScope === 'seminar') {
+      const parsedSeminarGroups = parseTeamworkGroupNumbers(seminar_group_numbers, maxSubjectGroups);
+      const requestedSeminarGroups = parsedSeminarGroups.all || !parsedSeminarGroups.groups.length
+        ? [...baseTargetGroups]
+        : parsedSeminarGroups.groups.filter((groupNum) => baseTargetGroups.includes(groupNum));
+      const normalizedSeminarGroups = Array.from(new Set(requestedSeminarGroups)).sort((a, b) => a - b);
+      if (!normalizedSeminarGroups.length) {
+        return res.redirect(`/teamwork?subject_id=${subjectId}&err=Invalid%20seminar%20groups`);
+      }
+      targetGroups = normalizedSeminarGroups;
+      const coversAllAllowedGroups = targetGroups.length === baseTargetGroups.length
+        && targetGroups.every((groupNum, index) => groupNum === baseTargetGroups[index]);
+      seminarGroupNumbersValue = coversAllAllowedGroups ? 'all' : serializeTeamworkGroupNumbers(targetGroups);
     }
 
     const activeSemester = await getActiveSemester(subjectRow.course_id || 1);
@@ -5585,8 +5716,9 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
     const taskRow = await db.get(
       `INSERT INTO teamwork_tasks
         (subject_id, title, created_by, created_at, due_date, course_id, semester_id,
-         random_distribution, group_count, member_limits_enabled, min_members, max_members)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         random_distribution, group_count, member_limits_enabled, min_members, max_members,
+         group_lock_enabled, lesson_scope, seminar_group_numbers)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING id`,
       [
         subjectId,
@@ -5601,6 +5733,9 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
         limitsEnabled ? 1 : 0,
         limitsEnabled ? minMembers : null,
         limitsEnabled ? maxMembers : null,
+        groupLockEnabled ? 1 : 0,
+        lessonScope,
+        lessonScope === 'seminar' ? seminarGroupNumbersValue : null,
       ]
     );
     if (!taskRow || !taskRow.id) {
@@ -5659,6 +5794,9 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
         group_count: groupCount,
         random_distribution: randomDistributionEnabled,
         member_limits_enabled: limitsEnabled,
+        group_lock_enabled: groupLockEnabled,
+        lesson_scope: lessonScope,
+        seminar_groups: lessonScope === 'seminar' ? (seminarGroupNumbersValue || 'all') : null,
       },
       subjectRow.course_id || 1,
       activeSemester.id
@@ -5724,131 +5862,183 @@ app.post('/teamwork/group/create', requireLogin, writeLimiter, async (req, res) 
   }
 });
 
-app.post('/teamwork/group/join', requireLogin, writeLimiter, (req, res) => {
+app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) => {
   if (hasSessionRole(req, 'teacher')) {
     return res.redirect('/teamwork?err=Teachers%20cannot%20join%20student%20groups');
   }
+
   const { group_id } = req.body;
   const groupId = Number(group_id);
   if (Number.isNaN(groupId)) {
     return res.redirect('/teamwork?err=Invalid%20group');
   }
+
   const { id: userId } = req.session.user;
   const joinedAt = new Date().toISOString();
-  db.get(
-    `
-      SELECT g.task_id, g.max_members, t.subject_id, t.created_by
-      FROM teamwork_groups g
-      JOIN teamwork_tasks t ON t.id = g.task_id
-      WHERE g.id = ?
-    `,
-    [groupId],
-    (grpErr, grpRow) => {
-      if (grpErr || !grpRow) {
-        return res.redirect('/teamwork?err=Group%20not%20found');
-      }
-      db.get(
-        'SELECT group_number FROM student_groups WHERE student_id = ? AND subject_id = ?',
-        [userId, grpRow.subject_id],
-        (sgErr, sgRow) => {
-          if (sgErr || !sgRow) {
-            return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
-          }
-          db.all(
-            'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
-            [grpRow.created_by, grpRow.subject_id],
-            (accessErr, teacherRows) => {
-              if (accessErr || !teacherRows || !teacherRows.length) {
-                return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
-              }
-              const hasAllGroups = teacherRows.some(
-                (row) => row.group_number === null || typeof row.group_number === 'undefined'
-              );
-              const allowedGroupSet = new Set();
-              teacherRows.forEach((row) => {
-                const groupNum = Number(row.group_number);
-                if (!Number.isNaN(groupNum) && groupNum > 0) {
-                  allowedGroupSet.add(groupNum);
-                }
-              });
-              if (!hasAllGroups && !allowedGroupSet.has(Number(sgRow.group_number))) {
-                return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
-              }
+  try {
+    const grpRow = await db.get(
+      `
+        SELECT g.task_id,
+               g.max_members,
+               t.subject_id,
+               t.created_by,
+               t.group_lock_enabled,
+               t.lesson_scope,
+               t.seminar_group_numbers,
+               s.group_count AS subject_group_count
+        FROM teamwork_groups g
+        JOIN teamwork_tasks t ON t.id = g.task_id
+        JOIN subjects s ON s.id = t.subject_id
+        WHERE g.id = ?
+      `,
+      [groupId]
+    );
 
-              db.get(
-                'SELECT id FROM teamwork_members WHERE task_id = ? AND user_id = ?',
-                [grpRow.task_id, userId],
-                (memErr, memRow) => {
-                  if (memErr) {
-                    return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Database%20error`);
-                  }
-                  if (memRow) {
-                    return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Already%20in%20group`);
-                  }
-                  if (grpRow.max_members) {
-                    db.get(
-                      'SELECT COUNT(*) AS cnt FROM teamwork_members WHERE group_id = ?',
-                      [groupId],
-                      (cntErr, cntRow) => {
-                        if (cntErr) {
-                          return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Database%20error`);
-                        }
-                        if (Number(cntRow.cnt) >= grpRow.max_members) {
-                          return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Group%20is%20full`);
-                        }
-                        db.run(
-                          'INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)',
-                          [grpRow.task_id, groupId, userId, joinedAt],
-                          () => res.redirect(`/teamwork?subject_id=${grpRow.subject_id}`)
-                        );
-                      }
-                    );
-                  } else {
-                    db.run(
-                      'INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)',
-                      [grpRow.task_id, groupId, userId, joinedAt],
-                      () => res.redirect(`/teamwork?subject_id=${grpRow.subject_id}`)
-                    );
-                  }
-                }
-              );
-            }
-          );
-        }
-      );
+    if (!grpRow) {
+      return res.redirect('/teamwork?err=Group%20not%20found');
     }
-  );
+
+    const sgRow = await db.get(
+      'SELECT group_number FROM student_groups WHERE student_id = ? AND subject_id = ?',
+      [userId, grpRow.subject_id]
+    );
+    if (!sgRow) {
+      return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
+    }
+
+    const teacherRows = await db.all(
+      'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
+      [grpRow.created_by, grpRow.subject_id]
+    );
+    if (!teacherRows || !teacherRows.length) {
+      return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
+    }
+
+    const teacherAccess = buildTeacherSubjectAccess(teacherRows, grpRow.subject_group_count || 1);
+    const audience = buildTeamworkTaskAudience(grpRow, teacherAccess, grpRow.subject_group_count || 1);
+    if (!audience.allowAll && !audience.groups.has(Number(sgRow.group_number))) {
+      return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
+    }
+
+    const memRow = await db.get(
+      'SELECT id FROM teamwork_members WHERE task_id = ? AND user_id = ?',
+      [grpRow.task_id, userId]
+    );
+    if (memRow) {
+      const lockEnabled = Number(grpRow.group_lock_enabled) === 1 || grpRow.group_lock_enabled === true;
+      if (lockEnabled) {
+        return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Group%20changes%20locked`);
+      }
+      return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Already%20in%20group`);
+    }
+
+    if (grpRow.max_members) {
+      const cntRow = await db.get('SELECT COUNT(*) AS cnt FROM teamwork_members WHERE group_id = ?', [groupId]);
+      if (Number(cntRow?.cnt || 0) >= Number(grpRow.max_members)) {
+        return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Group%20is%20full`);
+      }
+    }
+
+    await db.run(
+      'INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)',
+      [grpRow.task_id, groupId, userId, joinedAt]
+    );
+    return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}`);
+  } catch (err) {
+    return res.redirect('/teamwork?err=Database%20error');
+  }
 });
 
-app.post('/teamwork/group/leave', requireLogin, writeLimiter, (req, res) => {
+app.post('/teamwork/group/leave', requireLogin, writeLimiter, async (req, res) => {
   const { group_id } = req.body;
   const groupId = Number(group_id);
   if (Number.isNaN(groupId)) {
     return res.redirect('/teamwork?err=Invalid%20group');
   }
   const { id: userId } = req.session.user;
-  db.get(
-    `
-      SELECT g.task_id, g.leader_id, t.subject_id
-      FROM teamwork_groups g
-      JOIN teamwork_tasks t ON t.id = g.task_id
-      WHERE g.id = ?
-    `,
-    [groupId],
-    (grpErr, grpRow) => {
-      if (grpErr || !grpRow) {
-        return res.redirect('/teamwork?err=Group%20not%20found');
-      }
-      if (grpRow.leader_id === userId) {
-        return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Leader%20cannot%20leave`);
-      }
-      db.run(
-        'DELETE FROM teamwork_members WHERE group_id = ? AND user_id = ?',
-        [groupId, userId],
-        () => res.redirect(`/teamwork?subject_id=${grpRow.subject_id}`)
-      );
+  try {
+    const grpRow = await db.get(
+      `
+        SELECT g.task_id, g.leader_id, t.subject_id, t.group_lock_enabled
+        FROM teamwork_groups g
+        JOIN teamwork_tasks t ON t.id = g.task_id
+        WHERE g.id = ?
+      `,
+      [groupId]
+    );
+    if (!grpRow) {
+      return res.redirect('/teamwork?err=Group%20not%20found');
     }
-  );
+    if (grpRow.leader_id === userId) {
+      return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Leader%20cannot%20leave`);
+    }
+
+    const lockEnabled = Number(grpRow.group_lock_enabled) === 1 || grpRow.group_lock_enabled === true;
+    if (lockEnabled) {
+      return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Group%20changes%20locked`);
+    }
+
+    await db.run('DELETE FROM teamwork_members WHERE group_id = ? AND user_id = ?', [groupId, userId]);
+    return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}`);
+  } catch (err) {
+    return res.redirect('/teamwork?err=Database%20error');
+  }
+});
+
+app.post('/teamwork/group/move-member', requireLogin, writeLimiter, async (req, res) => {
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/teamwork?err=Only%20teachers%20can%20move%20members');
+  }
+
+  const taskId = Number(req.body.task_id);
+  const userIdToMove = Number(req.body.user_id);
+  const targetGroupId = Number(req.body.target_group_id);
+  if (Number.isNaN(taskId) || Number.isNaN(userIdToMove) || Number.isNaN(targetGroupId)) {
+    return res.redirect('/teamwork?err=Invalid%20move%20request');
+  }
+
+  const { id: actorUserId } = req.session.user;
+  try {
+    const taskRow = await db.get('SELECT id, subject_id, created_by FROM teamwork_tasks WHERE id = ?', [taskId]);
+    if (!taskRow) {
+      return res.redirect('/teamwork?err=Task%20not%20found');
+    }
+    if (Number(taskRow.created_by) !== Number(actorUserId)) {
+      return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Only%20task%20owner%20can%20move%20members`);
+    }
+
+    const memberRow = await db.get(
+      'SELECT id, group_id FROM teamwork_members WHERE task_id = ? AND user_id = ?',
+      [taskId, userIdToMove]
+    );
+    if (!memberRow) {
+      return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Member%20not%20found`);
+    }
+
+    const targetGroupRow = await db.get(
+      'SELECT id, max_members FROM teamwork_groups WHERE id = ? AND task_id = ?',
+      [targetGroupId, taskId]
+    );
+    if (!targetGroupRow) {
+      return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Target%20group%20not%20found`);
+    }
+
+    if (Number(memberRow.group_id) === Number(targetGroupId)) {
+      return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}`);
+    }
+
+    if (targetGroupRow.max_members) {
+      const countRow = await db.get('SELECT COUNT(*) AS cnt FROM teamwork_members WHERE group_id = ?', [targetGroupId]);
+      if (Number(countRow?.cnt || 0) >= Number(targetGroupRow.max_members)) {
+        return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Target%20group%20is%20full`);
+      }
+    }
+
+    await db.run('UPDATE teamwork_members SET group_id = ? WHERE id = ?', [targetGroupId, memberRow.id]);
+    return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}`);
+  } catch (err) {
+    return res.redirect('/teamwork?err=Database%20error');
+  }
 });
 
 app.post('/teamwork/group/disband', requireLogin, writeLimiter, (req, res) => {

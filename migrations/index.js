@@ -12,6 +12,7 @@ const scheduleGeneratorIndexes = require('./011_schedule_generator_indexes');
 const rbacRoles = require('./012_rbac_roles');
 const siteVisitEvents = require('./013_site_visit_events');
 const teamworkTeacherTaskConfig = require('./014_teamwork_teacher_task_config');
+const teamworkTaskScopeLock = require('./015_teamwork_task_scope_lock');
 
 module.exports = [
   init,
@@ -28,4 +29,5 @@ module.exports = [
   rbacRoles,
   siteVisitEvents,
   teamworkTeacherTaskConfig,
+  teamworkTaskScopeLock,
 ];

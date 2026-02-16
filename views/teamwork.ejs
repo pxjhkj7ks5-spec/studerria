@@ -687,11 +687,16 @@
                 <% } %>
                 <div class="d-flex flex-wrap gap-2 mt-2 task-settings-line">
                   <span class="task-setting-pill"><%= task.random_distribution ? 'Рандомний розподіл' : 'Вільний вибір групи' %></span>
+                  <span class="task-setting-pill"><%= task.lesson_scope === 'seminar' ? 'Семінар' : 'Лекція' %>: <%= task.audience_label || 'Усі групи' %></span>
                   <span class="task-setting-pill">Груп: <%= task.group_count || 1 %></span>
                   <% if (task.member_limits_enabled) { %>
                     <span class="task-setting-pill">Команда: <%= task.min_members %> - <%= task.max_members %></span>
                   <% } %>
+                  <span class="task-setting-pill"><%= task.group_lock_enabled ? 'Групи зафіксовані' : 'Групи можна змінювати' %></span>
                 </div>
+                <% if (!isTeacherMode && task.group_lock_enabled && task.current_user_group_id) { %>
+                  <div class="small text-muted mt-1">Перемикання між групами заблоковане викладачем.</div>
+                <% } %>
                 <div class="d-flex gap-2 mt-2 task-reactions">
                   <% const reactMap = task.reactions || {}; %>
                   <% const reactedMap = task.reacted || {}; %>
@@ -748,25 +753,53 @@
                             <span class="text-muted ms-2">Макс: <%= group.max_members %></span>
                           <% } %>
                         </div>
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 align-items-center">
                           <% if (!isTeacherMode) { %>
-                            <% if (!group.is_member) { %>
+                            <% if (group.is_member) { %>
+                              <% if (task.group_lock_enabled) { %>
+                                <span class="small text-muted">Зафіксовано</span>
+                              <% } else { %>
+                                <form method="POST" action="/teamwork/group/leave">
+                                  <input type="hidden" name="group_id" value="<%= group.id %>" />
+                                  <button class="btn btn-outline-secondary btn-sm" type="submit">Вийти</button>
+                                </form>
+                              <% } %>
+                            <% } else if (!task.current_user_group_id) { %>
                               <form method="POST" action="/teamwork/group/join">
                                 <input type="hidden" name="group_id" value="<%= group.id %>" />
                                 <button class="btn btn-outline-light btn-sm" type="submit">Приєднатися</button>
                               </form>
                             <% } else { %>
-                              <form method="POST" action="/teamwork/group/leave">
-                                <input type="hidden" name="group_id" value="<%= group.id %>" />
-                                <button class="btn btn-outline-secondary btn-sm" type="submit">Вийти</button>
-                              </form>
+                              <span class="small text-muted">Ви вже в іншій групі</span>
                             <% } %>
                           <% } %>
                         </div>
                       </div>
-                      <div class="small text-muted mb-2">
-                        Учасники: <%= group.members.map((m) => m.member_name).join(', ') || 'немає' %>
-                      </div>
+                      <% if (!group.members.length) { %>
+                        <div class="small text-muted mb-2">Учасники: немає</div>
+                      <% } else { %>
+                        <div class="member-stack mb-2">
+                          <% group.members.forEach(function(member) { %>
+                            <div class="member-row">
+                              <span class="member-name"><%= member.member_name %></span>
+                              <% if (task.is_owner && task.groups.length > 1) { %>
+                                <form method="POST" action="/teamwork/group/move-member" class="member-move-form">
+                                  <input type="hidden" name="task_id" value="<%= task.id %>" />
+                                  <input type="hidden" name="user_id" value="<%= member.user_id %>" />
+                                  <select class="form-select form-select-sm" name="target_group_id">
+                                    <% task.groups.forEach(function(targetGroup) { %>
+                                      <option value="<%= targetGroup.id %>" <%= Number(targetGroup.id) === Number(group.id) ? 'selected' : '' %>>
+                                        <%= targetGroup.name %>
+                                      </option>
+                                    <% }); %>
+                                  </select>
+                                  <button class="btn btn-outline-light btn-sm" type="submit">Перенести</button>
+                                </form>
+                              <% } %>
+                            </div>
+                          <% }); %>
+                        </div>
+                      <% } %>
                       <% if (group.is_leader) { %>
                         <form method="POST" action="/teamwork/group/update" class="row g-2 align-items-end">
                           <input type="hidden" name="group_id" value="<%= group.id %>" />
@@ -846,6 +879,35 @@
                 </div>
 
                 <div class="glass p-3 mb-3 task-options-block">
+                  <div class="lesson-scope-picker mb-3">
+                    <label class="form-label d-block">Тип заняття</label>
+                    <div class="btn-group w-100" role="group" aria-label="Lesson scope">
+                      <input class="btn-check" type="radio" name="lesson_scope" id="lessonScopeLecture" value="lecture" checked />
+                      <label class="btn btn-outline-light" for="lessonScopeLecture">Лекція</label>
+                      <input class="btn-check" type="radio" name="lesson_scope" id="lessonScopeSeminar" value="seminar" />
+                      <label class="btn btn-outline-light" for="lessonScopeSeminar">Семінар</label>
+                    </div>
+                  </div>
+
+                  <div id="seminarGroupsPanel" class="seminar-groups-panel is-hidden mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <span class="small text-muted">Показ для груп</span>
+                      <span class="small text-muted">За замовчуванням: усі групи</span>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                      <input class="form-check-input" type="checkbox" role="switch" id="seminarAllGroupsToggle" name="seminar_group_numbers" value="all" checked />
+                      <label class="form-check-label" for="seminarAllGroupsToggle">Усі групи</label>
+                    </div>
+                    <div id="seminarGroupsList" class="seminar-groups-list">
+                      <% for (let groupNum = 1; groupNum <= Math.max(1, Number((selectedSubject && selectedSubject.group_count) || 1)); groupNum += 1) { %>
+                        <label class="seminar-group-chip">
+                          <input class="seminar-group-check" type="checkbox" name="seminar_group_numbers" value="<%= groupNum %>" disabled />
+                          <span>Група <%= groupNum %></span>
+                        </label>
+                      <% } %>
+                    </div>
+                  </div>
+
                   <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="randomDistributionToggle" name="random_distribution" value="1" checked />
                     <label class="form-check-label" for="randomDistributionToggle">Рандомний розподіл студентів</label>
@@ -893,6 +955,12 @@
                       <output class="range-bubble" id="maxRangeBubble">4</output>
                     </div>
                   </div>
+
+                  <div class="form-check form-switch mt-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="groupLockToggle" name="group_lock_enabled" value="1" />
+                    <label class="form-check-label" for="groupLockToggle">Зафіксувати склад груп</label>
+                  </div>
+                  <div class="small text-muted mt-1">Якщо увімкнено, студенти не зможуть виходити або переходити між групами.</div>
                 </div>
 
                 <button class="btn btn-primary glass w-100" type="submit">Створити</button>
@@ -1046,6 +1114,35 @@
       }
 
       initTeamSizeRange();
+
+      function initLessonScopeControls() {
+        const lectureRadio = document.getElementById('lessonScopeLecture');
+        const seminarRadio = document.getElementById('lessonScopeSeminar');
+        const seminarPanel = document.getElementById('seminarGroupsPanel');
+        const allGroupsToggle = document.getElementById('seminarAllGroupsToggle');
+        const specificGroupChecks = Array.from(document.querySelectorAll('.seminar-group-check'));
+        if (!lectureRadio || !seminarRadio || !seminarPanel || !allGroupsToggle) return;
+
+        const applyPickerState = () => {
+          const seminarMode = seminarRadio.checked;
+          const allGroupsMode = allGroupsToggle.checked;
+          seminarPanel.classList.toggle('is-hidden', !seminarMode);
+          seminarPanel.classList.toggle('is-disabled', seminarMode && allGroupsMode);
+          specificGroupChecks.forEach((input) => {
+            input.disabled = !seminarMode || allGroupsMode;
+            if (!seminarMode || allGroupsMode) {
+              input.checked = false;
+            }
+          });
+        };
+
+        lectureRadio.addEventListener('change', applyPickerState);
+        seminarRadio.addEventListener('change', applyPickerState);
+        allGroupsToggle.addEventListener('change', applyPickerState);
+        applyPickerState();
+      }
+
+      initLessonScopeControls();
 
       function updateReactionButtons(container, reactions, reacted) {
         const buttons = container.querySelectorAll('.react-btn');
