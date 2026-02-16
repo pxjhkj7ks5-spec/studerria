@@ -2278,6 +2278,18 @@ function getAdminCourse(req) {
   return Number.isNaN(sessionCourse) ? 1 : sessionCourse;
 }
 
+function getStaffCourse(req) {
+  if (hasSessionRole(req, 'admin')) {
+    return getAdminCourse(req);
+  }
+  const sessionCourse = Number(req?.session?.adminCourse);
+  if (!Number.isNaN(sessionCourse) && sessionCourse > 0) {
+    return sessionCourse;
+  }
+  const userCourse = Number(req?.session?.user?.course_id || 1);
+  return Number.isNaN(userCourse) ? 1 : userCourse;
+}
+
 async function getActiveSemester(courseId) {
   const cached = cacheGet(referenceCache.activeSemester, courseId);
   if (cached) return cached;
@@ -10080,6 +10092,7 @@ app.get('/deanery', requireDeanery, (req, res) => {
     if (allowedCourses.length && !allowedCourses.some((course) => Number(course.id) === Number(courseId))) {
       courseId = Number(allowedCourses[0].id);
     }
+    req.session.adminCourse = courseId;
     const allowCourseSelect = allowedCourses.length > 1;
     let allowedSections = null;
     try {
@@ -10243,23 +10256,25 @@ app.post('/subgroup/join', requireLogin, (req, res) => {
   );
 });
 
-app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
+app.post('/admin/schedule/add', requireAdminOrDeanery, async (req, res) => {
   const { subject_id, group_number, group_numbers, day_of_week, class_number, week_numbers, semester_id, lesson_type } = req.body;
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
   const lessonType = normalizeLessonType(lesson_type);
-  const courseId = getAdminCourse(req);
+  const courseId = getStaffCourse(req);
+  const panelBase = hasSessionRole(req, 'admin') ? `/admin?course=${courseId}` : `/deanery?course=${courseId}`;
+  const withStatus = (status) => `${panelBase}&${status}`;
   const semesterId = Number(semester_id);
 
   if (!subject_id || !day_of_week || !week_numbers || Number.isNaN(classNum) || Number.isNaN(semesterId)) {
-    return res.redirect('/admin?err=Missing%20fields');
+    return res.redirect(withStatus('err=Missing%20fields'));
   }
   const dayAllowed = await isCourseDayActive(courseId, day_of_week);
   if (!dayAllowed) {
-    return res.redirect('/admin?err=Invalid%20day');
+    return res.redirect(withStatus('err=Invalid%20day'));
   }
   if (classNum < 1 || classNum > 7) {
-    return res.redirect('/admin?err=Invalid%20class%20number');
+    return res.redirect(withStatus('err=Invalid%20class%20number'));
   }
   try {
     const subjectRow = await db.get(
@@ -10267,7 +10282,7 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
       [subject_id]
     );
     if (!subjectRow || (subjectRow.course_id && Number(subjectRow.course_id) !== Number(courseId))) {
-      return res.redirect('/admin?err=Invalid%20subject');
+      return res.redirect(withStatus('err=Invalid%20subject'));
     }
     const maxGroups = Number(subjectRow.group_count || 1);
     const isGeneral = subjectRow.is_general === true || Number(subjectRow.is_general) === 1;
@@ -10286,7 +10301,7 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
 
     const semRow = await db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
     if (!semRow) {
-      return res.redirect('/admin?err=Invalid%20semester');
+      return res.redirect(withStatus('err=Invalid%20semester'));
     }
     const maxWeeks = Number(semRow.weeks_count) || 15;
     const weeks = week_numbers
@@ -10295,7 +10310,7 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
       .filter((w) => !Number.isNaN(w) && w >= 1 && w <= maxWeeks);
     const uniqueWeeks = Array.from(new Set(weeks));
     if (!uniqueWeeks.length) {
-      return res.redirect('/admin?err=Invalid%20weeks');
+      return res.redirect(withStatus('err=Invalid%20weeks'));
     }
 
     let targetGroups = [];
@@ -10305,13 +10320,13 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
       targetGroups = multiGroups;
     } else {
       if (Number.isNaN(groupNum)) {
-        return res.redirect('/admin?err=Missing%20fields');
+        return res.redirect(withStatus('err=Missing%20fields'));
       }
       targetGroups = [groupNum];
     }
 
     if (!targetGroups.length || targetGroups.some((g) => g < 1 || g > maxGroups)) {
-      return res.redirect('/admin?err=Invalid%20group');
+      return res.redirect(withStatus('err=Invalid%20group'));
     }
 
     const stmt = db.prepare(
@@ -10324,7 +10339,7 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
     });
     stmt.finalize((err) => {
       if (err) {
-        return res.redirect('/admin?err=Database%20error');
+        return res.redirect(withStatus('err=Database%20error'));
       }
       logAction(db, req, 'schedule_add', {
         subject_id,
@@ -10342,42 +10357,44 @@ app.post('/admin/schedule/add', requireAdmin, async (req, res) => {
         weeks: uniqueWeeks,
         semester_id: semesterId,
       });
-      return res.redirect('/admin?ok=Class%20added');
+      return res.redirect(withStatus('ok=Class%20added'));
     });
   } catch (err) {
     console.error('Failed to add schedule entry', err);
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(withStatus('err=Database%20error'));
   }
 });
 
-app.post('/admin/schedule/edit/:id', requireAdmin, async (req, res) => {
+app.post('/admin/schedule/edit/:id', requireAdminOrDeanery, async (req, res) => {
   const { id } = req.params;
   const { subject_id, group_number, day_of_week, class_number, week_number, semester_id, lesson_type } = req.body;
   const groupNum = Number(group_number);
   const classNum = Number(class_number);
   const weekNum = Number(week_number);
   const lessonType = normalizeLessonType(lesson_type);
-  const courseId = getAdminCourse(req);
+  const courseId = getStaffCourse(req);
+  const panelBase = hasSessionRole(req, 'admin') ? `/admin?course=${courseId}` : `/deanery?course=${courseId}`;
+  const withStatus = (status) => `${panelBase}&${status}`;
   const semesterId = Number(semester_id);
 
   if (!subject_id || !day_of_week || Number.isNaN(groupNum) || Number.isNaN(classNum) || Number.isNaN(weekNum) || Number.isNaN(semesterId)) {
-    return res.redirect('/admin?err=Missing%20fields');
+    return res.redirect(withStatus('err=Missing%20fields'));
   }
   const dayAllowed = await isCourseDayActive(courseId, day_of_week);
   if (!dayAllowed) {
-    return res.redirect('/admin?err=Invalid%20day');
+    return res.redirect(withStatus('err=Invalid%20day'));
   }
   if (classNum < 1 || classNum > 7) {
-    return res.redirect('/admin?err=Invalid%20class%20or%20week');
+    return res.redirect(withStatus('err=Invalid%20class%20or%20week'));
   }
   try {
     const semRow = await db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
     if (!semRow) {
-      return res.redirect('/admin?err=Invalid%20semester');
+      return res.redirect(withStatus('err=Invalid%20semester'));
     }
     const maxWeeks = Number(semRow.weeks_count) || 15;
     if (weekNum < 1 || weekNum > maxWeeks) {
-      return res.redirect('/admin?err=Invalid%20class%20or%20week');
+      return res.redirect(withStatus('err=Invalid%20class%20or%20week'));
     }
     db.run(
       `
@@ -10388,7 +10405,7 @@ app.post('/admin/schedule/edit/:id', requireAdmin, async (req, res) => {
       [subject_id, groupNum, day_of_week, classNum, weekNum, semesterId, lessonType, id, courseId],
       (err) => {
         if (err) {
-          return res.redirect('/admin?err=Database%20error');
+          return res.redirect(withStatus('err=Database%20error'));
         }
         logAction(db, req, 'schedule_edit', { id, subject_id, group_number: groupNum, day_of_week, class_number: classNum, week_number: weekNum, semester_id: semesterId });
         logActivity(db, req, 'schedule_edit', 'schedule', Number(id) || null, {
@@ -10399,20 +10416,21 @@ app.post('/admin/schedule/edit/:id', requireAdmin, async (req, res) => {
           week_number: weekNum,
           semester_id: semesterId,
         });
-        return res.redirect('/admin?ok=Class%20updated');
+        return res.redirect(withStatus('ok=Class%20updated'));
       }
     );
   } catch (err) {
     console.error('Failed to update schedule entry', err);
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(withStatus('err=Database%20error'));
   }
 });
 
-app.post('/admin/schedule/delete/:id', requireAdmin, (req, res) => {
+app.post('/admin/schedule/delete/:id', requireAdminOrDeanery, (req, res) => {
   const { id } = req.params;
-  const courseId = getAdminCourse(req);
+  const courseId = getStaffCourse(req);
   const referer = req.get('referer');
-  const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : '/admin';
+  const fallbackBase = hasSessionRole(req, 'admin') ? `/admin?course=${courseId}` : `/deanery?course=${courseId}`;
+  const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : fallbackBase;
   const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
   db.run('DELETE FROM schedule_entries WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
     if (err) {
@@ -10424,11 +10442,12 @@ app.post('/admin/schedule/delete/:id', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/schedule/delete-multiple', requireAdmin, (req, res) => {
+app.post('/admin/schedule/delete-multiple', requireAdminOrDeanery, (req, res) => {
   const ids = req.body.delete_ids;
   const returnTo = req.body.return_to || req.query.return_to || '';
   const referer = req.get('referer');
-  const fallback = '/admin';
+  const courseId = getStaffCourse(req);
+  const fallback = hasSessionRole(req, 'admin') ? `/admin?course=${courseId}` : `/deanery?course=${courseId}`;
   const redirectBase =
     (returnTo && returnTo.startsWith('/admin/schedule-list') ? returnTo : null) ||
     (referer && referer.includes('/admin/schedule-list') ? referer : null) ||
@@ -10439,7 +10458,6 @@ app.post('/admin/schedule/delete-multiple', requireAdmin, (req, res) => {
   }
   const list = Array.isArray(ids) ? ids : [ids];
   const placeholders = list.map(() => '?').join(',');
-  const courseId = getAdminCourse(req);
   db.run(`DELETE FROM schedule_entries WHERE course_id = ? AND id IN (${placeholders})`, [courseId, ...list], (err) => {
     if (err) {
       return res.redirect(withStatus(redirectBase, 'err=Database%20error'));
@@ -10450,10 +10468,11 @@ app.post('/admin/schedule/delete-multiple', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/schedule/clear-all', requireAdmin, (req, res) => {
-  const courseId = getAdminCourse(req);
+app.post('/admin/schedule/clear-all', requireAdminOrDeanery, (req, res) => {
+  const courseId = getStaffCourse(req);
   const referer = req.get('referer');
-  const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : '/admin';
+  const fallbackBase = hasSessionRole(req, 'admin') ? `/admin?course=${courseId}` : `/deanery?course=${courseId}`;
+  const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : fallbackBase;
   const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
   db.run('DELETE FROM schedule_entries WHERE course_id = ?', [courseId], (err) => {
     if (err) {

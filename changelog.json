@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.77",
+      "date": "2026-02-16",
+      "items": [
+        "fix(deanery): allow users with `deanery` role to use schedule mutation routes (`/admin/schedule/add|edit|delete|delete-multiple|clear-all`) without `Forbidden (update page)`",
+        "fix(deanery): persist selected deanery course into session (`adminCourse`) and use role-aware course resolver for schedule writes",
+        "fix(deanery): redirect schedule write results back to deanery panel for non-admin staff instead of `/admin`"
+      ]
+    },
+    {
       "version": "0.8.76",
       "date": "2026-02-16",
       "items": [
