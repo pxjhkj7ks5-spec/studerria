@@ -773,7 +773,6 @@
               <button class="admin-nav-link" type="button" data-admin-nav="admin-settings">System Settings</button>
             <% } %>
             <% if (role === 'admin' && sectionAllowed('admin-role-access')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-role-access">Role Access</button>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-role-studio">Role Studio</button>
             <% } %>
           </div>
@@ -1075,12 +1074,12 @@
         <% } %>
 
         <% if (role === 'admin' && sectionAllowed('admin-role-access')) { %>
-        <div id="admin-role-access" class="admin-panel" data-admin-title="System / Role Access">
+        <div id="admin-role-studio" class="admin-panel" data-admin-title="System / Role Studio">
           <div class="card mb-4">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                 <div>
-                  <h5 class="mb-1">Доступи ролей</h5>
+                  <h5 class="mb-1">Role Access</h5>
                   <div class="small text-muted">Адмін має повний доступ до всіх секцій.</div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
@@ -1104,6 +1103,7 @@
               <form
                 method="POST"
                 action="/admin/role-access"
+                data-role-access-form
                 data-default-permissions='<%= JSON.stringify(defaultRolePermissions || {}) %>'
                 data-initial-permissions='<%= JSON.stringify(rolePermissionsMap || {}) %>'
               >
@@ -1138,15 +1138,11 @@
                 <div class="d-flex flex-wrap gap-2 mt-3">
                   <button class="btn btn-primary" type="submit">Зберегти доступи</button>
                   <button class="btn btn-outline-secondary" type="button" data-role-revert>Revert unsaved changes</button>
-                  <button class="btn btn-outline-secondary" type="button" data-admin-nav="admin-role-studio">Відкрити Role Studio</button>
                   <div class="small text-muted">Діє для панелей старости та деканату.</div>
                 </div>
               </form>
             </div>
           </div>
-        </div>
-
-        <div id="admin-role-studio" class="admin-panel" data-admin-title="System / Role Studio">
           <div class="card mb-4">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -3408,6 +3404,12 @@
         if (adminNavLinks.length) return adminNavLinks[0].dataset.adminNav;
         return adminPanels.length ? adminPanels[0].id : '';
       };
+      const resolveAdminTab = (requestedTab) => {
+        if (requestedTab === 'admin-role-access' && adminPanels.some((panel) => panel.id === 'admin-role-studio')) {
+          return 'admin-role-studio';
+        }
+        return adminPanels.some((panel) => panel.id === requestedTab) ? requestedTab : getDefaultTab();
+      };
 
       const updateBreadcrumbs = (panel) => {
         if (!breadcrumbsEl) return;
@@ -3418,7 +3420,7 @@
       };
 
       const setActiveTab = (tab, { push = true } = {}) => {
-        const target = adminPanels.some((panel) => panel.id === tab) ? tab : getDefaultTab();
+        const target = resolveAdminTab(tab);
         if (!target) {
           adminPanels.forEach((panel) => {
             panel.style.display = 'block';
@@ -3970,7 +3972,7 @@
       }
 
       const roleAccessFocus = document.getElementById('roleAccessFocus');
-      const roleAccessForm = document.querySelector('#admin-role-access form');
+      const roleAccessForm = document.querySelector('#admin-role-studio [data-role-access-form]');
       if (roleAccessForm) {
         const defaultPermissions = roleAccessForm.dataset.defaultPermissions
           ? JSON.parse(roleAccessForm.dataset.defaultPermissions)
@@ -5329,6 +5331,12 @@
           const firstLinked = navLinks.find((link) => panelIds.has(link.dataset.adminNav || ''));
           return firstLinked ? firstLinked.dataset.adminNav : panels[0].id;
         };
+        const resolveAdminTab = (requestedTab) => {
+          if (requestedTab === 'admin-role-access' && panelIds.has('admin-role-studio')) {
+            return 'admin-role-studio';
+          }
+          return panelIds.has(requestedTab) ? requestedTab : getDefaultTab();
+        };
 
         const updateBreadcrumbs = (tabId) => {
           if (!breadcrumbsEl) return;
@@ -5340,7 +5348,7 @@
         };
 
         const applyTab = (requestedTab, push = true) => {
-          const resolved = panelIds.has(requestedTab) ? requestedTab : getDefaultTab();
+          const resolved = resolveAdminTab(requestedTab);
           panels.forEach((panel) => {
             panel.style.display = panel.id === resolved ? 'block' : 'none';
           });

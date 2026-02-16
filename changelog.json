@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.70",
+      "date": "2026-02-16",
+      "items": [
+        "refactor: merge legacy Role Access controls into the Role Studio page so all role management lives in one section",
+        "ux: remove separate Role Access sidebar tab and keep backward-compatible tab alias from admin-role-access to admin-role-studio"
+      ]
+    },
+    {
       "version": "0.8.69",
       "date": "2026-02-16",
       "items": [
