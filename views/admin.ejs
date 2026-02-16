@@ -817,6 +817,9 @@
           </div>
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">Activity</div>
+            <% if (sectionAllowed('admin-visit-analytics')) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-visit-analytics">Visit analytics</button>
+            <% } %>
             <% if (sectionAllowed('admin-history')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-history">History</button>
             <% } %>
@@ -2369,6 +2372,115 @@
 
         <% } %>
 
+        <% if (sectionAllowed('admin-visit-analytics')) { %>
+        <div id="admin-visit-analytics" class="admin-panel" data-admin-title="Activity / Visit analytics">
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                <div>
+                  <h5 class="card-title mb-1">Аналітика відвідування</h5>
+                  <div class="small text-muted">Живі метрики по візитах, ролях і популярних сторінках.</div>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                  <select class="form-select form-select-sm" id="visitAnalyticsDays" aria-label="Analytics period">
+                    <option value="7">7 днів</option>
+                    <option value="14" selected>14 днів</option>
+                    <option value="30">30 днів</option>
+                    <option value="60">60 днів</option>
+                    <option value="90">90 днів</option>
+                  </select>
+                  <button class="btn btn-outline-primary btn-sm" type="button" id="visitAnalyticsRefresh">Оновити</button>
+                </div>
+              </div>
+
+              <div class="visit-analytics-grid mt-3">
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Візити</div>
+                  <div class="visit-metric-value" id="visitMetricTotal">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Унікальні відвідувачі</div>
+                  <div class="visit-metric-value" id="visitMetricUnique">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Авторизовані користувачі</div>
+                  <div class="visit-metric-value" id="visitMetricSigned">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Активні дні</div>
+                  <div class="visit-metric-value" id="visitMetricDays">—</div>
+                </div>
+              </div>
+
+              <div class="visit-chart-wrap mt-3">
+                <canvas id="visitAnalyticsChart" height="120"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-12 col-xl-6">
+              <div class="card h-100">
+                <div class="card-body">
+                  <h6 class="mb-3">Топ сторінки</h6>
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                      <thead>
+                        <tr>
+                          <th>Сторінка</th>
+                          <th>Візити</th>
+                          <th>Унікальні</th>
+                        </tr>
+                      </thead>
+                      <tbody id="visitTopPagesBody">
+                        <tr>
+                          <td colspan="3" class="text-muted">Завантаження…</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12 col-xl-6">
+              <div class="card h-100">
+                <div class="card-body">
+                  <h6 class="mb-3">Розподіл за ролями</h6>
+                  <div id="visitRolesList" class="visit-role-list">
+                    <div class="text-muted">Завантаження…</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-body">
+              <h6 class="mb-3">Останні візити</h6>
+              <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                  <thead>
+                    <tr>
+                      <th>Час</th>
+                      <th>Користувач</th>
+                      <th>Роль</th>
+                      <th>Сторінка</th>
+                      <th>Шлях</th>
+                    </tr>
+                  </thead>
+                  <tbody id="visitRecentBody">
+                    <tr>
+                      <td colspan="5" class="text-muted">Завантаження…</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <% } %>
+
         <% if (sectionAllowed('admin-history')) { %>
         <div id="admin-history" class="admin-panel" data-admin-title="Activity / History">
           <div class="card mb-4">
@@ -3539,6 +3651,226 @@
         const errorMsg = toastContainer.dataset.toastError;
         if (successMsg) showToast('success', successMsg);
         if (errorMsg) showToast('error', errorMsg);
+      }
+
+      const visitAnalyticsPanel = document.getElementById('admin-visit-analytics');
+      const visitDaysSelect = document.getElementById('visitAnalyticsDays');
+      const visitRefreshBtn = document.getElementById('visitAnalyticsRefresh');
+      const visitTopPagesBody = document.getElementById('visitTopPagesBody');
+      const visitRecentBody = document.getElementById('visitRecentBody');
+      const visitRolesList = document.getElementById('visitRolesList');
+      const visitMetricTotal = document.getElementById('visitMetricTotal');
+      const visitMetricUnique = document.getElementById('visitMetricUnique');
+      const visitMetricSigned = document.getElementById('visitMetricSigned');
+      const visitMetricDays = document.getElementById('visitMetricDays');
+      const visitChartCanvas = document.getElementById('visitAnalyticsChart');
+      const visitChartCtor =
+        typeof window !== 'undefined' && window.Chart ? window.Chart : null;
+      let visitChart = null;
+      let visitAnalyticsLoading = false;
+
+      const formatVisitNumber = (value) => {
+        const n = Number(value || 0);
+        return new Intl.NumberFormat('uk-UA').format(Number.isFinite(n) ? n : 0);
+      };
+
+      const prettyVisitPageLabel = (key) => {
+        const labels = {
+          login: 'Логін',
+          register: 'Реєстрація',
+          schedule: 'Розклад',
+          'my-day': 'My Day',
+          teamwork: 'Teamwork',
+          profile: 'Профіль',
+          admin: 'Адмінка',
+          deanery: 'Деканат',
+          starosta: 'Староста',
+          teacher: 'Викладач',
+          subjects: 'Предмети',
+        };
+        const normalized = String(key || '').trim().toLowerCase();
+        return labels[normalized] || normalized || 'unknown';
+      };
+
+      const prettyVisitRoleLabel = (key) => {
+        const labels = {
+          admin: 'Адмін',
+          deanery: 'Деканат',
+          starosta: 'Староста',
+          teacher: 'Викладач',
+          student: 'Студент',
+          guest: 'Гість',
+        };
+        const normalized = String(key || '').trim().toLowerCase();
+        return labels[normalized] || normalized || 'guest';
+      };
+
+      const setVisitAnalyticsLoading = (loading) => {
+        visitAnalyticsLoading = !!loading;
+        if (visitRefreshBtn) {
+          visitRefreshBtn.disabled = visitAnalyticsLoading;
+          visitRefreshBtn.textContent = visitAnalyticsLoading ? 'Оновлення…' : 'Оновити';
+        }
+      };
+
+      const renderVisitRoles = (rows) => {
+        if (!visitRolesList) return;
+        if (!rows || !rows.length) {
+          visitRolesList.innerHTML = '<div class="text-muted">Немає даних за період.</div>';
+          return;
+        }
+        const total = rows.reduce((sum, row) => sum + Number(row.visits || 0), 0) || 1;
+        visitRolesList.innerHTML = rows.map((row) => {
+          const visits = Number(row.visits || 0);
+          const share = Math.round((visits / total) * 100);
+          return `
+            <div class="visit-role-item">
+              <span class="visit-role-label">${prettyVisitRoleLabel(row.role_key)}</span>
+              <span class="visit-role-value">${formatVisitNumber(visits)} · ${share}%</span>
+            </div>
+          `;
+        }).join('');
+      };
+
+      const renderVisitTopPages = (rows) => {
+        if (!visitTopPagesBody) return;
+        if (!rows || !rows.length) {
+          visitTopPagesBody.innerHTML = '<tr><td colspan="3" class="text-muted">Немає даних за період.</td></tr>';
+          return;
+        }
+        visitTopPagesBody.innerHTML = rows.map((row) => `
+          <tr>
+            <td>${prettyVisitPageLabel(row.page_key)}</td>
+            <td>${formatVisitNumber(row.visits)}</td>
+            <td>${formatVisitNumber(row.unique_visitors)}</td>
+          </tr>
+        `).join('');
+      };
+
+      const renderVisitRecent = (rows) => {
+        if (!visitRecentBody) return;
+        if (!rows || !rows.length) {
+          visitRecentBody.innerHTML = '<tr><td colspan="5" class="text-muted">Немає подій за період.</td></tr>';
+          return;
+        }
+        visitRecentBody.innerHTML = rows.map((row) => {
+          const at = row.created_at ? new Date(row.created_at).toLocaleString('uk-UA') : '—';
+          return `
+            <tr>
+              <td>${at}</td>
+              <td>${row.user_name || 'Guest'}</td>
+              <td>${prettyVisitRoleLabel(row.role_key)}</td>
+              <td>${prettyVisitPageLabel(row.page_key)}</td>
+              <td>${row.route_path || '/'}</td>
+            </tr>
+          `;
+        }).join('');
+      };
+
+      const renderVisitChart = (dailyRows) => {
+        if (!visitChartCanvas || !visitChartCtor) return;
+        const labels = (dailyRows || []).map((row) => row.day || '');
+        const visits = (dailyRows || []).map((row) => Number(row.visits || 0));
+        const unique = (dailyRows || []).map((row) => Number(row.unique_visitors || 0));
+        if (visitChart) {
+          visitChart.destroy();
+          visitChart = null;
+        }
+        visitChart = new visitChartCtor(visitChartCanvas, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'Візити',
+                data: visits,
+                borderColor: '#60a5fa',
+                backgroundColor: 'rgba(96, 165, 250, 0.22)',
+                fill: true,
+                tension: 0.32,
+                pointRadius: 2.5,
+              },
+              {
+                label: 'Унікальні',
+                data: unique,
+                borderColor: '#34d399',
+                backgroundColor: 'rgba(52, 211, 153, 0.16)',
+                fill: false,
+                tension: 0.32,
+                pointRadius: 2.5,
+              },
+            ],
+          },
+          options: {
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                grid: { color: 'rgba(148, 163, 184, 0.16)' },
+                ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') || '#94a3b8' },
+              },
+              y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(148, 163, 184, 0.12)' },
+                ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') || '#94a3b8' },
+              },
+            },
+            plugins: {
+              legend: {
+                labels: {
+                  color: getComputedStyle(document.body).getPropertyValue('--text-primary') || '#e2e8f0',
+                },
+              },
+            },
+          },
+        });
+      };
+
+      const loadVisitAnalytics = async () => {
+        if (!visitAnalyticsPanel || visitAnalyticsLoading) return;
+        const days = visitDaysSelect ? Number(visitDaysSelect.value || 14) : 14;
+        setVisitAnalyticsLoading(true);
+        try {
+          const res = await fetch(`/admin/visit-analytics.json?days=${encodeURIComponent(days)}`, {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+          });
+          if (!res.ok) {
+            throw new Error(`Analytics ${res.status}`);
+          }
+          const data = await res.json();
+          if (!data || !data.ok) {
+            throw new Error('Analytics payload invalid');
+          }
+          if (visitMetricTotal) visitMetricTotal.textContent = formatVisitNumber(data.summary && data.summary.total_visits);
+          if (visitMetricUnique) visitMetricUnique.textContent = formatVisitNumber(data.summary && data.summary.unique_visitors);
+          if (visitMetricSigned) visitMetricSigned.textContent = formatVisitNumber(data.summary && data.summary.signed_users);
+          if (visitMetricDays) visitMetricDays.textContent = formatVisitNumber(data.summary && data.summary.active_days);
+          renderVisitChart(data.daily || []);
+          renderVisitTopPages(data.top_pages || []);
+          renderVisitRoles(data.roles || []);
+          renderVisitRecent(data.recent || []);
+        } catch (err) {
+          renderVisitTopPages([]);
+          renderVisitRoles([]);
+          renderVisitRecent([]);
+          if (visitMetricTotal) visitMetricTotal.textContent = '—';
+          if (visitMetricUnique) visitMetricUnique.textContent = '—';
+          if (visitMetricSigned) visitMetricSigned.textContent = '—';
+          if (visitMetricDays) visitMetricDays.textContent = '—';
+          showToast('error', 'Не вдалось завантажити аналітику відвідування.');
+        } finally {
+          setVisitAnalyticsLoading(false);
+        }
+      };
+
+      if (visitAnalyticsPanel) {
+        if (visitRefreshBtn) {
+          visitRefreshBtn.addEventListener('click', loadVisitAnalytics);
+        }
+        if (visitDaysSelect) {
+          visitDaysSelect.addEventListener('change', loadVisitAnalytics);
+        }
+        loadVisitAnalytics();
       }
 
       document.addEventListener('click', async (event) => {

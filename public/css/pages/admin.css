@@ -521,6 +521,58 @@ body.theme-light .admin-metric-card {
   font-weight: 700;
 }
 
+.visit-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.visit-metric-card {
+  border-radius: var(--r-md);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 12px 14px;
+}
+
+.visit-metric-value {
+  margin-top: 4px;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.visit-chart-wrap {
+  min-height: 220px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px;
+}
+
+.visit-role-list {
+  display: grid;
+  gap: 8px;
+}
+
+.visit-role-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 9px 11px;
+}
+
+.visit-role-label {
+  font-weight: 600;
+}
+
+.visit-role-value {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .admin-chip {
   background: rgba(148, 163, 184, 0.2);
   color: #e2e8f0;
@@ -541,6 +593,13 @@ body.theme-light .admin-chip {
 body.theme-light .settings-section {
   background: rgba(15, 23, 42, 0.03);
   border-color: rgba(15, 23, 42, 0.08);
+}
+
+body.theme-light .visit-metric-card,
+body.theme-light .visit-chart-wrap,
+body.theme-light .visit-role-item {
+  border-color: rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .settings-section-title {

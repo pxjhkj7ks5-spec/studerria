@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.86",
+      "date": "2026-02-16",
+      "items": [
+        "feat(analytics): added site visit tracking (page key, route, role, user/session, course) with retention cleanup and dedupe window to reduce noisy duplicates",
+        "feat(admin): added new `Visit analytics` section with live metrics, trend chart, top pages, role split, and recent visits via `/admin/visit-analytics.json`",
+        "feat(rbac): added `admin-visit-analytics` permission to admin section catalog so access can be managed in Role Studio"
+      ]
+    },
+    {
       "version": "0.8.85",
       "date": "2026-02-16",
       "items": [

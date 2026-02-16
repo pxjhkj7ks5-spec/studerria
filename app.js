@@ -104,6 +104,7 @@ const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-overview', label: 'Огляд' },
   { id: 'admin-settings', label: 'Налаштування' },
   { id: 'admin-role-access', label: 'Role Studio' },
+  { id: 'admin-visit-analytics', label: 'Відвідування' },
   { id: 'admin-schedule', label: 'Розклад' },
   { id: 'admin-import-export', label: 'Імпорт/Експорт' },
   { id: 'admin-schedule-generator', label: 'Генератор' },
@@ -1168,6 +1169,7 @@ function requireAdminSectionAccess(sectionId) {
 const requireOverviewSectionAccess = requireAdminSectionAccess('admin-overview');
 const requireSettingsSectionAccess = requireAdminSectionAccess('admin-settings');
 const requireRoleAccessSectionAccess = requireAdminSectionAccess('admin-role-access');
+const requireVisitAnalyticsSectionAccess = requireAdminSectionAccess('admin-visit-analytics');
 const requireScheduleSectionAccess = requireAdminSectionAccess('admin-schedule');
 const requireImportExportSectionAccess = requireAdminSectionAccess('admin-import-export');
 const requireScheduleGeneratorSectionAccess = requireAdminSectionAccess('admin-schedule-generator');
@@ -2522,6 +2524,162 @@ const ACTIVITY_POINTS_CASE =
   "WHEN action_type = 'teamwork_group_create' THEN 1 " +
   "ELSE 0 END";
 
+const VISIT_DAY_OPTIONS = new Set([7, 14, 30, 60, 90]);
+const VISIT_DEDUP_WINDOW_MS = 10000;
+const VISIT_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const VISIT_DEDUP_MAX_KEYS = 5000;
+const VISIT_RETENTION_DAYS_RAW = Number(process.env.SITE_VISIT_RETENTION_DAYS || 120);
+const VISIT_RETENTION_DAYS = Number.isFinite(VISIT_RETENTION_DAYS_RAW) && VISIT_RETENTION_DAYS_RAW >= 14
+  ? Math.floor(VISIT_RETENTION_DAYS_RAW)
+  : 120;
+const visitDedupCache = new Map();
+let visitCleanupInFlight = false;
+let visitLastCleanupAt = 0;
+
+const parseVisitDays = (rawValue) => {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return 14;
+  const normalized = Math.floor(parsed);
+  return VISIT_DAY_OPTIONS.has(normalized) ? normalized : 14;
+};
+
+const buildVisitDayLabels = (days) => {
+  const normalizedDays = parseVisitDays(days);
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+  const labels = [];
+  for (let offset = normalizedDays - 1; offset >= 0; offset -= 1) {
+    const d = new Date(end);
+    d.setDate(end.getDate() - offset);
+    labels.push(d.toISOString().slice(0, 10));
+  }
+  return labels;
+};
+
+const resolveVisitPageKey = (pathname) => {
+  const normalized = String(pathname || '').trim();
+  if (!normalized) return null;
+  if (normalized === '/' || normalized === '/login') return 'login';
+  if (normalized.startsWith('/register')) return 'register';
+  if (normalized.startsWith('/schedule')) return 'schedule';
+  if (normalized.startsWith('/my-day')) return 'my-day';
+  if (normalized.startsWith('/teamwork')) return 'teamwork';
+  if (normalized.startsWith('/profile')) return 'profile';
+  if (normalized.startsWith('/admin')) return 'admin';
+  if (normalized.startsWith('/deanery')) return 'deanery';
+  if (normalized.startsWith('/starosta')) return 'starosta';
+  if (normalized.startsWith('/teacher')) return 'teacher';
+  if (normalized.startsWith('/subjects')) return 'subjects';
+  return null;
+};
+
+const shouldTrackVisitRequest = (req) => {
+  if (!req || req.method !== 'GET') return false;
+  const pathname = String(req.path || '');
+  const pageKey = resolveVisitPageKey(pathname);
+  if (!pageKey) return false;
+  const accept = String(req.get('accept') || '').toLowerCase();
+  if (accept && !accept.includes('text/html') && !accept.includes('*/*')) {
+    return false;
+  }
+  return true;
+};
+
+const trimVisitDedupCache = (nowMs) => {
+  if (visitDedupCache.size <= VISIT_DEDUP_MAX_KEYS) return;
+  const cutoff = nowMs - VISIT_DEDUP_WINDOW_MS * 8;
+  for (const [key, value] of visitDedupCache.entries()) {
+    if (value < cutoff) {
+      visitDedupCache.delete(key);
+    }
+  }
+  if (visitDedupCache.size <= VISIT_DEDUP_MAX_KEYS) return;
+  const overflow = visitDedupCache.size - VISIT_DEDUP_MAX_KEYS;
+  const keys = Array.from(visitDedupCache.keys());
+  for (let i = 0; i < overflow; i += 1) {
+    visitDedupCache.delete(keys[i]);
+  }
+};
+
+const shouldSkipVisitDuplicate = (req, pageKey, routePath) => {
+  const userId = Number(req?.session?.user?.id);
+  const sessionId = req?.sessionID || '';
+  const ip = req?.ip || '';
+  const dedupActorKey = Number.isFinite(userId) && userId > 0
+    ? `u:${userId}`
+    : (sessionId ? `s:${sessionId}` : `ip:${ip}`);
+  const dedupKey = `${dedupActorKey}:${pageKey}:${routePath}`;
+  const nowMs = Date.now();
+  const lastSeen = Number(visitDedupCache.get(dedupKey) || 0);
+  visitDedupCache.set(dedupKey, nowMs);
+  trimVisitDedupCache(nowMs);
+  return lastSeen > 0 && (nowMs - lastSeen) < VISIT_DEDUP_WINDOW_MS;
+};
+
+const resolveVisitCourseId = (req, routePath) => {
+  const queryCourse = Number(req?.query?.course);
+  if (Number.isFinite(queryCourse) && queryCourse > 0 && (
+    routePath.startsWith('/admin')
+    || routePath.startsWith('/deanery')
+    || routePath.startsWith('/starosta')
+  )) {
+    return queryCourse;
+  }
+  const sessionCourse = Number(req?.session?.user?.course_id);
+  if (Number.isFinite(sessionCourse) && sessionCourse > 0) return sessionCourse;
+  return null;
+};
+
+const maybeCleanupVisitEvents = async () => {
+  const nowMs = Date.now();
+  if (visitCleanupInFlight) return;
+  if ((nowMs - visitLastCleanupAt) < VISIT_CLEANUP_INTERVAL_MS) return;
+  visitCleanupInFlight = true;
+  visitLastCleanupAt = nowMs;
+  try {
+    await db.run(
+      "DELETE FROM site_visit_events WHERE created_at < NOW() - (?::int * INTERVAL '1 day')",
+      [VISIT_RETENTION_DAYS]
+    );
+  } catch (err) {
+    console.error('Database error (visit.cleanup)', err);
+  } finally {
+    visitCleanupInFlight = false;
+  }
+};
+
+const recordSiteVisit = async (payload) => {
+  if (!payload || !payload.pageKey || !payload.routePath) return;
+  const userAgentRaw = String(payload.userAgent || '');
+  const userAgent = userAgentRaw ? userAgentRaw.slice(0, 500) : null;
+  await db.run(
+    `
+      INSERT INTO site_visit_events (
+        user_id,
+        role_key,
+        course_id,
+        route_path,
+        page_key,
+        session_id,
+        ip,
+        user_agent,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      payload.userId || null,
+      payload.roleKey || null,
+      payload.courseId || null,
+      payload.routePath,
+      payload.pageKey,
+      payload.sessionId || null,
+      payload.ip || null,
+      userAgent,
+      payload.createdAt || new Date().toISOString(),
+    ]
+  );
+};
+
 function handleDbError(res, err, label) {
   console.error(`Database error (${label})`, err);
   if (!res.headersSent) {
@@ -2572,6 +2730,44 @@ function getStaffPanelBase(req, courseId) {
   }
   return `/admin?course=${courseId}`;
 }
+
+app.use((req, _res, next) => {
+  if (initStatus !== 'ok') {
+    return next();
+  }
+  if (!shouldTrackVisitRequest(req)) {
+    return next();
+  }
+  const routePath = String(req.path || '').slice(0, 180) || '/';
+  const pageKey = resolveVisitPageKey(routePath);
+  if (!pageKey) {
+    return next();
+  }
+  if (shouldSkipVisitDuplicate(req, pageKey, routePath)) {
+    return next();
+  }
+  const userId = Number(req?.session?.user?.id);
+  const roleKey = req?.session?.role ? normalizeRoleKey(req.session.role) : null;
+  const courseId = resolveVisitCourseId(req, routePath);
+  const payload = {
+    userId: Number.isFinite(userId) && userId > 0 ? userId : null,
+    roleKey,
+    courseId: Number.isFinite(courseId) && courseId > 0 ? courseId : null,
+    routePath,
+    pageKey,
+    sessionId: req.sessionID || null,
+    ip: req.ip || null,
+    userAgent: req.headers['user-agent'] || null,
+    createdAt: new Date().toISOString(),
+  };
+  recordSiteVisit(payload).catch((err) => {
+    console.error('Database error (visit.insert)', err);
+  });
+  maybeCleanupVisitEvents().catch((err) => {
+    console.error('Database error (visit.cleanup.background)', err);
+  });
+  return next();
+});
 
 async function getActiveSemester(courseId) {
   const cached = cacheGet(referenceCache.activeSemester, courseId);
@@ -8771,6 +8967,147 @@ app.post('/admin/role-access', requireRoleAccessSectionAccess, async (req, res) 
     return res.redirect(`/admin?ok=Role%20access%20saved&op=${operationId}`);
   } catch (err) {
     return handleDbError(res, err, 'admin.roleAccess.save');
+  }
+});
+
+app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.visitAnalytics.init');
+  }
+  try {
+    const days = parseVisitDays(req.query.days);
+    const labels = buildVisitDayLabels(days);
+    const sinceIso = labels.length
+      ? new Date(`${labels[0]}T00:00:00.000Z`).toISOString()
+      : new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
+    const courseId = getAdminCourse(req);
+    const uniqueExpr = "COALESCE(v.user_id::text, NULLIF(v.session_id, ''), NULLIF(v.ip, ''), 'guest')";
+
+    const [summaryRow, dailyRows, topPagesRows, roleRows, recentRows] = await Promise.all([
+      db.get(
+        `
+          SELECT
+            COUNT(*)::int AS total_visits,
+            COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors,
+            COUNT(DISTINCT v.user_id)::int AS signed_users,
+            COUNT(DISTINCT DATE(v.created_at))::int AS active_days
+          FROM site_visit_events v
+          WHERE v.course_id = ?
+            AND v.created_at >= ?
+        `,
+        [courseId, sinceIso]
+      ),
+      db.all(
+        `
+          SELECT
+            DATE(v.created_at) AS day,
+            COUNT(*)::int AS visits,
+            COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
+          FROM site_visit_events v
+          WHERE v.course_id = ?
+            AND v.created_at >= ?
+          GROUP BY DATE(v.created_at)
+          ORDER BY day ASC
+        `,
+        [courseId, sinceIso]
+      ),
+      db.all(
+        `
+          SELECT
+            v.page_key,
+            COUNT(*)::int AS visits,
+            COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
+          FROM site_visit_events v
+          WHERE v.course_id = ?
+            AND v.created_at >= ?
+          GROUP BY v.page_key
+          ORDER BY visits DESC, v.page_key ASC
+          LIMIT 8
+        `,
+        [courseId, sinceIso]
+      ),
+      db.all(
+        `
+          SELECT
+            COALESCE(NULLIF(v.role_key, ''), 'guest') AS role_key,
+            COUNT(*)::int AS visits
+          FROM site_visit_events v
+          WHERE v.course_id = ?
+            AND v.created_at >= ?
+          GROUP BY COALESCE(NULLIF(v.role_key, ''), 'guest')
+          ORDER BY visits DESC, role_key ASC
+        `,
+        [courseId, sinceIso]
+      ),
+      db.all(
+        `
+          SELECT
+            v.created_at,
+            COALESCE(NULLIF(u.full_name, ''), 'Guest') AS user_name,
+            COALESCE(NULLIF(v.role_key, ''), 'guest') AS role_key,
+            v.page_key,
+            v.route_path
+          FROM site_visit_events v
+          LEFT JOIN users u ON u.id = v.user_id
+          WHERE v.course_id = ?
+            AND v.created_at >= ?
+          ORDER BY v.created_at DESC
+          LIMIT 30
+        `,
+        [courseId, sinceIso]
+      ),
+    ]);
+
+    const dailyMap = new Map();
+    (dailyRows || []).forEach((row) => {
+      const key = row && row.day ? String(row.day).slice(0, 10) : '';
+      if (!key) return;
+      dailyMap.set(key, {
+        visits: Number(row.visits || 0),
+        unique_visitors: Number(row.unique_visitors || 0),
+      });
+    });
+    const daily = labels.map((day) => {
+      const value = dailyMap.get(day) || { visits: 0, unique_visitors: 0 };
+      return {
+        day,
+        visits: value.visits,
+        unique_visitors: value.unique_visitors,
+      };
+    });
+
+    return res.json({
+      ok: true,
+      days,
+      course_id: courseId,
+      summary: {
+        total_visits: Number(summaryRow?.total_visits || 0),
+        unique_visitors: Number(summaryRow?.unique_visitors || 0),
+        signed_users: Number(summaryRow?.signed_users || 0),
+        active_days: Number(summaryRow?.active_days || 0),
+      },
+      daily,
+      top_pages: (topPagesRows || []).map((row) => ({
+        page_key: String(row.page_key || 'unknown'),
+        visits: Number(row.visits || 0),
+        unique_visitors: Number(row.unique_visitors || 0),
+      })),
+      roles: (roleRows || []).map((row) => ({
+        role_key: String(row.role_key || 'guest'),
+        visits: Number(row.visits || 0),
+      })),
+      recent: (recentRows || []).map((row) => ({
+        created_at: row.created_at,
+        user_name: row.user_name || 'Guest',
+        role_key: row.role_key || 'guest',
+        page_key: row.page_key || 'unknown',
+        route_path: row.route_path || '/',
+      })),
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.visitAnalytics.fetch');
   }
 });
 
