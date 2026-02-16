@@ -3444,13 +3444,6 @@
         is_active: roleRow.is_active !== false && Number(roleRow.is_active) !== 0,
       }))) %>;
       const normalizeRoleKeyClient = (value) => String(value || '').trim().toLowerCase();
-      const escapeHtml = (value) =>
-        String(value || '')
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/\"/g, '&quot;')
-          .replace(/'/g, '&#39;');
       const getRoleLabel = (roleKey) => roleLabelMap[normalizeRoleKeyClient(roleKey)] || String(roleKey || 'student');
       const parseRoleKeys = (value, fallback = ['student']) => {
         const input = Array.isArray(value) ? value : (typeof value === 'string' ? value.split(',') : []);

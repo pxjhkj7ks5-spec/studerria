@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.74",
+      "date": "2026-02-16",
+      "items": [
+        "fix(admin): resolve global script parse failure by removing duplicate `escapeHtml` declaration in `admin.ejs` (restores theme toggle, user row clicks, filters, and draft autosave logic)",
+        "fix(schedule): hide dark-theme top glare pseudo-elements for week hero, online panel, and day cards to remove remaining oval artifacts"
+      ]
+    },
+    {
       "version": "0.8.73",
       "date": "2026-02-16",
       "items": [

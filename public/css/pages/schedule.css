@@ -453,6 +453,12 @@ body.theme-dark .day-card.liquid-card::after {
   display: none;
 }
 
+body.theme-dark .week-hero.glass::before,
+body.theme-dark .schedule-panel.glass::before,
+body.theme-dark .day-card.glass::before {
+  display: none;
+}
+
 .app-footer .footer-meta.glass-dock {
   position: relative;
   z-index: 1061;
