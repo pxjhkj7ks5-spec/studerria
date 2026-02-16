@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.94",
+      "date": "2026-02-16",
+      "items": [
+        "fix(teacher-pending): synced waiting-for-approval page theme with global `ui-theme` localStorage state instead of hardcoded dark mode",
+        "ux(teacher-pending): added in-page theme toggle button to switch between light and dark appearance like other auth/profile pages"
+      ]
+    },
+    {
       "version": "0.8.93",
       "date": "2026-02-16",
       "items": [
