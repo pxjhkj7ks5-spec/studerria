@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.8.72",
+      "date": "2026-02-16",
+      "items": [
+        "feat(admin): add Liquid Header Rail and depth-card table surfaces for a clearer Apple Liquid Glass hierarchy in admin",
+        "feat(role-studio): add glass segmented presets and ambient status chips for role state visibility",
+        "feat(role-studio): add local draft autosave/restore via localStorage with per-role \"Draft saved\" indicators",
+        "ux(changelog): restyle Changelog modal with liquid glass treatment and release-notes chip"
+      ]
+    },
+    {
       "version": "0.8.71",
       "date": "2026-02-16",
       "items": [

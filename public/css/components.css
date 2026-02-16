@@ -247,6 +247,67 @@ body.theme-light .hw-chip {
   filter: grayscale(0.2);
 }
 
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.55rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-chip--active {
+  border-color: rgba(74, 222, 128, 0.38);
+  background: rgba(74, 222, 128, 0.2);
+  color: #bbf7d0;
+}
+
+.status-chip--pending {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.2);
+  color: #fde68a;
+}
+
+.status-chip--info {
+  border-color: rgba(96, 165, 250, 0.35);
+  background: rgba(96, 165, 250, 0.18);
+  color: #bfdbfe;
+}
+
+.status-chip--neutral {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.22);
+  color: #e2e8f0;
+}
+
+.status-chip--muted {
+  opacity: 0.72;
+}
+
+body.theme-light .status-chip--active {
+  color: #166534;
+}
+
+body.theme-light .status-chip--pending {
+  color: #92400e;
+}
+
+body.theme-light .status-chip--info {
+  color: #1d4ed8;
+}
+
+body.theme-light .status-chip--neutral {
+  color: #334155;
+}
+
 /* Segmented control */
 .segmented,
 .segment-control {
