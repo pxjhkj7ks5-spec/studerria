@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.95",
+      "date": "2026-02-16",
+      "items": [
+        "fix(teamwork-ui): normalized lesson scope segmented switch geometry so both options have consistent rounded shape",
+        "fix(teamwork-ui): removed Bootstrap button-group seam on lesson type toggle to avoid mismatched active/inactive form edges"
+      ]
+    },
+    {
       "version": "0.8.94",
       "date": "2026-02-16",
       "items": [

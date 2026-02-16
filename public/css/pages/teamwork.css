@@ -217,8 +217,54 @@ body.theme-light .range-bubble {
   min-width: 130px;
 }
 
+.lesson-scope-picker .btn-group {
+  display: flex;
+  gap: 8px;
+}
+
 .lesson-scope-picker .btn-group .btn {
-  border-radius: 12px;
+  flex: 1 1 0;
+  min-height: 46px;
+  border-radius: 14px !important;
+  border-color: rgba(148, 163, 184, 0.34);
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.lesson-scope-picker .btn-group > .btn + .btn,
+.lesson-scope-picker .btn-group > .btn + .btn-group,
+.lesson-scope-picker .btn-group > .btn-group + .btn,
+.lesson-scope-picker .btn-group > .btn-group + .btn-group {
+  margin-left: 0 !important;
+}
+
+.lesson-scope-picker .btn-group > .btn:not(:first-child),
+.lesson-scope-picker .btn-group > .btn-group:not(:first-child) > .btn {
+  border-top-left-radius: 14px !important;
+  border-bottom-left-radius: 14px !important;
+}
+
+.lesson-scope-picker .btn-group > .btn:not(:last-child):not(.dropdown-toggle),
+.lesson-scope-picker .btn-group > .btn-group:not(:last-child) > .btn {
+  border-top-right-radius: 14px !important;
+  border-bottom-right-radius: 14px !important;
+}
+
+.lesson-scope-picker .btn-check:checked + .btn {
+  background: rgba(248, 250, 252, 0.92);
+  border-color: rgba(248, 250, 252, 0.95);
+  color: rgba(15, 23, 42, 0.96);
+}
+
+body.theme-light .lesson-scope-picker .btn-group .btn {
+  border-color: rgba(15, 23, 42, 0.18);
+  background: rgba(255, 255, 255, 0.58);
+  color: rgba(15, 23, 42, 0.86);
+}
+
+body.theme-light .lesson-scope-picker .btn-check:checked + .btn {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(15, 23, 42, 0.9);
+  color: rgba(248, 250, 252, 0.96);
 }
 
 .seminar-groups-panel {
