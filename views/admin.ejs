@@ -3903,7 +3903,7 @@
       const rbacRevertBtn = document.querySelector('[data-rbac-revert]');
       if (rbacRoleForms.length) {
         try {
-          const rbacPermissionDefaults = <%- JSON.stringify(defaultRolePermissions || {}) %>;
+          const rbacPermissionDefaults = <%- JSON.stringify((typeof defaultRolePermissions !== 'undefined' && defaultRolePermissions) ? defaultRolePermissions : {}) %>;
           const allAdminSectionKeys = <%- JSON.stringify((adminSectionOptionsList || []).map((section) => section.id)) %>;
           const rbacCourseDefaults = {
             admin: ['regular', 'teacher'],

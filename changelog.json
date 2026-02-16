@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.8.76",
+      "date": "2026-02-16",
+      "items": [
+        "fix(admin): prevent `ReferenceError` in `admin.ejs` when `defaultRolePermissions` local is missing (safe `typeof` fallback for Role Studio client bootstrap)"
+      ]
+    },
+    {
       "version": "0.8.75",
       "date": "2026-02-16",
       "items": [
