@@ -746,6 +746,10 @@
             >
               Превʼю
             </button>
+            <form method="POST" action="/admin/switch-to-student">
+              <input type="hidden" name="mode" value="self" />
+              <button class="btn btn-outline-secondary btn-sm admin-topbar-btn" type="submit">Розклад</button>
+            </form>
           <% } else if (isLimitedView) { %>
             <a class="btn btn-outline-primary btn-sm admin-topbar-btn" href="/schedule"><%= t('admin.backToSchedule') %></a>
           <% } %>
@@ -2818,11 +2822,6 @@
                   <option value="3">Група 3</option>
                 </select>
                 <button class="btn btn-outline-primary admin-topbar-btn w-100" type="submit"><%= t('admin.viewAsStudent') %></button>
-              </form>
-              <form method="POST" action="/admin/switch-to-student" class="admin-preview-form">
-                <input type="hidden" name="mode" value="self" />
-                <div class="small text-muted mb-2">Швидкий перехід у твій власний студентський розклад.</div>
-                <button class="btn btn-outline-secondary admin-topbar-btn w-100" type="submit">Мій розклад</button>
               </form>
             </div>
           </div>

@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.85",
+      "date": "2026-02-16",
+      "items": [
+        "ux(admin): returned quick self-schedule action to topbar with compact label `Розклад`",
+        "ux(admin): removed duplicate self-schedule action from preview modal to keep preview focused on course/group test mode"
+      ]
+    },
+    {
       "version": "0.8.84",
       "date": "2026-02-16",
       "items": [
