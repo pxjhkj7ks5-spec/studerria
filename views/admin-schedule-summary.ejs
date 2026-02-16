@@ -87,7 +87,7 @@
         <span class="navbar-brand">Сводка семестру</span>
         <div class="d-flex align-items-center">
           <span class="me-3 text-muted">
-            <%= t('role.admin') %>: <%= username %>
+            <%= role === 'admin' ? t('role.admin') : (role === 'deanery' ? t('role.deanery') : (role === 'starosta' ? t('role.starosta') : t('role.user'))) %>: <%= username %>
           </span>
           <button
             class="theme-toggle theme-toggle-min me-2"
@@ -100,7 +100,7 @@
             🌙
           </button>
           <a class="btn btn-outline-primary btn-sm me-2" href="/admin/schedule-list">До списку пар</a>
-          <a class="btn btn-outline-secondary btn-sm me-2" href="/admin">Назад в адмінку</a>
+          <a class="btn btn-outline-secondary btn-sm me-2" href="<%= adminHomeHref || '/admin' %>">Назад в адмінку</a>
           <form method="POST" action="/logout">
             <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
           </form>
@@ -118,7 +118,7 @@
         <div class="row g-2 align-items-end">
           <div class="col-12 col-md-4">
             <label class="form-label mb-0"><%= t('admin.course') %></label>
-            <select name="course" class="form-select" onchange="this.form.submit()">
+            <select name="course" class="form-select" <%= allowCourseSelect ? 'onchange="this.form.submit()"' : 'disabled' %>>
               <% (courses || []).forEach(function(c) { %>
                 <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
                   <%= c.name %>

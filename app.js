@@ -102,6 +102,7 @@ const userSeed = adminSeed ? [adminSeed] : [];
 const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-overview', label: 'Огляд' },
   { id: 'admin-settings', label: 'Налаштування' },
+  { id: 'admin-role-access', label: 'Role Studio' },
   { id: 'admin-schedule', label: 'Розклад' },
   { id: 'admin-import-export', label: 'Імпорт/Експорт' },
   { id: 'admin-schedule-generator', label: 'Генератор' },
@@ -826,8 +827,34 @@ const ensureUser = async (fullName, role, passwordHash, options = {}) => {
   }
 };
 
+const syncAdminSectionPermissionCatalog = async () => {
+  for (const permission of ADMIN_SECTION_PERMISSION_OPTIONS) {
+    await db.run(
+      `
+        INSERT INTO access_permissions (key, label, category)
+        VALUES (?, ?, 'admin_section')
+        ON CONFLICT (key) DO UPDATE
+        SET label = EXCLUDED.label,
+            category = EXCLUDED.category
+      `,
+      [permission.key, permission.label]
+    );
+  }
+  await pool.query(
+    `
+      INSERT INTO access_role_permissions (role_id, permission_id, allowed, created_at, updated_at)
+      SELECT r.id, p.id, true, NOW(), NOW()
+      FROM access_roles r
+      JOIN access_permissions p ON p.category = 'admin_section'
+      WHERE r.key = 'admin'
+      ON CONFLICT (role_id, permission_id) DO NOTHING
+    `
+  );
+};
+
 const initDb = async () => {
   await runMigrations(pool);
+  await syncAdminSectionPermissionCatalog();
 
   await pool.query('UPDATE subjects SET is_required = true WHERE is_required IS NULL');
 
@@ -995,7 +1022,22 @@ function requireAdminSectionAccess(sectionId) {
   };
 }
 
+const requireOverviewSectionAccess = requireAdminSectionAccess('admin-overview');
+const requireSettingsSectionAccess = requireAdminSectionAccess('admin-settings');
+const requireRoleAccessSectionAccess = requireAdminSectionAccess('admin-role-access');
 const requireScheduleSectionAccess = requireAdminSectionAccess('admin-schedule');
+const requireImportExportSectionAccess = requireAdminSectionAccess('admin-import-export');
+const requireScheduleGeneratorSectionAccess = requireAdminSectionAccess('admin-schedule-generator');
+const requireHomeworkSectionAccess = requireAdminSectionAccess('admin-homework');
+const requireUsersSectionAccess = requireAdminSectionAccess('admin-users');
+const requireTeachersSectionAccess = requireAdminSectionAccess('admin-teachers');
+const requireSubjectsSectionAccess = requireAdminSectionAccess('admin-subjects');
+const requireSemestersSectionAccess = requireAdminSectionAccess('admin-semesters');
+const requireCoursesSectionAccess = requireAdminSectionAccess('admin-courses');
+const requireHistorySectionAccess = requireAdminSectionAccess('admin-history');
+const requireActivitySectionAccess = requireAdminSectionAccess('admin-activity');
+const requireTeamworkSectionAccess = requireAdminSectionAccess('admin-teamwork');
+const requireMessagesSectionAccess = requireAdminSectionAccess('admin-messages');
 
 app.use(async (req, res, next) => {
   if (!req.session || !req.session.user) {
@@ -2199,9 +2241,7 @@ const {
   requireLogin,
   requireAdmin,
   requireStaff,
-  requireOverviewAccess,
   requireDeanery,
-  requireHomeworkBulkAccess,
 } = require('./lib/auth');
 const {
   daysOfWeek,
@@ -2330,12 +2370,20 @@ function ensureUsersSchema(cb) {
 }
 
 function getAdminCourse(req) {
-  const queryCourse = Number(req.query.course);
-  if (!Number.isNaN(queryCourse)) {
-    req.session.adminCourse = queryCourse;
+  if (hasSessionRole(req, 'admin')) {
+    const queryCourse = Number(req.query.course);
+    if (!Number.isNaN(queryCourse) && queryCourse > 0) {
+      req.session.adminCourse = queryCourse;
+    }
+    const sessionCourse = Number(req.session.adminCourse);
+    return Number.isNaN(sessionCourse) ? 1 : sessionCourse;
   }
-  const sessionCourse = Number(req.session.adminCourse);
-  return Number.isNaN(sessionCourse) ? 1 : sessionCourse;
+  const sessionCourse = Number(req?.session?.adminCourse);
+  if (!Number.isNaN(sessionCourse) && sessionCourse > 0) {
+    return sessionCourse;
+  }
+  const userCourse = Number(req?.session?.user?.course_id || 1);
+  return Number.isNaN(userCourse) ? 1 : userCourse;
 }
 
 function getStaffCourse(req) {
@@ -5088,7 +5136,7 @@ app.post('/teamwork/group/update', requireLogin, writeLimiter, (req, res) => {
   );
 });
 
-app.post('/admin/teamwork/delete/:id', requireStaff, (req, res) => {
+app.post('/admin/teamwork/delete/:id', requireTeamworkSectionAccess, (req, res) => {
   const taskId = Number(req.params.id);
   if (Number.isNaN(taskId)) {
     return res.redirect('/admin?err=Invalid%20task');
@@ -5103,7 +5151,7 @@ app.post('/admin/teamwork/delete/:id', requireStaff, (req, res) => {
   });
 });
 
-app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) => {
+app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, async (req, res) => {
   if (!settingsCache.allow_messages) {
     return res.redirect('/admin?err=Messages%20disabled');
   }
@@ -5234,7 +5282,7 @@ app.post('/admin/messages/send', requireStaff, writeLimiter, async (req, res) =>
   }
 });
 
-app.post('/admin/messages/delete/:id', requireStaff, writeLimiter, (req, res) => {
+app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimiter, (req, res) => {
   if (!settingsCache.allow_messages) {
     return res.redirect('/admin?err=Messages%20disabled');
   }
@@ -5455,7 +5503,7 @@ app.post('/messages/read', requireLogin, writeLimiter, (req, res) => {
   stmt.finalize(() => res.json({ ok: true }));
 });
 
-app.get('/admin/api/messages/:id/reads', requireStaff, readLimiter, async (req, res) => {
+app.get('/admin/api/messages/:id/reads', requireMessagesSectionAccess, readLimiter, async (req, res) => {
   if (!settingsCache.allow_messages) {
     return res.status(403).json({ error: 'Messages disabled' });
   }
@@ -6420,13 +6468,38 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
       );
 });
 
-app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
+app.get('/admin/schedule-list', requireScheduleSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleList.init');
   }
-  const courseId = getAdminCourse(req);
+  const roleKeys = getSessionRoleList(req);
+  const isAdmin = roleKeys.includes('admin');
+  let courses = [];
+  let courseId = getStaffCourse(req);
+  let allowCourseSelect = isAdmin;
+  try {
+    courses = await getCoursesCached();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleList.courses');
+  }
+  if (!isAdmin) {
+    const baseCourseId = Number(req.session.user.course_id || 1);
+    const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
+    if (!allowedCourses.length) {
+      return res.status(403).send('Forbidden (course access)');
+    }
+    courses = allowedCourses;
+    const requestedCourse = Number(req.query.course);
+    if (allowedCourseIds.has(requestedCourse)) {
+      courseId = requestedCourse;
+    } else if (!allowedCourseIds.has(courseId)) {
+      courseId = Number(allowedCourses[0].id);
+    }
+    req.session.adminCourse = courseId;
+    allowCourseSelect = allowedCourses.length > 1;
+  }
   const {
     group_number,
     day,
@@ -6547,7 +6620,6 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
       [...scheduleParams, perPage, offset]
     );
 
-    const courses = await getCoursesCached();
     const semesters = await getSemestersCached(courseId);
     const subjects = await getSubjectsCached(courseId);
 
@@ -6563,12 +6635,14 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
 
     return res.render('admin-schedule-list', {
       username: req.session.user.username,
-      role: 'admin',
+      role: normalizeRoleKey(req.session.role || 'student'),
+      adminHomeHref: getStaffPanelBase(req, courseId),
       courses,
       subjects,
       semesters,
       activeSemester,
       selectedCourseId: courseId,
+      allowCourseSelect,
       activeScheduleDays,
       schedule: rows || [],
       perPage,
@@ -6592,7 +6666,7 @@ app.get('/admin/schedule-list', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/schedule-windows', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-windows', requireScheduleSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -6607,12 +6681,23 @@ app.post('/admin/schedule-windows', requireAdmin, async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Invalid input' });
   }
   try {
+    const roleKeys = getSessionRoleList(req);
+    const isAdmin = roleKeys.includes('admin');
     const courses = await getCoursesCached();
+    let scopedCourseIds = courseIds;
+    if (!isAdmin) {
+      const baseCourseId = Number(req.session.user.course_id || 1);
+      const { allowedCourseIds } = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
+      scopedCourseIds = courseIds.filter((courseId) => allowedCourseIds.has(Number(courseId)));
+      if (!scopedCourseIds.length) {
+        return res.status(403).json({ ok: false, error: 'Forbidden (course access)' });
+      }
+    }
     const courseMap = new Map((courses || []).map((c) => [Number(c.id), c]));
     const warnings = [];
     const freeSets = [];
     const validCourses = [];
-    for (const courseId of courseIds) {
+    for (const courseId of scopedCourseIds) {
       const course = courseMap.get(Number(courseId));
       if (!course) {
         warnings.push(`Курс ${courseId} не знайдено.`);
@@ -6718,13 +6803,38 @@ app.post('/admin/schedule-windows', requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/admin/schedule-summary', requireAdmin, async (req, res) => {
+app.get('/admin/schedule-summary', requireScheduleSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleSummary.init');
   }
-  const courseId = Number(req.query.course || getAdminCourse(req));
+  const roleKeys = getSessionRoleList(req);
+  const isAdmin = roleKeys.includes('admin');
+  let courses = [];
+  let courseId = getStaffCourse(req);
+  let allowCourseSelect = isAdmin;
+  try {
+    courses = await getCoursesCached();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleSummary.courses');
+  }
+  if (!isAdmin) {
+    const baseCourseId = Number(req.session.user.course_id || 1);
+    const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
+    if (!allowedCourses.length) {
+      return res.status(403).send('Forbidden (course access)');
+    }
+    courses = allowedCourses;
+    const requestedCourse = Number(req.query.course);
+    if (allowedCourseIds.has(requestedCourse)) {
+      courseId = requestedCourse;
+    } else if (!allowedCourseIds.has(courseId)) {
+      courseId = Number(allowedCourses[0].id);
+    }
+    req.session.adminCourse = courseId;
+    allowCourseSelect = allowedCourses.length > 1;
+  }
   let activeSemester = null;
   try {
     const semesterList = await getSemestersCached(courseId);
@@ -6750,14 +6860,15 @@ app.get('/admin/schedule-summary', requireAdmin, async (req, res) => {
           [courseId, activeSemester.id]
         )
       : [];
-    const courses = await getCoursesCached();
     return res.render('admin-schedule-summary', {
       username: req.session.user.username,
-      role: req.session.role,
+      role: normalizeRoleKey(req.session.role || 'student'),
+      adminHomeHref: getStaffPanelBase(req, courseId),
       courses,
       semesters: semesterList,
       activeSemester,
       selectedCourseId: courseId,
+      allowCourseSelect,
       semesterSummary: summaryRows || [],
     });
   } catch (err) {
@@ -6765,7 +6876,7 @@ app.get('/admin/schedule-summary', requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
+app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7089,7 +7200,7 @@ app.get('/admin/schedule-generator', requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/admin/schedule-generator/merge-preview', requireAdmin, async (req, res) => {
+app.get('/admin/schedule-generator/merge-preview', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7110,7 +7221,7 @@ app.get('/admin/schedule-generator/merge-preview', requireAdmin, async (req, res
   }
 });
 
-app.post('/admin/schedule-generator/new', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/new', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7129,7 +7240,7 @@ app.post('/admin/schedule-generator/new', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/config', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7216,7 +7327,7 @@ app.post('/admin/schedule-generator/config', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/schedule-generator/config/autotune', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/config/autotune', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7365,7 +7476,7 @@ app.post('/admin/schedule-generator/config/autotune', requireAdmin, async (req, 
   }
 });
 
-app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/items/add', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7486,7 +7597,7 @@ app.post('/admin/schedule-generator/items/add', requireAdmin, async (req, res) =
   }
 });
 
-app.post('/admin/schedule-generator/mirror-auto', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/mirror-auto', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7548,7 +7659,7 @@ app.post('/admin/schedule-generator/mirror-auto', requireAdmin, async (req, res)
   return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Auto%20mirror%20pairs%20applied`);
 });
 
-app.post('/admin/schedule-generator/items/edit/:id', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/items/edit/:id', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7640,7 +7751,7 @@ app.post('/admin/schedule-generator/items/edit/:id', requireAdmin, async (req, r
   }
 });
 
-app.post('/admin/schedule-generator/items/delete/:id', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/items/delete/:id', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7659,7 +7770,7 @@ app.post('/admin/schedule-generator/items/delete/:id', requireAdmin, async (req,
   }
 });
 
-app.post('/admin/schedule-generator/items/freeze/:id', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/items/freeze/:id', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7721,7 +7832,7 @@ app.post('/admin/schedule-generator/items/freeze/:id', requireAdmin, async (req,
   }
 });
 
-app.post('/admin/schedule-generator/items/unfreeze/:id', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/items/unfreeze/:id', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7743,7 +7854,7 @@ app.post('/admin/schedule-generator/items/unfreeze/:id', requireAdmin, async (re
   }
 });
 
-app.post('/admin/schedule-generator/teachers/save', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/teachers/save', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -7777,7 +7888,7 @@ app.post('/admin/schedule-generator/teachers/save', requireAdmin, async (req, re
   }
 });
 
-app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -8003,7 +8114,7 @@ app.post('/admin/schedule-generator/run', requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, res) => {
+app.get('/admin/schedule-generator/:runId/preview', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -8142,7 +8253,7 @@ app.get('/admin/schedule-generator/:runId/preview', requireAdmin, async (req, re
   }
 });
 
-app.get('/admin/schedule-generator/backup.csv', requireAdmin, (req, res) => {
+app.get('/admin/schedule-generator/backup.csv', requireScheduleGeneratorSectionAccess, (req, res) => {
   const operationId = String(req.query.op || '').trim();
   if (!operationId) {
     return res.status(400).send('Missing operation id');
@@ -8156,7 +8267,7 @@ app.get('/admin/schedule-generator/backup.csv', requireAdmin, (req, res) => {
   return res.sendFile(backupPath);
 });
 
-app.post('/admin/schedule-generator/:runId/publish', requireAdmin, async (req, res) => {
+app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -8316,7 +8427,7 @@ const publishScheduledItems = async () => {
 
 const publishScheduleItems = publishScheduledItems;
 
-app.post('/admin/api/scheduler/run', requireAdmin, async (req, res) => {
+app.post('/admin/api/scheduler/run', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     const result = await publishScheduledItems();
     return res.json({ ok: true, ...result });
@@ -8330,7 +8441,7 @@ app.post('/admin/api/scheduler/run', requireAdmin, async (req, res) => {
 });
 });
 
-app.post('/admin/settings', requireAdmin, async (req, res) => {
+app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -8408,7 +8519,7 @@ app.post('/admin/settings', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/role-access', requireAdmin, async (req, res) => {
+app.post('/admin/role-access', requireRoleAccessSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -8468,7 +8579,7 @@ app.post('/admin/role-access', requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
+app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -8478,6 +8589,11 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
   const isAdmin = roleKeys.includes('admin');
   const isDeanery = roleKeys.includes('deanery');
   const isStarosta = roleKeys.includes('starosta');
+  const overviewRole = isAdmin
+    ? 'admin'
+    : (isDeanery
+      ? 'deanery'
+      : (isStarosta ? 'starosta' : normalizeRoleKey(req.session.role || roleKeys[0] || 'student')));
   let courses = [];
   try {
     courses = await getCoursesCached();
@@ -8634,7 +8750,7 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
 
     return res.render('admin-overview', {
       username: req.session.user.username,
-      role: isAdmin ? 'admin' : (isDeanery ? 'deanery' : 'starosta'),
+      role: overviewRole,
       courses,
       selectedCourseId: courseId,
       dashboardStats,
@@ -8643,16 +8759,18 @@ app.get('/admin/overview', requireOverviewAccess, async (req, res) => {
       weeklyTeamwork,
       weeklyUserRoles,
       weeklyUserSeries,
-      limitedStaffView: isStarosta,
+      limitedStaffView: !isAdmin,
       allowCourseSelect,
-      backLink: isAdmin ? `/admin?course=${courseId}` : (isDeanery ? `/deanery?course=${courseId}` : '/starosta'),
+      backLink: isAdmin
+        ? `/admin?course=${courseId}`
+        : (isDeanery ? `/deanery?course=${courseId}` : `/admin?course=${courseId}`),
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.stats');
   }
 });
 
-app.get('/admin/users.json', requireAdmin, async (req, res) => {
+app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -8744,7 +8862,7 @@ app.get('/admin/users.json', requireAdmin, async (req, res) => {
   });
 });
 
-app.post('/admin/import/validate', requireAdmin, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
+app.post('/admin/import/validate', requireImportExportSectionAccess, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -8973,7 +9091,7 @@ app.post('/admin/import/validate', requireAdmin, writeLimiter, csvUpload.single(
   });
 });
 
-app.get('/admin/import/errors.csv', requireAdmin, (req, res) => {
+app.get('/admin/import/errors.csv', requireImportExportSectionAccess, (req, res) => {
   const operationId = String(req.query.op || '').trim();
   if (!operationId) {
     return res.status(400).send('Missing operation id');
@@ -8996,7 +9114,7 @@ app.get('/admin/import/errors.csv', requireAdmin, (req, res) => {
   return res.send(lines.join('\n'));
 });
 
-app.get('/admin/export/schedule.csv', requireAdmin, async (req, res) => {
+app.get('/admin/export/schedule.csv', requireImportExportSectionAccess, async (req, res) => {
   const courseId = getAdminCourse(req);
   const activeSemester = await getActiveSemester(courseId);
   db.all(
@@ -9025,7 +9143,7 @@ app.get('/admin/export/schedule.csv', requireAdmin, async (req, res) => {
   );
 });
 
-app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
+app.post('/admin/import/schedule.csv', requireImportExportSectionAccess, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
   if (!req.file || !req.file.buffer) {
     return res.redirect('/admin?err=Missing%20CSV');
   }
@@ -9129,7 +9247,7 @@ app.post('/admin/import/schedule.csv', requireAdmin, writeLimiter, csvUpload.sin
   return res.redirect(`/admin?ok=Schedule%20imported%20(${inserted}%2F${updated}%2F${skipped})&op=${operationId}`);
 });
 
-app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
+app.get('/admin/export/users.csv', requireImportExportSectionAccess, (req, res) => {
   const courseId = Number(req.query.course || getAdminCourse(req));
   const semesterId = req.query.semester_id ? Number(req.query.semester_id) : null;
   const group = req.query.group;
@@ -9176,7 +9294,7 @@ app.get('/admin/export/users.csv', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
+app.post('/admin/import/users.csv', requireImportExportSectionAccess, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
   if (!req.file || !req.file.buffer) {
     return res.redirect('/admin?err=Missing%20CSV');
   }
@@ -9256,7 +9374,7 @@ app.post('/admin/import/users.csv', requireAdmin, writeLimiter, csvUpload.single
   return res.redirect(`/admin?ok=Users%20imported%20(${inserted}%2F${updated}%2F${skipped})&op=${operationId}`);
 });
 
-app.get('/admin/export/subjects.csv', requireAdmin, (req, res) => {
+app.get('/admin/export/subjects.csv', requireImportExportSectionAccess, (req, res) => {
   const courseId = getAdminCourse(req);
   db.all(
     'SELECT id, name, group_count, default_group, is_required, is_general FROM subjects WHERE course_id = ? ORDER BY name',
@@ -9277,7 +9395,7 @@ app.get('/admin/export/subjects.csv', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
+app.post('/admin/import/subjects.csv', requireImportExportSectionAccess, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
   if (!req.file || !req.file.buffer) {
     return res.redirect('/admin?err=Missing%20CSV');
   }
@@ -9352,7 +9470,7 @@ app.post('/admin/import/subjects.csv', requireAdmin, writeLimiter, csvUpload.sin
   return res.redirect(`/admin?ok=Subjects%20imported%20(${inserted}%2F${updated}%2F${skipped})&op=${operationId}`);
 });
 
-app.get('/admin/history.csv', requireAdmin, (req, res) => {
+app.get('/admin/history.csv', requireHistorySectionAccess, (req, res) => {
   const { history_actor, history_action, history_q, history_from, history_to } = req.query;
   const filters = [];
   const params = [];
@@ -9395,7 +9513,7 @@ app.get('/admin/history.csv', requireAdmin, (req, res) => {
   });
 });
 
-app.get('/admin/history.json', requireAdmin, (req, res) => {
+app.get('/admin/history.json', requireHistorySectionAccess, (req, res) => {
   const { history_actor, history_action, history_q, history_from, history_to } = req.query;
   const filters = [];
   const params = [];
@@ -9430,7 +9548,7 @@ app.get('/admin/history.json', requireAdmin, (req, res) => {
   });
 });
 
-app.get('/admin/user-logins.json', requireAdmin, (req, res) => {
+app.get('/admin/user-logins.json', requireActivitySectionAccess, (req, res) => {
   const { user_id } = req.query;
   if (!user_id) {
     return res.status(400).json({ error: 'Missing user_id' });
@@ -10566,7 +10684,7 @@ app.post('/admin/schedule/clear-all', requireScheduleSectionAccess, (req, res) =
   });
 });
 
-app.post('/admin/homework/delete/:id', requireAdmin, (req, res) => {
+app.post('/admin/homework/delete/:id', requireHomeworkSectionAccess, (req, res) => {
   const { id } = req.params;
   db.get('SELECT file_path FROM homework WHERE id = ?', [id], (err, row) => {
     if (err) {
@@ -10628,7 +10746,7 @@ app.post('/admin/homework/delete/:id', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/subjects/add', requireAdmin, (req, res) => {
+app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
   const { name, group_count, default_group, show_in_teamwork, visible, is_required, is_general } = req.body;
   const count = Number(group_count);
   const def = Number(default_group);
@@ -10658,7 +10776,7 @@ app.post('/admin/subjects/add', requireAdmin, (req, res) => {
   );
 });
 
-app.post('/admin/subjects/edit/:id', requireAdmin, (req, res) => {
+app.post('/admin/subjects/edit/:id', requireSubjectsSectionAccess, (req, res) => {
   const { id } = req.params;
   const { name, group_count, default_group, show_in_teamwork, visible, is_required, is_general } = req.body;
   const count = Number(group_count);
@@ -10780,7 +10898,7 @@ app.post('/admin/api/schedule/weeks/clone', requireScheduleSectionAccess, async 
   }
 });
 
-app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkBulkAccess, async (req, res) => {
+app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkSectionAccess, async (req, res) => {
   const homeworkId = Number(req.params.homeworkId);
   if (Number.isNaN(homeworkId)) return res.status(400).json({ error: 'Invalid homework' });
   const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
@@ -10861,7 +10979,7 @@ app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkBulkAccess, asy
   }
 });
 
-app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
+app.post('/admin/subjects/delete/:id', requireSubjectsSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
   db.run('DELETE FROM student_groups WHERE subject_id = ?', [id], (delErr) => {
@@ -10880,7 +10998,7 @@ app.post('/admin/subjects/delete/:id', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/courses/add', requireAdmin, (req, res) => {
+app.post('/admin/courses/add', requireCoursesSectionAccess, (req, res) => {
   const { id, name, is_teacher_course, location } = req.body;
   const courseId = Number(id);
   const teacherFlag = String(is_teacher_course) === '1' ? 1 : 0;
@@ -10902,7 +11020,7 @@ app.post('/admin/courses/add', requireAdmin, (req, res) => {
   );
 });
 
-app.post('/admin/courses/edit/:id', requireAdmin, (req, res) => {
+app.post('/admin/courses/edit/:id', requireCoursesSectionAccess, (req, res) => {
   const { id } = req.params;
   const { name, is_teacher_course, location } = req.body;
   const courseId = Number(id);
@@ -10924,7 +11042,7 @@ app.post('/admin/courses/edit/:id', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/courses/delete/:id', requireAdmin, (req, res) => {
+app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = Number(id);
   if (Number.isNaN(courseId)) {
@@ -10967,7 +11085,7 @@ app.post('/admin/courses/delete/:id', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/teacher-requests/:userId/approve', requireAdmin, async (req, res) => {
+app.post('/admin/teacher-requests/:userId/approve', requireTeachersSectionAccess, async (req, res) => {
   const userId = Number(req.params.userId);
   if (Number.isNaN(userId)) {
     return res.redirect('/admin?err=Invalid%20user');
@@ -10985,7 +11103,7 @@ app.post('/admin/teacher-requests/:userId/approve', requireAdmin, async (req, re
   }
 });
 
-app.post('/admin/teacher-requests/:userId/reject', requireAdmin, async (req, res) => {
+app.post('/admin/teacher-requests/:userId/reject', requireTeachersSectionAccess, async (req, res) => {
   const userId = Number(req.params.userId);
   if (Number.isNaN(userId)) {
     return res.redirect('/admin?err=Invalid%20user');
@@ -11171,7 +11289,7 @@ app.patch('/admin/api/courses/:courseId/week-time/:weekNumber', requireScheduleS
   }
 });
 
-app.post('/admin/api/homework/bulk', requireHomeworkBulkAccess, writeLimiter, async (req, res) => {
+app.post('/admin/api/homework/bulk', requireHomeworkSectionAccess, writeLimiter, async (req, res) => {
   const { ids, action, payload } = req.body || {};
   const list = Array.isArray(ids) ? ids.map((id) => Number(id)).filter((id) => Number.isFinite(id)) : [];
   if (!list.length || !action) {
@@ -11431,7 +11549,7 @@ app.get('/admin/api/schedule/validate', requireScheduleSectionAccess, async (req
   }
 });
 
-app.post('/admin/semesters/add', requireAdmin, (req, res) => {
+app.post('/admin/semesters/add', requireSemestersSectionAccess, (req, res) => {
   const { title, start_date, weeks_count, is_active } = req.body;
   const courseId = getAdminCourse(req);
   const weeks = Number(weeks_count);
@@ -11465,7 +11583,7 @@ app.post('/admin/semesters/add', requireAdmin, (req, res) => {
   }
 });
 
-app.post('/admin/semesters/edit/:id', requireAdmin, (req, res) => {
+app.post('/admin/semesters/edit/:id', requireSemestersSectionAccess, (req, res) => {
   const { id } = req.params;
   const { title, start_date, weeks_count } = req.body;
   const courseId = getAdminCourse(req);
@@ -11487,7 +11605,7 @@ app.post('/admin/semesters/edit/:id', requireAdmin, (req, res) => {
 );
 });
 
-app.post('/admin/semesters/set-active/:id', requireAdmin, (req, res) => {
+app.post('/admin/semesters/set-active/:id', requireSemestersSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
   db.run('UPDATE semesters SET is_active = 0 WHERE course_id = ?', [courseId], (err) => {
@@ -11505,7 +11623,7 @@ app.post('/admin/semesters/set-active/:id', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/semesters/archive/:id', requireAdmin, (req, res) => {
+app.post('/admin/semesters/archive/:id', requireSemestersSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
   db.run('UPDATE semesters SET is_archived = 1, is_active = 0 WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
@@ -11518,7 +11636,7 @@ app.post('/admin/semesters/archive/:id', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/semesters/restore/:id', requireAdmin, (req, res) => {
+app.post('/admin/semesters/restore/:id', requireSemestersSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
   db.run('UPDATE semesters SET is_archived = 0 WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
@@ -11531,7 +11649,7 @@ app.post('/admin/semesters/restore/:id', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/semesters/delete/:id', requireAdmin, (req, res) => {
+app.post('/admin/semesters/delete/:id', requireSemestersSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
   db.get('SELECT is_active FROM semesters WHERE id = ? AND course_id = ?', [id, courseId], (semErr, semRow) => {
@@ -11560,7 +11678,7 @@ app.post('/admin/semesters/delete/:id', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/semesters/hard-delete/:id', requireAdmin, async (req, res) => {
+app.post('/admin/semesters/hard-delete/:id', requireSemestersSectionAccess, async (req, res) => {
   const semesterId = Number(req.params.id);
   const courseId = getAdminCourse(req);
   if (!Number.isFinite(semesterId) || semesterId <= 0) {
@@ -11594,7 +11712,7 @@ app.post('/admin/semesters/hard-delete/:id', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/student-groups/set', requireAdmin, (req, res) => {
+app.post('/admin/student-groups/set', requireUsersSectionAccess, (req, res) => {
   const { student_id, subject_id, group_number } = req.body;
   const groupNum = Number(group_number);
   const courseId = getAdminCourse(req);
@@ -11629,7 +11747,7 @@ app.post('/admin/student-groups/set', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/group/remove', requireAdmin, (req, res) => {
+app.post('/admin/group/remove', requireUsersSectionAccess, (req, res) => {
   const { student_id, subject_id } = req.body;
   if (!student_id || !subject_id) {
     return res.redirect('/admin?err=Invalid%20remove%20request');
@@ -11649,7 +11767,7 @@ app.post('/admin/group/remove', requireAdmin, (req, res) => {
   );
 });
 
-app.get('/admin/users/:id/roles.json', requireAdmin, async (req, res) => {
+app.get('/admin/users/:id/roles.json', requireRoleAccessSectionAccess, async (req, res) => {
   const userId = Number(req.params.id);
   if (!Number.isFinite(userId) || userId < 1) {
     return res.status(400).json({ error: 'Invalid user' });
@@ -11682,7 +11800,7 @@ app.get('/admin/users/:id/roles.json', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/users/roles', requireAdmin, async (req, res) => {
+app.post('/admin/users/roles', requireRoleAccessSectionAccess, async (req, res) => {
   const userId = Number(req.body.user_id);
   const courseId = getAdminCourse(req);
   const selectedRoles = normalizeRoleList(
@@ -11716,7 +11834,7 @@ app.post('/admin/users/roles', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/users/role', requireAdmin, async (req, res) => {
+app.post('/admin/users/role', requireRoleAccessSectionAccess, async (req, res) => {
   const { user_id, role } = req.body;
   const roleKey = normalizeRoleKey(role);
   if (!user_id || !roleKey || !['student', 'admin', 'starosta', 'deanery', 'teacher'].includes(roleKey)) {
@@ -11748,7 +11866,7 @@ app.post('/admin/users/role', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/rbac/roles/create', requireAdmin, async (req, res) => {
+app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, async (req, res) => {
   const key = String(req.body.key || '').trim().toLowerCase();
   const label = String(req.body.label || '').trim();
   const description = String(req.body.description || '').trim();
@@ -11821,7 +11939,7 @@ app.post('/admin/rbac/roles/create', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/rbac/roles/:key/save', requireAdmin, async (req, res) => {
+app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (req, res) => {
   const roleKey = String(req.params.key || '').trim().toLowerCase();
   if (!roleKey) {
     return res.redirect('/admin?err=Invalid%20role');
@@ -11916,7 +12034,7 @@ app.post('/admin/rbac/roles/:key/save', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/rbac/roles/:key/delete', requireAdmin, async (req, res) => {
+app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async (req, res) => {
   const roleKey = String(req.params.key || '').trim().toLowerCase();
   if (!roleKey) {
     return res.redirect('/admin?err=Invalid%20role');
@@ -11943,7 +12061,7 @@ app.post('/admin/rbac/roles/:key/delete', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/users/course', requireAdmin, (req, res) => {
+app.post('/admin/users/course', requireUsersSectionAccess, (req, res) => {
   const { user_id, course_id } = req.body;
   const userId = Number(user_id);
   const courseId = Number(course_id);
@@ -11974,7 +12092,7 @@ app.post('/admin/users/course', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/users/reset-password', requireAdmin, (req, res) => {
+app.post('/admin/users/reset-password', requireUsersSectionAccess, (req, res) => {
   const { user_id, new_password } = req.body;
   if (!user_id || !new_password) {
     return res.redirect('/admin?err=Password%20required');
@@ -11997,7 +12115,7 @@ app.post('/admin/users/reset-password', requireAdmin, (req, res) => {
   );
 });
 
-app.post('/admin/homework/migrate', requireAdmin, (req, res) => {
+app.post('/admin/homework/migrate', requireHomeworkSectionAccess, (req, res) => {
   const timeToClass = (time) => {
     if (!time) return null;
     const start = time.split('-')[0].trim();
@@ -12048,7 +12166,7 @@ app.post('/admin/homework/migrate', requireAdmin, (req, res) => {
   );
 });
 
-app.post('/admin/users/delete-multiple', requireAdmin, (req, res) => {
+app.post('/admin/users/delete-multiple', requireUsersSectionAccess, (req, res) => {
   const ids = req.body.delete_user_ids;
   const courseId = getAdminCourse(req);
   if (!ids) {
@@ -12080,7 +12198,7 @@ app.post('/admin/users/delete-multiple', requireAdmin, (req, res) => {
   );
 });
 
-app.post('/admin/users/clear-all', requireAdmin, (req, res) => {
+app.post('/admin/users/clear-all', requireUsersSectionAccess, (req, res) => {
   const courseId = getAdminCourse(req);
   db.all('SELECT id FROM users WHERE role != ? AND course_id = ?', ['admin', courseId], (err, rows) => {
     if (err) {
@@ -12102,7 +12220,7 @@ app.post('/admin/users/clear-all', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/users/deactivate', requireAdmin, (req, res) => {
+app.post('/admin/users/deactivate', requireUsersSectionAccess, (req, res) => {
   const { user_id } = req.body;
   const courseId = getAdminCourse(req);
   if (!user_id) {
@@ -12126,7 +12244,7 @@ app.post('/admin/users/deactivate', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/users/activate', requireAdmin, (req, res) => {
+app.post('/admin/users/activate', requireUsersSectionAccess, (req, res) => {
   const { user_id } = req.body;
   const courseId = getAdminCourse(req);
   if (!user_id) {
@@ -12142,7 +12260,7 @@ app.post('/admin/users/activate', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/users/delete-permanent', requireAdmin, async (req, res) => {
+app.post('/admin/users/delete-permanent', requireUsersSectionAccess, async (req, res) => {
   const { user_id } = req.body;
   const userId = Number(user_id);
   const courseId = getAdminCourse(req);

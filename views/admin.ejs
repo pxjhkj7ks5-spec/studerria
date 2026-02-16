@@ -772,7 +772,7 @@
             <% if (sectionAllowed('admin-settings')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-settings">System Settings</button>
             <% } %>
-            <% if (role === 'admin' && sectionAllowed('admin-role-access')) { %>
+            <% if (sectionAllowed('admin-role-access')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-role-studio">Role Studio</button>
             <% } %>
           </div>
@@ -1065,7 +1065,7 @@
         </div>
         <% } %>
 
-        <% if (role === 'admin' && sectionAllowed('admin-role-access')) { %>
+        <% if (sectionAllowed('admin-role-access')) { %>
         <div id="admin-role-studio" class="admin-panel" data-admin-title="System / Role Studio">
           <div class="card mb-4 role-studio-card">
             <div class="card-body">
@@ -2817,7 +2817,7 @@
               <ul id="uaLoginHistory" class="list-group list-group-flush mt-2"></ul>
             </div>
 
-            <form method="POST" action="/admin/users/roles" class="mb-3" id="uaRolesForm">
+            <form method="POST" action="/admin/users/roles" class="mb-3" id="uaRolesForm" <%= sectionAllowed('admin-role-access') ? '' : 'style="display:none"' %>>
               <input type="hidden" name="user_id" id="uaRolesUserId" />
               <label class="form-label">Assign roles</label>
               <select class="form-select mb-2" name="role_keys[]" id="uaRolesSelect" multiple size="6" required></select>

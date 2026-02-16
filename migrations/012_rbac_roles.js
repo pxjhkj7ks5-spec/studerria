@@ -61,6 +61,7 @@ const ddl = [
 const permissionSeed = [
   { key: 'admin-overview', label: 'Огляд' },
   { key: 'admin-settings', label: 'Налаштування' },
+  { key: 'admin-role-access', label: 'Role Studio' },
   { key: 'admin-schedule', label: 'Розклад' },
   { key: 'admin-import-export', label: 'Імпорт/Експорт' },
   { key: 'admin-schedule-generator', label: 'Генератор' },

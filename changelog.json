@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.8.80",
+      "date": "2026-02-16",
+      "items": [
+        "fix(rbac): unlock `Schedule list` and `Semester summary` for custom roles with `admin-schedule` permission (removed hard `requireAdmin` guards)",
+        "feat(rbac): route-level section permissions wired across admin pages/APIs (overview, settings, schedule, generator, import/export, users, subjects, courses, semesters, homework, history, activity, messages, teamwork, role studio)",
+        "feat(role-studio): added `admin-role-access` permission to Role Studio catalog and runtime RBAC permission sync so new section keys are auto-registered in DB",
+        "ux(rbac): Role Studio tab can now be shown by section permission (not only legacy `admin` role)"
+      ]
+    },
+    {
       "version": "0.8.79",
       "date": "2026-02-16",
       "items": [
