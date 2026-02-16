@@ -457,19 +457,7 @@
               </form>
             </div>
           </div>
-          <footer class="app-footer text-center mt-3">
-            <small>
-              © <%= new Date().getFullYear() %> <%= authorName %> · v<%= appVersion %> · <%= buildStamp %> ·
-              <button
-                type="button"
-                class="btn btn-link btn-sm p-0 align-baseline"
-                data-bs-toggle="modal"
-                data-bs-target="#changelogModal"
-              >
-                Changelog
-              </button>
-            </small>
-          </footer>
+          <%- include('partials/app-footer') %>
         </div>
       </div>
     </div>

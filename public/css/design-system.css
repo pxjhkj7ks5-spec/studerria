@@ -628,6 +628,10 @@ body.theme-dark .ambient-layer {
   opacity: 1;
 }
 
+.app-footer .footer-meta.glass-dock::before {
+  display: none;
+}
+
 .liquid-card {
   position: relative;
   overflow: hidden;

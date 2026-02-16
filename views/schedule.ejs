@@ -1909,29 +1909,7 @@
         <button class="week-nav-btn week-nav-btn--next" type="button" id="weekNext" aria-label="Next week">›</button>
       </div>
 
-      <footer class="app-footer text-center py-4">
-        <small class="footer-meta">
-          <span class="footer-version">v<%= appVersion %></span>
-          <button
-            type="button"
-            class="footer-build"
-            data-bs-toggle="tooltip"
-            data-bs-placement="top"
-            data-bs-title="<%= buildStamp %>"
-            aria-label="Build timestamp"
-          >
-            build
-          </button>
-          <button
-            type="button"
-            class="footer-link"
-            data-bs-toggle="modal"
-            data-bs-target="#changelogModal"
-          >
-            Changelog
-          </button>
-        </small>
-      </footer>
+      <%- include('partials/app-footer') %>
     </div>
 
     <%- include('partials/changelog-modal') %>

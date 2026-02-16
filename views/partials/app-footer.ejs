@@ -1,0 +1,24 @@
+<footer class="app-footer text-center py-4">
+  <small class="footer-meta">
+    <span class="footer-version">v<%= appVersion %></span>
+    <button
+      type="button"
+      class="footer-build"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      data-bs-title="<%= buildStamp %>"
+      title="<%= buildStamp %>"
+      aria-label="Build timestamp"
+    >
+      build
+    </button>
+    <button
+      type="button"
+      class="footer-link"
+      data-bs-toggle="modal"
+      data-bs-target="#changelogModal"
+    >
+      Changelog
+    </button>
+  </small>
+</footer>

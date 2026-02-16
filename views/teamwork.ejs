@@ -823,22 +823,7 @@
       <% } %>
     </main>
 
-    <footer class="app-footer text-center py-4">
-      <small class="footer-meta">
-        <span class="footer-version">v<%= appVersion %></span>
-        <% if (buildStamp) { %>
-          <span class="footer-build">build <%= new Date(buildStamp).toLocaleString('uk-UA') %></span>
-        <% } %>
-        <button
-          type="button"
-          class="btn btn-link footer-link p-0 align-baseline"
-          data-bs-toggle="modal"
-          data-bs-target="#changelogModal"
-        >
-          Changelog
-        </button>
-      </small>
-    </footer>
+    <%- include('partials/app-footer') %>
 
     <% if (isTeacherMode) { %>
       <div class="modal fade" id="createTaskModal" tabindex="-1" aria-hidden="true">
