@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.90",
+      "date": "2026-02-16",
+      "items": [
+        "fix(students): set default Students tab status filter to `All` instead of `Active` when opening `admin-students` without explicit `users_status`",
+        "fix(admin): keep Users tab default status behavior unchanged (`Active`) while applying new default only for Students tab context"
+      ]
+    },
+    {
       "version": "0.8.89",
       "date": "2026-02-16",
       "items": [

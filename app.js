@@ -6545,6 +6545,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         : normalizeRoleKey(req.session.role || 'student')));
   const courseId = getAdminCourse(req);
   const {
+    tab,
     group_number,
     day,
     subject,
@@ -6567,6 +6568,11 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     teamwork_to,
     schedule_date,
   } = req.query;
+  const requestedTab = String(tab || '').trim();
+  const usersStatusDefault = requestedTab === 'admin-students' ? 'all' : 'active';
+  const resolvedUsersStatus = ['active', 'inactive', 'all'].includes(String(users_status || ''))
+    ? String(users_status)
+    : usersStatusDefault;
   const scheduleFilters = [];
   const scheduleParams = [];
   let activeSemester = null;
@@ -6742,9 +6748,9 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         const userFilters = ['course_id = ?'];
         const userParams = [courseId];
         if (usersHasIsActive) {
-          if (users_status === 'inactive') {
+          if (resolvedUsersStatus === 'inactive') {
             userFilters.push('is_active = 0');
-          } else if (users_status !== 'all') {
+          } else if (resolvedUsersStatus !== 'all') {
             userFilters.push('is_active = 1');
           }
         }
@@ -7207,7 +7213,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                         teamwork_from: teamwork_from || '',
                                         teamwork_to: teamwork_to || '',
                                       },
-                                      usersStatus: users_status || 'active',
+                                      usersStatus: resolvedUsersStatus,
                                       sorts: {
                                         schedule: sort_schedule || '',
                                         homework: sort_homework || '',

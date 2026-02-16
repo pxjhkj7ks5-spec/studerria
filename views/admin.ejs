@@ -1969,9 +1969,10 @@
                       <div class="col-12 col-md-3">
                         <label class="form-label">Статус</label>
                         <select class="form-select" name="users_status">
-                          <option value="active" <%= (usersStatus || 'active') === 'active' ? 'selected' : '' %>><%= t('admin.active') %></option>
-                          <option value="inactive" <%= usersStatus === 'inactive' ? 'selected' : '' %>><%= t('admin.inactive') %></option>
-                          <option value="all" <%= usersStatus === 'all' ? 'selected' : '' %>><%= t('admin.all') %></option>
+                          <% const studentsStatusValue = usersStatus || 'all'; %>
+                          <option value="active" <%= studentsStatusValue === 'active' ? 'selected' : '' %>><%= t('admin.active') %></option>
+                          <option value="inactive" <%= studentsStatusValue === 'inactive' ? 'selected' : '' %>><%= t('admin.inactive') %></option>
+                          <option value="all" <%= studentsStatusValue === 'all' ? 'selected' : '' %>><%= t('admin.all') %></option>
                         </select>
                       </div>
                       <div class="col-12 col-md-2 d-grid">
