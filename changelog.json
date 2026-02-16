@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.68",
+      "date": "2026-02-15",
+      "items": [
+        "fix: add independent admin-tab fallback script that always enforces single visible panel and left-menu switching",
+        "fix: make tab switching resilient even if the main admin script fails later in execution"
+      ]
+    },
+    {
       "version": "0.8.67",
       "date": "2026-02-15",
       "items": [

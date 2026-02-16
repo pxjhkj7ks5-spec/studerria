@@ -5296,6 +5296,73 @@
 
       initInputTracking();
     </script>
+    <script>
+      (function adminTabsFallback() {
+        const navLinks = Array.from(document.querySelectorAll('[data-admin-nav]'));
+        const panels = Array.from(document.querySelectorAll('.admin-panels .admin-panel'));
+        const breadcrumbsEl = document.getElementById('adminBreadcrumbs');
+        if (!panels.length) return;
+
+        const safeGet = (key, fallback = '') => {
+          try {
+            const value = window.localStorage.getItem(key);
+            return value === null || typeof value === 'undefined' ? fallback : value;
+          } catch (_) {
+            return fallback;
+          }
+        };
+        const safeSet = (key, value) => {
+          try {
+            window.localStorage.setItem(key, value);
+          } catch (_) {
+            // ignore storage errors
+          }
+        };
+
+        const panelIds = new Set(panels.map((panel) => panel.id));
+        const getDefaultTab = () => {
+          const firstLinked = navLinks.find((link) => panelIds.has(link.dataset.adminNav || ''));
+          return firstLinked ? firstLinked.dataset.adminNav : panels[0].id;
+        };
+
+        const updateBreadcrumbs = (tabId) => {
+          if (!breadcrumbsEl) return;
+          const panel = panels.find((item) => item.id === tabId);
+          const title = panel ? (panel.dataset.adminTitle || panel.id || '') : '';
+          breadcrumbsEl.innerHTML = title
+            ? `<span class="breadcrumb-item">Admin</span><span class="breadcrumb-sep">/</span><span class="breadcrumb-item active">${title}</span>`
+            : '<span class="breadcrumb-item">Admin</span>';
+        };
+
+        const applyTab = (requestedTab, push = true) => {
+          const resolved = panelIds.has(requestedTab) ? requestedTab : getDefaultTab();
+          panels.forEach((panel) => {
+            panel.style.display = panel.id === resolved ? 'block' : 'none';
+          });
+          navLinks.forEach((link) => {
+            link.classList.toggle('is-active', link.dataset.adminNav === resolved);
+          });
+          updateBreadcrumbs(resolved);
+          safeSet('admin:tab', resolved);
+          if (push) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', resolved);
+            window.history.replaceState({}, '', url);
+          }
+        };
+
+        const initialTab = new URLSearchParams(window.location.search).get('tab')
+          || safeGet('admin:tab', '')
+          || getDefaultTab();
+        applyTab(initialTab, false);
+
+        navLinks.forEach((link) => {
+          link.addEventListener('click', () => {
+            applyTab(link.dataset.adminNav || '', true);
+          });
+        });
+      })();
+    </script>
       <script src="/js/design-system.js" defer></script>
   </body>
 </html>
