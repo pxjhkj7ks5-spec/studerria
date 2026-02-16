@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.91",
+      "date": "2026-02-16",
+      "items": [
+        "ux(users): removed `Course` and `Schedule group` columns from Users table to make layout cleaner in course-scoped admin view",
+        "ux(students): removed `Course` and `Schedule group` columns from Students table (including `A/B` schedule group display)",
+        "fix(users): updated dynamic Users table renderer skeleton/column layout to match the simplified table structure"
+      ]
+    },
+    {
       "version": "0.8.90",
       "date": "2026-02-16",
       "items": [

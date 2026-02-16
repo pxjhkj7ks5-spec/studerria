@@ -1780,8 +1780,6 @@
                   <th><input type="checkbox" id="selectAllUsers" /></th>
                   <th><%= t('admin.name') %></th>
                   <th><%= t('admin.role') %></th>
-                  <th><%= t('admin.course') %></th>
-                  <th><%= t('admin.scheduleGroup') %></th>
                   <th><%= t('admin.subjectGroup') %></th>
                   <th><%= t('admin.setGroup') %></th>
                   <th><%= t('admin.actions') %></th>
@@ -1828,8 +1826,6 @@
                         <%= rowRolesLabel %>
                       </span>
                     </td>
-                    <td><%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %></td>
-                    <td><%= u.schedule_group %></td>
                     <td>
                       <% 
                         const subjectList = [];
@@ -1999,8 +1995,6 @@
                 <tr>
                   <th><%= t('admin.name') %></th>
                   <th><%= t('admin.role') %></th>
-                  <th><%= t('admin.course') %></th>
-                  <th><%= t('admin.scheduleGroup') %></th>
                   <th><%= t('admin.subjectGroup') %></th>
                   <th><%= t('admin.setGroup') %></th>
                   <th><%= t('admin.actions') %></th>
@@ -2020,8 +2014,6 @@
                         <%= rowRolesLabel %>
                       </span>
                     </td>
-                    <td><%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %></td>
-                    <td><%= u.schedule_group %></td>
                     <td>
                       <%
                         const subjectList = [];
@@ -4783,8 +4775,6 @@
                 <td>${checkbox}</td>
                 <td>${u.full_name}</td>
                 <td><span class="badge text-bg-${badgeClass}">${escapeHtml(rolesLabel)}</span></td>
-                <td>${courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}</td>
-                <td>${u.schedule_group}</td>
                 <td>${subjectsBtn}</td>
                 <td>
                   <form method="POST" action="/admin/student-groups/set" class="row g-2">
@@ -4837,7 +4827,7 @@
           if (!tbodyEl) return;
           tbodyEl.innerHTML = Array.from({ length: 6 }).map(() => `
             <tr class="skeleton-row">
-              <td colspan="8">
+              <td colspan="6">
                 <div class="skeleton-line"></div>
               </td>
             </tr>
