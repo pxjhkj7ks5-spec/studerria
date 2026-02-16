@@ -220,17 +220,109 @@ const sessionSecret = process.env.SESSION_SECRET || 'dev-secret-change-me';
 if (isProd && !process.env.SESSION_SECRET) {
   console.warn('SESSION_SECRET is not set in production; use a stable secret to avoid forced logouts.');
 }
+const sessionTableNameRaw = String(process.env.SESSION_TABLE_NAME || 'user_sessions').trim();
+const sessionTableName = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(sessionTableNameRaw)
+  ? sessionTableNameRaw
+  : 'user_sessions';
+if (sessionTableName !== sessionTableNameRaw) {
+  console.warn(`Invalid SESSION_TABLE_NAME "${sessionTableNameRaw}", fallback to "${sessionTableName}".`);
+}
 const pruneIntervalRaw = Number(process.env.SESSION_PRUNE_INTERVAL_SECONDS || 900);
 const pruneIntervalSeconds = Number.isFinite(pruneIntervalRaw) && pruneIntervalRaw >= 60
   ? Math.floor(pruneIntervalRaw)
   : 900;
+const sessionHealthProbeIntervalRaw = Number(process.env.SESSION_HEALTHCHECK_INTERVAL_SECONDS || 60);
+const sessionHealthProbeIntervalSeconds = Number.isFinite(sessionHealthProbeIntervalRaw) && sessionHealthProbeIntervalRaw >= 15
+  ? Math.floor(sessionHealthProbeIntervalRaw)
+  : 60;
+const sessionHealthProbeIntervalMs = sessionHealthProbeIntervalSeconds * 1000;
+
+const normalizeSessionHealthError = (rawError) => {
+  const normalized = String(rawError || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (normalized.length <= 220) return normalized;
+  return `${normalized.slice(0, 217)}...`;
+};
+
+const sessionHealthState = {
+  ok: true,
+  table: sessionTableName,
+  lastCheckedAt: null,
+  lastOkAt: null,
+  lastErrorAt: null,
+  lastError: null,
+  checks: 0,
+  failures: 0,
+  lastDurationMs: null,
+};
+
+const logSessionHealth = (event, payload = {}) => {
+  const record = {
+    type: 'session_health',
+    event,
+    ...payload,
+  };
+  if (event === 'probe_failed' || event === 'store_error' || event === 'probe_crashed') {
+    console.error('SESSION_HEALTH', JSON.stringify(record));
+    return;
+  }
+  console.log('SESSION_HEALTH', JSON.stringify(record));
+};
+
+const probeSessionStoreHealth = async (reason = 'interval') => {
+  const startedAt = Date.now();
+  const wasOk = sessionHealthState.ok;
+  try {
+    await new Promise((resolve, reject) => {
+      sessionStore.get('__healthcheck__', (err) => {
+        if (err) return reject(err);
+        return resolve();
+      });
+    });
+    const nowIso = new Date().toISOString();
+    const durationMs = Date.now() - startedAt;
+    sessionHealthState.ok = true;
+    sessionHealthState.lastCheckedAt = nowIso;
+    sessionHealthState.lastOkAt = nowIso;
+    sessionHealthState.lastDurationMs = durationMs;
+    sessionHealthState.lastError = null;
+    sessionHealthState.checks += 1;
+    logSessionHealth(wasOk ? 'probe_ok' : 'probe_recovered', { reason, duration_ms: durationMs });
+  } catch (err) {
+    const nowIso = new Date().toISOString();
+    const durationMs = Date.now() - startedAt;
+    const message = normalizeSessionHealthError(err && err.message ? err.message : err);
+    sessionHealthState.ok = false;
+    sessionHealthState.lastCheckedAt = nowIso;
+    sessionHealthState.lastErrorAt = nowIso;
+    sessionHealthState.lastError = message;
+    sessionHealthState.lastDurationMs = durationMs;
+    sessionHealthState.checks += 1;
+    sessionHealthState.failures += 1;
+    logSessionHealth('probe_failed', { reason, duration_ms: durationMs, error: message });
+  }
+};
+
 const sessionStore = new PgSession({
   pool,
-  tableName: process.env.SESSION_TABLE_NAME || 'user_sessions',
+  tableName: sessionTableName,
   createTableIfMissing: true,
   pruneSessionInterval: pruneIntervalSeconds,
   ttl: Math.floor(resolveSessionTtlMs(DEFAULT_SETTINGS.session_duration_days) / 1000),
-  errorLog: (...args) => console.error('Session store error', ...args),
+  errorLog: (...args) => {
+    const nowIso = new Date().toISOString();
+    const message = normalizeSessionHealthError(args
+      .map((item) => (item && item.message ? item.message : String(item)))
+      .join(' | '));
+    sessionHealthState.ok = false;
+    sessionHealthState.lastCheckedAt = nowIso;
+    sessionHealthState.lastErrorAt = nowIso;
+    sessionHealthState.lastError = message;
+    sessionHealthState.failures += 1;
+    console.error('SESSION_STORE_ERROR', ...args);
+    logSessionHealth('store_error', { error: message });
+  },
 });
 
 app.use(
@@ -2709,11 +2801,33 @@ app.get('/login', (req, res) => {
 });
 
 app.get('/_health', (req, res) => {
-  res.json({
-    status: 'ok',
+  const dbStatus = initStatus === 'ready' ? 'ok' : (initStatus === 'error' ? 'fail' : 'starting');
+  const sessionStatus = sessionHealthState.ok ? 'ok' : 'fail';
+  const status = dbStatus === 'fail' || sessionStatus === 'fail'
+    ? 'degraded'
+    : (dbStatus === 'starting' ? 'starting' : 'ok');
+  const strictMode = String(req.query.strict || '') === '1';
+  const httpStatus = strictMode && status !== 'ok' ? 503 : 200;
+  res.status(httpStatus).json({
+    status,
+    healthy: status === 'ok',
     db: {
       initStatus,
+      status: dbStatus,
       error: initError ? String(initError.message || initError) : null,
+    },
+    session: {
+      ok: sessionHealthState.ok,
+      status: sessionStatus,
+      table: sessionHealthState.table,
+      checks: sessionHealthState.checks,
+      failures: sessionHealthState.failures,
+      probe_interval_seconds: sessionHealthProbeIntervalSeconds,
+      last_checked_at: sessionHealthState.lastCheckedAt,
+      last_ok_at: sessionHealthState.lastOkAt,
+      last_error_at: sessionHealthState.lastErrorAt,
+      last_error: sessionHealthState.lastError,
+      last_duration_ms: sessionHealthState.lastDurationMs,
     },
   });
 });
@@ -12432,6 +12546,28 @@ const startScheduler = () => {
   }, intervalMs);
 };
 
+const startSessionHealthProbes = () => {
+  const runProbe = (reason) =>
+    probeSessionStoreHealth(reason).catch((err) => {
+      const message = normalizeSessionHealthError(err && err.message ? err.message : err);
+      console.error('Session health probe crashed', message);
+      sessionHealthState.ok = false;
+      sessionHealthState.lastError = message;
+      sessionHealthState.lastErrorAt = new Date().toISOString();
+      sessionHealthState.failures += 1;
+      logSessionHealth('probe_crashed', { reason, error: message });
+    });
+
+  logSessionHealth('probe_scheduler_started', {
+    interval_seconds: sessionHealthProbeIntervalSeconds,
+    table: sessionTableName,
+  });
+  runProbe('startup');
+  setInterval(() => {
+    runProbe('interval');
+  }, sessionHealthProbeIntervalMs);
+};
+
 const startServer = () => {
   console.log('Starting server', {
     port: PORT,
@@ -12442,6 +12578,7 @@ const startServer = () => {
   ensureDbReady().catch((err) => {
     console.error('Failed to initialize database', err);
   });
+  startSessionHealthProbes();
   startScheduler();
 };
 

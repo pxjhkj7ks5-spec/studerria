@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.83",
+      "date": "2026-02-16",
+      "items": [
+        "feat(health): expanded `/_health` with session-store diagnostics (checks/failures/last probe/latency) and optional strict mode (`?strict=1`) for alerting",
+        "feat(session): added periodic Postgres session-store probes with structured `SESSION_HEALTH` logs (`probe_ok`, `probe_failed`, `probe_recovered`, scheduler start) for Cloud Monitoring filters",
+        "ui(admin): added liquid-glass session health chip in admin topbar with live polling and manual refresh click"
+      ]
+    },
+    {
       "version": "0.8.82",
       "date": "2026-02-16",
       "items": [

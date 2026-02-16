@@ -718,6 +718,16 @@
             <% } %>
           </span>
           <button
+            class="session-health-chip is-loading me-2"
+            type="button"
+            id="sessionHealthChip"
+            aria-label="Session store status"
+            title="Session store status"
+          >
+            <span class="session-health-dot" aria-hidden="true"></span>
+            <span id="sessionHealthLabel">Session…</span>
+          </button>
+          <button
             class="theme-toggle-min me-2"
             type="button"
             id="themeToggle"
@@ -3250,6 +3260,93 @@
           document.body.classList.add(next);
           safeStorageSet('ui-theme', next);
           themeToggle.textContent = next === 'theme-dark' ? labelLight : labelDark;
+        });
+      }
+
+      const sessionHealthChip = document.getElementById('sessionHealthChip');
+      const sessionHealthLabel = document.getElementById('sessionHealthLabel');
+      const healthChipIntervalMs = 30000;
+
+      const formatHealthTime = (rawIso) => {
+        if (!rawIso) return '';
+        const parsed = new Date(rawIso);
+        if (Number.isNaN(parsed.getTime())) return '';
+        return parsed.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      };
+
+      const setSessionHealthChipState = ({ state = 'loading', title = '', label = '' } = {}) => {
+        if (!sessionHealthChip || !sessionHealthLabel) return;
+        sessionHealthChip.classList.remove('is-loading', 'is-ok', 'is-fail');
+        sessionHealthChip.classList.add(state === 'ok' ? 'is-ok' : (state === 'fail' ? 'is-fail' : 'is-loading'));
+        sessionHealthChip.title = title || 'Session store status';
+        sessionHealthChip.setAttribute('aria-label', sessionHealthChip.title);
+        sessionHealthLabel.textContent = label || 'Session…';
+      };
+
+      const applySessionHealthPayload = (payload, networkError = '') => {
+        if (!payload || networkError) {
+          const fallbackMessage = networkError || 'Failed to load health status';
+          setSessionHealthChipState({
+            state: 'fail',
+            label: 'Session off',
+            title: fallbackMessage,
+          });
+          return;
+        }
+        const sessionHealth = payload.session || {};
+        const checkedAt = formatHealthTime(sessionHealth.last_checked_at);
+        const baseTitle = checkedAt ? `Last check: ${checkedAt}` : 'No checks yet';
+        if (sessionHealth.ok) {
+          setSessionHealthChipState({
+            state: 'ok',
+            label: 'Session OK',
+            title: baseTitle,
+          });
+          return;
+        }
+        const failureTitle = sessionHealth.last_error
+          ? `${baseTitle} · ${sessionHealth.last_error}`
+          : baseTitle;
+        setSessionHealthChipState({
+          state: 'fail',
+          label: 'Session fail',
+          title: failureTitle,
+        });
+      };
+
+      const fetchSessionHealth = async () => {
+        if (!sessionHealthChip) return;
+        try {
+          const res = await fetch('/_health', {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+          });
+          if (!res.ok) {
+            throw new Error(`Health endpoint ${res.status}`);
+          }
+          const payload = await res.json();
+          applySessionHealthPayload(payload);
+        } catch (err) {
+          const message = err && err.message ? err.message : 'Health endpoint unavailable';
+          applySessionHealthPayload(null, message);
+        }
+      };
+
+      if (sessionHealthChip) {
+        setSessionHealthChipState({
+          state: 'loading',
+          label: 'Session…',
+          title: 'Checking session store',
+        });
+        fetchSessionHealth();
+        window.setInterval(fetchSessionHealth, healthChipIntervalMs);
+        sessionHealthChip.addEventListener('click', () => {
+          setSessionHealthChipState({
+            state: 'loading',
+            label: 'Session…',
+            title: 'Checking session store',
+          });
+          fetchSessionHealth();
         });
       }
 
