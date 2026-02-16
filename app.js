@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const session = require('express-session');
+const PgSession = require('connect-pg-simple')(session);
 const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
@@ -163,6 +164,28 @@ const DEFAULT_SETTINGS = {
   role_permissions: { ...DEFAULT_ROLE_PERMISSIONS },
 };
 let settingsCache = { ...DEFAULT_SETTINGS };
+const SESSION_DAY_MS = 24 * 60 * 60 * 1000;
+
+function resolveSessionTtlDays(rawDays) {
+  const parsedDays = Number(rawDays);
+  if (!Number.isFinite(parsedDays) || parsedDays < 1) {
+    return DEFAULT_SETTINGS.session_duration_days;
+  }
+  return Math.floor(parsedDays);
+}
+
+function resolveSessionTtlMs(rawDays) {
+  return resolveSessionTtlDays(rawDays) * SESSION_DAY_MS;
+}
+
+function isRememberRequested(rawValue) {
+  if (typeof rawValue === 'undefined' || rawValue === null || rawValue === '') {
+    return true;
+  }
+  if (rawValue === true) return true;
+  const normalized = String(rawValue).trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'on' || normalized === 'yes';
+}
 
 const bellSchedule = {
   1: { start: '08:30', end: '09:50' },
@@ -184,19 +207,56 @@ app.use('/uploads', express.static('uploads'));
 const isProd = process.env.NODE_ENV === 'production';
 app.set('trust proxy', 1);
 
+const pool = new Pool({
+  host: process.env.DB_HOST || `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+});
+
+const sessionSecret = process.env.SESSION_SECRET || 'dev-secret-change-me';
+if (isProd && !process.env.SESSION_SECRET) {
+  console.warn('SESSION_SECRET is not set in production; use a stable secret to avoid forced logouts.');
+}
+const pruneIntervalRaw = Number(process.env.SESSION_PRUNE_INTERVAL_SECONDS || 900);
+const pruneIntervalSeconds = Number.isFinite(pruneIntervalRaw) && pruneIntervalRaw >= 60
+  ? Math.floor(pruneIntervalRaw)
+  : 900;
+const sessionStore = new PgSession({
+  pool,
+  tableName: process.env.SESSION_TABLE_NAME || 'user_sessions',
+  createTableIfMissing: true,
+  pruneSessionInterval: pruneIntervalSeconds,
+  ttl: Math.floor(resolveSessionTtlMs(DEFAULT_SETTINGS.session_duration_days) / 1000),
+  errorLog: (...args) => console.error('Session store error', ...args),
+});
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
+    name: process.env.SESSION_COOKIE_NAME || 'sid',
+    store: sessionStore,
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
+    rolling: true,
+    unset: 'destroy',
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
       secure: isProd,
+      maxAge: resolveSessionTtlMs(DEFAULT_SETTINGS.session_duration_days),
     },
   })
 );
+
+app.use((req, _res, next) => {
+  if (req.session && req.session.cookie) {
+    req.session.cookie.maxAge = resolveSessionTtlMs(settingsCache.session_duration_days);
+  }
+  return next();
+});
 
 app.use((req, res, next) => {
   const lang = getPreferredLang(req);
@@ -213,15 +273,6 @@ app.use((req, res, next) => {
   res.locals.lang = lang;
   res.locals.t = (key) => translate(lang, key);
   next();
-});
-
-const pool = new Pool({
-  host: process.env.DB_HOST || `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
 
 const convertPlaceholders = (sql) => {
@@ -2339,9 +2390,9 @@ function logActivity(dbRef, req, actionType, targetType, targetId, details, cour
 }
 
 function applyRememberMe(req, remember) {
-  const ttlDays = settingsCache.session_duration_days || 14;
+  const ttlMs = resolveSessionTtlMs(settingsCache.session_duration_days);
   if (remember) {
-    req.session.cookie.maxAge = ttlDays * 24 * 60 * 60 * 1000;
+    req.session.cookie.maxAge = ttlMs;
   } else {
     req.session.cookie.expires = false;
     req.session.cookie.maxAge = null;
@@ -2702,7 +2753,7 @@ app.post('/login', authLimiter, async (req, res) => {
           language: user.language || getPreferredLang(req),
         };
         req.session.role = role;
-        const remember = remember_me === '1' || remember_me === 'on' || remember_me === true;
+        const remember = isRememberRequested(remember_me);
         req.session.rememberMe = remember;
         applyRememberMe(req, remember);
 
@@ -2747,7 +2798,7 @@ app.post('/register', registerLimiter, async (req, res) => {
       return res.redirect('/register?error=Database%20error');
     }
     req.session.pendingUserId = row.id;
-    req.session.rememberMe = remember_me === '1' || remember_me === 'on' || remember_me === true;
+    req.session.rememberMe = isRememberRequested(remember_me);
     logAction(db, req, 'register_user', { user_id: row.id, full_name: normalizedName });
     broadcast('users_updated');
     return res.redirect('/register/course');

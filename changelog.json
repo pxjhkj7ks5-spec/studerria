@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.81",
+      "date": "2026-02-16",
+      "items": [
+        "feat(session): switched from in-memory express sessions to Postgres-backed sessions via `connect-pg-simple` (`user_sessions` table) to persist logins across Cloud Run scale/restarts",
+        "feat(session): enabled rolling session expiry with dynamic TTL from `session_duration_days`, compact session cookie name (`sid`), and periodic server-side session pruning",
+        "ops(cloud-run): updated deploy config with session affinity and instance limits (`min=1`, `max=1`) to reduce session turbulence between releases"
+      ]
+    },
+    {
       "version": "0.8.80",
       "date": "2026-02-16",
       "items": [
