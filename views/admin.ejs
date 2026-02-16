@@ -3334,16 +3334,18 @@
         if (event.key !== 'Escape') return;
         const openModal = document.querySelector('.modal.show');
         if (!openModal) return;
-        const instance = bootstrap.Modal.getInstance(openModal);
+        if (!bootstrapModalCtor || !bootstrapModalCtor.getInstance) return;
+        const instance = bootstrapModalCtor.getInstance(openModal);
         if (instance) instance.hide();
       });
 
       const adminNavLinks = Array.from(document.querySelectorAll('[data-admin-nav]'));
       const adminPanels = Array.from(document.querySelectorAll('.admin-panel'));
-      const adminLayoutEl = document.querySelector('.admin-layout');
       const breadcrumbsEl = document.getElementById('adminBreadcrumbs');
       const confirmModalEl = document.getElementById('confirmActionModal');
-      const confirmModal = confirmModalEl ? new bootstrap.Modal(confirmModalEl) : null;
+      const bootstrapModalCtor =
+        typeof window !== 'undefined' && window.bootstrap && window.bootstrap.Modal ? window.bootstrap.Modal : null;
+      const confirmModal = confirmModalEl && bootstrapModalCtor ? new bootstrapModalCtor(confirmModalEl) : null;
       const confirmActionTitle = document.getElementById('confirmActionTitle');
       const confirmActionMessage = document.getElementById('confirmActionMessage');
       const confirmActionButton = document.getElementById('confirmActionButton');
@@ -3437,9 +3439,6 @@
       const initialTab = new URLSearchParams(window.location.search).get('tab')
         || safeStorageGet('admin:tab', '')
         || getDefaultTab();
-      if (adminLayoutEl) {
-        adminLayoutEl.classList.add('admin-tabs-ready');
-      }
       setActiveTab(initialTab, { push: false });
 
       adminNavLinks.forEach((link) => {

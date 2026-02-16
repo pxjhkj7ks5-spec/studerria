@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.67",
+      "date": "2026-02-15",
+      "items": [
+        "fix: restore strict single-panel admin behavior by default (`.admin-panel` hidden, first panel visible as fallback)",
+        "fix: decouple early admin tab initialization from bootstrap runtime (guard `Modal` constructor usage) to prevent full-page multi-panel fallback"
+      ]
+    },
+    {
       "version": "0.8.66",
       "date": "2026-02-15",
       "items": [
