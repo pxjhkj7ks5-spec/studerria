@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.69",
+      "date": "2026-02-16",
+      "items": [
+        "feat: add dedicated \"Role Studio\" section in admin sidebar with one-click tab switching",
+        "ux: separate legacy Role Access matrix from new RBAC Role Studio screen to make new role settings immediately discoverable"
+      ]
+    },
+    {
       "version": "0.8.68",
       "date": "2026-02-15",
       "items": [
