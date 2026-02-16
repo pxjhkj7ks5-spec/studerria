@@ -1582,6 +1582,8 @@
           <form method="POST" action="/admin/switch-to-admin" class="drawer-action-wrap">
             <button class="drawer-action" type="submit"><%= t('schedule.backToAdmin') %></button>
           </form>
+        <% } else if (hasCustomAdminPanelAccess) { %>
+          <a class="drawer-action" href="<%= customAdminPanelHref || '/admin' %>"><%= t('schedule.backToAdmin') %></a>
         <% } %>
         <% if (role === 'starosta') { %>
           <a class="drawer-action" href="/starosta"><%= t('menu.starosta') %></a>

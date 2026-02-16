@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.8.78",
+      "date": "2026-02-16",
+      "items": [
+        "fix(rbac): allow custom roles with admin-section permissions to open `/admin` panel (new `requireAdminPanelAccess` check)",
+        "fix(rbac): pass `allowedSections` to admin view for non-admin custom roles so section visibility follows Role Studio permissions",
+        "ux(rbac): show \"Back to admin\" entry in schedule drawer/mobile/desktop menus for custom roles that have admin panel access"
+      ]
+    },
+    {
       "version": "0.8.77",
       "date": "2026-02-16",
       "items": [

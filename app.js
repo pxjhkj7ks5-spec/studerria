@@ -966,6 +966,46 @@ app.use(async (req, res, next) => {
   return next();
 });
 
+function requireAdminPanelAccess(req, res, next) {
+  if (!req.session || !req.session.user) {
+    return res.status(403).send('Forbidden (update page)');
+  }
+  if (hasSessionRole(req, 'admin') || req.canAccessAdminPanel) {
+    return next();
+  }
+  return res.status(403).send('Forbidden (update page)');
+}
+
+app.use(async (req, res, next) => {
+  if (!req.session || !req.session.user) {
+    req.allowedAdminSections = [];
+    req.canAccessAdminPanel = false;
+    res.locals.hasCustomAdminPanelAccess = false;
+    res.locals.customAdminPanelHref = '/admin';
+    return next();
+  }
+  const roleKeys = getSessionRoleList(req);
+  const isAdmin = roleKeys.includes('admin');
+  let allowedSections = null;
+  if (!isAdmin) {
+    try {
+      allowedSections = await getRoleAllowedSectionsForRoleKeys(roleKeys, req.session.role || roleKeys[0] || 'student');
+    } catch (err) {
+      allowedSections = getRoleAllowedSections(req.session.role || roleKeys[0] || 'student');
+    }
+    if (!Array.isArray(allowedSections)) {
+      allowedSections = [];
+    }
+  }
+  const canAccessAdminPanel = isAdmin || (Array.isArray(allowedSections) && allowedSections.length > 0);
+  const hasLegacyStaffRole = roleKeys.some((key) => ['admin', 'deanery', 'starosta'].includes(key));
+  req.allowedAdminSections = isAdmin ? null : allowedSections;
+  req.canAccessAdminPanel = canAccessAdminPanel;
+  res.locals.hasCustomAdminPanelAccess = canAccessAdminPanel && !hasLegacyStaffRole;
+  res.locals.customAdminPanelHref = '/admin';
+  return next();
+});
+
 app.use(async (req, res, next) => {
   if (!req.session || !req.session.user) {
     return next();
@@ -5622,12 +5662,26 @@ app.post('/teamwork/react', requireLogin, writeLimiter, async (req, res) => {
   }
 });
 
-app.get('/admin', requireAdmin, async (req, res, next) => {
+app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
   try {
     await ensureDbReady();
   } catch (err) {
     return handleDbError(res, err, 'init');
   }
+  const isAdminPanelOwner = hasSessionRole(req, 'admin');
+  const allowedSections = isAdminPanelOwner
+    ? null
+    : (Array.isArray(req.allowedAdminSections) ? req.allowedAdminSections : []);
+  if (!isAdminPanelOwner && !allowedSections.length) {
+    return res.status(403).send('Forbidden (update page)');
+  }
+  const adminViewRole = isAdminPanelOwner
+    ? 'admin'
+    : (hasSessionRole(req, 'deanery')
+      ? 'deanery'
+      : (hasSessionRole(req, 'starosta')
+        ? 'starosta'
+        : normalizeRoleKey(req.session.role || 'student')));
   const courseId = getAdminCourse(req);
   const {
     group_number,
@@ -6240,7 +6294,7 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         res.render('admin', {
           username: req.session.user.username,
           userId: req.session.user.id,
-          role: 'admin',
+          role: adminViewRole,
                                       schedule,
                                       homework,
                                       homeworkTags,
@@ -6259,7 +6313,8 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
         semestersByCourse,
         activeSemester,
         selectedCourseId: courseId,
-        limitedStaffView: false,
+        limitedStaffView: !isAdminPanelOwner,
+        allowedSections,
         weeklyLabels,
         weeklyHomework,
         weeklyTeamwork,

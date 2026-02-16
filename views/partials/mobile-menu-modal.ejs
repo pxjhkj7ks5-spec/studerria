@@ -16,6 +16,8 @@
             <form method="POST" action="/admin/switch-to-admin">
               <button class="btn w-100 glass mobile-menu-action" type="submit"><%= t('schedule.backToAdmin') %></button>
             </form>
+          <% } else if (hasCustomAdminPanelAccess) { %>
+            <a class="btn w-100 glass mobile-menu-action" href="<%= customAdminPanelHref || '/admin' %>"><%= t('schedule.backToAdmin') %></a>
           <% } %>
           <% if (role === 'starosta') { %>
             <a class="btn w-100 glass mobile-menu-action" href="/starosta"><%= t('menu.starosta') %></a>
