@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.8.96",
+      "date": "2026-02-16",
+      "items": [
+        "fix(teamwork-ui): corrected dark-theme rendering of member move dropdown list in group cards",
+        "fix(teamwork-ui): added explicit dark option/focus styling and `color-scheme` for member transfer select to keep readable contrast"
+      ]
+    },
+    {
       "version": "0.8.95",
       "date": "2026-02-16",
       "items": [

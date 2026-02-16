@@ -217,6 +217,27 @@ body.theme-light .range-bubble {
   min-width: 130px;
 }
 
+body.theme-dark .member-move-form .form-select {
+  background: rgba(15, 23, 42, 0.58);
+  border-color: rgba(148, 163, 184, 0.42);
+  color: rgba(248, 250, 252, 0.95);
+  color-scheme: dark;
+}
+
+body.theme-dark .member-move-form .form-select:focus {
+  border-color: rgba(96, 165, 250, 0.72);
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.28);
+}
+
+body.theme-dark .member-move-form .form-select option {
+  background: #1b2233;
+  color: rgba(248, 250, 252, 0.95);
+}
+
+body.theme-light .member-move-form .form-select {
+  color-scheme: light;
+}
+
 .lesson-scope-picker .btn-group {
   display: flex;
   gap: 8px;
