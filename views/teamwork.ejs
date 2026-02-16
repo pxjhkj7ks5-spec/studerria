@@ -748,6 +748,9 @@
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <div>
                           <strong><%= group.name %></strong>
+                          <% if (task.lesson_scope === 'seminar' && group.seminar_group_number) { %>
+                            <span class="text-muted ms-2">Сем. група <%= group.seminar_group_number %></span>
+                          <% } %>
                           <span class="text-muted ms-2">Лідер: <%= group.leader_name %></span>
                           <% if (group.max_members) { %>
                             <span class="text-muted ms-2">Макс: <%= group.max_members %></span>
@@ -789,7 +792,7 @@
                                   <select class="form-select form-select-sm" name="target_group_id">
                                     <% task.groups.forEach(function(targetGroup) { %>
                                       <option value="<%= targetGroup.id %>" <%= Number(targetGroup.id) === Number(group.id) ? 'selected' : '' %>>
-                                        <%= targetGroup.name %>
+                                        <%= targetGroup.name %><%= task.lesson_scope === 'seminar' && targetGroup.seminar_group_number ? ` (сем. ${targetGroup.seminar_group_number})` : '' %>
                                       </option>
                                     <% }); %>
                                   </select>

@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.8.97",
+      "date": "2026-02-16",
+      "items": [
+        "feat(teamwork): seminar tasks now create separate team sets per selected seminar group (`group_count` teams for each selected seminar group)",
+        "feat(teamwork): random distribution for seminar tasks now happens only within each student's seminar group (no cross-group mixing)",
+        "feat(teamwork): students now see/join only teams of their seminar group in seminar-scope tasks; teacher view shows seminar group label for each team",
+        "feat(teamwork): added `seminar_group_number` storage for teamwork groups to persist per-seminar team ownership"
+      ]
+    },
+    {
       "version": "0.8.96",
       "date": "2026-02-16",
       "items": [

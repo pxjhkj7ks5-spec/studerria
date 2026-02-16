@@ -5155,6 +5155,52 @@ const serializeTeamworkGroupNumbers = (groupNumbers) => {
   return groupNumbers.join(',');
 };
 
+const buildTeamworkRandomDistribution = ({
+  students = [],
+  bucketCount = 1,
+  limitsEnabled = false,
+  minMembers = null,
+  maxMembers = null,
+}) => {
+  const normalizedBucketCount = Math.max(1, Number(bucketCount) || 1);
+  const shuffled = [...students];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    const current = shuffled[index];
+    shuffled[index] = shuffled[randomIndex];
+    shuffled[randomIndex] = current;
+  }
+
+  const distribution = Array.from({ length: normalizedBucketCount }, () => []);
+  let cursor = 0;
+  if (limitsEnabled && Number(minMembers) > 0) {
+    for (let groupIndex = 0; groupIndex < normalizedBucketCount; groupIndex += 1) {
+      for (let memberIndex = 0; memberIndex < Number(minMembers); memberIndex += 1) {
+        if (cursor >= shuffled.length) break;
+        distribution[groupIndex].push(shuffled[cursor]);
+        cursor += 1;
+      }
+    }
+  }
+
+  while (cursor < shuffled.length) {
+    const groupOrder = distribution
+      .map((bucket, groupIndex) => ({ groupIndex, size: bucket.length }))
+      .sort((a, b) => a.size - b.size || a.groupIndex - b.groupIndex);
+    let placed = false;
+    for (const group of groupOrder) {
+      if (limitsEnabled && maxMembers && distribution[group.groupIndex].length >= Number(maxMembers)) continue;
+      distribution[group.groupIndex].push(shuffled[cursor]);
+      cursor += 1;
+      placed = true;
+      break;
+    }
+    if (!placed) return null;
+  }
+
+  return distribution;
+};
+
 const buildTeacherSubjectAccess = (rows, maxGroupCount = 1) => {
   const safeMaxGroupCount = Math.max(1, Number(maxGroupCount) || 1);
   const hasRows = Array.isArray(rows) && rows.length > 0;
@@ -5399,7 +5445,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
           FROM teamwork_groups g
           JOIN users u ON u.id = g.leader_id
           WHERE g.task_id IN (${placeholders})
-          ORDER BY g.id ASC
+          ORDER BY g.task_id ASC, g.seminar_group_number NULLS FIRST, g.id ASC
         `,
         taskIds
       ),
@@ -5509,22 +5555,38 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         }
 
         const used = membersByTask[task.id] || new Set();
-        const allowedStudents = (students || []).filter((student) => {
+        const allowedStudentsByAudience = (students || []).filter((student) => {
           if (audience.allowAll) return true;
           return audience.groups.has(Number(student.group_number));
         });
+        const studentSeminarGroupSet = new Set(studentSubjectGroups.map((groupNum) => Number(groupNum)));
+        const allowedStudents = !isTeacherMode && audience.lessonScope === 'seminar'
+          ? allowedStudentsByAudience.filter((student) => studentSeminarGroupSet.has(Number(student.group_number)))
+          : allowedStudentsByAudience;
         freeStudents[task.id] = allowedStudents.filter((student) => !used.has(student.id));
 
-        const taskGroups = (groupsByTask[task.id] || []).map((group) => ({
+        const rawTaskGroups = (groupsByTask[task.id] || []).map((group) => ({
           ...group,
           is_leader: Number(group.leader_id) === Number(userId),
           is_member: group.members.some((member) => Number(member.user_id) === Number(userId)),
         }));
+        const currentUserGroup = rawTaskGroups.find((group) => group.is_member);
+        const taskGroups = !isTeacherMode && audience.lessonScope === 'seminar'
+          ? rawTaskGroups.filter((group) => {
+              if (group.is_member) return true;
+              const seminarGroupNumber = Number(group.seminar_group_number);
+              if (!Number.isInteger(seminarGroupNumber) || seminarGroupNumber < 1) return true;
+              return studentSeminarGroupSet.has(seminarGroupNumber);
+            })
+          : rawTaskGroups;
 
-        const currentUserGroup = taskGroups.find((group) => group.is_member);
         const parsedGroupCount = Number(task.group_count || 0);
         const normalizedGroupCount = Number.isFinite(parsedGroupCount) && parsedGroupCount > 0 ? parsedGroupCount : 1;
         const lockEnabled = Number(task.group_lock_enabled) === 1 || task.group_lock_enabled === true;
+        const seminarTargetGroupCount = audience.lessonScope === 'seminar'
+          ? Math.max(1, Number(audience.groups?.size || 0))
+          : 1;
+        const maxConfiguredGroupsTotal = normalizedGroupCount * seminarTargetGroupCount;
 
         return {
           ...task,
@@ -5538,7 +5600,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
           current_user_group_id: currentUserGroup ? Number(currentUserGroup.id) : null,
           is_owner: Number(task.created_by) === Number(userId),
           can_create_groups: Number(task.created_by) === Number(userId)
-            && (!parsedGroupCount || taskGroups.length < parsedGroupCount),
+            && (!parsedGroupCount || rawTaskGroups.length < maxConfiguredGroupsTotal),
           reactions: reactionMap[task.id] || {},
           reacted: reactedMap[task.id] || {},
         };
@@ -5666,50 +5728,71 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
       [subjectId, subjectRow.course_id || 1, ...targetGroups]
     );
 
+    const seminarGroupOrder = lessonScope === 'seminar'
+      ? [...targetGroups].sort((a, b) => a - b)
+      : [];
+    const studentsBySeminarGroup = new Map();
+    if (lessonScope === 'seminar') {
+      seminarGroupOrder.forEach((seminarGroup) => {
+        studentsBySeminarGroup.set(seminarGroup, []);
+      });
+      students.forEach((student) => {
+        const seminarGroup = Number(student.group_number);
+        if (!studentsBySeminarGroup.has(seminarGroup)) return;
+        studentsBySeminarGroup.get(seminarGroup).push(student);
+      });
+    }
+
     if (limitsEnabled) {
-      if (maxMembers * groupCount < students.length) {
-        return res.redirect(`/teamwork?subject_id=${subjectId}&err=Group%20capacity%20too%20low`);
-      }
-      if (randomDistributionEnabled && minMembers * groupCount > students.length) {
-        return res.redirect(`/teamwork?subject_id=${subjectId}&err=Too%20few%20students%20for%20minimum`);
-      }
-    }
-
-    const shuffled = [...students];
-    for (let index = shuffled.length - 1; index > 0; index -= 1) {
-      const randomIndex = Math.floor(Math.random() * (index + 1));
-      const current = shuffled[index];
-      shuffled[index] = shuffled[randomIndex];
-      shuffled[randomIndex] = current;
-    }
-
-    const distribution = Array.from({ length: groupCount }, () => []);
-    if (randomDistributionEnabled) {
-      let cursor = 0;
-      if (limitsEnabled && minMembers > 0) {
-        for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
-          for (let memberIndex = 0; memberIndex < minMembers; memberIndex += 1) {
-            if (cursor >= shuffled.length) break;
-            distribution[groupIndex].push(shuffled[cursor]);
-            cursor += 1;
+      if (lessonScope === 'seminar') {
+        for (const seminarGroup of seminarGroupOrder) {
+          const seminarStudents = studentsBySeminarGroup.get(seminarGroup) || [];
+          const seminarStudentCount = seminarStudents.length;
+          if (maxMembers * groupCount < seminarStudentCount) {
+            return res.redirect(`/teamwork?subject_id=${subjectId}&err=Group%20capacity%20too%20low%20for%20seminar%20group%20${seminarGroup}`);
+          }
+          if (randomDistributionEnabled && seminarStudentCount > 0 && minMembers * groupCount > seminarStudentCount) {
+            return res.redirect(`/teamwork?subject_id=${subjectId}&err=Too%20few%20students%20for%20minimum%20in%20seminar%20group%20${seminarGroup}`);
           }
         }
+      } else {
+        if (maxMembers * groupCount < students.length) {
+          return res.redirect(`/teamwork?subject_id=${subjectId}&err=Group%20capacity%20too%20low`);
+        }
+        if (randomDistributionEnabled && minMembers * groupCount > students.length) {
+          return res.redirect(`/teamwork?subject_id=${subjectId}&err=Too%20few%20students%20for%20minimum`);
+        }
       }
-      while (cursor < shuffled.length) {
-        const groupOrder = distribution
-          .map((bucket, groupIndex) => ({ groupIndex, size: bucket.length }))
-          .sort((a, b) => a.size - b.size || a.groupIndex - b.groupIndex);
-        let placed = false;
-        for (const group of groupOrder) {
-          if (limitsEnabled && maxMembers && distribution[group.groupIndex].length >= maxMembers) continue;
-          distribution[group.groupIndex].push(shuffled[cursor]);
-          cursor += 1;
-          placed = true;
-          break;
+    }
+
+    const lectureDistribution = randomDistributionEnabled && lessonScope !== 'seminar'
+      ? buildTeamworkRandomDistribution({
+          students,
+          bucketCount: groupCount,
+          limitsEnabled,
+          minMembers,
+          maxMembers,
+        })
+      : null;
+    if (randomDistributionEnabled && lessonScope !== 'seminar' && !lectureDistribution) {
+      return res.redirect(`/teamwork?subject_id=${subjectId}&err=Unable%20to%20distribute%20students`);
+    }
+
+    const seminarDistributionByGroup = new Map();
+    if (randomDistributionEnabled && lessonScope === 'seminar') {
+      for (const seminarGroup of seminarGroupOrder) {
+        const seminarStudents = studentsBySeminarGroup.get(seminarGroup) || [];
+        const seminarDistribution = buildTeamworkRandomDistribution({
+          students: seminarStudents,
+          bucketCount: groupCount,
+          limitsEnabled,
+          minMembers,
+          maxMembers,
+        });
+        if (!seminarDistribution) {
+          return res.redirect(`/teamwork?subject_id=${subjectId}&err=Unable%20to%20distribute%20seminar%20group%20${seminarGroup}`);
         }
-        if (!placed) {
-          return res.redirect(`/teamwork?subject_id=${subjectId}&err=Unable%20to%20distribute%20students`);
-        }
+        seminarDistributionByGroup.set(seminarGroup, seminarDistribution);
       }
     }
 
@@ -5742,43 +5825,101 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
       return res.redirect('/teamwork?err=Database%20error');
     }
 
-    const createdGroupIds = [];
-    for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
-      const groupRow = await db.get(
-        'INSERT INTO teamwork_groups (task_id, name, leader_id, max_members, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id',
-        [
-          taskRow.id,
-          `Команда ${groupIndex + 1}`,
-          userId,
-          limitsEnabled ? maxMembers : null,
-          createdAt,
-        ]
-      );
-      if (!groupRow || !groupRow.id) {
-        return res.redirect(`/teamwork?subject_id=${subjectId}&err=Group%20create%20failed`);
+    const createdGroupsBySeminar = new Map();
+    const createdLectureGroups = [];
+    if (lessonScope === 'seminar') {
+      for (const seminarGroup of seminarGroupOrder) {
+        createdGroupsBySeminar.set(seminarGroup, []);
+        for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+          const groupRow = await db.get(
+            `INSERT INTO teamwork_groups
+              (task_id, name, leader_id, max_members, created_at, seminar_group_number)
+             VALUES (?, ?, ?, ?, ?, ?)
+             RETURNING id`,
+            [
+              taskRow.id,
+              `Команда ${groupIndex + 1}`,
+              userId,
+              limitsEnabled ? maxMembers : null,
+              createdAt,
+              seminarGroup,
+            ]
+          );
+          if (!groupRow || !groupRow.id) {
+            return res.redirect(`/teamwork?subject_id=${subjectId}&err=Group%20create%20failed`);
+          }
+          createdGroupsBySeminar.get(seminarGroup).push(groupRow.id);
+          logActivity(
+            db,
+            req,
+            'teamwork_group_create',
+            'teamwork_group',
+            groupRow.id,
+            { task_id: taskRow.id, seminar_group_number: seminarGroup },
+            subjectRow.course_id || 1,
+            activeSemester.id
+          );
+        }
       }
-      createdGroupIds.push(groupRow.id);
-      logActivity(
-        db,
-        req,
-        'teamwork_group_create',
-        'teamwork_group',
-        groupRow.id,
-        { task_id: taskRow.id },
-        subjectRow.course_id || 1,
-        activeSemester.id
-      );
+    } else {
+      for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+        const groupRow = await db.get(
+          `INSERT INTO teamwork_groups
+            (task_id, name, leader_id, max_members, created_at, seminar_group_number)
+           VALUES (?, ?, ?, ?, ?, ?)
+           RETURNING id`,
+          [
+            taskRow.id,
+            `Команда ${groupIndex + 1}`,
+            userId,
+            limitsEnabled ? maxMembers : null,
+            createdAt,
+            null,
+          ]
+        );
+        if (!groupRow || !groupRow.id) {
+          return res.redirect(`/teamwork?subject_id=${subjectId}&err=Group%20create%20failed`);
+        }
+        createdLectureGroups.push(groupRow.id);
+        logActivity(
+          db,
+          req,
+          'teamwork_group_create',
+          'teamwork_group',
+          groupRow.id,
+          { task_id: taskRow.id },
+          subjectRow.course_id || 1,
+          activeSemester.id
+        );
+      }
     }
 
     if (randomDistributionEnabled) {
-      for (let groupIndex = 0; groupIndex < createdGroupIds.length; groupIndex += 1) {
-        const groupId = createdGroupIds[groupIndex];
-        const groupMembers = distribution[groupIndex] || [];
-        for (const student of groupMembers) {
-          await db.run(
-            'INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)',
-            [taskRow.id, groupId, student.id, createdAt]
-          );
+      if (lessonScope === 'seminar') {
+        for (const seminarGroup of seminarGroupOrder) {
+          const seminarGroupIds = createdGroupsBySeminar.get(seminarGroup) || [];
+          const seminarDistribution = seminarDistributionByGroup.get(seminarGroup) || [];
+          for (let groupIndex = 0; groupIndex < seminarGroupIds.length; groupIndex += 1) {
+            const groupId = seminarGroupIds[groupIndex];
+            const groupMembers = seminarDistribution[groupIndex] || [];
+            for (const student of groupMembers) {
+              await db.run(
+                'INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)',
+                [taskRow.id, groupId, student.id, createdAt]
+              );
+            }
+          }
+        }
+      } else {
+        for (let groupIndex = 0; groupIndex < createdLectureGroups.length; groupIndex += 1) {
+          const groupId = createdLectureGroups[groupIndex];
+          const groupMembers = lectureDistribution[groupIndex] || [];
+          for (const student of groupMembers) {
+            await db.run(
+              'INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)',
+              [taskRow.id, groupId, student.id, createdAt]
+            );
+          }
         }
       }
     }
@@ -5822,7 +5963,11 @@ app.post('/teamwork/group/create', requireLogin, writeLimiter, async (req, res) 
   const createdAt = new Date().toISOString();
   try {
     const taskRow = await db.get(
-      'SELECT id, subject_id, created_by, group_count, member_limits_enabled, max_members FROM teamwork_tasks WHERE id = ?',
+      `SELECT t.id, t.subject_id, t.created_by, t.group_count, t.member_limits_enabled, t.max_members,
+              t.lesson_scope, t.seminar_group_numbers, s.group_count AS subject_group_count
+       FROM teamwork_tasks t
+       JOIN subjects s ON s.id = t.subject_id
+       WHERE t.id = ?`,
       [taskId]
     );
     if (!taskRow) {
@@ -5834,12 +5979,58 @@ app.post('/teamwork/group/create', requireLogin, writeLimiter, async (req, res) 
 
     const countRow = await db.get('SELECT COUNT(*) AS cnt FROM teamwork_groups WHERE task_id = ?', [taskId]);
     const nextIndex = (countRow && countRow.cnt ? Number(countRow.cnt) : 0) + 1;
-    const maxConfiguredGroups = Number(taskRow.group_count || 0);
+    const lessonScope = normalizeTeamworkLessonScope(taskRow.lesson_scope);
+    let maxConfiguredGroups = Number(taskRow.group_count || 0);
+    let seminarGroupNumberForNew = null;
+    let seminarGroupLocalIndex = nextIndex;
+    if (lessonScope === 'seminar') {
+      const teacherRows = await db.all(
+        'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
+        [taskRow.created_by, taskRow.subject_id]
+      );
+      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], taskRow.subject_group_count || 1);
+      const audience = buildTeamworkTaskAudience(taskRow, teacherAccess, taskRow.subject_group_count || 1);
+      const seminarGroups = Array.from(audience.groups || []).sort((a, b) => a - b);
+      if (!seminarGroups.length) {
+        return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=No%20seminar%20groups%20configured`);
+      }
+      maxConfiguredGroups = maxConfiguredGroups * seminarGroups.length;
+
+      const existingBySeminar = await db.all(
+        `
+          SELECT seminar_group_number, COUNT(*) AS cnt
+          FROM teamwork_groups
+          WHERE task_id = ?
+          GROUP BY seminar_group_number
+        `,
+        [taskId]
+      );
+      const seminarCounts = new Map();
+      seminarGroups.forEach((groupNum) => {
+        seminarCounts.set(groupNum, 0);
+      });
+      (existingBySeminar || []).forEach((row) => {
+        const groupNum = Number(row.seminar_group_number);
+        if (!seminarCounts.has(groupNum)) return;
+        seminarCounts.set(groupNum, Number(row.cnt || 0));
+      });
+
+      seminarGroupNumberForNew = seminarGroups[0];
+      seminarGroups.forEach((groupNum) => {
+        const bestCount = Number(seminarCounts.get(seminarGroupNumberForNew) || 0);
+        const currentCount = Number(seminarCounts.get(groupNum) || 0);
+        if (currentCount < bestCount) {
+          seminarGroupNumberForNew = groupNum;
+        }
+      });
+      seminarGroupLocalIndex = Number(seminarCounts.get(seminarGroupNumberForNew) || 0) + 1;
+    }
+
     if (maxConfiguredGroups > 0 && nextIndex > maxConfiguredGroups) {
       return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Group%20limit%20reached`);
     }
 
-    const groupName = name && name.trim().length ? name.trim() : `Команда ${nextIndex}`;
+    const groupName = name && name.trim().length ? name.trim() : `Команда ${seminarGroupLocalIndex}`;
     const limitsEnabled = Number(taskRow.member_limits_enabled) === 1 || taskRow.member_limits_enabled === true;
     let resolvedMaxMembers = null;
     if (limitsEnabled) {
@@ -5849,8 +6040,11 @@ app.post('/teamwork/group/create', requireLogin, writeLimiter, async (req, res) 
     }
 
     const groupRow = await db.get(
-      'INSERT INTO teamwork_groups (task_id, name, leader_id, max_members, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id',
-      [taskId, groupName, userId, resolvedMaxMembers, createdAt]
+      `INSERT INTO teamwork_groups
+        (task_id, name, leader_id, max_members, created_at, seminar_group_number)
+       VALUES (?, ?, ?, ?, ?, ?)
+       RETURNING id`,
+      [taskId, groupName, userId, resolvedMaxMembers, createdAt, seminarGroupNumberForNew]
     );
     if (!groupRow || !groupRow.id) {
       return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Group%20create%20failed`);
@@ -5880,6 +6074,7 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
       `
         SELECT g.task_id,
                g.max_members,
+               g.seminar_group_number,
                t.subject_id,
                t.created_by,
                t.group_lock_enabled,
@@ -5918,6 +6113,13 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
     const audience = buildTeamworkTaskAudience(grpRow, teacherAccess, grpRow.subject_group_count || 1);
     if (!audience.allowAll && !audience.groups.has(Number(sgRow.group_number))) {
       return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
+    }
+    if (normalizeTeamworkLessonScope(grpRow.lesson_scope) === 'seminar') {
+      const studentSeminarGroup = Number(sgRow.group_number);
+      const targetSeminarGroup = Number(grpRow.seminar_group_number);
+      if (Number.isInteger(targetSeminarGroup) && targetSeminarGroup > 0 && targetSeminarGroup !== studentSeminarGroup) {
+        return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=This%20group%20belongs%20to%20another%20seminar%20group`);
+      }
     }
 
     const memRow = await db.get(
