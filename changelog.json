@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.8.73",
+      "date": "2026-02-16",
+      "items": [
+        "fix(admin): harden Role Studio client initialization with safe guard to prevent downstream UI handlers from breaking on runtime errors",
+        "fix(admin): simplify Role Studio preset UI (restore regular buttons/status text) and keep autosave drafts in localStorage with restore toast",
+        "fix(admin): revert risky table container styling and raise admin topbar z-index to keep header controls clickable",
+        "fix(schedule): remove dark-theme liquid glare ovals on week hero, online panel, and day cards"
+      ]
+    },
+    {
       "version": "0.8.72",
       "date": "2026-02-16",
       "items": [

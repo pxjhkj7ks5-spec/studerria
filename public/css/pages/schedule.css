@@ -447,6 +447,12 @@ body.theme-dark .month-summary.liquid-card {
   box-shadow: 0 10px 20px rgba(2, 6, 23, 0.26);
 }
 
+body.theme-dark .week-hero.liquid-card::after,
+body.theme-dark .schedule-panel.liquid-card::after,
+body.theme-dark .day-card.liquid-card::after {
+  display: none;
+}
+
 .app-footer .footer-meta.glass-dock {
   position: relative;
   z-index: 1061;

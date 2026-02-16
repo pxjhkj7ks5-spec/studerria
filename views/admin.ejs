@@ -840,10 +840,7 @@
         <div class="container py-4">
       <div class="admin-header-rail mb-3">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <div class="d-flex align-items-center gap-2">
-            <h1 class="h3 mb-0"><%= t('admin.dashboard') %></h1>
-            <span class="status-chip status-chip--active">Live</span>
-          </div>
+          <h1 class="h3 mb-0"><%= t('admin.dashboard') %></h1>
           <% if (sectionAllowed('admin-overview')) { %>
             <a class="btn btn-outline-primary btn-sm" href="/admin/overview?course=<%= selectedCourseId %>"><%= t('admin.openOverview') %></a>
           <% } %>
@@ -1077,12 +1074,10 @@
                   <h5 class="mb-1">Role Studio</h5>
                   <div class="small text-muted">Кастомні ролі, секційні права та доступ до типів курсів.</div>
                 </div>
-                <div class="d-flex gap-2 flex-wrap align-items-center">
-                  <div class="segmented role-studio-segmented" role="tablist" aria-label="Role presets">
-                    <button class="segmented__item is-active" type="button" data-rbac-template="deanery">Default: Deanery</button>
-                    <button class="segmented__item" type="button" data-rbac-template="starosta">Default: Starosta</button>
-                    <button class="segmented__item" type="button" data-rbac-template="reset">Reset defaults</button>
-                  </div>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-rbac-template="deanery">Default: Deanery</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-rbac-template="starosta">Default: Starosta</button>
+                  <button class="btn btn-outline-danger btn-sm" type="button" data-rbac-template="reset">Reset system defaults</button>
                   <button class="btn btn-outline-secondary btn-sm" type="button" data-rbac-revert>Revert unsaved</button>
                 </div>
               </div>
@@ -1121,12 +1116,7 @@
                       <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                         <div>
                           <div class="fw-semibold"><%= roleRow.label %> <span class="text-muted">(<%= roleRow.key %>)</span></div>
-                          <div class="d-flex align-items-center gap-2 flex-wrap small">
-                            <span class="status-chip status-chip--neutral">Users: <%= roleRow.members_count || 0 %></span>
-                            <span class="status-chip <%= roleRow.is_system ? 'status-chip--info' : 'status-chip--pending' %>"><%= roleRow.is_system ? 'System role' : 'Custom role' %></span>
-                            <span class="status-chip <%= roleRow.is_active ? 'status-chip--active' : 'status-chip--muted' %>"><%= roleRow.is_active ? 'Active' : 'Inactive' %></span>
-                            <span class="status-chip status-chip--pending d-none" data-rbac-draft-indicator>Draft saved</span>
-                          </div>
+                          <div class="small text-muted">Users: <%= roleRow.members_count || 0 %> · <%= roleRow.is_system ? 'System role' : 'Custom role' %></div>
                         </div>
                         <div class="form-check form-switch">
                           <input class="form-check-input" type="checkbox" name="is_active" value="1" id="rbacActive_<%= roleRow.key %>" <%= roleRow.is_active ? 'checked' : '' %> <%= roleRow.key === 'admin' ? 'disabled' : '' %> />
@@ -3919,192 +3909,152 @@
       const rbacTemplateButtons = Array.from(document.querySelectorAll('[data-rbac-template]'));
       const rbacRevertBtn = document.querySelector('[data-rbac-revert]');
       if (rbacRoleForms.length) {
-        const rbacPermissionDefaults = <%- JSON.stringify(defaultRolePermissions || {}) %>;
-        const allAdminSectionKeys = <%- JSON.stringify((adminSectionOptionsList || []).map((section) => section.id)) %>;
-        const rbacCourseDefaults = {
-          admin: ['regular', 'teacher'],
-          teacher: ['regular', 'teacher'],
-          deanery: ['regular'],
-          starosta: ['regular'],
-          student: ['regular'],
-        };
-        const roleSnapshots = new Map();
-        const ROLE_DRAFT_PREFIX = 'admin:rbac:draft:';
+        try {
+          const rbacPermissionDefaults = <%- JSON.stringify(defaultRolePermissions || {}) %>;
+          const allAdminSectionKeys = <%- JSON.stringify((adminSectionOptionsList || []).map((section) => section.id)) %>;
+          const rbacCourseDefaults = {
+            admin: ['regular', 'teacher'],
+            teacher: ['regular', 'teacher'],
+            deanery: ['regular'],
+            starosta: ['regular'],
+            student: ['regular'],
+          };
+          const roleSnapshots = new Map();
+          const ROLE_DRAFT_PREFIX = 'admin:rbac:draft:';
+          let draftRestoreNotified = false;
 
-        const getRoleForm = (roleKey) =>
-          rbacRoleForms.find((form) => normalizeRoleKeyClient(form.dataset.roleKey) === normalizeRoleKeyClient(roleKey));
-        const getRoleDraftKey = (form) => {
-          const roleKey = normalizeRoleKeyClient(form && form.dataset ? form.dataset.roleKey : '');
-          return roleKey ? `${ROLE_DRAFT_PREFIX}${roleKey}` : '';
-        };
-        const getDraftIndicator = (form) => form.querySelector('[data-rbac-draft-indicator]');
-        const setDraftIndicator = (form, hasDraft) => {
-          const indicator = getDraftIndicator(form);
-          if (!indicator) return;
-          indicator.classList.toggle('d-none', !hasDraft);
-        };
-        const collectRoleDraft = (form) => {
-          const payload = {};
-          const formData = new FormData(form);
-          form.querySelectorAll('input, select, textarea').forEach((field) => {
-            if (!field || !field.name || field.disabled || field.type === 'submit' || field.type === 'button') return;
-            if (field.type === 'checkbox') {
-              if (!Object.prototype.hasOwnProperty.call(payload, field.name)) payload[field.name] = [];
-              if (field.checked) payload[field.name].push(field.value || 'on');
-              return;
-            }
-            if (field.type === 'radio') {
-              if (field.checked) payload[field.name] = field.value;
-              return;
-            }
-            if (field.tagName === 'SELECT' && field.multiple) {
-              payload[field.name] = Array.from(field.selectedOptions).map((option) => option.value);
-              return;
-            }
-            if (formData.has(field.name)) payload[field.name] = formData.get(field.name);
+          const getRoleForm = (roleKey) =>
+            rbacRoleForms.find((form) => normalizeRoleKeyClient(form.dataset.roleKey) === normalizeRoleKeyClient(roleKey));
+          const getRoleDraftKey = (form) => {
+            const roleKey = normalizeRoleKeyClient(form && form.dataset ? form.dataset.roleKey : '');
+            return roleKey ? `${ROLE_DRAFT_PREFIX}${roleKey}` : '';
+          };
+          const collectRoleDraft = (form) => ({
+            label: (form.querySelector('input[name="label"]') || {}).value || '',
+            description: (form.querySelector('input[name="description"]') || {}).value || '',
+            is_active: (() => {
+              const activeField = form.querySelector('input[name="is_active"]');
+              return !!(activeField && activeField.checked);
+            })(),
+            permission_keys: Array.from(form.querySelectorAll('input[name="permission_keys"]:checked')).map((input) => input.value),
+            course_kinds: Array.from(form.querySelectorAll('input[name="course_kinds"]:checked')).map((input) => input.value),
           });
-          return payload;
-        };
-        const applyRoleDraft = (form, payload) => {
-          if (!payload || typeof payload !== 'object') return;
-          form.querySelectorAll('input, select, textarea').forEach((field) => {
-            if (!field || !field.name || field.disabled || !Object.prototype.hasOwnProperty.call(payload, field.name)) return;
-            const value = payload[field.name];
-            if (field.type === 'checkbox') {
-              const arr = Array.isArray(value) ? value : [];
-              field.checked = arr.includes(field.value || 'on');
-              return;
-            }
-            if (field.type === 'radio') {
-              field.checked = String(value) === String(field.value);
-              return;
-            }
-            if (field.tagName === 'SELECT' && field.multiple) {
-              const selected = new Set(Array.isArray(value) ? value.map(String) : []);
-              Array.from(field.options).forEach((option) => {
-                option.selected = selected.has(String(option.value));
-              });
-              return;
-            }
-            field.value = value;
-          });
-        };
-        const saveRoleDraft = (form) => {
-          const draftKey = getRoleDraftKey(form);
-          if (!draftKey) return;
-          const payload = collectRoleDraft(form);
-          safeStorageSet(draftKey, JSON.stringify(payload));
-          setDraftIndicator(form, true);
-        };
-        const clearRoleDraft = (form) => {
-          const draftKey = getRoleDraftKey(form);
-          if (!draftKey) return;
-          safeStorageRemove(draftKey);
-          setDraftIndicator(form, false);
-        };
-        const getCheckedValues = (form, name) =>
-          Array.from(form.querySelectorAll(`input[name="${name}"]:checked`)).map((input) => input.value);
-        const setCheckedValues = (form, name, values) => {
-          const allowed = new Set(Array.isArray(values) ? values : []);
-          form.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
-            input.checked = allowed.has(input.value);
-          });
-        };
-        const captureRoleSnapshots = () => {
-          roleSnapshots.clear();
-          rbacRoleForms.forEach((form) => {
-            const key = normalizeRoleKeyClient(form.dataset.roleKey);
-            if (!key) return;
-            roleSnapshots.set(key, {
-              permission_keys: getCheckedValues(form, 'permission_keys'),
-              course_kinds: getCheckedValues(form, 'course_kinds'),
-              is_active: (() => {
-                const activeField = form.querySelector('input[name="is_active"]');
-                return !!(activeField && activeField.checked);
-              })(),
+          const setCheckedValues = (form, name, values) => {
+            const allowed = new Set(Array.isArray(values) ? values : []);
+            form.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+              input.checked = allowed.has(input.value);
             });
-          });
-        };
-        const applyRolePreset = (roleKey) => {
-          const form = getRoleForm(roleKey);
-          if (!form) return false;
-          const normalizedRole = normalizeRoleKeyClient(roleKey);
-          const permissions = normalizedRole === 'admin'
-            ? allAdminSectionKeys
-            : (rbacPermissionDefaults[normalizedRole] || []);
-          const courseKinds = rbacCourseDefaults[normalizedRole] || ['regular'];
-          setCheckedValues(form, 'permission_keys', permissions);
-          setCheckedValues(form, 'course_kinds', courseKinds);
-          const activeField = form.querySelector('input[name="is_active"]');
-          if (activeField && !activeField.disabled) activeField.checked = true;
-          saveRoleDraft(form);
-          return true;
-        };
-        const revertRoleSnapshots = () => {
-          rbacRoleForms.forEach((form) => {
-            const key = normalizeRoleKeyClient(form.dataset.roleKey);
-            const snapshot = roleSnapshots.get(key);
-            if (!snapshot) return;
-            setCheckedValues(form, 'permission_keys', snapshot.permission_keys || []);
-            setCheckedValues(form, 'course_kinds', snapshot.course_kinds || []);
+          };
+          const applyRoleDraft = (form, payload) => {
+            if (!payload || typeof payload !== 'object') return;
+            const labelField = form.querySelector('input[name="label"]');
+            const descField = form.querySelector('input[name="description"]');
             const activeField = form.querySelector('input[name="is_active"]');
-            if (activeField && !activeField.disabled) activeField.checked = !!snapshot.is_active;
+            if (labelField && typeof payload.label === 'string') labelField.value = payload.label;
+            if (descField && typeof payload.description === 'string') descField.value = payload.description;
+            if (activeField && !activeField.disabled) activeField.checked = !!payload.is_active;
+            setCheckedValues(form, 'permission_keys', payload.permission_keys || []);
+            setCheckedValues(form, 'course_kinds', payload.course_kinds || []);
+          };
+          const saveRoleDraft = (form) => {
+            const draftKey = getRoleDraftKey(form);
+            if (!draftKey) return;
+            safeStorageSet(draftKey, JSON.stringify(collectRoleDraft(form)));
+          };
+          const clearRoleDraft = (form) => {
+            const draftKey = getRoleDraftKey(form);
+            if (!draftKey) return;
+            safeStorageRemove(draftKey);
+          };
+          const captureRoleSnapshots = () => {
+            roleSnapshots.clear();
+            rbacRoleForms.forEach((form) => {
+              const key = normalizeRoleKeyClient(form.dataset.roleKey);
+              if (!key) return;
+              roleSnapshots.set(key, collectRoleDraft(form));
+            });
+          };
+          const applyRolePreset = (roleKey) => {
+            const form = getRoleForm(roleKey);
+            if (!form) return false;
+            const normalizedRole = normalizeRoleKeyClient(roleKey);
+            const permissions = normalizedRole === 'admin'
+              ? allAdminSectionKeys
+              : (rbacPermissionDefaults[normalizedRole] || []);
+            const courseKinds = rbacCourseDefaults[normalizedRole] || ['regular'];
+            setCheckedValues(form, 'permission_keys', permissions);
+            setCheckedValues(form, 'course_kinds', courseKinds);
+            const activeField = form.querySelector('input[name="is_active"]');
+            if (activeField && !activeField.disabled) activeField.checked = true;
             saveRoleDraft(form);
-          });
-        };
-        const applySystemDefaults = () => {
-          ['admin', 'deanery', 'starosta', 'teacher', 'student'].forEach((roleKey) => {
-            applyRolePreset(roleKey);
-          });
-        };
+            return true;
+          };
+          const revertRoleSnapshots = () => {
+            rbacRoleForms.forEach((form) => {
+              const key = normalizeRoleKeyClient(form.dataset.roleKey);
+              const snapshot = roleSnapshots.get(key);
+              if (!snapshot) return;
+              applyRoleDraft(form, snapshot);
+              clearRoleDraft(form);
+            });
+          };
+          const applySystemDefaults = () => {
+            ['admin', 'deanery', 'starosta', 'teacher', 'student'].forEach((roleKey) => {
+              applyRolePreset(roleKey);
+            });
+          };
 
-        captureRoleSnapshots();
-        rbacRoleForms.forEach((form) => {
-          const draftKey = getRoleDraftKey(form);
-          if (draftKey) {
-            const rawDraft = safeStorageGet(draftKey, '');
+          rbacRoleForms.forEach((form) => {
+            const draftKey = getRoleDraftKey(form);
+            const rawDraft = draftKey ? safeStorageGet(draftKey, '') : '';
             if (rawDraft) {
               try {
                 applyRoleDraft(form, JSON.parse(rawDraft));
-                setDraftIndicator(form, true);
+                if (!draftRestoreNotified) {
+                  showToast('success', 'Чернетки Role Studio відновлено.');
+                  draftRestoreNotified = true;
+                }
               } catch (_) {
                 clearRoleDraft(form);
               }
             }
+          });
+          captureRoleSnapshots();
+          rbacRoleForms.forEach((form) => {
+            const fields = Array.from(form.querySelectorAll('input, select, textarea'));
+            fields.forEach((field) => {
+              if (!field || field.disabled || !field.name) return;
+              field.addEventListener('input', () => saveRoleDraft(form));
+              field.addEventListener('change', () => saveRoleDraft(form));
+            });
+            form.addEventListener('submit', () => {
+              clearRoleDraft(form);
+            });
+          });
+
+          rbacTemplateButtons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+              const template = normalizeRoleKeyClient(btn.dataset.rbacTemplate);
+              if (!template) return;
+              if (template === 'reset') {
+                applySystemDefaults();
+                showToast('success', 'System defaults applied in Role Studio.');
+                return;
+              }
+              if (applyRolePreset(template)) {
+                showToast('success', `Default preset applied for ${template}.`);
+              }
+            });
+          });
+
+          if (rbacRevertBtn) {
+            rbacRevertBtn.addEventListener('click', () => {
+              revertRoleSnapshots();
+              showToast('success', 'Unsaved role changes reverted.');
+            });
           }
-          const fields = Array.from(form.querySelectorAll('input, select, textarea'));
-          fields.forEach((field) => {
-            if (!field || field.disabled || !field.name) return;
-            field.addEventListener('input', () => saveRoleDraft(form));
-            field.addEventListener('change', () => saveRoleDraft(form));
-          });
-          form.addEventListener('submit', () => {
-            clearRoleDraft(form);
-          });
-        });
-
-        rbacTemplateButtons.forEach((btn) => {
-          btn.addEventListener('click', () => {
-            rbacTemplateButtons.forEach((item) => item.classList.remove('is-active'));
-            btn.classList.add('is-active');
-            const template = normalizeRoleKeyClient(btn.dataset.rbacTemplate);
-            if (!template) return;
-            if (template === 'reset') {
-              applySystemDefaults();
-              showToast('success', 'System defaults applied in Role Studio.');
-              return;
-            }
-            if (applyRolePreset(template)) {
-              showToast('success', `Default preset applied for ${template}.`);
-            }
-          });
-        });
-
-        if (rbacRevertBtn) {
-          rbacRevertBtn.addEventListener('click', () => {
-            revertRoleSnapshots();
-            showToast('success', 'Unsaved role changes reverted.');
-          });
+        } catch (err) {
+          console.error('RBAC role studio init failed:', err);
         }
       }
 
