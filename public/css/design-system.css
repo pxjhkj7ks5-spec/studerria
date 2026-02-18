@@ -490,6 +490,12 @@ button.btn:active,
   color: var(--badge-hw-text) !important;
 }
 
+.priority-submitted {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.28);
+  color: rgba(16, 185, 129, 0.95) !important;
+}
+
 .topbar,
 .admin-nav,
 .schedule-drawer,

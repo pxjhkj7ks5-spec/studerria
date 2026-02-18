@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.09",
+      "date": "2026-02-18",
+      "items": [
+        "feat(schedule): added student-facing homework submission signal in homework modal list (`Здано` chip + submitted timestamp)",
+        "ux(schedule): submission action now shows `Оновити здачу` for already submitted homework",
+        "fix(schedule): student homework query now joins `homework_submissions` so submission status is visible immediately after page reload"
+      ]
+    },
+    {
       "version": "0.9.08",
       "date": "2026-02-18",
       "items": [

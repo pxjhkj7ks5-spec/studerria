@@ -2683,6 +2683,8 @@
           li.appendChild(meta);
 
           const dueDate = item.custom_due_date || item.class_date;
+          const hasSubmitted = canSubmitHomework && Boolean(item.submitted_at);
+          const submittedAt = hasSubmitted ? new Date(item.submitted_at) : null;
           let isUrgent = false;
           if (dueDate) {
             const due = new Date(dueDate);
@@ -2727,7 +2729,20 @@
             due.textContent = `Дедлайн: ${dueLabel}`;
             priorityWrap.appendChild(due);
           }
+          if (hasSubmitted && submittedAt && !Number.isNaN(submittedAt.getTime())) {
+            const submittedChip = document.createElement('span');
+            submittedChip.className = 'priority-chip priority-submitted';
+            submittedChip.textContent = 'Здано';
+            priorityWrap.appendChild(submittedChip);
+          }
           li.appendChild(priorityWrap);
+
+          if (hasSubmitted && submittedAt && !Number.isNaN(submittedAt.getTime())) {
+            const submittedMeta = document.createElement('div');
+            submittedMeta.className = 'text-muted small mb-2';
+            submittedMeta.textContent = `Ви здали: ${submittedAt.toLocaleString('uk-UA')}`;
+            li.appendChild(submittedMeta);
+          }
 
           if (item.link_url) {
             const link = document.createElement('a');
@@ -2762,14 +2777,15 @@
             const submitBtn = document.createElement('button');
             submitBtn.type = 'button';
             submitBtn.className = 'btn btn-sm btn-outline-primary';
-            submitBtn.textContent = 'Здати ДЗ';
+            submitBtn.textContent = hasSubmitted ? 'Оновити здачу' : 'Здати ДЗ';
             submitBtn.addEventListener('click', () => {
               if (!homeworkSubmitForm) return;
               homeworkSubmitForm.action = `/homework/${encodeURIComponent(item.id)}/submit`;
               if (homeworkSubmitMeta) {
                 const dueDate = item.custom_due_date || item.class_date;
                 const dueLabel = dueDate ? new Date(dueDate).toLocaleDateString('uk-UA') : 'Без дедлайну';
-                homeworkSubmitMeta.textContent = `${item.subject || ''} • дедлайн: ${dueLabel}`;
+                const submittedHint = hasSubmitted ? ' • статус: здано' : '';
+                homeworkSubmitMeta.textContent = `${item.subject || ''} • дедлайн: ${dueLabel}${submittedHint}`;
               }
               if (homeworkSubmitId) homeworkSubmitId.value = String(item.id);
               if (homeworkSubmitText) homeworkSubmitText.value = '';

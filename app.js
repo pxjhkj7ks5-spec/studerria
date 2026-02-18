@@ -5207,9 +5207,16 @@ app.get('/schedule', requireLogin, async (req, res) => {
 
         db.all(
           `
-            SELECT h.*, subj.name AS subject_name, s.id AS subgroup_id, s.name AS subgroup_name, m.member_username AS subgroup_member
+            SELECT
+              h.*,
+              subj.name AS subject_name,
+              hs.submitted_at AS submission_submitted_at,
+              s.id AS subgroup_id,
+              s.name AS subgroup_name,
+              m.member_username AS subgroup_member
             FROM homework h
             JOIN subjects subj ON subj.id = h.subject_id
+            LEFT JOIN homework_submissions hs ON hs.homework_id = h.id AND hs.student_id = ?
             LEFT JOIN subgroups s ON s.homework_id = h.id
             LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
             WHERE (${hwConditions})
@@ -5220,7 +5227,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
             ORDER BY h.created_at DESC
           `,
-          [...hwParams, scheduleCourseId, activeSemester ? activeSemester.id : null, nowIso],
+          [userId, ...hwParams, scheduleCourseId, activeSemester ? activeSemester.id : null, nowIso],
           (err, rows) => {
             if (err) {
               return res.status(500).send('Database error');
@@ -5244,6 +5251,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                   file_name: normalizeUploadedOriginalName(row.file_name),
                   created_by: row.created_by,
                   created_at: row.created_at,
+                  submitted_at: row.submission_submitted_at || null,
                   is_control: Number(row.is_control || 0),
                   is_teacher_homework: Number(row.is_teacher_homework || 0),
                   is_credit: Number(row.is_credit || 0),
