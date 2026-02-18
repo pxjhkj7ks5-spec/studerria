@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.9.07",
+      "date": "2026-02-18",
+      "items": [
+        "fix(schedule): restored always-visible `Meet` chip on class cards (removed `chip-now` visibility dependency)",
+        "fix(schedule): deduplicated teacher-created homework/custom deadlines in teacher weekly lists and grouped affected groups into one card/meta row",
+        "fix(homework): narrowed student homework targets to own subject-group assignments to prevent `Forbidden (homework submit)` on visible tasks",
+        "fix(journal): deduplicated teacher batch columns (with grade merge + archive for duplicates) and mapped submissions/status by student group inside one shared column",
+        "fix(journal): improved role-mode fallback so users without teacher assignments can still open their student subject journal list"
+      ]
+    },
+    {
       "version": "0.9.06",
       "date": "2026-02-18",
       "items": [

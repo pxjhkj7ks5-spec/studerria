@@ -1823,9 +1823,9 @@
                           <% } %>
                           <% if (hwMeta && hwMeta.meet) { %>
                             <% if (hwMeta.meet_link) { %>
-                              <a class="schedule-chip chip chip-now" href="<%= hwMeta.meet_link %>" target="_blank" rel="noopener" onclick="event.stopPropagation()">Meet</a>
+                              <a class="hw-chip chip badge--hw" href="<%= hwMeta.meet_link %>" target="_blank" rel="noopener" onclick="event.stopPropagation()">Meet</a>
                             <% } else { %>
-                              <span class="schedule-chip chip chip-now">Meet</span>
+                              <span class="hw-chip chip badge--hw">Meet</span>
                             <% } %>
                           <% } %>
                           <% if (hwMeta) { %>
@@ -1858,7 +1858,17 @@
                     >
                       <div>
                         <div class="fw-semibold"><%= item.subject_name %></div>
-                        <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
+                        <% const teacherGroups = Array.isArray(item.group_numbers) ? item.group_numbers.filter((g) => Number.isFinite(Number(g)) && Number(g) > 0) : []; %>
+                        <% let groupNote = ''; %>
+                        <% if (role === 'teacher') { %>
+                          <% if (teacherGroups.length > 1) { %>
+                            <% groupNote = ` · Групи ${teacherGroups.join(', ')}`; %>
+                          <% } else if (teacherGroups.length === 1) { %>
+                            <% groupNote = ` · Група ${teacherGroups[0]}`; %>
+                          <% } else if (item.group_number) { %>
+                            <% groupNote = ` · Група ${item.group_number}`; %>
+                          <% } %>
+                        <% } %>
                         <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
                         <div class="d-flex flex-wrap gap-1 mt-1">
                           <% if (Number(item.is_credit || 0) === 1) { %>
@@ -1905,7 +1915,17 @@
                     >
                       <div>
                         <div class="fw-semibold"><%= item.subject_name %></div>
-                        <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
+                        <% const teacherGroups = Array.isArray(item.group_numbers) ? item.group_numbers.filter((g) => Number.isFinite(Number(g)) && Number(g) > 0) : []; %>
+                        <% let groupNote = ''; %>
+                        <% if (role === 'teacher') { %>
+                          <% if (teacherGroups.length > 1) { %>
+                            <% groupNote = ` · Групи ${teacherGroups.join(', ')}`; %>
+                          <% } else if (teacherGroups.length === 1) { %>
+                            <% groupNote = ` · Група ${teacherGroups[0]}`; %>
+                          <% } else if (item.group_number) { %>
+                            <% groupNote = ` · Група ${item.group_number}`; %>
+                          <% } %>
+                        <% } %>
                         <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
                         <div class="d-flex flex-wrap gap-1 mt-1">
                           <% if (Number(item.is_credit || 0) === 1) { %>
@@ -2648,8 +2668,17 @@
           meta.className = 'text-muted small mb-2';
           const created = new Date(item.created_at).toLocaleString();
           meta.textContent = `Додав: ${item.created_by || '—'} • ${created}`;
-          if (isTeacherView && item.group_number) {
-            meta.textContent += ` • Група ${item.group_number}`;
+          if (isTeacherView) {
+            const groups = Array.isArray(item.group_numbers)
+              ? item.group_numbers.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
+              : [];
+            if (groups.length > 1) {
+              meta.textContent += ` • Групи ${groups.join(', ')}`;
+            } else if (groups.length === 1) {
+              meta.textContent += ` • Група ${groups[0]}`;
+            } else if (item.group_number) {
+              meta.textContent += ` • Група ${item.group_number}`;
+            }
           }
           li.appendChild(meta);
 

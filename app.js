@@ -4639,10 +4639,12 @@ app.get('/schedule', requireLogin, async (req, res) => {
             }
           }
         });
-        homework = Array.from(homeworkMap.values()).map((hw) => ({
-          ...hw,
-          subgroups: Object.values(hw.subgroups),
-        }));
+        homework = dedupeTeacherHomeworkItems(
+          Array.from(homeworkMap.values()).map((hw) => ({
+            ...hw,
+            subgroups: Object.values(hw.subgroups),
+          }))
+        );
         homework.forEach((hw) => {
           const legacyKey = `${hw.subject_id}|${hw.group_number}|${hw.day}|${hw.class_number}`;
           const key = hw.class_date ? `${legacyKey}|${hw.class_date}` : legacyKey;
@@ -4790,7 +4792,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           `,
           [...cdParams, nowIso, weekStartDate, weekEndDate]
         );
-        customDeadlineItems = cdRows || [];
+        customDeadlineItems = dedupeTeacherHomeworkItems(cdRows || []);
         const ids = customDeadlineItems.map((row) => row.id);
         const byDate = {};
         customDeadlineItems.forEach((row) => {
@@ -5026,10 +5028,15 @@ app.get('/schedule', requireLogin, async (req, res) => {
 
       const buildHomeworkTargets = (baseGroups = [], scheduleRows = []) => {
         const map = new Map();
+        const baseGroupsBySubject = new Map();
         (baseGroups || []).forEach((item) => {
           const subjectId = Number(item.subject_id);
           const groupNumber = Number(item.group_number);
           if (!Number.isFinite(subjectId) || !Number.isFinite(groupNumber)) return;
+          if (!baseGroupsBySubject.has(subjectId)) {
+            baseGroupsBySubject.set(subjectId, new Set());
+          }
+          baseGroupsBySubject.get(subjectId).add(groupNumber);
           const key = `${subjectId}|${groupNumber}`;
           if (!map.has(key)) {
             map.set(key, {
@@ -5043,6 +5050,12 @@ app.get('/schedule', requireLogin, async (req, res) => {
           const subjectId = Number(row.subject_id);
           const groupNumber = Number(row.group_number);
           if (!Number.isFinite(subjectId) || !Number.isFinite(groupNumber) || groupNumber < 1) return;
+          if (baseGroupsBySubject.size) {
+            const allowedGroups = baseGroupsBySubject.get(subjectId);
+            if (!allowedGroups || !allowedGroups.has(groupNumber)) {
+              return;
+            }
+          }
           const key = `${subjectId}|${groupNumber}`;
           if (!map.has(key)) {
             map.set(key, {
@@ -5635,6 +5648,124 @@ const DEFAULT_SUBJECT_GRADING_SETTINGS = {
 
 const toDateOnly = (rawValue) => String(rawValue || '').slice(0, 10);
 
+const normalizeBatchToken = (rawValue) => String(rawValue || '').trim().toLowerCase();
+
+const buildHomeworkBatchKey = (row) => {
+  const parts = [
+    Number(row?.created_by_id || row?.created_by || 0),
+    String(row?.created_at || ''),
+    Number(row?.subject_id || 0),
+    Number(row?.course_id || 0),
+    Number(row?.semester_id || 0),
+    Number(row?.is_custom_deadline || 0),
+    Number(row?.is_credit || 0),
+    Number(row?.is_control || 0),
+    normalizeBatchToken(row?.description),
+    String(row?.custom_due_date || row?.class_date || ''),
+    normalizeBatchToken(row?.day_of_week),
+    Number(row?.class_number || 0),
+    normalizeBatchToken(row?.meeting_url),
+    normalizeBatchToken(row?.link_url),
+    normalizeBatchToken(row?.file_path),
+  ];
+  return parts.join('|');
+};
+
+const buildHomeworkBatchKeyFromColumnRow = (row) => {
+  return buildHomeworkBatchKey({
+    created_by_id: row?.homework_created_by_id,
+    created_by: row?.homework_created_by,
+    created_at: row?.homework_created_at,
+    subject_id: row?.subject_id,
+    course_id: row?.course_id,
+    semester_id: row?.semester_id,
+    is_custom_deadline: row?.homework_is_custom_deadline,
+    is_credit: row?.homework_is_credit,
+    is_control: row?.homework_is_control,
+    description: row?.homework_description,
+    custom_due_date: row?.custom_due_date || row?.homework_custom_due_date,
+    class_date: row?.class_date || row?.homework_class_date,
+    day_of_week: row?.homework_day_of_week,
+    class_number: row?.homework_class_number,
+    meeting_url: row?.homework_meeting_url,
+    link_url: row?.homework_link_url,
+    file_path: row?.homework_file_path,
+  });
+};
+
+const dedupeTeacherHomeworkItems = (items) => {
+  const deduped = [];
+  const byBatchKey = new Map();
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const isTeacherHomework = Number(item?.is_teacher_homework || 0) === 1;
+    if (!isTeacherHomework) {
+      deduped.push(item);
+      return;
+    }
+    const batchKey = buildHomeworkBatchKey(item);
+    if (!byBatchKey.has(batchKey)) {
+      const groupNumbers = Number.isInteger(Number(item.group_number)) ? [Number(item.group_number)] : [];
+      const next = {
+        ...item,
+        group_numbers: groupNumbers,
+      };
+      byBatchKey.set(batchKey, next);
+      deduped.push(next);
+      return;
+    }
+    const target = byBatchKey.get(batchKey);
+    const groupNumber = Number(item.group_number);
+    if (Number.isInteger(groupNumber) && groupNumber > 0) {
+      const set = new Set([...(target.group_numbers || []), groupNumber]);
+      target.group_numbers = Array.from(set).sort((a, b) => a - b);
+      target.group_number = target.group_numbers[0] || target.group_number;
+    }
+  });
+  return deduped;
+};
+
+const selectPreferredHomeworkBatchRow = (currentRow, candidateRow, existingByHomeworkId = new Map()) => {
+  if (!currentRow) return candidateRow;
+  if (!candidateRow) return currentRow;
+  const currentColumn = existingByHomeworkId.get(Number(currentRow.id));
+  const candidateColumn = existingByHomeworkId.get(Number(candidateRow.id));
+  if (currentColumn && !candidateColumn) return currentRow;
+  if (candidateColumn && !currentColumn) return candidateRow;
+  if (currentColumn && candidateColumn) {
+    const currentGrades = Number(currentColumn.grades_count || 0);
+    const candidateGrades = Number(candidateColumn.grades_count || 0);
+    if (candidateGrades > currentGrades) return candidateRow;
+    if (currentGrades > candidateGrades) return currentRow;
+  }
+  return Number(candidateRow.id || 0) < Number(currentRow.id || 0) ? candidateRow : currentRow;
+};
+
+const buildTeacherHomeworkBatchLookup = (rows = []) => {
+  const byBatchGroup = new Map();
+  const byHomeworkId = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const homeworkId = Number(row?.id || 0);
+    if (!Number.isFinite(homeworkId) || homeworkId < 1) return;
+    const groupNumber = Number(row?.group_number || 0);
+    const batchKey = Number(row?.is_teacher_homework || 0) === 1 ? buildHomeworkBatchKey(row) : '';
+    const item = {
+      id: homeworkId,
+      group_number: Number.isInteger(groupNumber) && groupNumber > 0 ? groupNumber : null,
+      batch_key: batchKey,
+      custom_due_date: toDateOnly(row?.custom_due_date),
+      class_date: toDateOnly(row?.class_date),
+    };
+    byHomeworkId.set(homeworkId, item);
+    if (batchKey && item.group_number) {
+      byBatchGroup.set(`${batchKey}|${item.group_number}`, item);
+    }
+  });
+  return {
+    byHomeworkId,
+    byBatchGroup,
+  };
+};
+
 const parsePositiveDecimal = (rawValue, fallbackValue) => {
   if (rawValue === null || typeof rawValue === 'undefined' || rawValue === '') return fallbackValue;
   const normalized = Number(String(rawValue).replace(',', '.'));
@@ -5679,10 +5810,11 @@ const resolveHomeworkSubmissionStatus = (homeworkRow, submissionRow) => {
 
 const canUseTeacherJournalMode = (req, journalScope) => {
   const roles = getSessionRoleList(req);
+  const hasTeacherContext = roles.some((roleKey) => ['teacher', 'deanery', 'admin'].includes(roleKey));
   return Boolean(
     journalScope?.fullAccess
-    || (journalScope?.permissionKeys && journalScope.permissionKeys.has(JOURNAL_OWN_PERMISSION))
-    || roles.includes('teacher')
+    || (hasTeacherContext && journalScope?.permissionKeys && journalScope.permissionKeys.has(JOURNAL_OWN_PERMISSION))
+    || hasTeacherContext
   );
 };
 
@@ -5734,7 +5866,27 @@ async function ensureSubjectGradingSettings(subjectId, courseId, semesterId, use
 async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, gradingSettings, userId) {
   const params = [subjectId, courseId];
   let sql = `
-    SELECT h.id, h.description, h.custom_due_date, h.class_date, h.is_credit, h.created_at
+    SELECT
+      h.id,
+      h.subject_id,
+      h.course_id,
+      h.semester_id,
+      h.group_number,
+      h.description,
+      h.custom_due_date,
+      h.class_date,
+      h.day_of_week,
+      h.class_number,
+      h.meeting_url,
+      h.link_url,
+      h.file_path,
+      h.is_credit,
+      h.is_control,
+      h.is_custom_deadline,
+      h.is_teacher_homework,
+      h.created_by_id,
+      h.created_by,
+      h.created_at
     FROM homework h
     WHERE h.subject_id = ?
       AND h.course_id = ?
@@ -5747,22 +5899,35 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
     sql += ' AND h.semester_id IS NULL';
   }
   sql += ' ORDER BY COALESCE(h.custom_due_date, h.class_date, h.created_at) ASC, h.id ASC';
-  const homeworkRows = await db.all(sql, params);
+  const rawHomeworkRows = await db.all(sql, params);
 
   const columnParams = [subjectId, courseId];
   let columnsSql = `
-    SELECT id, source_homework_id, title, column_type, max_points, is_credit, position
-    FROM journal_columns
-    WHERE subject_id = ?
-      AND course_id = ?
-      AND source_homework_id IS NOT NULL
-      AND COALESCE(is_archived, 0) = 0
+    SELECT
+      jc.id,
+      jc.source_homework_id,
+      jc.title,
+      jc.column_type,
+      jc.max_points,
+      jc.is_credit,
+      jc.position,
+      COALESCE(gc.grades_count, 0) AS grades_count
+    FROM journal_columns jc
+    LEFT JOIN (
+      SELECT column_id, COUNT(*) AS grades_count
+      FROM journal_grades
+      GROUP BY column_id
+    ) gc ON gc.column_id = jc.id
+    WHERE jc.subject_id = ?
+      AND jc.course_id = ?
+      AND jc.source_homework_id IS NOT NULL
+      AND COALESCE(jc.is_archived, 0) = 0
   `;
   if (semesterId) {
-    columnsSql += ' AND (semester_id = ? OR semester_id IS NULL)';
+    columnsSql += ' AND (jc.semester_id = ? OR jc.semester_id IS NULL)';
     columnParams.push(semesterId);
   } else {
-    columnsSql += ' AND semester_id IS NULL';
+    columnsSql += ' AND jc.semester_id IS NULL';
   }
   const existing = await db.all(columnsSql, columnParams);
   const existingByHomeworkId = new Map();
@@ -5778,7 +5943,65 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
     }
   });
 
-  for (const homeworkRow of homeworkRows || []) {
+  const dedupedHomeworkRows = [];
+  const teacherBatchState = new Map();
+  (rawHomeworkRows || []).forEach((homeworkRow) => {
+    const isTeacherHomework = Number(homeworkRow.is_teacher_homework || 0) === 1;
+    if (!isTeacherHomework) {
+      dedupedHomeworkRows.push(homeworkRow);
+      return;
+    }
+    const batchKey = buildHomeworkBatchKey(homeworkRow);
+    if (!teacherBatchState.has(batchKey)) {
+      teacherBatchState.set(batchKey, {
+        index: dedupedHomeworkRows.length,
+        preferred: homeworkRow,
+        rows: [homeworkRow],
+      });
+      dedupedHomeworkRows.push(homeworkRow);
+      return;
+    }
+    const state = teacherBatchState.get(batchKey);
+    state.rows.push(homeworkRow);
+    state.preferred = selectPreferredHomeworkBatchRow(state.preferred, homeworkRow, existingByHomeworkId);
+    dedupedHomeworkRows[state.index] = state.preferred;
+  });
+
+  for (const state of teacherBatchState.values()) {
+    if (!state || !state.rows || state.rows.length < 2 || !state.preferred) continue;
+    const preferredHomeworkId = Number(state.preferred.id);
+    const targetColumn = existingByHomeworkId.get(preferredHomeworkId);
+    if (!targetColumn) continue;
+    for (const row of state.rows) {
+      const duplicateHomeworkId = Number(row.id);
+      if (!Number.isFinite(duplicateHomeworkId) || duplicateHomeworkId < 1 || duplicateHomeworkId === preferredHomeworkId) continue;
+      const duplicateColumn = existingByHomeworkId.get(duplicateHomeworkId);
+      if (!duplicateColumn || Number(duplicateColumn.id) === Number(targetColumn.id)) continue;
+      await db.run(
+        `
+          INSERT INTO journal_grades
+            (column_id, student_id, score, teacher_comment, graded_by, graded_at, submission_status)
+          SELECT ?, student_id, score, teacher_comment, graded_by, graded_at, submission_status
+          FROM journal_grades
+          WHERE column_id = ?
+          ON CONFLICT (column_id, student_id) DO NOTHING
+        `,
+        [targetColumn.id, duplicateColumn.id]
+      );
+      await db.run(
+        `
+          UPDATE journal_columns
+          SET is_archived = 1,
+              updated_at = NOW()
+          WHERE id = ?
+        `,
+        [duplicateColumn.id]
+      );
+      existingByHomeworkId.delete(duplicateHomeworkId);
+    }
+  }
+
+  for (const homeworkRow of dedupedHomeworkRows) {
     const homeworkId = Number(homeworkRow.id);
     const isCredit = Number(homeworkRow.is_credit || 0) === 1 ? 1 : 0;
     const columnType = isCredit ? 'credit' : 'homework';
@@ -5854,6 +6077,30 @@ async function getTeacherJournalSubjectAccess(userId, subjectId) {
   return buildTeacherSubjectAccess(rows, Number(rows[0].group_count || 1));
 }
 
+async function getStudentJournalSubjectOptions(userId) {
+  const rows = await db.all(
+    `
+      SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.group_count, s.course_id, c.name AS course_name
+      FROM student_groups sg
+      JOIN subjects s ON s.id = sg.subject_id
+      JOIN courses c ON c.id = s.course_id
+      WHERE sg.student_id = ? AND s.visible = 1
+      ORDER BY c.id ASC, s.name ASC
+    `,
+    [userId]
+  );
+  return (rows || []).map((row) => ({
+    subject_id: Number(row.subject_id),
+    subject_name: row.subject_name,
+    group_count: Math.max(1, Number(row.group_count || 1)),
+    course_id: Number(row.course_id || 1),
+    course_name: row.course_name || '',
+    has_all_groups: false,
+    group_numbers: [Number(row.group_number || 1)],
+    group_label: `Група ${Number(row.group_number || 1)}`,
+  }));
+}
+
 async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode) {
   const userId = Number(req.session.user.id);
   if (teacherJournalMode && journalScope.fullAccess) {
@@ -5890,6 +6137,9 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
       `,
       [userId]
     );
+    if (!rows || !rows.length) {
+      return getStudentJournalSubjectOptions(userId);
+    }
     const map = new Map();
     (rows || []).forEach((row) => {
       const key = Number(row.subject_id);
@@ -5935,27 +6185,7 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
     });
   }
 
-  const rows = await db.all(
-    `
-      SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.group_count, s.course_id, c.name AS course_name
-      FROM student_groups sg
-      JOIN subjects s ON s.id = sg.subject_id
-      JOIN courses c ON c.id = s.course_id
-      WHERE sg.student_id = ? AND s.visible = 1
-      ORDER BY c.id ASC, s.name ASC
-    `,
-    [userId]
-  );
-  return (rows || []).map((row) => ({
-    subject_id: Number(row.subject_id),
-    subject_name: row.subject_name,
-    group_count: Math.max(1, Number(row.group_count || 1)),
-    course_id: Number(row.course_id || 1),
-    course_name: row.course_name || '',
-    has_all_groups: false,
-    group_numbers: [Number(row.group_number || 1)],
-    group_label: `Група ${Number(row.group_number || 1)}`,
-  }));
+  return getStudentJournalSubjectOptions(userId);
 }
 
 async function getJournalColumns(subjectId, courseId, semesterId) {
@@ -5963,19 +6193,31 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
   let sql = `
     SELECT
       jc.*,
+      COALESCE(gc.grades_count, 0) AS grades_count,
       h.description AS homework_description,
       h.custom_due_date,
       h.class_date,
       h.group_number AS homework_group_number,
+      h.day_of_week AS homework_day_of_week,
+      h.class_number AS homework_class_number,
       h.meeting_url AS homework_meeting_url,
       h.link_url AS homework_link_url,
       h.file_path AS homework_file_path,
       h.file_name AS homework_file_name,
       h.is_custom_deadline AS homework_is_custom_deadline,
+      h.is_control AS homework_is_control,
+      h.is_credit AS homework_is_credit,
+      h.is_teacher_homework AS homework_is_teacher_homework,
       h.created_at AS homework_created_at,
       h.created_by AS homework_created_by,
+      h.created_by_id AS homework_created_by_id,
       u.full_name AS homework_created_by_name
     FROM journal_columns jc
+    LEFT JOIN (
+      SELECT column_id, COUNT(*) AS grades_count
+      FROM journal_grades
+      GROUP BY column_id
+    ) gc ON gc.column_id = jc.id
     LEFT JOIN homework h ON h.id = jc.source_homework_id
     LEFT JOIN users u ON u.id = h.created_by_id
     WHERE jc.subject_id = ?
@@ -5996,29 +6238,72 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
       jc.id ASC
   `;
   const rows = await db.all(sql, params);
-  return (rows || []).map((row) => ({
-    id: Number(row.id),
-    subject_id: Number(row.subject_id),
-    source_type: String(row.source_type || 'manual'),
-    source_homework_id: row.source_homework_id ? Number(row.source_homework_id) : null,
-    title: String(row.title || ''),
-    column_type: normalizeColumnType(row.column_type),
-    max_points: parsePositiveDecimal(row.max_points, 10),
-    is_credit: Number(row.is_credit || 0) === 1,
-    position: Number(row.position || 0),
-    homework_description: row.homework_description || null,
-    custom_due_date: toDateOnly(row.custom_due_date),
-    class_date: toDateOnly(row.class_date),
-    homework_group_number: row.homework_group_number ? Number(row.homework_group_number) : null,
-    homework_meeting_url: row.homework_meeting_url || null,
-    homework_link_url: row.homework_link_url || null,
-    homework_file_path: row.homework_file_path || null,
-    homework_file_name: normalizeUploadedOriginalName(row.homework_file_name),
-    homework_is_custom_deadline: Number(row.homework_is_custom_deadline || 0) === 1,
-    homework_created_at: row.homework_created_at || null,
-    homework_created_by: row.homework_created_by || null,
-    homework_created_by_name: row.homework_created_by_name || null,
-  }));
+  const normalizedRows = (rows || []).map((row) => {
+    const sourceHomeworkId = row.source_homework_id ? Number(row.source_homework_id) : null;
+    const sourceHomeworkIsTeacher = Number(row.homework_is_teacher_homework || 0) === 1;
+    const sourceHomeworkBatchKey = sourceHomeworkId && sourceHomeworkIsTeacher
+      ? buildHomeworkBatchKeyFromColumnRow({
+          ...row,
+          subject_id: row.subject_id,
+          course_id: row.course_id,
+          semester_id: row.semester_id,
+        })
+      : '';
+    return {
+      id: Number(row.id),
+      subject_id: Number(row.subject_id),
+      source_type: String(row.source_type || 'manual'),
+      source_homework_id: sourceHomeworkId,
+      source_homework_is_teacher: sourceHomeworkIsTeacher,
+      source_homework_batch_key: sourceHomeworkBatchKey,
+      title: String(row.title || ''),
+      column_type: normalizeColumnType(row.column_type),
+      max_points: parsePositiveDecimal(row.max_points, 10),
+      is_credit: Number(row.is_credit || 0) === 1,
+      position: Number(row.position || 0),
+      homework_description: row.homework_description || null,
+      custom_due_date: toDateOnly(row.custom_due_date),
+      class_date: toDateOnly(row.class_date),
+      homework_group_number: row.homework_group_number ? Number(row.homework_group_number) : null,
+      homework_meeting_url: row.homework_meeting_url || null,
+      homework_link_url: row.homework_link_url || null,
+      homework_file_path: row.homework_file_path || null,
+      homework_file_name: normalizeUploadedOriginalName(row.homework_file_name),
+      homework_is_custom_deadline: Number(row.homework_is_custom_deadline || 0) === 1,
+      homework_created_at: row.homework_created_at || null,
+      homework_created_by: row.homework_created_by || null,
+      homework_created_by_name: row.homework_created_by_name || null,
+      _grades_count: Number(row.grades_count || 0),
+    };
+  });
+
+  const selectedByKey = new Map();
+  const orderedKeys = [];
+  normalizedRows.forEach((column) => {
+    const dedupeKey = column.source_homework_id && column.source_homework_is_teacher && column.source_homework_batch_key
+      ? `teacher:${column.source_homework_batch_key}`
+      : `column:${column.id}`;
+    if (!selectedByKey.has(dedupeKey)) {
+      selectedByKey.set(dedupeKey, column);
+      orderedKeys.push(dedupeKey);
+      return;
+    }
+    const existingColumn = selectedByKey.get(dedupeKey);
+    const shouldReplace = Number(column._grades_count || 0) > Number(existingColumn._grades_count || 0)
+      || (
+        Number(column._grades_count || 0) === Number(existingColumn._grades_count || 0)
+        && Number(column.id || 0) < Number(existingColumn.id || 0)
+      );
+    if (shouldReplace) {
+      selectedByKey.set(dedupeKey, column);
+    }
+  });
+
+  return orderedKeys.map((key) => {
+    const row = { ...(selectedByKey.get(key) || {}) };
+    delete row._grades_count;
+    return row;
+  });
 }
 
 async function getJournalStudents(subjectId, courseId, groupFilterSet = null, userFilterIds = []) {
@@ -6054,6 +6339,93 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
   }));
 }
 
+async function resolveJournalColumnHomeworkForStudent(columnRow, studentGroupNumber) {
+  const sourceHomeworkId = Number(columnRow?.source_homework_id || 0);
+  const fallback = {
+    homework_id: Number.isFinite(sourceHomeworkId) && sourceHomeworkId > 0 ? sourceHomeworkId : null,
+    custom_due_date: toDateOnly(columnRow?.custom_due_date || columnRow?.homework_custom_due_date),
+    class_date: toDateOnly(columnRow?.class_date || columnRow?.homework_class_date),
+  };
+  if (!fallback.homework_id) return fallback;
+
+  const isTeacherHomework = Number(
+    columnRow?.source_homework_is_teacher
+    || columnRow?.homework_is_teacher_homework
+    || 0
+  ) === 1;
+  if (!isTeacherHomework) return fallback;
+
+  const groupNumber = Number(studentGroupNumber || 0);
+  if (!Number.isInteger(groupNumber) || groupNumber < 1) return fallback;
+
+  const batchKey = buildHomeworkBatchKey({
+    created_by_id: columnRow?.homework_created_by_id,
+    created_by: columnRow?.homework_created_by,
+    created_at: columnRow?.homework_created_at,
+    subject_id: columnRow?.subject_id,
+    course_id: columnRow?.course_id,
+    semester_id: columnRow?.semester_id,
+    is_custom_deadline: columnRow?.homework_is_custom_deadline,
+    is_credit: columnRow?.homework_is_credit,
+    is_control: columnRow?.homework_is_control,
+    description: columnRow?.homework_description,
+    custom_due_date: columnRow?.custom_due_date || columnRow?.homework_custom_due_date,
+    class_date: columnRow?.class_date || columnRow?.homework_class_date,
+    day_of_week: columnRow?.homework_day_of_week,
+    class_number: columnRow?.homework_class_number,
+    meeting_url: columnRow?.homework_meeting_url,
+    link_url: columnRow?.homework_link_url,
+    file_path: columnRow?.homework_file_path,
+  });
+  if (!batchKey) return fallback;
+
+  const params = [columnRow.subject_id, columnRow.course_id, groupNumber];
+  let sql = `
+    SELECT
+      h.id,
+      h.group_number,
+      h.subject_id,
+      h.course_id,
+      h.semester_id,
+      h.created_by_id,
+      h.created_by,
+      h.created_at,
+      h.description,
+      h.custom_due_date,
+      h.class_date,
+      h.day_of_week,
+      h.class_number,
+      h.meeting_url,
+      h.link_url,
+      h.file_path,
+      h.is_custom_deadline,
+      h.is_control,
+      h.is_credit,
+      h.is_teacher_homework
+    FROM homework h
+    WHERE h.subject_id = ?
+      AND h.course_id = ?
+      AND h.group_number = ?
+      AND COALESCE(h.status, 'published') = 'published'
+      AND COALESCE(h.is_teacher_homework, 0) = 1
+  `;
+  if (columnRow.semester_id) {
+    sql += ' AND (h.semester_id = ? OR h.semester_id IS NULL)';
+    params.push(columnRow.semester_id);
+  } else {
+    sql += ' AND h.semester_id IS NULL';
+  }
+  const rows = await db.all(sql, params);
+  const matched = (rows || []).find((row) => buildHomeworkBatchKey(row) === batchKey);
+  if (!matched) return fallback;
+
+  return {
+    homework_id: Number(matched.id),
+    custom_due_date: toDateOnly(matched.custom_due_date),
+    class_date: toDateOnly(matched.class_date),
+  };
+}
+
 async function buildJournalMatrix({
   subjectId,
   courseId,
@@ -6066,13 +6438,6 @@ async function buildJournalMatrix({
   await syncJournalColumnsFromHomework(subjectId, courseId, semesterId, gradingSettings, actorUserId);
 
   let columns = await getJournalColumns(subjectId, courseId, semesterId);
-  if (groupFilterSet && groupFilterSet.size) {
-    columns = columns.filter((column) => {
-      if (!column.source_homework_id || !column.homework_group_number) return true;
-      return groupFilterSet.has(Number(column.homework_group_number));
-    });
-  }
-
   const students = await getJournalStudents(subjectId, courseId, groupFilterSet, studentFilterIds);
   if (!students.length) {
     return {
@@ -6082,9 +6447,74 @@ async function buildJournalMatrix({
     };
   }
 
+  let teacherBatchLookup = {
+    byHomeworkId: new Map(),
+    byBatchGroup: new Map(),
+  };
+  const hasTeacherHomeworkColumns = columns.some((column) => (
+    Number(column.source_homework_id || 0) > 0
+    && column.source_homework_is_teacher
+    && column.source_homework_batch_key
+  ));
+  if (hasTeacherHomeworkColumns) {
+    const teacherHomeworkParams = [subjectId, courseId];
+    let teacherHomeworkSql = `
+      SELECT
+        h.id,
+        h.group_number,
+        h.subject_id,
+        h.course_id,
+        h.semester_id,
+        h.created_by_id,
+        h.created_by,
+        h.created_at,
+        h.description,
+        h.custom_due_date,
+        h.class_date,
+        h.day_of_week,
+        h.class_number,
+        h.meeting_url,
+        h.link_url,
+        h.file_path,
+        h.is_custom_deadline,
+        h.is_control,
+        h.is_credit,
+        h.is_teacher_homework
+      FROM homework h
+      WHERE h.subject_id = ?
+        AND h.course_id = ?
+        AND COALESCE(h.status, 'published') = 'published'
+        AND COALESCE(h.is_teacher_homework, 0) = 1
+    `;
+    if (semesterId) {
+      teacherHomeworkSql += ' AND (h.semester_id = ? OR h.semester_id IS NULL)';
+      teacherHomeworkParams.push(semesterId);
+    } else {
+      teacherHomeworkSql += ' AND h.semester_id IS NULL';
+    }
+    const teacherHomeworkRows = await db.all(teacherHomeworkSql, teacherHomeworkParams);
+    teacherBatchLookup = buildTeacherHomeworkBatchLookup(teacherHomeworkRows || []);
+  }
+
+  if (groupFilterSet && groupFilterSet.size) {
+    const allowedGroups = Array.from(groupFilterSet)
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value > 0);
+    columns = columns.filter((column) => {
+      if (!column.source_homework_id) return true;
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (!column.source_homework_is_teacher) {
+        if (!homeworkGroup) return true;
+        return allowedGroups.includes(homeworkGroup);
+      }
+      if (homeworkGroup && allowedGroups.includes(homeworkGroup)) return true;
+      if (!column.source_homework_batch_key) return false;
+      return allowedGroups.some((groupNumber) => teacherBatchLookup.byBatchGroup.has(`${column.source_homework_batch_key}|${groupNumber}`));
+    });
+  }
+
   const columnIds = columns.map((column) => column.id);
   const studentIds = students.map((student) => student.id);
-
   let gradesByKey = new Map();
   if (columnIds.length && studentIds.length) {
     const rows = await db.all(
@@ -6109,9 +6539,47 @@ async function buildJournalMatrix({
     );
   }
 
-  const homeworkIds = columns
-    .map((column) => Number(column.source_homework_id))
-    .filter((value) => Number.isFinite(value) && value > 0);
+  const resolveHomeworkContextForCell = (column, studentGroupNumber) => {
+    const fallbackHomeworkId = Number(column?.source_homework_id || 0);
+    if (!Number.isFinite(fallbackHomeworkId) || fallbackHomeworkId < 1) {
+      return { homework_id: null, due_row: column };
+    }
+    if (!column.source_homework_is_teacher || !column.source_homework_batch_key) {
+      return {
+        homework_id: fallbackHomeworkId,
+        due_row: teacherBatchLookup.byHomeworkId.get(fallbackHomeworkId) || column,
+      };
+    }
+    const groupNumber = Number(studentGroupNumber || 0);
+    if (Number.isInteger(groupNumber) && groupNumber > 0) {
+      const mapped = teacherBatchLookup.byBatchGroup.get(`${column.source_homework_batch_key}|${groupNumber}`);
+      if (mapped && Number(mapped.id) > 0) {
+        return { homework_id: Number(mapped.id), due_row: mapped };
+      }
+    }
+    return {
+      homework_id: fallbackHomeworkId,
+      due_row: teacherBatchLookup.byHomeworkId.get(fallbackHomeworkId) || column,
+    };
+  };
+
+  const homeworkIdSet = new Set();
+  columns.forEach((column) => {
+    const fallbackHomeworkId = Number(column.source_homework_id || 0);
+    if (!Number.isFinite(fallbackHomeworkId) || fallbackHomeworkId < 1) return;
+    if (!column.source_homework_is_teacher || !column.source_homework_batch_key) {
+      homeworkIdSet.add(fallbackHomeworkId);
+      return;
+    }
+    students.forEach((student) => {
+      const context = resolveHomeworkContextForCell(column, student.group_number);
+      if (Number(context.homework_id) > 0) {
+        homeworkIdSet.add(Number(context.homework_id));
+      }
+    });
+  });
+  const homeworkIds = Array.from(homeworkIdSet);
+
   let submissionsByKey = new Map();
   if (homeworkIds.length && studentIds.length) {
     const rows = await db.all(
@@ -6141,12 +6609,19 @@ async function buildJournalMatrix({
   const rows = students.map((student) => {
     const cells = columns.map((column) => {
       const grade = gradesByKey.get(`${column.id}|${student.id}`) || null;
-      const submission = column.source_homework_id
-        ? (submissionsByKey.get(`${column.source_homework_id}|${student.id}`) || null)
+      const homeworkContext = resolveHomeworkContextForCell(column, student.group_number);
+      const submission = homeworkContext.homework_id
+        ? (submissionsByKey.get(`${homeworkContext.homework_id}|${student.id}`) || null)
         : null;
       let status = 'missing';
-      if (column.source_homework_id) {
-        status = resolveHomeworkSubmissionStatus(column, submission);
+      if (homeworkContext.homework_id) {
+        status = resolveHomeworkSubmissionStatus(
+          {
+            custom_due_date: homeworkContext.due_row?.custom_due_date || column.custom_due_date,
+            class_date: homeworkContext.due_row?.class_date || column.class_date,
+          },
+          submission
+        );
       } else if (grade && Number.isFinite(grade.score)) {
         status = 'manual';
       }
@@ -6278,7 +6753,19 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
           h.group_number AS homework_group_number,
           h.custom_due_date,
           h.class_date,
-          h.description AS homework_description
+          h.description AS homework_description,
+          h.day_of_week AS homework_day_of_week,
+          h.class_number AS homework_class_number,
+          h.meeting_url AS homework_meeting_url,
+          h.link_url AS homework_link_url,
+          h.file_path AS homework_file_path,
+          h.is_custom_deadline AS homework_is_custom_deadline,
+          h.is_control AS homework_is_control,
+          h.is_credit AS homework_is_credit,
+          h.is_teacher_homework AS homework_is_teacher_homework,
+          h.created_at AS homework_created_at,
+          h.created_by AS homework_created_by,
+          h.created_by_id AS homework_created_by_id
         FROM journal_columns jc
         LEFT JOIN homework h ON h.id = jc.source_homework_id
         WHERE jc.id = ?
@@ -6316,11 +6803,9 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       if (!access.allowAll && !access.groups.has(studentGroup)) {
         return res.status(403).json({ error: 'Forbidden' });
       }
-      const homeworkGroup = Number(column.homework_group_number || 0);
-      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
-        return res.status(403).json({ error: 'Forbidden' });
-      }
     }
+
+    const resolvedHomework = await resolveJournalColumnHomeworkForStudent(column, Number(studentRow.group_number || 0));
 
     const grade = await db.get(
       `
@@ -6331,7 +6816,7 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       `,
       [columnId, studentId]
     );
-    const submission = column.source_homework_id
+    const submission = resolvedHomework.homework_id
       ? await db.get(
           `
             SELECT submission_text, link_url, file_path, file_name, submitted_at, updated_at
@@ -6339,14 +6824,14 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
             WHERE homework_id = ? AND student_id = ?
             LIMIT 1
           `,
-          [column.source_homework_id, studentId]
+          [resolvedHomework.homework_id, studentId]
         )
       : null;
-    const submissionStatus = column.source_homework_id
+    const submissionStatus = resolvedHomework.homework_id
       ? resolveHomeworkSubmissionStatus(
           {
-            custom_due_date: column.custom_due_date,
-            class_date: column.class_date,
+            custom_due_date: resolvedHomework.custom_due_date,
+            class_date: resolvedHomework.class_date,
           },
           submission
         )
@@ -6417,7 +6902,20 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
           jc.*,
           h.group_number AS homework_group_number,
           h.custom_due_date,
-          h.class_date
+          h.class_date,
+          h.description AS homework_description,
+          h.day_of_week AS homework_day_of_week,
+          h.class_number AS homework_class_number,
+          h.meeting_url AS homework_meeting_url,
+          h.link_url AS homework_link_url,
+          h.file_path AS homework_file_path,
+          h.is_custom_deadline AS homework_is_custom_deadline,
+          h.is_control AS homework_is_control,
+          h.is_credit AS homework_is_credit,
+          h.is_teacher_homework AS homework_is_teacher_homework,
+          h.created_at AS homework_created_at,
+          h.created_by AS homework_created_by,
+          h.created_by_id AS homework_created_by_id
         FROM journal_columns jc
         LEFT JOIN homework h ON h.id = jc.source_homework_id
         WHERE jc.id = ?
@@ -6457,14 +6955,11 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
       if (!access.allowAll && !access.groups.has(studentGroup)) {
         return res.status(403).send('Forbidden (journal)');
       }
-      const homeworkGroup = Number(column.homework_group_number || 0);
-      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
-        return res.status(403).send('Forbidden (journal)');
-      }
     }
 
     let submissionStatus = 'manual';
     if (column.source_homework_id) {
+      const resolvedHomework = await resolveJournalColumnHomeworkForStudent(column, Number(studentRow.group_number || 0));
       const submission = await db.get(
         `
           SELECT submitted_at
@@ -6472,12 +6967,12 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
           WHERE homework_id = ? AND student_id = ?
           LIMIT 1
         `,
-        [column.source_homework_id, studentId]
+        [resolvedHomework.homework_id, studentId]
       );
       submissionStatus = resolveHomeworkSubmissionStatus(
         {
-          custom_due_date: column.custom_due_date,
-          class_date: column.class_date,
+          custom_due_date: resolvedHomework.custom_due_date,
+          class_date: resolvedHomework.class_date,
         },
         submission
       );
