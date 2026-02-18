@@ -3,6 +3,7 @@
   const isMyDay = activePage === 'my-day';
   const isProfile = activePage === 'profile';
   const isTeamwork = activePage === 'teamwork';
+  const isSubjects = activePage === 'subjects';
   const brandTitle = isSchedule ? 'Studerria' : (pageTitle || 'Studerria');
 %>
 <nav class="navbar navbar-expand-lg topbar">
@@ -55,6 +56,7 @@
         >
           🌙
         </button>
+        <a class="btn btn-glass" href="/subjects">Предмети</a>
         <a class="btn btn-glass" href="/schedule">Повернутись до розкладу</a>
       <% } else { %>
         <% if (!isMyDay) { %>
@@ -95,6 +97,9 @@
         >
           🌙
         </button>
+        <% if (!isMyDay && !isSubjects) { %>
+          <a class="btn btn-glass me-1 desktop-only" href="/subjects">Предмети</a>
+        <% } %>
         <% if (!isMyDay && !isTeamwork) { %>
           <a class="btn btn-glass me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
         <% } %>

@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.9.02",
+      "date": "2026-02-18",
+      "items": [
+        "feat(subjects): added new `/subjects` page with glass-based subject navigation and materials feed for lectures/files/links",
+        "feat(subjects): teachers can now publish subject materials with audience targeting (all groups, specific group, or all assigned groups)",
+        "feat(subjects): students can view only materials available for their subject groups, including attachments and external links",
+        "feat(nav): added `Предмети` shortcuts to topbar/mobile menu and schedule drawer for faster access",
+        "feat(db): added `subject_materials` table migration with indexes and app-level normalization for existing rows"
+      ]
+    },
+    {
       "version": "0.9.01",
       "date": "2026-02-18",
       "items": [

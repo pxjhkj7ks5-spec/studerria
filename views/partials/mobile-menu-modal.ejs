@@ -2,6 +2,7 @@
   const isMyDay = activePage === 'my-day';
   const isProfile = activePage === 'profile';
   const isTeamwork = activePage === 'teamwork';
+  const isSubjects = activePage === 'subjects';
 %>
 <div class="modal fade" id="mobileMenuModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -34,6 +35,9 @@
             <a class="btn w-100 glass mobile-menu-action" href="/my-day">Мій день</a>
           <% } else { %>
             <a class="btn w-100 glass mobile-menu-action" href="/schedule">Повернутись до розкладу</a>
+          <% } %>
+          <% if (!isSubjects) { %>
+            <a class="btn w-100 glass mobile-menu-action" href="/subjects">Предмети</a>
           <% } %>
           <% if (!isTeamwork) { %>
             <a class="btn w-100 glass mobile-menu-action" href="/teamwork"><%= t('menu.teamwork') %></a>

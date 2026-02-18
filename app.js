@@ -1026,6 +1026,15 @@ const initDb = async () => {
   await pool.query("UPDATE messages SET status = 'published' WHERE status IS NULL");
   await pool.query('UPDATE personal_reminders SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE personal_reminders SET updated_at = created_at WHERE updated_at IS NULL');
+  try {
+    await pool.query("UPDATE subject_materials SET material_type = 'lecture' WHERE material_type IS NULL");
+    await pool.query('UPDATE subject_materials SET course_id = 1 WHERE course_id IS NULL');
+    await pool.query('UPDATE subject_materials SET updated_at = created_at WHERE updated_at IS NULL');
+  } catch (err) {
+    if (!(err && err.code === '42P01')) {
+      throw err;
+    }
+  }
   await pool.query('UPDATE users SET password = NULL WHERE password IS NOT NULL');
 
   const courseRows = await pool.query('SELECT id, name FROM courses ORDER BY id');
@@ -5268,6 +5277,450 @@ const buildTeamworkTaskAudience = (task, teacherAccess, maxGroupCount = 1) => {
     label: seminarAllowAll ? 'Усі групи' : (finalGroups.length ? `Групи ${finalGroups.join(', ')}` : 'Немає груп'),
   };
 };
+
+const SUBJECT_MATERIAL_TYPES = new Set(['lecture', 'file', 'link', 'mixed']);
+
+const normalizeSubjectMaterialType = (rawValue) => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  return SUBJECT_MATERIAL_TYPES.has(normalized) ? normalized : 'lecture';
+};
+
+const normalizeExternalUrl = (rawValue) => {
+  const value = String(rawValue || '').trim();
+  if (!value) return '';
+  try {
+    const parsed = new URL(value);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return '';
+    }
+    return parsed.toString();
+  } catch (err) {
+    return '';
+  }
+};
+
+app.get('/subjects', requireLogin, async (req, res) => {
+  const { id: userId, username, role, course_id: fallbackCourseId } = req.session.user;
+  const requestedSubjectId = Number(req.query.subject_id);
+  const selectedSubjectId = Number.isFinite(requestedSubjectId) && requestedSubjectId > 0
+    ? requestedSubjectId
+    : null;
+  const isTeacherMode = hasSessionRole(req, 'teacher');
+
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'subjects.init');
+  }
+
+  try {
+    const subjectRows = isTeacherMode
+      ? await db.all(
+          `
+            SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count,
+                   s.course_id, c.name AS course_name
+            FROM teacher_subjects ts
+            JOIN subjects s ON s.id = ts.subject_id
+            JOIN courses c ON c.id = s.course_id
+            WHERE ts.user_id = ? AND s.visible = 1
+            ORDER BY c.id, s.name
+          `,
+          [userId]
+        )
+      : await db.all(
+          `
+            SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.group_count,
+                   s.course_id, c.name AS course_name
+            FROM student_groups sg
+            JOIN subjects s ON s.id = sg.subject_id
+            JOIN courses c ON c.id = s.course_id
+            WHERE sg.student_id = ? AND s.visible = 1
+            ORDER BY c.id, s.name
+          `,
+          [userId]
+        );
+
+    const subjectMap = new Map();
+    (subjectRows || []).forEach((row) => {
+      const subjectKey = Number(row.subject_id);
+      if (!subjectMap.has(subjectKey)) {
+        subjectMap.set(subjectKey, {
+          subject_id: subjectKey,
+          subject_name: row.subject_name,
+          course_id: Number(row.course_id || fallbackCourseId || 1),
+          course_name: row.course_name || '',
+          group_count: Math.max(1, Number(row.group_count || 1)),
+          has_all_groups: false,
+          group_numbers: new Set(),
+        });
+      }
+      const item = subjectMap.get(subjectKey);
+      if (row.group_number === null || typeof row.group_number === 'undefined') {
+        item.has_all_groups = true;
+      } else {
+        const groupNum = Number(row.group_number);
+        if (Number.isInteger(groupNum) && groupNum > 0) {
+          item.group_numbers.add(groupNum);
+        }
+      }
+    });
+
+    const subjects = Array.from(subjectMap.values())
+      .map((item) => {
+        const groups = Array.from(item.group_numbers).sort((a, b) => a - b);
+        let groupLabel = 'Без групи';
+        if (item.has_all_groups) {
+          groupLabel = 'Усі групи';
+        } else if (groups.length === 1) {
+          groupLabel = `Група ${groups[0]}`;
+        } else if (groups.length > 1) {
+          groupLabel = `Групи ${groups.join(', ')}`;
+        }
+        return {
+          ...item,
+          group_numbers: groups,
+          group_label: groupLabel,
+        };
+      })
+      .sort((a, b) => a.course_id - b.course_id || a.subject_name.localeCompare(b.subject_name));
+
+    const selectedSubject = selectedSubjectId
+      ? (subjects.find((subject) => Number(subject.subject_id) === Number(selectedSubjectId)) || null)
+      : (subjects[0] || null);
+
+    let materials = [];
+    let materialAudienceOptions = [];
+    if (selectedSubject) {
+      const selectedCourseId = Number(selectedSubject.course_id || fallbackCourseId || 1);
+      const activeSemester = await getActiveSemester(selectedCourseId);
+      const params = [selectedSubject.subject_id, selectedCourseId];
+      let materialsSql = `
+        SELECT sm.*, u.full_name AS created_by_name
+        FROM subject_materials sm
+        JOIN users u ON u.id = sm.created_by
+        WHERE sm.subject_id = ? AND sm.course_id = ?
+      `;
+
+      if (activeSemester && activeSemester.id) {
+        materialsSql += ' AND (sm.semester_id = ? OR sm.semester_id IS NULL)';
+        params.push(activeSemester.id);
+      } else {
+        materialsSql += ' AND sm.semester_id IS NULL';
+      }
+
+      if (!isTeacherMode && !selectedSubject.has_all_groups) {
+        if (selectedSubject.group_numbers.length) {
+          const groupPlaceholders = selectedSubject.group_numbers.map(() => '?').join(',');
+          materialsSql += ` AND (sm.group_number IS NULL OR sm.group_number IN (${groupPlaceholders}))`;
+          params.push(...selectedSubject.group_numbers);
+        } else {
+          materialsSql += ' AND sm.group_number IS NULL';
+        }
+      }
+
+      materialsSql += ' ORDER BY sm.created_at DESC, sm.id DESC';
+      const materialRows = await db.all(materialsSql, params);
+      materials = (materialRows || []).map((row) => {
+        const createdAt = row.created_at ? new Date(row.created_at) : null;
+        const createdAtLabel = createdAt && !Number.isNaN(createdAt.getTime())
+          ? createdAt.toLocaleString('uk-UA', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : String(row.created_at || '');
+        return {
+          ...row,
+          material_type: normalizeSubjectMaterialType(row.material_type),
+          group_label: row.group_number ? `Група ${row.group_number}` : 'Усі групи',
+          created_at_label: createdAtLabel,
+          can_manage: Number(row.created_by) === Number(userId),
+        };
+      });
+
+      if (isTeacherMode) {
+        const baseGroups = selectedSubject.has_all_groups
+          ? Array.from({ length: selectedSubject.group_count }, (_v, index) => index + 1)
+          : selectedSubject.group_numbers;
+        const sortedGroups = Array.from(new Set(baseGroups)).sort((a, b) => a - b);
+        if (selectedSubject.has_all_groups || sortedGroups.length > 1) {
+          materialAudienceOptions.push({
+            value: 'all',
+            label: selectedSubject.has_all_groups ? 'Усі групи' : 'Усі мої групи',
+          });
+        }
+        sortedGroups.forEach((groupNum) => {
+          materialAudienceOptions.push({ value: String(groupNum), label: `Група ${groupNum}` });
+        });
+        if (!materialAudienceOptions.length) {
+          materialAudienceOptions.push({ value: 'all', label: 'Усі групи' });
+        }
+      }
+    }
+
+    return res.render('subjects', {
+      subjects,
+      selectedSubjectId: selectedSubject ? selectedSubject.subject_id : null,
+      selectedSubject,
+      materials,
+      materialAudienceOptions,
+      messages: res.locals.messages,
+      username,
+      role,
+      isTeacherMode,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'subjects.page');
+  }
+});
+
+app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('attachment'), async (req, res) => {
+  if (!hasSessionRole(req, 'teacher')) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.redirect('/subjects?err=Only%20teachers%20can%20add%20materials');
+  }
+
+  const userId = Number(req.session.user.id);
+  const subjectId = Number(req.body.subject_id);
+  const title = String(req.body.title || '').trim();
+  const description = String(req.body.description || '').trim();
+  const materialType = normalizeSubjectMaterialType(req.body.material_type);
+  const audienceRaw = String(req.body.group_number || 'all').trim().toLowerCase();
+  const rawLinkUrl = String(req.body.link_url || '').trim();
+  const linkUrl = normalizeExternalUrl(rawLinkUrl);
+  const filePath = req.file ? `/uploads/${req.file.filename}` : null;
+  const fileName = req.file ? req.file.originalname : null;
+
+  if (!Number.isFinite(subjectId) || subjectId < 1 || !title || title.length > 180) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.redirect(`/subjects?subject_id=${Number.isFinite(subjectId) ? subjectId : ''}&err=Invalid%20material%20data`);
+  }
+  if (description.length > 4000) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.redirect(`/subjects?subject_id=${subjectId}&err=Description%20is%20too%20long`);
+  }
+  if (rawLinkUrl && !linkUrl) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.redirect(`/subjects?subject_id=${subjectId}&err=Invalid%20link%20URL`);
+  }
+  if (!description && !linkUrl && !req.file) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.redirect(`/subjects?subject_id=${subjectId}&err=Add%20description,%20link%20or%20file`);
+  }
+  if (materialType === 'file' && !req.file) {
+    return res.redirect(`/subjects?subject_id=${subjectId}&err=File%20is%20required%20for%20this%20type`);
+  }
+  if (materialType === 'link' && !linkUrl) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.redirect(`/subjects?subject_id=${subjectId}&err=Link%20is%20required%20for%20this%20type`);
+  }
+
+  try {
+    const subjectRow = await db.get(
+      'SELECT id, group_count, course_id FROM subjects WHERE id = ? AND visible = 1',
+      [subjectId]
+    );
+    if (!subjectRow) {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      return res.redirect('/subjects?err=Invalid%20subject');
+    }
+
+    const selectedCourseId = Number(subjectRow.course_id || req.session.user.course_id || 1);
+    const teacherRows = await db.all(
+      'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
+      [userId, subjectId]
+    );
+    const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], Number(subjectRow.group_count || 1));
+    if (!teacherAccess.hasRows) {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      return res.redirect(`/subjects?subject_id=${subjectId}&err=No%20access%20to%20subject`);
+    }
+
+    let targetGroups = [];
+    if (!audienceRaw || audienceRaw === 'all') {
+      if (teacherAccess.allowAll) {
+        targetGroups = [null];
+      } else {
+        targetGroups = Array.from(teacherAccess.groups || []).sort((a, b) => a - b);
+      }
+    } else {
+      const targetGroupNumber = Number(audienceRaw);
+      if (!Number.isInteger(targetGroupNumber) || targetGroupNumber < 1 || targetGroupNumber > Number(subjectRow.group_count || 1)) {
+        if (req.file) {
+          fs.unlink(req.file.path, () => {});
+        }
+        return res.redirect(`/subjects?subject_id=${subjectId}&err=Invalid%20target%20group`);
+      }
+      if (!teacherAccess.allowAll && !teacherAccess.groups.has(targetGroupNumber)) {
+        if (req.file) {
+          fs.unlink(req.file.path, () => {});
+        }
+        return res.redirect(`/subjects?subject_id=${subjectId}&err=No%20access%20to%20target%20group`);
+      }
+      targetGroups = [targetGroupNumber];
+    }
+    if (!targetGroups.length) {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      return res.redirect(`/subjects?subject_id=${subjectId}&err=No%20available%20groups%20for%20material`);
+    }
+
+    const createdAt = new Date().toISOString();
+    const activeSemester = await getActiveSemester(selectedCourseId);
+    const createdIds = [];
+    for (const groupNumber of targetGroups) {
+      const inserted = await db.get(
+        `
+          INSERT INTO subject_materials
+          (subject_id, group_number, title, description, material_type, link_url, file_path, file_name, created_by, created_at, updated_at, course_id, semester_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          RETURNING id
+        `,
+        [
+          subjectId,
+          groupNumber,
+          title,
+          description || null,
+          materialType,
+          linkUrl || null,
+          filePath,
+          fileName,
+          userId,
+          createdAt,
+          createdAt,
+          selectedCourseId,
+          activeSemester ? activeSemester.id : null,
+        ]
+      );
+      if (!inserted || !inserted.id) {
+        throw new Error('Material insert failed');
+      }
+      createdIds.push(Number(inserted.id));
+    }
+
+    logAction(db, req, 'subject_material_create', {
+      subject_id: subjectId,
+      material_type: materialType,
+      copies: createdIds.length,
+      has_file: Boolean(filePath),
+      has_link: Boolean(linkUrl),
+    });
+    logActivity(
+      db,
+      req,
+      'subject_material_create',
+      'subject_material',
+      createdIds[0] || null,
+      {
+        subject_id: subjectId,
+        material_type: materialType,
+        copies: createdIds.length,
+      },
+      selectedCourseId,
+      activeSemester ? activeSemester.id : null
+    );
+    broadcast('subject_materials_updated', { subject_id: subjectId });
+    return res.redirect(`/subjects?subject_id=${subjectId}&ok=Матеріал%20додано`);
+  } catch (err) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    console.error('Failed to create subject material', err);
+    return res.redirect(`/subjects?subject_id=${subjectId}&err=Database%20error`);
+  }
+});
+
+app.post('/subjects/materials/:id/delete', requireLogin, writeLimiter, async (req, res) => {
+  if (!hasSessionRole(req, 'teacher') && !hasSessionRole(req, 'admin')) {
+    return res.redirect('/subjects?err=Only%20teachers%20can%20delete%20materials');
+  }
+
+  const materialId = Number(req.params.id);
+  if (!Number.isFinite(materialId) || materialId < 1) {
+    return res.redirect('/subjects?err=Invalid%20material');
+  }
+
+  try {
+    const material = await db.get(
+      `
+        SELECT id, subject_id, group_number, file_path, created_by, course_id, semester_id
+        FROM subject_materials
+        WHERE id = ?
+      `,
+      [materialId]
+    );
+    if (!material) {
+      return res.redirect('/subjects?err=Material%20not%20found');
+    }
+
+    const userId = Number(req.session.user.id);
+    const isAdmin = hasSessionRole(req, 'admin');
+    if (!isAdmin && Number(material.created_by) !== userId) {
+      return res.redirect(`/subjects?subject_id=${material.subject_id}&err=You%20can%20delete%20only%20your%20materials`);
+    }
+    if (!isAdmin) {
+      const teacherAccess = await db.get(
+        'SELECT 1 FROM teacher_subjects WHERE user_id = ? AND subject_id = ? LIMIT 1',
+        [userId, material.subject_id]
+      );
+      if (!teacherAccess) {
+        return res.redirect(`/subjects?subject_id=${material.subject_id}&err=No%20access%20to%20subject`);
+      }
+    }
+
+    await db.run('DELETE FROM subject_materials WHERE id = ?', [materialId]);
+    if (material.file_path) {
+      const references = await db.get(
+        'SELECT COUNT(*)::int AS count FROM subject_materials WHERE file_path = ?',
+        [material.file_path]
+      );
+      if (Number(references?.count || 0) === 0) {
+        const relativePath = String(material.file_path).replace(/^\/+/, '');
+        const absolutePath = path.join(__dirname, relativePath);
+        fs.unlink(absolutePath, () => {});
+      }
+    }
+
+    logAction(db, req, 'subject_material_delete', {
+      subject_id: material.subject_id,
+      material_id: materialId,
+    });
+    logActivity(
+      db,
+      req,
+      'subject_material_delete',
+      'subject_material',
+      materialId,
+      { subject_id: material.subject_id, group_number: material.group_number },
+      Number(material.course_id || req.session.user.course_id || 1),
+      Number.isFinite(Number(material.semester_id)) ? Number(material.semester_id) : null
+    );
+    broadcast('subject_materials_updated', { subject_id: material.subject_id });
+    return res.redirect(`/subjects?subject_id=${material.subject_id}&ok=Матеріал%20видалено`);
+  } catch (err) {
+    console.error('Failed to delete subject material', err);
+    return res.redirect('/subjects?err=Database%20error');
+  }
+});
 
 app.get('/teamwork', requireLogin, async (req, res) => {
   const { id: userId, username, role, course_id: fallbackCourseId } = req.session.user;
