@@ -630,7 +630,7 @@
         <div class="alert alert-success"><%= messages.success %></div>
       <% } %>
 
-      <div class="glass p-3 mb-4">
+      <div class="glass glass-float p-3 mb-4">
         <h5 class="mb-3">Ваші предмети</h5>
         <div class="d-flex flex-wrap gap-2 subject-pills-wrap">
           <% if (!subjects.length) { %>
@@ -651,6 +651,7 @@
           <% } %>
         </div>
       </div>
+      <div class="living-separator mb-4" aria-hidden="true"></div>
 
       <% if (selectedSubjectId) { %>
         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -671,13 +672,14 @@
             </button>
           <% } %>
         </div>
+        <div class="living-separator mb-3" aria-hidden="true"></div>
 
         <% if (!tasks.length) { %>
           <div class="glass p-4 text-center text-muted">Ще немає командних завдань</div>
         <% } %>
 
         <% tasks.forEach(function(task) { %>
-          <div class="glass p-4 mb-4 task-card">
+          <div class="glass glass-float p-4 mb-4 task-card">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <div>
                 <h5 class="mb-1"><%= task.title %></h5>
@@ -742,9 +744,9 @@
                   <div class="text-muted">Груп ще немає.</div>
                 <% } %>
 
-                <div class="d-grid gap-3">
+                <div class="d-grid gap-3 context-cloud-list">
                   <% task.groups.forEach(function(group) { %>
-                    <div class="glass p-3 group-card">
+                    <div class="glass p-3 group-card context-cloud-item">
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <div>
                           <strong><%= group.name %></strong>
@@ -783,7 +785,7 @@
                       <% } else { %>
                         <div class="member-stack mb-2">
                           <% group.members.forEach(function(member) { %>
-                            <div class="member-row">
+                            <div class="member-row context-cloud-item">
                               <span class="member-name"><%= member.member_name %></span>
                               <% if (task.is_owner && task.groups.length > 1) { %>
                                 <form method="POST" action="/teamwork/group/move-member" class="member-move-form">
@@ -845,10 +847,10 @@
                   <h6>Можуть приєднатись</h6>
                   <ul class="list-group list-group-flush mt-2">
                     <% (freeStudents[task.id] || []).forEach(function(stu) { %>
-                      <li class="list-group-item bg-transparent"><%= stu.full_name %></li>
+                      <li class="list-group-item bg-transparent context-cloud-item"><%= stu.full_name %></li>
                     <% }); %>
                     <% if (!(freeStudents[task.id] || []).length) { %>
-                      <li class="list-group-item bg-transparent text-muted">Немає вільних студентів</li>
+                      <li class="list-group-item bg-transparent text-muted context-cloud-item">Немає вільних студентів</li>
                     <% } %>
                   </ul>
                 </div>
@@ -884,11 +886,11 @@
                 <div class="glass p-3 mb-3 task-options-block">
                   <div class="lesson-scope-picker mb-3">
                     <label class="form-label d-block">Тип заняття</label>
-                    <div class="btn-group w-100" role="group" aria-label="Lesson scope">
+                    <div class="btn-group w-100 liquid-chip-control" role="group" aria-label="Lesson scope">
                       <input class="btn-check" type="radio" name="lesson_scope" id="lessonScopeLecture" value="lecture" checked />
-                      <label class="btn btn-outline-light" for="lessonScopeLecture">Лекція</label>
+                      <label class="btn btn-outline-light liquid-chip" for="lessonScopeLecture">Лекція</label>
                       <input class="btn-check" type="radio" name="lesson_scope" id="lessonScopeSeminar" value="seminar" />
-                      <label class="btn btn-outline-light" for="lessonScopeSeminar">Семінар</label>
+                      <label class="btn btn-outline-light liquid-chip" for="lessonScopeSeminar">Семінар</label>
                     </div>
                   </div>
 

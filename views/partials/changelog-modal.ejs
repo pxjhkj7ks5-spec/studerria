@@ -1,6 +1,6 @@
 <div class="modal fade changelog-liquid-modal" id="changelogModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content">
+    <div class="modal-content changelog-sheet">
       <div class="modal-header">
         <h5 class="modal-title">Changelog</h5>
         <span class="status-chip status-chip--info">Release notes</span>
@@ -9,7 +9,7 @@
       <div class="modal-body">
         <% if (changelog && changelog.length) { %>
           <% changelog.forEach(function(entry) { %>
-            <div class="mb-3">
+            <div class="mb-3 changelog-release">
               <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                 <span class="fw-semibold">v<%= entry.version %></span>
                 <% if (entry.date) { %>

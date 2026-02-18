@@ -126,6 +126,56 @@
       });
   }
 
+  function initLivingSeparators() {
+    const root = document.documentElement;
+    if (!root || !document.querySelector('.living-separator')) {
+      return;
+    }
+
+    const motionQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    const setShift = (value) => {
+      root.style.setProperty('--living-separator-shift', `${value.toFixed(2)}px`);
+    };
+
+    if (motionQuery && motionQuery.matches) {
+      setShift(0);
+      return;
+    }
+
+    let rafId = 0;
+    const updateShift = () => {
+      rafId = 0;
+      const offset = window.scrollY || window.pageYOffset || 0;
+      const shift = Math.sin(offset / 120) * 10;
+      setShift(shift);
+    };
+
+    const scheduleUpdate = () => {
+      if (rafId) {
+        return;
+      }
+      rafId = window.requestAnimationFrame(updateShift);
+    };
+
+    updateShift();
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+
+    if (motionQuery && typeof motionQuery.addEventListener === 'function') {
+      motionQuery.addEventListener('change', (event) => {
+        if (event.matches) {
+          if (rafId) {
+            window.cancelAnimationFrame(rafId);
+            rafId = 0;
+          }
+          setShift(0);
+          return;
+        }
+        scheduleUpdate();
+      });
+    }
+  }
+
   function observeThemeChanges() {
     const body = document.body;
     if (!body) {
@@ -275,6 +325,7 @@
     applySemanticBadges(document);
     applyGlassDock(document);
     applyFocusHalo(document);
+    initLivingSeparators();
     observeThemeChanges();
     observeDynamicBadges();
     initModalBehavior();

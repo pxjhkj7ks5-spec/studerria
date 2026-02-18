@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.8.98",
+      "date": "2026-02-18",
+      "items": [
+        "feat(ui): added new floating glass variant (`.glass-float`) with stronger blur/refraction and applied it to key Teamwork panels",
+        "feat(ui): introduced `living-separator` utility with scroll-reactive light shift for depth between major Teamwork sections",
+        "feat(teamwork-ui): upgraded primary team/member/free-student lists with contextual hover cloud glow via `context-cloud-item`",
+        "feat(teamwork-ui): prototyped liquid segmented chips for lesson scope switch with spring-style active animation",
+        "style(changelog): restyled Changelog modal as a glass sheet with soft deep shadow, thin border, and layered liquid highlight"
+      ]
+    },
+    {
       "version": "0.8.97",
       "date": "2026-02-16",
       "items": [
