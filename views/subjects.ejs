@@ -64,7 +64,7 @@
           <section class="glass materials-add-form mb-4">
             <div class="materials-toolbar mb-3">
               <h6 class="mb-0">Додати матеріал</h6>
-              <span class="text-muted small">Лекції, файли та посилання для студентів</span>
+              <span class="text-muted small">Лекції, силабус (закріплюється зверху), файли та посилання для студентів</span>
             </div>
             <form method="POST" action="/subjects/materials" enctype="multipart/form-data">
               <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
@@ -77,6 +77,7 @@
                   <label class="form-label">Тип</label>
                   <select class="form-select" name="material_type">
                     <option value="lecture">Лекція</option>
+                    <option value="syllabus">Силабус</option>
                     <option value="file">Файл</option>
                     <option value="link">Посилання</option>
                     <option value="mixed">Змішаний</option>
@@ -122,7 +123,7 @@
             </div>
           <% } else { %>
             <% materials.forEach(function(item) { %>
-              <article class="glass material-card">
+              <article class="glass material-card <%= item.is_syllabus ? 'material-card--syllabus' : '' %>">
                 <div class="material-header">
                   <div>
                     <h6 class="material-title"><%= item.title %></h6>
@@ -134,7 +135,7 @@
                       <span><%= item.created_at_label %></span>
                     </div>
                   </div>
-                  <span class="status-chip status-chip--neutral material-type-chip"><%= typeLabelMap[item.material_type] || 'Матеріал' %></span>
+                  <span class="status-chip status-chip--neutral material-type-chip"><%= item.is_syllabus ? 'Силабус' : (typeLabelMap[item.material_type] || 'Матеріал') %></span>
                 </div>
 
                 <% if (item.description) { %>

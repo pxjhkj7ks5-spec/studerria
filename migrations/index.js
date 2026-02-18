@@ -15,6 +15,7 @@ const teamworkTeacherTaskConfig = require('./014_teamwork_teacher_task_config');
 const teamworkTaskScopeLock = require('./015_teamwork_task_scope_lock');
 const teamworkGroupsSeminarGroupNumber = require('./016_teamwork_groups_seminar_group_number');
 const subjectMaterials = require('./017_subject_materials');
+const subjectMaterialsSyllabus = require('./018_subject_materials_syllabus');
 
 module.exports = [
   init,
@@ -34,4 +35,5 @@ module.exports = [
   teamworkTaskScopeLock,
   teamworkGroupsSeminarGroupNumber,
   subjectMaterials,
+  subjectMaterialsSyllabus,
 ];

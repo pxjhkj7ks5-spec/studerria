@@ -1029,9 +1029,10 @@ const initDb = async () => {
   try {
     await pool.query("UPDATE subject_materials SET material_type = 'lecture' WHERE material_type IS NULL");
     await pool.query('UPDATE subject_materials SET course_id = 1 WHERE course_id IS NULL');
+    await pool.query('UPDATE subject_materials SET is_syllabus = 0 WHERE is_syllabus IS NULL');
     await pool.query('UPDATE subject_materials SET updated_at = created_at WHERE updated_at IS NULL');
   } catch (err) {
-    if (!(err && err.code === '42P01')) {
+    if (!(err && (err.code === '42P01' || err.code === '42703'))) {
       throw err;
     }
   }
@@ -5285,6 +5286,17 @@ const normalizeSubjectMaterialType = (rawValue) => {
   return SUBJECT_MATERIAL_TYPES.has(normalized) ? normalized : 'lecture';
 };
 
+const parseSubjectMaterialInputType = (rawValue) => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  if (normalized === 'syllabus') {
+    return { materialType: 'lecture', isSyllabus: 1 };
+  }
+  return {
+    materialType: normalizeSubjectMaterialType(normalized),
+    isSyllabus: 0,
+  };
+};
+
 const normalizeExternalUrl = (rawValue) => {
   const value = String(rawValue || '').trim();
   if (!value) return '';
@@ -5418,7 +5430,7 @@ app.get('/subjects', requireLogin, async (req, res) => {
         }
       }
 
-      materialsSql += ' ORDER BY sm.created_at DESC, sm.id DESC';
+      materialsSql += ' ORDER BY COALESCE(sm.is_syllabus, 0) DESC, sm.created_at DESC, sm.id DESC';
       const materialRows = await db.all(materialsSql, params);
       materials = (materialRows || []).map((row) => {
         const createdAt = row.created_at ? new Date(row.created_at) : null;
@@ -5434,6 +5446,7 @@ app.get('/subjects', requireLogin, async (req, res) => {
         return {
           ...row,
           material_type: normalizeSubjectMaterialType(row.material_type),
+          is_syllabus: Number(row.is_syllabus || 0) === 1,
           group_label: row.group_number ? `Група ${row.group_number}` : 'Усі групи',
           created_at_label: createdAtLabel,
           can_manage: Number(row.created_by) === Number(userId),
@@ -5488,7 +5501,7 @@ app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('atta
   const subjectId = Number(req.body.subject_id);
   const title = String(req.body.title || '').trim();
   const description = String(req.body.description || '').trim();
-  const materialType = normalizeSubjectMaterialType(req.body.material_type);
+  const { materialType, isSyllabus } = parseSubjectMaterialInputType(req.body.material_type);
   const audienceRaw = String(req.body.group_number || 'all').trim().toLowerCase();
   const rawLinkUrl = String(req.body.link_url || '').trim();
   const linkUrl = normalizeExternalUrl(rawLinkUrl);
@@ -5591,8 +5604,8 @@ app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('atta
       const inserted = await db.get(
         `
           INSERT INTO subject_materials
-          (subject_id, group_number, title, description, material_type, link_url, file_path, file_name, created_by, created_at, updated_at, course_id, semester_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (subject_id, group_number, title, description, material_type, is_syllabus, link_url, file_path, file_name, created_by, created_at, updated_at, course_id, semester_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           RETURNING id
         `,
         [
@@ -5601,6 +5614,7 @@ app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('atta
           title,
           description || null,
           materialType,
+          isSyllabus,
           linkUrl || null,
           filePath,
           fileName,
@@ -5620,6 +5634,7 @@ app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('atta
     logAction(db, req, 'subject_material_create', {
       subject_id: subjectId,
       material_type: materialType,
+      is_syllabus: isSyllabus === 1,
       copies: createdIds.length,
       has_file: Boolean(filePath),
       has_link: Boolean(linkUrl),
@@ -5633,6 +5648,7 @@ app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('atta
       {
         subject_id: subjectId,
         material_type: materialType,
+        is_syllabus: isSyllabus === 1,
         copies: createdIds.length,
       },
       selectedCourseId,

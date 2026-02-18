@@ -75,6 +75,44 @@
 .page-subjects .materials-add-form .form-control,
 .page-subjects .materials-add-form .form-select {
   border-radius: 12px;
+  transition: border-color var(--dur-med) var(--ease-apple), box-shadow var(--dur-med) var(--ease-apple), background-color var(--dur-med) var(--ease-apple);
+}
+
+body.theme-dark.page-subjects .materials-add-form .form-control,
+body.theme-dark.page-subjects .materials-add-form .form-select {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.84), rgba(15, 23, 42, 0.66));
+  border-color: rgba(120, 167, 255, 0.44);
+  color: rgba(248, 250, 252, 0.96);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(120, 167, 255, 0.14), 0 8px 20px rgba(2, 6, 23, 0.3);
+  color-scheme: dark;
+}
+
+body.theme-dark.page-subjects .materials-add-form .form-control::placeholder {
+  color: rgba(203, 213, 225, 0.56);
+}
+
+body.theme-dark.page-subjects .materials-add-form .form-control:focus,
+body.theme-dark.page-subjects .materials-add-form .form-select:focus {
+  border-color: rgba(96, 165, 250, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 0 2px rgba(96, 165, 250, 0.26), 0 12px 28px rgba(37, 99, 235, 0.2);
+}
+
+body.theme-dark.page-subjects .materials-add-form .form-select option {
+  background: #1a2336;
+  color: rgba(248, 250, 252, 0.96);
+}
+
+body.theme-dark.page-subjects .materials-add-form input[type="file"]::file-selector-button {
+  border: 1px solid rgba(148, 163, 184, 0.44);
+  background: rgba(30, 41, 59, 0.9);
+  color: rgba(248, 250, 252, 0.92);
+  border-radius: 10px;
+  padding: 0.28rem 0.72rem;
+  margin-right: 0.6rem;
+}
+
+body.theme-light.page-subjects .materials-add-form .form-select {
+  color-scheme: light;
 }
 
 .page-subjects .materials-feed {
@@ -85,6 +123,11 @@
 .page-subjects .material-card {
   border-radius: var(--radius-18);
   padding: 14px;
+}
+
+.page-subjects .material-card--syllabus {
+  border-color: rgba(120, 167, 255, 0.5);
+  background: linear-gradient(180deg, rgba(35, 74, 150, 0.24), rgba(15, 23, 42, 0.42));
 }
 
 .page-subjects .material-header {
@@ -128,6 +171,12 @@
 .page-subjects .material-type-chip {
   font-size: 0.69rem;
   padding: 0.22rem 0.55rem;
+}
+
+.page-subjects .material-card--syllabus .material-type-chip {
+  border-color: rgba(120, 167, 255, 0.52);
+  background: rgba(59, 130, 246, 0.24);
+  color: rgba(219, 234, 254, 0.98);
 }
 
 @media (max-width: 768px) {
