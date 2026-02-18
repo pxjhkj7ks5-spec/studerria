@@ -3,6 +3,7 @@
   const isProfile = activePage === 'profile';
   const isTeamwork = activePage === 'teamwork';
   const isSubjects = activePage === 'subjects';
+  const isJournal = activePage === 'journal';
 %>
 <div class="modal fade" id="mobileMenuModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -49,6 +50,9 @@
           <% } %>
           <% if (!isSubjects) { %>
             <a class="btn w-100 glass mobile-menu-action" href="/subjects">Предмети</a>
+          <% } %>
+          <% if (!isJournal) { %>
+            <a class="btn w-100 glass mobile-menu-action" href="/journal">Журнал</a>
           <% } %>
           <% if (!isTeamwork) { %>
             <a class="btn w-100 glass mobile-menu-action" href="/teamwork"><%= t('menu.teamwork') %></a>

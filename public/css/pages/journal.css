@@ -1,0 +1,150 @@
+.page-journal .journal-subject-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.page-journal .journal-table-wrap {
+  overflow: auto;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
+}
+
+.page-journal .journal-table {
+  min-width: 980px;
+  margin: 0;
+}
+
+.page-journal .journal-table th,
+.page-journal .journal-table td {
+  vertical-align: middle;
+  border-color: color-mix(in srgb, var(--surface-border) 78%, transparent);
+}
+
+.page-journal .journal-th-student {
+  min-width: 220px;
+}
+
+.page-journal .journal-th-column {
+  min-width: 170px;
+  max-width: 220px;
+}
+
+.page-journal .journal-col-title {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.page-journal .journal-col-meta {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.74rem;
+  color: var(--ds-text2);
+}
+
+.page-journal .journal-student-cell {
+  min-width: 220px;
+}
+
+.page-journal .journal-student-name {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.page-journal .journal-student-meta {
+  margin-top: 4px;
+  color: var(--ds-text2);
+  font-size: 0.78rem;
+}
+
+.page-journal .journal-cell {
+  min-width: 110px;
+}
+
+.page-journal .journal-cell-btn {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  min-height: 46px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--surface-soft) 86%, transparent);
+  color: var(--ds-text0);
+  transition: transform var(--dur-fast) var(--ease-apple), box-shadow var(--dur-fast) var(--ease-apple), border-color var(--dur-fast) var(--ease-apple);
+}
+
+.page-journal .journal-cell-btn:hover {
+  transform: translateY(-1px);
+}
+
+.page-journal .journal-cell-score {
+  font-weight: 600;
+  font-size: 0.96rem;
+}
+
+.page-journal .journal-cell-btn.is-on-time {
+  border-color: rgba(34, 197, 94, 0.46);
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.2), rgba(21, 128, 61, 0.22));
+}
+
+.page-journal .journal-cell-btn.is-late {
+  border-color: rgba(245, 158, 11, 0.48);
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.2), rgba(180, 83, 9, 0.2));
+}
+
+.page-journal .journal-cell-btn.is-manual {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.2));
+}
+
+.page-journal .journal-cell-btn.is-missing {
+  border-color: color-mix(in srgb, var(--surface-border) 90%, transparent);
+  background: color-mix(in srgb, var(--surface-soft) 92%, transparent);
+}
+
+.page-journal .final-col {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: color-mix(in srgb, var(--surface-bg) 88%, transparent);
+  min-width: 135px;
+}
+
+.page-journal .journal-final-cell {
+  text-align: right;
+}
+
+.page-journal .journal-final-value {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.page-journal .journal-final-meta {
+  margin-top: 2px;
+  color: var(--ds-text2);
+  font-size: 0.74rem;
+}
+
+.page-journal .journal-submission-box {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
+  border-radius: 14px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface-soft) 88%, transparent);
+}
+
+.page-journal .journal-submission-text {
+  margin-top: 4px;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 900px) {
+  .page-journal .journal-th-student,
+  .page-journal .journal-student-cell {
+    min-width: 180px;
+  }
+
+  .page-journal .journal-th-column {
+    min-width: 145px;
+  }
+}

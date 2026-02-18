@@ -150,6 +150,19 @@ const ADMIN_SECTION_PERMISSION_OPTIONS = ADMIN_SECTION_OPTIONS.map((section) => 
   category: 'admin_section',
 }));
 
+const JOURNAL_PERMISSION_OPTIONS = [
+  { key: 'journal-own', label: 'Журнал: свій доступ', category: 'feature' },
+  { key: 'journal-full', label: 'Журнал: повний доступ', category: 'feature' },
+];
+
+const RBAC_PERMISSION_OPTIONS = [
+  ...ADMIN_SECTION_PERMISSION_OPTIONS,
+  ...JOURNAL_PERMISSION_OPTIONS,
+];
+
+const JOURNAL_OWN_PERMISSION = 'journal-own';
+const JOURNAL_FULL_PERMISSION = 'journal-full';
+
 const COURSE_KIND_OPTIONS = [
   { key: 'regular', label: 'Regular courses' },
   { key: 'teacher', label: 'Teacher courses' },
@@ -649,6 +662,55 @@ async function getRoleAllowedSectionsForRoleKeys(roleKeys = [], fallbackRole = '
   return Array.from(merged);
 }
 
+async function getRolePermissionKeysForRoleKeys(roleKeys = [], categories = []) {
+  const normalizedRoles = normalizeRoleList(roleKeys);
+  if (!normalizedRoles.length) {
+    return new Set();
+  }
+  const normalizedCategories = Array.from(
+    new Set((Array.isArray(categories) ? categories : []).map((value) => String(value || '').trim()).filter(Boolean))
+  );
+  try {
+    const whereCategory = normalizedCategories.length ? 'AND p.category = ANY(?)' : '';
+    const rows = await db.all(
+      `
+        SELECT DISTINCT p.key
+        FROM access_role_permissions rp
+        JOIN access_roles ar ON ar.id = rp.role_id
+        JOIN access_permissions p ON p.id = rp.permission_id
+        WHERE rp.allowed = true
+          AND ar.is_active = true
+          AND ar.key = ANY(?)
+          ${whereCategory}
+        ORDER BY p.key
+      `,
+      normalizedCategories.length ? [normalizedRoles, normalizedCategories] : [normalizedRoles]
+    );
+    return new Set((rows || []).map((row) => String(row.key)));
+  } catch (err) {
+    return new Set();
+  }
+}
+
+async function getJournalAccessScope(req) {
+  const roleKeys = getSessionRoleList(req);
+  if (roleKeys.includes('admin')) {
+    return { canUseJournal: true, ownOnly: false, fullAccess: true, permissionKeys: new Set([JOURNAL_OWN_PERMISSION, JOURNAL_FULL_PERMISSION]) };
+  }
+  const permissionKeys = await getRolePermissionKeysForRoleKeys(roleKeys, ['feature']);
+  const fullAccess = permissionKeys.has(JOURNAL_FULL_PERMISSION);
+  const ownByPermission = permissionKeys.has(JOURNAL_OWN_PERMISSION);
+  const teacherFallback = roleKeys.includes('teacher');
+  const studentFallback = roleKeys.includes('student') || roleKeys.includes('starosta');
+  const canUseJournal = fullAccess || ownByPermission || teacherFallback || studentFallback;
+  return {
+    canUseJournal,
+    ownOnly: !fullAccess,
+    fullAccess,
+    permissionKeys,
+  };
+}
+
 const getRoleAllowedSections = (role) => {
   if (role === 'admin') return null;
   const permissions = settingsCache.role_permissions || {};
@@ -973,17 +1035,17 @@ const ensureUser = async (fullName, role, passwordHash, options = {}) => {
   }
 };
 
-const syncAdminSectionPermissionCatalog = async () => {
-  for (const permission of ADMIN_SECTION_PERMISSION_OPTIONS) {
+const syncRbacPermissionCatalog = async () => {
+  for (const permission of RBAC_PERMISSION_OPTIONS) {
     await db.run(
       `
         INSERT INTO access_permissions (key, label, category)
-        VALUES (?, ?, 'admin_section')
+        VALUES (?, ?, ?)
         ON CONFLICT (key) DO UPDATE
         SET label = EXCLUDED.label,
             category = EXCLUDED.category
       `,
-      [permission.key, permission.label]
+      [permission.key, permission.label, permission.category]
     );
   }
   await pool.query(
@@ -991,7 +1053,7 @@ const syncAdminSectionPermissionCatalog = async () => {
       INSERT INTO access_role_permissions (role_id, permission_id, allowed, created_at, updated_at)
       SELECT r.id, p.id, true, NOW(), NOW()
       FROM access_roles r
-      JOIN access_permissions p ON p.category = 'admin_section'
+      JOIN access_permissions p ON p.category IN ('admin_section', 'feature')
       WHERE r.key = 'admin'
       ON CONFLICT (role_id, permission_id) DO NOTHING
     `
@@ -1000,7 +1062,7 @@ const syncAdminSectionPermissionCatalog = async () => {
 
 const initDb = async () => {
   await runMigrations(pool);
-  await syncAdminSectionPermissionCatalog();
+  await syncRbacPermissionCatalog();
 
   await pool.query('UPDATE subjects SET is_required = true WHERE is_required IS NULL');
 
@@ -2606,6 +2668,7 @@ const resolveVisitPageKey = (pathname) => {
   if (normalized.startsWith('/starosta')) return 'starosta';
   if (normalized.startsWith('/teacher')) return 'teacher';
   if (normalized.startsWith('/subjects')) return 'subjects';
+  if (normalized.startsWith('/journal')) return 'journal';
   return null;
 };
 
@@ -3743,7 +3806,7 @@ async function buildMyDayData(user) {
         LEFT JOIN homework_completions hc ON hc.homework_id = h.id AND hc.user_id = ?
         WHERE (${conditions})
           AND h.course_id = ?
-          AND h.semester_id = ?
+          AND (h.semester_id = ? OR h.semester_id IS NULL)
           AND COALESCE(h.status, 'published') = 'published'
           AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
           AND (h.custom_due_date IS NOT NULL OR h.class_date IS NOT NULL)
@@ -4150,6 +4213,158 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
   }
 });
 
+app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('submission_attachment'), async (req, res) => {
+  const homeworkId = Number(req.params.id);
+  if (!Number.isFinite(homeworkId) || homeworkId < 1) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.redirect('/schedule?err=Invalid%20homework');
+  }
+
+  const userId = Number(req.session.user.id);
+  const courseId = Number(req.session.user.course_id || 1);
+  const activeSemester = await getActiveSemester(courseId);
+  const nowIso = new Date().toISOString();
+  const submissionText = String(req.body.submission_text || '').trim();
+  const rawLinkUrl = String(req.body.link_url || '').trim();
+  const linkUrl = normalizeExternalUrl(rawLinkUrl);
+  const filePath = req.file ? `/uploads/${req.file.filename}` : null;
+  const fileName = req.file ? req.file.originalname : null;
+
+  if (submissionText.length > 4000) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.redirect('/schedule?err=Submission%20text%20is%20too%20long');
+  }
+  if (rawLinkUrl && !linkUrl) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.redirect('/schedule?err=Invalid%20link%20URL');
+  }
+  if (!submissionText && !linkUrl && !req.file) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.redirect('/schedule?err=Add%20text,%20link%20or%20file');
+  }
+
+  try {
+    const homework = await db.get(
+      `
+        SELECT id, subject_id, group_number, course_id, semester_id
+        FROM homework
+        WHERE id = ?
+          AND course_id = ?
+          AND COALESCE(status, 'published') = 'published'
+          AND (scheduled_at IS NULL OR scheduled_at <= ?)
+          ${activeSemester ? 'AND (semester_id = ? OR semester_id IS NULL)' : 'AND semester_id IS NULL'}
+        LIMIT 1
+      `,
+      activeSemester ? [homeworkId, courseId, nowIso, activeSemester.id] : [homeworkId, courseId, nowIso]
+    );
+    if (!homework) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      return res.redirect('/schedule?err=Homework%20not%20found');
+    }
+
+    const studentAccess = await db.get(
+      `
+        SELECT 1
+        FROM student_groups
+        WHERE student_id = ? AND subject_id = ? AND group_number = ?
+        LIMIT 1
+      `,
+      [userId, homework.subject_id, homework.group_number]
+    );
+    if (!studentAccess) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      return res.status(403).send('Forbidden (homework submit)');
+    }
+
+    const existing = await db.get(
+      `
+        SELECT id, file_path
+        FROM homework_submissions
+        WHERE homework_id = ? AND student_id = ?
+        LIMIT 1
+      `,
+      [homeworkId, userId]
+    );
+    if (existing) {
+      await db.run(
+        `
+          UPDATE homework_submissions
+          SET submission_text = ?,
+              link_url = ?,
+              file_path = ?,
+              file_name = ?,
+              submitted_at = ?,
+              updated_at = ?
+          WHERE id = ?
+        `,
+        [
+          submissionText || null,
+          linkUrl || null,
+          filePath || existing.file_path || null,
+          fileName || null,
+          nowIso,
+          nowIso,
+          existing.id,
+        ]
+      );
+      if (filePath && existing.file_path && existing.file_path !== filePath) {
+        const relativePath = String(existing.file_path).replace(/^\/+/, '');
+        const absolutePath = path.join(__dirname, relativePath);
+        fs.unlink(absolutePath, () => {});
+      }
+    } else {
+      await db.run(
+        `
+          INSERT INTO homework_submissions
+            (homework_id, student_id, submission_text, link_url, file_path, file_name, submitted_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          homeworkId,
+          userId,
+          submissionText || null,
+          linkUrl || null,
+          filePath,
+          fileName,
+          nowIso,
+          nowIso,
+        ]
+      );
+    }
+
+    await db.run(
+      `
+        INSERT INTO homework_completions (user_id, homework_id, done_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT (user_id, homework_id)
+        DO UPDATE SET done_at = EXCLUDED.done_at
+      `,
+      [userId, homeworkId, nowIso]
+    );
+
+    logActivity(
+      db,
+      req,
+      'homework_submit',
+      'homework',
+      homeworkId,
+      {
+        subject_id: Number(homework.subject_id),
+        group_number: Number(homework.group_number),
+        has_text: Boolean(submissionText),
+        has_link: Boolean(linkUrl),
+        has_file: Boolean(filePath),
+      },
+      Number(homework.course_id || courseId),
+      homework.semester_id ? Number(homework.semester_id) : null
+    );
+    return res.redirect('/schedule?ok=ДЗ%20здано');
+  } catch (err) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.redirect('/schedule?err=Database%20error');
+  }
+});
+
 app.get('/schedule', requireLogin, async (req, res) => {
   const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
   if (hasSessionRole(req, 'teacher')) {
@@ -4404,6 +4619,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
               created_by: row.created_by,
               created_at: row.created_at,
               is_control: Number(row.is_control || 0),
+              is_teacher_homework: Number(row.is_teacher_homework || 0),
+              is_credit: Number(row.is_credit || 0),
               course_id: row.course_id,
               subgroups: {},
             });
@@ -4430,11 +4647,31 @@ app.get('/schedule', requireLogin, async (req, res) => {
           const legacyKey = `${hw.subject_id}|${hw.group_number}|${hw.day}|${hw.class_number}`;
           const key = hw.class_date ? `${legacyKey}|${hw.class_date}` : legacyKey;
           if (!homeworkMeta[key]) {
-            homeworkMeta[key] = { count: 0, preview: [], control: false };
+            homeworkMeta[key] = {
+              count: 0,
+              preview: [],
+              control: false,
+              teacher_homework: false,
+              credit: false,
+              meet: false,
+              meet_link: '',
+            };
           }
           homeworkMeta[key].count += 1;
           if (hw.is_control) {
             homeworkMeta[key].control = true;
+          }
+          if (hw.is_teacher_homework) {
+            homeworkMeta[key].teacher_homework = true;
+          }
+          if (hw.is_credit) {
+            homeworkMeta[key].credit = true;
+          }
+          if (hw.meeting_url) {
+            homeworkMeta[key].meet = true;
+            if (!homeworkMeta[key].meet_link) {
+              homeworkMeta[key].meet_link = String(hw.meeting_url);
+            }
           }
           if (hw.description && homeworkMeta[key].preview.length < 2) {
             homeworkMeta[key].preview.push(hw.description);
@@ -4443,11 +4680,31 @@ app.get('/schedule', requireLogin, async (req, res) => {
             ? `${hw.subject_id}|${hw.day}|${hw.class_number}|${hw.class_date}`
             : `${hw.subject_id}|${hw.day}|${hw.class_number}`;
           if (!homeworkMetaAll[allKey]) {
-            homeworkMetaAll[allKey] = { count: 0, preview: [], control: false };
+            homeworkMetaAll[allKey] = {
+              count: 0,
+              preview: [],
+              control: false,
+              teacher_homework: false,
+              credit: false,
+              meet: false,
+              meet_link: '',
+            };
           }
           homeworkMetaAll[allKey].count += 1;
           if (hw.is_control) {
             homeworkMetaAll[allKey].control = true;
+          }
+          if (hw.is_teacher_homework) {
+            homeworkMetaAll[allKey].teacher_homework = true;
+          }
+          if (hw.is_credit) {
+            homeworkMetaAll[allKey].credit = true;
+          }
+          if (hw.meeting_url) {
+            homeworkMetaAll[allKey].meet = true;
+            if (!homeworkMetaAll[allKey].meet_link) {
+              homeworkMetaAll[allKey].meet_link = String(hw.meeting_url);
+            }
           }
           if (hw.description && homeworkMetaAll[allKey].preview.length < 2) {
             homeworkMetaAll[allKey].preview.push(hw.description);
@@ -4767,18 +5024,49 @@ app.get('/schedule', requireLogin, async (req, res) => {
         });
       }
 
-      const loadCustomDeadlines = (cb) => {
+      const buildHomeworkTargets = (baseGroups = [], scheduleRows = []) => {
+        const map = new Map();
+        (baseGroups || []).forEach((item) => {
+          const subjectId = Number(item.subject_id);
+          const groupNumber = Number(item.group_number);
+          if (!Number.isFinite(subjectId) || !Number.isFinite(groupNumber)) return;
+          const key = `${subjectId}|${groupNumber}`;
+          if (!map.has(key)) {
+            map.set(key, {
+              subject_id: subjectId,
+              group_number: groupNumber,
+              subject_name: item.subject_name || '',
+            });
+          }
+        });
+        (scheduleRows || []).forEach((row) => {
+          const subjectId = Number(row.subject_id);
+          const groupNumber = Number(row.group_number);
+          if (!Number.isFinite(subjectId) || !Number.isFinite(groupNumber) || groupNumber < 1) return;
+          const key = `${subjectId}|${groupNumber}`;
+          if (!map.has(key)) {
+            map.set(key, {
+              subject_id: subjectId,
+              group_number: groupNumber,
+              subject_name: row.subject_name || '',
+            });
+          }
+        });
+        return Array.from(map.values());
+      };
+
+      const loadCustomDeadlines = (homeworkTargets, cb) => {
         if (!settingsCache.allow_custom_deadlines) {
           return cb({}, [], []);
         }
-        if (!studentGroups.length || !weekStartDate || !weekEndDate) {
+        if (!homeworkTargets.length || !weekStartDate || !weekEndDate) {
           return cb({}, [], []);
         }
-        const conditions = studentGroups
+        const conditions = homeworkTargets
           .map(() => '(h.subject_id = ? AND h.group_number = ?)')
           .join(' OR ');
         const params = [];
-        studentGroups.forEach((sg) => {
+        homeworkTargets.forEach((sg) => {
           params.push(sg.subject_id, sg.group_number);
         });
         params.push(scheduleCourseId, activeSemester ? activeSemester.id : null, nowIso, weekStartDate, weekEndDate);
@@ -4788,7 +5076,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           JOIN subjects subj ON subj.id = h.subject_id
           WHERE (${conditions})
             AND h.course_id = ?
-            AND h.semester_id = ?
+            AND (h.semester_id = ? OR h.semester_id IS NULL)
             AND COALESCE(h.status, 'published') = 'published'
             AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
             AND h.is_custom_deadline = 1
@@ -4862,9 +5150,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
         });
       };
 
-      const loadHomework = () => {
-        if (!studentGroups.length) {
-          return loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
+      const loadHomework = (homeworkTargets) => {
+        if (!homeworkTargets.length) {
+          return loadCustomDeadlines(homeworkTargets, (customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
             res.render('schedule', {
             scheduleByDay,
             daysOfWeek: activeDays,
@@ -4896,11 +5184,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
           );
         }
 
-        const hwConditions = studentGroups
+        const hwConditions = homeworkTargets
           .map(() => '(h.subject_id = ? AND h.group_number = ?)')
           .join(' OR ');
         const hwParams = [];
-        studentGroups.forEach((sg) => {
+        homeworkTargets.forEach((sg) => {
           hwParams.push(sg.subject_id, sg.group_number);
         });
 
@@ -4913,7 +5201,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
             WHERE (${hwConditions})
               AND h.course_id = ?
-              AND h.semester_id = ?
+              AND (h.semester_id = ? OR h.semester_id IS NULL)
               AND COALESCE(h.status, 'published') = 'published'
               AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
               AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
@@ -4944,6 +5232,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
                   created_by: row.created_by,
                   created_at: row.created_at,
                   is_control: Number(row.is_control || 0),
+                  is_teacher_homework: Number(row.is_teacher_homework || 0),
+                  is_credit: Number(row.is_credit || 0),
                   course_id: row.course_id,
                   subgroups: {},
                 });
@@ -4972,11 +5262,31 @@ app.get('/schedule', requireLogin, async (req, res) => {
               const legacyKey = `${hw.subject_id}|${hw.group_number}|${hw.day}|${hw.class_number}`;
               const key = hw.class_date ? `${legacyKey}|${hw.class_date}` : legacyKey;
               if (!homeworkMeta[key]) {
-                homeworkMeta[key] = { count: 0, preview: [], control: false };
+                homeworkMeta[key] = {
+                  count: 0,
+                  preview: [],
+                  control: false,
+                  teacher_homework: false,
+                  credit: false,
+                  meet: false,
+                  meet_link: '',
+                };
               }
               homeworkMeta[key].count += 1;
               if (hw.is_control) {
                 homeworkMeta[key].control = true;
+              }
+              if (hw.is_teacher_homework) {
+                homeworkMeta[key].teacher_homework = true;
+              }
+              if (hw.is_credit) {
+                homeworkMeta[key].credit = true;
+              }
+              if (hw.meeting_url) {
+                homeworkMeta[key].meet = true;
+                if (!homeworkMeta[key].meet_link) {
+                  homeworkMeta[key].meet_link = String(hw.meeting_url);
+                }
               }
               if (hw.description && homeworkMeta[key].preview.length < 2) {
                 homeworkMeta[key].preview.push(hw.description);
@@ -5016,7 +5326,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             };
 
             if (!homeworkIds.length) {
-              return loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
+              return loadCustomDeadlines(homeworkTargets, (customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
                 finalizeRender([], customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems)
               );
             }
@@ -5071,7 +5381,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                             hw.reactions = reactionMap[hw.id] || {};
                             hw.reacted = reactedMap[hw.id] || {};
                           });
-                          loadCustomDeadlines((customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
+                          loadCustomDeadlines(homeworkTargets, (customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
                             finalizeRender(tagOptions, customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems)
                           );
                         }
@@ -5119,7 +5429,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
         activeDays.forEach((day) => {
           scheduleByDay[day].sort((a, b) => a.class_number - b.class_number);
         });
-        return loadHomework();
+        const homeworkTargets = buildHomeworkTargets(studentGroups, rows || []);
+        return loadHomework(homeworkTargets);
       });
     }
   );
@@ -5310,6 +5621,1123 @@ const normalizeExternalUrl = (rawValue) => {
     return '';
   }
 };
+
+const JOURNAL_COLUMN_TYPES = new Set(['homework', 'seminar', 'exam', 'credit', 'custom']);
+
+const DEFAULT_SUBJECT_GRADING_SETTINGS = {
+  homework_max_points: 10,
+  seminar_max_points: 10,
+  exam_max_points: 40,
+  credit_max_points: 20,
+  custom_max_points: 10,
+  final_max_points: 100,
+};
+
+const toDateOnly = (rawValue) => String(rawValue || '').slice(0, 10);
+
+const parsePositiveDecimal = (rawValue, fallbackValue) => {
+  if (rawValue === null || typeof rawValue === 'undefined' || rawValue === '') return fallbackValue;
+  const normalized = Number(String(rawValue).replace(',', '.'));
+  if (!Number.isFinite(normalized) || normalized <= 0) return fallbackValue;
+  return Math.round(normalized * 100) / 100;
+};
+
+const normalizeColumnType = (rawValue) => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  return JOURNAL_COLUMN_TYPES.has(normalized) ? normalized : 'custom';
+};
+
+const getDefaultMaxPointsByType = (gradingSettings, columnType) => {
+  const safeSettings = {
+    ...DEFAULT_SUBJECT_GRADING_SETTINGS,
+    ...(gradingSettings || {}),
+  };
+  if (columnType === 'homework') return Number(safeSettings.homework_max_points || 10);
+  if (columnType === 'seminar') return Number(safeSettings.seminar_max_points || 10);
+  if (columnType === 'exam') return Number(safeSettings.exam_max_points || 40);
+  if (columnType === 'credit') return Number(safeSettings.credit_max_points || 20);
+  return Number(safeSettings.custom_max_points || 10);
+};
+
+const buildHomeworkJournalTitle = (homeworkRow) => {
+  const base = String(homeworkRow?.description || 'Завдання')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const shortBase = base.length > 78 ? `${base.slice(0, 75)}...` : base;
+  const dueDate = toDateOnly(homeworkRow?.custom_due_date || homeworkRow?.class_date);
+  return dueDate ? `${shortBase} (${dueDate})` : shortBase;
+};
+
+const resolveHomeworkSubmissionStatus = (homeworkRow, submissionRow) => {
+  if (!submissionRow) return 'missing';
+  const dueDate = toDateOnly(homeworkRow?.custom_due_date || homeworkRow?.class_date);
+  if (!dueDate) return 'manual';
+  const submittedDate = toDateOnly(submissionRow.submitted_at);
+  if (!submittedDate) return 'manual';
+  return submittedDate <= dueDate ? 'on_time' : 'late';
+};
+
+const canUseTeacherJournalMode = (req, journalScope) => {
+  const roles = getSessionRoleList(req);
+  return Boolean(
+    journalScope?.fullAccess
+    || (journalScope?.permissionKeys && journalScope.permissionKeys.has(JOURNAL_OWN_PERMISSION))
+    || roles.includes('teacher')
+  );
+};
+
+async function ensureSubjectGradingSettings(subjectId, courseId, semesterId, userId) {
+  await db.run(
+    `
+      INSERT INTO subject_grading_settings
+      (
+        subject_id, course_id, semester_id,
+        homework_max_points, seminar_max_points, exam_max_points, credit_max_points, custom_max_points,
+        final_max_points, created_by, updated_by, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 100, ?, ?, NOW(), NOW())
+      ON CONFLICT (subject_id) DO NOTHING
+    `,
+    [
+      subjectId,
+      courseId || null,
+      semesterId || null,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points,
+      userId || null,
+      userId || null,
+    ]
+  );
+  const row = await db.get(
+    `
+      SELECT *
+      FROM subject_grading_settings
+      WHERE subject_id = ?
+      LIMIT 1
+    `,
+    [subjectId]
+  );
+  if (!row) return { ...DEFAULT_SUBJECT_GRADING_SETTINGS };
+  return {
+    homework_max_points: parsePositiveDecimal(row.homework_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points),
+    seminar_max_points: parsePositiveDecimal(row.seminar_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points),
+    exam_max_points: parsePositiveDecimal(row.exam_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points),
+    credit_max_points: parsePositiveDecimal(row.credit_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points),
+    custom_max_points: parsePositiveDecimal(row.custom_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points),
+    final_max_points: 100,
+  };
+}
+
+async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, gradingSettings, userId) {
+  const params = [subjectId, courseId];
+  let sql = `
+    SELECT h.id, h.description, h.custom_due_date, h.class_date, h.is_credit, h.created_at
+    FROM homework h
+    WHERE h.subject_id = ?
+      AND h.course_id = ?
+      AND COALESCE(h.status, 'published') = 'published'
+  `;
+  if (semesterId) {
+    sql += ' AND (h.semester_id = ? OR h.semester_id IS NULL)';
+    params.push(semesterId);
+  } else {
+    sql += ' AND h.semester_id IS NULL';
+  }
+  sql += ' ORDER BY COALESCE(h.custom_due_date, h.class_date, h.created_at) ASC, h.id ASC';
+  const homeworkRows = await db.all(sql, params);
+
+  const columnParams = [subjectId, courseId];
+  let columnsSql = `
+    SELECT id, source_homework_id, title, column_type, max_points, is_credit, position
+    FROM journal_columns
+    WHERE subject_id = ?
+      AND course_id = ?
+      AND source_homework_id IS NOT NULL
+      AND COALESCE(is_archived, 0) = 0
+  `;
+  if (semesterId) {
+    columnsSql += ' AND (semester_id = ? OR semester_id IS NULL)';
+    columnParams.push(semesterId);
+  } else {
+    columnsSql += ' AND semester_id IS NULL';
+  }
+  const existing = await db.all(columnsSql, columnParams);
+  const existingByHomeworkId = new Map();
+  let maxNonCreditPosition = 0;
+  let maxCreditPosition = 0;
+  (existing || []).forEach((row) => {
+    existingByHomeworkId.set(Number(row.source_homework_id), row);
+    const position = Number(row.position || 0);
+    if (Number(row.is_credit) === 1) {
+      if (position > maxCreditPosition) maxCreditPosition = position;
+    } else if (position > maxNonCreditPosition) {
+      maxNonCreditPosition = position;
+    }
+  });
+
+  for (const homeworkRow of homeworkRows || []) {
+    const homeworkId = Number(homeworkRow.id);
+    const isCredit = Number(homeworkRow.is_credit || 0) === 1 ? 1 : 0;
+    const columnType = isCredit ? 'credit' : 'homework';
+    const title = buildHomeworkJournalTitle(homeworkRow);
+    const defaultMaxPoints = parsePositiveDecimal(
+      getDefaultMaxPointsByType(gradingSettings, columnType),
+      getDefaultMaxPointsByType(DEFAULT_SUBJECT_GRADING_SETTINGS, columnType)
+    );
+    const existingRow = existingByHomeworkId.get(homeworkId);
+    if (existingRow) {
+      const existingMaxPoints = parsePositiveDecimal(existingRow.max_points, defaultMaxPoints);
+      const needsUpdate = String(existingRow.title || '') !== title
+        || String(existingRow.column_type || '') !== columnType
+        || Number(existingRow.is_credit || 0) !== isCredit
+        || Number(existingMaxPoints) !== Number(defaultMaxPoints);
+      if (needsUpdate) {
+        await db.run(
+          `
+            UPDATE journal_columns
+            SET title = ?,
+                column_type = ?,
+                is_credit = ?,
+                max_points = ?,
+                updated_at = NOW()
+            WHERE id = ?
+          `,
+          [title, columnType, isCredit, defaultMaxPoints, existingRow.id]
+        );
+      }
+      continue;
+    }
+    const nextPosition = isCredit ? (maxCreditPosition + 10) : (maxNonCreditPosition + 10);
+    if (isCredit) maxCreditPosition = nextPosition;
+    else maxNonCreditPosition = nextPosition;
+    await db.run(
+      `
+        INSERT INTO journal_columns
+        (
+          subject_id, course_id, semester_id, source_type, source_homework_id,
+          title, column_type, max_points, position, is_credit, created_by, created_at, updated_at
+        )
+        VALUES (?, ?, ?, 'homework', ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `,
+      [
+        subjectId,
+        courseId,
+        semesterId || null,
+        homeworkId,
+        title,
+        columnType,
+        defaultMaxPoints,
+        nextPosition,
+        isCredit,
+        userId || null,
+      ]
+    );
+  }
+}
+
+async function getTeacherJournalSubjectAccess(userId, subjectId) {
+  const rows = await db.all(
+    `
+      SELECT ts.group_number, s.group_count
+      FROM teacher_subjects ts
+      JOIN subjects s ON s.id = ts.subject_id
+      WHERE ts.user_id = ? AND ts.subject_id = ?
+    `,
+    [userId, subjectId]
+  );
+  if (!rows || !rows.length) {
+    return { hasRows: false, allowAll: false, groups: new Set() };
+  }
+  return buildTeacherSubjectAccess(rows, Number(rows[0].group_count || 1));
+}
+
+async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode) {
+  const userId = Number(req.session.user.id);
+  if (teacherJournalMode && journalScope.fullAccess) {
+    const rows = await db.all(
+      `
+        SELECT s.id AS subject_id, s.name AS subject_name, s.group_count, s.course_id, c.name AS course_name
+        FROM subjects s
+        JOIN courses c ON c.id = s.course_id
+        WHERE s.visible = 1
+        ORDER BY c.id ASC, s.name ASC
+      `
+    );
+    return (rows || []).map((row) => ({
+      subject_id: Number(row.subject_id),
+      subject_name: row.subject_name,
+      group_count: Math.max(1, Number(row.group_count || 1)),
+      course_id: Number(row.course_id || 1),
+      course_name: row.course_name || '',
+      has_all_groups: true,
+      group_numbers: Array.from({ length: Math.max(1, Number(row.group_count || 1)) }, (_v, index) => index + 1),
+      group_label: 'Усі групи',
+    }));
+  }
+
+  if (teacherJournalMode) {
+    const rows = await db.all(
+      `
+        SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count, s.course_id, c.name AS course_name
+        FROM teacher_subjects ts
+        JOIN subjects s ON s.id = ts.subject_id
+        JOIN courses c ON c.id = s.course_id
+        WHERE ts.user_id = ? AND s.visible = 1
+        ORDER BY c.id ASC, s.name ASC
+      `,
+      [userId]
+    );
+    const map = new Map();
+    (rows || []).forEach((row) => {
+      const key = Number(row.subject_id);
+      if (!map.has(key)) {
+        map.set(key, {
+          subject_id: key,
+          subject_name: row.subject_name,
+          group_count: Math.max(1, Number(row.group_count || 1)),
+          course_id: Number(row.course_id || 1),
+          course_name: row.course_name || '',
+          has_all_groups: false,
+          group_numbers_set: new Set(),
+        });
+      }
+      const item = map.get(key);
+      if (row.group_number === null || typeof row.group_number === 'undefined') {
+        item.has_all_groups = true;
+      } else {
+        const groupNumber = Number(row.group_number);
+        if (Number.isInteger(groupNumber) && groupNumber > 0) {
+          item.group_numbers_set.add(groupNumber);
+        }
+      }
+    });
+    return Array.from(map.values()).map((item) => {
+      const groupNumbers = item.has_all_groups
+        ? Array.from({ length: item.group_count }, (_v, index) => index + 1)
+        : Array.from(item.group_numbers_set).sort((a, b) => a - b);
+      let groupLabel = 'Без груп';
+      if (item.has_all_groups) groupLabel = 'Усі групи';
+      else if (groupNumbers.length === 1) groupLabel = `Група ${groupNumbers[0]}`;
+      else if (groupNumbers.length > 1) groupLabel = `Групи ${groupNumbers.join(', ')}`;
+      return {
+        subject_id: item.subject_id,
+        subject_name: item.subject_name,
+        group_count: item.group_count,
+        course_id: item.course_id,
+        course_name: item.course_name,
+        has_all_groups: item.has_all_groups,
+        group_numbers: groupNumbers,
+        group_label: groupLabel,
+      };
+    });
+  }
+
+  const rows = await db.all(
+    `
+      SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.group_count, s.course_id, c.name AS course_name
+      FROM student_groups sg
+      JOIN subjects s ON s.id = sg.subject_id
+      JOIN courses c ON c.id = s.course_id
+      WHERE sg.student_id = ? AND s.visible = 1
+      ORDER BY c.id ASC, s.name ASC
+    `,
+    [userId]
+  );
+  return (rows || []).map((row) => ({
+    subject_id: Number(row.subject_id),
+    subject_name: row.subject_name,
+    group_count: Math.max(1, Number(row.group_count || 1)),
+    course_id: Number(row.course_id || 1),
+    course_name: row.course_name || '',
+    has_all_groups: false,
+    group_numbers: [Number(row.group_number || 1)],
+    group_label: `Група ${Number(row.group_number || 1)}`,
+  }));
+}
+
+async function getJournalColumns(subjectId, courseId, semesterId) {
+  const params = [subjectId, courseId];
+  let sql = `
+    SELECT
+      jc.*,
+      h.description AS homework_description,
+      h.custom_due_date,
+      h.class_date,
+      h.group_number AS homework_group_number,
+      h.meeting_url AS homework_meeting_url,
+      h.link_url AS homework_link_url,
+      h.file_path AS homework_file_path,
+      h.file_name AS homework_file_name,
+      h.is_custom_deadline AS homework_is_custom_deadline,
+      h.created_at AS homework_created_at,
+      h.created_by AS homework_created_by,
+      u.full_name AS homework_created_by_name
+    FROM journal_columns jc
+    LEFT JOIN homework h ON h.id = jc.source_homework_id
+    LEFT JOIN users u ON u.id = h.created_by_id
+    WHERE jc.subject_id = ?
+      AND jc.course_id = ?
+      AND COALESCE(jc.is_archived, 0) = 0
+  `;
+  if (semesterId) {
+    sql += ' AND (jc.semester_id = ? OR jc.semester_id IS NULL)';
+    params.push(semesterId);
+  } else {
+    sql += ' AND jc.semester_id IS NULL';
+  }
+  sql += `
+    ORDER BY
+      CASE WHEN COALESCE(jc.is_credit, 0) = 1 THEN 1 ELSE 0 END ASC,
+      COALESCE(jc.position, 0) ASC,
+      COALESCE(h.custom_due_date, h.class_date, h.created_at, jc.created_at::text) ASC,
+      jc.id ASC
+  `;
+  const rows = await db.all(sql, params);
+  return (rows || []).map((row) => ({
+    id: Number(row.id),
+    subject_id: Number(row.subject_id),
+    source_type: String(row.source_type || 'manual'),
+    source_homework_id: row.source_homework_id ? Number(row.source_homework_id) : null,
+    title: String(row.title || ''),
+    column_type: normalizeColumnType(row.column_type),
+    max_points: parsePositiveDecimal(row.max_points, 10),
+    is_credit: Number(row.is_credit || 0) === 1,
+    position: Number(row.position || 0),
+    homework_description: row.homework_description || null,
+    custom_due_date: toDateOnly(row.custom_due_date),
+    class_date: toDateOnly(row.class_date),
+    homework_group_number: row.homework_group_number ? Number(row.homework_group_number) : null,
+    homework_meeting_url: row.homework_meeting_url || null,
+    homework_link_url: row.homework_link_url || null,
+    homework_file_path: row.homework_file_path || null,
+    homework_file_name: normalizeUploadedOriginalName(row.homework_file_name),
+    homework_is_custom_deadline: Number(row.homework_is_custom_deadline || 0) === 1,
+    homework_created_at: row.homework_created_at || null,
+    homework_created_by: row.homework_created_by || null,
+    homework_created_by_name: row.homework_created_by_name || null,
+  }));
+}
+
+async function getJournalStudents(subjectId, courseId, groupFilterSet = null, userFilterIds = []) {
+  const params = [subjectId, courseId];
+  let sql = `
+    SELECT DISTINCT u.id, u.full_name, sg.group_number
+    FROM student_groups sg
+    JOIN users u ON u.id = sg.student_id
+    WHERE sg.subject_id = ?
+      AND u.course_id = ?
+      AND u.is_active = 1
+  `;
+  if (groupFilterSet && groupFilterSet.size) {
+    const groups = Array.from(groupFilterSet).filter((value) => Number.isInteger(value) && value > 0);
+    if (groups.length) {
+      sql += ` AND sg.group_number IN (${groups.map(() => '?').join(',')})`;
+      params.push(...groups);
+    }
+  }
+  const userIds = Array.isArray(userFilterIds)
+    ? Array.from(new Set(userFilterIds.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)))
+    : [];
+  if (userIds.length) {
+    sql += ` AND u.id IN (${userIds.map(() => '?').join(',')})`;
+    params.push(...userIds);
+  }
+  sql += ' ORDER BY sg.group_number ASC, u.full_name ASC';
+  const rows = await db.all(sql, params);
+  return (rows || []).map((row) => ({
+    id: Number(row.id),
+    full_name: row.full_name,
+    group_number: Number(row.group_number || 0),
+  }));
+}
+
+async function buildJournalMatrix({
+  subjectId,
+  courseId,
+  semesterId,
+  actorUserId,
+  groupFilterSet = null,
+  studentFilterIds = [],
+}) {
+  const gradingSettings = await ensureSubjectGradingSettings(subjectId, courseId, semesterId, actorUserId);
+  await syncJournalColumnsFromHomework(subjectId, courseId, semesterId, gradingSettings, actorUserId);
+
+  let columns = await getJournalColumns(subjectId, courseId, semesterId);
+  if (groupFilterSet && groupFilterSet.size) {
+    columns = columns.filter((column) => {
+      if (!column.source_homework_id || !column.homework_group_number) return true;
+      return groupFilterSet.has(Number(column.homework_group_number));
+    });
+  }
+
+  const students = await getJournalStudents(subjectId, courseId, groupFilterSet, studentFilterIds);
+  if (!students.length) {
+    return {
+      gradingSettings,
+      columns,
+      rows: [],
+    };
+  }
+
+  const columnIds = columns.map((column) => column.id);
+  const studentIds = students.map((student) => student.id);
+
+  let gradesByKey = new Map();
+  if (columnIds.length && studentIds.length) {
+    const rows = await db.all(
+      `
+        SELECT column_id, student_id, score, teacher_comment, submission_status, graded_at
+        FROM journal_grades
+        WHERE column_id IN (${columnIds.map(() => '?').join(',')})
+          AND student_id IN (${studentIds.map(() => '?').join(',')})
+      `,
+      [...columnIds, ...studentIds]
+    );
+    gradesByKey = new Map(
+      (rows || []).map((row) => [
+        `${Number(row.column_id)}|${Number(row.student_id)}`,
+        {
+          score: Number(row.score),
+          teacher_comment: row.teacher_comment || '',
+          submission_status: String(row.submission_status || ''),
+          graded_at: row.graded_at || null,
+        },
+      ])
+    );
+  }
+
+  const homeworkIds = columns
+    .map((column) => Number(column.source_homework_id))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  let submissionsByKey = new Map();
+  if (homeworkIds.length && studentIds.length) {
+    const rows = await db.all(
+      `
+        SELECT homework_id, student_id, submission_text, link_url, file_path, file_name, submitted_at, updated_at
+        FROM homework_submissions
+        WHERE homework_id IN (${homeworkIds.map(() => '?').join(',')})
+          AND student_id IN (${studentIds.map(() => '?').join(',')})
+      `,
+      [...homeworkIds, ...studentIds]
+    );
+    submissionsByKey = new Map(
+      (rows || []).map((row) => [
+        `${Number(row.homework_id)}|${Number(row.student_id)}`,
+        {
+          submission_text: row.submission_text || '',
+          link_url: row.link_url || '',
+          file_path: row.file_path || '',
+          file_name: normalizeUploadedOriginalName(row.file_name),
+          submitted_at: row.submitted_at || null,
+          updated_at: row.updated_at || null,
+        },
+      ])
+    );
+  }
+
+  const rows = students.map((student) => {
+    const cells = columns.map((column) => {
+      const grade = gradesByKey.get(`${column.id}|${student.id}`) || null;
+      const submission = column.source_homework_id
+        ? (submissionsByKey.get(`${column.source_homework_id}|${student.id}`) || null)
+        : null;
+      let status = 'missing';
+      if (column.source_homework_id) {
+        status = resolveHomeworkSubmissionStatus(column, submission);
+      } else if (grade && Number.isFinite(grade.score)) {
+        status = 'manual';
+      }
+      if (grade && grade.submission_status) {
+        status = grade.submission_status;
+      }
+      return {
+        column_id: column.id,
+        student_id: student.id,
+        score: grade && Number.isFinite(grade.score) ? Number(grade.score) : null,
+        teacher_comment: grade ? grade.teacher_comment : '',
+        graded_at: grade ? grade.graded_at : null,
+        status,
+        submission,
+      };
+    });
+    const rawEarned = cells.reduce((sum, cell) => sum + (Number.isFinite(cell.score) ? Number(cell.score) : 0), 0);
+    const rawMax = columns.reduce((sum, column) => sum + parsePositiveDecimal(column.max_points, 0), 0);
+    const finalScore = rawMax > 0 ? Math.min(100, (rawEarned / rawMax) * 100) : 0;
+    return {
+      student,
+      cells,
+      raw_earned: Math.round(rawEarned * 100) / 100,
+      raw_max: Math.round(rawMax * 100) / 100,
+      final_score: Math.round(finalScore * 100) / 100,
+    };
+  });
+
+  return {
+    gradingSettings,
+    columns,
+    rows,
+  };
+}
+
+app.get('/journal', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'journal.init');
+  }
+
+  try {
+    const journalScope = await getJournalAccessScope(req);
+    if (!journalScope.canUseJournal) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    const subjectOptions = await getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode);
+    const requestedSubjectId = Number(req.query.subject_id);
+    const selectedSubject = Number.isFinite(requestedSubjectId) && requestedSubjectId > 0
+      ? (subjectOptions.find((item) => Number(item.subject_id) === requestedSubjectId) || null)
+      : (subjectOptions[0] || null);
+
+    if (!selectedSubject) {
+      return res.render('journal', {
+        username: req.session.user.username,
+        role: req.session.role,
+        subjects: [],
+        selectedSubject: null,
+        columns: [],
+        journalRows: [],
+        gradingSettings: { ...DEFAULT_SUBJECT_GRADING_SETTINGS },
+        canEditJournal: false,
+        teacherJournalMode,
+        canManageAllSubjects: Boolean(journalScope.fullAccess),
+        selectedSemester: null,
+      });
+    }
+
+    const selectedCourseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
+    const selectedSemester = await getActiveSemester(selectedCourseId);
+
+    let groupFilterSet = null;
+    let studentFilterIds = [];
+
+    if (!teacherJournalMode) {
+      groupFilterSet = new Set((selectedSubject.group_numbers || []).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0));
+      studentFilterIds = [Number(req.session.user.id)];
+    } else if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
+      groupFilterSet = new Set((selectedSubject.group_numbers || []).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0));
+    }
+
+    const matrix = await buildJournalMatrix({
+      subjectId: Number(selectedSubject.subject_id),
+      courseId: selectedCourseId,
+      semesterId: selectedSemester ? Number(selectedSemester.id) : null,
+      actorUserId: Number(req.session.user.id),
+      groupFilterSet,
+      studentFilterIds,
+    });
+
+    return res.render('journal', {
+      username: req.session.user.username,
+      role: req.session.role,
+      subjects: subjectOptions,
+      selectedSubject,
+      columns: matrix.columns,
+      journalRows: matrix.rows,
+      gradingSettings: matrix.gradingSettings,
+      canEditJournal: teacherJournalMode,
+      teacherJournalMode,
+      canManageAllSubjects: Boolean(journalScope.fullAccess),
+      selectedSemester,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'journal.page');
+  }
+});
+
+app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
+  const columnId = Number(req.query.column_id);
+  const studentId = Number(req.query.student_id);
+  if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
+    return res.status(400).json({ error: 'Invalid cell' });
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    if (!journalScope.canUseJournal) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    const column = await db.get(
+      `
+        SELECT
+          jc.*,
+          h.group_number AS homework_group_number,
+          h.custom_due_date,
+          h.class_date,
+          h.description AS homework_description
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.status(404).json({ error: 'Column not found' });
+    }
+
+    const studentRow = await db.get(
+      `
+        SELECT sg.group_number, u.id, u.full_name
+        FROM student_groups sg
+        JOIN users u ON u.id = sg.student_id
+        WHERE sg.subject_id = ? AND sg.student_id = ?
+        LIMIT 1
+      `,
+      [column.subject_id, studentId]
+    );
+    if (!studentRow) {
+      return res.status(404).json({ error: 'Student not found for subject' });
+    }
+
+    if (!teacherJournalMode) {
+      if (Number(req.session.user.id) !== studentId) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    } else if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      if (!access.hasRows) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const studentGroup = Number(studentRow.group_number || 0);
+      if (!access.allowAll && !access.groups.has(studentGroup)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
+
+    const grade = await db.get(
+      `
+        SELECT score, teacher_comment, submission_status, graded_at
+        FROM journal_grades
+        WHERE column_id = ? AND student_id = ?
+        LIMIT 1
+      `,
+      [columnId, studentId]
+    );
+    const submission = column.source_homework_id
+      ? await db.get(
+          `
+            SELECT submission_text, link_url, file_path, file_name, submitted_at, updated_at
+            FROM homework_submissions
+            WHERE homework_id = ? AND student_id = ?
+            LIMIT 1
+          `,
+          [column.source_homework_id, studentId]
+        )
+      : null;
+    const submissionStatus = column.source_homework_id
+      ? resolveHomeworkSubmissionStatus(
+          {
+            custom_due_date: column.custom_due_date,
+            class_date: column.class_date,
+          },
+          submission
+        )
+      : 'manual';
+
+    return res.json({
+      column: {
+        id: Number(column.id),
+        title: String(column.title || ''),
+        max_points: parsePositiveDecimal(column.max_points, 10),
+        column_type: normalizeColumnType(column.column_type),
+        source_homework_id: column.source_homework_id ? Number(column.source_homework_id) : null,
+        homework_description: column.homework_description || null,
+        due_date: toDateOnly(column.custom_due_date || column.class_date),
+      },
+      student: {
+        id: Number(studentRow.id),
+        full_name: studentRow.full_name,
+        group_number: Number(studentRow.group_number || 0),
+      },
+      grade: grade
+        ? {
+            score: Number(grade.score),
+            teacher_comment: grade.teacher_comment || '',
+            submission_status: String(grade.submission_status || submissionStatus),
+            graded_at: grade.graded_at || null,
+          }
+        : null,
+      submission: submission
+        ? {
+            submission_text: submission.submission_text || '',
+            link_url: submission.link_url || '',
+            file_path: submission.file_path || '',
+            file_name: normalizeUploadedOriginalName(submission.file_name),
+            submitted_at: submission.submitted_at || null,
+            updated_at: submission.updated_at || null,
+          }
+        : null,
+      submission_status: submissionStatus,
+      can_edit: teacherJournalMode,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) => {
+  const columnId = Number(req.body.column_id);
+  const studentId = Number(req.body.student_id);
+  const scoreRaw = req.body.score;
+  const teacherComment = String(req.body.teacher_comment || '').trim();
+
+  if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
+    return res.redirect('/journal?err=Invalid%20grade%20target');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.*,
+          h.group_number AS homework_group_number,
+          h.custom_due_date,
+          h.class_date
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+        LIMIT 1
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.redirect('/journal?err=Column%20not%20found');
+    }
+    const maxPoints = parsePositiveDecimal(column.max_points, 10);
+    const parsedScore = Number(String(scoreRaw || '').replace(',', '.'));
+    const score = Number.isFinite(parsedScore) ? Math.round(parsedScore * 100) / 100 : NaN;
+    if (!Number.isFinite(score) || score < 0 || score > maxPoints) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
+    }
+
+    const studentRow = await db.get(
+      `
+        SELECT sg.group_number
+        FROM student_groups sg
+        WHERE sg.subject_id = ? AND sg.student_id = ?
+        LIMIT 1
+      `,
+      [column.subject_id, studentId]
+    );
+    if (!studentRow) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const studentGroup = Number(studentRow.group_number || 0);
+      if (!access.allowAll && !access.groups.has(studentGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    let submissionStatus = 'manual';
+    if (column.source_homework_id) {
+      const submission = await db.get(
+        `
+          SELECT submitted_at
+          FROM homework_submissions
+          WHERE homework_id = ? AND student_id = ?
+          LIMIT 1
+        `,
+        [column.source_homework_id, studentId]
+      );
+      submissionStatus = resolveHomeworkSubmissionStatus(
+        {
+          custom_due_date: column.custom_due_date,
+          class_date: column.class_date,
+        },
+        submission
+      );
+    }
+
+    await db.run(
+      `
+        INSERT INTO journal_grades
+          (column_id, student_id, score, teacher_comment, graded_by, graded_at, submission_status)
+        VALUES (?, ?, ?, ?, ?, NOW(), ?)
+        ON CONFLICT (column_id, student_id)
+        DO UPDATE SET
+          score = EXCLUDED.score,
+          teacher_comment = EXCLUDED.teacher_comment,
+          graded_by = EXCLUDED.graded_by,
+          graded_at = EXCLUDED.graded_at,
+          submission_status = EXCLUDED.submission_status
+      `,
+      [
+        columnId,
+        studentId,
+        score,
+        teacherComment || null,
+        Number(req.session.user.id),
+        submissionStatus,
+      ]
+    );
+
+    logActivity(
+      db,
+      req,
+      'journal_grade_save',
+      'journal_grade',
+      columnId,
+      {
+        student_id: studentId,
+        score,
+        subject_id: Number(column.subject_id),
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(`/journal?subject_id=${column.subject_id}&ok=Оцінку%20збережено`);
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res) => {
+  const subjectId = Number(req.body.subject_id);
+  const title = String(req.body.title || '').trim();
+  const typeRaw = normalizeColumnType(req.body.column_type);
+  const requestedCredit = String(req.body.is_credit || '').toLowerCase();
+  const isCredit = typeRaw === 'credit' || requestedCredit === '1' || requestedCredit === 'true' || requestedCredit === 'on';
+  const columnType = isCredit ? 'credit' : typeRaw;
+
+  if (!Number.isFinite(subjectId) || subjectId < 1 || !title) {
+    return res.redirect('/journal?err=Invalid%20column%20data');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const subject = await db.get(
+      `
+        SELECT id, course_id
+        FROM subjects
+        WHERE id = ? AND visible = 1
+        LIMIT 1
+      `,
+      [subjectId]
+    );
+    if (!subject) {
+      return res.redirect('/journal?err=Subject%20not%20found');
+    }
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    const courseId = Number(subject.course_id || req.session.user.course_id || 1);
+    const activeSemester = await getActiveSemester(courseId);
+    const semesterId = activeSemester ? Number(activeSemester.id) : null;
+    const gradingSettings = await ensureSubjectGradingSettings(subjectId, courseId, semesterId, Number(req.session.user.id));
+    const defaultMax = getDefaultMaxPointsByType(gradingSettings, columnType);
+    const maxPoints = parsePositiveDecimal(req.body.max_points, defaultMax);
+    if (!Number.isFinite(maxPoints) || maxPoints <= 0) {
+      return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20max%20points`);
+    }
+
+    const positionParams = [subjectId, courseId];
+    let positionSql = `
+      SELECT COALESCE(MAX(position), 0) AS max_position
+      FROM journal_columns
+      WHERE subject_id = ?
+        AND course_id = ?
+        AND COALESCE(is_archived, 0) = 0
+        AND COALESCE(is_credit, 0) = ?
+    `;
+    if (semesterId) {
+      positionSql += ' AND (semester_id = ? OR semester_id IS NULL)';
+      positionParams.push(isCredit ? 1 : 0, semesterId);
+    } else {
+      positionSql += ' AND semester_id IS NULL';
+      positionParams.push(isCredit ? 1 : 0);
+    }
+    const positionRow = await db.get(positionSql, positionParams);
+    const nextPosition = Number(positionRow?.max_position || 0) + 10;
+
+    await db.run(
+      `
+        INSERT INTO journal_columns
+          (subject_id, course_id, semester_id, source_type, source_homework_id, title, column_type, max_points, position, is_credit, created_by, created_at, updated_at)
+        VALUES (?, ?, ?, 'manual', NULL, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `,
+      [
+        subjectId,
+        courseId,
+        semesterId,
+        title,
+        columnType,
+        maxPoints,
+        nextPosition,
+        isCredit ? 1 : 0,
+        Number(req.session.user.id),
+      ]
+    );
+
+    logActivity(
+      db,
+      req,
+      'journal_column_create',
+      'journal_column',
+      null,
+      {
+        subject_id: subjectId,
+        column_type: columnType,
+        max_points: maxPoints,
+        is_credit: isCredit,
+      },
+      courseId,
+      semesterId
+    );
+    return res.redirect(`/journal?subject_id=${subjectId}&ok=Колонку%20додано`);
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) => {
+  const subjectId = Number(req.body.subject_id);
+  if (!Number.isFinite(subjectId) || subjectId < 1) {
+    return res.redirect('/journal?err=Invalid%20subject');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const subject = await db.get(
+      `
+        SELECT id, course_id
+        FROM subjects
+        WHERE id = ? AND visible = 1
+        LIMIT 1
+      `,
+      [subjectId]
+    );
+    if (!subject) {
+      return res.redirect('/journal?err=Subject%20not%20found');
+    }
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    const courseId = Number(subject.course_id || req.session.user.course_id || 1);
+    const activeSemester = await getActiveSemester(courseId);
+    const semesterId = activeSemester ? Number(activeSemester.id) : null;
+
+    const homeworkMax = parsePositiveDecimal(req.body.homework_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points);
+    const seminarMax = parsePositiveDecimal(req.body.seminar_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points);
+    const examMax = parsePositiveDecimal(req.body.exam_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points);
+    const creditMax = parsePositiveDecimal(req.body.credit_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points);
+    const customMax = parsePositiveDecimal(req.body.custom_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points);
+    if (!homeworkMax || !seminarMax || !examMax || !creditMax || !customMax) {
+      return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20grading%20config`);
+    }
+
+    await db.run(
+      `
+        INSERT INTO subject_grading_settings
+          (
+            subject_id, course_id, semester_id,
+            homework_max_points, seminar_max_points, exam_max_points, credit_max_points, custom_max_points,
+            final_max_points, created_by, created_at, updated_by, updated_at
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 100, ?, NOW(), ?, NOW())
+        ON CONFLICT (subject_id)
+        DO UPDATE SET
+          course_id = EXCLUDED.course_id,
+          semester_id = EXCLUDED.semester_id,
+          homework_max_points = EXCLUDED.homework_max_points,
+          seminar_max_points = EXCLUDED.seminar_max_points,
+          exam_max_points = EXCLUDED.exam_max_points,
+          credit_max_points = EXCLUDED.credit_max_points,
+          custom_max_points = EXCLUDED.custom_max_points,
+          final_max_points = 100,
+          updated_by = EXCLUDED.updated_by,
+          updated_at = EXCLUDED.updated_at
+      `,
+      [
+        subjectId,
+        courseId,
+        semesterId,
+        homeworkMax,
+        seminarMax,
+        examMax,
+        creditMax,
+        customMax,
+        Number(req.session.user.id),
+        Number(req.session.user.id),
+      ]
+    );
+
+    logActivity(
+      db,
+      req,
+      'journal_grading_config_update',
+      'subject_grading_settings',
+      subjectId,
+      {
+        homework_max_points: homeworkMax,
+        seminar_max_points: seminarMax,
+        exam_max_points: examMax,
+        credit_max_points: creditMax,
+        custom_max_points: customMax,
+        final_max_points: 100,
+      },
+      courseId,
+      semesterId
+    );
+    return res.redirect(`/journal?subject_id=${subjectId}&ok=Налаштування%20оцінювання%20оновлено`);
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
 
 app.get('/subjects', requireLogin, async (req, res) => {
   const { id: userId, username, role, course_id: fallbackCourseId } = req.session.user;
@@ -8054,7 +9482,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       defaultRolePermissions: DEFAULT_ROLE_PERMISSIONS,
                                       adminSectionOptions: ADMIN_SECTION_OPTIONS,
                                       rbacRoles,
-                                      rbacPermissionOptions: ADMIN_SECTION_PERMISSION_OPTIONS,
+                                      rbacPermissionOptions: RBAC_PERMISSION_OPTIONS,
                                       courseKindOptions: COURSE_KIND_OPTIONS,
                                       userRoleAssignments: roleKeysByUser,
                                       userPrimaryRoleMap: primaryRoleByUser,
@@ -11380,6 +12808,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   const groupNum = Number(group_number);
   const subjectId = Number(subject_id);
   const isControl = String(is_control || '').toLowerCase() === '1' ? 1 : 0;
+  const isCredit = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_credit || '').toLowerCase()) ? 1 : 0;
   const sessionCourseId = req.session.user?.course_id || 1;
   const inputCourseId = Number(req.body.course_id);
   const isTeacher = hasSessionRole(req, 'teacher');
@@ -11451,34 +12880,59 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
     const maxGroups = Number(subjectRow.group_count || 1);
     let targetGroups = [];
     if (isTeacher) {
-      const teacherRow = await db.get(
+      const teacherRows = await db.all(
         'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
         [userId, subjectId]
       );
-      if (!teacherRow) {
+      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], maxGroups);
+      if (!teacherAccess.hasRows) {
         if (req.file) {
           fs.unlink(req.file.path, () => {});
         }
         return res.status(400).send('Invalid subject');
       }
-      const isGeneral = subjectRow.is_general === true || Number(subjectRow.is_general) === 1;
-      if (isGeneral) {
-        targetGroups = Array.from({ length: maxGroups }, (_, idx) => idx + 1);
+
+      const scheduleGroupParams = [subjectId, courseId || 1, day_of_week, classNum];
+      let scheduleGroupSql = `
+        SELECT DISTINCT group_number
+        FROM schedule_entries
+        WHERE subject_id = ?
+          AND course_id = ?
+          AND day_of_week = ?
+          AND class_number = ?
+      `;
+      if (activeSemester && activeSemester.id) {
+        scheduleGroupSql += ' AND semester_id = ?';
+        scheduleGroupParams.push(activeSemester.id);
+        const parsedClassDate = /^\d{4}-\d{2}-\d{2}$/.test(String(class_date || ''))
+          ? new Date(`${class_date}T00:00:00`)
+          : null;
+        const classWeek = parsedClassDate ? getAcademicWeekForSemester(parsedClassDate, activeSemester) : null;
+        if (Number.isFinite(classWeek) && classWeek > 0) {
+          scheduleGroupSql += ' AND week_number = ?';
+          scheduleGroupParams.push(classWeek);
+        }
+      }
+      scheduleGroupSql += ' ORDER BY group_number ASC';
+      const scheduleGroupsRows = await db.all(scheduleGroupSql, scheduleGroupParams);
+      const scheduleGroups = (scheduleGroupsRows || [])
+        .map((row) => Number(row.group_number))
+        .filter((value) => Number.isInteger(value) && value >= 1 && value <= maxGroups);
+
+      if (scheduleGroups.length) {
+        targetGroups = scheduleGroups.filter((value) => teacherAccess.allowAll || teacherAccess.groups.has(value));
+      } else if (Number.isInteger(groupNum) && groupNum >= 1 && groupNum <= maxGroups) {
+        if (!teacherAccess.allowAll && !teacherAccess.groups.has(groupNum)) {
+          if (req.file) {
+            fs.unlink(req.file.path, () => {});
+          }
+          return res.status(400).send('Invalid group');
+        }
+        targetGroups = [groupNum];
+      } else if (teacherAccess.allowAll) {
+        targetGroups = Array.from({ length: maxGroups }, (_v, index) => index + 1);
       } else {
-        const resolvedGroup = teacherRow.group_number !== null ? Number(teacherRow.group_number) : groupNum;
-        if (!resolvedGroup || Number.isNaN(resolvedGroup)) {
-          if (req.file) {
-            fs.unlink(req.file.path, () => {});
-          }
-          return res.status(400).send('Invalid group');
-        }
-        if (teacherRow.group_number !== null && Number(teacherRow.group_number) !== groupNum) {
-          if (req.file) {
-            fs.unlink(req.file.path, () => {});
-          }
-          return res.status(400).send('Invalid group');
-        }
-        targetGroups = [Number(resolvedGroup)];
+        targetGroups = Array.from(teacherAccess.groups || []).sort((a, b) => a - b);
       }
     } else {
       targetGroups = [groupNum];
@@ -11495,8 +12949,8 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
       const row = await db.get(
         `
           INSERT INTO homework
-          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, status, scheduled_at, published_at, is_control)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, status, scheduled_at, published_at, is_control, is_teacher_homework, is_credit)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           RETURNING id
         `,
         [
@@ -11523,6 +12977,8 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
           scheduledAt,
           publishedAt,
           isControl,
+          isTeacher ? 1 : 0,
+          isCredit,
         ]
       );
       if (!row || !row.id) {
@@ -11567,6 +13023,8 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
         class_number: classNum,
         tags: tagList,
         is_control: isControl,
+        is_teacher_homework: isTeacher ? 1 : 0,
+        is_credit: isCredit,
       },
       courseId || 1,
       activeSemester ? activeSemester.id : null
@@ -11590,6 +13048,7 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
   const subjectId = Number(subject_id);
   const groupInput = req.body.group_number ? Number(req.body.group_number) : null;
   const dueDate = String(custom_due_date || '').slice(0, 10);
+  const isCredit = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_credit || '').toLowerCase()) ? 1 : 0;
   if (!description || Number.isNaN(subjectId) || !dueDate) {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
@@ -11647,33 +13106,36 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
     }
     let targetGroups = [];
     if (isTeacher) {
-      const teacherRow = await db.get(
+      const teacherRows = await db.all(
         'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
         [userId, subjectId]
       );
-      if (!teacherRow) {
+      const maxGroups = Number(subjectRow.group_count || 1);
+      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], maxGroups);
+      if (!teacherAccess.hasRows) {
         if (req.file) {
           fs.unlink(req.file.path, () => {});
         }
         return res.status(400).send('Invalid subject');
       }
-      const resolvedGroup = groupInput && !Number.isNaN(groupInput) ? groupInput : teacherRow.group_number;
-      if (resolvedGroup && teacherRow.group_number !== null && Number(teacherRow.group_number) !== Number(resolvedGroup)) {
+      if (groupInput && (!Number.isInteger(groupInput) || groupInput < 1 || groupInput > maxGroups)) {
         if (req.file) {
           fs.unlink(req.file.path, () => {});
         }
         return res.status(400).send('Invalid group');
       }
-      if (resolvedGroup && !Number.isNaN(resolvedGroup)) {
-        targetGroups = [Number(resolvedGroup)];
-      } else if (subjectRow.is_general === true || Number(subjectRow.is_general) === 1) {
-        const maxGroups = Number(subjectRow.group_count || 1);
-        targetGroups = Array.from({ length: maxGroups }, (_, idx) => idx + 1);
-      } else {
+      if (groupInput && (!teacherAccess.allowAll && !teacherAccess.groups.has(groupInput))) {
         if (req.file) {
           fs.unlink(req.file.path, () => {});
         }
-        return res.status(400).send('Select group');
+        return res.status(400).send('Invalid group');
+      }
+      if (groupInput && !Number.isNaN(groupInput)) {
+        targetGroups = [Number(groupInput)];
+      } else if (teacherAccess.allowAll) {
+        targetGroups = Array.from({ length: maxGroups }, (_, idx) => idx + 1);
+      } else {
+        targetGroups = Array.from(teacherAccess.groups || []).sort((a, b) => a - b);
       }
     } else {
       const groupRow = await db.get(
@@ -11701,8 +13163,8 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
       const row = await db.get(
         `
           INSERT INTO homework
-          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at, is_teacher_homework, is_credit)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           RETURNING id
         `,
         [
@@ -11730,6 +13192,8 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
           homeworkStatus,
           scheduledAt,
           publishedAt,
+          isTeacher ? 1 : 0,
+          isCredit,
         ]
       );
       if (!row || !row.id) {
@@ -11746,7 +13210,13 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
       'homework_create',
       'homework',
       createdId,
-      { subject_id: subjectId, custom_due_date: dueDate, is_custom_deadline: true },
+      {
+        subject_id: subjectId,
+        custom_due_date: dueDate,
+        is_custom_deadline: true,
+        is_teacher_homework: isTeacher ? 1 : 0,
+        is_credit: isCredit,
+      },
       courseId || 1,
       activeSemester ? activeSemester.id : null
     );
@@ -13929,7 +15399,9 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
     const courseKinds = selectedCourseKinds.length
       ? selectedCourseKinds
       : (roleRow.key === 'admin' ? ['regular', 'teacher'] : ['regular']);
-    const permissionRows = await db.all('SELECT key FROM access_permissions WHERE category = ?', ['admin_section']);
+    const permissionRows = await db.all(
+      "SELECT key FROM access_permissions WHERE category IN ('admin_section', 'feature')"
+    );
     const validPermissions = new Set((permissionRows || []).map((row) => String(row.key)));
     const permissionKeys = selectedPermissions.filter((key) => validPermissions.has(key));
     const client = await pool.connect();

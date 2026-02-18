@@ -1600,6 +1600,7 @@
           </button>
         <% } %>
         <a class="drawer-action" href="/subjects">Предмети</a>
+        <a class="drawer-action" href="/journal">Журнал</a>
         <a class="drawer-action" href="/teamwork"><%= t('menu.teamwork') %></a>
         <a class="drawer-action" href="/my-day">Мій день</a>
         <a class="drawer-action" href="/profile"><%= t('schedule.profile') %></a>
@@ -1814,6 +1815,19 @@
                           <% if (hwMeta && hwMeta.control) { %>
                             <span class="control-chip chip badge--control">Контроль</span>
                           <% } %>
+                          <% if (hwMeta && hwMeta.teacher_homework) { %>
+                            <span class="hw-chip chip badge--hw">Викл.ДЗ</span>
+                          <% } %>
+                          <% if (hwMeta && hwMeta.credit) { %>
+                            <span class="hw-chip chip badge--control">Залік</span>
+                          <% } %>
+                          <% if (hwMeta && hwMeta.meet) { %>
+                            <% if (hwMeta.meet_link) { %>
+                              <a class="schedule-chip chip chip-now" href="<%= hwMeta.meet_link %>" target="_blank" rel="noopener" onclick="event.stopPropagation()">Meet</a>
+                            <% } else { %>
+                              <span class="schedule-chip chip chip-now">Meet</span>
+                            <% } %>
+                          <% } %>
                           <% if (hwMeta) { %>
                             <span class="hw-chip chip badge--hw">ДЗ <%= hwMeta.count %></span>
                           <% } %>
@@ -1846,6 +1860,14 @@
                         <div class="fw-semibold"><%= item.subject_name %></div>
                         <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
                         <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                          <% if (Number(item.is_credit || 0) === 1) { %>
+                            <span class="priority-chip priority-control">Залік</span>
+                          <% } %>
+                          <% if (Number(item.is_teacher_homework || 0) === 1) { %>
+                            <span class="priority-chip priority-urgent">Викл.ДЗ</span>
+                          <% } %>
+                        </div>
                       </div>
                     </div>
                   <% }); %>
@@ -1885,6 +1907,14 @@
                         <div class="fw-semibold"><%= item.subject_name %></div>
                         <% const groupNote = role === 'teacher' && item.group_number ? ` · Група ${item.group_number}` : ''; %>
                         <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                          <% if (Number(item.is_credit || 0) === 1) { %>
+                            <span class="priority-chip priority-control">Залік</span>
+                          <% } %>
+                          <% if (Number(item.is_teacher_homework || 0) === 1) { %>
+                            <span class="priority-chip priority-urgent">Викл.ДЗ</span>
+                          <% } %>
+                        </div>
                       </div>
                     </div>
                   <% }); %>
@@ -2009,6 +2039,17 @@
                   <span class="toggle-text">Контроль</span>
                 </div>
               </div>
+              <% if (role && role !== 'student') { %>
+                <div class="mb-3">
+                  <div class="control-toggle">
+                    <input class="toggle-input" type="checkbox" id="hwCredit" name="is_credit" value="1" />
+                    <label class="toggle" for="hwCredit">
+                      <span class="toggle-knob"></span>
+                    </label>
+                    <span class="toggle-text">Залік</span>
+                  </div>
+                </div>
+              <% } %>
               <div class="mb-3">
                 <label for="hwFile" class="form-label">Attachment (optional)</label>
                 <div class="file-field">
@@ -2048,6 +2089,54 @@
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="homeworkSubmitModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <form method="POST" id="homeworkSubmitForm" enctype="multipart/form-data" autocomplete="off">
+            <div class="modal-header">
+              <h5 class="modal-title">Здати домашнє завдання</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3 text-muted small" id="homeworkSubmitMeta">-</div>
+              <div class="mb-3">
+                <label class="form-label">Текст відповіді (опц.)</label>
+                <textarea class="form-control" name="submission_text" id="homeworkSubmitText" rows="4" maxlength="4000"></textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Посилання (опц.)</label>
+                <input
+                  class="form-control"
+                  type="text"
+                  name="link_url"
+                  id="homeworkSubmitLink"
+                  inputmode="url"
+                  autocapitalize="none"
+                  placeholder="https://example.com"
+                  autocomplete="off"
+                />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Файл (опц.)</label>
+                <div class="file-field">
+                  <input id="homeworkSubmitFile" type="file" class="file-input" name="submission_attachment" />
+                  <div class="file-ui">
+                    <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="homeworkSubmitFile">Оберіть</button>
+                    <span class="file-name" data-file-name="homeworkSubmitFile">Файл не вибрано</span>
+                  </div>
+                </div>
+              </div>
+              <input type="hidden" id="homeworkSubmitId" />
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Закрити</button>
+              <button type="submit" class="btn btn-primary glass">Здати</button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
@@ -2130,6 +2219,17 @@
                   <label class="form-label">Опис</label>
                   <textarea class="form-control" name="description" rows="3" required></textarea>
                 </div>
+                <% if (role && role !== 'student') { %>
+                  <div class="col-12">
+                    <div class="control-toggle">
+                      <input class="toggle-input" type="checkbox" id="customIsCredit" name="is_credit" value="1" />
+                      <label class="toggle" for="customIsCredit">
+                        <span class="toggle-knob"></span>
+                      </label>
+                      <span class="toggle-text">Позначити як залік</span>
+                    </div>
+                  </div>
+                <% } %>
                 <div class="col-12 col-md-6">
                   <label class="form-label">Посилання (опц.)</label>
                   <input
@@ -2454,16 +2554,26 @@
       }
 
       const isTeacherView = <%- JSON.stringify(role === 'teacher') %>;
+      const canSubmitHomework = <%- JSON.stringify(role === 'student' || role === 'starosta') %>;
       const homeworkModal = document.getElementById('homeworkModal');
       const homeworkData = <%- JSON.stringify(homework || []) %>;
       const customDeadlineItems = <%- JSON.stringify(customDeadlineItems || []) %>;
       const listEl = document.getElementById('homeworkList');
+      const homeworkSubmitForm = document.getElementById('homeworkSubmitForm');
+      const homeworkSubmitMeta = document.getElementById('homeworkSubmitMeta');
+      const homeworkSubmitText = document.getElementById('homeworkSubmitText');
+      const homeworkSubmitLink = document.getElementById('homeworkSubmitLink');
+      const homeworkSubmitFile = document.getElementById('homeworkSubmitFile');
+      const homeworkSubmitId = document.getElementById('homeworkSubmitId');
+      const homeworkSubmitModalEl = document.getElementById('homeworkSubmitModal');
+      const homeworkSubmitModal = homeworkSubmitModalEl && window.bootstrap ? new window.bootstrap.Modal(homeworkSubmitModalEl) : null;
       const subgroupSection = document.getElementById('subgroupSection');
       const subgroupList = document.getElementById('subgroupList');
       const subgroupHomeworkId = document.getElementById('subgroupHomeworkId');
       const joinSubgroupId = document.getElementById('joinSubgroupId');
       const currentUser = <%- JSON.stringify(username) %>;
       const hwControlToggle = document.getElementById('hwControl');
+      const hwCreditToggle = document.getElementById('hwCredit');
       let currentHomeworkItems = [];
 
       function updateReactionButtons(container, reactions, reacted) {
@@ -2537,7 +2647,7 @@
           const meta = document.createElement('div');
           meta.className = 'text-muted small mb-2';
           const created = new Date(item.created_at).toLocaleString();
-          meta.textContent = `${item.created_by} • ${created}`;
+          meta.textContent = `Додав: ${item.created_by || '—'} • ${created}`;
           if (isTeacherView && item.group_number) {
             meta.textContent += ` • Група ${item.group_number}`;
           }
@@ -2569,6 +2679,18 @@
             normal.textContent = 'Звичайне';
             priorityWrap.appendChild(normal);
           }
+          if (item.is_credit) {
+            const credit = document.createElement('span');
+            credit.className = 'priority-chip priority-control';
+            credit.textContent = 'Залік';
+            priorityWrap.appendChild(credit);
+          }
+          if (item.is_teacher_homework) {
+            const teacherHw = document.createElement('span');
+            teacherHw.className = 'priority-chip priority-urgent';
+            teacherHw.textContent = 'Викл.ДЗ';
+            priorityWrap.appendChild(teacherHw);
+          }
           if (dueDate) {
             const dueLabel = new Date(dueDate).toLocaleDateString('uk-UA');
             const due = document.createElement('span');
@@ -2583,7 +2705,7 @@
             link.href = item.link_url;
             link.target = '_blank';
             link.rel = 'noopener';
-            link.textContent = 'Open link';
+            link.textContent = 'Посилання';
             link.className = 'me-3';
             li.appendChild(link);
           }
@@ -2592,7 +2714,7 @@
             meet.href = item.meeting_url;
             meet.target = '_blank';
             meet.rel = 'noopener';
-            meet.textContent = 'Online class';
+            meet.textContent = 'Онлайн-зустріч';
             meet.className = 'me-3';
             li.appendChild(meet);
           }
@@ -2600,9 +2722,34 @@
           if (item.file_path) {
             const fileLink = document.createElement('a');
             fileLink.href = item.file_path;
-            fileLink.textContent = item.file_name || 'Download file';
+            fileLink.textContent = item.file_name || 'Файл';
             fileLink.className = 'd-inline-block';
             li.appendChild(fileLink);
+          }
+
+          if (canSubmitHomework && homeworkSubmitModal && item.id) {
+            const submitWrap = document.createElement('div');
+            submitWrap.className = 'mt-2';
+            const submitBtn = document.createElement('button');
+            submitBtn.type = 'button';
+            submitBtn.className = 'btn btn-sm btn-outline-primary';
+            submitBtn.textContent = 'Здати ДЗ';
+            submitBtn.addEventListener('click', () => {
+              if (!homeworkSubmitForm) return;
+              homeworkSubmitForm.action = `/homework/${encodeURIComponent(item.id)}/submit`;
+              if (homeworkSubmitMeta) {
+                const dueDate = item.custom_due_date || item.class_date;
+                const dueLabel = dueDate ? new Date(dueDate).toLocaleDateString('uk-UA') : 'Без дедлайну';
+                homeworkSubmitMeta.textContent = `${item.subject || ''} • дедлайн: ${dueLabel}`;
+              }
+              if (homeworkSubmitId) homeworkSubmitId.value = String(item.id);
+              if (homeworkSubmitText) homeworkSubmitText.value = '';
+              if (homeworkSubmitLink) homeworkSubmitLink.value = '';
+              if (homeworkSubmitFile) homeworkSubmitFile.value = '';
+              homeworkSubmitModal.show();
+            });
+            submitWrap.appendChild(submitBtn);
+            li.appendChild(submitWrap);
           }
 
           const reactWrap = document.createElement('div');
@@ -2698,6 +2845,9 @@
         }
         if (hwControlToggle) {
           hwControlToggle.checked = false;
+        }
+        if (hwCreditToggle) {
+          hwCreditToggle.checked = false;
         }
 
         const filtered = homeworkData.filter((item) => {

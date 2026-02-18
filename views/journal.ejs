@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Журнал • Studerria</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/pages/journal.css" />
+    <link rel="stylesheet" href="/css/design-system.css" />
+  </head>
+  <body class="theme-dark page-journal">
+    <%- include('partials/topbar', { role, username, t, activePage: 'journal', pageTitle: 'Журнал' }) %>
+
+    <main class="container py-4">
+      <% if (messages && messages.error) { %>
+        <div class="alert alert-danger"><%= messages.error %></div>
+      <% } %>
+      <% if (messages && messages.success) { %>
+        <div class="alert alert-success"><%= messages.success %></div>
+      <% } %>
+
+      <section class="glass liquid-card p-3 mb-3">
+        <form method="GET" action="/journal" class="row g-3 align-items-end">
+          <div class="col-12 col-lg-7">
+            <label class="form-label">Предмет</label>
+            <select class="form-select" name="subject_id" onchange="this.form.submit()">
+              <% if (!subjects || !subjects.length) { %>
+                <option value="">Немає доступних предметів</option>
+              <% } else { %>
+                <% subjects.forEach(function(subject) { %>
+                  <option value="<%= subject.subject_id %>" <%= selectedSubject && selectedSubject.subject_id === subject.subject_id ? 'selected' : '' %>>
+                    <%= subject.subject_name %> · <%= subject.course_name %> · <%= subject.group_label %>
+                  </option>
+                <% }); %>
+              <% } %>
+            </select>
+          </div>
+          <div class="col-12 col-lg-5">
+            <% if (selectedSubject) { %>
+              <div class="journal-subject-meta">
+                <span class="status-chip status-chip--info"><%= selectedSubject.course_name %></span>
+                <% if (selectedSemester && selectedSemester.title) { %>
+                  <span class="status-chip status-chip--neutral"><%= selectedSemester.title %></span>
+                <% } %>
+                <span class="status-chip status-chip--neutral"><%= selectedSubject.group_label %></span>
+                <% if (canManageAllSubjects) { %>
+                  <span class="status-chip status-chip--success">Повний доступ</span>
+                <% } %>
+              </div>
+            <% } %>
+          </div>
+        </form>
+      </section>
+
+      <% if (selectedSubject && canEditJournal) { %>
+        <section class="glass liquid-card p-3 mb-3">
+          <div class="row g-3">
+            <div class="col-12 col-xl-8">
+              <h6 class="mb-2">Налаштування системи оцінювання</h6>
+              <form method="POST" action="/journal/config/save" class="row g-2">
+                <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                <div class="col-6 col-md-4 col-xl-2">
+                  <label class="form-label">ДЗ</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" name="homework_max_points" value="<%= gradingSettings.homework_max_points %>" required />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                  <label class="form-label">Семінар</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" name="seminar_max_points" value="<%= gradingSettings.seminar_max_points %>" required />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                  <label class="form-label">Екзамен</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" name="exam_max_points" value="<%= gradingSettings.exam_max_points %>" required />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                  <label class="form-label">Залік</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" name="credit_max_points" value="<%= gradingSettings.credit_max_points %>" required />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                  <label class="form-label">Кастом</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" name="custom_max_points" value="<%= gradingSettings.custom_max_points %>" required />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                  <label class="form-label">Фінал</label>
+                  <input class="form-control" type="number" value="100" disabled />
+                </div>
+                <div class="col-12">
+                  <button class="btn btn-primary" type="submit">Зберегти систему</button>
+                </div>
+              </form>
+            </div>
+            <div class="col-12 col-xl-4">
+              <h6 class="mb-2">Нова колонка</h6>
+              <form method="POST" action="/journal/columns/create" class="row g-2">
+                <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                <div class="col-12">
+                  <label class="form-label">Назва</label>
+                  <input class="form-control" name="title" maxlength="140" required />
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Тип</label>
+                  <select class="form-select" name="column_type">
+                    <option value="custom">Кастом</option>
+                    <option value="seminar">Семінар</option>
+                    <option value="exam">Екзамен</option>
+                    <option value="credit">Залік</option>
+                    <option value="homework">ДЗ</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Макс. бал</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" name="max_points" />
+                </div>
+                <div class="col-12">
+                  <button class="btn btn-outline-primary w-100" type="submit">Додати колонку</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+      <% } %>
+
+      <section class="glass liquid-card p-3">
+        <% if (!selectedSubject) { %>
+          <div class="text-muted">Предмет не обрано.</div>
+        <% } else if (!columns || !columns.length) { %>
+          <div class="text-muted">Поки що немає колонок у журналі. Додайте завдання у розкладі або створіть ручну колонку.</div>
+        <% } else if (!journalRows || !journalRows.length) { %>
+          <div class="text-muted">Немає студентів у цьому предметі для поточного доступу.</div>
+        <% } else { %>
+          <div class="journal-table-wrap">
+            <table class="table journal-table mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th class="journal-th-student">ПІБ</th>
+                  <% columns.forEach(function(column) { %>
+                    <th class="journal-th-column">
+                      <div class="journal-col-title"><%= column.title %></div>
+                      <div class="journal-col-meta">
+                        <span><%= Number(column.max_points).toFixed(2).replace(/\.00$/, '') %> б.</span>
+                        <% if (column.is_credit) { %>
+                          <span class="status-chip status-chip--warning">Залік</span>
+                        <% } %>
+                        <% if (column.source_homework_id && column.homework_meeting_url) { %>
+                          <span class="status-chip status-chip--info">Meet</span>
+                        <% } %>
+                      </div>
+                    </th>
+                  <% }); %>
+                  <th class="journal-th-final final-col">Підсумок / 100</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% journalRows.forEach(function(row) { %>
+                  <tr>
+                    <td class="journal-student-cell">
+                      <div class="journal-student-name"><%= row.student.full_name %></div>
+                      <div class="journal-student-meta">Група <%= row.student.group_number %></div>
+                    </td>
+                    <% row.cells.forEach(function(cell) { %>
+                      <% const statusClass = cell.status === 'on_time' ? 'is-on-time' : cell.status === 'late' ? 'is-late' : cell.status === 'manual' ? 'is-manual' : 'is-missing'; %>
+                      <td class="journal-cell">
+                        <button
+                          class="journal-cell-btn <%= statusClass %>"
+                          type="button"
+                          data-column-id="<%= cell.column_id %>"
+                          data-student-id="<%= cell.student_id %>"
+                          data-can-open="1"
+                        >
+                          <span class="journal-cell-score"><%= Number.isFinite(cell.score) ? String(cell.score).replace(/\.00$/, '') : '—' %></span>
+                        </button>
+                      </td>
+                    <% }); %>
+                    <td class="journal-final-cell final-col">
+                      <div class="journal-final-value"><%= row.final_score.toFixed(2).replace(/\.00$/, '') %></div>
+                      <div class="journal-final-meta"><%= row.raw_earned.toFixed(2).replace(/\.00$/, '') %> / <%= row.raw_max.toFixed(2).replace(/\.00$/, '') %></div>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </section>
+    </main>
+
+    <%- include('partials/app-footer') %>
+    <%- include('partials/mobile-menu-modal', { role, t, activePage: 'journal' }) %>
+    <%- include('partials/changelog-modal') %>
+
+    <div class="modal fade" id="journalCellModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="journalCellTitle">Оцінювання</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <div class="text-muted small mb-1">Студент</div>
+              <div class="fw-semibold" id="journalCellStudent">-</div>
+            </div>
+            <div class="mb-3">
+              <div class="text-muted small mb-1">Статус здачі</div>
+              <span class="status-chip status-chip--neutral" id="journalCellStatus">-</span>
+            </div>
+            <div id="journalSubmissionBox" class="journal-submission-box mb-4">
+              <div class="text-muted">Здача відсутня.</div>
+            </div>
+            <form id="journalGradeForm" method="POST" action="/journal/grades/save" autocomplete="off">
+              <input type="hidden" name="column_id" id="journalGradeColumnId" />
+              <input type="hidden" name="student_id" id="journalGradeStudentId" />
+              <div class="row g-3">
+                <div class="col-12 col-md-4">
+                  <label class="form-label">Бал</label>
+                  <input class="form-control" type="number" step="0.01" min="0" name="score" id="journalGradeScore" required />
+                </div>
+                <div class="col-12 col-md-8">
+                  <label class="form-label">Коментар (опц.)</label>
+                  <textarea class="form-control" name="teacher_comment" id="journalGradeComment" rows="2" maxlength="2000"></textarea>
+                </div>
+              </div>
+              <% if (canEditJournal) { %>
+                <button class="btn btn-primary mt-3" type="submit">Зберегти оцінку</button>
+              <% } %>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      const themeToggles = document.querySelectorAll('.theme-toggle');
+      const savedTheme = localStorage.getItem('ui-theme') || 'theme-dark';
+      document.body.classList.remove('theme-light', 'theme-dark');
+      document.body.classList.add(savedTheme);
+      themeToggles.forEach((btn) => {
+        btn.textContent = savedTheme === 'theme-dark' ? btn.dataset.lightLabel : btn.dataset.darkLabel;
+        btn.addEventListener('click', () => {
+          const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
+          document.body.classList.remove('theme-light', 'theme-dark');
+          document.body.classList.add(next);
+          localStorage.setItem('ui-theme', next);
+          themeToggles.forEach((b) => {
+            b.textContent = next === 'theme-dark' ? b.dataset.lightLabel : b.dataset.darkLabel;
+          });
+        });
+      });
+
+      const canEditJournal = <%- canEditJournal ? 'true' : 'false' %>;
+      const modalEl = document.getElementById('journalCellModal');
+      const modal = modalEl && window.bootstrap ? new window.bootstrap.Modal(modalEl) : null;
+      const statusEl = document.getElementById('journalCellStatus');
+      const submissionBox = document.getElementById('journalSubmissionBox');
+      const titleEl = document.getElementById('journalCellTitle');
+      const studentEl = document.getElementById('journalCellStudent');
+      const scoreEl = document.getElementById('journalGradeScore');
+      const commentEl = document.getElementById('journalGradeComment');
+      const columnInput = document.getElementById('journalGradeColumnId');
+      const studentInput = document.getElementById('journalGradeStudentId');
+      const gradeForm = document.getElementById('journalGradeForm');
+
+      function setStatusLabel(status) {
+        const value = String(status || '').toLowerCase();
+        if (value === 'on_time') {
+          statusEl.className = 'status-chip status-chip--success';
+          statusEl.textContent = 'Здано вчасно';
+          return;
+        }
+        if (value === 'late') {
+          statusEl.className = 'status-chip status-chip--warning';
+          statusEl.textContent = 'Здано із запізненням';
+          return;
+        }
+        if (value === 'manual') {
+          statusEl.className = 'status-chip status-chip--info';
+          statusEl.textContent = 'Ручна колонка';
+          return;
+        }
+        statusEl.className = 'status-chip status-chip--neutral';
+        statusEl.textContent = 'Ще не здано';
+      }
+
+      function renderSubmission(submission, column) {
+        const parts = [];
+        if (column && column.homework_description) {
+          parts.push(`<div class="mb-2"><strong>Завдання:</strong> ${column.homework_description}</div>`);
+        }
+        if (column && column.due_date) {
+          parts.push(`<div class="mb-2 text-muted small">Дедлайн: ${column.due_date}</div>`);
+        }
+        if (submission && submission.submitted_at) {
+          parts.push(`<div class="mb-2 text-muted small">Здано: ${new Date(submission.submitted_at).toLocaleString('uk-UA')}</div>`);
+        }
+        if (submission && submission.submission_text) {
+          parts.push(`<div class="mb-2"><strong>Текст:</strong><div class="journal-submission-text">${submission.submission_text}</div></div>`);
+        }
+        if (submission && submission.link_url) {
+          parts.push(`<div class="mb-2"><a href="${submission.link_url}" target="_blank" rel="noopener">Відкрити посилання</a></div>`);
+        }
+        if (submission && submission.file_path) {
+          const fileLabel = submission.file_name || 'Файл';
+          parts.push(`<div class="mb-2"><a href="${submission.file_path}" target="_blank" rel="noopener">${fileLabel}</a></div>`);
+        }
+        if (!parts.length) {
+          submissionBox.innerHTML = '<div class="text-muted">Здача відсутня.</div>';
+          return;
+        }
+        submissionBox.innerHTML = parts.join('');
+      }
+
+      async function openJournalCell(columnId, studentId) {
+        if (!modal) return;
+        try {
+          const res = await fetch(`/journal/cell.json?column_id=${encodeURIComponent(columnId)}&student_id=${encodeURIComponent(studentId)}`);
+          if (!res.ok) throw new Error('Request failed');
+          const data = await res.json();
+          titleEl.textContent = data && data.column ? data.column.title : 'Оцінювання';
+          studentEl.textContent = data && data.student ? data.student.full_name : '-';
+          setStatusLabel(data ? data.submission_status : '');
+          renderSubmission(data ? data.submission : null, data ? data.column : null);
+
+          columnInput.value = String(columnId);
+          studentInput.value = String(studentId);
+          scoreEl.max = data && data.column ? String(data.column.max_points || 0) : '';
+          scoreEl.value = data && data.grade && Number.isFinite(Number(data.grade.score))
+            ? String(data.grade.score)
+            : '';
+          commentEl.value = data && data.grade && data.grade.teacher_comment ? data.grade.teacher_comment : '';
+          scoreEl.disabled = !canEditJournal;
+          commentEl.disabled = !canEditJournal;
+          if (gradeForm) {
+            const submitBtn = gradeForm.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.style.display = canEditJournal ? '' : 'none';
+          }
+          modal.show();
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      document.querySelectorAll('.journal-cell-btn[data-can-open="1"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const columnId = Number(btn.dataset.columnId);
+          const studentId = Number(btn.dataset.studentId);
+          if (!columnId || !studentId) return;
+          openJournalCell(columnId, studentId);
+        });
+      });
+    </script>
+    <script src="/js/design-system.js" defer></script>
+  </body>
+</html>

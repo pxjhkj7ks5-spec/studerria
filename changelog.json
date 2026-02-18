@@ -1,6 +1,18 @@
 {
   "items": [
     {
+      "version": "0.9.06",
+      "date": "2026-02-18",
+      "items": [
+        "feat(journal): added a new `/journal` page with interactive gradebook table (rows by student, columns by assignments) and per-cell review modal",
+        "feat(journal): added grading workflow with required score, optional teacher comment, submission status colors (on-time/late/missing), and student self-view restrictions",
+        "feat(journal): added per-subject grading system settings (homework/seminar/exam/credit/custom defaults) with strict final normalization to 100 points",
+        "feat(journal): synced gradebook columns with homework/custom deadlines, added manual columns, and pinned `Залік` columns before final result",
+        "feat(homework): added student homework submissions (`text/link/file`), teacher-facing submission review data, and storage for `is_teacher_homework`/`is_credit` markers",
+        "fix(schedule): fixed teacher homework distribution logic by target schedule groups; added schedule chips for `Викл.ДЗ`, `Залік`, and `Meet`, plus explicit `Додав:` author labels"
+      ]
+    },
+    {
       "version": "0.9.05",
       "date": "2026-02-18",
       "items": [
