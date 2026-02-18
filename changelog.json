@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.01",
+      "date": "2026-02-18",
+      "items": [
+        "fix(teamwork-ui): removed persistent top oval glare in `Ваші предмети` by disabling both `::before` and `::after` overlays for the targeted subject card variant"
+      ]
+    },
+    {
       "version": "0.9.00",
       "date": "2026-02-18",
       "items": [

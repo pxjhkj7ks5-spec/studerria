@@ -338,8 +338,10 @@ body.theme-light .seminar-group-chip {
   display: none;
 }
 
+.page-teamwork .glass-float--no-top-glare::before,
 .page-teamwork .glass-float--no-top-glare::after {
-  display: none;
+  display: none !important;
+  content: none !important;
 }
 
 @media (max-width: 768px) {
