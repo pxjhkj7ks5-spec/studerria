@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.00",
+      "date": "2026-02-18",
+      "items": [
+        "fix(teamwork-ui): removed remaining top oval glare in the `Ваші предмети` panel by disabling top-glare pseudo-element for that specific glass card"
+      ]
+    },
+    {
       "version": "0.8.99",
       "date": "2026-02-18",
       "items": [

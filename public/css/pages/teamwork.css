@@ -338,6 +338,10 @@ body.theme-light .seminar-group-chip {
   display: none;
 }
 
+.page-teamwork .glass-float--no-top-glare::after {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .member-row {
     flex-direction: column;
