@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.04",
+      "date": "2026-02-18",
+      "items": [
+        "fix(nav): removed `Предмети` shortcut from Teamwork topbar",
+        "fix(nav): for `subjects` page limited actions to only theme toggle and `Повернутись до розкладу` (desktop and mobile menu)"
+      ]
+    },
+    {
       "version": "0.9.03",
       "date": "2026-02-18",
       "items": [
