@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.08",
+      "date": "2026-02-18",
+      "items": [
+        "fix(journal): homework-to-journal sync now imports only teacher-created assignments (`is_teacher_homework = 1`)",
+        "fix(journal): auto-archives previously synced homework columns whose source assignment is not teacher-created"
+      ]
+    },
+    {
       "version": "0.9.07",
       "date": "2026-02-18",
       "items": [

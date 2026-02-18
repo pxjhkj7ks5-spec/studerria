@@ -5891,6 +5891,7 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
     WHERE h.subject_id = ?
       AND h.course_id = ?
       AND COALESCE(h.status, 'published') = 'published'
+      AND COALESCE(h.is_teacher_homework, 0) = 1
   `;
   if (semesterId) {
     sql += ' AND (h.semester_id = ? OR h.semester_id IS NULL)';
@@ -5911,13 +5912,15 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
       jc.max_points,
       jc.is_credit,
       jc.position,
-      COALESCE(gc.grades_count, 0) AS grades_count
+      COALESCE(gc.grades_count, 0) AS grades_count,
+      COALESCE(hs.is_teacher_homework, 0) AS source_is_teacher_homework
     FROM journal_columns jc
     LEFT JOIN (
       SELECT column_id, COUNT(*) AS grades_count
       FROM journal_grades
       GROUP BY column_id
     ) gc ON gc.column_id = jc.id
+    LEFT JOIN homework hs ON hs.id = jc.source_homework_id
     WHERE jc.subject_id = ?
       AND jc.course_id = ?
       AND jc.source_homework_id IS NOT NULL
@@ -5931,9 +5934,17 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
   }
   const existing = await db.all(columnsSql, columnParams);
   const existingByHomeworkId = new Map();
+  const staleHomeworkColumnIds = [];
   let maxNonCreditPosition = 0;
   let maxCreditPosition = 0;
   (existing || []).forEach((row) => {
+    if (Number(row.source_is_teacher_homework || 0) !== 1) {
+      const staleId = Number(row.id);
+      if (Number.isFinite(staleId) && staleId > 0) {
+        staleHomeworkColumnIds.push(staleId);
+      }
+      return;
+    }
     existingByHomeworkId.set(Number(row.source_homework_id), row);
     const position = Number(row.position || 0);
     if (Number(row.is_credit) === 1) {
@@ -5942,6 +5953,17 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
       maxNonCreditPosition = position;
     }
   });
+  if (staleHomeworkColumnIds.length) {
+    await db.run(
+      `
+        UPDATE journal_columns
+        SET is_archived = 1,
+            updated_at = NOW()
+        WHERE id = ANY(?)
+      `,
+      [staleHomeworkColumnIds]
+    );
+  }
 
   const dedupedHomeworkRows = [];
   const teacherBatchState = new Map();
