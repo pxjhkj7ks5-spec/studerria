@@ -699,15 +699,14 @@ body.theme-light .glass-float {
 .glass-float::after {
   content: "";
   position: absolute;
-  left: 14%;
-  right: 14%;
-  top: -52%;
-  height: 72%;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0));
-  opacity: 0.62;
+  left: 1px;
+  right: 1px;
+  top: 1px;
+  height: 44px;
+  border-radius: calc(var(--radius-18) - 2px) calc(var(--radius-18) - 2px) 20px 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
+  opacity: 0.5;
   pointer-events: none;
-  transform: translate3d(calc(var(--living-separator-shift) * 0.18), 0, 0);
 }
 
 .living-separator {
@@ -869,12 +868,12 @@ body.theme-light .glass-float {
 .changelog-liquid-modal .modal-content::before {
   content: "";
   position: absolute;
-  left: 14%;
-  right: 14%;
-  top: -42%;
-  height: 56%;
+  left: 20px;
+  right: 20px;
+  top: 1px;
+  height: 1px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0));
+  background: color-mix(in srgb, rgba(255, 255, 255, 0.42) 78%, transparent);
   pointer-events: none;
 }
 

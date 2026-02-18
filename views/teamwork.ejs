@@ -619,7 +619,7 @@
     <link rel="stylesheet" href="/css/pages/teamwork.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
   </head>
-  <body class="theme-dark">
+  <body class="theme-dark page-teamwork">
     <%- include('partials/topbar', { role, username, t, activePage: 'teamwork', pageTitle: t('menu.teamwork') }) %>
 
     <main class="container py-4">
@@ -1148,6 +1148,28 @@
       }
 
       initLessonScopeControls();
+
+      function initSubjectSwitchFeedback() {
+        const subjectLinks = Array.from(document.querySelectorAll('.subject-pill-card[href]'));
+        if (!subjectLinks.length) return;
+
+        const markPending = (link) => {
+          subjectLinks.forEach((item) => item.classList.remove('subject-pill--pending'));
+          link.classList.add('subject-pill--pending');
+        };
+
+        subjectLinks.forEach((link) => {
+          link.addEventListener('pointerdown', () => markPending(link));
+          link.addEventListener('click', () => markPending(link));
+          link.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              markPending(link);
+            }
+          });
+        });
+      }
+
+      initSubjectSwitchFeedback();
 
       function updateReactionButtons(container, reactions, reacted) {
         const buttons = container.querySelectorAll('.react-btn');

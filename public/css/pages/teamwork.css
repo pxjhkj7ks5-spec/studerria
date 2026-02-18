@@ -19,6 +19,21 @@
   gap: 2px;
   min-width: 180px;
   padding: 8px 14px;
+  transition: border-color 90ms linear, background-color 90ms linear, box-shadow 90ms linear, color 90ms linear !important;
+  will-change: background-color, border-color;
+}
+
+.subject-pill.subject-pill-card:active,
+.subject-pill.subject-pill-card.subject-pill--pending {
+  border-color: rgba(120, 167, 255, 0.62) !important;
+  background: linear-gradient(180deg, rgba(96, 165, 250, 0.94), rgba(59, 130, 246, 0.9)) !important;
+  color: rgba(248, 250, 252, 0.98) !important;
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+}
+
+.subject-pill.subject-pill-card:active .subject-pill-meta,
+.subject-pill.subject-pill-card.subject-pill--pending .subject-pill-meta {
+  opacity: 0.92;
 }
 
 .subject-pill-title {
@@ -312,6 +327,15 @@ body.theme-light .seminar-groups-panel {
 body.theme-light .seminar-group-chip {
   border-color: rgba(15, 23, 42, 0.16);
   background: rgba(15, 23, 42, 0.08);
+}
+
+.page-teamwork .ambient-layer {
+  background: linear-gradient(165deg, rgba(120, 167, 255, 0.06) 0%, rgba(125, 211, 252, 0.03) 52%, rgba(163, 191, 250, 0.06) 100%);
+}
+
+.page-teamwork .ambient-layer::before,
+.page-teamwork .ambient-layer::after {
+  display: none;
 }
 
 @media (max-width: 768px) {
