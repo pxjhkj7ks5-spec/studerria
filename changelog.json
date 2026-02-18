@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.03",
+      "date": "2026-02-18",
+      "items": [
+        "fix(ui): stabilized topbar theme-toggle geometry (fixed width/height and disabled flex shrinking) to prevent squashed icon button"
+      ]
+    },
+    {
       "version": "0.9.02",
       "date": "2026-02-18",
       "items": [
