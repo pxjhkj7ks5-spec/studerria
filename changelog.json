@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.21",
+      "date": "2026-02-19",
+      "items": [
+        "feat(my-day): redesigned `/my-day` into a new 5-block `Studeria Cockpit` layout (personal brief, priority deadlines, upcoming classes, pulse inbox, competencies)",
+        "feat(my-day): added inline homework submit modal on dashboard cards with safe `redirect_to` support in `/homework/:id/submit` to return back to cockpit",
+        "feat(my-day): expanded `buildMyDayData` with role-aware scope, today+tomorrow classes, deadline focus, inbox signals, activity summary, and competency snapshot scoring"
+      ]
+    },
+    {
       "version": "0.9.20",
       "date": "2026-02-19",
       "items": [

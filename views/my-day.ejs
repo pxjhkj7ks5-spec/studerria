@@ -1,764 +1,368 @@
-<!DOCTYPE html>
-<html lang="uk">
+<!doctype html>
+<html lang="<%= lang %>">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Мій день • Studerria</title>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Studeria Cockpit</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
       integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
       crossorigin="anonymous"
     />
-    <style>
-      :root {
-        --card-gap: 1.5rem;
-        --card-radius: 18px;
-        --input-radius: 12px;
-      }
-
-      body.theme-dark {
-        background: radial-gradient(circle at top, #1b2a52, #0c1224 55%, #090b17 100%);
-        color: #e7ecf3;
-      }
-      body.theme-light {
-        background: radial-gradient(circle at top, #eef3ff, #e7f0ff 45%, #f7f9ff 100%);
-        color: #111827;
-      }
-
-      /* Topbar (match Schedule) */
-      body.theme-light .text-white {
-        color: #0f172a !important;
-      }
-      body.theme-light .btn-outline-light {
-        color: #0f172a;
-        border-color: rgba(15, 23, 42, 0.2);
-      }
-      body.theme-light .btn-outline-light:hover {
-        background: rgba(15, 23, 42, 0.06);
-      }
-      .topbar a.btn {
-        text-decoration: none;
-      }
-      .topbar {
-        backdrop-filter: blur(12px);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        padding: 0.75rem 0;
-      }
-      body.theme-dark .topbar {
-        background: rgba(10, 10, 20, 0.5);
-      }
-      body.theme-light .topbar {
-        background: rgba(255, 255, 255, 0.75);
-      }
-      .topbar .container {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        min-height: 44px;
-      }
-      .topbar .navbar-brand {
-        font-weight: 700;
-        font-size: 1.25rem;
-        margin-right: auto;
-        display: flex;
-        align-items: center;
-        height: 36px;
-        line-height: 1;
-        padding: 0;
-      }
-      .topbar-actions {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-        min-height: 36px;
-      }
-      .topbar-actions form {
-        display: contents;
-      }
-      .mobile-menu-btn {
-        line-height: 1;
-        align-self: center;
-        margin-top: 0;
-      }
-      @media (max-width: 991px) {
-        .topbar-actions {
-          flex-basis: auto;
-          order: 2;
-          gap: 0.3rem;
-        }
-      }
-      .btn {
-        transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
-      }
-      .btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
-      }
-      body.theme-dark .btn:hover {
-        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45);
-      }
-      .btn:active {
-        transform: translateY(0);
-        box-shadow: none;
-      }
-      .btn-glass {
-        border-radius: 999px;
-        padding: 0.42rem 0.9rem;
-        font-weight: 600;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        background: rgba(255, 255, 255, 0.08);
-        color: rgba(255, 255, 255, 0.9);
-        backdrop-filter: blur(12px);
-        transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
-      }
-      .btn-glass:hover {
-        transform: translateY(-1px);
-        background: rgba(255, 255, 255, 0.15);
-        border-color: rgba(255, 255, 255, 0.35);
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-      }
-      body.theme-light .btn-glass {
-        color: #0f172a;
-        background: rgba(255, 255, 255, 0.35);
-        border-color: rgba(15, 23, 42, 0.15);
-      }
-      body.theme-light .btn-glass:hover {
-        background: rgba(255, 255, 255, 0.9);
-        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
-      }
-      .theme-toggle-min {
-        width: 36px;
-        height: 36px;
-        border-radius: 999px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        background: rgba(255, 255, 255, 0.08);
-        color: rgba(255, 255, 255, 0.9);
-        backdrop-filter: blur(10px);
-        transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
-      }
-      .theme-toggle-min:hover {
-        transform: translateY(-1px);
-        background: rgba(255, 255, 255, 0.15);
-        border-color: rgba(255, 255, 255, 0.35);
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-      }
-      body.theme-light .theme-toggle-min {
-        border-color: rgba(15, 23, 42, 0.12);
-        background: rgba(255, 255, 255, 0.7);
-        color: #0f172a;
-      }
-      body.theme-light .theme-toggle-min:hover {
-        background: rgba(255, 255, 255, 0.9);
-        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
-      }
-      .msg-btn {
-        border-radius: 999px;
-        width: 36px;
-        height: 36px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 16px;
-        position: relative;
-      }
-      .msg-badge {
-        position: absolute;
-        top: -6px;
-        right: -6px;
-        min-width: 18px;
-        height: 18px;
-        border-radius: 999px;
-        background: #ef4444;
-        color: #fff;
-        font-size: 11px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 5px;
-      }
-      button.mobile-menu-btn {
-        border-radius: 999px;
-        width: 38px;
-        height: 38px;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-      }
-      .mobile-menu-action {
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.22);
-        background: rgba(255, 255, 255, 0.12);
-        color: rgba(255, 255, 255, 0.92);
-        text-align: left;
-        font-size: 0.95rem;
-        padding: 12px 14px;
-        width: 100%;
-      }
-      .mobile-menu-action:hover {
-        background: rgba(255, 255, 255, 0.14);
-        border-color: rgba(255, 255, 255, 0.3);
-      }
-      body.theme-dark .mobile-menu-action {
-        color: #f8fafc !important;
-      }
-      body.theme-dark .mobile-menu-action:hover {
-        color: #f8fafc !important;
-      }
-      body.theme-light .mobile-menu-action {
-        background: rgba(255, 255, 255, 0.82);
-        border-color: rgba(15, 23, 42, 0.14);
-        color: #0f172a;
-      }
-      body.theme-light .mobile-menu-action:hover {
-        background: rgba(255, 255, 255, 0.9);
-        border-color: rgba(15, 23, 42, 0.2);
-      }
-      #mobileMenuModal .modal-content {
-        border-radius: 18px;
-        background: rgba(20, 24, 36, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-      }
-      body.theme-light #mobileMenuModal .modal-content {
-        background: rgba(255, 255, 255, 0.8);
-        border: 1px solid rgba(15, 23, 42, 0.1);
-      }
-      #mobileMenuModal .modal-header {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-        padding: 14px 16px;
-      }
-      body.theme-light #mobileMenuModal .modal-header {
-        border-bottom: 1px solid rgba(15, 23, 42, 0.12);
-      }
-      #mobileMenuModal .modal-title {
-        font-size: 1.05rem;
-        font-weight: 700;
-      }
-      #mobileMenuModal .modal-body {
-        padding: 12px 16px 16px;
-      }
-      #mobileMenuModal .btn-close {
-        filter: brightness(1.35);
-        opacity: 0.9;
-      }
-      body.theme-dark #mobileMenuModal .btn-close {
-        filter: invert(1) brightness(1.2);
-        opacity: 0.95;
-      }
-      body.theme-light #mobileMenuModal .btn-close {
-        filter: none;
-        opacity: 0.75;
-      }
-      @media (max-width: 768px) {
-        .topbar-actions .desktop-only {
-          display: none !important;
-        }
-        .topbar-actions .mobile-menu-btn {
-          display: inline-flex !important;
-        }
-        .topbar-actions {
-          gap: 8px;
-        }
-      }
-
-      .app-footer {
-        text-align: center;
-        font-size: 0.85rem;
-        padding-bottom: 120px;
-      }
-      body.theme-dark .app-footer {
-        color: rgba(255, 255, 255, 0.6);
-      }
-      body.theme-light .app-footer {
-        color: rgba(15, 23, 42, 0.6);
-      }
-
-      /* Glass card base */
-      .glass {
-        position: relative;
-        isolation: isolate;
-        overflow: clip;
-        background-clip: padding-box;
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        backdrop-filter: blur(14px);
-        border-radius: var(--card-radius);
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
-      }
-      body.theme-light .glass {
-        background: rgba(255, 255, 255, 0.75);
-        border-color: rgba(15, 23, 42, 0.08);
-        box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
-      }
-
-      /* Typography */
-      .hero-title {
-        font-size: clamp(1.65rem, 2.4vw, 2.2rem);
-        font-weight: 700;
-        letter-spacing: -0.02em;
-      }
-      .hero-sub {
-        font-size: 0.9rem;
-        font-weight: 500;
-        color: rgba(255, 255, 255, 0.7);
-      }
-      body.theme-light .hero-sub {
-        color: rgba(15, 23, 42, 0.65);
-      }
-
-      .card-heading {
-        font-size: 1rem;
-        font-weight: 600;
-        margin-bottom: 0.75rem;
-        color: inherit;
-      }
-
-      /* Main layout */
-      main {
-        padding: 1.5rem 1rem;
-      }
-      @media (min-width: 768px) {
-        main {
-          padding: 2rem 2rem;
-        }
-      }
-
-      .header-card {
-        padding: 1.25rem !important;
-      }
-      @media (max-width: 576px) {
-        .header-card {
-          padding: 1.05rem !important;
-        }
-      }
-
-      .header-content {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-      }
-      @media (min-width: 768px) {
-        .header-content {
-          flex-direction: row;
-          align-items: center;
-          justify-content: space-between;
-          gap: 1.5rem;
-        }
-      }
-
-      /* Grid layout */
-      .myday-grid {
-        display: grid;
-        gap: 1.25rem;
-        grid-template-columns: 1fr;
-        margin-top: 1.5rem;
-      }
-      @media (min-width: 900px) {
-        .myday-grid {
-          grid-template-columns: repeat(2, 1fr);
-        }
-        .myday-grid > :nth-child(5) {
-          grid-column: 1 / -1;
-        }
-      }
-
-      .myday-card {
-        padding: 1.15rem;
-        display: flex;
-        flex-direction: column;
-        min-height: 240px;
-      }
-      @media (max-width: 576px) {
-        .myday-card {
-          padding: 1rem;
-          min-height: 220px;
-        }
-      }
-
-      /* Empty states */
-      .empty-state {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 1.5rem 1rem;
-        text-align: center;
-        min-height: 140px;
-        color: rgba(255, 255, 255, 0.6);
-      }
-      body.theme-light .empty-state {
-        color: rgba(15, 23, 42, 0.6);
-      }
-      .empty-state-emoji {
-        font-size: 3rem;
-        margin-bottom: 0.75rem;
-        opacity: 0.6;
-      }
-      .empty-state-text {
-        font-size: 0.95rem;
-        line-height: 1.5;
-        margin-bottom: 0.5rem;
-      }
-      .empty-state-hint {
-        font-size: 0.85rem;
-        opacity: 0.7;
-        margin-top: 0.5rem;
-      }
-
-      /* Stat pill */
-      .stat-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.35rem 0.8rem;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.12);
-        font-size: 0.85rem;
-        font-weight: 500;
-        white-space: nowrap;
-      }
-      body.theme-light .stat-pill {
-        background: rgba(15, 23, 42, 0.08);
-      }
-
-      /* Item components */
-      .deadline-item,
-      .reminder-item {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 1rem;
-        padding: 0.75rem 1rem;
-        border-radius: var(--input-radius);
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        transition: all 200ms ease;
-      }
-      .deadline-item:hover,
-      .reminder-item:hover {
-        background: rgba(255, 255, 255, 0.1);
-        border-color: rgba(255, 255, 255, 0.14);
-      }
-      body.theme-light .deadline-item,
-      body.theme-light .reminder-item {
-        background: rgba(15, 23, 42, 0.04);
-        border-color: rgba(15, 23, 42, 0.1);
-      }
-      body.theme-light .deadline-item:hover,
-      body.theme-light .reminder-item:hover {
-        background: rgba(15, 23, 42, 0.08);
-        border-color: rgba(15, 23, 42, 0.15);
-      }
-
-      .item-content {
-        flex: 1;
-        min-width: 0;
-      }
-      .item-title {
-        font-weight: 600;
-        margin-bottom: 0.25rem;
-      }
-      .item-meta {
-        font-size: 0.8rem;
-        color: rgba(255, 255, 255, 0.65);
-      }
-      body.theme-light .item-meta {
-        color: rgba(15, 23, 42, 0.6);
-      }
-
-      .item-actions {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-      }
-
-      /* Form controls */
-      .reminder-form {
-        display: grid;
-        gap: 0.6rem;
-        padding: 0.75rem 0;
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
-      }
-      body.theme-light .reminder-form {
-        border-top-color: rgba(15, 23, 42, 0.08);
-      }
-
-      .form-group {
-        display: grid;
-        gap: 0.4rem;
-      }
-      .form-label {
-        font-size: 0.85rem;
-        font-weight: 600;
-        display: none;
-      }
-
-      .reminder-input,
-      .reminder-input:focus {
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        color: inherit;
-        border-radius: var(--input-radius);
-        padding: 0.5rem 0.75rem;
-        font-size: 0.9rem;
-        font-family: inherit;
-        transition: all 200ms ease;
-      }
-      .reminder-input:focus {
-        background: rgba(255, 255, 255, 0.12);
-        border-color: rgba(255, 255, 255, 0.24);
-        outline: none;
-        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
-      }
-      body.theme-light .reminder-input,
-      body.theme-light .reminder-input:focus {
-        background: rgba(15, 23, 42, 0.05);
-        border-color: rgba(15, 23, 42, 0.14);
-      }
-      body.theme-light .reminder-input:focus {
-        background: rgba(15, 23, 42, 0.08);
-        border-color: rgba(15, 23, 42, 0.2);
-        box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.03);
-      }
-
-      .reminder-input::placeholder {
-        color: rgba(255, 255, 255, 0.5);
-      }
-      body.theme-light .reminder-input::placeholder {
-        color: rgba(15, 23, 42, 0.45);
-      }
-
-      .reminder-input-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.6rem;
-      }
-      @media (max-width: 768px) {
-        .reminder-input-row {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .reminder-form-actions {
-        display: flex;
-        gap: 0.5rem;
-        justify-content: flex-start;
-        flex-wrap: wrap;
-      }
-
-      .btn-form {
-        padding: 0.5rem 1rem;
-        font-size: 0.85rem;
-        font-weight: 600;
-        border-radius: 999px;
-        border: none;
-        cursor: pointer;
-        transition: all 200ms ease;
-        min-height: 40px;
-      }
-      .btn-form:hover {
-        transform: translateY(-1px);
-      }
-
-      .btn-form-primary {
-        background: rgba(59, 130, 246, 0.9);
-        color: white;
-        border: 1px solid rgba(59, 130, 246, 1);
-      }
-      .btn-form-primary:hover {
-        background: rgba(59, 130, 246, 1);
-      }
-
-      .btn-form-secondary {
-        background: rgba(255, 255, 255, 0.12);
-        color: inherit;
-        border: 1px solid rgba(255, 255, 255, 0.18);
-      }
-      .btn-form-secondary:hover {
-        background: rgba(255, 255, 255, 0.18);
-        border-color: rgba(255, 255, 255, 0.24);
-      }
-      body.theme-light .btn-form-secondary {
-        background: rgba(15, 23, 42, 0.08);
-        border-color: rgba(15, 23, 42, 0.12);
-      }
-      body.theme-light .btn-form-secondary:hover {
-        background: rgba(15, 23, 42, 0.12);
-        border-color: rgba(15, 23, 42, 0.16);
-      }
-
-      /* Reminder toggle button */
-      .btn-add-reminder {
-        background: rgba(59, 130, 246, 0.15);
-        color: rgba(59, 130, 246, 1);
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        border-radius: 999px;
-        padding: 0.45rem 0.8rem;
-        font-size: 0.8rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 200ms ease;
-        white-space: nowrap;
-      }
-      .btn-add-reminder:hover {
-        background: rgba(59, 130, 246, 0.25);
-        border-color: rgba(59, 130, 246, 0.5);
-      }
-
-      .action-buttons {
-        display: inline-flex;
-        gap: 0.4rem;
-        flex-wrap: wrap;
-      }
-      .btn-sm-action {
-        padding: 0.3rem 0.6rem;
-        font-size: 0.78rem;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        background: rgba(255, 255, 255, 0.08);
-        color: inherit;
-        cursor: pointer;
-        transition: all 200ms ease;
-        min-height: auto;
-      }
-      .btn-sm-action:hover {
-        background: rgba(255, 255, 255, 0.15);
-        border-color: rgba(255, 255, 255, 0.3);
-      }
-
-      .reminder-title.done {
-        text-decoration: line-through;
-        opacity: 0.6;
-      }
-
-      /* Items list */
-      .items-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.65rem;
-        flex: 1;
-      }
-
-      .muted {
-        color: rgba(255, 255, 255, 0.6);
-      }
-      body.theme-light .muted {
-        color: rgba(15, 23, 42, 0.6);
-      }
-
-      /* Mobile menu modal */
-</style>
-      <link rel="stylesheet" href="/css/tokens.css" />
-    <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/my-day.css" />
-    <link rel="stylesheet" href="/css/design-system.css" />
   </head>
   <body class="theme-dark">
-    <!-- Top Navigation -->
-    <%- include('partials/topbar', { role, username, t, activePage: 'my-day', pageTitle: 'Мій день' }) %>
+    <%
+      const cockpit = myDay || {};
+      const brief = cockpit.brief || {};
+      const briefReasons = Array.isArray(brief.reasons) ? brief.reasons : [];
+      const deadlineItems = Array.isArray(cockpit.deadline_focus) ? cockpit.deadline_focus : [];
+      const classItems = Array.isArray(cockpit.next_classes) ? cockpit.next_classes : [];
+      const inboxItems = Array.isArray(cockpit.inbox_items) ? cockpit.inbox_items : [];
+      const competencies = Array.isArray(cockpit.competencies) ? cockpit.competencies : [];
+      const activity = cockpit.activity_summary || {};
+      const reminders = Array.isArray(cockpit.reminders) ? cockpit.reminders : [];
+      const briefToneClass = `brief-tone-${brief.tone || 'calm'}`;
 
-    <!-- Main content -->
-    <main class="container py-4">
-      <!-- Page header -->
-      <div class="glass header-card mb-4">
-        <div class="header-content">
-          <div>
-            <h1 class="hero-title">Мій день</h1>
-            <p class="hero-sub">Фокус на сьогоднішніх парах і дедлайнах.</p>
-          </div>
-          <div class="stat-pill">
-            <span>Сьогодні:</span>
-            <strong><%= myDay.today ? new Date(myDay.today).toLocaleDateString('uk-UA') : '-' %></strong>
-          </div>
+      const formatShortDate = (value) => {
+        if (!value) return '-';
+        const parsed = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(parsed.getTime())) return value;
+        return parsed.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' });
+      };
+      const formatReminderDate = (value) => {
+        if (!value) return '-';
+        const parsed = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(parsed.getTime())) return value;
+        return parsed.toLocaleDateString('uk-UA');
+      };
+      const getDeadlineStatus = (item) => {
+        if (item && item.submission_status === 'submitted_on_time') {
+          return { label: 'Вчасно', className: 'status-on-time' };
+        }
+        if (item && item.submission_status === 'submitted_late') {
+          return { label: 'Із запізненням', className: 'status-late' };
+        }
+        if (item && item.submission_status === 'overdue') {
+          return { label: 'Прострочено', className: 'status-overdue' };
+        }
+        return { label: 'Відкрито', className: 'status-open' };
+      };
+      const getDayContext = (item) => (item && item.day_context === 'tomorrow' ? 'Завтра' : 'Сьогодні');
+    %>
+
+    <%- include('partials/topbar', { role, username, t, activePage: 'my-day', pageTitle: 'Studeria Cockpit' }) %>
+
+    <main class="container cockpit-page py-4">
+      <% if (okMessage) { %>
+        <div class="alert alert-success cockpit-alert" role="alert"><%= okMessage %></div>
+      <% } %>
+      <% if (errMessage) { %>
+        <div class="alert alert-danger cockpit-alert" role="alert"><%= errMessage %></div>
+      <% } %>
+
+      <section class="cockpit-card brief-card <%= briefToneClass %>">
+        <div class="brief-head">
+          <span class="brief-kicker">Leadership Brief</span>
+          <span class="brief-meta">Тиждень <%= cockpit.week_number || '-' %></span>
         </div>
-      </div>
+        <h1 class="brief-title"><%= brief.title || 'Твій день під контролем' %></h1>
+        <p class="brief-message"><%= brief.message || 'Критичних сигналів не знайдено, тримай темп.' %></p>
+        <div class="brief-actions">
+          <a class="btn btn-glass" href="<%= brief.action_href || '/schedule' %>"><%= brief.action_label || 'Відкрити розклад' %></a>
+          <button type="button" class="btn btn-soft" id="briefWhyToggle">Чому я це бачу?</button>
+        </div>
+        <div class="brief-reasons d-none" id="briefWhyPanel">
+          <% if (briefReasons.length) { %>
+            <% briefReasons.forEach((reason) => { %>
+              <div class="brief-reason-row"><%= reason %></div>
+            <% }) %>
+          <% } else { %>
+            <div class="brief-reason-row">Сигнали ще накопичуються.</div>
+          <% } %>
+        </div>
+      </section>
 
-      <!-- Cards grid -->
-      <div class="myday-grid">
-          
-          <!-- Card 1: Now/Next -->
-          <div class="glass myday-card">
-            <h3 class="card-heading">Зараз / Далі</h3>
-            <div id="currentBlock" class="mb-2"></div>
-            <div id="nextBlock" class="muted flex-grow-1"></div>
+      <section class="cockpit-grid">
+        <article class="cockpit-card section-card" id="deadlinesBlock">
+          <div class="section-head">
+            <h2 class="section-title">Найближчі дедлайни</h2>
+            <span class="section-subtitle">2-3 задачі з найвищим пріоритетом</span>
           </div>
-
-          <!-- Card 2: Today's classes -->
-          <div class="glass myday-card">
-            <h3 class="card-heading">Пари сьогодні</h3>
-            <div id="classesContainer"></div>
-          </div>
-
-          <!-- Card 3: Deadlines -->
-          <div class="glass myday-card">
-            <h3 class="card-heading">Дедлайни сьогодні/завтра</h3>
-            <div id="deadlinesContainer"></div>
-          </div>
-
-          <!-- Card 4: Reminders -->
-          <div class="glass myday-card">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-              <h3 class="card-heading mb-0">Нагадування</h3>
-              <button class="btn-add-reminder" type="button" id="toggleReminderForm">+ Додати</button>
+          <% if (!deadlineItems.length) { %>
+            <div class="empty-state">
+              <div class="empty-state-title">Критичних дедлайнів не знайдено</div>
+              <div class="empty-state-subtitle">Система не бачить відкритих ризиків на найближчий період.</div>
             </div>
-            
-            <!-- Reminder form (hidden by default) -->
+          <% } else { %>
+            <div class="item-list">
+              <% deadlineItems.forEach((item) => {
+                   const status = getDeadlineStatus(item);
+                   const isHomework = item && item.type === 'homework';
+                   const canSubmitNow = Boolean(isHomework && item.can_submit && item.submission_status !== 'submitted_on_time');
+              %>
+                <div class="item-row deadline-row">
+                  <div class="item-main">
+                    <div class="item-title"><%= item.description || 'Завдання' %></div>
+                    <div class="item-meta">
+                      <span><%= item.subject_name || 'Предмет' %></span>
+                      <span>до <%= formatShortDate(item.deadline_date) %></span>
+                      <% if (item.is_control) { %><span class="type-chip">Контроль</span><% } %>
+                      <% if (item.is_credit) { %><span class="type-chip">Залік</span><% } %>
+                    </div>
+                  </div>
+                  <div class="item-side">
+                    <span class="status-chip <%= status.className %>"><%= status.label %></span>
+                    <% if (canSubmitNow) { %>
+                      <button
+                        type="button"
+                        class="btn btn-submit-now"
+                        data-submit-homework-id="<%= item.id %>"
+                        data-submit-title="<%= item.description || 'Завдання' %>"
+                      >
+                        Здати
+                      </button>
+                    <% } else if (isHomework && item.submission_status === 'submitted_on_time') { %>
+                      <span class="item-note">Здано <%= item.submitted_date || '' %></span>
+                    <% } else if (isHomework && item.submission_status === 'submitted_late') { %>
+                      <span class="item-note">Здано із запізненням</span>
+                    <% } else if (item.type === 'teamwork') { %>
+                      <a href="/teamwork" class="btn btn-inline-link">Відкрити</a>
+                    <% } else { %>
+                      <a href="/schedule" class="btn btn-inline-link">Відкрити</a>
+                    <% } %>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+          <div class="section-footer-link">
+            <a href="/schedule">Відкрити повний список у розкладі</a>
+          </div>
+        </article>
+
+        <article class="cockpit-card section-card">
+          <div class="section-head">
+            <h2 class="section-title">Пари найближчим часом</h2>
+            <span class="section-subtitle">Сьогодні та завтра</span>
+          </div>
+          <% if (!classItems.length) { %>
+            <div class="empty-state">
+              <div class="empty-state-title">Найближчих пар немає</div>
+              <div class="empty-state-subtitle">Перевір розклад, якщо очікуєш зміни.</div>
+            </div>
+          <% } else { %>
+            <div class="item-list">
+              <% classItems.forEach((item) => { %>
+                <div class="item-row class-row">
+                  <div class="item-main">
+                    <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
+                    <div class="item-meta">
+                      <span class="type-chip"><%= getDayContext(item) %></span>
+                      <span>Пара <%= item.class_number || '-' %></span>
+                      <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
+                      <% if (item.group_number) { %><span>Група <%= item.group_number %></span><% } %>
+                    </div>
+                  </div>
+                  <div class="item-side">
+                    <a href="/schedule" class="btn btn-inline-link">До розкладу</a>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </article>
+
+        <article class="cockpit-card section-card" id="inboxBlock">
+          <div class="section-head">
+            <h2 class="section-title">Пульс та інбокс</h2>
+            <span class="section-subtitle">Швидкий зріз прогресу і сигналів</span>
+          </div>
+
+          <div class="summary-grid">
+            <div class="summary-pill">
+              <span>Вчасно</span>
+              <strong><%= activity.on_time_share === null || typeof activity.on_time_share === 'undefined' ? '-' : `${activity.on_time_share}%` %></strong>
+            </div>
+            <div class="summary-pill">
+              <span>Прострочки</span>
+              <strong><%= activity.overdue || 0 %></strong>
+            </div>
+            <div class="summary-pill">
+              <span>У ризику</span>
+              <strong><%= activity.risky_subjects || 0 %></strong>
+            </div>
+            <div class="summary-pill">
+              <span>Новий фідбек</span>
+              <strong><%= activity.recent_feedback || 0 %></strong>
+            </div>
+          </div>
+
+          <div class="inbox-list">
+            <% inboxItems.forEach((item) => { %>
+              <div class="inbox-item inbox-<%= item.kind || 'info' %>">
+                <div class="inbox-main">
+                  <div class="inbox-title"><%= item.title || 'Оновлення' %></div>
+                  <div class="inbox-meta"><%= item.meta || '' %></div>
+                </div>
+                <a class="btn btn-inline-link" href="<%= item.action_href || '/schedule' %>"><%= item.action_label || 'Відкрити' %></a>
+              </div>
+            <% }) %>
+          </div>
+
+          <div class="reminder-block">
+            <div class="reminder-header">
+              <h3>Нагадування</h3>
+              <button type="button" class="btn btn-soft btn-sm" id="toggleReminderForm">Додати</button>
+            </div>
             <form id="reminderForm" class="reminder-form d-none">
-              <div class="form-group">
-                <input class="reminder-input" type="text" id="reminderTitle" placeholder="Короткий заголовок" required />
+              <input type="hidden" id="reminderEditId" value="" />
+              <div class="reminder-row">
+                <input type="text" id="reminderTitle" class="form-control reminder-input" maxlength="160" placeholder="Назва нагадування" required />
               </div>
-              <div class="form-group">
-                <textarea class="reminder-input" id="reminderNote" rows="2" placeholder="Нотатка (необовʼязково)"></textarea>
+              <div class="reminder-row">
+                <textarea id="reminderNote" class="form-control reminder-input" rows="2" maxlength="500" placeholder="Нотатка (опційно)"></textarea>
               </div>
-              <div class="reminder-input-row">
-                <div class="form-group">
-                  <input class="reminder-input" type="date" id="reminderDate" required />
-                </div>
-                <div class="form-group">
-                  <input class="reminder-input" type="time" id="reminderTime" />
-                </div>
+              <div class="reminder-row reminder-row-split">
+                <input type="date" id="reminderDate" class="form-control reminder-input" required />
+                <input type="time" id="reminderTime" class="form-control reminder-input" />
               </div>
-              <div class="reminder-form-actions">
-                <button class="btn-form btn-form-primary" type="submit" id="reminderSubmit">Додати</button>
-                <button class="btn-form btn-form-secondary" type="button" id="reminderCancel">Скасувати</button>
+              <div class="reminder-actions">
+                <button type="submit" class="btn btn-glass btn-sm" id="reminderSubmit">Додати</button>
+                <button type="button" class="btn btn-soft btn-sm" id="reminderCancel">Скасувати</button>
               </div>
-              <input type="hidden" id="reminderEditId" />
             </form>
+            <div id="reminderList" class="reminder-list">
+              <% if (!reminders.length) { %>
+                <div class="empty-state compact">
+                  <div class="empty-state-title">Нагадувань немає</div>
+                  <div class="empty-state-subtitle">Додай перше на найближчий тиждень.</div>
+                </div>
+              <% } else { %>
+                <% reminders.forEach((reminder) => { %>
+                  <div class="reminder-item">
+                    <div class="reminder-main">
+                      <div class="reminder-title <%= reminder.is_done ? 'done' : '' %>"><%= reminder.title %></div>
+                      <div class="reminder-meta"><%= formatReminderDate(reminder.remind_date) %><%= reminder.remind_time ? ` · ${reminder.remind_time}` : '' %></div>
+                    </div>
+                  </div>
+                <% }) %>
+              <% } %>
+            </div>
+          </div>
+        </article>
 
-            <!-- Reminders list -->
-            <div id="reminderList" class="items-list flex-grow-1"></div>
+        <article class="cockpit-card section-card" id="competencyBlock">
+          <div class="section-head">
+            <h2 class="section-title">Компас компетентностей</h2>
+            <span class="section-subtitle">Портфоліо сильних сторін і точок росту</span>
           </div>
 
-          <!-- Card 5: Top priorities (full width on 2-col+) -->
-          <div class="glass myday-card">
-            <h3 class="card-heading">Топ пріоритети</h3>
-            <div id="prioritiesContainer"></div>
+          <div class="competency-hero">
+            <div class="competency-orb" id="competencyOrb">
+              <div class="competency-orb-core">
+                <strong><%= cockpit.competency_average || 0 %></strong>
+                <span>/100</span>
+              </div>
+            </div>
+            <div class="competency-insights">
+              <div class="competency-insight">
+                <span>Сильна</span>
+                <strong><%= cockpit.competency_strongest ? cockpit.competency_strongest.label : 'Накопичуємо дані' %></strong>
+              </div>
+              <div class="competency-insight">
+                <span>Зростає</span>
+                <strong>
+                  <% if (cockpit.competency_fastest_growth) { %>
+                    <%= cockpit.competency_fastest_growth.label %>
+                    <% if (cockpit.competency_fastest_growth.delta > 0) { %>+<%= cockpit.competency_fastest_growth.delta %><% } else { %><%= cockpit.competency_fastest_growth.delta %><% } %>
+                  <% } else { %>
+                    Накопичуємо дані
+                  <% } %>
+                </strong>
+              </div>
+              <div class="competency-insight">
+                <span>Підтягнути</span>
+                <strong><%= cockpit.competency_weakest ? cockpit.competency_weakest.label : 'Накопичуємо дані' %></strong>
+              </div>
+            </div>
           </div>
 
-      </div>
+          <div class="competency-list">
+            <% if (!competencies.length) { %>
+              <div class="empty-state compact">
+                <div class="empty-state-title">Ще немає достатньо даних</div>
+                <div class="empty-state-subtitle">Після оцінених активностей з'явиться портрет компетентностей.</div>
+              </div>
+            <% } else { %>
+              <% competencies.forEach((item, index) => { %>
+                <div class="competency-item" data-color-index="<%= index %>">
+                  <div class="competency-head">
+                    <span class="competency-name"><%= item.label %></span>
+                    <span class="competency-score"><%= item.score %></span>
+                  </div>
+                  <div class="competency-bar">
+                    <span style="width: <%= Math.max(0, Math.min(100, Number(item.score || 0))) %>%"></span>
+                  </div>
+                  <div class="competency-delta <%= item.trend === 'up' ? 'trend-up' : (item.trend === 'down' ? 'trend-down' : 'trend-neutral') %>">
+                    <% if (item.delta > 0) { %>+<%= item.delta %><% } else { %><%= item.delta %><% } %>
+                  </div>
+                </div>
+              <% }) %>
+            <% } %>
+          </div>
+        </article>
+      </section>
     </main>
 
+    <div class="modal fade" id="homeworkSubmitModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal">
+          <form id="homeworkSubmitForm" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="redirect_to" value="/my-day" />
+            <div class="modal-header">
+              <h5 class="modal-title">Здати завдання</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="submit-target" id="submitHomeworkTarget">Завдання</div>
+              <div class="mb-3">
+                <label for="submissionText" class="form-label">Текст</label>
+                <textarea id="submissionText" name="submission_text" class="form-control reminder-input" rows="4" maxlength="4000" placeholder="Опиши відповідь або короткий підсумок"></textarea>
+              </div>
+              <div class="mb-3">
+                <label for="submissionLink" class="form-label">Посилання</label>
+                <input id="submissionLink" name="link_url" class="form-control reminder-input" type="url" placeholder="https://..." />
+              </div>
+              <div>
+                <label for="submissionAttachment" class="form-label">Файл</label>
+                <input id="submissionAttachment" name="submission_attachment" class="form-control reminder-input" type="file" />
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-soft" data-bs-dismiss="modal">Скасувати</button>
+              <button type="submit" class="btn btn-glass">Здати</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <%- include('partials/app-footer') %>
+    <%- include('partials/changelog-modal') %>
+    <%- include('partials/mobile-menu-modal', { role, t, activePage: 'my-day' }) %>
 
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
-    <%- include('partials/changelog-modal') %>
-    <%- include('partials/mobile-menu-modal', { role, t, activePage: 'my-day' }) %>
-
     <script>
-      // ============ THEME ============
+      const myDay = <%- JSON.stringify(myDay || {}) %>;
       const themeToggles = document.querySelectorAll('.theme-toggle');
-      const storedTheme = localStorage.getItem('ui-theme') || 'theme-light';
+      const storedTheme = localStorage.getItem('ui-theme') || 'theme-dark';
       document.body.classList.remove('theme-dark', 'theme-light');
       document.body.classList.add(storedTheme);
       themeToggles.forEach((btn) => {
@@ -769,14 +373,58 @@
           document.body.classList.remove('theme-dark', 'theme-light');
           document.body.classList.add(next);
           localStorage.setItem('ui-theme', next);
-          themeToggles.forEach((b) => {
-            b.textContent = next === 'theme-dark' ? b.dataset.lightLabel : b.dataset.darkLabel;
+          themeToggles.forEach((toggle) => {
+            toggle.textContent = next === 'theme-dark' ? toggle.dataset.lightLabel : toggle.dataset.darkLabel;
           });
         });
       });
 
-      // ============ DATA ============
-      const myDay = <%- JSON.stringify(myDay || {}) %>;
+      const briefWhyToggle = document.getElementById('briefWhyToggle');
+      const briefWhyPanel = document.getElementById('briefWhyPanel');
+      if (briefWhyToggle && briefWhyPanel) {
+        briefWhyToggle.addEventListener('click', () => {
+          briefWhyPanel.classList.toggle('d-none');
+        });
+      }
+
+      const submitModalElement = document.getElementById('homeworkSubmitModal');
+      const submitForm = document.getElementById('homeworkSubmitForm');
+      const submitTarget = document.getElementById('submitHomeworkTarget');
+      const submissionText = document.getElementById('submissionText');
+      const submissionLink = document.getElementById('submissionLink');
+      const submissionAttachment = document.getElementById('submissionAttachment');
+      const submitModal = submitModalElement ? new bootstrap.Modal(submitModalElement) : null;
+
+      document.querySelectorAll('[data-submit-homework-id]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const homeworkId = Number(button.dataset.submitHomeworkId || 0);
+          const homeworkTitle = String(button.dataset.submitTitle || 'Завдання');
+          if (!homeworkId || !submitForm) return;
+          submitForm.action = `/homework/${homeworkId}/submit`;
+          if (submitTarget) submitTarget.textContent = homeworkTitle;
+          if (submissionText) submissionText.value = '';
+          if (submissionLink) submissionLink.value = '';
+          if (submissionAttachment) submissionAttachment.value = '';
+          if (submitModal) submitModal.show();
+        });
+      });
+
+      function escapeHtml(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function formatDate(value) {
+        if (!value) return '-';
+        const parsed = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(parsed.getTime())) return value;
+        return parsed.toLocaleDateString('uk-UA');
+      }
+
       const reminderForm = document.getElementById('reminderForm');
       const toggleReminderForm = document.getElementById('toggleReminderForm');
       const reminderTitle = document.getElementById('reminderTitle');
@@ -787,209 +435,14 @@
       const reminderSubmit = document.getElementById('reminderSubmit');
       const reminderCancel = document.getElementById('reminderCancel');
       const reminderList = document.getElementById('reminderList');
-      const mobileMenuModal = document.getElementById('mobileMenuModal');
-
       let reminders = Array.isArray(myDay.reminders) ? myDay.reminders : [];
+
       if (reminderDate && myDay.today) {
         reminderDate.value = myDay.today;
       }
 
-      // ============ UTILITY FUNCTIONS ============
-      function escapeHtml(value) {
-        return String(value || '')
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/\"/g, '&quot;')
-          .replace(/'/g, '&#39;');
-      }
-
-      function formatDate(value) {
-        if (!value) return '-';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return value;
-        return date.toLocaleDateString('uk-UA');
-      }
-
-      function getLessonTypeLabel(type) {
-        if (!type) return '';
-        if (type === 'lecture') return 'Лекція';
-        if (type === 'seminar') return 'Семінар';
-        if (type === 'lab') return 'Лаб';
-        if (type === 'practice') return 'Практика';
-        return '';
-      }
-
-      function hasInlineType(name) {
-        return /(лекц|семін|лаб|практ|lecture|seminar|lab|practice)/i.test(String(name || ''));
-      }
-
-      function buildClassName(cls) {
-        if (!cls) return '';
-        const base = String(cls.subject_name || '');
-        const typeLabel = getLessonTypeLabel(cls.lesson_type);
-        if (!typeLabel || hasInlineType(base)) return base;
-        return `${base} · ${typeLabel}`;
-      }
-
-      // ============ RENDER: NOW/NEXT ============
-      function renderNowNext() {
-        const currentBlock = document.getElementById('currentBlock');
-        const nextBlock = document.getElementById('nextBlock');
-        if (!currentBlock || !nextBlock) return;
-
-        if (myDay.current_class) {
-          currentBlock.innerHTML = `
-            <div class="item-title">🎯 Йде зараз</div>
-            <div class="item-meta">${escapeHtml(buildClassName(myDay.current_class))} · ${myDay.current_class.start}–${myDay.current_class.end}</div>
-          `;
-        } else {
-          currentBlock.innerHTML = '<div class="empty-state" style="min-height: auto; padding: 1rem 0;"><div class="empty-state-text">Зараз немає пар</div></div>';
-        }
-
-        if (myDay.next_class) {
-          nextBlock.textContent = `Далі: ${buildClassName(myDay.next_class)} о ${myDay.next_class.start}`;
-        } else {
-          nextBlock.textContent = 'Наступних пар сьогодні немає.';
-        }
-      }
-
-      function updateCountdown() {
-        if (!myDay.next_class || !myDay.next_class.startAt) return;
-        const startAt = new Date(myDay.next_class.startAt);
-        const diff = startAt.getTime() - Date.now();
-        if (diff <= 0) return;
-        const minutes = Math.floor(diff / 60000);
-        const seconds = Math.floor((diff % 60000) / 1000);
-        const nextBlock = document.getElementById('nextBlock');
-        if (nextBlock) {
-          nextBlock.textContent = `Далі: ${buildClassName(myDay.next_class)} через ${minutes} хв ${seconds} сек`;
-        }
-      }
-
-      renderNowNext();
-      setInterval(updateCountdown, 1000);
-
-      // ============ RENDER: CLASSES ============
-      function renderClasses() {
-        const container = document.getElementById('classesContainer');
-        if (!container) return;
-
-        if (!myDay.classes_today || !myDay.classes_today.length) {
-          container.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-state-emoji">📚</div>
-              <div class="empty-state-text">Сьогодні пар немає</div>
-              <div class="empty-state-hint">Чудовий день для відпочинку!</div>
-            </div>
-          `;
-          return;
-        }
-
-        const html = myDay.classes_today
-          .map((cls) => `
-            <div class="deadline-item">
-              <div class="item-content">
-                <div class="item-title">${escapeHtml(buildClassName(cls))}</div>
-                <div class="item-meta">Пара #${cls.class_number} · ${cls.start}–${cls.end}</div>
-              </div>
-              <span class="stat-pill">Група ${cls.group_number}</span>
-            </div>
-          `)
-          .join('');
-        container.innerHTML = `<div class="items-list">${html}</div>`;
-      }
-
-      // ============ RENDER: DEADLINES ============
-      function renderDeadlines() {
-        const container = document.getElementById('deadlinesContainer');
-        if (!container) return;
-
-        if (!myDay.deadlines || !myDay.deadlines.length) {
-          container.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-state-emoji">✅</div>
-              <div class="empty-state-text">Немає дедлайнів</div>
-              <div class="empty-state-hint">на найближчі 2 дні</div>
-            </div>
-          `;
-          return;
-        }
-
-        const html = myDay.deadlines
-          .map((item) => {
-            const btn = item.type === 'homework'
-              ? `<button class="btn-sm-action complete-btn" data-homework-id="${item.id}" style="margin-left: auto;">${item.completed ? '✓ Готово' : 'Зробити'}</button>`
-              : '';
-            return `
-              <div class="deadline-item">
-                <div class="item-content">
-                  <div class="item-title">${escapeHtml(item.description)}</div>
-                  <div class="item-meta">${escapeHtml(item.subject_name)} · ${item.deadline_date}${item.type === 'teamwork' ? ' · 🤝 Тимворк' : ''}</div>
-                </div>
-                ${btn}
-              </div>
-            `;
-          })
-          .join('');
-        container.innerHTML = `<div class="items-list">${html}</div>`;
-
-        // Re-attach complete button handlers
-        container.querySelectorAll('.complete-btn').forEach((btn) => {
-          btn.addEventListener('click', completeHomework);
-        });
-      }
-
-      async function completeHomework(e) {
-        const btn = e.target.closest('.complete-btn');
-        if (!btn) return;
-        const id = btn.dataset.homeworkId;
-        if (!id) return;
-        btn.disabled = true;
-        try {
-          const res = await fetch(`/api/homework/${id}/complete`, { method: 'POST' });
-          if (!res.ok) return;
-          const data = await res.json();
-          btn.classList.toggle('completed', data.completed);
-          btn.textContent = data.completed ? '✓ Готово' : 'Зробити';
-        } catch (err) {
-          console.error(err);
-        } finally {
-          btn.disabled = false;
-        }
-      }
-
-      // ============ RENDER: PRIORITIES ============
-      function renderPriorities() {
-        const container = document.getElementById('prioritiesContainer');
-        if (!container) return;
-
-        if (!myDay.top_priorities || !myDay.top_priorities.length) {
-          container.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-state-emoji">✨</div>
-              <div class="empty-state-text">Наразі все під контролем</div>
-            </div>
-          `;
-          return;
-        }
-
-        const html = myDay.top_priorities
-          .map((item) => `
-            <div class="deadline-item">
-              <div class="item-content">
-                <div class="item-title">${escapeHtml(item.subject_name)}</div>
-                <div class="item-meta">${escapeHtml(item.description)} · ${item.deadline_date}</div>
-              </div>
-              <span class="stat-pill">${item.type === 'workload' ? '⚡ Навантаження' : '📌 Найближче'}</span>
-            </div>
-          `)
-          .join('');
-        container.innerHTML = `<div class="items-list">${html}</div>`;
-      }
-
-      // ============ RENDER: REMINDERS ============
       function resetReminderForm() {
+        if (!reminderTitle || !reminderNote || !reminderDate || !reminderTime || !reminderEditId || !reminderSubmit) return;
         reminderTitle.value = '';
         reminderNote.value = '';
         reminderDate.value = myDay.today || '';
@@ -999,52 +452,46 @@
       }
 
       function renderReminders(list) {
-        if (!list.length) {
+        if (!reminderList) return;
+        if (!Array.isArray(list) || !list.length) {
           reminderList.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-state-emoji">🔔</div>
-              <div class="empty-state-text">Немає нагадувань</div>
-              <div class="empty-state-hint">на найближчі 7 днів</div>
+            <div class="empty-state compact">
+              <div class="empty-state-title">Нагадувань немає</div>
+              <div class="empty-state-subtitle">Додай перше на найближчий тиждень.</div>
             </div>
           `;
           return;
         }
 
-        const html = list
-          .map((reminder) => {
-            const dateLabel = formatDate(reminder.remind_date);
-            const timeLabel = reminder.remind_time ? ` · ${escapeHtml(reminder.remind_time)}` : '';
-            const dayLabel = reminder.remind_date === myDay.today ? ' · сьогодні' : reminder.remind_date === myDay.tomorrow ? ' · завтра' : '';
-            const noteHtml = reminder.note ? `<div class="item-meta">${escapeHtml(reminder.note)}</div>` : '';
-            const doneClass = reminder.is_done ? 'done' : '';
-            const toggleLabel = reminder.is_done ? '↩️ Відновити' : '✓ Готово';
-            return `
-              <div class="reminder-item" data-reminder-id="${reminder.id}">
-                <div class="item-content">
-                  <div class="item-title reminder-title ${doneClass}">${escapeHtml(reminder.title)}</div>
-                  ${noteHtml}
-                  <div class="item-meta">${escapeHtml(dateLabel)}${timeLabel}${dayLabel}</div>
-                </div>
-                <div class="action-buttons">
-                  <button class="btn-sm-action reminder-toggle" type="button" data-id="${reminder.id}" data-done="${reminder.is_done ? '1' : '0'}">${toggleLabel}</button>
-                  <button class="btn-sm-action reminder-edit" type="button" data-id="${reminder.id}">✏️ Редагувати</button>
-                  <button class="btn-sm-action reminder-delete" type="button" data-id="${reminder.id}">🗑️ Видалити</button>
-                </div>
+        reminderList.innerHTML = list.map((reminder) => {
+          const dateLabel = formatDate(reminder.remind_date);
+          const timeLabel = reminder.remind_time ? ` · ${escapeHtml(reminder.remind_time)}` : '';
+          const doneClass = reminder.is_done ? 'done' : '';
+          const toggleLabel = reminder.is_done ? 'Відновити' : 'Готово';
+          return `
+            <div class="reminder-item" data-reminder-id="${reminder.id}">
+              <div class="reminder-main">
+                <div class="reminder-title ${doneClass}">${escapeHtml(reminder.title)}</div>
+                ${reminder.note ? `<div class="reminder-note">${escapeHtml(reminder.note)}</div>` : ''}
+                <div class="reminder-meta">${escapeHtml(dateLabel)}${timeLabel}</div>
               </div>
-            `;
-          })
-          .join('');
-        reminderList.innerHTML = html;
+              <div class="reminder-actions-inline">
+                <button type="button" class="btn btn-soft btn-xs reminder-toggle" data-id="${reminder.id}" data-done="${reminder.is_done ? '1' : '0'}">${toggleLabel}</button>
+                <button type="button" class="btn btn-soft btn-xs reminder-edit" data-id="${reminder.id}">Редагувати</button>
+                <button type="button" class="btn btn-soft btn-xs reminder-delete" data-id="${reminder.id}">Видалити</button>
+              </div>
+            </div>
+          `;
+        }).join('');
 
-        // Re-attach event handlers
-        reminderList.querySelectorAll('.reminder-toggle').forEach((btn) => {
-          btn.addEventListener('click', toggleReminder);
+        reminderList.querySelectorAll('.reminder-toggle').forEach((button) => {
+          button.addEventListener('click', toggleReminder);
         });
-        reminderList.querySelectorAll('.reminder-edit').forEach((btn) => {
-          btn.addEventListener('click', editReminder);
+        reminderList.querySelectorAll('.reminder-edit').forEach((button) => {
+          button.addEventListener('click', editReminder);
         });
-        reminderList.querySelectorAll('.reminder-delete').forEach((btn) => {
-          btn.addEventListener('click', deleteReminder);
+        reminderList.querySelectorAll('.reminder-delete').forEach((button) => {
+          button.addEventListener('click', deleteReminder);
         });
       }
 
@@ -1056,9 +503,9 @@
             to: myDay.reminders_window_end,
             status: 'all',
           });
-          const res = await fetch(`/api/reminders?${params.toString()}`);
-          if (!res.ok) return;
-          const data = await res.json();
+          const response = await fetch(`/api/reminders?${params.toString()}`);
+          if (!response.ok) return;
+          const data = await response.json();
           reminders = Array.isArray(data.reminders) ? data.reminders : [];
           renderReminders(reminders);
         } catch (err) {
@@ -1066,32 +513,32 @@
         }
       }
 
-      async function toggleReminder(e) {
-        const btn = e.target.closest('.reminder-toggle');
-        if (!btn) return;
-        const id = btn.dataset.id;
-        const newDone = btn.dataset.done !== '1';
-        btn.disabled = true;
+      async function toggleReminder(event) {
+        const button = event.target.closest('.reminder-toggle');
+        if (!button) return;
+        const reminderId = button.dataset.id;
+        const isDone = button.dataset.done === '1';
+        button.disabled = true;
         try {
-          const res = await fetch(`/api/reminders/${id}`, {
+          const response = await fetch(`/api/reminders/${reminderId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ is_done: newDone }),
+            body: JSON.stringify({ is_done: !isDone }),
           });
-          if (!res.ok) return;
+          if (!response.ok) return;
           await loadReminders();
         } catch (err) {
           console.error(err);
         } finally {
-          btn.disabled = false;
+          button.disabled = false;
         }
       }
 
-      function editReminder(e) {
-        const btn = e.target.closest('.reminder-edit');
-        if (!btn) return;
-        const id = btn.dataset.id;
-        const reminder = reminders.find((item) => String(item.id) === String(id));
+      function editReminder(event) {
+        const button = event.target.closest('.reminder-edit');
+        if (!button || !reminderForm) return;
+        const reminderId = button.dataset.id;
+        const reminder = reminders.find((item) => String(item.id) === String(reminderId));
         if (!reminder) return;
         reminderForm.classList.remove('d-none');
         reminderTitle.value = reminder.title || '';
@@ -1103,24 +550,23 @@
         reminderTitle.focus();
       }
 
-      async function deleteReminder(e) {
-        const btn = e.target.closest('.reminder-delete');
-        if (!btn) return;
-        const id = btn.dataset.id;
-        if (!confirm('Видалити це нагадування?')) return;
-        btn.disabled = true;
+      async function deleteReminder(event) {
+        const button = event.target.closest('.reminder-delete');
+        if (!button) return;
+        const reminderId = button.dataset.id;
+        if (!confirm('Видалити нагадування?')) return;
+        button.disabled = true;
         try {
-          const res = await fetch(`/api/reminders/${id}`, { method: 'DELETE' });
-          if (!res.ok) return;
+          const response = await fetch(`/api/reminders/${reminderId}`, { method: 'DELETE' });
+          if (!response.ok) return;
           await loadReminders();
         } catch (err) {
           console.error(err);
         } finally {
-          btn.disabled = false;
+          button.disabled = false;
         }
       }
 
-      // ============ REMINDER FORM HANDLERS ============
       if (toggleReminderForm && reminderForm) {
         toggleReminderForm.addEventListener('click', () => {
           reminderForm.classList.toggle('d-none');
@@ -1150,12 +596,12 @@
               remind_time: reminderTime.value,
             };
             const editId = reminderEditId.value;
-            const res = await fetch(editId ? `/api/reminders/${editId}` : '/api/reminders', {
+            const response = await fetch(editId ? `/api/reminders/${editId}` : '/api/reminders', {
               method: editId ? 'PATCH' : 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
             });
-            if (!res.ok) return;
+            if (!response.ok) return;
             await loadReminders();
             resetReminderForm();
             reminderForm.classList.add('d-none');
@@ -1167,29 +613,42 @@
         });
       }
 
-      // ============ KEYBOARD HANDLERS ============
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          // Close mobile menu if open
-          const modalElement = mobileMenuModal;
-          if (modalElement) {
-            const modal = bootstrap.Modal.getInstance(modalElement);
-            if (modal) modal.hide();
-          }
-          // Collapse reminder form if open
-          if (reminderForm && !reminderForm.classList.contains('d-none')) {
-            resetReminderForm();
-            reminderForm.classList.add('d-none');
-          }
-        }
+      const palette = ['#4f9dff', '#2dd4bf', '#f59e0b', '#fb7185', '#22c55e', '#a78bfa', '#38bdf8', '#f97316'];
+      const competencyOrb = document.getElementById('competencyOrb');
+      const competencyItems = document.querySelectorAll('.competency-item');
+
+      function hexToRgba(hex, alpha) {
+        const normalized = String(hex || '').replace('#', '');
+        if (normalized.length !== 6) return `rgba(79, 157, 255, ${alpha})`;
+        const r = Number.parseInt(normalized.slice(0, 2), 16);
+        const g = Number.parseInt(normalized.slice(2, 4), 16);
+        const b = Number.parseInt(normalized.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+
+      const competencyData = Array.isArray(myDay.competencies) ? myDay.competencies : [];
+      if (competencyOrb && competencyData.length) {
+        const step = 100 / competencyData.length;
+        let start = 0;
+        const segments = competencyData.map((entry, index) => {
+          const end = start + step;
+          const score = Math.max(0, Math.min(100, Number(entry.score || 0)));
+          const alpha = 0.25 + (score / 100) * 0.75;
+          const color = hexToRgba(palette[index % palette.length], alpha);
+          const segment = `${color} ${start}% ${end}%`;
+          start = end;
+          return segment;
+        });
+        competencyOrb.style.setProperty('--orb-gradient', `conic-gradient(${segments.join(',')})`);
+      }
+
+      competencyItems.forEach((item, index) => {
+        const color = palette[index % palette.length];
+        item.style.setProperty('--competency-color', color);
       });
 
-      // ============ INITIAL RENDER ============
-      renderClasses();
-      renderDeadlines();
-      renderPriorities();
       renderReminders(reminders);
     </script>
-      <script src="/js/design-system.js" defer></script>
+    <script src="/js/design-system.js" defer></script>
   </body>
 </html>

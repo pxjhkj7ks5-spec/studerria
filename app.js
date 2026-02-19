@@ -3785,8 +3785,8 @@ app.post('/profile/reset-subjects', requireLogin, async (req, res) => {
   }
 });
 
-async function buildMyDayData(user) {
-  const courseId = user.course_id || 1;
+async function buildMyDayData(user, role = 'student') {
+  const courseId = Number(user.course_id || 1);
   const activeSemester = await getActiveSemester(courseId);
   const now = new Date();
   const todayStr = formatLocalDate(now);
@@ -3794,6 +3794,12 @@ async function buildMyDayData(user) {
   const dayName = getDayNameFromDate(todayStr);
   const weekNumber = getAcademicWeekForSemester(now, activeSemester);
   const nowIso = new Date().toISOString();
+  const normalizedRole = String(role || '').toLowerCase();
+  const isStaffRole = normalizedRole === 'teacher' || normalizedRole === 'admin' || normalizedRole === 'deanery';
+
+  const windowEndShort = formatLocalDate(addDays(now, 7));
+  const deadlinesWindowEnd = formatLocalDate(addDays(now, 14));
+  const deadlinesWindowStart = formatLocalDate(addDays(now, -7));
 
   const studentGroups = await db.all(
     `
@@ -3805,11 +3811,85 @@ async function buildMyDayData(user) {
     [user.id, courseId]
   );
 
-  let classesToday = [];
-  if (studentGroups.length && dayName) {
-    const conditions = studentGroups.map(() => '(se.subject_id = ? AND se.group_number = ?)').join(' OR ');
-    const params = [weekNumber, courseId, activeSemester ? activeSemester.id : null, dayName];
-    studentGroups.forEach((sg) => params.push(sg.subject_id, sg.group_number));
+  let workloadTargets = (studentGroups || []).map((row) => ({
+    subject_id: Number(row.subject_id),
+    group_number: Number(row.group_number),
+    subject_name: row.subject_name,
+  }));
+
+  if (!workloadTargets.length && isStaffRole) {
+    const teacherTargets = await db.all(
+      `
+        SELECT ts.subject_id, ts.group_number, s.name AS subject_name
+        FROM teacher_subjects ts
+        JOIN subjects s ON s.id = ts.subject_id
+        WHERE ts.user_id = ? AND s.course_id = ? AND s.visible = 1
+      `,
+      [user.id, courseId]
+    );
+    workloadTargets = (teacherTargets || []).map((row) => ({
+      subject_id: Number(row.subject_id),
+      group_number: row.group_number === null ? null : Number(row.group_number),
+      subject_name: row.subject_name,
+    }));
+  }
+
+  const targetMap = new Map();
+  workloadTargets.forEach((target) => {
+    const subjectId = Number(target.subject_id);
+    if (!Number.isFinite(subjectId) || subjectId < 1) return;
+    const groupNumber = target.group_number === null ? null : Number(target.group_number || 0);
+    const normalizedGroup = Number.isFinite(groupNumber) && groupNumber > 0 ? groupNumber : null;
+    const key = `${subjectId}|${normalizedGroup === null ? 'all' : normalizedGroup}`;
+    if (!targetMap.has(key)) {
+      targetMap.set(key, {
+        subject_id: subjectId,
+        group_number: normalizedGroup,
+        subject_name: target.subject_name || '',
+      });
+    }
+  });
+  workloadTargets = Array.from(targetMap.values());
+  const studentHasOwnSubjects = Boolean((studentGroups || []).length);
+
+  const buildScope = (alias) => {
+    const chunks = [];
+    const params = [];
+    workloadTargets.forEach((target) => {
+      if (target.group_number === null) {
+        chunks.push(`${alias}.subject_id = ?`);
+        params.push(target.subject_id);
+      } else {
+        chunks.push(`(${alias}.subject_id = ? AND ${alias}.group_number = ?)`);
+        params.push(target.subject_id, target.group_number);
+      }
+    });
+    return { clause: chunks.length ? chunks.join(' OR ') : '1=0', params };
+  };
+
+  const parseDateOnly = (rawValue) => {
+    if (!rawValue) return null;
+    const date = new Date(rawValue);
+    if (Number.isNaN(date.getTime())) return null;
+    return formatLocalDate(date);
+  };
+
+  const loadClassesForDate = async (dateValue) => {
+    const targetDayName = getDayNameFromDate(dateValue);
+    if (!targetDayName || !workloadTargets.length) {
+      return [];
+    }
+    const dateAsDate = new Date(`${dateValue}T12:00:00`);
+    const weekForDate = getAcademicWeekForSemester(dateAsDate, activeSemester);
+    const scope = buildScope('se');
+    const params = [weekForDate, courseId, targetDayName];
+    if (activeSemester) {
+      params.push(activeSemester.id);
+    }
+    params.push(...scope.params);
+    const semesterClause = activeSemester
+      ? 'AND (se.semester_id = ? OR se.semester_id IS NULL)'
+      : 'AND se.semester_id IS NULL';
     const rows = await db.all(
       `
         SELECT se.*, s.name AS subject_name
@@ -3817,29 +3897,34 @@ async function buildMyDayData(user) {
         JOIN subjects s ON s.id = se.subject_id
         WHERE se.week_number = ?
           AND se.course_id = ?
-          AND se.semester_id = ?
           AND se.day_of_week = ?
+          ${semesterClause}
           AND s.visible = 1
-          AND (${conditions})
+          AND (${scope.clause})
         ORDER BY se.class_number ASC
       `,
       params
     );
-    classesToday = (rows || []).map((row) => {
+    return (rows || []).map((row) => {
       const slot = bellSchedule[row.class_number] || {};
       return {
-        id: row.id,
-        subject_id: row.subject_id,
+        id: Number(row.id),
+        subject_id: Number(row.subject_id),
         subject_name: row.subject_name,
         lesson_type: row.lesson_type || null,
-        class_number: row.class_number,
-        group_number: row.group_number,
+        class_number: Number(row.class_number),
+        group_number: row.group_number === null ? null : Number(row.group_number),
         day_of_week: row.day_of_week,
+        class_date: dateValue,
+        day_context: dateValue === todayStr ? 'today' : 'tomorrow',
         start: slot.start || '',
         end: slot.end || '',
       };
     });
-  }
+  };
+
+  const classesToday = await loadClassesForDate(todayStr);
+  const classesTomorrow = await loadClassesForDate(tomorrowStr);
 
   let currentClass = null;
   let nextClass = null;
@@ -3848,102 +3933,164 @@ async function buildMyDayData(user) {
     if (!cls.start || !cls.end) return;
     const startAt = new Date(`${todayStr}T${cls.start}:00`);
     const endAt = new Date(`${todayStr}T${cls.end}:00`);
-    if (nowMs >= startAt.getTime() && nowMs <= endAt.getTime()) {
+    const startMs = startAt.getTime();
+    const endMs = endAt.getTime();
+    if (nowMs >= startMs && nowMs <= endMs) {
       currentClass = { ...cls, startAt: startAt.toISOString(), endAt: endAt.toISOString() };
-    } else if (nowMs < startAt.getTime() && !nextClass) {
+    } else if (nowMs < startMs && !nextClass) {
       nextClass = { ...cls, startAt: startAt.toISOString(), endAt: endAt.toISOString() };
     }
   });
 
+  const nextClasses = [...classesToday, ...classesTomorrow]
+    .map((cls) => {
+      if (!cls.start) return null;
+      const startAt = new Date(`${cls.class_date}T${cls.start}:00`);
+      return { ...cls, startAt: startAt.toISOString() };
+    })
+    .filter(Boolean)
+    .filter((cls) => new Date(cls.startAt).getTime() >= nowMs)
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
+    .slice(0, 6);
+
+  const canSubmitHomework = studentHasOwnSubjects;
   let homeworkItems = [];
-  if (studentGroups.length) {
-    const conditions = studentGroups.map(() => '(h.subject_id = ? AND h.group_number = ?)').join(' OR ');
-    const params = [user.id];
-    studentGroups.forEach((sg) => params.push(sg.subject_id, sg.group_number));
-    params.push(courseId, activeSemester ? activeSemester.id : null, nowIso);
+  if (workloadTargets.length) {
+    const scope = buildScope('h');
+    const params = [user.id, user.id, courseId];
+    if (activeSemester) {
+      params.push(activeSemester.id);
+    }
+    params.push(nowIso, ...scope.params);
+    const semesterClause = activeSemester
+      ? 'AND (h.semester_id = ? OR h.semester_id IS NULL)'
+      : 'AND h.semester_id IS NULL';
     const rows = await db.all(
       `
-        SELECT h.id, h.description, h.custom_due_date, h.class_date, h.subject_id, h.group_number,
-               h.created_by, h.created_at, subj.name AS subject_name, hc.id AS completion_id
+        SELECT
+          h.id,
+          h.description,
+          h.custom_due_date,
+          h.class_date,
+          h.subject_id,
+          h.group_number,
+          h.created_by,
+          h.created_at,
+          h.is_control,
+          h.is_credit,
+          h.is_teacher_homework,
+          h.meeting_url,
+          subj.name AS subject_name,
+          hc.id AS completion_id,
+          hs.id AS submission_id,
+          hs.submitted_at
         FROM homework h
         JOIN subjects subj ON subj.id = h.subject_id
         LEFT JOIN homework_completions hc ON hc.homework_id = h.id AND hc.user_id = ?
-        WHERE (${conditions})
-          AND h.course_id = ?
-          AND (h.semester_id = ? OR h.semester_id IS NULL)
+        LEFT JOIN homework_submissions hs ON hs.homework_id = h.id AND hs.student_id = ?
+        WHERE h.course_id = ?
+          ${semesterClause}
           AND COALESCE(h.status, 'published') = 'published'
           AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
           AND (h.custom_due_date IS NOT NULL OR h.class_date IS NOT NULL)
+          AND (${scope.clause})
         ORDER BY COALESCE(h.custom_due_date, h.class_date) ASC, h.created_at DESC
       `,
       params
     );
+
     homeworkItems = (rows || []).map((row) => {
-      const deadline = row.custom_due_date || row.class_date;
+      const deadline = row.custom_due_date || row.class_date || null;
+      const submittedDate = parseDateOnly(row.submitted_at);
+      let submissionStatus = 'pending';
+      if (row.submission_id) {
+        const isLate = Boolean(deadline && submittedDate && submittedDate > deadline);
+        submissionStatus = isLate ? 'submitted_late' : 'submitted_on_time';
+      } else if (deadline && deadline < todayStr) {
+        submissionStatus = 'overdue';
+      }
       return {
-        id: row.id,
-        description: row.description,
-        subject_id: row.subject_id,
+        id: Number(row.id),
+        type: 'homework',
+        description: row.description || 'Завдання',
+        subject_id: Number(row.subject_id),
         subject_name: row.subject_name,
-        group_number: row.group_number,
+        group_number: row.group_number === null ? null : Number(row.group_number),
         deadline_date: deadline,
         created_by: row.created_by,
         created_at: row.created_at,
+        is_control: Number(row.is_control || 0) === 1,
+        is_credit: Number(row.is_credit || 0) === 1,
+        is_teacher_homework: Number(row.is_teacher_homework || 0) === 1,
+        meeting_url: row.meeting_url || null,
         completed: Boolean(row.completion_id),
+        submission_id: row.submission_id ? Number(row.submission_id) : null,
+        submitted_at: row.submitted_at || null,
+        submitted_date: submittedDate,
+        submission_status: submissionStatus,
+        can_submit: canSubmitHomework,
       };
     });
   }
 
-  const homeworkDeadlines = homeworkItems
-    .filter((item) => item.deadline_date === todayStr || item.deadline_date === tomorrowStr)
-    .map((item) => ({ ...item, type: 'homework' }));
-
   let teamworkDeadlines = [];
-  if (studentGroups.length) {
-    const subjectIds = Array.from(new Set(studentGroups.map((sg) => sg.subject_id)));
-    if (subjectIds.length) {
-      const placeholders = subjectIds.map(() => '?').join(',');
-      const params = [courseId, activeSemester ? activeSemester.id : null, todayStr, tomorrowStr, ...subjectIds];
-      const rows = await db.all(
-        `
-          SELECT t.id, t.title, t.due_date, t.subject_id, s.name AS subject_name
-          FROM teamwork_tasks t
-          JOIN subjects s ON s.id = t.subject_id
-          WHERE t.course_id = ?
-            AND t.semester_id = ?
-            AND t.due_date IS NOT NULL
-            AND t.due_date >= ?
-            AND t.due_date <= ?
-            AND t.subject_id IN (${placeholders})
-          ORDER BY t.due_date ASC, t.created_at DESC
-        `,
-        params
-      );
-      teamworkDeadlines = (rows || []).map((row) => ({
-        id: row.id,
-        description: row.title,
-        subject_id: row.subject_id,
-        subject_name: row.subject_name,
-        deadline_date: row.due_date,
-        type: 'teamwork',
-      }));
+  const subjectIds = Array.from(new Set(workloadTargets.map((row) => Number(row.subject_id)).filter(Boolean)));
+  if (subjectIds.length) {
+    const placeholders = subjectIds.map(() => '?').join(',');
+    const params = [courseId];
+    if (activeSemester) {
+      params.push(activeSemester.id);
     }
+    params.push(todayStr, deadlinesWindowEnd, ...subjectIds);
+    const semesterClause = activeSemester
+      ? 'AND (t.semester_id = ? OR t.semester_id IS NULL)'
+      : 'AND t.semester_id IS NULL';
+    const rows = await db.all(
+      `
+        SELECT t.id, t.title, t.due_date, t.subject_id, s.name AS subject_name, t.status
+        FROM teamwork_tasks t
+        JOIN subjects s ON s.id = t.subject_id
+        WHERE t.course_id = ?
+          ${semesterClause}
+          AND t.due_date IS NOT NULL
+          AND t.due_date >= ?
+          AND t.due_date <= ?
+          AND t.subject_id IN (${placeholders})
+        ORDER BY t.due_date ASC, t.created_at DESC
+      `,
+      params
+    );
+    teamworkDeadlines = (rows || []).map((row) => ({
+      id: Number(row.id),
+      type: 'teamwork',
+      description: row.title || 'Командна задача',
+      subject_id: Number(row.subject_id),
+      subject_name: row.subject_name,
+      deadline_date: row.due_date,
+      submission_status: row.due_date < todayStr ? 'overdue' : 'pending',
+      teamwork_status: row.status || null,
+      can_submit: false,
+    }));
   }
 
-  const deadlines = [...homeworkDeadlines, ...teamworkDeadlines].sort((a, b) =>
-    String(a.deadline_date || '').localeCompare(String(b.deadline_date || ''))
-  );
+  const deadlines = [...homeworkItems, ...teamworkDeadlines]
+    .filter((item) => item.deadline_date && item.deadline_date >= deadlinesWindowStart && item.deadline_date <= deadlinesWindowEnd)
+    .sort((a, b) => String(a.deadline_date || '').localeCompare(String(b.deadline_date || '')));
 
-  const upcomingWindowEnd = formatLocalDate(addDays(now, 7));
+  const actionableDeadlines = deadlines.filter((item) => item.submission_status !== 'submitted_on_time');
+  const deadlinesFocus = (actionableDeadlines.length ? actionableDeadlines : deadlines).slice(0, 3);
+
   const upcomingItems = homeworkItems.filter((item) => {
     if (!item.deadline_date) return false;
-    return item.deadline_date >= todayStr && item.deadline_date <= upcomingWindowEnd;
+    return item.deadline_date >= todayStr && item.deadline_date <= deadlinesWindowEnd;
   });
+
   let topPriorities = [];
   if (upcomingItems.length) {
-    const earliest = upcomingItems[0];
+    const earliest = upcomingItems.find((item) => item.submission_status !== 'submitted_on_time') || upcomingItems[0];
     const subjectCounts = {};
     upcomingItems.forEach((item) => {
+      if (item.submission_status === 'submitted_on_time') return;
       const key = String(item.subject_id);
       subjectCounts[key] = (subjectCounts[key] || 0) + 1;
     });
@@ -3977,7 +4124,7 @@ async function buildMyDayData(user) {
           AND remind_date <= ?
         ORDER BY remind_date ASC, remind_time ASC NULLS LAST, created_at DESC
       `,
-      [user.id, courseId, activeSemester.id, todayStr, upcomingWindowEnd]
+      [user.id, courseId, activeSemester.id, todayStr, windowEndShort]
     );
     reminders = (rows || []).map((row) => ({
       id: row.id,
@@ -3989,18 +4136,331 @@ async function buildMyDayData(user) {
     }));
   }
 
+  const submittedOnTimeCount = homeworkItems.filter((item) => item.submission_status === 'submitted_on_time').length;
+  const submittedLateCount = homeworkItems.filter((item) => item.submission_status === 'submitted_late').length;
+  const overdueCount = homeworkItems.filter((item) => item.submission_status === 'overdue').length;
+  const dueSoonCount = homeworkItems.filter((item) => (
+    item.submission_status === 'pending' && item.deadline_date && item.deadline_date >= todayStr && item.deadline_date <= tomorrowStr
+  )).length;
+  const submittedTotalCount = submittedOnTimeCount + submittedLateCount;
+  const onTimeRatio = submittedTotalCount ? submittedOnTimeCount / submittedTotalCount : 0;
+  const onTimeShare = submittedTotalCount ? Math.round((submittedOnTimeCount / submittedTotalCount) * 100) : null;
+  const openReminders = reminders.filter((item) => !item.is_done).length;
+
+  const riskySubjectMap = new Map();
+  homeworkItems.forEach((item) => {
+    if (item.submission_status !== 'overdue' && item.submission_status !== 'pending') return;
+    const key = String(item.subject_id);
+    const nextCount = Number(riskySubjectMap.get(key) || 0) + 1;
+    riskySubjectMap.set(key, nextCount);
+  });
+  const riskySubjectCount = riskySubjectMap.size;
+  const riskiestSubject = topPriorities.find((item) => item.type === 'workload') || topPriorities[0] || null;
+
+  let gradeRows = [];
+  if (studentHasOwnSubjects && subjectIds.length) {
+    const placeholders = subjectIds.map(() => '?').join(',');
+    const params = [user.id, courseId];
+    if (activeSemester) {
+      params.push(activeSemester.id);
+    }
+    params.push(...subjectIds);
+    const semesterClause = activeSemester
+      ? 'AND (jc.semester_id = ? OR jc.semester_id IS NULL)'
+      : 'AND jc.semester_id IS NULL';
+    gradeRows = await db.all(
+      `
+        SELECT jc.column_type, jc.max_points, jg.score, jg.graded_at
+        FROM journal_columns jc
+        JOIN journal_grades jg ON jg.column_id = jc.id
+        WHERE jg.student_id = ?
+          AND jc.course_id = ?
+          ${semesterClause}
+          AND jc.is_archived = 0
+          AND jg.deleted_at IS NULL
+          AND jc.subject_id IN (${placeholders})
+      `,
+      params
+    );
+  }
+
+  const feedbackSince = addDays(now, -14).getTime();
+  const feedbackCount = (gradeRows || []).filter((row) => {
+    const gradedAt = row.graded_at ? new Date(row.graded_at).getTime() : Number.NaN;
+    return Number.isFinite(gradedAt) && gradedAt >= feedbackSince;
+  }).length;
+
+  const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+  const avg = (values, fallback = 0.52) => {
+    if (!Array.isArray(values) || !values.length) return fallback;
+    return values.reduce((acc, item) => acc + item, 0) / values.length;
+  };
+  const pickTypeBuckets = (rows, predicate = () => true) => {
+    const buckets = { homework: [], seminar: [], exam: [], credit: [], custom: [] };
+    (rows || []).forEach((row) => {
+      if (!predicate(row)) return;
+      const type = String(row.column_type || 'custom');
+      if (!Object.prototype.hasOwnProperty.call(buckets, type)) return;
+      const score = Number(row.score);
+      const maxPoints = Number(row.max_points);
+      if (!Number.isFinite(score) || !Number.isFinite(maxPoints) || maxPoints <= 0) return;
+      buckets[type].push(clamp01(score / maxPoints));
+    });
+    return buckets;
+  };
+
+  const recentSince = addDays(now, -21).getTime();
+  const previousSince = addDays(now, -42).getTime();
+  const baseBuckets = pickTypeBuckets(gradeRows);
+  const recentBuckets = pickTypeBuckets(gradeRows, (row) => {
+    const gradedAt = row.graded_at ? new Date(row.graded_at).getTime() : Number.NaN;
+    return Number.isFinite(gradedAt) && gradedAt >= recentSince;
+  });
+  const previousBuckets = pickTypeBuckets(gradeRows, (row) => {
+    const gradedAt = row.graded_at ? new Date(row.graded_at).getTime() : Number.NaN;
+    return Number.isFinite(gradedAt) && gradedAt >= previousSince && gradedAt < recentSince;
+  });
+
+  const weightVector = (buckets) => ({
+    homework: avg(buckets.homework),
+    seminar: avg(buckets.seminar),
+    exam: avg(buckets.exam),
+    credit: avg(buckets.credit),
+    custom: avg(buckets.custom),
+  });
+
+  const baseVector = weightVector(baseBuckets);
+  const recentVector = weightVector(recentBuckets);
+  const previousVector = weightVector(previousBuckets);
+  const selfOrgSignal = onTimeShare === null ? 0.52 : clamp01(onTimeShare / 100);
+
+  const competencyDefinitions = [
+    {
+      key: 'leadership',
+      label: 'Лідерство',
+      compute: (vector) => (vector.custom * 0.45) + (vector.seminar * 0.35) + (vector.exam * 0.2),
+    },
+    {
+      key: 'negotiation',
+      label: 'Перемовини',
+      compute: (vector) => (vector.seminar * 0.45) + (vector.custom * 0.35) + (vector.exam * 0.2),
+    },
+    {
+      key: 'communication',
+      label: 'Ораторика',
+      compute: (vector) => (vector.seminar * 0.55) + (vector.custom * 0.25) + (vector.homework * 0.2),
+    },
+    {
+      key: 'analysis',
+      label: 'Аналітика',
+      compute: (vector) => (vector.exam * 0.55) + (vector.homework * 0.3) + (vector.custom * 0.15),
+    },
+    {
+      key: 'teamwork',
+      label: 'Командність',
+      compute: (vector) => (vector.seminar * 0.45) + (vector.credit * 0.3) + (vector.custom * 0.25),
+    },
+    {
+      key: 'self_organization',
+      label: 'Самоорганізація',
+      compute: (vector) => (vector.homework * 0.45) + (vector.credit * 0.25) + (selfOrgSignal * 0.3),
+    },
+  ];
+
+  const competencies = competencyDefinitions.map((definition) => {
+    const scoreRaw = clamp01(definition.compute(baseVector));
+    const recentRaw = clamp01(definition.compute(recentVector));
+    const previousRaw = clamp01(definition.compute(previousVector));
+    const delta = Math.round((recentRaw - previousRaw) * 100);
+    return {
+      key: definition.key,
+      label: definition.label,
+      score: Math.round(scoreRaw * 100),
+      delta,
+      trend: delta >= 3 ? 'up' : (delta <= -3 ? 'down' : 'steady'),
+    };
+  });
+
+  const sortedByScore = [...competencies].sort((a, b) => b.score - a.score);
+  const sortedByDelta = [...competencies].sort((a, b) => b.delta - a.delta);
+  const strongestCompetency = sortedByScore[0] || null;
+  const weakestCompetency = sortedByScore[sortedByScore.length - 1] || null;
+  const fastestGrowingCompetency = sortedByDelta[0] || null;
+  const competencyAverage = competencies.length
+    ? Math.round(competencies.reduce((sum, item) => sum + item.score, 0) / competencies.length)
+    : 0;
+
+  const activitySummary = {
+    tracked_homework_total: homeworkItems.length,
+    submitted_on_time: submittedOnTimeCount,
+    submitted_late: submittedLateCount,
+    overdue: overdueCount,
+    due_soon: dueSoonCount,
+    on_time_share: onTimeShare,
+    risky_subjects: riskySubjectCount,
+    recent_feedback: feedbackCount,
+    open_reminders: openReminders,
+  };
+
+  const inboxItems = [];
+  if (overdueCount > 0) {
+    inboxItems.push({
+      kind: 'risk',
+      title: `Прострочено: ${overdueCount}`,
+      meta: 'Закрий прострочки, щоб не втратити темп',
+      action_href: '/my-day#deadlinesBlock',
+      action_label: 'До дедлайнів',
+    });
+  }
+  if (dueSoonCount > 0) {
+    inboxItems.push({
+      kind: 'focus',
+      title: `На 48 год: ${dueSoonCount}`,
+      meta: 'Найближчі завдання потребують уваги',
+      action_href: '/my-day#deadlinesBlock',
+      action_label: 'Відкрити',
+    });
+  }
+  if (feedbackCount > 0) {
+    inboxItems.push({
+      kind: 'update',
+      title: `Новий фідбек: ${feedbackCount}`,
+      meta: 'Оновлені оцінки за 14 днів',
+      action_href: '/journal',
+      action_label: 'До журналу',
+    });
+  }
+  if (nextClass) {
+    inboxItems.push({
+      kind: 'class',
+      title: `Найближча пара: ${nextClass.subject_name}`,
+      meta: `${nextClass.start} - ${nextClass.end}`,
+      action_href: '/schedule',
+      action_label: 'Розклад',
+    });
+  }
+  if (openReminders > 0) {
+    inboxItems.push({
+      kind: 'reminder',
+      title: `Активні нагадування: ${openReminders}`,
+      meta: 'Не забудь перевірити особистий список',
+      action_href: '/my-day#inboxBlock',
+      action_label: 'Перевірити',
+    });
+  }
+  if (!inboxItems.length) {
+    inboxItems.push({
+      kind: 'ok',
+      title: 'Стабільний темп',
+      meta: 'Критичних сигналів зараз немає',
+      action_href: '/schedule',
+      action_label: 'Розклад',
+    });
+  }
+
+  let brief = {
+    tone: 'calm',
+    title: 'Твій день під контролем',
+    message: 'Система не бачить критичних ризиків. Тримай темп і закривай задачі в дедлайн.',
+    action_label: 'Відкрити розклад',
+    action_href: '/schedule',
+    reasons: ['Критичних прострочок немає', 'Темп здач стабільний'],
+  };
+
+  if (!studentHasOwnSubjects && isStaffRole) {
+    brief = {
+      tone: 'focus',
+      title: 'Оперативний зріз по дисциплінах',
+      message: `У фокусі ${workloadTargets.length || 0} предметів, найближчих подій: ${deadlinesFocus.length}.`,
+      action_label: 'Відкрити розклад',
+      action_href: '/schedule',
+      reasons: [
+        `Пари на сьогодні/завтра: ${classesToday.length + classesTomorrow.length}`,
+        `Актуальні дедлайни: ${deadlinesFocus.length}`,
+      ],
+    };
+  } else if (overdueCount > 0) {
+    const subjectHint = riskiestSubject && riskiestSubject.subject_name
+      ? `Почни з ${riskiestSubject.subject_name}.`
+      : 'Почни з найближчого простроченого завдання.';
+    brief = {
+      tone: 'risk',
+      title: 'Є ризик по дедлайнах',
+      message: `Маєш ${overdueCount} прострочених завдань. ${subjectHint}`,
+      action_label: 'Закрити дедлайни',
+      action_href: '/my-day#deadlinesBlock',
+      reasons: [
+        `Прострочені задачі: ${overdueCount}`,
+        `Предметів у ризику: ${riskySubjectCount}`,
+      ],
+    };
+  } else if (dueSoonCount > 0) {
+    brief = {
+      tone: 'focus',
+      title: 'Фокус на найближчі 48 год',
+      message: `Попереду ${dueSoonCount} задач до завтра. Закрий їх зараз, щоб зберегти темп.`,
+      action_label: 'Перейти до здачі',
+      action_href: '/my-day#deadlinesBlock',
+      reasons: [
+        `Задачі до завтра: ${dueSoonCount}`,
+        `Вчасні здачі: ${onTimeShare === null ? '-' : `${onTimeShare}%`}`,
+      ],
+    };
+  } else if (fastestGrowingCompetency && fastestGrowingCompetency.delta >= 3) {
+    brief = {
+      tone: 'growth',
+      title: 'Помітний прогрес за останній період',
+      message: `Прокачується ${fastestGrowingCompetency.label} (+${fastestGrowingCompetency.delta}). Тримай цей фокус.`,
+      action_label: 'Переглянути прогрес',
+      action_href: '/my-day#competencyBlock',
+      reasons: [
+        `Сильна сторона: ${strongestCompetency ? strongestCompetency.label : 'н/д'}`,
+        `Середній профіль: ${competencyAverage}/100`,
+      ],
+    };
+  } else if (nextClass) {
+    brief = {
+      tone: 'calm',
+      title: 'Робочий ритм збережено',
+      message: `Наступна пара: ${nextClass.subject_name} о ${nextClass.start}. Підготуй матеріали заздалегідь.`,
+      action_label: 'До розкладу',
+      action_href: '/schedule',
+      reasons: [
+        `Критичних прострочок: ${overdueCount}`,
+        `Ближчі дедлайни: ${deadlinesFocus.length}`,
+      ],
+    };
+  }
+
+  if (strongestCompetency && strongestCompetency.score >= 65 && brief.tone !== 'risk') {
+    brief.message = `${brief.message} Додатково: ${strongestCompetency.label} зараз серед найсильніших напрямів.`;
+  }
+
   return {
     today: todayStr,
     tomorrow: tomorrowStr,
     day_name: dayName,
     week_number: weekNumber,
     classes_today: classesToday,
+    classes_tomorrow: classesTomorrow,
     current_class: currentClass,
     next_class: nextClass,
+    next_classes: nextClasses,
     deadlines,
+    deadline_focus: deadlinesFocus,
     top_priorities: topPriorities,
     reminders,
-    reminders_window_end: upcomingWindowEnd,
+    reminders_window_end: windowEndShort,
+    activity_summary: activitySummary,
+    inbox_items: inboxItems,
+    competencies,
+    competency_average: competencyAverage,
+    competency_strongest: strongestCompetency,
+    competency_weakest: weakestCompetency,
+    competency_fastest_growth: fastestGrowingCompetency,
+    brief,
+    scope_count: workloadTargets.length,
+    role: normalizedRole,
   };
 }
 
@@ -4011,12 +4471,14 @@ app.get('/my-day', requireLogin, async (req, res) => {
     return handleDbError(res, err, 'myday.init');
   }
   try {
-    const myDay = await buildMyDayData(req.session.user);
+    const myDay = await buildMyDayData(req.session.user, req.session.role);
     return res.render('my-day', {
       username: req.session.user.username,
       role: req.session.role,
       viewAs: req.session.viewAs || null,
       myDay,
+      okMessage: String(req.query.ok || ''),
+      errMessage: String(req.query.err || ''),
     });
   } catch (err) {
     return handleDbError(res, err, 'myday');
@@ -4025,7 +4487,7 @@ app.get('/my-day', requireLogin, async (req, res) => {
 
 app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
   try {
-    const myDay = await buildMyDayData(req.session.user);
+    const myDay = await buildMyDayData(req.session.user, req.session.role);
     return res.json(myDay);
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
@@ -4279,9 +4741,12 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
 
 app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('submission_attachment'), async (req, res) => {
   const homeworkId = Number(req.params.id);
+  const requestedRedirect = typeof req.body.redirect_to === 'string' ? String(req.body.redirect_to).trim() : '';
+  const redirectBase = requestedRedirect.startsWith('/my-day') ? '/my-day' : '/schedule';
+  const redirectWith = (kind, message) => `${redirectBase}?${kind}=${encodeURIComponent(String(message || ''))}`;
   if (!Number.isFinite(homeworkId) || homeworkId < 1) {
     if (req.file) fs.unlink(req.file.path, () => {});
-    return res.redirect('/schedule?err=Invalid%20homework');
+    return res.redirect(redirectWith('err', 'Invalid homework'));
   }
 
   const userId = Number(req.session.user.id);
@@ -4296,15 +4761,15 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
 
   if (submissionText.length > 4000) {
     if (req.file) fs.unlink(req.file.path, () => {});
-    return res.redirect('/schedule?err=Submission%20text%20is%20too%20long');
+    return res.redirect(redirectWith('err', 'Submission text is too long'));
   }
   if (rawLinkUrl && !linkUrl) {
     if (req.file) fs.unlink(req.file.path, () => {});
-    return res.redirect('/schedule?err=Invalid%20link%20URL');
+    return res.redirect(redirectWith('err', 'Invalid link URL'));
   }
   if (!submissionText && !linkUrl && !req.file) {
     if (req.file) fs.unlink(req.file.path, () => {});
-    return res.redirect('/schedule?err=Add%20text,%20link%20or%20file');
+    return res.redirect(redirectWith('err', 'Add text, link or file'));
   }
 
   try {
@@ -4323,7 +4788,7 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
     );
     if (!homework) {
       if (req.file) fs.unlink(req.file.path, () => {});
-      return res.redirect('/schedule?err=Homework%20not%20found');
+      return res.redirect(redirectWith('err', 'Homework not found'));
     }
 
     const studentAccess = await db.get(
@@ -4422,10 +4887,10 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
       Number(homework.course_id || courseId),
       homework.semester_id ? Number(homework.semester_id) : null
     );
-    return res.redirect('/schedule?ok=ДЗ%20здано');
+    return res.redirect(redirectWith('ok', 'ДЗ здано'));
   } catch (err) {
     if (req.file) fs.unlink(req.file.path, () => {});
-    return res.redirect('/schedule?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
