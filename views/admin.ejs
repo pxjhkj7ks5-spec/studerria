@@ -1063,6 +1063,52 @@
                     </div>
                   </div>
                 </div>
+                <div class="col-12">
+                  <div class="settings-section">
+                    <div class="settings-section-title">Data retention</div>
+                    <div class="row g-3">
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Visit analytics (days)</label>
+                        <input
+                          type="number"
+                          min="14"
+                          max="3650"
+                          class="form-control"
+                          name="site_visit_retention_days"
+                          value="<%= (settings && settings.site_visit_retention_days) || 120 %>"
+                          data-settings-field
+                          required
+                        />
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Login history (days)</label>
+                        <input
+                          type="number"
+                          min="14"
+                          max="3650"
+                          class="form-control"
+                          name="login_history_retention_days"
+                          value="<%= (settings && settings.login_history_retention_days) || 180 %>"
+                          data-settings-field
+                          required
+                        />
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Activity log (days)</label>
+                        <input
+                          type="number"
+                          min="14"
+                          max="3650"
+                          class="form-control"
+                          name="activity_log_retention_days"
+                          value="<%= (settings && settings.activity_log_retention_days) || 365 %>"
+                          data-settings-field
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div class="col-12 d-flex align-items-center gap-3">
                   <button class="btn btn-primary" type="submit" data-settings-save disabled><%= t('admin.saveSettings') %></button>
                   <div class="small text-muted">Manual save · changes are applied after clicking “Save”.</div>
@@ -1162,6 +1208,14 @@
                             </label>
                           <% }); %>
                         </div>
+                      </div>
+                      <div class="role-studio-simulator mb-3" data-rbac-simulator>
+                        <div class="small fw-semibold mb-1">Permission simulator</div>
+                        <div class="small text-muted mb-2" data-rbac-sim-summary>Оберіть permissions для перегляду доступу.</div>
+                        <div class="small text-muted mb-1">Admin panel sections</div>
+                        <div class="d-flex flex-wrap gap-1 mb-2" data-rbac-sim-admin></div>
+                        <div class="small text-muted mb-1">Feature access</div>
+                        <div class="d-flex flex-wrap gap-1" data-rbac-sim-feature></div>
                       </div>
                       <div class="d-flex flex-wrap gap-2">
                         <button class="btn btn-outline-primary" type="submit">Зберегти роль</button>
@@ -4527,6 +4581,14 @@
         try {
           const rbacPermissionDefaults = <%- JSON.stringify((typeof defaultRolePermissions !== 'undefined' && defaultRolePermissions) ? defaultRolePermissions : {}) %>;
           const allAdminSectionKeys = <%- JSON.stringify((adminSectionOptionsList || []).map((section) => section.id)) %>;
+          const adminSectionLabelMap = <%- JSON.stringify((adminSectionOptionsList || []).reduce((acc, section) => {
+            acc[section.id] = section.label;
+            return acc;
+          }, {})) %>;
+          const rbacPermissionMeta = <%- JSON.stringify((rbacPermissionOptionsList || []).reduce((acc, permission) => {
+            acc[permission.key] = { label: permission.label, category: permission.category };
+            return acc;
+          }, {})) %>;
           const rbacCourseDefaults = {
             admin: ['regular', 'teacher'],
             teacher: ['regular', 'teacher'],
@@ -4560,6 +4622,49 @@
               input.checked = allowed.has(input.value);
             });
           };
+          const renderRolePermissionSimulation = (form) => {
+            if (!form) return;
+            const summaryEl = form.querySelector('[data-rbac-sim-summary]');
+            const adminListEl = form.querySelector('[data-rbac-sim-admin]');
+            const featureListEl = form.querySelector('[data-rbac-sim-feature]');
+            if (!summaryEl || !adminListEl || !featureListEl) return;
+
+            const selectedPermissions = Array.from(form.querySelectorAll('input[name="permission_keys"]:checked'))
+              .map((input) => String(input.value || '').trim())
+              .filter(Boolean);
+            const adminSections = selectedPermissions.filter((key) => Object.prototype.hasOwnProperty.call(adminSectionLabelMap, key));
+            const featurePermissions = selectedPermissions.filter((key) => !Object.prototype.hasOwnProperty.call(adminSectionLabelMap, key));
+
+            if (adminSections.length) {
+              summaryEl.textContent = `Доступ до адмін-панелі: ${adminSections.length} секцій`;
+            } else {
+              summaryEl.textContent = 'Адмін-панель для цієї ролі буде недоступна (немає жодної admin_section permission).';
+            }
+
+            adminListEl.innerHTML = adminSections.length
+              ? adminSections
+                .sort((a, b) => String(adminSectionLabelMap[a] || a).localeCompare(String(adminSectionLabelMap[b] || b), 'uk-UA'))
+                .map((key) => `<span class="badge admin-chip role-studio-sim-chip">${adminSectionLabelMap[key] || key}</span>`)
+                .join('')
+              : '<span class="text-muted small">Немає секцій</span>';
+
+            featureListEl.innerHTML = featurePermissions.length
+              ? featurePermissions
+                .sort((a, b) => {
+                  const aLabel = rbacPermissionMeta[a] && rbacPermissionMeta[a].label ? rbacPermissionMeta[a].label : a;
+                  const bLabel = rbacPermissionMeta[b] && rbacPermissionMeta[b].label ? rbacPermissionMeta[b].label : b;
+                  return String(aLabel).localeCompare(String(bLabel), 'uk-UA');
+                })
+                .map((key) => {
+                  const meta = rbacPermissionMeta[key] || { label: key, category: 'feature' };
+                  return `<span class="badge admin-chip role-studio-sim-chip">${meta.label}</span>`;
+                })
+                .join('')
+              : '<span class="text-muted small">Немає feature-доступів</span>';
+          };
+          const renderAllRolePermissionSimulations = () => {
+            rbacRoleForms.forEach((form) => renderRolePermissionSimulation(form));
+          };
           const applyRoleDraft = (form, payload) => {
             if (!payload || typeof payload !== 'object') return;
             const labelField = form.querySelector('input[name="label"]');
@@ -4570,6 +4675,7 @@
             if (activeField && !activeField.disabled) activeField.checked = !!payload.is_active;
             setCheckedValues(form, 'permission_keys', payload.permission_keys || []);
             setCheckedValues(form, 'course_kinds', payload.course_kinds || []);
+            renderRolePermissionSimulation(form);
           };
           const saveRoleDraft = (form) => {
             const draftKey = getRoleDraftKey(form);
@@ -4602,6 +4708,7 @@
             const activeField = form.querySelector('input[name="is_active"]');
             if (activeField && !activeField.disabled) activeField.checked = true;
             saveRoleDraft(form);
+            renderRolePermissionSimulation(form);
             return true;
           };
           const revertRoleSnapshots = () => {
@@ -4612,6 +4719,7 @@
               applyRoleDraft(form, snapshot);
               clearRoleDraft(form);
             });
+            renderAllRolePermissionSimulations();
           };
           const applySystemDefaults = () => {
             ['admin', 'deanery', 'starosta', 'teacher', 'student'].forEach((roleKey) => {
@@ -4633,14 +4741,22 @@
                 clearRoleDraft(form);
               }
             }
+            renderRolePermissionSimulation(form);
           });
           captureRoleSnapshots();
+          renderAllRolePermissionSimulations();
           rbacRoleForms.forEach((form) => {
             const fields = Array.from(form.querySelectorAll('input, select, textarea'));
             fields.forEach((field) => {
               if (!field || field.disabled || !field.name) return;
-              field.addEventListener('input', () => saveRoleDraft(form));
-              field.addEventListener('change', () => saveRoleDraft(form));
+              field.addEventListener('input', () => {
+                saveRoleDraft(form);
+                renderRolePermissionSimulation(form);
+              });
+              field.addEventListener('change', () => {
+                saveRoleDraft(form);
+                renderRolePermissionSimulation(form);
+              });
             });
             form.addEventListener('submit', () => {
               clearRoleDraft(form);

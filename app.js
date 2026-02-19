@@ -168,6 +168,31 @@ const COURSE_KIND_OPTIONS = [
   { key: 'teacher', label: 'Teacher courses' },
 ];
 
+const SETTINGS_RETENTION_MIN_DAYS = 14;
+const SETTINGS_RETENTION_MAX_DAYS = 3650;
+
+function normalizeRetentionDays(rawValue, fallbackDays) {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return fallbackDays;
+  const rounded = Math.floor(parsed);
+  if (rounded < SETTINGS_RETENTION_MIN_DAYS) return fallbackDays;
+  if (rounded > SETTINGS_RETENTION_MAX_DAYS) return SETTINGS_RETENTION_MAX_DAYS;
+  return rounded;
+}
+
+const SITE_VISIT_RETENTION_DAYS_DEFAULT = normalizeRetentionDays(
+  process.env.SITE_VISIT_RETENTION_DAYS,
+  120
+);
+const LOGIN_HISTORY_RETENTION_DAYS_DEFAULT = normalizeRetentionDays(
+  process.env.LOGIN_HISTORY_RETENTION_DAYS,
+  180
+);
+const ACTIVITY_LOG_RETENTION_DAYS_DEFAULT = normalizeRetentionDays(
+  process.env.ACTIVITY_LOG_RETENTION_DAYS,
+  365
+);
+
 const DEFAULT_SETTINGS = {
   session_duration_days: 14,
   max_file_size_mb: 20,
@@ -176,6 +201,9 @@ const DEFAULT_SETTINGS = {
   allow_custom_deadlines: true,
   allow_messages: true,
   schedule_refresh_minutes: 5,
+  site_visit_retention_days: SITE_VISIT_RETENTION_DAYS_DEFAULT,
+  login_history_retention_days: LOGIN_HISTORY_RETENTION_DAYS_DEFAULT,
+  activity_log_retention_days: ACTIVITY_LOG_RETENTION_DAYS_DEFAULT,
   role_permissions: { ...DEFAULT_ROLE_PERMISSIONS },
 };
 let settingsCache = { ...DEFAULT_SETTINGS };
@@ -526,6 +554,12 @@ const refreshSettingsCache = async () => {
     } else if (row.key === 'schedule_refresh_minutes') {
       const n = Number(row.value);
       if (!Number.isNaN(n) && n > 0) parsed.schedule_refresh_minutes = n;
+    } else if (row.key === 'site_visit_retention_days') {
+      parsed.site_visit_retention_days = normalizeRetentionDays(row.value, DEFAULT_SETTINGS.site_visit_retention_days);
+    } else if (row.key === 'login_history_retention_days') {
+      parsed.login_history_retention_days = normalizeRetentionDays(row.value, DEFAULT_SETTINGS.login_history_retention_days);
+    } else if (row.key === 'activity_log_retention_days') {
+      parsed.activity_log_retention_days = normalizeRetentionDays(row.value, DEFAULT_SETTINGS.activity_log_retention_days);
     } else if (row.key === 'role_permissions') {
       try {
         const raw = JSON.parse(row.value);
@@ -2626,10 +2660,9 @@ const VISIT_DAY_OPTIONS = new Set([7, 14, 30, 60, 90]);
 const VISIT_DEDUP_WINDOW_MS = 10000;
 const VISIT_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const VISIT_DEDUP_MAX_KEYS = 5000;
-const VISIT_RETENTION_DAYS_RAW = Number(process.env.SITE_VISIT_RETENTION_DAYS || 120);
-const VISIT_RETENTION_DAYS = Number.isFinite(VISIT_RETENTION_DAYS_RAW) && VISIT_RETENTION_DAYS_RAW >= 14
-  ? Math.floor(VISIT_RETENTION_DAYS_RAW)
-  : 120;
+const VISIT_RETENTION_DAYS = SITE_VISIT_RETENTION_DAYS_DEFAULT;
+const LOGIN_HISTORY_RETENTION_DAYS = LOGIN_HISTORY_RETENTION_DAYS_DEFAULT;
+const ACTIVITY_LOG_RETENTION_DAYS = ACTIVITY_LOG_RETENTION_DAYS_DEFAULT;
 const visitDedupCache = new Map();
 let visitCleanupInFlight = false;
 let visitLastCleanupAt = 0;
@@ -2741,13 +2774,38 @@ const maybeCleanupVisitEvents = async () => {
   if ((nowMs - visitLastCleanupAt) < VISIT_CLEANUP_INTERVAL_MS) return;
   visitCleanupInFlight = true;
   visitLastCleanupAt = nowMs;
+  const visitRetentionDays = normalizeRetentionDays(settingsCache.site_visit_retention_days, VISIT_RETENTION_DAYS);
+  const loginHistoryRetentionDays = normalizeRetentionDays(
+    settingsCache.login_history_retention_days,
+    LOGIN_HISTORY_RETENTION_DAYS
+  );
+  const activityLogRetentionDays = normalizeRetentionDays(
+    settingsCache.activity_log_retention_days,
+    ACTIVITY_LOG_RETENTION_DAYS
+  );
   try {
     await db.run(
       "DELETE FROM site_visit_events WHERE created_at < NOW() - (?::int * INTERVAL '1 day')",
-      [VISIT_RETENTION_DAYS]
+      [visitRetentionDays]
     );
   } catch (err) {
-    console.error('Database error (visit.cleanup)', err);
+    console.error('Database error (visit.cleanup.events)', err);
+  }
+  try {
+    await db.run(
+      "DELETE FROM login_history WHERE created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')",
+      [loginHistoryRetentionDays]
+    );
+  } catch (err) {
+    console.error('Database error (visit.cleanup.login_history)', err);
+  }
+  try {
+    await db.run(
+      "DELETE FROM activity_log WHERE created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')",
+      [activityLogRetentionDays]
+    );
+  } catch (err) {
+    console.error('Database error (visit.cleanup.activity_log)', err);
   } finally {
     visitCleanupInFlight = false;
   }
@@ -12848,19 +12906,33 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   const allowCustomDeadlines = String(req.body.allow_custom_deadlines).toLowerCase() === 'true';
   const allowMessages = String(req.body.allow_messages).toLowerCase() === 'true';
   const scheduleRefreshMinutes = Number(req.body.schedule_refresh_minutes);
+  const siteVisitRetentionDays = Number(req.body.site_visit_retention_days);
+  const loginHistoryRetentionDays = Number(req.body.login_history_retention_days);
+  const activityLogRetentionDays = Number(req.body.activity_log_retention_days);
   const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   if (
     Number.isNaN(sessionDays) || sessionDays <= 0 ||
     Number.isNaN(maxFileSize) || maxFileSize <= 0 ||
     Number.isNaN(minTeamMembers) || minTeamMembers <= 0 ||
-    Number.isNaN(scheduleRefreshMinutes) || scheduleRefreshMinutes <= 0
+    Number.isNaN(scheduleRefreshMinutes) || scheduleRefreshMinutes <= 0 ||
+    Number.isNaN(siteVisitRetentionDays) ||
+    Number.isNaN(loginHistoryRetentionDays) ||
+    Number.isNaN(activityLogRetentionDays)
   ) {
     if (wantsJson) {
       return res.status(400).json({ error: 'Invalid settings' });
     }
     return res.redirect('/admin?err=Invalid%20settings');
   }
-  if (scheduleRefreshMinutes > 120) {
+  if (
+    scheduleRefreshMinutes > 120 ||
+    siteVisitRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
+    siteVisitRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
+    loginHistoryRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
+    loginHistoryRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
+    activityLogRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
+    activityLogRetentionDays > SETTINGS_RETENTION_MAX_DAYS
+  ) {
     if (wantsJson) {
       return res.status(400).json({ error: 'Invalid settings' });
     }
@@ -12875,6 +12947,9 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
       allow_custom_deadlines: allowCustomDeadlines,
       allow_messages: allowMessages,
       schedule_refresh_minutes: scheduleRefreshMinutes,
+      site_visit_retention_days: normalizeRetentionDays(siteVisitRetentionDays, DEFAULT_SETTINGS.site_visit_retention_days),
+      login_history_retention_days: normalizeRetentionDays(loginHistoryRetentionDays, DEFAULT_SETTINGS.login_history_retention_days),
+      activity_log_retention_days: normalizeRetentionDays(activityLogRetentionDays, DEFAULT_SETTINGS.activity_log_retention_days),
     };
     const changes = Object.keys(nextSettings).reduce((acc, key) => {
       if (String(settingsCache[key]) !== String(nextSettings[key])) {
@@ -12892,6 +12967,9 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     stmt.run('allow_custom_deadlines', allowCustomDeadlines ? 'true' : 'false');
     stmt.run('allow_messages', allowMessages ? 'true' : 'false');
     stmt.run('schedule_refresh_minutes', String(scheduleRefreshMinutes));
+    stmt.run('site_visit_retention_days', String(nextSettings.site_visit_retention_days));
+    stmt.run('login_history_retention_days', String(nextSettings.login_history_retention_days));
+    stmt.run('activity_log_retention_days', String(nextSettings.activity_log_retention_days));
     await refreshSettingsCache();
     const operationId = randomUUID();
     logAction(db, req, 'system_settings_update', {

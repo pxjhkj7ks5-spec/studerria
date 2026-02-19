@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.19",
+      "date": "2026-02-19",
+      "items": [
+        "feat(admin-settings): added configurable data-retention controls for `site_visit_events`, `login_history`, and `activity_log` (14-3650 days)",
+        "feat(admin-maintenance): background cleanup now respects retention settings and auto-prunes visit/login/activity logs on schedule",
+        "feat(role-studio): added live permission simulator that previews admin sections and feature-level access from selected RBAC permissions"
+      ]
+    },
+    {
       "version": "0.9.18",
       "date": "2026-02-19",
       "items": [
