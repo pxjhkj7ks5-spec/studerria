@@ -17,6 +17,7 @@ const teamworkGroupsSeminarGroupNumber = require('./016_teamwork_groups_seminar_
 const subjectMaterials = require('./017_subject_materials');
 const subjectMaterialsSyllabus = require('./018_subject_materials_syllabus');
 const journalGradebook = require('./019_journal_gradebook');
+const journalWeightedConfig = require('./020_journal_weighted_config');
 
 module.exports = [
   init,
@@ -38,4 +39,5 @@ module.exports = [
   subjectMaterials,
   subjectMaterialsSyllabus,
   journalGradebook,
+  journalWeightedConfig,
 ];

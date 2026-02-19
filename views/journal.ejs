@@ -61,35 +61,63 @@
       </section>
 
       <% if (selectedSubject && canEditJournal) { %>
+        <%
+          const gradingTypeRows = [
+            { key: 'homework', label: 'ДЗ' },
+            { key: 'seminar', label: 'Семінар' },
+            { key: 'exam', label: 'Екзамен' },
+            { key: 'credit', label: 'Залік' },
+            { key: 'custom', label: 'Кастом' },
+          ];
+          let enabledWeightTotal = 0;
+          gradingTypeRows.forEach((cfg) => {
+            const enabled = Number(gradingSettings && gradingSettings[`${cfg.key}_enabled`]) === 1;
+            const weight = Number(gradingSettings && gradingSettings[`${cfg.key}_weight_points`]);
+            if (enabled && Number.isFinite(weight)) enabledWeightTotal += weight;
+          });
+        %>
         <section class="glass liquid-card p-3 mb-3">
           <div class="row g-3">
             <div class="col-12 col-xl-8">
               <h6 class="mb-2">Налаштування системи оцінювання</h6>
-              <form method="POST" action="/journal/config/save" class="row g-2">
+              <form method="POST" action="/journal/config/save" class="row g-3">
                 <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
-                <div class="col-6 col-md-4 col-xl-2">
-                  <label class="form-label">ДЗ</label>
-                  <input class="form-control" type="number" step="0.01" min="0.01" name="homework_max_points" value="<%= gradingSettings.homework_max_points %>" required />
+                <div class="col-12 journal-config-table-wrap">
+                  <table class="table table-sm journal-config-table align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Тип</th>
+                        <th class="text-center">Увімк.</th>
+                        <th>Бал за 1 роботу</th>
+                        <th>Внесок у фінал / 100</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% gradingTypeRows.forEach(function(cfg) { %>
+                        <% const enabledField = `${cfg.key}_enabled`; %>
+                        <% const maxField = `${cfg.key}_max_points`; %>
+                        <% const weightField = `${cfg.key}_weight_points`; %>
+                        <% const enabledValue = Number(gradingSettings && gradingSettings[enabledField]) === 1; %>
+                        <tr>
+                          <td><strong><%= cfg.label %></strong></td>
+                          <td class="text-center">
+                            <input type="hidden" name="<%= enabledField %>" value="0" />
+                            <input class="form-check-input" type="checkbox" name="<%= enabledField %>" value="1" <%= enabledValue ? 'checked' : '' %> />
+                          </td>
+                          <td>
+                            <input class="form-control form-control-sm" type="number" step="0.01" min="0.01" name="<%= maxField %>" value="<%= gradingSettings[maxField] %>" required />
+                          </td>
+                          <td>
+                            <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="<%= weightField %>" value="<%= gradingSettings[weightField] %>" required />
+                          </td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
                 </div>
-                <div class="col-6 col-md-4 col-xl-2">
-                  <label class="form-label">Семінар</label>
-                  <input class="form-control" type="number" step="0.01" min="0.01" name="seminar_max_points" value="<%= gradingSettings.seminar_max_points %>" required />
-                </div>
-                <div class="col-6 col-md-4 col-xl-2">
-                  <label class="form-label">Екзамен</label>
-                  <input class="form-control" type="number" step="0.01" min="0.01" name="exam_max_points" value="<%= gradingSettings.exam_max_points %>" required />
-                </div>
-                <div class="col-6 col-md-4 col-xl-2">
-                  <label class="form-label">Залік</label>
-                  <input class="form-control" type="number" step="0.01" min="0.01" name="credit_max_points" value="<%= gradingSettings.credit_max_points %>" required />
-                </div>
-                <div class="col-6 col-md-4 col-xl-2">
-                  <label class="form-label">Кастом</label>
-                  <input class="form-control" type="number" step="0.01" min="0.01" name="custom_max_points" value="<%= gradingSettings.custom_max_points %>" required />
-                </div>
-                <div class="col-6 col-md-4 col-xl-2">
-                  <label class="form-label">Фінал</label>
-                  <input class="form-control" type="number" value="100" disabled />
+                <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
+                  <span class="status-chip status-chip--info">Сума внесків (активні): <%= enabledWeightTotal.toFixed(2).replace(/\.00$/, '') %> / 100</span>
+                  <span class="status-chip status-chip--neutral">Фінал: 100 (фіксовано)</span>
                 </div>
                 <div class="col-12">
                   <button class="btn btn-primary" type="submit">Зберегти систему</button>
@@ -117,6 +145,13 @@
                 <div class="col-6">
                   <label class="form-label">Макс. бал</label>
                   <input class="form-control" type="number" step="0.01" min="0.01" name="max_points" />
+                </div>
+                <div class="col-12">
+                  <input type="hidden" name="include_in_final" value="0" />
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="journalIncludeFinal" name="include_in_final" value="1" checked />
+                    <label class="form-check-label" for="journalIncludeFinal">Враховувати у фінальному розрахунку</label>
+                  </div>
                 </div>
                 <div class="col-12">
                   <button class="btn btn-outline-primary w-100" type="submit">Додати колонку</button>
@@ -148,10 +183,23 @@
                         <% if (column.is_credit) { %>
                           <span class="status-chip status-chip--warning">Залік</span>
                         <% } %>
+                        <% if (!column.include_in_final) { %>
+                          <span class="status-chip status-chip--neutral">Не враховується</span>
+                        <% } %>
                         <% if (column.source_homework_id && column.homework_meeting_url) { %>
                           <span class="status-chip status-chip--info">Meet</span>
                         <% } %>
                       </div>
+                      <% if (canEditJournal) { %>
+                        <form method="POST" action="/journal/columns/final-toggle" class="journal-column-toggle-form">
+                          <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                          <input type="hidden" name="column_id" value="<%= column.id %>" />
+                          <input type="hidden" name="include_in_final" value="<%= column.include_in_final ? 0 : 1 %>" />
+                          <button class="btn btn-sm <%= column.include_in_final ? 'btn-outline-warning' : 'btn-outline-success' %>" type="submit">
+                            <%= column.include_in_final ? 'Виключити з фіналу' : 'Врахувати у фіналі' %>
+                          </button>
+                        </form>
+                      <% } %>
                     </th>
                   <% }); %>
                   <th class="journal-th-final final-col">Підсумок / 100</th>
@@ -179,8 +227,9 @@
                       </td>
                     <% }); %>
                     <td class="journal-final-cell final-col">
+                      <% const weightedEarned = Number.isFinite(Number(row.weighted_earned)) ? Number(row.weighted_earned) : Number(row.final_score || 0); %>
                       <div class="journal-final-value"><%= row.final_score.toFixed(2).replace(/\.00$/, '') %></div>
-                      <div class="journal-final-meta"><%= row.raw_earned.toFixed(2).replace(/\.00$/, '') %> / <%= row.raw_max.toFixed(2).replace(/\.00$/, '') %></div>
+                      <div class="journal-final-meta"><%= weightedEarned.toFixed(2).replace(/\.00$/, '') %> / 100 · сирі <%= row.raw_earned.toFixed(2).replace(/\.00$/, '') %> / <%= row.raw_max.toFixed(2).replace(/\.00$/, '') %></div>
                     </td>
                   </tr>
                 <% }); %>
@@ -231,6 +280,13 @@
                 <button class="btn btn-primary mt-3" type="submit">Зберегти оцінку</button>
               <% } %>
             </form>
+            <form id="journalGradeDeleteForm" method="POST" action="/journal/grades/delete" class="mt-2" autocomplete="off">
+              <input type="hidden" name="column_id" id="journalGradeDeleteColumnId" />
+              <input type="hidden" name="student_id" id="journalGradeDeleteStudentId" />
+              <% if (canEditJournal) { %>
+                <button class="btn btn-outline-danger" type="submit" id="journalGradeDeleteBtn" disabled>Видалити оцінку</button>
+              <% } %>
+            </form>
           </div>
         </div>
       </div>
@@ -271,6 +327,10 @@
       const columnInput = document.getElementById('journalGradeColumnId');
       const studentInput = document.getElementById('journalGradeStudentId');
       const gradeForm = document.getElementById('journalGradeForm');
+      const deleteForm = document.getElementById('journalGradeDeleteForm');
+      const deleteColumnInput = document.getElementById('journalGradeDeleteColumnId');
+      const deleteStudentInput = document.getElementById('journalGradeDeleteStudentId');
+      const deleteBtn = document.getElementById('journalGradeDeleteBtn');
 
       function setStatusLabel(status) {
         const value = String(status || '').toLowerCase();
@@ -334,6 +394,8 @@
 
           columnInput.value = String(columnId);
           studentInput.value = String(studentId);
+          if (deleteColumnInput) deleteColumnInput.value = String(columnId);
+          if (deleteStudentInput) deleteStudentInput.value = String(studentId);
           scoreEl.max = data && data.column ? String(data.column.max_points || 0) : '';
           scoreEl.value = data && data.grade && Number.isFinite(Number(data.grade.score))
             ? String(data.grade.score)
@@ -344,6 +406,13 @@
           if (gradeForm) {
             const submitBtn = gradeForm.querySelector('button[type="submit"]');
             if (submitBtn) submitBtn.style.display = canEditJournal ? '' : 'none';
+          }
+          if (deleteForm) {
+            deleteForm.style.display = canEditJournal ? '' : 'none';
+          }
+          if (deleteBtn) {
+            const hasGrade = Boolean(data && data.grade && Number.isFinite(Number(data.grade.score)));
+            deleteBtn.disabled = !canEditJournal || !hasGrade;
           }
           modal.show();
         } catch (err) {

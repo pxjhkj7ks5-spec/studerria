@@ -4,6 +4,18 @@
   gap: 8px;
 }
 
+.page-journal .journal-config-table-wrap {
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
+}
+
+.page-journal .journal-config-table th,
+.page-journal .journal-config-table td {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
 .page-journal .journal-table-wrap {
   overflow: auto;
   border-radius: 16px;
@@ -42,6 +54,17 @@
   gap: 6px;
   font-size: 0.74rem;
   color: var(--ds-text2);
+}
+
+.page-journal .journal-column-toggle-form {
+  margin-top: 8px;
+}
+
+.page-journal .journal-column-toggle-form .btn {
+  font-size: 0.72rem;
+  line-height: 1.1;
+  padding: 0.2rem 0.45rem;
+  white-space: normal;
 }
 
 .page-journal .journal-student-cell {

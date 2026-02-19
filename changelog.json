@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.9.10",
+      "date": "2026-02-19",
+      "items": [
+        "feat(journal): added teacher/admin/deanery ability to delete an existing grade directly from the grade cell modal",
+        "feat(journal): added per-column `include_in_final` toggle to exclude/include columns in final score calculations",
+        "feat(journal): introduced flexible weighted grading config per activity type (enable/disable, per-item max, and contribution weight out of 100)",
+        "feat(db): added migration `020_journal_weighted_config` for journal final-inclusion flags and extended subject grading settings fields"
+      ]
+    },
+    {
       "version": "0.9.09",
       "date": "2026-02-18",
       "items": [

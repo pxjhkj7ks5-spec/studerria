@@ -5644,13 +5644,24 @@ const normalizeExternalUrl = (rawValue) => {
 };
 
 const JOURNAL_COLUMN_TYPES = new Set(['homework', 'seminar', 'exam', 'credit', 'custom']);
+const JOURNAL_SCORING_TYPES = ['homework', 'seminar', 'exam', 'credit', 'custom'];
 
 const DEFAULT_SUBJECT_GRADING_SETTINGS = {
+  homework_enabled: 1,
+  seminar_enabled: 1,
+  exam_enabled: 1,
+  credit_enabled: 1,
+  custom_enabled: 1,
   homework_max_points: 10,
   seminar_max_points: 10,
   exam_max_points: 40,
   credit_max_points: 20,
   custom_max_points: 10,
+  homework_weight_points: 20,
+  seminar_weight_points: 20,
+  exam_weight_points: 40,
+  credit_weight_points: 10,
+  custom_weight_points: 10,
   final_max_points: 100,
 };
 
@@ -5781,9 +5792,40 @@ const parsePositiveDecimal = (rawValue, fallbackValue) => {
   return Math.round(normalized * 100) / 100;
 };
 
+const parseNonNegativeDecimal = (rawValue, fallbackValue) => {
+  if (rawValue === null || typeof rawValue === 'undefined' || rawValue === '') return fallbackValue;
+  const normalized = Number(String(rawValue).replace(',', '.'));
+  if (!Number.isFinite(normalized) || normalized < 0) return fallbackValue;
+  return Math.round(normalized * 100) / 100;
+};
+
+const parseBinaryFlag = (rawValue, fallbackValue = 0) => {
+  if (rawValue === null || typeof rawValue === 'undefined' || rawValue === '') {
+    return Number(fallbackValue) === 1 ? 1 : 0;
+  }
+  const normalized = String(rawValue).trim().toLowerCase();
+  if (['1', 'true', 'on', 'yes'].includes(normalized)) return 1;
+  if (['0', 'false', 'off', 'no'].includes(normalized)) return 0;
+  return Number(fallbackValue) === 1 ? 1 : 0;
+};
+
 const normalizeColumnType = (rawValue) => {
   const normalized = String(rawValue || '').trim().toLowerCase();
   return JOURNAL_COLUMN_TYPES.has(normalized) ? normalized : 'custom';
+};
+
+const getGradingTypeEnabled = (gradingSettings, columnType) => {
+  const safeType = normalizeColumnType(columnType);
+  const field = `${safeType}_enabled`;
+  const fallback = Number(DEFAULT_SUBJECT_GRADING_SETTINGS[field] || 0);
+  return parseBinaryFlag(gradingSettings?.[field], fallback) === 1;
+};
+
+const getGradingTypeWeightPoints = (gradingSettings, columnType) => {
+  const safeType = normalizeColumnType(columnType);
+  const field = `${safeType}_weight_points`;
+  const fallback = Number(DEFAULT_SUBJECT_GRADING_SETTINGS[field] || 0);
+  return parseNonNegativeDecimal(gradingSettings?.[field], fallback);
 };
 
 const getDefaultMaxPointsByType = (gradingSettings, columnType) => {
@@ -5832,21 +5874,33 @@ async function ensureSubjectGradingSettings(subjectId, courseId, semesterId, use
       INSERT INTO subject_grading_settings
       (
         subject_id, course_id, semester_id,
+        homework_enabled, seminar_enabled, exam_enabled, credit_enabled, custom_enabled,
         homework_max_points, seminar_max_points, exam_max_points, credit_max_points, custom_max_points,
+        homework_weight_points, seminar_weight_points, exam_weight_points, credit_weight_points, custom_weight_points,
         final_max_points, created_by, updated_by, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 100, ?, ?, NOW(), NOW())
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 100, ?, ?, NOW(), NOW())
       ON CONFLICT (subject_id) DO NOTHING
     `,
     [
       subjectId,
       courseId || null,
       semesterId || null,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.homework_enabled,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_enabled,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.exam_enabled,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.credit_enabled,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.custom_enabled,
       DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points,
       DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points,
       DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points,
       DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points,
       DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.homework_weight_points,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_weight_points,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.exam_weight_points,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.credit_weight_points,
+      DEFAULT_SUBJECT_GRADING_SETTINGS.custom_weight_points,
       userId || null,
       userId || null,
     ]
@@ -5862,11 +5916,21 @@ async function ensureSubjectGradingSettings(subjectId, courseId, semesterId, use
   );
   if (!row) return { ...DEFAULT_SUBJECT_GRADING_SETTINGS };
   return {
+    homework_enabled: parseBinaryFlag(row.homework_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_enabled),
+    seminar_enabled: parseBinaryFlag(row.seminar_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_enabled),
+    exam_enabled: parseBinaryFlag(row.exam_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_enabled),
+    credit_enabled: parseBinaryFlag(row.credit_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_enabled),
+    custom_enabled: parseBinaryFlag(row.custom_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_enabled),
     homework_max_points: parsePositiveDecimal(row.homework_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points),
     seminar_max_points: parsePositiveDecimal(row.seminar_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points),
     exam_max_points: parsePositiveDecimal(row.exam_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points),
     credit_max_points: parsePositiveDecimal(row.credit_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points),
     custom_max_points: parsePositiveDecimal(row.custom_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points),
+    homework_weight_points: parseNonNegativeDecimal(row.homework_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_weight_points),
+    seminar_weight_points: parseNonNegativeDecimal(row.seminar_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_weight_points),
+    exam_weight_points: parseNonNegativeDecimal(row.exam_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_weight_points),
+    credit_weight_points: parseNonNegativeDecimal(row.credit_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_weight_points),
+    custom_weight_points: parseNonNegativeDecimal(row.custom_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_weight_points),
     final_max_points: 100,
   };
 }
@@ -5918,6 +5982,7 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
       jc.title,
       jc.column_type,
       jc.max_points,
+      jc.include_in_final,
       jc.is_credit,
       jc.position,
       COALESCE(gc.grades_count, 0) AS grades_count,
@@ -6066,14 +6131,15 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
     const nextPosition = isCredit ? (maxCreditPosition + 10) : (maxNonCreditPosition + 10);
     if (isCredit) maxCreditPosition = nextPosition;
     else maxNonCreditPosition = nextPosition;
+    const includeInFinalDefault = getGradingTypeEnabled(gradingSettings, columnType) ? 1 : 0;
     await db.run(
       `
         INSERT INTO journal_columns
         (
           subject_id, course_id, semester_id, source_type, source_homework_id,
-          title, column_type, max_points, position, is_credit, created_by, created_at, updated_at
+          title, column_type, max_points, position, is_credit, include_in_final, created_by, created_at, updated_at
         )
-        VALUES (?, ?, ?, 'homework', ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        VALUES (?, ?, ?, 'homework', ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
       [
         subjectId,
@@ -6085,6 +6151,7 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
         defaultMaxPoints,
         nextPosition,
         isCredit,
+        includeInFinalDefault,
         userId || null,
       ]
     );
@@ -6289,6 +6356,7 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
       title: String(row.title || ''),
       column_type: normalizeColumnType(row.column_type),
       max_points: parsePositiveDecimal(row.max_points, 10),
+      include_in_final: Number(row.include_in_final ?? 1) === 1,
       is_credit: Number(row.is_credit || 0) === 1,
       position: Number(row.position || 0),
       homework_description: row.homework_description || null,
@@ -6636,6 +6704,18 @@ async function buildJournalMatrix({
     );
   }
 
+  const scoringColumnIndexesByType = new Map();
+  columns.forEach((column, index) => {
+    const type = normalizeColumnType(column.column_type);
+    if (!JOURNAL_SCORING_TYPES.includes(type)) return;
+    if (!column.include_in_final) return;
+    if (!getGradingTypeEnabled(gradingSettings, type)) return;
+    if (!scoringColumnIndexesByType.has(type)) {
+      scoringColumnIndexesByType.set(type, []);
+    }
+    scoringColumnIndexesByType.get(type).push(index);
+  });
+
   const rows = students.map((student) => {
     const cells = columns.map((column) => {
       const grade = gradesByKey.get(`${column.id}|${student.id}`) || null;
@@ -6668,14 +6748,32 @@ async function buildJournalMatrix({
         submission,
       };
     });
-    const rawEarned = cells.reduce((sum, cell) => sum + (Number.isFinite(cell.score) ? Number(cell.score) : 0), 0);
-    const rawMax = columns.reduce((sum, column) => sum + parsePositiveDecimal(column.max_points, 0), 0);
-    const finalScore = rawMax > 0 ? Math.min(100, (rawEarned / rawMax) * 100) : 0;
+    let rawEarned = 0;
+    let rawMax = 0;
+    let weightedEarned = 0;
+    JOURNAL_SCORING_TYPES.forEach((type) => {
+      const indexes = scoringColumnIndexesByType.get(type) || [];
+      if (!indexes.length) return;
+      const typeWeight = getGradingTypeWeightPoints(gradingSettings, type);
+      const typeRawMax = indexes.reduce((sum, idx) => sum + parsePositiveDecimal(columns[idx]?.max_points, 0), 0);
+      const typeRawEarned = indexes.reduce((sum, idx) => {
+        const score = Number(cells[idx]?.score);
+        return sum + (Number.isFinite(score) ? score : 0);
+      }, 0);
+      rawEarned += typeRawEarned;
+      rawMax += typeRawMax;
+      if (typeRawMax > 0 && typeWeight > 0) {
+        const ratio = Math.max(0, Math.min(1, typeRawEarned / typeRawMax));
+        weightedEarned += ratio * typeWeight;
+      }
+    });
+    const finalScore = Math.min(100, weightedEarned);
     return {
       student,
       cells,
       raw_earned: Math.round(rawEarned * 100) / 100,
       raw_max: Math.round(rawMax * 100) / 100,
+      weighted_earned: Math.round(weightedEarned * 100) / 100,
       final_score: Math.round(finalScore * 100) / 100,
     };
   });
@@ -7051,11 +7149,176 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
   }
 });
 
+app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) => {
+  const columnId = Number(req.body.column_id);
+  const studentId = Number(req.body.student_id);
+  if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
+    return res.redirect('/journal?err=Invalid%20grade%20target');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.*,
+          h.group_number AS homework_group_number
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+        LIMIT 1
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.redirect('/journal?err=Column%20not%20found');
+    }
+
+    const studentRow = await db.get(
+      `
+        SELECT sg.group_number
+        FROM student_groups sg
+        WHERE sg.subject_id = ? AND sg.student_id = ?
+        LIMIT 1
+      `,
+      [column.subject_id, studentId]
+    );
+    if (!studentRow) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const studentGroup = Number(studentRow.group_number || 0);
+      if (!access.allowAll && !access.groups.has(studentGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    await db.run(
+      `
+        DELETE FROM journal_grades
+        WHERE column_id = ? AND student_id = ?
+      `,
+      [columnId, studentId]
+    );
+
+    logActivity(
+      db,
+      req,
+      'journal_grade_delete',
+      'journal_grade',
+      columnId,
+      {
+        student_id: studentId,
+        subject_id: Number(column.subject_id),
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(`/journal?subject_id=${column.subject_id}&ok=Оцінку%20видалено`);
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/columns/final-toggle', requireLogin, writeLimiter, async (req, res) => {
+  const subjectId = Number(req.body.subject_id);
+  const columnId = Number(req.body.column_id);
+  const includeInFinal = parseBinaryFlag(req.body.include_in_final, 1) === 1 ? 1 : 0;
+  if (!Number.isFinite(subjectId) || subjectId < 1 || !Number.isFinite(columnId) || columnId < 1) {
+    return res.redirect('/journal?err=Invalid%20column%20target');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.id,
+          jc.subject_id,
+          jc.course_id,
+          jc.semester_id,
+          jc.source_homework_id,
+          h.group_number AS homework_group_number
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+          AND jc.subject_id = ?
+          AND COALESCE(jc.is_archived, 0) = 0
+        LIMIT 1
+      `,
+      [columnId, subjectId]
+    );
+    if (!column) {
+      return res.redirect(`/journal?subject_id=${subjectId}&err=Column%20not%20found`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    await db.run(
+      `
+        UPDATE journal_columns
+        SET include_in_final = ?,
+            updated_at = NOW()
+        WHERE id = ?
+      `,
+      [includeInFinal, columnId]
+    );
+
+    logActivity(
+      db,
+      req,
+      'journal_column_toggle_final',
+      'journal_column',
+      columnId,
+      {
+        subject_id: subjectId,
+        include_in_final: includeInFinal,
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(`/journal?subject_id=${subjectId}&ok=Налаштування%20колонки%20оновлено`);
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
 app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res) => {
   const subjectId = Number(req.body.subject_id);
   const title = String(req.body.title || '').trim();
   const typeRaw = normalizeColumnType(req.body.column_type);
   const requestedCredit = String(req.body.is_credit || '').toLowerCase();
+  const includeInFinal = parseBinaryFlag(req.body.include_in_final, 1) === 1 ? 1 : 0;
   const isCredit = typeRaw === 'credit' || requestedCredit === '1' || requestedCredit === 'true' || requestedCredit === 'on';
   const columnType = isCredit ? 'credit' : typeRaw;
 
@@ -7122,8 +7385,8 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
     await db.run(
       `
         INSERT INTO journal_columns
-          (subject_id, course_id, semester_id, source_type, source_homework_id, title, column_type, max_points, position, is_credit, created_by, created_at, updated_at)
-        VALUES (?, ?, ?, 'manual', NULL, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+          (subject_id, course_id, semester_id, source_type, source_homework_id, title, column_type, max_points, position, is_credit, include_in_final, created_by, created_at, updated_at)
+        VALUES (?, ?, ?, 'manual', NULL, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
       [
         subjectId,
@@ -7134,6 +7397,7 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
         maxPoints,
         nextPosition,
         isCredit ? 1 : 0,
+        includeInFinal,
         Number(req.session.user.id),
       ]
     );
@@ -7149,6 +7413,7 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
         column_type: columnType,
         max_points: maxPoints,
         is_credit: isCredit,
+        include_in_final: includeInFinal,
       },
       courseId,
       semesterId
@@ -7196,13 +7461,36 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
     const activeSemester = await getActiveSemester(courseId);
     const semesterId = activeSemester ? Number(activeSemester.id) : null;
 
-    const homeworkMax = parsePositiveDecimal(req.body.homework_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points);
-    const seminarMax = parsePositiveDecimal(req.body.seminar_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points);
-    const examMax = parsePositiveDecimal(req.body.exam_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points);
-    const creditMax = parsePositiveDecimal(req.body.credit_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points);
-    const customMax = parsePositiveDecimal(req.body.custom_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points);
-    if (!homeworkMax || !seminarMax || !examMax || !creditMax || !customMax) {
-      return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20grading%20config`);
+    const nextSettings = {};
+    let enabledTypesCount = 0;
+    let enabledWeightTotal = 0;
+    for (const typeKey of JOURNAL_SCORING_TYPES) {
+      const enabledField = `${typeKey}_enabled`;
+      const maxField = `${typeKey}_max_points`;
+      const weightField = `${typeKey}_weight_points`;
+
+      const enabled = parseBinaryFlag(req.body[enabledField], DEFAULT_SUBJECT_GRADING_SETTINGS[enabledField]);
+      const maxPoints = parsePositiveDecimal(req.body[maxField], DEFAULT_SUBJECT_GRADING_SETTINGS[maxField]);
+      const weightPoints = parseNonNegativeDecimal(req.body[weightField], DEFAULT_SUBJECT_GRADING_SETTINGS[weightField]);
+      if (!Number.isFinite(maxPoints) || maxPoints <= 0 || !Number.isFinite(weightPoints) || weightPoints < 0) {
+        return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20grading%20config`);
+      }
+
+      nextSettings[enabledField] = enabled;
+      nextSettings[maxField] = maxPoints;
+      nextSettings[weightField] = weightPoints;
+
+      if (enabled === 1) {
+        enabledTypesCount += 1;
+        enabledWeightTotal += weightPoints;
+      }
+    }
+
+    if (enabledTypesCount < 1) {
+      return res.redirect(`/journal?subject_id=${subjectId}&err=Enable%20at%20least%20one%20activity%20type`);
+    }
+    if (enabledWeightTotal > 100.0001) {
+      return res.redirect(`/journal?subject_id=${subjectId}&err=Total%20enabled%20weight%20cannot%20exceed%20100`);
     }
 
     await db.run(
@@ -7210,19 +7498,31 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
         INSERT INTO subject_grading_settings
           (
             subject_id, course_id, semester_id,
+            homework_enabled, seminar_enabled, exam_enabled, credit_enabled, custom_enabled,
             homework_max_points, seminar_max_points, exam_max_points, credit_max_points, custom_max_points,
+            homework_weight_points, seminar_weight_points, exam_weight_points, credit_weight_points, custom_weight_points,
             final_max_points, created_by, created_at, updated_by, updated_at
           )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 100, ?, NOW(), ?, NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 100, ?, NOW(), ?, NOW())
         ON CONFLICT (subject_id)
         DO UPDATE SET
           course_id = EXCLUDED.course_id,
           semester_id = EXCLUDED.semester_id,
+          homework_enabled = EXCLUDED.homework_enabled,
+          seminar_enabled = EXCLUDED.seminar_enabled,
+          exam_enabled = EXCLUDED.exam_enabled,
+          credit_enabled = EXCLUDED.credit_enabled,
+          custom_enabled = EXCLUDED.custom_enabled,
           homework_max_points = EXCLUDED.homework_max_points,
           seminar_max_points = EXCLUDED.seminar_max_points,
           exam_max_points = EXCLUDED.exam_max_points,
           credit_max_points = EXCLUDED.credit_max_points,
           custom_max_points = EXCLUDED.custom_max_points,
+          homework_weight_points = EXCLUDED.homework_weight_points,
+          seminar_weight_points = EXCLUDED.seminar_weight_points,
+          exam_weight_points = EXCLUDED.exam_weight_points,
+          credit_weight_points = EXCLUDED.credit_weight_points,
+          custom_weight_points = EXCLUDED.custom_weight_points,
           final_max_points = 100,
           updated_by = EXCLUDED.updated_by,
           updated_at = EXCLUDED.updated_at
@@ -7231,11 +7531,21 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
         subjectId,
         courseId,
         semesterId,
-        homeworkMax,
-        seminarMax,
-        examMax,
-        creditMax,
-        customMax,
+        nextSettings.homework_enabled,
+        nextSettings.seminar_enabled,
+        nextSettings.exam_enabled,
+        nextSettings.credit_enabled,
+        nextSettings.custom_enabled,
+        nextSettings.homework_max_points,
+        nextSettings.seminar_max_points,
+        nextSettings.exam_max_points,
+        nextSettings.credit_max_points,
+        nextSettings.custom_max_points,
+        nextSettings.homework_weight_points,
+        nextSettings.seminar_weight_points,
+        nextSettings.exam_weight_points,
+        nextSettings.credit_weight_points,
+        nextSettings.custom_weight_points,
         Number(req.session.user.id),
         Number(req.session.user.id),
       ]
@@ -7248,11 +7558,8 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
       'subject_grading_settings',
       subjectId,
       {
-        homework_max_points: homeworkMax,
-        seminar_max_points: seminarMax,
-        exam_max_points: examMax,
-        credit_max_points: creditMax,
-        custom_max_points: customMax,
+        ...nextSettings,
+        enabled_weight_total: Math.round(enabledWeightTotal * 100) / 100,
         final_max_points: 100,
       },
       courseId,
