@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.13",
+      "date": "2026-02-19",
+      "items": [
+        "fix(journal-ui): compacted per-column action controls in header (smaller labels/buttons and tighter spacing)",
+        "fix(journal-ui): removed right-side final breakdown chips (`ДЗ/Залік/Кастом`) from the final score column to reduce visual noise"
+      ]
+    },
+    {
       "version": "0.9.12",
       "date": "2026-02-19",
       "items": [

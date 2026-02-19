@@ -78,12 +78,18 @@ body.theme-dark.page-journal .journal-table thead th {
 }
 
 .page-journal .journal-col-meta {
-  margin-top: 6px;
+  margin-top: 4px;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  font-size: 0.74rem;
+  gap: 4px;
+  font-size: 0.7rem;
   color: var(--ds-text2);
+}
+
+.page-journal .journal-col-meta .status-chip {
+  min-height: 1.2rem;
+  padding: 0.14rem 0.48rem;
+  font-size: 0.64rem;
 }
 
 .page-journal .status-chip--success {
@@ -105,10 +111,10 @@ body.theme-dark.page-journal .journal-table thead th {
 }
 
 .page-journal .journal-col-actions {
-  margin-top: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .page-journal .journal-column-toggle-form {
@@ -117,13 +123,21 @@ body.theme-dark.page-journal .journal-table thead th {
 
 .page-journal .journal-col-actions .journal-column-toggle-form {
   margin-top: 0;
+  width: 100%;
 }
 
 .page-journal .journal-column-toggle-form .btn {
-  font-size: 0.72rem;
-  line-height: 1.1;
-  padding: 0.2rem 0.45rem;
+  font-size: 0.68rem;
+  line-height: 1;
+  padding: 0.18rem 0.38rem;
   white-space: normal;
+  width: 100%;
+}
+
+.page-journal .journal-col-action-btn {
+  min-height: 26px;
+  border-radius: 999px;
+  text-align: center;
 }
 
 .page-journal .journal-student-cell {
@@ -212,14 +226,6 @@ body.theme-dark.page-journal .journal-table thead th {
   margin-top: 2px;
   color: var(--ds-text2);
   font-size: 0.74rem;
-}
-
-.page-journal .journal-final-breakdown {
-  margin-top: 6px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  justify-content: flex-end;
 }
 
 .page-journal .journal-submission-box {

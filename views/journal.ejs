@@ -254,27 +254,36 @@
                             <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
                             <input type="hidden" name="column_id" value="<%= column.id %>" />
                             <input type="hidden" name="include_in_final" value="<%= column.include_in_final ? 0 : 1 %>" />
-                            <button class="btn btn-sm <%= column.include_in_final ? 'btn-outline-warning' : 'btn-outline-success' %>" type="submit">
-                              <%= column.include_in_final ? 'Виключити' : 'Врахувати' %>
+                            <button
+                              class="btn btn-sm journal-col-action-btn <%= column.include_in_final ? 'btn-outline-warning' : 'btn-outline-success' %>"
+                              type="submit"
+                              title="<%= column.include_in_final ? 'Виключити з фіналу' : 'Врахувати у фіналі' %>"
+                            >
+                              <%= column.include_in_final ? 'Фінал-' : 'Фінал+' %>
                             </button>
                           </form>
                           <form method="POST" action="/journal/columns/lock-toggle" class="journal-column-toggle-form">
                             <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
                             <input type="hidden" name="column_id" value="<%= column.id %>" />
                             <input type="hidden" name="is_locked" value="<%= column.is_locked ? 0 : 1 %>" />
-                            <button class="btn btn-sm <%= column.is_locked ? 'btn-outline-success' : 'btn-outline-danger' %>" type="submit">
-                              <%= column.is_locked ? 'Розблокувати' : 'Заблокувати' %>
+                            <button
+                              class="btn btn-sm journal-col-action-btn <%= column.is_locked ? 'btn-outline-success' : 'btn-outline-danger' %>"
+                              type="submit"
+                              title="<%= column.is_locked ? 'Розблокувати колонку' : 'Заблокувати колонку' %>"
+                            >
+                              <%= column.is_locked ? 'Unlock' : 'Lock' %>
                             </button>
                           </form>
                           <button
-                            class="btn btn-sm btn-outline-primary journal-bulk-open-btn"
+                            class="btn btn-sm btn-outline-primary journal-col-action-btn journal-bulk-open-btn"
                             type="button"
                             data-column-id="<%= column.id %>"
                             data-column-title="<%= column.title %>"
                             data-column-max="<%= Number(column.max_points).toFixed(2) %>"
                             data-column-locked="<%= column.is_locked ? 1 : 0 %>"
+                            title="Масове оцінювання"
                           >
-                            Масово
+                            Bulk
                           </button>
                         </div>
                       <% } %>
@@ -312,15 +321,6 @@
                       <% const weightedEarned = Number.isFinite(Number(row.weighted_earned)) ? Number(row.weighted_earned) : Number(row.final_score || 0); %>
                       <div class="journal-final-value"><%= row.final_score.toFixed(2).replace(/\.00$/, '') %></div>
                       <div class="journal-final-meta"><%= weightedEarned.toFixed(2).replace(/\.00$/, '') %> / 100 · сирі <%= row.raw_earned.toFixed(2).replace(/\.00$/, '') %> / <%= row.raw_max.toFixed(2).replace(/\.00$/, '') %></div>
-                      <% if (Array.isArray(row.type_breakdown) && row.type_breakdown.length) { %>
-                        <div class="journal-final-breakdown">
-                          <% row.type_breakdown.forEach(function(typeItem) { %>
-                            <span class="status-chip status-chip--neutral">
-                              <%= typeItem.label %>: <%= Number(typeItem.contribution || 0).toFixed(2).replace(/\.00$/, '') %>/<%= Number(typeItem.weight_points || 0).toFixed(2).replace(/\.00$/, '') %>
-                            </span>
-                          <% }); %>
-                        </div>
-                      <% } %>
                     </td>
                   </tr>
                 <% }); %>
