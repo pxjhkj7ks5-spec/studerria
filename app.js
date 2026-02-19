@@ -2641,6 +2641,12 @@ const parseVisitDays = (rawValue) => {
   return VISIT_DAY_OPTIONS.has(normalized) ? normalized : 14;
 };
 
+const parseVisitExcludeAdmin = (rawValue) => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return true;
+  const normalized = String(rawValue).trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+};
+
 const buildVisitDayLabels = (days) => {
   const normalizedDays = parseVisitDays(days);
   const end = new Date();
@@ -12976,12 +12982,16 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
   }
   try {
     const days = parseVisitDays(req.query.days);
+    const excludeAdmin = parseVisitExcludeAdmin(req.query.exclude_admin);
     const labels = buildVisitDayLabels(days);
     const sinceIso = labels.length
       ? new Date(`${labels[0]}T00:00:00.000Z`).toISOString()
       : new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
     const courseId = getAdminCourse(req);
     const uniqueExpr = "COALESCE(v.user_id::text, NULLIF(v.session_id, ''), NULLIF(v.ip, ''), 'guest')";
+    const excludeAdminClause = excludeAdmin
+      ? "AND COALESCE(NULLIF(v.role_key, ''), 'guest') <> 'admin'"
+      : '';
 
     const [summaryRow, dailyRows, topPagesRows, roleRows, recentRows] = await Promise.all([
       db.get(
@@ -12994,6 +13004,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
           FROM site_visit_events v
           WHERE v.course_id = ?
             AND v.created_at >= ?
+            ${excludeAdminClause}
         `,
         [courseId, sinceIso]
       ),
@@ -13006,6 +13017,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
           FROM site_visit_events v
           WHERE v.course_id = ?
             AND v.created_at >= ?
+            ${excludeAdminClause}
           GROUP BY DATE(v.created_at)
           ORDER BY day ASC
         `,
@@ -13020,6 +13032,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
           FROM site_visit_events v
           WHERE v.course_id = ?
             AND v.created_at >= ?
+            ${excludeAdminClause}
           GROUP BY v.page_key
           ORDER BY visits DESC, v.page_key ASC
           LIMIT 8
@@ -13034,6 +13047,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
           FROM site_visit_events v
           WHERE v.course_id = ?
             AND v.created_at >= ?
+            ${excludeAdminClause}
           GROUP BY COALESCE(NULLIF(v.role_key, ''), 'guest')
           ORDER BY visits DESC, role_key ASC
         `,
@@ -13051,6 +13065,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
           LEFT JOIN users u ON u.id = v.user_id
           WHERE v.course_id = ?
             AND v.created_at >= ?
+            ${excludeAdminClause}
           ORDER BY v.created_at DESC
           LIMIT 30
         `,
@@ -13080,6 +13095,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       ok: true,
       days,
       course_id: courseId,
+      exclude_admin: excludeAdmin,
       summary: {
         total_visits: Number(summaryRow?.total_visits || 0),
         unique_visitors: Number(summaryRow?.unique_visitors || 0),

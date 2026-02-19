@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.18",
+      "date": "2026-02-19",
+      "items": [
+        "feat(admin-visit-analytics): added `Без адмінів` switch to filter visit/login analytics and recent visits without admin activity",
+        "fix(admin-visit-analytics): API `/admin/visit-analytics.json` now supports `exclude_admin` filter for all counters, charts, top pages, role split, and recent events"
+      ]
+    },
+    {
       "version": "0.9.17",
       "date": "2026-02-19",
       "items": [
