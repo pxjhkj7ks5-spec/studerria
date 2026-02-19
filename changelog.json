@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.17",
+      "date": "2026-02-19",
+      "items": [
+        "fix(journal-dark-theme): removed bright disabled/read-only glow in grade modal fields by adding explicit dark overrides for `:disabled` and `[readonly]` inputs"
+      ]
+    },
+    {
       "version": "0.9.16",
       "date": "2026-02-19",
       "items": [

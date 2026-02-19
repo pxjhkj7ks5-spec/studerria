@@ -26,6 +26,22 @@ body.theme-dark.page-journal .form-select:focus {
   color: var(--ds-text0);
 }
 
+body.theme-dark.page-journal .form-control:disabled,
+body.theme-dark.page-journal .form-control[readonly],
+body.theme-dark.page-journal .form-select:disabled {
+  background-color: color-mix(in srgb, var(--surface-soft) 90%, transparent) !important;
+  color: color-mix(in srgb, var(--ds-text0) 86%, #000 14%);
+  border-color: color-mix(in srgb, var(--surface-border) 82%, transparent);
+  -webkit-text-fill-color: color-mix(in srgb, var(--ds-text0) 86%, #000 14%);
+  opacity: 1;
+}
+
+body.theme-dark.page-journal #journalCellModal .form-control:disabled,
+body.theme-dark.page-journal #journalCellModal .form-control[readonly] {
+  background-color: color-mix(in srgb, var(--surface-soft) 88%, transparent) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
 body.theme-dark.page-journal .form-select {
   color-scheme: dark;
 }
