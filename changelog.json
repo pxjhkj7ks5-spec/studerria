@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.16",
+      "date": "2026-02-19",
+      "items": [
+        "fix(journal-topbar): limited journal topbar actions to only theme toggle and `Повернутись до розкладу`",
+        "fix(journal-dark-theme): forced dark styling for journal form fields and select dropdown options to remove white/glare rendering in dark mode"
+      ]
+    },
+    {
       "version": "0.9.15",
       "date": "2026-02-19",
       "items": [
