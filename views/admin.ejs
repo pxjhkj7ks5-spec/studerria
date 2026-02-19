@@ -3825,6 +3825,9 @@
         const activePanel = adminPanels.find((panel) => panel.id === target);
         updateBreadcrumbs(activePanel);
         safeStorageSet('admin:tab', target);
+        if (target === 'admin-visit-analytics') {
+          window.dispatchEvent(new window.CustomEvent('admin:visit-analytics-opened'));
+        }
         if (push) {
           const url = new URL(window.location.href);
           url.searchParams.set('tab', target);
@@ -4082,6 +4085,21 @@
         }
       };
 
+      const isVisitAnalyticsVisible = () => {
+        if (!visitAnalyticsPanel) return false;
+        const style = window.getComputedStyle(visitAnalyticsPanel);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+      };
+
+      const refreshVisitAnalyticsOnOpen = () => {
+        if (!visitAnalyticsPanel) return;
+        if (!isVisitAnalyticsVisible()) return;
+        if (visitChart && typeof visitChart.resize === 'function') {
+          visitChart.resize();
+        }
+        loadVisitAnalytics();
+      };
+
       if (visitAnalyticsPanel) {
         if (visitRefreshBtn) {
           visitRefreshBtn.addEventListener('click', loadVisitAnalytics);
@@ -4092,7 +4110,10 @@
         if (visitExcludeAdminToggle) {
           visitExcludeAdminToggle.addEventListener('change', loadVisitAnalytics);
         }
-        loadVisitAnalytics();
+        window.addEventListener('admin:visit-analytics-opened', refreshVisitAnalyticsOnOpen);
+        if (isVisitAnalyticsVisible()) {
+          loadVisitAnalytics();
+        }
       }
 
       document.addEventListener('click', async (event) => {

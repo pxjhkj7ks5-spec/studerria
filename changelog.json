@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.20",
+      "date": "2026-02-19",
+      "items": [
+        "fix(admin-visit-analytics): fixed chart rendering when panel is opened from another admin tab (lazy refresh + chart resize on tab activation)"
+      ]
+    },
+    {
       "version": "0.9.19",
       "date": "2026-02-19",
       "items": [
