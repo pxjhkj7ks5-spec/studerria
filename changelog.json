@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.15",
+      "date": "2026-02-19",
+      "items": [
+        "ux(journal): made grading-system panel collapsible and closed by default with click-to-expand summary",
+        "feat(journal): exposed grade-formation block for students in read-only mode (`Вид діяльності` / `Бал за 1 роботу` / `Внесок у фінал`)"
+      ]
+    },
+    {
       "version": "0.9.14",
       "date": "2026-02-19",
       "items": [

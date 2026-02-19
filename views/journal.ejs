@@ -70,7 +70,7 @@
         </form>
       </section>
 
-      <% if (selectedSubject && canEditJournal) { %>
+      <% if (selectedSubject) { %>
         <%
           const gradingTypeRows = [
             { key: 'homework', label: 'ДЗ' },
@@ -87,131 +87,189 @@
           });
         %>
         <section class="glass liquid-card p-3 mb-3">
-          <div class="row g-3">
-            <div class="col-12 col-xl-8">
-              <h6 class="mb-2">Налаштування системи оцінювання</h6>
-              <form method="POST" action="/journal/config/save" class="row g-3" id="journalConfigForm">
-                <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
-                <div class="col-12">
-                  <div class="row g-2 align-items-end">
-                    <div class="col-12 col-lg-5">
-                      <label class="form-label" for="journalPresetSelect">Швидкий пресет</label>
-                      <select class="form-select form-select-sm" id="journalPresetSelect">
-                        <option value="">Оберіть шаблон...</option>
-                        <option value="balanced">Балансований (20/20/40/10/10)</option>
-                        <option value="exam_focus">Фокус на екзамені (15/15/60/10/0)</option>
-                        <option value="continuous">Безперервний контроль (35/35/20/10/0)</option>
-                        <option value="homework_only">Лише ДЗ (100/0/0/0/0)</option>
-                      </select>
-                    </div>
-                    <div class="col-12 col-lg-7 d-flex flex-wrap gap-2">
-                      <button class="btn btn-sm btn-outline-secondary" type="button" id="journalApplyPresetBtn">Застосувати пресет</button>
-                      <button class="btn btn-sm btn-outline-info" type="button" id="journalNormalizeWeightsBtn">Авто-розподіл ваг до 100</button>
-                    </div>
+          <details class="journal-grading-details">
+            <summary class="journal-grading-summary">
+              <div class="journal-grading-summary-main">
+                <span class="journal-grading-summary-title"><%= canEditJournal ? 'Налаштування системи оцінювання' : 'Як формується оцінка' %></span>
+                <span class="journal-grading-summary-subtitle">Натисніть, щоб <span class="journal-grading-summary-open-text">розгорнути</span><span class="journal-grading-summary-close-text">згорнути</span></span>
+              </div>
+              <div class="journal-grading-summary-chips">
+                <span class="status-chip status-chip--info">Сума внесків (активні): <%= enabledWeightTotal.toFixed(2).replace(/\.00$/, '') %> / 100</span>
+                <span class="status-chip status-chip--neutral">Фінал: 100 (фіксовано)</span>
+              </div>
+            </summary>
+            <div class="journal-grading-body">
+              <% if (canEditJournal) { %>
+                <div class="row g-3">
+                  <div class="col-12 col-xl-8">
+                    <h6 class="mb-2">Налаштування системи оцінювання</h6>
+                    <form method="POST" action="/journal/config/save" class="row g-3" id="journalConfigForm">
+                      <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                      <div class="col-12">
+                        <div class="row g-2 align-items-end">
+                          <div class="col-12 col-lg-5">
+                            <label class="form-label" for="journalPresetSelect">Швидкий пресет</label>
+                            <select class="form-select form-select-sm" id="journalPresetSelect">
+                              <option value="">Оберіть шаблон...</option>
+                              <option value="balanced">Балансований (20/20/40/10/10)</option>
+                              <option value="exam_focus">Фокус на екзамені (15/15/60/10/0)</option>
+                              <option value="continuous">Безперервний контроль (35/35/20/10/0)</option>
+                              <option value="homework_only">Лише ДЗ (100/0/0/0/0)</option>
+                            </select>
+                          </div>
+                          <div class="col-12 col-lg-7 d-flex flex-wrap gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" id="journalApplyPresetBtn">Застосувати пресет</button>
+                            <button class="btn btn-sm btn-outline-info" type="button" id="journalNormalizeWeightsBtn">Авто-розподіл ваг до 100</button>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-12 journal-config-table-wrap">
+                        <table class="table table-sm journal-config-table align-middle mb-0">
+                          <thead>
+                            <tr>
+                              <th>Тип</th>
+                              <th class="text-center">Увімк.</th>
+                              <th>Бал за 1 роботу</th>
+                              <th>Внесок у фінал / 100</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <% gradingTypeRows.forEach(function(cfg) { %>
+                              <% const enabledField = `${cfg.key}_enabled`; %>
+                              <% const maxField = `${cfg.key}_max_points`; %>
+                              <% const weightField = `${cfg.key}_weight_points`; %>
+                              <% const enabledValue = Number(gradingSettings && gradingSettings[enabledField]) === 1; %>
+                              <tr>
+                                <td><strong><%= cfg.label %></strong></td>
+                                <td class="text-center">
+                                  <input type="hidden" name="<%= enabledField %>" value="0" />
+                                  <input
+                                    class="form-check-input journal-enabled-input"
+                                    type="checkbox"
+                                    name="<%= enabledField %>"
+                                    value="1"
+                                    data-type-key="<%= cfg.key %>"
+                                    <%= enabledValue ? 'checked' : '' %>
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    class="form-control form-control-sm journal-max-input"
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    name="<%= maxField %>"
+                                    data-type-key="<%= cfg.key %>"
+                                    value="<%= gradingSettings[maxField] %>"
+                                    required
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    class="form-control form-control-sm journal-weight-input"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    name="<%= weightField %>"
+                                    data-type-key="<%= cfg.key %>"
+                                    value="<%= gradingSettings[weightField] %>"
+                                    required
+                                  />
+                                </td>
+                              </tr>
+                            <% }); %>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
+                        <span class="status-chip status-chip--info">Сума внесків (активні): <span id="journalEnabledWeightTotal"><%= enabledWeightTotal.toFixed(2).replace(/\.00$/, '') %></span> / 100</span>
+                        <span class="status-chip status-chip--neutral">Фінал: 100 (фіксовано)</span>
+                      </div>
+                      <div class="col-12">
+                        <button class="btn btn-primary" type="submit">Зберегти систему</button>
+                      </div>
+                    </form>
+                  </div>
+                  <div class="col-12 col-xl-4">
+                    <h6 class="mb-2">Нова колонка</h6>
+                    <form method="POST" action="/journal/columns/create" class="row g-2">
+                      <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                      <div class="col-12">
+                        <label class="form-label">Назва</label>
+                        <input class="form-control" name="title" maxlength="140" required />
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label">Тип</label>
+                        <select class="form-select" name="column_type">
+                          <option value="custom">Кастом</option>
+                          <option value="seminar">Семінар</option>
+                          <option value="exam">Екзамен</option>
+                          <option value="credit">Залік</option>
+                          <option value="homework">ДЗ</option>
+                        </select>
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label">Макс. бал</label>
+                        <input class="form-control" type="number" step="0.01" min="0.01" name="max_points" />
+                      </div>
+                      <div class="col-12">
+                        <input type="hidden" name="include_in_final" value="0" />
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" id="journalIncludeFinal" name="include_in_final" value="1" checked />
+                          <label class="form-check-label" for="journalIncludeFinal">Враховувати у фінальному розрахунку</label>
+                        </div>
+                      </div>
+                      <div class="col-12">
+                        <button class="btn btn-outline-primary w-100" type="submit">Додати колонку</button>
+                      </div>
+                    </form>
                   </div>
                 </div>
-                <div class="col-12 journal-config-table-wrap">
-                  <table class="table table-sm journal-config-table align-middle mb-0">
-                    <thead>
-                      <tr>
-                        <th>Тип</th>
-                        <th class="text-center">Увімк.</th>
-                        <th>Бал за 1 роботу</th>
-                        <th>Внесок у фінал / 100</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <% gradingTypeRows.forEach(function(cfg) { %>
-                        <% const enabledField = `${cfg.key}_enabled`; %>
-                        <% const maxField = `${cfg.key}_max_points`; %>
-                        <% const weightField = `${cfg.key}_weight_points`; %>
-                        <% const enabledValue = Number(gradingSettings && gradingSettings[enabledField]) === 1; %>
+              <% } else { %>
+                <div class="journal-grading-student-view">
+                  <p class="text-muted mb-2">Нижче показано, як рахується фінальний бал для цього предмета.</p>
+                  <div class="journal-config-table-wrap">
+                    <table class="table table-sm journal-config-table journal-config-table--readonly align-middle mb-0">
+                      <thead>
                         <tr>
-                          <td><strong><%= cfg.label %></strong></td>
-                          <td class="text-center">
-                            <input type="hidden" name="<%= enabledField %>" value="0" />
-                            <input
-                              class="form-check-input journal-enabled-input"
-                              type="checkbox"
-                              name="<%= enabledField %>"
-                              value="1"
-                              data-type-key="<%= cfg.key %>"
-                              <%= enabledValue ? 'checked' : '' %>
-                            />
-                          </td>
-                          <td>
-                            <input
-                              class="form-control form-control-sm journal-max-input"
-                              type="number"
-                              step="0.01"
-                              min="0.01"
-                              name="<%= maxField %>"
-                              data-type-key="<%= cfg.key %>"
-                              value="<%= gradingSettings[maxField] %>"
-                              required
-                            />
-                          </td>
-                          <td>
-                            <input
-                              class="form-control form-control-sm journal-weight-input"
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              name="<%= weightField %>"
-                              data-type-key="<%= cfg.key %>"
-                              value="<%= gradingSettings[weightField] %>"
-                              required
-                            />
-                          </td>
+                          <th>Вид діяльності</th>
+                          <th>Бал за 1 роботу</th>
+                          <th>Внесок у фінал / 100</th>
                         </tr>
-                      <% }); %>
-                    </tbody>
-                  </table>
-                </div>
-                <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
-                  <span class="status-chip status-chip--info">Сума внесків (активні): <span id="journalEnabledWeightTotal"><%= enabledWeightTotal.toFixed(2).replace(/\.00$/, '') %></span> / 100</span>
-                  <span class="status-chip status-chip--neutral">Фінал: 100 (фіксовано)</span>
-                </div>
-                <div class="col-12">
-                  <button class="btn btn-primary" type="submit">Зберегти систему</button>
-                </div>
-              </form>
-            </div>
-            <div class="col-12 col-xl-4">
-              <h6 class="mb-2">Нова колонка</h6>
-              <form method="POST" action="/journal/columns/create" class="row g-2">
-                <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
-                <div class="col-12">
-                  <label class="form-label">Назва</label>
-                  <input class="form-control" name="title" maxlength="140" required />
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Тип</label>
-                  <select class="form-select" name="column_type">
-                    <option value="custom">Кастом</option>
-                    <option value="seminar">Семінар</option>
-                    <option value="exam">Екзамен</option>
-                    <option value="credit">Залік</option>
-                    <option value="homework">ДЗ</option>
-                  </select>
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Макс. бал</label>
-                  <input class="form-control" type="number" step="0.01" min="0.01" name="max_points" />
-                </div>
-                <div class="col-12">
-                  <input type="hidden" name="include_in_final" value="0" />
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="journalIncludeFinal" name="include_in_final" value="1" checked />
-                    <label class="form-check-label" for="journalIncludeFinal">Враховувати у фінальному розрахунку</label>
+                      </thead>
+                      <tbody>
+                        <% gradingTypeRows.forEach(function(cfg) { %>
+                          <% const enabledField = `${cfg.key}_enabled`; %>
+                          <% const maxField = `${cfg.key}_max_points`; %>
+                          <% const weightField = `${cfg.key}_weight_points`; %>
+                          <% const enabledValue = Number(gradingSettings && gradingSettings[enabledField]) === 1; %>
+                          <% const maxValueRaw = Number(gradingSettings && gradingSettings[maxField]); %>
+                          <% const maxValue = Number.isFinite(maxValueRaw) ? maxValueRaw.toFixed(2).replace(/\.00$/, '') : '0'; %>
+                          <% const weightValueRaw = Number(gradingSettings && gradingSettings[weightField]); %>
+                          <% const weightValue = Number.isFinite(weightValueRaw) ? weightValueRaw.toFixed(2).replace(/\.00$/, '') : '0'; %>
+                          <tr class="<%= enabledValue ? '' : 'is-disabled' %>">
+                            <td><strong><%= cfg.label %></strong></td>
+                            <td><%= maxValue %></td>
+                            <td>
+                              <% if (enabledValue) { %>
+                                <span class="status-chip status-chip--info"><%= weightValue %></span>
+                              <% } else { %>
+                                <span class="status-chip status-chip--neutral">Вимкнено</span>
+                              <% } %>
+                            </td>
+                          </tr>
+                        <% }); %>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
+                    <span class="status-chip status-chip--info">Сума внесків (активні): <%= enabledWeightTotal.toFixed(2).replace(/\.00$/, '') %> / 100</span>
+                    <span class="status-chip status-chip--neutral">Фінал: 100 (фіксовано)</span>
                   </div>
                 </div>
-                <div class="col-12">
-                  <button class="btn btn-outline-primary w-100" type="submit">Додати колонку</button>
-                </div>
-              </form>
+              <% } %>
             </div>
-          </div>
+          </details>
         </section>
       <% } %>
 
