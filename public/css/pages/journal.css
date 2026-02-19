@@ -127,17 +127,23 @@ body.theme-dark.page-journal .journal-table thead th {
 }
 
 .page-journal .journal-column-toggle-form .btn {
-  font-size: 0.68rem;
-  line-height: 1;
-  padding: 0.18rem 0.38rem;
-  white-space: normal;
   width: 100%;
 }
 
 .page-journal .journal-col-action-btn {
+  width: 100%;
   min-height: 26px;
+  padding: 0.18rem 0.38rem;
+  font-size: 0.68rem;
+  line-height: 1;
   border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .page-journal .journal-student-cell {

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.14",
+      "date": "2026-02-19",
+      "items": [
+        "fix(journal-ui): normalized compact action-button sizing so `Bulk` matches `Фінал`/`Lock` controls in column headers"
+      ]
+    },
+    {
       "version": "0.9.13",
       "date": "2026-02-19",
       "items": [
