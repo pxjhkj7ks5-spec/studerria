@@ -26,6 +26,16 @@
       <% if (messages && messages.success) { %>
         <div class="alert alert-success"><%= messages.success %></div>
       <% } %>
+      <% if (undoGrade && canEditJournal) { %>
+        <form method="POST" action="/journal/grades/restore" class="alert alert-warning d-flex flex-wrap gap-2 align-items-center">
+          <input type="hidden" name="column_id" value="<%= undoGrade.column_id %>" />
+          <input type="hidden" name="student_id" value="<%= undoGrade.student_id %>" />
+          <span>Оцінку видалено. Можна скасувати протягом <strong id="journalUndoCountdown"><%= undoGrade.seconds_left %></strong> с.</span>
+          <button class="btn btn-sm btn-outline-dark" type="submit" id="journalUndoDeleteBtn" data-undo-until="<%= undoGrade.until %>">
+            Скасувати видалення
+          </button>
+        </form>
+      <% } %>
 
       <section class="glass liquid-card p-3 mb-3">
         <form method="GET" action="/journal" class="row g-3 align-items-end">
@@ -80,8 +90,26 @@
           <div class="row g-3">
             <div class="col-12 col-xl-8">
               <h6 class="mb-2">Налаштування системи оцінювання</h6>
-              <form method="POST" action="/journal/config/save" class="row g-3">
+              <form method="POST" action="/journal/config/save" class="row g-3" id="journalConfigForm">
                 <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                <div class="col-12">
+                  <div class="row g-2 align-items-end">
+                    <div class="col-12 col-lg-5">
+                      <label class="form-label" for="journalPresetSelect">Швидкий пресет</label>
+                      <select class="form-select form-select-sm" id="journalPresetSelect">
+                        <option value="">Оберіть шаблон...</option>
+                        <option value="balanced">Балансований (20/20/40/10/10)</option>
+                        <option value="exam_focus">Фокус на екзамені (15/15/60/10/0)</option>
+                        <option value="continuous">Безперервний контроль (35/35/20/10/0)</option>
+                        <option value="homework_only">Лише ДЗ (100/0/0/0/0)</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-lg-7 d-flex flex-wrap gap-2">
+                      <button class="btn btn-sm btn-outline-secondary" type="button" id="journalApplyPresetBtn">Застосувати пресет</button>
+                      <button class="btn btn-sm btn-outline-info" type="button" id="journalNormalizeWeightsBtn">Авто-розподіл ваг до 100</button>
+                    </div>
+                  </div>
+                </div>
                 <div class="col-12 journal-config-table-wrap">
                   <table class="table table-sm journal-config-table align-middle mb-0">
                     <thead>
@@ -102,13 +130,38 @@
                           <td><strong><%= cfg.label %></strong></td>
                           <td class="text-center">
                             <input type="hidden" name="<%= enabledField %>" value="0" />
-                            <input class="form-check-input" type="checkbox" name="<%= enabledField %>" value="1" <%= enabledValue ? 'checked' : '' %> />
+                            <input
+                              class="form-check-input journal-enabled-input"
+                              type="checkbox"
+                              name="<%= enabledField %>"
+                              value="1"
+                              data-type-key="<%= cfg.key %>"
+                              <%= enabledValue ? 'checked' : '' %>
+                            />
                           </td>
                           <td>
-                            <input class="form-control form-control-sm" type="number" step="0.01" min="0.01" name="<%= maxField %>" value="<%= gradingSettings[maxField] %>" required />
+                            <input
+                              class="form-control form-control-sm journal-max-input"
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              name="<%= maxField %>"
+                              data-type-key="<%= cfg.key %>"
+                              value="<%= gradingSettings[maxField] %>"
+                              required
+                            />
                           </td>
                           <td>
-                            <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="<%= weightField %>" value="<%= gradingSettings[weightField] %>" required />
+                            <input
+                              class="form-control form-control-sm journal-weight-input"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              name="<%= weightField %>"
+                              data-type-key="<%= cfg.key %>"
+                              value="<%= gradingSettings[weightField] %>"
+                              required
+                            />
                           </td>
                         </tr>
                       <% }); %>
@@ -116,7 +169,7 @@
                   </table>
                 </div>
                 <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
-                  <span class="status-chip status-chip--info">Сума внесків (активні): <%= enabledWeightTotal.toFixed(2).replace(/\.00$/, '') %> / 100</span>
+                  <span class="status-chip status-chip--info">Сума внесків (активні): <span id="journalEnabledWeightTotal"><%= enabledWeightTotal.toFixed(2).replace(/\.00$/, '') %></span> / 100</span>
                   <span class="status-chip status-chip--neutral">Фінал: 100 (фіксовано)</span>
                 </div>
                 <div class="col-12">
@@ -186,19 +239,44 @@
                         <% if (!column.include_in_final) { %>
                           <span class="status-chip status-chip--neutral">Не враховується</span>
                         <% } %>
+                        <% if (column.is_locked) { %>
+                          <span class="status-chip status-chip--danger">Заблоковано</span>
+                        <% } else { %>
+                          <span class="status-chip status-chip--success">Відкрито</span>
+                        <% } %>
                         <% if (column.source_homework_id && column.homework_meeting_url) { %>
                           <span class="status-chip status-chip--info">Meet</span>
                         <% } %>
                       </div>
                       <% if (canEditJournal) { %>
-                        <form method="POST" action="/journal/columns/final-toggle" class="journal-column-toggle-form">
-                          <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
-                          <input type="hidden" name="column_id" value="<%= column.id %>" />
-                          <input type="hidden" name="include_in_final" value="<%= column.include_in_final ? 0 : 1 %>" />
-                          <button class="btn btn-sm <%= column.include_in_final ? 'btn-outline-warning' : 'btn-outline-success' %>" type="submit">
-                            <%= column.include_in_final ? 'Виключити з фіналу' : 'Врахувати у фіналі' %>
+                        <div class="journal-col-actions">
+                          <form method="POST" action="/journal/columns/final-toggle" class="journal-column-toggle-form">
+                            <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                            <input type="hidden" name="column_id" value="<%= column.id %>" />
+                            <input type="hidden" name="include_in_final" value="<%= column.include_in_final ? 0 : 1 %>" />
+                            <button class="btn btn-sm <%= column.include_in_final ? 'btn-outline-warning' : 'btn-outline-success' %>" type="submit">
+                              <%= column.include_in_final ? 'Виключити' : 'Врахувати' %>
+                            </button>
+                          </form>
+                          <form method="POST" action="/journal/columns/lock-toggle" class="journal-column-toggle-form">
+                            <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                            <input type="hidden" name="column_id" value="<%= column.id %>" />
+                            <input type="hidden" name="is_locked" value="<%= column.is_locked ? 0 : 1 %>" />
+                            <button class="btn btn-sm <%= column.is_locked ? 'btn-outline-success' : 'btn-outline-danger' %>" type="submit">
+                              <%= column.is_locked ? 'Розблокувати' : 'Заблокувати' %>
+                            </button>
+                          </form>
+                          <button
+                            class="btn btn-sm btn-outline-primary journal-bulk-open-btn"
+                            type="button"
+                            data-column-id="<%= column.id %>"
+                            data-column-title="<%= column.title %>"
+                            data-column-max="<%= Number(column.max_points).toFixed(2) %>"
+                            data-column-locked="<%= column.is_locked ? 1 : 0 %>"
+                          >
+                            Масово
                           </button>
-                        </form>
+                        </div>
                       <% } %>
                     </th>
                   <% }); %>
@@ -206,20 +284,24 @@
                 </tr>
               </thead>
               <tbody>
-                <% journalRows.forEach(function(row) { %>
+                <% journalRows.forEach(function(row, rowIndex) { %>
                   <tr>
                     <td class="journal-student-cell">
                       <div class="journal-student-name"><%= row.student.full_name %></div>
                       <div class="journal-student-meta">Група <%= row.student.group_number %></div>
                     </td>
-                    <% row.cells.forEach(function(cell) { %>
+                    <% row.cells.forEach(function(cell, cellIndex) { %>
+                      <% const cellColumn = columns[cellIndex] || null; %>
+                      <% const lockedClass = cellColumn && cellColumn.is_locked ? 'is-locked' : ''; %>
                       <% const statusClass = cell.status === 'on_time' ? 'is-on-time' : cell.status === 'late' ? 'is-late' : cell.status === 'manual' ? 'is-manual' : 'is-missing'; %>
                       <td class="journal-cell">
                         <button
-                          class="journal-cell-btn <%= statusClass %>"
+                          class="journal-cell-btn <%= statusClass %> <%= lockedClass %>"
                           type="button"
                           data-column-id="<%= cell.column_id %>"
                           data-student-id="<%= cell.student_id %>"
+                          data-row-index="<%= rowIndex %>"
+                          data-column-index="<%= cellIndex %>"
                           data-can-open="1"
                         >
                           <span class="journal-cell-score"><%= Number.isFinite(cell.score) ? String(cell.score).replace(/\.00$/, '') : '—' %></span>
@@ -230,6 +312,15 @@
                       <% const weightedEarned = Number.isFinite(Number(row.weighted_earned)) ? Number(row.weighted_earned) : Number(row.final_score || 0); %>
                       <div class="journal-final-value"><%= row.final_score.toFixed(2).replace(/\.00$/, '') %></div>
                       <div class="journal-final-meta"><%= weightedEarned.toFixed(2).replace(/\.00$/, '') %> / 100 · сирі <%= row.raw_earned.toFixed(2).replace(/\.00$/, '') %> / <%= row.raw_max.toFixed(2).replace(/\.00$/, '') %></div>
+                      <% if (Array.isArray(row.type_breakdown) && row.type_breakdown.length) { %>
+                        <div class="journal-final-breakdown">
+                          <% row.type_breakdown.forEach(function(typeItem) { %>
+                            <span class="status-chip status-chip--neutral">
+                              <%= typeItem.label %>: <%= Number(typeItem.contribution || 0).toFixed(2).replace(/\.00$/, '') %>/<%= Number(typeItem.weight_points || 0).toFixed(2).replace(/\.00$/, '') %>
+                            </span>
+                          <% }); %>
+                        </div>
+                      <% } %>
                     </td>
                   </tr>
                 <% }); %>
@@ -260,6 +351,9 @@
               <div class="text-muted small mb-1">Статус здачі</div>
               <span class="status-chip status-chip--neutral" id="journalCellStatus">-</span>
             </div>
+            <div class="alert alert-warning d-none py-2" id="journalLockedNotice">
+              Колонка заблокована: редагування оцінок вимкнено.
+            </div>
             <div id="journalSubmissionBox" class="journal-submission-box mb-4">
               <div class="text-muted">Здача відсутня.</div>
             </div>
@@ -277,7 +371,12 @@
                 </div>
               </div>
               <% if (canEditJournal) { %>
-                <button class="btn btn-primary mt-3" type="submit">Зберегти оцінку</button>
+                <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+                  <button class="btn btn-primary" type="submit">Зберегти оцінку</button>
+                  <button class="btn btn-outline-secondary" type="button" id="journalPrevCellBtn">Попередня клітинка</button>
+                  <button class="btn btn-outline-secondary" type="button" id="journalNextCellBtn">Наступна клітинка</button>
+                  <span class="text-muted small">Гарячі клавіші: `Ctrl+Enter` зберегти, `Alt+←/→/↑/↓` навігація</span>
+                </div>
               <% } %>
             </form>
             <form id="journalGradeDeleteForm" method="POST" action="/journal/grades/delete" class="mt-2" autocomplete="off">
@@ -288,6 +387,48 @@
               <% } %>
             </form>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="journalBulkModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <form method="POST" action="/journal/grades/bulk-save" id="journalBulkForm" autocomplete="off">
+            <div class="modal-header">
+              <h5 class="modal-title">Масове оцінювання</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="subject_id" value="<%= selectedSubject ? selectedSubject.subject_id : '' %>" />
+              <input type="hidden" name="column_id" id="journalBulkColumnId" />
+              <input type="hidden" name="entries_json" id="journalBulkEntriesJson" />
+              <div class="mb-2">
+                <div class="text-muted small">Колонка</div>
+                <div class="fw-semibold" id="journalBulkColumnTitle">-</div>
+              </div>
+              <div class="alert alert-warning py-2 d-none" id="journalBulkLockedAlert">
+                Колонка заблокована. Масове оцінювання недоступне.
+              </div>
+              <div class="text-muted small mb-2">
+                Вставте значення з Excel у порядку студентів у таблиці. Формат рядка: `бал` або `бал[TAB]коментар`.
+              </div>
+              <textarea
+                class="form-control"
+                id="journalBulkPaste"
+                rows="8"
+                placeholder="90&#9;Вчасно&#10;75&#9;Потрібно допрацювати&#10;100"
+              ></textarea>
+              <div class="mt-3">
+                <div class="text-muted small mb-1" id="journalBulkPreviewMeta">Попередній перегляд: 0 записів</div>
+                <div class="journal-bulk-preview" id="journalBulkPreview"></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Скасувати</button>
+              <button class="btn btn-primary" type="submit" id="journalBulkSubmitBtn">Зберегти масово</button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
@@ -316,6 +457,22 @@
       });
 
       const canEditJournal = <%- canEditJournal ? 'true' : 'false' %>;
+      const journalColumnsData = <%- JSON.stringify((columns || []).map(function(column) {
+        return {
+          id: Number(column.id),
+          title: String(column.title || ''),
+          max_points: Number(column.max_points || 0),
+          is_locked: Boolean(column.is_locked),
+        };
+      })).replace(/</g, '\\u003c') %>;
+      const journalStudentsData = <%- JSON.stringify((journalRows || []).map(function(row) {
+        return {
+          id: Number(row.student.id),
+          full_name: String(row.student.full_name || ''),
+          group_number: Number(row.student.group_number || 0),
+        };
+      })).replace(/</g, '\\u003c') %>;
+
       const modalEl = document.getElementById('journalCellModal');
       const modal = modalEl && window.bootstrap ? new window.bootstrap.Modal(modalEl) : null;
       const statusEl = document.getElementById('journalCellStatus');
@@ -331,6 +488,143 @@
       const deleteColumnInput = document.getElementById('journalGradeDeleteColumnId');
       const deleteStudentInput = document.getElementById('journalGradeDeleteStudentId');
       const deleteBtn = document.getElementById('journalGradeDeleteBtn');
+      const lockedNotice = document.getElementById('journalLockedNotice');
+      const prevCellBtn = document.getElementById('journalPrevCellBtn');
+      const nextCellBtn = document.getElementById('journalNextCellBtn');
+
+      const bulkModalEl = document.getElementById('journalBulkModal');
+      const bulkModal = bulkModalEl && window.bootstrap ? new window.bootstrap.Modal(bulkModalEl) : null;
+      const bulkForm = document.getElementById('journalBulkForm');
+      const bulkColumnIdInput = document.getElementById('journalBulkColumnId');
+      const bulkEntriesInput = document.getElementById('journalBulkEntriesJson');
+      const bulkColumnTitleEl = document.getElementById('journalBulkColumnTitle');
+      const bulkPasteEl = document.getElementById('journalBulkPaste');
+      const bulkPreviewEl = document.getElementById('journalBulkPreview');
+      const bulkPreviewMetaEl = document.getElementById('journalBulkPreviewMeta');
+      const bulkSubmitBtn = document.getElementById('journalBulkSubmitBtn');
+      const bulkLockedAlert = document.getElementById('journalBulkLockedAlert');
+
+      let currentCellColumnId = 0;
+      let currentCellStudentId = 0;
+      let currentCellLocked = false;
+      let bulkCurrentMax = 0;
+      let bulkCurrentLocked = false;
+
+      const formatNumber = (value) => {
+        const num = Number(value || 0);
+        if (!Number.isFinite(num)) return '0';
+        return num.toFixed(2).replace(/\.00$/, '');
+      };
+
+      const findColumnIndex = (columnId) => journalColumnsData.findIndex((column) => Number(column.id) === Number(columnId));
+      const findStudentIndex = (studentId) => journalStudentsData.findIndex((student) => Number(student.id) === Number(studentId));
+
+      const refreshWeightSummary = () => {
+        const enabledInputs = Array.from(document.querySelectorAll('.journal-enabled-input'));
+        const totalEl = document.getElementById('journalEnabledWeightTotal');
+        if (!enabledInputs.length || !totalEl) return;
+        let sum = 0;
+        enabledInputs.forEach((checkbox) => {
+          if (!checkbox.checked) return;
+          const typeKey = checkbox.dataset.typeKey || '';
+          const weightInput = document.querySelector(`.journal-weight-input[data-type-key="${typeKey}"]`);
+          const weight = Number(String(weightInput ? weightInput.value : '0').replace(',', '.'));
+          if (Number.isFinite(weight) && weight > 0) sum += weight;
+        });
+        totalEl.textContent = formatNumber(sum);
+      };
+
+      const applyGradingPreset = (presetKey) => {
+        const presets = {
+          balanced: {
+            homework: { enabled: 1, max: 10, weight: 20 },
+            seminar: { enabled: 1, max: 10, weight: 20 },
+            exam: { enabled: 1, max: 40, weight: 40 },
+            credit: { enabled: 1, max: 20, weight: 10 },
+            custom: { enabled: 1, max: 10, weight: 10 },
+          },
+          exam_focus: {
+            homework: { enabled: 1, max: 10, weight: 15 },
+            seminar: { enabled: 1, max: 10, weight: 15 },
+            exam: { enabled: 1, max: 40, weight: 60 },
+            credit: { enabled: 1, max: 20, weight: 10 },
+            custom: { enabled: 0, max: 10, weight: 0 },
+          },
+          continuous: {
+            homework: { enabled: 1, max: 15, weight: 35 },
+            seminar: { enabled: 1, max: 15, weight: 35 },
+            exam: { enabled: 1, max: 30, weight: 20 },
+            credit: { enabled: 1, max: 20, weight: 10 },
+            custom: { enabled: 0, max: 10, weight: 0 },
+          },
+          homework_only: {
+            homework: { enabled: 1, max: 15, weight: 100 },
+            seminar: { enabled: 0, max: 10, weight: 0 },
+            exam: { enabled: 0, max: 40, weight: 0 },
+            credit: { enabled: 0, max: 20, weight: 0 },
+            custom: { enabled: 0, max: 10, weight: 0 },
+          },
+        };
+        const preset = presets[presetKey];
+        if (!preset) return;
+        Object.keys(preset).forEach((typeKey) => {
+          const cfg = preset[typeKey];
+          const enabledInput = document.querySelector(`.journal-enabled-input[data-type-key="${typeKey}"]`);
+          const maxInput = document.querySelector(`.journal-max-input[data-type-key="${typeKey}"]`);
+          const weightInput = document.querySelector(`.journal-weight-input[data-type-key="${typeKey}"]`);
+          if (enabledInput) enabledInput.checked = cfg.enabled === 1;
+          if (maxInput && Number.isFinite(Number(cfg.max)) && Number(cfg.max) > 0) maxInput.value = String(cfg.max);
+          if (weightInput && Number.isFinite(Number(cfg.weight))) weightInput.value = String(cfg.weight);
+        });
+        refreshWeightSummary();
+      };
+
+      const normalizeWeightsToHundred = () => {
+        const enabledInputs = Array.from(document.querySelectorAll('.journal-enabled-input'));
+        const active = enabledInputs
+          .filter((input) => input.checked)
+          .map((input) => {
+            const typeKey = input.dataset.typeKey || '';
+            const weightInput = document.querySelector(`.journal-weight-input[data-type-key="${typeKey}"]`);
+            const value = Number(String(weightInput ? weightInput.value : '0').replace(',', '.'));
+            return {
+              typeKey,
+              weightInput,
+              value: Number.isFinite(value) && value >= 0 ? value : 0,
+            };
+          })
+          .filter((item) => item.weightInput);
+        if (!active.length) return;
+
+        const sum = active.reduce((acc, item) => acc + item.value, 0);
+        if (sum <= 0) {
+          const even = Math.round((100 / active.length) * 100) / 100;
+          active.forEach((item) => {
+            item.weightInput.value = String(even);
+          });
+          const current = active.reduce((acc, item) => acc + Number(item.weightInput.value), 0);
+          const delta = Math.round((100 - current) * 100) / 100;
+          if (Math.abs(delta) > 0.0001) {
+            active[0].weightInput.value = String(Math.max(0, Number(active[0].weightInput.value) + delta));
+          }
+          refreshWeightSummary();
+          return;
+        }
+
+        const normalized = active.map((item) => ({
+          ...item,
+          scaled: Math.round(((item.value * 100) / sum) * 100) / 100,
+        }));
+        const current = normalized.reduce((acc, item) => acc + item.scaled, 0);
+        const delta = Math.round((100 - current) * 100) / 100;
+        if (Math.abs(delta) > 0.0001) {
+          normalized[0].scaled = Math.max(0, normalized[0].scaled + delta);
+        }
+        normalized.forEach((item) => {
+          item.weightInput.value = String(Math.round(item.scaled * 100) / 100);
+        });
+        refreshWeightSummary();
+      };
 
       function setStatusLabel(status) {
         const value = String(status || '').toLowerCase();
@@ -381,6 +675,18 @@
         submissionBox.innerHTML = parts.join('');
       }
 
+      const navigateCell = (columnStep, studentStep) => {
+        const currentColumnIndex = findColumnIndex(currentCellColumnId);
+        const currentStudentIndex = findStudentIndex(currentCellStudentId);
+        if (currentColumnIndex < 0 || currentStudentIndex < 0) return;
+        const nextColumnIndex = Math.max(0, Math.min(journalColumnsData.length - 1, currentColumnIndex + columnStep));
+        const nextStudentIndex = Math.max(0, Math.min(journalStudentsData.length - 1, currentStudentIndex + studentStep));
+        const nextColumn = journalColumnsData[nextColumnIndex];
+        const nextStudent = journalStudentsData[nextStudentIndex];
+        if (!nextColumn || !nextStudent) return;
+        openJournalCell(nextColumn.id, nextStudent.id);
+      };
+
       async function openJournalCell(columnId, studentId) {
         if (!modal) return;
         try {
@@ -391,6 +697,9 @@
           studentEl.textContent = data && data.student ? data.student.full_name : '-';
           setStatusLabel(data ? data.submission_status : '');
           renderSubmission(data ? data.submission : null, data ? data.column : null);
+          currentCellColumnId = Number(columnId);
+          currentCellStudentId = Number(studentId);
+          currentCellLocked = Boolean(data && data.column && data.column.is_locked);
 
           columnInput.value = String(columnId);
           studentInput.value = String(studentId);
@@ -401,23 +710,185 @@
             ? String(data.grade.score)
             : '';
           commentEl.value = data && data.grade && data.grade.teacher_comment ? data.grade.teacher_comment : '';
-          scoreEl.disabled = !canEditJournal;
-          commentEl.disabled = !canEditJournal;
+          const canEditCurrent = Boolean(canEditJournal && data && data.can_edit && !currentCellLocked);
+          scoreEl.disabled = !canEditCurrent;
+          commentEl.disabled = !canEditCurrent;
           if (gradeForm) {
             const submitBtn = gradeForm.querySelector('button[type="submit"]');
-            if (submitBtn) submitBtn.style.display = canEditJournal ? '' : 'none';
+            if (submitBtn) {
+              submitBtn.style.display = canEditJournal ? '' : 'none';
+              submitBtn.disabled = !canEditCurrent;
+            }
           }
           if (deleteForm) {
             deleteForm.style.display = canEditJournal ? '' : 'none';
           }
           if (deleteBtn) {
             const hasGrade = Boolean(data && data.grade && Number.isFinite(Number(data.grade.score)));
-            deleteBtn.disabled = !canEditJournal || !hasGrade;
+            deleteBtn.disabled = !canEditCurrent || !hasGrade;
+          }
+          if (prevCellBtn) {
+            prevCellBtn.disabled = !canEditJournal || currentCellLocked;
+          }
+          if (nextCellBtn) {
+            nextCellBtn.disabled = !canEditJournal || currentCellLocked;
+          }
+          if (lockedNotice) {
+            lockedNotice.classList.toggle('d-none', !currentCellLocked);
           }
           modal.show();
         } catch (err) {
           console.error(err);
         }
+      }
+
+      const parseBulkInput = () => {
+        if (!bulkPasteEl || !bulkPreviewMetaEl || !bulkPreviewEl) return false;
+        const lines = String(bulkPasteEl.value || '').replace(/\r/g, '').split('\n');
+        const entries = [];
+        const errors = [];
+        const previewRows = [];
+        const maxRows = Math.min(lines.length, journalStudentsData.length);
+        for (let index = 0; index < maxRows; index += 1) {
+          const student = journalStudentsData[index];
+          const rawLine = String(lines[index] || '');
+          if (!rawLine.trim()) continue;
+          const parts = rawLine.split('\t');
+          const scoreRaw = String(parts[0] || '').trim();
+          if (!scoreRaw) continue;
+          const score = Number(scoreRaw.replace(',', '.'));
+          const comment = parts.slice(1).join(' ').trim();
+          if (!Number.isFinite(score) || score < 0 || score > bulkCurrentMax) {
+            errors.push(`Рядок ${index + 1}: бал має бути від 0 до ${formatNumber(bulkCurrentMax)}`);
+            continue;
+          }
+          const normalizedScore = Math.round(score * 100) / 100;
+          entries.push({
+            student_id: student.id,
+            score: normalizedScore,
+            teacher_comment: comment,
+          });
+          if (previewRows.length < 12) {
+            previewRows.push(`${student.full_name}: ${formatNumber(normalizedScore)}${comment ? ` (${comment})` : ''}`);
+          }
+        }
+        const linesExtra = lines.length > journalStudentsData.length
+          ? `, зайві рядки: ${lines.length - journalStudentsData.length}`
+          : '';
+        if (errors.length) {
+          bulkPreviewMetaEl.textContent = `Попередній перегляд: помилки (${errors.length})${linesExtra}`;
+          bulkPreviewEl.innerHTML = errors.map((line) => `<div class="text-danger small">${line}</div>`).join('');
+        } else {
+          bulkPreviewMetaEl.textContent = `Попередній перегляд: ${entries.length} записів${linesExtra}`;
+          bulkPreviewEl.innerHTML = previewRows.length
+            ? previewRows.map((line) => `<div class="small">${line}</div>`).join('')
+            : '<div class="text-muted small">Немає даних для збереження.</div>';
+        }
+        const canSubmit = !bulkCurrentLocked && entries.length > 0 && errors.length === 0;
+        if (bulkSubmitBtn) bulkSubmitBtn.disabled = !canSubmit;
+        if (bulkEntriesInput) bulkEntriesInput.value = canSubmit ? JSON.stringify(entries) : '';
+        return canSubmit;
+      };
+
+      const openBulkModal = (buttonEl) => {
+        if (!bulkModal || !buttonEl) return;
+        const columnId = Number(buttonEl.dataset.columnId || 0);
+        const columnTitle = String(buttonEl.dataset.columnTitle || '');
+        const maxPoints = Number(buttonEl.dataset.columnMax || 0);
+        const isLocked = Number(buttonEl.dataset.columnLocked || 0) === 1;
+        if (!columnId) return;
+        bulkCurrentLocked = isLocked;
+        bulkCurrentMax = Number.isFinite(maxPoints) && maxPoints > 0 ? maxPoints : 100;
+        if (bulkColumnIdInput) bulkColumnIdInput.value = String(columnId);
+        if (bulkColumnTitleEl) {
+          bulkColumnTitleEl.textContent = `${columnTitle || 'Колонка'} · Макс ${formatNumber(bulkCurrentMax)} б.`;
+        }
+        if (bulkPasteEl) {
+          bulkPasteEl.value = '';
+          bulkPasteEl.disabled = isLocked;
+        }
+        if (bulkLockedAlert) {
+          bulkLockedAlert.classList.toggle('d-none', !isLocked);
+        }
+        if (bulkEntriesInput) bulkEntriesInput.value = '';
+        if (bulkPreviewMetaEl) bulkPreviewMetaEl.textContent = 'Попередній перегляд: 0 записів';
+        if (bulkPreviewEl) bulkPreviewEl.innerHTML = '<div class="text-muted small">Вставте дані для попереднього перегляду.</div>';
+        if (bulkSubmitBtn) bulkSubmitBtn.disabled = true;
+        bulkModal.show();
+      };
+
+      const undoBtn = document.getElementById('journalUndoDeleteBtn');
+      const undoCountdownEl = document.getElementById('journalUndoCountdown');
+      if (undoBtn && undoCountdownEl) {
+        const undoUntil = Number(undoBtn.dataset.undoUntil || 0);
+        const syncUndoTimer = () => {
+          const leftMs = undoUntil - Date.now();
+          const leftSec = Math.max(0, Math.ceil(leftMs / 1000));
+          undoCountdownEl.textContent = String(leftSec);
+          if (leftSec < 1) {
+            undoBtn.disabled = true;
+            undoBtn.textContent = 'Час минув';
+            return false;
+          }
+          return true;
+        };
+        syncUndoTimer();
+        const timer = setInterval(() => {
+          if (!syncUndoTimer()) {
+            clearInterval(timer);
+          }
+        }, 1000);
+      }
+
+      const presetSelectEl = document.getElementById('journalPresetSelect');
+      const applyPresetBtn = document.getElementById('journalApplyPresetBtn');
+      const normalizeBtn = document.getElementById('journalNormalizeWeightsBtn');
+      if (applyPresetBtn && presetSelectEl) {
+        applyPresetBtn.addEventListener('click', () => {
+          if (!presetSelectEl.value) return;
+          applyGradingPreset(presetSelectEl.value);
+        });
+      }
+      if (normalizeBtn) {
+        normalizeBtn.addEventListener('click', normalizeWeightsToHundred);
+      }
+      document.querySelectorAll('.journal-enabled-input, .journal-weight-input').forEach((el) => {
+        el.addEventListener('input', refreshWeightSummary);
+        el.addEventListener('change', refreshWeightSummary);
+      });
+      refreshWeightSummary();
+
+      if (prevCellBtn) {
+        prevCellBtn.addEventListener('click', () => navigateCell(0, -1));
+      }
+      if (nextCellBtn) {
+        nextCellBtn.addEventListener('click', () => navigateCell(0, 1));
+      }
+      if (modalEl) {
+        modalEl.addEventListener('keydown', (event) => {
+          if (!modalEl.classList.contains('show')) return;
+          if (event.ctrlKey && event.key === 'Enter') {
+            if (gradeForm && canEditJournal && !currentCellLocked && !scoreEl.disabled) {
+              event.preventDefault();
+              gradeForm.requestSubmit();
+            }
+            return;
+          }
+          if (!event.altKey) return;
+          if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            navigateCell(0, -1);
+          } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            navigateCell(0, 1);
+          } else if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            navigateCell(-1, 0);
+          } else if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            navigateCell(1, 0);
+          }
+        });
       }
 
       document.querySelectorAll('.journal-cell-btn[data-can-open="1"]').forEach((btn) => {
@@ -428,6 +899,20 @@
           openJournalCell(columnId, studentId);
         });
       });
+      document.querySelectorAll('.journal-bulk-open-btn').forEach((btn) => {
+        btn.addEventListener('click', () => openBulkModal(btn));
+      });
+      if (bulkPasteEl) {
+        bulkPasteEl.addEventListener('input', parseBulkInput);
+      }
+      if (bulkForm) {
+        bulkForm.addEventListener('submit', (event) => {
+          const valid = parseBulkInput();
+          if (!valid) {
+            event.preventDefault();
+          }
+        });
+      }
     </script>
     <script src="/js/design-system.js" defer></script>
   </body>

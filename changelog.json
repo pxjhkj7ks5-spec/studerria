@@ -1,6 +1,18 @@
 {
   "items": [
     {
+      "version": "0.9.11",
+      "date": "2026-02-19",
+      "items": [
+        "feat(journal): implemented soft-delete for grades with 30-second undo restore action in the journal UI",
+        "feat(journal): added bulk grading modal for teachers (paste from Excel by student order) and new `/journal/grades/bulk-save` endpoint",
+        "feat(journal): added per-column lock/unlock controls to freeze grading edits and protect finalized columns",
+        "feat(journal): expanded final score transparency with per-type contribution breakdown chips in the final column",
+        "feat(journal-config): added grading presets and automatic weight normalization to 100 for enabled activity types",
+        "feat(db): added migration `021_journal_grade_undo_and_lock` (`journal_grades` soft-delete fields + `journal_columns` lock fields)"
+      ]
+    },
+    {
       "version": "0.9.10",
       "date": "2026-02-19",
       "items": [

@@ -18,6 +18,7 @@ const subjectMaterials = require('./017_subject_materials');
 const subjectMaterialsSyllabus = require('./018_subject_materials_syllabus');
 const journalGradebook = require('./019_journal_gradebook');
 const journalWeightedConfig = require('./020_journal_weighted_config');
+const journalGradeUndoAndLock = require('./021_journal_grade_undo_and_lock');
 
 module.exports = [
   init,
@@ -40,4 +41,5 @@ module.exports = [
   subjectMaterialsSyllabus,
   journalGradebook,
   journalWeightedConfig,
+  journalGradeUndoAndLock,
 ];

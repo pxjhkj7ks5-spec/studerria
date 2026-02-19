@@ -5645,6 +5645,14 @@ const normalizeExternalUrl = (rawValue) => {
 
 const JOURNAL_COLUMN_TYPES = new Set(['homework', 'seminar', 'exam', 'credit', 'custom']);
 const JOURNAL_SCORING_TYPES = ['homework', 'seminar', 'exam', 'credit', 'custom'];
+const JOURNAL_SCORING_TYPE_META = {
+  homework: { key: 'homework', label: 'ДЗ' },
+  seminar: { key: 'seminar', label: 'Семінар' },
+  exam: { key: 'exam', label: 'Екзамен' },
+  credit: { key: 'credit', label: 'Залік' },
+  custom: { key: 'custom', label: 'Кастом' },
+};
+const JOURNAL_GRADE_UNDO_SECONDS = 30;
 
 const DEFAULT_SUBJECT_GRADING_SETTINGS = {
   homework_enabled: 1,
@@ -5858,6 +5866,8 @@ const resolveHomeworkSubmissionStatus = (homeworkRow, submissionRow) => {
   return submittedDate <= dueDate ? 'on_time' : 'late';
 };
 
+const isJournalColumnLocked = (column) => Number(column?.is_locked || 0) === 1;
+
 const canUseTeacherJournalMode = (req, journalScope) => {
   const roles = getSessionRoleList(req);
   const hasTeacherContext = roles.some((roleKey) => ['teacher', 'deanery', 'admin'].includes(roleKey));
@@ -5991,6 +6001,7 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
     LEFT JOIN (
       SELECT column_id, COUNT(*) AS grades_count
       FROM journal_grades
+      WHERE deleted_at IS NULL
       GROUP BY column_id
     ) gc ON gc.column_id = jc.id
     LEFT JOIN homework hs ON hs.id = jc.source_homework_id
@@ -6079,6 +6090,7 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
           SELECT ?, student_id, score, teacher_comment, graded_by, graded_at, submission_status
           FROM journal_grades
           WHERE column_id = ?
+            AND deleted_at IS NULL
           ON CONFLICT (column_id, student_id) DO NOTHING
         `,
         [targetColumn.id, duplicateColumn.id]
@@ -6313,6 +6325,7 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
     LEFT JOIN (
       SELECT column_id, COUNT(*) AS grades_count
       FROM journal_grades
+      WHERE deleted_at IS NULL
       GROUP BY column_id
     ) gc ON gc.column_id = jc.id
     LEFT JOIN homework h ON h.id = jc.source_homework_id
@@ -6357,6 +6370,7 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
       column_type: normalizeColumnType(row.column_type),
       max_points: parsePositiveDecimal(row.max_points, 10),
       include_in_final: Number(row.include_in_final ?? 1) === 1,
+      is_locked: Number(row.is_locked || 0) === 1,
       is_credit: Number(row.is_credit || 0) === 1,
       position: Number(row.position || 0),
       homework_description: row.homework_description || null,
@@ -6621,6 +6635,7 @@ async function buildJournalMatrix({
         FROM journal_grades
         WHERE column_id IN (${columnIds.map(() => '?').join(',')})
           AND student_id IN (${studentIds.map(() => '?').join(',')})
+          AND deleted_at IS NULL
       `,
       [...columnIds, ...studentIds]
     );
@@ -6751,6 +6766,7 @@ async function buildJournalMatrix({
     let rawEarned = 0;
     let rawMax = 0;
     let weightedEarned = 0;
+    const typeBreakdown = [];
     JOURNAL_SCORING_TYPES.forEach((type) => {
       const indexes = scoringColumnIndexesByType.get(type) || [];
       if (!indexes.length) return;
@@ -6762,10 +6778,21 @@ async function buildJournalMatrix({
       }, 0);
       rawEarned += typeRawEarned;
       rawMax += typeRawMax;
+      const ratio = typeRawMax > 0 ? Math.max(0, Math.min(1, typeRawEarned / typeRawMax)) : 0;
+      const contribution = typeWeight > 0 ? ratio * typeWeight : 0;
       if (typeRawMax > 0 && typeWeight > 0) {
-        const ratio = Math.max(0, Math.min(1, typeRawEarned / typeRawMax));
-        weightedEarned += ratio * typeWeight;
+        weightedEarned += contribution;
       }
+      typeBreakdown.push({
+        type,
+        label: JOURNAL_SCORING_TYPE_META[type]?.label || type,
+        columns_count: indexes.length,
+        weight_points: Math.round(typeWeight * 100) / 100,
+        raw_earned: Math.round(typeRawEarned * 100) / 100,
+        raw_max: Math.round(typeRawMax * 100) / 100,
+        ratio: Math.round(ratio * 10000) / 10000,
+        contribution: Math.round(contribution * 100) / 100,
+      });
     });
     const finalScore = Math.min(100, weightedEarned);
     return {
@@ -6775,6 +6802,7 @@ async function buildJournalMatrix({
       raw_max: Math.round(rawMax * 100) / 100,
       weighted_earned: Math.round(weightedEarned * 100) / 100,
       final_score: Math.round(finalScore * 100) / 100,
+      type_breakdown: typeBreakdown,
     };
   });
 
@@ -6803,6 +6831,22 @@ app.get('/journal', requireLogin, async (req, res) => {
     const selectedSubject = Number.isFinite(requestedSubjectId) && requestedSubjectId > 0
       ? (subjectOptions.find((item) => Number(item.subject_id) === requestedSubjectId) || null)
       : (subjectOptions[0] || null);
+    const undoColumnId = Number(req.query.undo_column_id);
+    const undoStudentId = Number(req.query.undo_student_id);
+    const undoUntilMs = Number(req.query.undo_until);
+    const nowMs = Date.now();
+    const undoGrade = (
+      Number.isFinite(undoColumnId) && undoColumnId > 0
+      && Number.isFinite(undoStudentId) && undoStudentId > 0
+      && Number.isFinite(undoUntilMs) && undoUntilMs > nowMs
+    )
+      ? {
+          column_id: undoColumnId,
+          student_id: undoStudentId,
+          until: undoUntilMs,
+          seconds_left: Math.max(1, Math.floor((undoUntilMs - nowMs) / 1000)),
+        }
+      : null;
 
     if (!selectedSubject) {
       return res.render('journal', {
@@ -6817,6 +6861,8 @@ app.get('/journal', requireLogin, async (req, res) => {
         teacherJournalMode,
         canManageAllSubjects: Boolean(journalScope.fullAccess),
         selectedSemester: null,
+        undoGrade: null,
+        gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
       });
     }
 
@@ -6854,6 +6900,8 @@ app.get('/journal', requireLogin, async (req, res) => {
       teacherJournalMode,
       canManageAllSubjects: Boolean(journalScope.fullAccess),
       selectedSemester,
+      undoGrade: teacherJournalMode ? undoGrade : null,
+      gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
     });
   } catch (err) {
     return handleDbError(res, err, 'journal.page');
@@ -6940,6 +6988,7 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
         SELECT score, teacher_comment, submission_status, graded_at
         FROM journal_grades
         WHERE column_id = ? AND student_id = ?
+          AND deleted_at IS NULL
         LIMIT 1
       `,
       [columnId, studentId]
@@ -6971,6 +7020,7 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
         title: String(column.title || ''),
         max_points: parsePositiveDecimal(column.max_points, 10),
         column_type: normalizeColumnType(column.column_type),
+        is_locked: isJournalColumnLocked(column),
         source_homework_id: column.source_homework_id ? Number(column.source_homework_id) : null,
         homework_description: column.homework_description || null,
         due_date: toDateOnly(column.custom_due_date || column.class_date),
@@ -6999,7 +7049,7 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
           }
         : null,
       submission_status: submissionStatus,
-      can_edit: teacherJournalMode,
+      can_edit: teacherJournalMode && !isJournalColumnLocked(column),
     });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
@@ -7053,6 +7103,9 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
     );
     if (!column) {
       return res.redirect('/journal?err=Column%20not%20found');
+    }
+    if (isJournalColumnLocked(column)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
     }
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     const parsedScore = Number(String(scoreRaw || '').replace(',', '.'));
@@ -7117,7 +7170,9 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
           teacher_comment = EXCLUDED.teacher_comment,
           graded_by = EXCLUDED.graded_by,
           graded_at = EXCLUDED.graded_at,
-          submission_status = EXCLUDED.submission_status
+          submission_status = EXCLUDED.submission_status,
+          deleted_at = NULL,
+          deleted_by = NULL
       `,
       [
         columnId,
@@ -7144,6 +7199,217 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
       column.semester_id ? Number(column.semester_id) : null
     );
     return res.redirect(`/journal?subject_id=${column.subject_id}&ok=Оцінку%20збережено`);
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, res) => {
+  const subjectIdFromBody = Number(req.body.subject_id);
+  const columnId = Number(req.body.column_id);
+  const entriesRaw = String(req.body.entries_json || '').trim();
+  if (!Number.isFinite(columnId) || columnId < 1 || !entriesRaw) {
+    return res.redirect('/journal?err=Invalid%20bulk%20payload');
+  }
+
+  let entries = [];
+  try {
+    const parsed = JSON.parse(entriesRaw);
+    entries = Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return res.redirect('/journal?err=Invalid%20bulk%20payload');
+  }
+
+  const normalizedEntries = entries
+    .map((entry) => ({
+      student_id: Number(entry?.student_id),
+      score_raw: entry?.score,
+      teacher_comment: String(entry?.teacher_comment || '').trim(),
+    }))
+    .filter((entry) => Number.isFinite(entry.student_id) && entry.student_id > 0);
+
+  if (!normalizedEntries.length) {
+    return res.redirect('/journal?err=No%20grades%20to%20save');
+  }
+  if (normalizedEntries.length > 500) {
+    return res.redirect('/journal?err=Bulk%20limit%20exceeded');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.*,
+          h.group_number AS homework_group_number,
+          h.custom_due_date,
+          h.class_date,
+          h.description AS homework_description,
+          h.day_of_week AS homework_day_of_week,
+          h.class_number AS homework_class_number,
+          h.meeting_url AS homework_meeting_url,
+          h.link_url AS homework_link_url,
+          h.file_path AS homework_file_path,
+          h.is_custom_deadline AS homework_is_custom_deadline,
+          h.is_control AS homework_is_control,
+          h.is_credit AS homework_is_credit,
+          h.is_teacher_homework AS homework_is_teacher_homework,
+          h.created_at AS homework_created_at,
+          h.created_by AS homework_created_by,
+          h.created_by_id AS homework_created_by_id
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+        LIMIT 1
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.redirect('/journal?err=Column%20not%20found');
+    }
+    if (isJournalColumnLocked(column)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    const maxPoints = parsePositiveDecimal(column.max_points, 10);
+    const uniqueStudentIds = Array.from(new Set(normalizedEntries.map((entry) => entry.student_id)));
+    const studentRows = await db.all(
+      `
+        SELECT student_id, group_number
+        FROM student_groups
+        WHERE subject_id = ?
+          AND student_id IN (${uniqueStudentIds.map(() => '?').join(',')})
+      `,
+      [column.subject_id, ...uniqueStudentIds]
+    );
+    const studentGroups = new Map(
+      (studentRows || []).map((row) => [Number(row.student_id), Number(row.group_number || 0)])
+    );
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      for (const studentId of uniqueStudentIds) {
+        const groupNumber = Number(studentGroups.get(studentId) || 0);
+        if (!groupNumber) {
+          return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+        }
+        if (!access.allowAll && !access.groups.has(groupNumber)) {
+          return res.status(403).send('Forbidden (journal)');
+        }
+      }
+    } else {
+      for (const studentId of uniqueStudentIds) {
+        if (!studentGroups.has(studentId)) {
+          return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+        }
+      }
+    }
+
+    const submissionCache = new Map();
+    const resolveSubmissionStatusForStudent = async (studentId) => {
+      if (!column.source_homework_id) return 'manual';
+      if (submissionCache.has(studentId)) return submissionCache.get(studentId);
+      const groupNumber = Number(studentGroups.get(studentId) || 0);
+      const resolvedHomework = await resolveJournalColumnHomeworkForStudent(column, groupNumber);
+      const submission = resolvedHomework.homework_id
+        ? await db.get(
+            `
+              SELECT submitted_at
+              FROM homework_submissions
+              WHERE homework_id = ? AND student_id = ?
+              LIMIT 1
+            `,
+            [resolvedHomework.homework_id, studentId]
+          )
+        : null;
+      const status = resolveHomeworkSubmissionStatus(
+        {
+          custom_due_date: resolvedHomework.custom_due_date,
+          class_date: resolvedHomework.class_date,
+        },
+        submission
+      );
+      submissionCache.set(studentId, status);
+      return status;
+    };
+
+    let updatedCount = 0;
+    for (const entry of normalizedEntries) {
+      const scoreText = String(entry.score_raw ?? '').trim();
+      if (!scoreText) continue;
+      const parsedScore = Number(scoreText.replace(',', '.'));
+      const score = Number.isFinite(parsedScore) ? Math.round(parsedScore * 100) / 100 : NaN;
+      if (!Number.isFinite(score) || score < 0 || score > maxPoints) {
+        return res.redirect(
+          `/journal?subject_id=${column.subject_id}&err=Bulk%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`
+        );
+      }
+      if (entry.teacher_comment.length > 2000) {
+        return res.redirect(`/journal?subject_id=${column.subject_id}&err=Comment%20is%20too%20long`);
+      }
+      const submissionStatus = await resolveSubmissionStatusForStudent(entry.student_id);
+      await db.run(
+        `
+          INSERT INTO journal_grades
+            (column_id, student_id, score, teacher_comment, graded_by, graded_at, submission_status)
+          VALUES (?, ?, ?, ?, ?, NOW(), ?)
+          ON CONFLICT (column_id, student_id)
+          DO UPDATE SET
+            score = EXCLUDED.score,
+            teacher_comment = EXCLUDED.teacher_comment,
+            graded_by = EXCLUDED.graded_by,
+            graded_at = EXCLUDED.graded_at,
+            submission_status = EXCLUDED.submission_status,
+            deleted_at = NULL,
+            deleted_by = NULL
+        `,
+        [
+          columnId,
+          entry.student_id,
+          score,
+          entry.teacher_comment || null,
+          Number(req.session.user.id),
+          submissionStatus,
+        ]
+      );
+      updatedCount += 1;
+    }
+
+    if (updatedCount < 1) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=No%20grades%20to%20save`);
+    }
+
+    logActivity(
+      db,
+      req,
+      'journal_grade_bulk_save',
+      'journal_grade',
+      columnId,
+      {
+        subject_id: Number(column.subject_id),
+        updated_count: updatedCount,
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    const subjectId = Number(column.subject_id || subjectIdFromBody || 0);
+    return res.redirect(`/journal?subject_id=${subjectId}&ok=Масове%20оцінювання%20збережено%20(${updatedCount})`);
   } catch (err) {
     return res.redirect('/journal?err=Database%20error');
   }
@@ -7179,6 +7445,9 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
     if (!column) {
       return res.redirect('/journal?err=Column%20not%20found');
     }
+    if (isJournalColumnLocked(column)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
 
     const studentRow = await db.get(
       `
@@ -7208,12 +7477,29 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
       }
     }
 
-    await db.run(
+    const activeGrade = await db.get(
       `
-        DELETE FROM journal_grades
+        SELECT id
+        FROM journal_grades
         WHERE column_id = ? AND student_id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
       `,
       [columnId, studentId]
+    );
+    if (!activeGrade) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Оцінка%20не%20знайдена`);
+    }
+
+    await db.run(
+      `
+        UPDATE journal_grades
+        SET deleted_at = NOW(),
+            deleted_by = ?
+        WHERE column_id = ? AND student_id = ?
+          AND deleted_at IS NULL
+      `,
+      [Number(req.session.user.id), columnId, studentId]
     );
 
     logActivity(
@@ -7229,7 +7515,116 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(`/journal?subject_id=${column.subject_id}&ok=Оцінку%20видалено`);
+    const undoUntil = Date.now() + (JOURNAL_GRADE_UNDO_SECONDS * 1000);
+    return res.redirect(
+      `/journal?subject_id=${column.subject_id}&ok=Оцінку%20видалено&undo_column_id=${columnId}&undo_student_id=${studentId}&undo_until=${undoUntil}`
+    );
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res) => {
+  const columnId = Number(req.body.column_id);
+  const studentId = Number(req.body.student_id);
+  if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
+    return res.redirect('/journal?err=Invalid%20grade%20target');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.*,
+          h.group_number AS homework_group_number
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+        LIMIT 1
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.redirect('/journal?err=Column%20not%20found');
+    }
+    if (isJournalColumnLocked(column)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+
+    const studentRow = await db.get(
+      `
+        SELECT sg.group_number
+        FROM student_groups sg
+        WHERE sg.subject_id = ? AND sg.student_id = ?
+        LIMIT 1
+      `,
+      [column.subject_id, studentId]
+    );
+    if (!studentRow) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const studentGroup = Number(studentRow.group_number || 0);
+      if (!access.allowAll && !access.groups.has(studentGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    const restorable = await db.get(
+      `
+        SELECT id
+        FROM journal_grades
+        WHERE column_id = ? AND student_id = ?
+          AND deleted_at IS NOT NULL
+          AND deleted_at >= (NOW() - (? * INTERVAL '1 second'))
+        LIMIT 1
+      `,
+      [columnId, studentId, JOURNAL_GRADE_UNDO_SECONDS]
+    );
+    if (!restorable) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Час%20на%20відновлення%20оцінки%20минув`);
+    }
+
+    await db.run(
+      `
+        UPDATE journal_grades
+        SET deleted_at = NULL,
+            deleted_by = NULL
+        WHERE column_id = ? AND student_id = ?
+      `,
+      [columnId, studentId]
+    );
+
+    logActivity(
+      db,
+      req,
+      'journal_grade_restore',
+      'journal_grade',
+      columnId,
+      {
+        student_id: studentId,
+        subject_id: Number(column.subject_id),
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(`/journal?subject_id=${column.subject_id}&ok=Оцінку%20відновлено`);
   } catch (err) {
     return res.redirect('/journal?err=Database%20error');
   }
@@ -7308,6 +7703,86 @@ app.post('/journal/columns/final-toggle', requireLogin, writeLimiter, async (req
       column.semester_id ? Number(column.semester_id) : null
     );
     return res.redirect(`/journal?subject_id=${subjectId}&ok=Налаштування%20колонки%20оновлено`);
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/columns/lock-toggle', requireLogin, writeLimiter, async (req, res) => {
+  const subjectId = Number(req.body.subject_id);
+  const columnId = Number(req.body.column_id);
+  const isLocked = parseBinaryFlag(req.body.is_locked, 0) === 1 ? 1 : 0;
+  if (!Number.isFinite(subjectId) || subjectId < 1 || !Number.isFinite(columnId) || columnId < 1) {
+    return res.redirect('/journal?err=Invalid%20column%20target');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.id,
+          jc.subject_id,
+          jc.course_id,
+          jc.semester_id,
+          jc.source_homework_id,
+          h.group_number AS homework_group_number
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+          AND jc.subject_id = ?
+          AND COALESCE(jc.is_archived, 0) = 0
+        LIMIT 1
+      `,
+      [columnId, subjectId]
+    );
+    if (!column) {
+      return res.redirect(`/journal?subject_id=${subjectId}&err=Column%20not%20found`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    await db.run(
+      `
+        UPDATE journal_columns
+        SET is_locked = ?,
+            locked_by = CASE WHEN ? = 1 THEN ? ELSE NULL END,
+            locked_at = CASE WHEN ? = 1 THEN NOW() ELSE NULL END,
+            updated_at = NOW()
+        WHERE id = ?
+      `,
+      [isLocked, isLocked, Number(req.session.user.id), isLocked, columnId]
+    );
+
+    logActivity(
+      db,
+      req,
+      'journal_column_lock_toggle',
+      'journal_column',
+      columnId,
+      {
+        subject_id: subjectId,
+        is_locked: isLocked,
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(`/journal?subject_id=${subjectId}&ok=${isLocked ? 'Колонку%20заблоковано' : 'Колонку%20розблоковано'}`);
   } catch (err) {
     return res.redirect('/journal?err=Database%20error');
   }
