@@ -4,10 +4,20 @@
   gap: 8px;
 }
 
+body.theme-dark.page-journal .glass::before,
+body.theme-dark.page-journal .glass-card::before,
+body.theme-dark.page-journal .glass-panel::before,
+body.theme-dark.page-journal .glass-inset::before,
+body.theme-dark.page-journal .liquid-card::before,
+body.theme-dark.page-journal .liquid-card::after {
+  display: none;
+}
+
 .page-journal .journal-config-table-wrap {
   overflow: auto;
   border-radius: 14px;
   border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
 }
 
 .page-journal .journal-config-table th,
@@ -16,10 +26,30 @@
   vertical-align: middle;
 }
 
+body.theme-dark.page-journal .journal-config-table,
+body.theme-dark.page-journal .journal-table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--ds-text0);
+  --bs-table-border-color: color-mix(in srgb, var(--surface-border) 78%, transparent);
+  --bs-table-striped-bg: color-mix(in srgb, var(--surface-soft) 60%, transparent);
+}
+
+body.theme-dark.page-journal .journal-config-table > :not(caption) > * > *,
+body.theme-dark.page-journal .journal-table > :not(caption) > * > * {
+  background: transparent !important;
+  color: var(--ds-text0);
+}
+
+body.theme-dark.page-journal .journal-config-table thead th,
+body.theme-dark.page-journal .journal-table thead th {
+  color: var(--ds-text2);
+}
+
 .page-journal .journal-table-wrap {
   overflow: auto;
   border-radius: 16px;
   border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
 }
 
 .page-journal .journal-table {

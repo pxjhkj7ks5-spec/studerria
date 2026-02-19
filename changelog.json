@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.12",
+      "date": "2026-02-19",
+      "items": [
+        "fix(journal-ui): forced dark-theme table surfaces in journal/config blocks (removed white table backgrounds)",
+        "fix(journal-ui): removed extra oval/glare pseudo-elements on journal glass cards in dark theme",
+        "fix(journal-ui): softened top block visuals by disabling clipped top diffusion overlays for journal page containers"
+      ]
+    },
+    {
       "version": "0.9.11",
       "date": "2026-02-19",
       "items": [
