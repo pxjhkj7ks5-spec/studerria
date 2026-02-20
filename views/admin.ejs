@@ -531,14 +531,6 @@
         background: rgba(255, 255, 255, 0.7);
         border-color: rgba(15, 23, 42, 0.12);
       }
-      .save-all-btn {
-        position: fixed;
-        right: 24px;
-        bottom: 24px;
-        z-index: 1200;
-        border-radius: 999px;
-        padding: 0.75rem 1.5rem;
-      }
       :root {
         --radius-lg: 20px;
         --radius-md: 14px;
@@ -3558,10 +3550,6 @@
       </div>
     </main>
     <%- include('partials/app-footer') %>
-    <% if (!isLimitedView) { %>
-      <button class="btn btn-primary save-all-btn" type="button">Зберегти все</button>
-    <% } %>
-
     <% if (!isLimitedView && role === 'admin') { %>
       <div class="modal fade admin-preview-modal" id="adminPreviewModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -7023,70 +7011,6 @@
       bindUserRowClicks();
       bindSubjectButtons();
 
-      function getTrackableInputs(form) {
-        const byId = Array.from(document.querySelectorAll(`[form="${form.id}"]`));
-        const inside = Array.from(form.querySelectorAll('input, select, textarea'));
-        return [...new Set([...byId, ...inside])];
-      }
-
-      function initInputTracking() {
-        document.querySelectorAll('input, select, textarea').forEach((el) => {
-          if (el.type === 'checkbox' || el.type === 'radio') {
-            el.dataset.initialChecked = el.checked ? '1' : '0';
-          } else {
-            el.dataset.initialValue = el.value;
-          }
-        });
-      }
-
-      function formHasChanges(form) {
-        const inputs = getTrackableInputs(form);
-        return inputs.some((el) => {
-          if (el.type === 'checkbox' || el.type === 'radio') {
-            return (el.dataset.initialChecked === '1') !== el.checked;
-          }
-          return (el.dataset.initialValue ?? '') !== el.value;
-        });
-      }
-
-      function buildFormBody(form) {
-        const params = new URLSearchParams();
-        getTrackableInputs(form).forEach((el) => {
-          if (!el.name) return;
-          if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) return;
-          params.append(el.name, el.value);
-        });
-        return params;
-      }
-
-      function formIsVisible(form) {
-        const section = form.closest('[id^="admin-"]');
-        if (!section) return true;
-        return section.offsetParent !== null;
-      }
-
-      async function saveAllForms() {
-        const forms = Array.from(document.querySelectorAll('form[data-save-all="true"]'))
-          .filter(formIsVisible)
-          .filter(formHasChanges);
-        const button = document.querySelector('.save-all-btn');
-        if (!forms.length) {
-          alert('Немає змін для збереження');
-          return;
-        }
-        if (button) button.disabled = true;
-        for (const form of forms) {
-          const method = (form.method || 'POST').toUpperCase();
-          await fetch(form.action, {
-            method,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-            body: buildFormBody(form),
-          });
-        }
-        if (button) button.disabled = false;
-        window.location.reload();
-      }
-
       const addSubjectSelect = document.getElementById('addSubjectSelect');
       const addLessonTypeSelect = document.getElementById('addLessonTypeSelect');
       const addGroupSelect = document.getElementById('addGroupSelect');
@@ -7258,11 +7182,6 @@
         });
       }
       syncAddGroupSelect();
-
-      const saveAllBtn = document.querySelector('.save-all-btn');
-      if (saveAllBtn) {
-        saveAllBtn.addEventListener('click', saveAllForms);
-      }
 
       const homeworkBulkBar = document.getElementById('homeworkBulkBar');
       const homeworkSelectedCount = document.getElementById('homeworkSelectedCount');
@@ -7728,7 +7647,6 @@
         });
       });
 
-      initInputTracking();
     </script>
     <script>
       (function adminTabsFallback() {

@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.56",
+      "date": "2026-02-20",
+      "items": [
+        "fix(admin-ui): removed floating \"Зберегти все\" button in admin panel to avoid misleading bulk-save behavior when section-level Save buttons are used",
+        "chore(admin-ui): deleted unused save-all tracking/submission client code tied to the removed global button"
+      ]
+    },
+    {
       "version": "0.9.55",
       "date": "2026-02-20",
       "items": [
