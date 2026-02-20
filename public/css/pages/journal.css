@@ -236,6 +236,32 @@ body.theme-dark.page-journal .dropdown-item:focus {
   background: color-mix(in srgb, var(--surface-soft) 88%, transparent);
 }
 
+.page-journal .journal-attendance-quick-panel {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 82%, transparent);
+  border-radius: 14px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--surface-soft) 82%, transparent);
+}
+
+.page-journal .journal-attendance-editor {
+  border-top: 1px dashed color-mix(in srgb, var(--surface-border) 76%, transparent);
+  padding-top: 12px;
+}
+
+.page-journal .journal-attendance-quick-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-journal .journal-attendance-quick-student {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  padding: 10px 12px;
+}
+
 .page-journal .journal-config-table--readonly tbody tr.is-disabled td {
   opacity: 0.66;
 }

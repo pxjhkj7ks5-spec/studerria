@@ -89,6 +89,7 @@
           const attendanceStatuses = Array.isArray(attendance.statuses) ? attendance.statuses : [];
           const attendanceStudentSummary = attendance.student_summary || null;
           const attendanceClassOptions = Array.isArray(attendance.class_options) ? attendance.class_options : [];
+          const attendanceQuickCurrent = attendance.quick_current_slot || {};
           const attendanceStatusChipClass = {
             present: 'status-chip--success',
             late: 'status-chip--warning',
@@ -161,85 +162,154 @@
               </div>
             </summary>
             <div class="journal-attendance-body">
-              <form method="GET" action="/journal" class="row g-2 align-items-end mb-3">
-                <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
-                <div class="col-12 col-md-4 col-xl-3">
-                  <label class="form-label">Дата</label>
-                  <input class="form-control form-control-sm" type="date" name="attendance_date" value="<%= attendance.date || '' %>" required />
-                </div>
-                <div class="col-12 col-md-4 col-xl-3">
-                  <label class="form-label">Пара</label>
-                  <select class="form-select form-select-sm" name="attendance_class_number">
-                    <% attendanceClassOptions.forEach((item) => { %>
-                      <option value="<%= item.value %>" <%= Number(attendance.class_number) === Number(item.value) ? 'selected' : '' %>><%= item.label %></option>
-                    <% }) %>
-                  </select>
-                </div>
-                <div class="col-12 col-md-4 col-xl-3">
-                  <button class="btn btn-outline-secondary btn-sm w-100" type="submit">Показати</button>
-                </div>
-              </form>
+              <% if (!canEditAttendance) { %>
+                <form method="GET" action="/journal" class="row g-2 align-items-end mb-3">
+                  <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                  <div class="col-12 col-md-4 col-xl-3">
+                    <label class="form-label">Дата</label>
+                    <input class="form-control form-control-sm" type="date" name="attendance_date" value="<%= attendance.date || '' %>" required />
+                  </div>
+                  <div class="col-12 col-md-4 col-xl-3">
+                    <label class="form-label">Пара</label>
+                    <select class="form-select form-select-sm" name="attendance_class_number">
+                      <% attendanceClassOptions.forEach((item) => { %>
+                        <option value="<%= item.value %>" <%= Number(attendance.class_number) === Number(item.value) ? 'selected' : '' %>><%= item.label %></option>
+                      <% }) %>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-4 col-xl-3">
+                    <button class="btn btn-outline-secondary btn-sm w-100" type="submit">Показати</button>
+                  </div>
+                </form>
+              <% } %>
 
               <% if (canEditAttendance) { %>
-                <% if (!attendanceRows.length) { %>
-                  <div class="text-muted">Немає студентів для відмітки відвідуваності в поточному доступі.</div>
-                <% } else { %>
-                  <form method="POST" action="/journal/attendance/save" id="journalAttendanceForm" autocomplete="off">
+                <div class="journal-attendance-quick-panel mb-3">
+                  <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <% if (attendanceQuickCurrent && attendanceQuickCurrent.available) { %>
+                      <a
+                        class="btn btn-success btn-sm"
+                        href="/journal?subject_id=<%= selectedSubject.subject_id %>&attendance_date=<%= encodeURIComponent(String(attendanceQuickCurrent.class_date || attendance.date || '')) %>&attendance_class_number=<%= Number(attendanceQuickCurrent.class_number || attendance.class_number || 1) %>&attendance_quick=1"
+                      >
+                        Заповнити поточну пару
+                      </a>
+                    <% } else { %>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" disabled>
+                        Поточна пара недоступна
+                      </button>
+                    <% } %>
+                    <button
+                      class="btn btn-primary btn-sm"
+                      type="button"
+                      id="journalAttendanceQuickSelectedBtn"
+                      <%= attendanceRows.length ? '' : 'disabled' %>
+                    >
+                      Заповнити обрану пару
+                    </button>
+                    <button
+                      class="btn btn-outline-info btn-sm"
+                      type="button"
+                      id="journalAttendanceToggleEditorBtn"
+                      data-open-label="Переглянути і редагувати"
+                      data-close-label="Сховати редактор"
+                    >
+                      Переглянути і редагувати
+                    </button>
+                  </div>
+                  <div class="small text-muted mt-2">
+                    <% if (attendanceQuickCurrent && attendanceQuickCurrent.available) { %>
+                      Зараз у розкладі: <%= attendanceQuickCurrent.label || `Пара ${attendanceQuickCurrent.class_number}` %>.
+                    <% } else { %>
+                      Для поточного часу не знайдено пари цього предмета в розкладі.
+                    <% } %>
+                  </div>
+                </div>
+
+                <div class="journal-attendance-editor d-none" id="journalAttendanceEditor">
+                  <form method="GET" action="/journal" class="row g-2 align-items-end mb-3">
                     <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
-                    <input type="hidden" name="attendance_date" value="<%= attendance.date || '' %>" />
-                    <input type="hidden" name="attendance_class_number" value="<%= attendance.class_number || '' %>" />
-                    <input type="hidden" name="rows_json" id="journalAttendanceRowsJson" />
-                    <div class="journal-attendance-table-wrap">
-                      <table class="table table-sm align-middle mb-0 journal-attendance-table">
-                        <thead>
-                          <tr>
-                            <th>ПІБ</th>
-                            <th>Статус</th>
-                            <th>Причина / коментар</th>
-                            <th>Оновлено</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <% attendanceRows.forEach((row) => { %>
-                            <tr data-attendance-row data-student-id="<%= row.student_id %>">
-                              <td>
-                                <div class="fw-semibold"><%= row.full_name %></div>
-                                <% if (row.group_number) { %>
-                                  <div class="text-muted small">Група <%= row.group_number %></div>
-                                <% } %>
-                              </td>
-                              <td>
-                                <select class="form-select form-select-sm journal-attendance-status" data-attendance-status>
-                                  <option value="">— Не відмічено —</option>
-                                  <% attendanceStatuses.forEach((status) => { %>
-                                    <option value="<%= status.key %>" <%= row.status === status.key ? 'selected' : '' %>><%= status.label %></option>
-                                  <% }) %>
-                                </select>
-                              </td>
-                              <td>
-                                <input
-                                  class="form-control form-control-sm"
-                                  type="text"
-                                  maxlength="<%= attendance.reason_max_length || 240 %>"
-                                  value="<%= row.reason || '' %>"
-                                  data-attendance-reason
-                                  placeholder="Опц. причина відсутності або короткий коментар"
-                                />
-                              </td>
-                              <td class="text-muted small">
-                                <%= row.marked_at ? new Date(row.marked_at).toLocaleString('uk-UA') : '—' %>
-                              </td>
-                            </tr>
-                          <% }) %>
-                        </tbody>
-                      </table>
+                    <div class="col-12 col-md-4 col-xl-3">
+                      <label class="form-label">Дата</label>
+                      <input class="form-control form-control-sm" type="date" name="attendance_date" value="<%= attendance.date || '' %>" required />
                     </div>
-                    <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
-                      <button class="btn btn-primary btn-sm" type="submit">Зберегти відвідуваність</button>
-                      <span class="text-muted small">Порожній статус означає: запис буде прибрано.</span>
+                    <div class="col-12 col-md-4 col-xl-3">
+                      <label class="form-label">Пара</label>
+                      <select class="form-select form-select-sm" name="attendance_class_number">
+                        <% attendanceClassOptions.forEach((item) => { %>
+                          <option value="<%= item.value %>" <%= Number(attendance.class_number) === Number(item.value) ? 'selected' : '' %>><%= item.label %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-4 col-xl-3">
+                      <button class="btn btn-outline-secondary btn-sm w-100" type="submit">Показати</button>
                     </div>
                   </form>
-                <% } %>
+
+                  <% if (!attendanceRows.length) { %>
+                    <div class="text-muted">Немає студентів для відмітки відвідуваності в поточному доступі.</div>
+                  <% } else { %>
+                    <form method="POST" action="/journal/attendance/save" id="journalAttendanceForm" autocomplete="off">
+                      <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                      <input type="hidden" name="attendance_date" value="<%= attendance.date || '' %>" />
+                      <input type="hidden" name="attendance_class_number" value="<%= attendance.class_number || '' %>" />
+                      <input type="hidden" name="rows_json" id="journalAttendanceRowsJson" />
+                      <div class="journal-attendance-table-wrap">
+                        <table class="table table-sm align-middle mb-0 journal-attendance-table">
+                          <thead>
+                            <tr>
+                              <th>ПІБ</th>
+                              <th>Статус</th>
+                              <th>Причина / коментар</th>
+                              <th>Оновлено</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <% attendanceRows.forEach((row) => { %>
+                              <tr
+                                data-attendance-row
+                                data-student-id="<%= row.student_id %>"
+                                data-student-name="<%= row.full_name %>"
+                                data-group-number="<%= row.group_number || '' %>"
+                              >
+                                <td>
+                                  <div class="fw-semibold"><%= row.full_name %></div>
+                                  <% if (row.group_number) { %>
+                                    <div class="text-muted small">Група <%= row.group_number %></div>
+                                  <% } %>
+                                </td>
+                                <td>
+                                  <select class="form-select form-select-sm journal-attendance-status" data-attendance-status>
+                                    <option value="">— Не відмічено —</option>
+                                    <% attendanceStatuses.forEach((status) => { %>
+                                      <option value="<%= status.key %>" <%= row.status === status.key ? 'selected' : '' %>><%= status.label %></option>
+                                    <% }) %>
+                                  </select>
+                                </td>
+                                <td>
+                                  <input
+                                    class="form-control form-control-sm"
+                                    type="text"
+                                    maxlength="<%= attendance.reason_max_length || 240 %>"
+                                    value="<%= row.reason || '' %>"
+                                    data-attendance-reason
+                                    placeholder="Опц. причина відсутності або короткий коментар"
+                                  />
+                                </td>
+                                <td class="text-muted small">
+                                  <%= row.marked_at ? new Date(row.marked_at).toLocaleString('uk-UA') : '—' %>
+                                </td>
+                              </tr>
+                            <% }) %>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+                        <button class="btn btn-primary btn-sm" type="submit">Зберегти відвідуваність</button>
+                        <span class="text-muted small">Порожній статус означає: запис буде прибрано.</span>
+                      </div>
+                    </form>
+                  <% } %>
+                </div>
               <% } else { %>
                 <div class="row g-3">
                   <div class="col-12 col-lg-5">
@@ -819,6 +889,54 @@
       </div>
     </div>
 
+    <div class="modal fade" id="journalAttendanceQuickModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-md modal-dialog-centered">
+        <div class="modal-content">
+          <form method="POST" action="/journal/attendance/save" id="journalAttendanceQuickForm" autocomplete="off">
+            <div class="modal-header">
+              <h5 class="modal-title">Швидка відмітка відвідуваності</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="subject_id" value="<%= selectedSubject ? selectedSubject.subject_id : '' %>" />
+              <input type="hidden" name="attendance_date" id="journalAttendanceQuickDateInput" value="<%= attendanceContext && attendanceContext.date ? attendanceContext.date : '' %>" />
+              <input type="hidden" name="attendance_class_number" id="journalAttendanceQuickClassInput" value="<%= attendanceContext && attendanceContext.class_number ? attendanceContext.class_number : '' %>" />
+              <input type="hidden" name="rows_json" id="journalAttendanceQuickRowsJson" />
+              <div class="small text-muted mb-2" id="journalAttendanceQuickScope">—</div>
+              <div class="journal-attendance-quick-progress mb-3">
+                <span class="status-chip status-chip--neutral" id="journalAttendanceQuickProgress">0 / 0</span>
+                <span class="text-muted small" id="journalAttendanceQuickSummary">Немає студентів для відмітки.</span>
+              </div>
+              <div class="journal-attendance-quick-student mb-3" id="journalAttendanceQuickStudentCard">
+                <div class="fw-semibold" id="journalAttendanceQuickStudentName">—</div>
+                <div class="text-muted small" id="journalAttendanceQuickStudentGroup">—</div>
+              </div>
+              <div class="d-grid gap-2 mb-3">
+                <button class="btn btn-success" type="button" data-attendance-quick-status="present">Присутній</button>
+                <button class="btn btn-danger" type="button" data-attendance-quick-status="absent">Відсутній</button>
+                <button class="btn btn-info" type="button" data-attendance-quick-status="excused">Поважна причина</button>
+              </div>
+              <div>
+                <label class="form-label">Коментар / причина (опц.)</label>
+                <input
+                  class="form-control form-control-sm"
+                  type="text"
+                  id="journalAttendanceQuickReason"
+                  maxlength="<%= attendanceContext && attendanceContext.reason_max_length ? attendanceContext.reason_max_length : 240 %>"
+                  placeholder="Потрібно лише за потреби"
+                />
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="journalAttendanceQuickBackBtn">Назад</button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="journalAttendanceQuickSkipBtn">Пропустити</button>
+              <button class="btn btn-primary" type="submit" id="journalAttendanceQuickSaveBtn">Зберегти відвідуваність</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="journalBulkModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -886,6 +1004,8 @@
       });
 
       const canEditJournal = <%- canEditJournal ? 'true' : 'false' %>;
+      const canEditAttendance = <%- canEditAttendance ? 'true' : 'false' %>;
+      const attendanceQuickAutoOpen = <%- attendanceQuickAutoOpen ? 'true' : 'false' %>;
       const queryParams = new URLSearchParams(window.location.search);
       const autoOpenColumnId = Number(queryParams.get('open_column_id') || 0);
       const autoOpenStudentId = Number(queryParams.get('open_student_id') || 0);
@@ -973,6 +1093,25 @@
       const attendanceForm = document.getElementById('journalAttendanceForm');
       const attendanceRowsJsonInput = document.getElementById('journalAttendanceRowsJson');
       const attendanceRowEls = Array.from(document.querySelectorAll('[data-attendance-row]'));
+      const attendanceToggleEditorBtn = document.getElementById('journalAttendanceToggleEditorBtn');
+      const attendanceEditorEl = document.getElementById('journalAttendanceEditor');
+      const attendanceQuickSelectedBtn = document.getElementById('journalAttendanceQuickSelectedBtn');
+      const attendanceQuickModalEl = document.getElementById('journalAttendanceQuickModal');
+      const attendanceQuickModal = attendanceQuickModalEl && window.bootstrap ? new window.bootstrap.Modal(attendanceQuickModalEl) : null;
+      const attendanceQuickForm = document.getElementById('journalAttendanceQuickForm');
+      const attendanceQuickDateInput = document.getElementById('journalAttendanceQuickDateInput');
+      const attendanceQuickClassInput = document.getElementById('journalAttendanceQuickClassInput');
+      const attendanceQuickRowsJsonInput = document.getElementById('journalAttendanceQuickRowsJson');
+      const attendanceQuickProgressEl = document.getElementById('journalAttendanceQuickProgress');
+      const attendanceQuickSummaryEl = document.getElementById('journalAttendanceQuickSummary');
+      const attendanceQuickStudentNameEl = document.getElementById('journalAttendanceQuickStudentName');
+      const attendanceQuickStudentGroupEl = document.getElementById('journalAttendanceQuickStudentGroup');
+      const attendanceQuickScopeEl = document.getElementById('journalAttendanceQuickScope');
+      const attendanceQuickReasonEl = document.getElementById('journalAttendanceQuickReason');
+      const attendanceQuickBackBtn = document.getElementById('journalAttendanceQuickBackBtn');
+      const attendanceQuickSkipBtn = document.getElementById('journalAttendanceQuickSkipBtn');
+      const attendanceQuickSaveBtn = document.getElementById('journalAttendanceQuickSaveBtn');
+      const attendanceQuickStatusButtons = Array.from(document.querySelectorAll('[data-attendance-quick-status]'));
 
       let currentCellColumnId = 0;
       let currentCellStudentId = 0;
@@ -1766,6 +1905,202 @@
         }).filter((row) => Number.isFinite(row.student_id) && row.student_id > 0);
       };
 
+      const resolveAttendanceClassLabel = (classNumberRaw) => {
+        const classNumber = Number(classNumberRaw || 0);
+        if (!Number.isFinite(classNumber) || classNumber < 1) return 'Пара -';
+        const option = document.querySelector(
+          `.journal-attendance-editor select[name="attendance_class_number"] option[value="${classNumber}"]`
+        );
+        if (option && String(option.textContent || '').trim()) {
+          return String(option.textContent || '').trim();
+        }
+        return `Пара ${classNumber}`;
+      };
+
+      const setAttendanceEditorVisible = (visible) => {
+        if (!attendanceEditorEl || !attendanceToggleEditorBtn) return;
+        attendanceEditorEl.classList.toggle('d-none', !visible);
+        const openLabel = attendanceToggleEditorBtn.dataset.openLabel || 'Переглянути і редагувати';
+        const closeLabel = attendanceToggleEditorBtn.dataset.closeLabel || 'Сховати редактор';
+        attendanceToggleEditorBtn.textContent = visible ? closeLabel : openLabel;
+      };
+
+      if (attendanceToggleEditorBtn && attendanceEditorEl) {
+        setAttendanceEditorVisible(false);
+        attendanceToggleEditorBtn.addEventListener('click', () => {
+          const next = attendanceEditorEl.classList.contains('d-none');
+          setAttendanceEditorVisible(next);
+        });
+      }
+
+      const attendanceQuickState = {
+        rows: [],
+        index: 0,
+      };
+
+      const buildAttendanceQuickRows = () => (
+        attendanceRowEls.map((rowEl) => {
+          const studentId = Number(rowEl.dataset.studentId || 0);
+          const statusEl = rowEl.querySelector('[data-attendance-status]');
+          const reasonEl = rowEl.querySelector('[data-attendance-reason]');
+          return {
+            student_id: studentId,
+            full_name: String(rowEl.dataset.studentName || '').trim() || `Студент #${studentId}`,
+            group_number: Number(rowEl.dataset.groupNumber || 0),
+            status: String(statusEl ? statusEl.value : '').trim(),
+            reason: String(reasonEl ? reasonEl.value : '').trim(),
+          };
+        }).filter((row) => Number.isFinite(row.student_id) && row.student_id > 0)
+      );
+
+      const syncAttendanceQuickRowToEditor = (entry) => {
+        if (!entry) return;
+        const rowEl = attendanceRowEls.find((item) => Number(item.dataset.studentId || 0) === Number(entry.student_id));
+        if (!rowEl) return;
+        const statusEl = rowEl.querySelector('[data-attendance-status]');
+        const reasonEl = rowEl.querySelector('[data-attendance-reason]');
+        if (statusEl) statusEl.value = String(entry.status || '').trim();
+        if (reasonEl) reasonEl.value = String(entry.reason || '').trim();
+      };
+
+      const countAttendanceQuickSummary = (rows) => {
+        const counters = { present: 0, absent: 0, excused: 0, unset: 0 };
+        (rows || []).forEach((row) => {
+          const status = String(row && row.status ? row.status : '').trim();
+          if (status === 'present' || status === 'absent' || status === 'excused') {
+            counters[status] += 1;
+          } else {
+            counters.unset += 1;
+          }
+        });
+        return counters;
+      };
+
+      const renderAttendanceQuickStep = () => {
+        const rows = attendanceQuickState.rows || [];
+        const total = rows.length;
+        if (!total) {
+          if (attendanceQuickProgressEl) attendanceQuickProgressEl.textContent = '0 / 0';
+          if (attendanceQuickSummaryEl) attendanceQuickSummaryEl.textContent = 'Немає студентів для відмітки.';
+          if (attendanceQuickStudentNameEl) attendanceQuickStudentNameEl.textContent = '—';
+          if (attendanceQuickStudentGroupEl) attendanceQuickStudentGroupEl.textContent = '—';
+          if (attendanceQuickReasonEl) {
+            attendanceQuickReasonEl.value = '';
+            attendanceQuickReasonEl.disabled = true;
+          }
+          attendanceQuickStatusButtons.forEach((button) => {
+            button.disabled = true;
+          });
+          if (attendanceQuickBackBtn) attendanceQuickBackBtn.disabled = true;
+          if (attendanceQuickSkipBtn) attendanceQuickSkipBtn.disabled = true;
+          if (attendanceQuickSaveBtn) attendanceQuickSaveBtn.disabled = true;
+          return;
+        }
+        if (attendanceQuickState.index >= total) {
+          const summary = countAttendanceQuickSummary(rows);
+          if (attendanceQuickProgressEl) attendanceQuickProgressEl.textContent = `${total} / ${total}`;
+          if (attendanceQuickSummaryEl) {
+            attendanceQuickSummaryEl.textContent = `Готово: присутні ${summary.present}, відсутні ${summary.absent}, поважні ${summary.excused}, не відмічено ${summary.unset}.`;
+          }
+          if (attendanceQuickStudentNameEl) attendanceQuickStudentNameEl.textContent = 'Готово до збереження';
+          if (attendanceQuickStudentGroupEl) attendanceQuickStudentGroupEl.textContent = 'За потреби натисніть "Назад" і змініть відмітку.';
+          if (attendanceQuickReasonEl) {
+            attendanceQuickReasonEl.value = '';
+            attendanceQuickReasonEl.disabled = true;
+          }
+          attendanceQuickStatusButtons.forEach((button) => {
+            button.disabled = true;
+          });
+          if (attendanceQuickBackBtn) attendanceQuickBackBtn.disabled = total < 1;
+          if (attendanceQuickSkipBtn) attendanceQuickSkipBtn.disabled = true;
+          if (attendanceQuickSaveBtn) attendanceQuickSaveBtn.disabled = false;
+          return;
+        }
+        const current = rows[attendanceQuickState.index];
+        if (attendanceQuickProgressEl) attendanceQuickProgressEl.textContent = `${attendanceQuickState.index + 1} / ${total}`;
+        if (attendanceQuickSummaryEl) attendanceQuickSummaryEl.textContent = 'Оберіть статус, і система відкриє наступного студента.';
+        if (attendanceQuickStudentNameEl) attendanceQuickStudentNameEl.textContent = current.full_name || `Студент #${current.student_id}`;
+        if (attendanceQuickStudentGroupEl) {
+          const groupNumber = Number(current.group_number || 0);
+          attendanceQuickStudentGroupEl.textContent = Number.isFinite(groupNumber) && groupNumber > 0 ? `Група ${groupNumber}` : 'Група не вказана';
+        }
+        if (attendanceQuickReasonEl) {
+          attendanceQuickReasonEl.disabled = false;
+          attendanceQuickReasonEl.value = String(current.reason || '');
+        }
+        attendanceQuickStatusButtons.forEach((button) => {
+          button.disabled = false;
+        });
+        if (attendanceQuickBackBtn) attendanceQuickBackBtn.disabled = attendanceQuickState.index < 1;
+        if (attendanceQuickSkipBtn) attendanceQuickSkipBtn.disabled = false;
+        if (attendanceQuickSaveBtn) attendanceQuickSaveBtn.disabled = false;
+      };
+
+      const openAttendanceQuickModal = () => {
+        if (!attendanceQuickModal) return;
+        const dateInputEl = attendanceForm ? attendanceForm.querySelector('input[name="attendance_date"]') : null;
+        const classInputEl = attendanceForm ? attendanceForm.querySelector('input[name="attendance_class_number"]') : null;
+        const dateValue = String(dateInputEl ? dateInputEl.value : '').trim();
+        const classNumber = Number(classInputEl ? classInputEl.value : 0);
+        if (attendanceQuickDateInput) attendanceQuickDateInput.value = dateValue;
+        if (attendanceQuickClassInput) attendanceQuickClassInput.value = Number.isFinite(classNumber) ? String(classNumber) : '';
+        if (attendanceQuickScopeEl) {
+          attendanceQuickScopeEl.textContent = `${dateValue || '—'} · ${resolveAttendanceClassLabel(classNumber)}`;
+        }
+        attendanceQuickState.rows = buildAttendanceQuickRows();
+        attendanceQuickState.index = 0;
+        renderAttendanceQuickStep();
+        attendanceQuickModal.show();
+      };
+
+      if (attendanceQuickSelectedBtn) {
+        attendanceQuickSelectedBtn.addEventListener('click', () => {
+          openAttendanceQuickModal();
+        });
+      }
+      if (attendanceQuickBackBtn) {
+        attendanceQuickBackBtn.addEventListener('click', () => {
+          if (!attendanceQuickState.rows.length) return;
+          attendanceQuickState.index = Math.max(0, attendanceQuickState.index - 1);
+          renderAttendanceQuickStep();
+        });
+      }
+      if (attendanceQuickSkipBtn) {
+        attendanceQuickSkipBtn.addEventListener('click', () => {
+          if (!attendanceQuickState.rows.length) return;
+          attendanceQuickState.index = Math.min(attendanceQuickState.rows.length, attendanceQuickState.index + 1);
+          renderAttendanceQuickStep();
+        });
+      }
+      attendanceQuickStatusButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const status = String(button.dataset.attendanceQuickStatus || '').trim();
+          if (!status) return;
+          const rows = attendanceQuickState.rows || [];
+          if (!rows.length) return;
+          if (attendanceQuickState.index >= rows.length) return;
+          const current = rows[attendanceQuickState.index];
+          if (!current) return;
+          current.status = status;
+          current.reason = String(attendanceQuickReasonEl ? attendanceQuickReasonEl.value : '').trim();
+          syncAttendanceQuickRowToEditor(current);
+          attendanceQuickState.index = Math.min(rows.length, attendanceQuickState.index + 1);
+          renderAttendanceQuickStep();
+        });
+      });
+
+      if (attendanceQuickForm && attendanceQuickRowsJsonInput) {
+        attendanceQuickForm.addEventListener('submit', () => {
+          const rows = attendanceQuickState.rows || [];
+          const payload = rows.map((row) => ({
+            student_id: Number(row.student_id),
+            status: String(row.status || '').trim(),
+            reason: String(row.reason || '').trim(),
+          }));
+          attendanceQuickRowsJsonInput.value = JSON.stringify(payload);
+        });
+      }
+
       const undoBtn = document.getElementById('journalUndoDeleteBtn');
       const undoCountdownEl = document.getElementById('journalUndoCountdown');
       if (undoBtn && undoCountdownEl) {
@@ -1904,6 +2239,9 @@
       }
       if (autoOpenColumnId > 0 && autoOpenStudentId > 0) {
         openJournalCell(autoOpenColumnId, autoOpenStudentId);
+      }
+      if (canEditAttendance && attendanceQuickAutoOpen && attendanceQuickModal && attendanceRowEls.length) {
+        openAttendanceQuickModal();
       }
     </script>
     <script src="/js/design-system.js" defer></script>

@@ -10352,6 +10352,112 @@ const getAttendanceClassOptions = () => (
     .sort((a, b) => a.value - b.value)
 );
 
+const parseBellTimeToMinutes = (rawValue) => {
+  const value = String(rawValue || '').trim();
+  const match = value.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+};
+
+async function resolveJournalCurrentAttendanceSlot({
+  subjectId,
+  courseId,
+  semesterId,
+  semester = null,
+  allowedGroupNumbers = [],
+  hasAllGroups = false,
+}) {
+  const response = {
+    available: false,
+    class_date: formatLocalDate(new Date()),
+    class_number: null,
+    day_of_week: null,
+    start: '',
+    end: '',
+    label: '',
+    group_numbers: [],
+  };
+  if (!Number.isFinite(Number(subjectId)) || !Number.isFinite(Number(courseId))) {
+    return response;
+  }
+  const now = new Date();
+  const classDate = formatLocalDate(now);
+  response.class_date = classDate;
+  const dayName = getDayNameFromDate(classDate);
+  response.day_of_week = dayName;
+  if (!dayName) return response;
+  const weekNumber = getAcademicWeekForSemester(
+    new Date(`${classDate}T12:00:00`),
+    semester || null
+  );
+  const semesterFilter = buildExactSemesterCondition('se', semesterId);
+  const normalizedGroups = Array.isArray(allowedGroupNumbers)
+    ? allowedGroupNumbers
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+    : [];
+  const uniqueGroups = Array.from(new Set(normalizedGroups));
+  const groupFilter = (!hasAllGroups && uniqueGroups.length)
+    ? ` AND se.group_number IN (${uniqueGroups.map(() => '?').join(',')})`
+    : '';
+  const rows = await db.all(
+    `
+      SELECT se.class_number, se.group_number
+      FROM schedule_entries se
+      WHERE se.subject_id = ?
+        AND se.course_id = ?
+        AND se.day_of_week = ?
+        AND se.week_number = ?
+        ${semesterFilter.clause}
+        ${groupFilter}
+      ORDER BY se.class_number ASC
+    `,
+    [Number(subjectId), Number(courseId), dayName, Number(weekNumber), ...semesterFilter.params, ...uniqueGroups]
+  );
+  if (!rows || !rows.length) return response;
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const byClass = new Map();
+  (rows || []).forEach((row) => {
+    const classNumber = Number(row.class_number || 0);
+    if (!Number.isInteger(classNumber) || classNumber < 1 || !bellSchedule[classNumber]) return;
+    if (!byClass.has(classNumber)) {
+      byClass.set(classNumber, new Set());
+    }
+    const groupNumber = Number(row.group_number || 0);
+    if (Number.isInteger(groupNumber) && groupNumber > 0) {
+      byClass.get(classNumber).add(groupNumber);
+    }
+  });
+
+  const orderedClasses = Array.from(byClass.keys()).sort((a, b) => a - b);
+  for (const classNumber of orderedClasses) {
+    const slot = bellSchedule[classNumber];
+    if (!slot) continue;
+    const startMinutes = parseBellTimeToMinutes(slot.start);
+    const endMinutes = parseBellTimeToMinutes(slot.end);
+    if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) continue;
+    if (nowMinutes < startMinutes || nowMinutes > endMinutes) continue;
+    const groups = Array.from(byClass.get(classNumber) || []).sort((a, b) => a - b);
+    const groupLabel = groups.length ? ` · Група ${groups.join(', ')}` : '';
+    return {
+      available: true,
+      class_date: classDate,
+      class_number: classNumber,
+      day_of_week: dayName,
+      start: slot.start || '',
+      end: slot.end || '',
+      label: `Пара ${classNumber}${slot.start && slot.end ? ` (${slot.start}-${slot.end})` : ''}${groupLabel}`,
+      group_numbers: groups,
+    };
+  }
+  return response;
+}
+
 const normalizeBatchToken = (rawValue) => String(rawValue || '').trim().toLowerCase();
 
 const buildHomeworkBatchKey = (row) => {
@@ -11718,10 +11824,13 @@ async function buildJournalAttendanceContext({
   subjectId,
   courseId,
   semesterId,
+  semester = null,
   students = [],
   requestedDate,
   requestedClassNumber,
   studentViewUserId = null,
+  allowedGroupNumbers = [],
+  hasAllGroups = false,
 }) {
   const classOptions = getAttendanceClassOptions();
   const normalizedDate = isValidDateString(String(requestedDate || ''))
@@ -11860,6 +11969,33 @@ async function buildJournalAttendanceContext({
     };
   }
 
+  let quickCurrentSlot = {
+    available: false,
+    class_date: formatLocalDate(new Date()),
+    class_number: null,
+    day_of_week: null,
+    start: '',
+    end: '',
+    label: '',
+    group_numbers: [],
+    is_selected: false,
+  };
+  if (!(Number.isFinite(safeStudentViewId) && safeStudentViewId > 0)) {
+    quickCurrentSlot = await resolveJournalCurrentAttendanceSlot({
+      subjectId,
+      courseId,
+      semesterId,
+      semester,
+      allowedGroupNumbers,
+      hasAllGroups,
+    });
+    quickCurrentSlot.is_selected = Boolean(
+      quickCurrentSlot.available
+      && String(quickCurrentSlot.class_date || '') === String(normalizedDate || '')
+      && Number(quickCurrentSlot.class_number) === Number(normalizedClassNumber)
+    );
+  }
+
   return {
     date: normalizedDate,
     class_number: normalizedClassNumber,
@@ -11869,6 +12005,7 @@ async function buildJournalAttendanceContext({
     summary,
     student_summary: studentSummary,
     reason_max_length: ATTENDANCE_REASON_MAX_LENGTH,
+    quick_current_slot: quickCurrentSlot,
   };
 }
 
@@ -12322,10 +12459,22 @@ app.get('/journal', requireLogin, async (req, res) => {
           },
           student_summary: null,
           reason_max_length: ATTENDANCE_REASON_MAX_LENGTH,
+          quick_current_slot: {
+            available: false,
+            class_date: formatLocalDate(new Date()),
+            class_number: null,
+            day_of_week: null,
+            start: '',
+            end: '',
+            label: '',
+            group_numbers: [],
+            is_selected: false,
+          },
         },
         canEditJournal: false,
         canEditAttendance: false,
         teacherJournalMode,
+        attendanceQuickAutoOpen: false,
         canManageAllSubjects: Boolean(journalScope.fullAccess),
         subjectClosure: null,
         canCloseSubject: false,
@@ -12367,10 +12516,13 @@ app.get('/journal', requireLogin, async (req, res) => {
       subjectId: Number(selectedSubject.subject_id),
       courseId: selectedCourseId,
       semesterId: selectedSemester ? Number(selectedSemester.id) : null,
+      semester: selectedSemester || null,
       students: (matrix.rows || []).map((row) => row.student),
       requestedDate: req.query.attendance_date,
       requestedClassNumber: req.query.attendance_class_number,
       studentViewUserId: teacherJournalMode ? null : Number(req.session.user.id),
+      allowedGroupNumbers: Array.isArray(selectedSubject.group_numbers) ? selectedSubject.group_numbers : [],
+      hasAllGroups: Boolean(selectedSubject.has_all_groups),
     });
 
     return res.render('journal', {
@@ -12385,6 +12537,7 @@ app.get('/journal', requireLogin, async (req, res) => {
       canEditJournal,
       canEditAttendance: teacherJournalMode,
       teacherJournalMode,
+      attendanceQuickAutoOpen: teacherJournalMode && String(req.query.attendance_quick || '') === '1',
       canManageAllSubjects: Boolean(journalScope.fullAccess),
       subjectClosure,
       canCloseSubject,
