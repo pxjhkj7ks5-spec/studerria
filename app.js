@@ -6809,6 +6809,20 @@ const JOURNAL_SCORING_TYPE_META = {
   custom: { key: 'custom', label: 'Кастом' },
 };
 const JOURNAL_GRADE_UNDO_SECONDS = 30;
+const JOURNAL_RETAKE_KINDS = ['retake', 'makeup'];
+const JOURNAL_RETAKE_KIND_META = {
+  retake: { key: 'retake', label: 'Перездача' },
+  makeup: { key: 'makeup', label: 'Відпрацювання' },
+};
+const JOURNAL_RETAKE_STATUSES = ['planned', 'submitted', 'graded', 'cancelled'];
+const JOURNAL_RETAKE_STATUS_META = {
+  planned: { key: 'planned', label: 'Заплановано' },
+  submitted: { key: 'submitted', label: 'Здано' },
+  graded: { key: 'graded', label: 'Оцінено' },
+  cancelled: { key: 'cancelled', label: 'Скасовано' },
+};
+const JOURNAL_RETAKE_NOTE_MAX_LENGTH = 1200;
+const JOURNAL_RETAKE_COMMENT_MAX_LENGTH = 2000;
 const ATTENDANCE_STATUS_OPTIONS = ['present', 'late', 'absent', 'excused'];
 const ATTENDANCE_STATUS_META = {
   present: { key: 'present', label: 'Присутній' },
@@ -6838,6 +6852,19 @@ const DEFAULT_SUBJECT_GRADING_SETTINGS = {
 };
 
 const toDateOnly = (rawValue) => String(rawValue || '').slice(0, 10);
+const normalizeJournalRetakeKind = (rawValue) => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  return JOURNAL_RETAKE_KINDS.includes(normalized) ? normalized : 'retake';
+};
+
+const normalizeJournalRetakeStatus = (rawValue) => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  return JOURNAL_RETAKE_STATUSES.includes(normalized) ? normalized : 'planned';
+};
+
+const normalizeJournalRetakeNote = (rawValue) => String(rawValue || '').trim().slice(0, JOURNAL_RETAKE_NOTE_MAX_LENGTH);
+const normalizeJournalRetakeComment = (rawValue) => String(rawValue || '').trim().slice(0, JOURNAL_RETAKE_COMMENT_MAX_LENGTH);
+
 const normalizeAttendanceStatus = (rawValue) => {
   const normalized = String(rawValue || '').trim().toLowerCase();
   return ATTENDANCE_STATUS_OPTIONS.includes(normalized) ? normalized : '';
@@ -8598,6 +8625,32 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
           submission
         )
       : 'manual';
+    const retakeRows = await db.all(
+      `
+        SELECT
+          jra.id,
+          jra.attempt_no,
+          jra.kind,
+          jra.status,
+          jra.due_date,
+          jra.approved_at,
+          jra.note,
+          jra.score,
+          jra.teacher_comment,
+          jra.graded_at,
+          jra.count_in_final,
+          ua.full_name AS approved_by_name,
+          ug.full_name AS graded_by_name
+        FROM journal_retake_attempts jra
+        LEFT JOIN users ua ON ua.id = jra.approved_by
+        LEFT JOIN users ug ON ug.id = jra.graded_by
+        WHERE jra.column_id = ?
+          AND jra.student_id = ?
+        ORDER BY jra.attempt_no DESC, jra.id DESC
+      `,
+      [columnId, studentId]
+    );
+    const canManageRetakes = teacherJournalMode && !isJournalColumnLocked(column);
 
     return res.json({
       column: {
@@ -8635,6 +8688,39 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
         : null,
       submission_status: submissionStatus,
       can_edit: teacherJournalMode && !isJournalColumnLocked(column),
+      can_manage_retakes: canManageRetakes,
+      retake_meta: {
+        kinds: JOURNAL_RETAKE_KINDS.map((key) => ({
+          key,
+          label: JOURNAL_RETAKE_KIND_META[key]?.label || key,
+        })),
+        statuses: JOURNAL_RETAKE_STATUSES.map((key) => ({
+          key,
+          label: JOURNAL_RETAKE_STATUS_META[key]?.label || key,
+        })),
+        note_max_length: JOURNAL_RETAKE_NOTE_MAX_LENGTH,
+        comment_max_length: JOURNAL_RETAKE_COMMENT_MAX_LENGTH,
+      },
+      retake_attempts: (retakeRows || []).map((row) => {
+        const parsedScore = Number(row.score);
+        return {
+          id: Number(row.id),
+          attempt_no: Number(row.attempt_no || 1),
+          kind: normalizeJournalRetakeKind(row.kind),
+          kind_label: JOURNAL_RETAKE_KIND_META[normalizeJournalRetakeKind(row.kind)]?.label || normalizeJournalRetakeKind(row.kind),
+          status: normalizeJournalRetakeStatus(row.status),
+          status_label: JOURNAL_RETAKE_STATUS_META[normalizeJournalRetakeStatus(row.status)]?.label || normalizeJournalRetakeStatus(row.status),
+          due_date: toDateOnly(row.due_date),
+          approved_at: row.approved_at || null,
+          approved_by_name: row.approved_by_name || '',
+          note: row.note || '',
+          score: Number.isFinite(parsedScore) ? parsedScore : null,
+          teacher_comment: row.teacher_comment || '',
+          graded_at: row.graded_at || null,
+          graded_by_name: row.graded_by_name || '',
+          count_in_final: Number(row.count_in_final || 0) === 1,
+        };
+      }),
     });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
@@ -9210,6 +9296,320 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
       column.semester_id ? Number(column.semester_id) : null
     );
     return res.redirect(`/journal?subject_id=${column.subject_id}&ok=Оцінку%20відновлено`);
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/retakes/create', requireLogin, writeLimiter, async (req, res) => {
+  const columnId = Number(req.body.column_id);
+  const studentId = Number(req.body.student_id);
+  const kind = normalizeJournalRetakeKind(req.body.kind);
+  const dueDateRaw = String(req.body.due_date || '').trim();
+  const note = normalizeJournalRetakeNote(req.body.note);
+
+  if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
+    return res.redirect('/journal?err=Invalid%20retake%20target');
+  }
+  if (dueDateRaw && !isValidDateString(dueDateRaw)) {
+    return res.redirect('/journal?err=Invalid%20retake%20due%20date');
+  }
+  const dueDate = dueDateRaw && isValidDateString(dueDateRaw) ? dueDateRaw : null;
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.*,
+          h.group_number AS homework_group_number
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+        LIMIT 1
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.redirect('/journal?err=Column%20not%20found');
+    }
+    if (isJournalColumnLocked(column)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+
+    const studentRow = await db.get(
+      `
+        SELECT sg.group_number
+        FROM student_groups sg
+        WHERE sg.subject_id = ? AND sg.student_id = ?
+        LIMIT 1
+      `,
+      [column.subject_id, studentId]
+    );
+    if (!studentRow) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const studentGroup = Number(studentRow.group_number || 0);
+      if (!access.allowAll && !access.groups.has(studentGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    const attemptCounter = await db.get(
+      `
+        SELECT COALESCE(MAX(attempt_no), 0) AS max_attempt_no
+        FROM journal_retake_attempts
+        WHERE column_id = ? AND student_id = ?
+      `,
+      [columnId, studentId]
+    );
+    const attemptNo = Number(attemptCounter?.max_attempt_no || 0) + 1;
+
+    await db.run(
+      `
+        INSERT INTO journal_retake_attempts
+          (
+            column_id, student_id, attempt_no, kind, status,
+            due_date, approved_by, approved_at, note,
+            count_in_final, created_at, updated_at
+          )
+        VALUES (?, ?, ?, ?, 'planned', ?, ?, NOW(), ?, 0, NOW(), NOW())
+      `,
+      [
+        columnId,
+        studentId,
+        attemptNo,
+        kind,
+        dueDate,
+        Number(req.session.user.id),
+        note || null,
+      ]
+    );
+
+    logActivity(
+      db,
+      req,
+      'journal_retake_create',
+      'journal_retake',
+      null,
+      {
+        subject_id: Number(column.subject_id),
+        column_id: columnId,
+        student_id: studentId,
+        attempt_no: attemptNo,
+        kind,
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(
+      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Спробу додано')}`
+    );
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res) => {
+  const attemptId = Number(req.body.attempt_id);
+  const columnId = Number(req.body.column_id);
+  const studentId = Number(req.body.student_id);
+  const status = normalizeJournalRetakeStatus(req.body.status);
+  const dueDateRaw = String(req.body.due_date || '').trim();
+  const note = normalizeJournalRetakeNote(req.body.note);
+  const teacherComment = normalizeJournalRetakeComment(req.body.teacher_comment);
+  const countInFinal = parseBinaryFlag(req.body.count_in_final, 0) === 1 ? 1 : 0;
+  const scoreText = String(req.body.score || '').trim();
+  const parsedScore = scoreText ? Number(scoreText.replace(',', '.')) : NaN;
+  const score = scoreText ? (Number.isFinite(parsedScore) ? Math.round(parsedScore * 100) / 100 : NaN) : null;
+
+  if (!Number.isFinite(attemptId) || attemptId < 1 || !Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
+    return res.redirect('/journal?err=Invalid%20retake%20target');
+  }
+  if (dueDateRaw && !isValidDateString(dueDateRaw)) {
+    return res.redirect('/journal?err=Invalid%20retake%20due%20date');
+  }
+  if (scoreText && !Number.isFinite(score)) {
+    return res.redirect('/journal?err=Invalid%20retake%20score');
+  }
+  if (status === 'graded' && !Number.isFinite(score)) {
+    return res.redirect('/journal?err=Для%20статусу%20Оцінено%20потрібно%20вказати%20бал');
+  }
+  if (countInFinal === 1 && (status !== 'graded' || !Number.isFinite(score))) {
+    return res.redirect('/journal?err=Щоб%20врахувати%20у%20фіналі,%20потрібно%20вказати%20оцінений%20бал');
+  }
+  const dueDate = dueDateRaw && isValidDateString(dueDateRaw) ? dueDateRaw : null;
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.*,
+          h.group_number AS homework_group_number
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+        LIMIT 1
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.redirect('/journal?err=Column%20not%20found');
+    }
+    if (isJournalColumnLocked(column)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+    const maxPoints = parsePositiveDecimal(column.max_points, 10);
+    if (Number.isFinite(score) && (score < 0 || score > maxPoints)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Retake%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
+    }
+
+    const studentRow = await db.get(
+      `
+        SELECT sg.group_number
+        FROM student_groups sg
+        WHERE sg.subject_id = ? AND sg.student_id = ?
+        LIMIT 1
+      `,
+      [column.subject_id, studentId]
+    );
+    if (!studentRow) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const studentGroup = Number(studentRow.group_number || 0);
+      if (!access.allowAll && !access.groups.has(studentGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    const existingAttempt = await db.get(
+      `
+        SELECT id, attempt_no
+        FROM journal_retake_attempts
+        WHERE id = ?
+          AND column_id = ?
+          AND student_id = ?
+        LIMIT 1
+      `,
+      [attemptId, columnId, studentId]
+    );
+    if (!existingAttempt) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Спроба%20не%20знайдена`);
+    }
+
+    const gradedBy = status === 'graded' && Number.isFinite(score) ? Number(req.session.user.id) : null;
+    await withTransaction(async (client) => {
+      const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
+      await query(
+        `
+          UPDATE journal_retake_attempts
+          SET status = ?,
+              due_date = ?,
+              note = ?,
+              score = ?,
+              teacher_comment = ?,
+              graded_by = ?,
+              graded_at = CASE WHEN ? IS NULL THEN NULL ELSE NOW() END,
+              count_in_final = ?,
+              updated_at = NOW()
+          WHERE id = ?
+        `,
+        [
+          status,
+          dueDate,
+          note || null,
+          Number.isFinite(score) ? score : null,
+          teacherComment || null,
+          gradedBy,
+          gradedBy,
+          countInFinal,
+          attemptId,
+        ]
+      );
+
+      if (countInFinal === 1 && Number.isFinite(score)) {
+        await query(
+          `
+            UPDATE journal_retake_attempts
+            SET count_in_final = CASE WHEN id = ? THEN 1 ELSE 0 END,
+                updated_at = NOW()
+            WHERE column_id = ?
+              AND student_id = ?
+          `,
+          [attemptId, columnId, studentId]
+        );
+        await query(
+          `
+            INSERT INTO journal_grades
+              (column_id, student_id, score, teacher_comment, graded_by, graded_at, submission_status)
+            VALUES (?, ?, ?, ?, ?, NOW(), 'manual')
+            ON CONFLICT (column_id, student_id)
+            DO UPDATE SET
+              score = EXCLUDED.score,
+              teacher_comment = EXCLUDED.teacher_comment,
+              graded_by = EXCLUDED.graded_by,
+              graded_at = EXCLUDED.graded_at,
+              submission_status = EXCLUDED.submission_status,
+              deleted_at = NULL,
+              deleted_by = NULL
+          `,
+          [columnId, studentId, score, teacherComment || null, Number(req.session.user.id)]
+        );
+      }
+    });
+
+    logActivity(
+      db,
+      req,
+      'journal_retake_update',
+      'journal_retake',
+      attemptId,
+      {
+        subject_id: Number(column.subject_id),
+        column_id: columnId,
+        student_id: studentId,
+        status,
+        count_in_final: countInFinal,
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(
+      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Спробу оновлено')}`
+    );
   } catch (err) {
     return res.redirect('/journal?err=Database%20error');
   }

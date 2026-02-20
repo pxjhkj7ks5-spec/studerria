@@ -482,6 +482,56 @@ body.theme-dark.page-journal .journal-table thead th {
   white-space: pre-wrap;
 }
 
+.page-journal .journal-retake-section {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 82%, transparent);
+  border-radius: 14px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--surface-soft) 86%, transparent);
+}
+
+.page-journal .journal-retake-list {
+  display: grid;
+  gap: 10px;
+}
+
+.page-journal .journal-retake-item {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 78%, transparent);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+}
+
+.page-journal .journal-retake-item-head {
+  display: grid;
+  gap: 6px;
+}
+
+.page-journal .journal-retake-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: var(--ds-text2);
+}
+
+.page-journal .journal-retake-note {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  color: var(--ds-text1);
+}
+
+.page-journal .journal-retake-item-form .form-control,
+.page-journal .journal-retake-item-form .form-select,
+.page-journal .journal-retake-create-form .form-control,
+.page-journal .journal-retake-create-form .form-select {
+  border-radius: 10px;
+}
+
+.page-journal .journal-retake-readonly {
+  margin-top: 8px;
+  color: var(--ds-text1);
+}
+
 .page-journal .journal-feedback-templates {
   display: flex;
   flex-wrap: wrap;

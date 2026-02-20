@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.9.27",
+      "date": "2026-02-20",
+      "items": [
+        "feat(journal-retakes): added `Перездачі / Відпрацювання` flow in journal cell modal with attempt timeline, statuses, deadlines, and per-attempt teacher notes/comments",
+        "feat(api): added `/journal/retakes/create` and `/journal/retakes/update` endpoints with subject/group access checks and locked-column protection",
+        "feat(journal-cell): extended `/journal/cell.json` payload with retake metadata, attempt list, and manage permissions for role-aware rendering",
+        "feat(db): added migration `023_journal_retake_attempts` (`journal_retake_attempts` table + uniqueness/lookup indexes + single-final-attempt guard)",
+        "feat(journal): when a graded retake is marked `Врахувати у фіналі`, score is synced into `journal_grades` as the active cell grade source"
+      ]
+    },
+    {
       "version": "0.9.26",
       "date": "2026-02-20",
       "items": [

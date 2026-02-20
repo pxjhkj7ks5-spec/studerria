@@ -597,6 +597,43 @@
             <div id="journalSubmissionBox" class="journal-submission-box mb-4">
               <div class="text-muted">Здача відсутня.</div>
             </div>
+            <section id="journalRetakeSection" class="journal-retake-section mb-4">
+              <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                  <div class="text-muted small mb-1">Перездачі / відпрацювання</div>
+                  <div class="small text-muted">Спроби, дедлайни, статус і внесення у фінальний бал.</div>
+                </div>
+              </div>
+              <div id="journalRetakeList" class="journal-retake-list">
+                <div class="text-muted small">Спроб поки немає.</div>
+              </div>
+              <% if (canEditJournal) { %>
+                <form id="journalRetakeCreateForm" method="POST" action="/journal/retakes/create" class="journal-retake-create-form mt-3" autocomplete="off">
+                  <input type="hidden" name="column_id" id="journalRetakeCreateColumnId" />
+                  <input type="hidden" name="student_id" id="journalRetakeCreateStudentId" />
+                  <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label form-label-sm mb-1">Тип</label>
+                      <select class="form-select form-select-sm" name="kind" id="journalRetakeCreateKind">
+                        <option value="retake">Перездача</option>
+                        <option value="makeup">Відпрацювання</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label form-label-sm mb-1">Дедлайн (опц.)</label>
+                      <input class="form-control form-control-sm" type="date" name="due_date" id="journalRetakeCreateDueDate" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <button class="btn btn-sm btn-outline-info w-100" type="submit" id="journalRetakeCreateSubmitBtn">Додати спробу</button>
+                    </div>
+                  </div>
+                  <div class="mt-2">
+                    <label class="form-label form-label-sm mb-1">Нотатка (опц.)</label>
+                    <textarea class="form-control form-control-sm" name="note" rows="2" maxlength="1200" placeholder="Що саме потрібно перездати / відпрацювати"></textarea>
+                  </div>
+                </form>
+              <% } %>
+            </section>
             <form id="journalGradeForm" method="POST" action="/journal/grades/save" autocomplete="off">
               <input type="hidden" name="column_id" id="journalGradeColumnId" />
               <input type="hidden" name="student_id" id="journalGradeStudentId" />
@@ -745,6 +782,12 @@
       const lockedNotice = document.getElementById('journalLockedNotice');
       const prevCellBtn = document.getElementById('journalPrevCellBtn');
       const nextCellBtn = document.getElementById('journalNextCellBtn');
+      const retakeSectionEl = document.getElementById('journalRetakeSection');
+      const retakeListEl = document.getElementById('journalRetakeList');
+      const retakeCreateForm = document.getElementById('journalRetakeCreateForm');
+      const retakeCreateColumnInput = document.getElementById('journalRetakeCreateColumnId');
+      const retakeCreateStudentInput = document.getElementById('journalRetakeCreateStudentId');
+      const retakeCreateSubmitBtn = document.getElementById('journalRetakeCreateSubmitBtn');
 
       const bulkModalEl = document.getElementById('journalBulkModal');
       const bulkModal = bulkModalEl && window.bootstrap ? new window.bootstrap.Modal(bulkModalEl) : null;
@@ -771,6 +814,25 @@
         const num = Number(value || 0);
         if (!Number.isFinite(num)) return '0';
         return num.toFixed(2).replace(/\.00$/, '');
+      };
+      const escapeHtml = (value) => String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      const formatDateTime = (value) => {
+        if (!value) return '';
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return String(value);
+        return parsed.toLocaleString('uk-UA');
+      };
+      const getRetakeStatusChipClass = (statusKey) => {
+        const key = String(statusKey || '').toLowerCase();
+        if (key === 'graded') return 'status-chip--success';
+        if (key === 'submitted') return 'status-chip--info';
+        if (key === 'cancelled') return 'status-chip--danger';
+        return 'status-chip--warning';
       };
 
       const findColumnIndex = (columnId) => journalColumnsData.findIndex((column) => Number(column.id) === Number(columnId));
@@ -932,6 +994,137 @@
         submissionBox.innerHTML = parts.join('');
       }
 
+      function renderRetakes(data) {
+        if (!retakeSectionEl || !retakeListEl) return;
+        const attempts = Array.isArray(data && data.retake_attempts) ? data.retake_attempts : [];
+        const canManage = Boolean(canEditJournal && data && data.can_manage_retakes);
+        const retakeMeta = data && data.retake_meta ? data.retake_meta : {};
+        const statusOptions = Array.isArray(retakeMeta.statuses) && retakeMeta.statuses.length
+          ? retakeMeta.statuses
+          : [
+              { key: 'planned', label: 'Заплановано' },
+              { key: 'submitted', label: 'Здано' },
+              { key: 'graded', label: 'Оцінено' },
+              { key: 'cancelled', label: 'Скасовано' },
+            ];
+        const noteMaxLength = Number(retakeMeta.note_max_length || 1200);
+        const commentMaxLength = Number(retakeMeta.comment_max_length || 2000);
+        const maxScore = Number(data && data.column ? data.column.max_points : 0);
+
+        if (retakeCreateColumnInput) retakeCreateColumnInput.value = String(currentCellColumnId || 0);
+        if (retakeCreateStudentInput) retakeCreateStudentInput.value = String(currentCellStudentId || 0);
+        if (retakeCreateSubmitBtn) retakeCreateSubmitBtn.disabled = !canManage;
+        if (retakeCreateForm) {
+          retakeCreateForm.classList.toggle('d-none', !canEditJournal);
+          const kindSelect = retakeCreateForm.querySelector('[name="kind"]');
+          const dueDateInput = retakeCreateForm.querySelector('[name="due_date"]');
+          const noteInput = retakeCreateForm.querySelector('[name="note"]');
+          if (kindSelect) kindSelect.disabled = !canManage;
+          if (dueDateInput) {
+            dueDateInput.disabled = !canManage;
+            dueDateInput.value = '';
+          }
+          if (noteInput) {
+            noteInput.disabled = !canManage;
+            noteInput.maxLength = noteMaxLength;
+            noteInput.value = '';
+          }
+        }
+
+        if (!attempts.length) {
+          retakeListEl.innerHTML = '<div class="text-muted small">Спроб поки немає.</div>';
+          return;
+        }
+
+        const html = attempts.map((attempt) => {
+          const statusKey = String(attempt && attempt.status ? attempt.status : 'planned');
+          const statusClass = getRetakeStatusChipClass(statusKey);
+          const scoreValue = Number(attempt && attempt.score);
+          const scoreDisplay = Number.isFinite(scoreValue) ? formatNumber(scoreValue) : '—';
+          const statusOptionsHtml = statusOptions.map((option) => {
+            const key = String(option && option.key ? option.key : '');
+            const label = String(option && option.label ? option.label : key);
+            return `<option value="${escapeHtml(key)}"${key === statusKey ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+          }).join('');
+          const noteText = String(attempt && attempt.note ? attempt.note : '');
+          const commentText = String(attempt && attempt.teacher_comment ? attempt.teacher_comment : '');
+          const dueDate = String(attempt && attempt.due_date ? attempt.due_date : '');
+          const approvedBy = String(attempt && attempt.approved_by_name ? attempt.approved_by_name : '');
+          const gradedBy = String(attempt && attempt.graded_by_name ? attempt.graded_by_name : '');
+          const scoreInputValue = Number.isFinite(scoreValue) ? String(scoreValue) : '';
+
+          const readonlyBlock = `
+            <div class="journal-retake-readonly small">
+              <div>Бал: <strong>${escapeHtml(scoreDisplay)}</strong>${attempt && attempt.count_in_final ? ' · враховано у фіналі' : ''}</div>
+              ${commentText ? `<div class="mt-1">${escapeHtml(commentText)}</div>` : ''}
+            </div>
+          `;
+
+          const formBlock = `
+            <form method="POST" action="/journal/retakes/update" class="journal-retake-item-form mt-2" autocomplete="off">
+              <input type="hidden" name="attempt_id" value="${Number(attempt && attempt.id ? attempt.id : 0)}" />
+              <input type="hidden" name="column_id" value="${currentCellColumnId}" />
+              <input type="hidden" name="student_id" value="${currentCellStudentId}" />
+              <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
+                  <label class="form-label form-label-sm mb-1">Статус</label>
+                  <select class="form-select form-select-sm" name="status">
+                    ${statusOptionsHtml}
+                  </select>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label form-label-sm mb-1">Дедлайн</label>
+                  <input class="form-control form-control-sm" type="date" name="due_date" value="${escapeHtml(dueDate)}" />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label form-label-sm mb-1">Бал</label>
+                  <input class="form-control form-control-sm" type="number" step="0.01" min="0" max="${escapeHtml(formatNumber(maxScore))}" name="score" value="${escapeHtml(scoreInputValue)}" placeholder="напр. 10" />
+                </div>
+              </div>
+              <div class="row g-2 mt-1">
+                <div class="col-12 col-md-6">
+                  <label class="form-label form-label-sm mb-1">Нотатка</label>
+                  <textarea class="form-control form-control-sm" name="note" rows="2" maxlength="${noteMaxLength}" placeholder="Що потрібно перездати">${escapeHtml(noteText)}</textarea>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label form-label-sm mb-1">Коментар</label>
+                  <textarea class="form-control form-control-sm" name="teacher_comment" rows="2" maxlength="${commentMaxLength}" placeholder="Фідбек викладача">${escapeHtml(commentText)}</textarea>
+                </div>
+              </div>
+              <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                <input type="hidden" name="count_in_final" value="0" />
+                <label class="form-check d-inline-flex align-items-center gap-2 m-0">
+                  <input class="form-check-input mt-0" type="checkbox" name="count_in_final" value="1"${attempt && attempt.count_in_final ? ' checked' : ''} />
+                  <span class="small">Врахувати у фінальному розрахунку</span>
+                </label>
+                <button class="btn btn-sm btn-primary ms-auto" type="submit">Зберегти спробу</button>
+              </div>
+            </form>
+          `;
+
+          return `
+            <article class="journal-retake-item">
+              <div class="journal-retake-item-head">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <strong>#${Number(attempt && attempt.attempt_no ? attempt.attempt_no : 1)} · ${escapeHtml(String(attempt && attempt.kind_label ? attempt.kind_label : 'Спроба'))}</strong>
+                  <span class="status-chip ${statusClass}">${escapeHtml(String(attempt && attempt.status_label ? attempt.status_label : statusKey))}</span>
+                  ${attempt && attempt.count_in_final ? '<span class="status-chip status-chip--success">У фіналі</span>' : ''}
+                </div>
+                <div class="journal-retake-item-meta">
+                  ${dueDate ? `<span>Дедлайн: ${escapeHtml(dueDate)}</span>` : '<span>Дедлайн: —</span>'}
+                  ${attempt && attempt.approved_at ? `<span>Додано: ${escapeHtml(formatDateTime(attempt.approved_at))}${approvedBy ? ` · ${escapeHtml(approvedBy)}` : ''}</span>` : ''}
+                  ${attempt && attempt.graded_at ? `<span>Оцінено: ${escapeHtml(formatDateTime(attempt.graded_at))}${gradedBy ? ` · ${escapeHtml(gradedBy)}` : ''}</span>` : ''}
+                </div>
+              </div>
+              ${noteText ? `<div class="journal-retake-note small">${escapeHtml(noteText)}</div>` : ''}
+              ${canManage ? formBlock : readonlyBlock}
+            </article>
+          `;
+        }).join('');
+
+        retakeListEl.innerHTML = html;
+      }
+
       const navigateCell = (columnStep, studentStep) => {
         const currentColumnIndex = findColumnIndex(currentCellColumnId);
         const currentStudentIndex = findStudentIndex(currentCellStudentId);
@@ -957,6 +1150,7 @@
           currentCellColumnId = Number(columnId);
           currentCellStudentId = Number(studentId);
           currentCellLocked = Boolean(data && data.column && data.column.is_locked);
+          renderRetakes(data || null);
 
           columnInput.value = String(columnId);
           studentInput.value = String(studentId);
