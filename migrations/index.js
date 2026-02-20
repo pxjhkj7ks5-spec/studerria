@@ -25,6 +25,7 @@ const journalGradeAppeals = require('./024_journal_grade_appeals');
 const adminChangeAudit = require('./025_admin_change_audit');
 const journalSubjectClosure = require('./026_journal_subject_closure');
 const journalModerationCompetencies = require('./027_journal_moderation_competencies');
+const userRegistrationEvents = require('./028_user_registration_events');
 
 module.exports = [
   init,
@@ -54,4 +55,5 @@ module.exports = [
   adminChangeAudit,
   journalSubjectClosure,
   journalModerationCompetencies,
+  userRegistrationEvents,
 ];

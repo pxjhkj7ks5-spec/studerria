@@ -3418,6 +3418,15 @@
               <strong>Login History:</strong>
               <ul id="uaLoginHistory" class="list-group list-group-flush mt-2"></ul>
             </div>
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>Account forensics:</strong>
+                <button class="btn btn-sm btn-outline-secondary glass" type="button" id="uaForensicsRefreshBtn">Refresh</button>
+              </div>
+              <div class="small text-muted mt-2" id="uaForensicsMeta">No data yet</div>
+              <div class="mt-2" id="uaForensicsGuess"></div>
+              <ul id="uaForensicsMatches" class="list-group list-group-flush mt-2"></ul>
+            </div>
 
             <form method="POST" action="/admin/users/roles" class="mb-3" id="uaRolesForm" <%= sectionAllowed('admin-role-access') ? '' : 'style="display:none"' %>>
               <input type="hidden" name="user_id" id="uaRolesUserId" />
@@ -5808,6 +5817,95 @@
         }
       }
 
+      function getForensicsConfidenceClass(level) {
+        if (level === 'high') return 'text-bg-danger';
+        if (level === 'medium') return 'text-bg-warning';
+        if (level === 'low') return 'text-bg-info';
+        return 'text-bg-secondary';
+      }
+
+      function getForensicsSourceLabel(source) {
+        if (source === 'registration_event') return 'Registration event';
+        if (source === 'inferred_site_visits') return 'Inferred from register visits';
+        if (source === 'login_only') return 'Login history only';
+        return 'Unknown source';
+      }
+
+      async function loadUserForensics(userId) {
+        const matchesList = document.getElementById('uaForensicsMatches');
+        const meta = document.getElementById('uaForensicsMeta');
+        const guess = document.getElementById('uaForensicsGuess');
+        if (!matchesList || !meta || !guess) return;
+        meta.textContent = 'Loading forensics…';
+        guess.innerHTML = '';
+        matchesList.innerHTML = '<li class="list-group-item text-muted">Loading…</li>';
+        try {
+          const res = await fetch(`/admin/users/${encodeURIComponent(userId)}/forensics.json`);
+          if (!res.ok) {
+            throw new Error('forensics_load_failed');
+          }
+          const data = await res.json();
+          const evidence = data.evidence || {};
+          const sourceLabel = getForensicsSourceLabel(evidence.source);
+          const ipCount = Array.isArray(evidence.ips) ? evidence.ips.length : 0;
+          const sessionCount = Array.isArray(evidence.session_ids) ? evidence.session_ids.length : 0;
+          const agentCount = Array.isArray(evidence.user_agents) ? evidence.user_agents.length : 0;
+          meta.textContent = `${sourceLabel} · IP: ${ipCount} · Session: ${sessionCount} · Device: ${agentCount}`;
+
+          if (data.suspected_owner) {
+            const owner = data.suspected_owner;
+            const ownerRole = getRoleLabel(normalizeRoleKeyClient(owner.role || 'student'));
+            const confidenceClass = getForensicsConfidenceClass(owner.confidence);
+            guess.innerHTML = `
+              <div class="alert alert-warning py-2 px-3 mb-0">
+                Можливий власник: <strong>${escapeHtml(owner.full_name || '')}</strong>
+                <span class="badge ms-2 ${confidenceClass}">${escapeHtml(owner.confidence_label || '')} (${Number(owner.score || 0)})</span>
+                <div class="small mt-1 text-muted">${escapeHtml(ownerRole)}</div>
+              </div>
+            `;
+          } else {
+            guess.innerHTML = '<div class="small text-muted">Чіткого кандидата поки не знайдено.</div>';
+          }
+
+          if (!Array.isArray(data.matches) || !data.matches.length) {
+            matchesList.innerHTML = '<li class="list-group-item text-muted">No matches yet</li>';
+            return;
+          }
+
+          matchesList.innerHTML = data.matches
+            .map((match) => {
+              const roleLabel = getRoleLabel(normalizeRoleKeyClient(match.role || 'student'));
+              const confidenceClass = getForensicsConfidenceClass(match.confidence);
+              const ipHits = Array.isArray(match.ip_hits) && match.ip_hits.length
+                ? `IP: ${match.ip_hits.map((v) => escapeHtml(v)).join(', ')}`
+                : '';
+              const sessionHits = Array.isArray(match.session_hits) && match.session_hits.length
+                ? `Session: ${match.session_hits.map((v) => escapeHtml(v)).join(', ')}`
+                : '';
+              const reasons = Array.isArray(match.reasons) ? match.reasons.slice(0, 4) : [];
+              const details = [ipHits, sessionHits].filter(Boolean).join(' · ');
+              return `
+                <li class="list-group-item">
+                  <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                      <div class="fw-semibold">${escapeHtml(match.full_name || '')}</div>
+                      <div class="small text-muted">${escapeHtml(roleLabel)}</div>
+                    </div>
+                    <span class="badge ${confidenceClass}">${escapeHtml(match.confidence_label || '')} · ${Number(match.score || 0)}</span>
+                  </div>
+                  ${details ? `<div class="small text-muted mt-1">${details}</div>` : ''}
+                  ${reasons.length ? `<div class="small mt-1">${reasons.map((v) => escapeHtml(v)).join(' · ')}</div>` : ''}
+                </li>
+              `;
+            })
+            .join('');
+        } catch (err) {
+          meta.textContent = 'Failed to load forensics';
+          guess.innerHTML = '';
+          matchesList.innerHTML = '<li class="list-group-item text-muted">Failed to load</li>';
+        }
+      }
+
       function bindUserRowClicks() {
         document.querySelectorAll('.user-row').forEach((row) => {
           row.addEventListener('click', (e) => {
@@ -5846,6 +5944,12 @@
 
             const modal = new bootstrap.Modal(document.getElementById('userActionsModal'));
             modal.show();
+
+            const forensicsRefreshBtn = document.getElementById('uaForensicsRefreshBtn');
+            if (forensicsRefreshBtn) {
+              forensicsRefreshBtn.onclick = () => loadUserForensics(userId);
+            }
+            loadUserForensics(userId);
 
             const deleteBtn = document.getElementById('uaDeleteBtn');
             deleteBtn.onclick = async () => {

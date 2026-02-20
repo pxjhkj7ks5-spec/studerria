@@ -2855,6 +2855,92 @@ function logActivity(dbRef, req, actionType, targetType, targetId, details, cour
   );
 }
 
+function normalizeForensicsIp(rawValue) {
+  if (rawValue === null || rawValue === undefined) return null;
+  const value = String(rawValue).trim();
+  if (!value) return null;
+  if (value.startsWith('::ffff:')) return value.slice(7);
+  if (value === '::1') return '127.0.0.1';
+  return value;
+}
+
+function normalizeForensicsAgent(rawValue) {
+  if (rawValue === null || rawValue === undefined) return null;
+  const value = String(rawValue).trim().replace(/\s+/g, ' ');
+  if (!value) return null;
+  return value.slice(0, 500);
+}
+
+function normalizeForensicsToken(rawValue) {
+  if (rawValue === null || rawValue === undefined) return null;
+  const value = String(rawValue).trim();
+  return value || null;
+}
+
+function buildForensicsDeviceFingerprint(rawValue) {
+  const normalized = normalizeForensicsAgent(rawValue);
+  if (!normalized) return null;
+  const compact = normalized.toLowerCase();
+  const browserMatch = compact.match(/(edg|chrome|safari|firefox|opr|opera|trident|msie)\/[0-9.]+/);
+  const osMatch = compact.match(/(windows nt [0-9.]+|android [0-9.]+|iphone os [0-9_]+|ipad; cpu os [0-9_]+|mac os x [0-9_]+|linux)/);
+  const deviceMatch = compact.match(/(mobile|tablet|desktop)/);
+  const browser = browserMatch ? browserMatch[1] : 'browser';
+  const os = osMatch ? osMatch[1].replace(/\s+/g, '-') : 'os';
+  const device = deviceMatch ? deviceMatch[1] : 'device';
+  return `${browser}|${os}|${device}`.slice(0, 180);
+}
+
+function resolveForensicsConfidence(scoreRaw) {
+  const score = Number(scoreRaw || 0);
+  if (score >= 110) return { key: 'high', label: 'Висока' };
+  if (score >= 65) return { key: 'medium', label: 'Середня' };
+  if (score >= 35) return { key: 'low', label: 'Низька' };
+  return { key: 'weak', label: 'Слабка' };
+}
+
+function toIsoStringSafe(rawValue) {
+  const parsed = new Date(rawValue);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
+async function recordUserRegistrationEvent({ userId, fullName, ip, userAgent, sessionId, source = 'register_form', courseId = null }) {
+  const normalizedUserId = Number(userId);
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId <= 0) return;
+  const normalizedName = String(fullName || '').trim() || `User ${normalizedUserId}`;
+  const normalizedIp = normalizeForensicsIp(ip);
+  const normalizedAgent = normalizeForensicsAgent(userAgent);
+  const normalizedSessionId = String(sessionId || '').trim() || null;
+  const normalizedSource = ['register_form', 'import', 'admin_create'].includes(String(source))
+    ? String(source)
+    : 'register_form';
+  await db.run(
+    `
+      INSERT INTO user_registration_events (
+        user_id,
+        full_name,
+        ip,
+        user_agent,
+        device_fingerprint,
+        session_id,
+        source,
+        course_id,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `,
+    [
+      normalizedUserId,
+      normalizedName,
+      normalizedIp,
+      normalizedAgent,
+      buildForensicsDeviceFingerprint(normalizedAgent),
+      normalizedSessionId,
+      normalizedSource,
+      Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+    ]
+  );
+}
+
 function applyRememberMe(req, remember) {
   const ttlMs = resolveSessionTtlMs(settingsCache.session_duration_days);
   if (remember) {
@@ -3778,13 +3864,15 @@ app.post('/login', authLimiter, async (req, res) => {
           db.run('UPDATE users SET role = ? WHERE id = ?', [role, user.id]);
         }
         const loginAt = new Date().toISOString();
+        const loginIp = normalizeForensicsIp(getClientIp(req));
+        const loginUserAgent = normalizeForensicsAgent(req.headers['user-agent'] || null);
         db.run(
           'UPDATE users SET last_login_ip = ?, last_user_agent = ?, last_login_at = ? WHERE id = ?',
-          [req.ip, req.headers['user-agent'] || null, loginAt, user.id]
+          [loginIp, loginUserAgent, loginAt, user.id]
         );
         db.run(
           'INSERT INTO login_history (user_id, full_name, ip, user_agent, created_at, course_id) VALUES (?, ?, ?, ?, ?, ?)',
-          [user.id, user.full_name, req.ip, req.headers['user-agent'] || null, loginAt, user.course_id || 1]
+          [user.id, user.full_name, loginIp, loginUserAgent, loginAt, user.course_id || 1]
         );
         req.session.user = {
           id: user.id,
@@ -3838,6 +3926,19 @@ app.post('/register', registerLimiter, async (req, res) => {
     if (!row || !row.id) {
       return res.redirect('/register?error=Database%20error');
     }
+    try {
+      await recordUserRegistrationEvent({
+        userId: row.id,
+        fullName: normalizedName,
+        ip: getClientIp(req),
+        userAgent: req.headers['user-agent'] || null,
+        sessionId: req.sessionID || null,
+        source: 'register_form',
+        courseId: null,
+      });
+    } catch (eventErr) {
+      console.error('Database error (register.registration_event)', eventErr);
+    }
     req.session.pendingUserId = row.id;
     req.session.rememberMe = isRememberRequested(remember_me);
     logAction(db, req, 'register_user', { user_id: row.id, full_name: normalizedName });
@@ -3883,6 +3984,15 @@ app.post('/register/course', registerLimiter, (req, res) => {
       if (updErr) {
         return res.redirect('/register/course?error=Database%20error');
       }
+      db.run(
+        'UPDATE user_registration_events SET course_id = COALESCE(course_id, ?) WHERE user_id = ?',
+        [courseId, userId],
+        (eventErr) => {
+          if (eventErr) {
+            console.error('Database error (register.course.registration_event)', eventErr);
+          }
+        }
+      );
       if (course.is_teacher_course === true || Number(course.is_teacher_course) === 1) {
         return res.redirect('/register/teacher-subjects');
       }
@@ -20217,6 +20327,542 @@ app.get('/admin/user-logins.json', requireActivitySectionAccess, (req, res) => {
       res.json({ logins: rows });
     }
   );
+});
+
+app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.users.forensics.init');
+  }
+
+  const targetUserId = Number(req.params.id);
+  if (!Number.isFinite(targetUserId) || targetUserId <= 0) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+  const scopedCourseId = getAdminCourse(req);
+  const canCrossCourseForensics = hasSessionRole(req, 'admin');
+
+  const addIfPresent = (setRef, rawValue, normalizer) => {
+    const normalized = normalizer(rawValue);
+    if (normalized) setRef.add(normalized);
+  };
+
+  const buildInClause = (list) => list.map(() => '?').join(',');
+  const parseTs = (rawValue) => {
+    const parsed = new Date(rawValue);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString();
+  };
+
+  const shortSessionLabel = (sessionId) => {
+    const value = String(sessionId || '').trim();
+    if (!value) return 'session';
+    if (value.length <= 14) return value;
+    return `${value.slice(0, 10)}…`;
+  };
+
+  try {
+    const targetSql = canCrossCourseForensics
+      ? `
+        SELECT id, full_name, role, schedule_group, course_id, created_at, last_login_ip, last_user_agent, last_login_at
+        FROM users
+        WHERE id = ?
+      `
+      : `
+        SELECT id, full_name, role, schedule_group, course_id, created_at, last_login_ip, last_user_agent, last_login_at
+        FROM users
+        WHERE id = ? AND course_id = ?
+      `;
+    const targetParams = canCrossCourseForensics ? [targetUserId] : [targetUserId, scopedCourseId];
+    const targetUser = await db.get(targetSql, targetParams);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const targetCreatedAtIso = toIsoStringSafe(targetUser.created_at);
+    const targetLoginRows = await db.all(
+      `
+        SELECT ip, user_agent, created_at
+        FROM login_history
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 20
+      `,
+      [targetUserId]
+    );
+
+    let registrationEvent = null;
+    try {
+      registrationEvent = await db.get(
+        `
+          SELECT id, ip, user_agent, device_fingerprint, session_id, source, course_id, created_at
+          FROM user_registration_events
+          WHERE user_id = ?
+          ORDER BY created_at DESC
+          LIMIT 1
+        `,
+        [targetUserId]
+      );
+    } catch (err) {
+      registrationEvent = null;
+    }
+
+    let inferredRegistrationRows = [];
+    if (!registrationEvent && targetCreatedAtIso) {
+      const inferredParams = [targetCreatedAtIso, targetCreatedAtIso];
+      let inferredSql = `
+        SELECT
+          session_id,
+          ip,
+          user_agent,
+          COUNT(*)::int AS event_count,
+          MIN(created_at) AS first_seen_at,
+          MAX(created_at) AS last_seen_at
+        FROM site_visit_events
+        WHERE page_key = 'register'
+          AND created_at >= (?::timestamptz - INTERVAL '20 minutes')
+          AND created_at <= (?::timestamptz + INTERVAL '45 minutes')
+      `;
+      if (Number.isFinite(Number(targetUser.course_id))) {
+        inferredSql += ' AND (course_id IS NULL OR course_id = ?) ';
+        inferredParams.push(Number(targetUser.course_id));
+      }
+      inferredSql += `
+        GROUP BY session_id, ip, user_agent
+        ORDER BY event_count DESC, ABS(EXTRACT(EPOCH FROM (MIN(created_at) - ?::timestamptz))) ASC
+        LIMIT 12
+      `;
+      inferredParams.push(targetCreatedAtIso);
+      inferredRegistrationRows = await db.all(inferredSql, inferredParams);
+    }
+
+    const evidenceIpsSet = new Set();
+    const evidenceAgentsSet = new Set();
+    const evidenceFingerprintsSet = new Set();
+    const evidenceSessionsSet = new Set();
+
+    addIfPresent(evidenceIpsSet, targetUser.last_login_ip, normalizeForensicsIp);
+    addIfPresent(evidenceAgentsSet, targetUser.last_user_agent, normalizeForensicsAgent);
+    addIfPresent(evidenceFingerprintsSet, buildForensicsDeviceFingerprint(targetUser.last_user_agent), normalizeForensicsToken);
+
+    (targetLoginRows || []).forEach((row) => {
+      addIfPresent(evidenceIpsSet, row.ip, normalizeForensicsIp);
+      addIfPresent(evidenceAgentsSet, row.user_agent, normalizeForensicsAgent);
+      addIfPresent(evidenceFingerprintsSet, buildForensicsDeviceFingerprint(row.user_agent), normalizeForensicsToken);
+    });
+
+    if (registrationEvent) {
+      addIfPresent(evidenceIpsSet, registrationEvent.ip, normalizeForensicsIp);
+      addIfPresent(evidenceAgentsSet, registrationEvent.user_agent, normalizeForensicsAgent);
+      addIfPresent(evidenceFingerprintsSet, registrationEvent.device_fingerprint, normalizeForensicsToken);
+      addIfPresent(evidenceSessionsSet, registrationEvent.session_id, normalizeForensicsToken);
+    }
+
+    (inferredRegistrationRows || []).forEach((row) => {
+      addIfPresent(evidenceIpsSet, row.ip, normalizeForensicsIp);
+      addIfPresent(evidenceAgentsSet, row.user_agent, normalizeForensicsAgent);
+      addIfPresent(evidenceFingerprintsSet, buildForensicsDeviceFingerprint(row.user_agent), normalizeForensicsToken);
+      addIfPresent(evidenceSessionsSet, row.session_id, normalizeForensicsToken);
+    });
+
+    const matchesByUser = new Map();
+    const addMatch = (row, payload) => {
+      const userId = Number(row.user_id || row.id);
+      if (!Number.isFinite(userId) || userId <= 0 || userId === targetUserId) return;
+      if (!matchesByUser.has(userId)) {
+        matchesByUser.set(userId, {
+          user_id: userId,
+          full_name: row.full_name || `User ${userId}`,
+          role: normalizeRoleKey(row.role || 'student'),
+          course_id: Number.isFinite(Number(row.course_id)) ? Number(row.course_id) : null,
+          schedule_group: row.schedule_group || null,
+          score: 0,
+          reason_keys: new Set(),
+          reasons: [],
+          ip_hits: new Set(),
+          session_hits: new Set(),
+          agent_hits: new Set(),
+          last_seen_at: null,
+        });
+      }
+      const entry = matchesByUser.get(userId);
+      const reasonKey = String(payload.reason_key || '').trim();
+      const reasonLabel = String(payload.reason || '').trim();
+      if (reasonKey && !entry.reason_keys.has(reasonKey)) {
+        entry.reason_keys.add(reasonKey);
+        entry.reasons.push(reasonLabel || reasonKey);
+        entry.score += Number(payload.points || 0);
+      }
+      addIfPresent(entry.ip_hits, payload.ip, normalizeForensicsIp);
+      addIfPresent(entry.session_hits, payload.session_id, normalizeForensicsToken);
+      addIfPresent(entry.agent_hits, payload.user_agent, normalizeForensicsAgent);
+      const seenAt = parseTs(payload.occurred_at || row.last_seen_at || row.created_at);
+      if (seenAt) {
+        if (!entry.last_seen_at || new Date(seenAt).getTime() > new Date(entry.last_seen_at).getTime()) {
+          entry.last_seen_at = seenAt;
+        }
+      }
+      if (Number.isFinite(Number(targetUser.course_id)) && Number(entry.course_id) === Number(targetUser.course_id)) {
+        const courseReason = 'meta:same-course';
+        if (!entry.reason_keys.has(courseReason)) {
+          entry.reason_keys.add(courseReason);
+          entry.reasons.push('Той самий курс');
+          entry.score += 4;
+        }
+      }
+    };
+
+    const evidenceSessions = Array.from(evidenceSessionsSet).filter((v) => String(v).trim().length);
+    const evidenceIps = Array.from(evidenceIpsSet).filter((v) => String(v).trim().length);
+    const evidenceAgents = Array.from(evidenceAgentsSet).filter((v) => String(v).trim().length);
+    const evidenceFingerprints = Array.from(evidenceFingerprintsSet).filter((v) => String(v).trim().length);
+
+    if (evidenceSessions.length) {
+      const placeholders = buildInClause(evidenceSessions);
+      const scopedClause = canCrossCourseForensics ? '' : ' AND u.course_id = ? ';
+      const rows = await db.all(
+        `
+          SELECT
+            v.user_id,
+            u.full_name,
+            u.role,
+            u.course_id,
+            u.schedule_group,
+            v.session_id,
+            MAX(v.created_at) AS last_seen_at
+          FROM site_visit_events v
+          JOIN users u ON u.id = v.user_id
+          WHERE v.user_id IS NOT NULL
+            AND v.user_id <> ?
+            AND v.session_id IN (${placeholders})
+            ${scopedClause}
+          GROUP BY v.user_id, u.full_name, u.role, u.course_id, u.schedule_group, v.session_id
+        `,
+        canCrossCourseForensics
+          ? [targetUserId, ...evidenceSessions]
+          : [targetUserId, ...evidenceSessions, scopedCourseId]
+      );
+      (rows || []).forEach((row) => {
+        addMatch(row, {
+          points: 82,
+          reason_key: `session:${row.session_id}`,
+          reason: `Спільна сесія браузера (${shortSessionLabel(row.session_id)})`,
+          session_id: row.session_id,
+          occurred_at: row.last_seen_at,
+        });
+      });
+    }
+
+    if (evidenceIps.length) {
+      const placeholders = buildInClause(evidenceIps);
+      const scopedUsersClause = canCrossCourseForensics ? '' : ' AND course_id = ? ';
+      const scopedJoinClause = canCrossCourseForensics ? '' : ' AND u.course_id = ? ';
+
+      const userIpRows = await db.all(
+        `
+          SELECT
+            id AS user_id,
+            full_name,
+            role,
+            course_id,
+            schedule_group,
+            last_login_ip AS ip,
+            last_login_at AS last_seen_at
+          FROM users
+          WHERE id <> ?
+            AND last_login_ip IN (${placeholders})
+            ${scopedUsersClause}
+        `,
+        canCrossCourseForensics
+          ? [targetUserId, ...evidenceIps]
+          : [targetUserId, ...evidenceIps, scopedCourseId]
+      );
+      (userIpRows || []).forEach((row) => {
+        addMatch(row, {
+          points: 36,
+          reason_key: `users-last-ip:${row.ip}`,
+          reason: `Збіг по останньому IP (${row.ip})`,
+          ip: row.ip,
+          occurred_at: row.last_seen_at,
+        });
+      });
+
+      const loginIpRows = await db.all(
+        `
+          SELECT
+            lh.user_id,
+            u.full_name,
+            u.role,
+            u.course_id,
+            u.schedule_group,
+            lh.ip,
+            MAX(lh.created_at) AS last_seen_at
+          FROM login_history lh
+          JOIN users u ON u.id = lh.user_id
+          WHERE lh.user_id <> ?
+            AND lh.ip IN (${placeholders})
+            ${scopedJoinClause}
+          GROUP BY lh.user_id, u.full_name, u.role, u.course_id, u.schedule_group, lh.ip
+        `,
+        canCrossCourseForensics
+          ? [targetUserId, ...evidenceIps]
+          : [targetUserId, ...evidenceIps, scopedCourseId]
+      );
+      (loginIpRows || []).forEach((row) => {
+        addMatch(row, {
+          points: 42,
+          reason_key: `login-ip:${row.ip}`,
+          reason: `Збіг по IP у login history (${row.ip})`,
+          ip: row.ip,
+          occurred_at: row.last_seen_at,
+        });
+      });
+
+      const visitIpRows = await db.all(
+        `
+          SELECT
+            v.user_id,
+            u.full_name,
+            u.role,
+            u.course_id,
+            u.schedule_group,
+            v.ip,
+            MAX(v.created_at) AS last_seen_at
+          FROM site_visit_events v
+          JOIN users u ON u.id = v.user_id
+          WHERE v.user_id IS NOT NULL
+            AND v.user_id <> ?
+            AND v.ip IN (${placeholders})
+            ${scopedJoinClause}
+          GROUP BY v.user_id, u.full_name, u.role, u.course_id, u.schedule_group, v.ip
+        `,
+        canCrossCourseForensics
+          ? [targetUserId, ...evidenceIps]
+          : [targetUserId, ...evidenceIps, scopedCourseId]
+      );
+      (visitIpRows || []).forEach((row) => {
+        addMatch(row, {
+          points: 28,
+          reason_key: `visit-ip:${row.ip}`,
+          reason: `Збіг по IP у візитах (${row.ip})`,
+          ip: row.ip,
+          occurred_at: row.last_seen_at,
+        });
+      });
+
+      try {
+        const registrationIpRows = await db.all(
+          `
+            SELECT
+              re.user_id,
+              u.full_name,
+              u.role,
+              u.course_id,
+              u.schedule_group,
+              re.ip,
+              MAX(re.created_at) AS last_seen_at
+            FROM user_registration_events re
+            JOIN users u ON u.id = re.user_id
+            WHERE re.user_id <> ?
+              AND re.ip IN (${placeholders})
+              ${scopedJoinClause}
+            GROUP BY re.user_id, u.full_name, u.role, u.course_id, u.schedule_group, re.ip
+          `,
+          canCrossCourseForensics
+            ? [targetUserId, ...evidenceIps]
+            : [targetUserId, ...evidenceIps, scopedCourseId]
+        );
+        (registrationIpRows || []).forEach((row) => {
+          addMatch(row, {
+            points: 45,
+            reason_key: `registration-ip:${row.ip}`,
+            reason: `Збіг по IP під час реєстрації (${row.ip})`,
+            ip: row.ip,
+            occurred_at: row.last_seen_at,
+          });
+        });
+      } catch (err) {
+        // no-op if table is missing on legacy nodes
+      }
+    }
+
+    if (evidenceAgents.length) {
+      const placeholders = buildInClause(evidenceAgents);
+      const scopedUsersClause = canCrossCourseForensics ? '' : ' AND course_id = ? ';
+      const scopedJoinClause = canCrossCourseForensics ? '' : ' AND u.course_id = ? ';
+
+      const userAgentRows = await db.all(
+        `
+          SELECT
+            id AS user_id,
+            full_name,
+            role,
+            course_id,
+            schedule_group,
+            last_user_agent AS user_agent,
+            last_login_at AS last_seen_at
+          FROM users
+          WHERE id <> ?
+            AND last_user_agent IN (${placeholders})
+            ${scopedUsersClause}
+        `,
+        canCrossCourseForensics
+          ? [targetUserId, ...evidenceAgents]
+          : [targetUserId, ...evidenceAgents, scopedCourseId]
+      );
+      (userAgentRows || []).forEach((row) => {
+        addMatch(row, {
+          points: 18,
+          reason_key: `users-agent:${row.user_agent}`,
+          reason: 'Збіг по пристрою (останній логін)',
+          user_agent: row.user_agent,
+          occurred_at: row.last_seen_at,
+        });
+      });
+
+      const loginAgentRows = await db.all(
+        `
+          SELECT
+            lh.user_id,
+            u.full_name,
+            u.role,
+            u.course_id,
+            u.schedule_group,
+            lh.user_agent,
+            MAX(lh.created_at) AS last_seen_at
+          FROM login_history lh
+          JOIN users u ON u.id = lh.user_id
+          WHERE lh.user_id <> ?
+            AND lh.user_agent IN (${placeholders})
+            ${scopedJoinClause}
+          GROUP BY lh.user_id, u.full_name, u.role, u.course_id, u.schedule_group, lh.user_agent
+        `,
+        canCrossCourseForensics
+          ? [targetUserId, ...evidenceAgents]
+          : [targetUserId, ...evidenceAgents, scopedCourseId]
+      );
+      (loginAgentRows || []).forEach((row) => {
+        addMatch(row, {
+          points: 16,
+          reason_key: `login-agent:${row.user_agent}`,
+          reason: 'Збіг по пристрою в login history',
+          user_agent: row.user_agent,
+          occurred_at: row.last_seen_at,
+        });
+      });
+    }
+
+    if (evidenceFingerprints.length) {
+      const placeholders = buildInClause(evidenceFingerprints);
+      const scopedJoinClause = canCrossCourseForensics ? '' : ' AND u.course_id = ? ';
+      try {
+        const registrationFingerprintRows = await db.all(
+          `
+            SELECT
+              re.user_id,
+              u.full_name,
+              u.role,
+              u.course_id,
+              u.schedule_group,
+              re.device_fingerprint,
+              MAX(re.created_at) AS last_seen_at
+            FROM user_registration_events re
+            JOIN users u ON u.id = re.user_id
+            WHERE re.user_id <> ?
+              AND re.device_fingerprint IN (${placeholders})
+              ${scopedJoinClause}
+            GROUP BY re.user_id, u.full_name, u.role, u.course_id, u.schedule_group, re.device_fingerprint
+          `,
+          canCrossCourseForensics
+            ? [targetUserId, ...evidenceFingerprints]
+            : [targetUserId, ...evidenceFingerprints, scopedCourseId]
+        );
+        (registrationFingerprintRows || []).forEach((row) => {
+          addMatch(row, {
+            points: 24,
+            reason_key: `registration-fingerprint:${row.device_fingerprint}`,
+            reason: 'Збіг device fingerprint під час реєстрації',
+            occurred_at: row.last_seen_at,
+          });
+        });
+      } catch (err) {
+        // no-op if table is missing on legacy nodes
+      }
+    }
+
+    const matches = Array.from(matchesByUser.values())
+      .map((row) => {
+        const confidence = resolveForensicsConfidence(row.score);
+        return {
+          user_id: row.user_id,
+          full_name: row.full_name,
+          role: row.role,
+          course_id: row.course_id,
+          schedule_group: row.schedule_group,
+          score: Number(row.score || 0),
+          confidence: confidence.key,
+          confidence_label: confidence.label,
+          reasons: row.reasons.slice(0, 6),
+          ip_hits: Array.from(row.ip_hits),
+          session_hits: Array.from(row.session_hits),
+          agent_hits: Array.from(row.agent_hits),
+          last_seen_at: row.last_seen_at,
+        };
+      })
+      .sort((a, b) => {
+        if (Number(b.score || 0) !== Number(a.score || 0)) {
+          return Number(b.score || 0) - Number(a.score || 0);
+        }
+        const aSeen = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
+        const bSeen = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+        return bSeen - aSeen;
+      })
+      .slice(0, 10);
+
+    const suspectedOwner = matches.length && matches[0].score >= 35 ? matches[0] : null;
+
+    return res.json({
+      target: {
+        id: targetUser.id,
+        full_name: targetUser.full_name,
+        role: normalizeRoleKey(targetUser.role || 'student'),
+        course_id: Number.isFinite(Number(targetUser.course_id)) ? Number(targetUser.course_id) : null,
+        schedule_group: targetUser.schedule_group || null,
+        created_at: parseTs(targetUser.created_at),
+        last_login_at: parseTs(targetUser.last_login_at),
+      },
+      evidence: {
+        source: registrationEvent ? 'registration_event' : (inferredRegistrationRows.length ? 'inferred_site_visits' : 'login_only'),
+        ips: evidenceIps,
+        session_ids: evidenceSessions,
+        user_agents: evidenceAgents,
+        device_fingerprints: evidenceFingerprints,
+        register_event: registrationEvent
+          ? {
+              ip: normalizeForensicsIp(registrationEvent.ip),
+              user_agent: normalizeForensicsAgent(registrationEvent.user_agent),
+              session_id: String(registrationEvent.session_id || '').trim() || null,
+              source: registrationEvent.source || 'register_form',
+              created_at: parseTs(registrationEvent.created_at),
+            }
+          : null,
+        inferred_register_events: (inferredRegistrationRows || []).slice(0, 4).map((row) => ({
+          session_id: String(row.session_id || '').trim() || null,
+          ip: normalizeForensicsIp(row.ip),
+          user_agent: normalizeForensicsAgent(row.user_agent),
+          event_count: Number(row.event_count || 0),
+          first_seen_at: parseTs(row.first_seen_at),
+          last_seen_at: parseTs(row.last_seen_at),
+        })),
+        has_login_history: (targetLoginRows || []).length > 0,
+      },
+      suspected_owner: suspectedOwner,
+      matches,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.users.forensics.fetch');
+  }
 });
 
 app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment'), async (req, res) => {
