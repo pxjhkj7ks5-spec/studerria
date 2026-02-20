@@ -11663,6 +11663,7 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
 }
 
 async function getJournalStudents(subjectId, courseId, groupFilterSet = null, userFilterIds = []) {
+  const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
   const params = [subjectId, courseId];
   let sql = `
     SELECT DISTINCT u.id, u.full_name, sg.group_number
@@ -11670,7 +11671,7 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
     JOIN users u ON u.id = sg.student_id
     WHERE sg.subject_id = ?
       AND u.course_id = ?
-      AND u.is_active = 1
+      ${activeUserFilter}
   `;
   if (groupFilterSet && groupFilterSet.size) {
     const groups = Array.from(groupFilterSet).filter((value) => Number.isInteger(value) && value > 0);
@@ -11693,6 +11694,20 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
     full_name: row.full_name,
     group_number: Number(row.group_number || 0),
   }));
+}
+
+async function getJournalStudentGroup(subjectId, studentId) {
+  const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
+  return db.get(
+    `
+      SELECT sg.group_number
+      FROM student_groups sg
+      JOIN users u ON u.id = sg.student_id
+      WHERE sg.subject_id = ? AND sg.student_id = ?${activeUserFilter}
+      LIMIT 1
+    `,
+    [subjectId, studentId]
+  );
 }
 
 async function buildJournalAttendanceContext({
@@ -12852,12 +12867,13 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       return res.status(404).json({ error: 'Column not found' });
     }
 
+    const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
     const studentRow = await db.get(
       `
         SELECT sg.group_number, u.id, u.full_name
         FROM student_groups sg
         JOIN users u ON u.id = sg.student_id
-        WHERE sg.subject_id = ? AND sg.student_id = ?
+        WHERE sg.subject_id = ? AND sg.student_id = ?${activeUserFilter}
         LIMIT 1
       `,
       [column.subject_id, studentId]
@@ -13266,15 +13282,7 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
     }
 
-    const studentRow = await db.get(
-      `
-        SELECT sg.group_number
-        FROM student_groups sg
-        WHERE sg.subject_id = ? AND sg.student_id = ?
-        LIMIT 1
-      `,
-      [column.subject_id, studentId]
-    );
+    const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
     }
@@ -13488,12 +13496,15 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
 
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     const uniqueStudentIds = Array.from(new Set(normalizedEntries.map((entry) => entry.student_id)));
+    const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
     const studentRows = await db.all(
       `
-        SELECT student_id, group_number
-        FROM student_groups
-        WHERE subject_id = ?
-          AND student_id IN (${uniqueStudentIds.map(() => '?').join(',')})
+        SELECT sg.student_id, sg.group_number
+        FROM student_groups sg
+        JOIN users u ON u.id = sg.student_id
+        WHERE sg.subject_id = ?
+          AND sg.student_id IN (${uniqueStudentIds.map(() => '?').join(',')})
+          ${activeUserFilter}
       `,
       [column.subject_id, ...uniqueStudentIds]
     );
@@ -13688,15 +13699,7 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
       return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
 
-    const studentRow = await db.get(
-      `
-        SELECT sg.group_number
-        FROM student_groups sg
-        WHERE sg.subject_id = ? AND sg.student_id = ?
-        LIMIT 1
-      `,
-      [column.subject_id, studentId]
-    );
+    const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
     }
@@ -13831,15 +13834,7 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
       return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
 
-    const studentRow = await db.get(
-      `
-        SELECT sg.group_number
-        FROM student_groups sg
-        WHERE sg.subject_id = ? AND sg.student_id = ?
-        LIMIT 1
-      `,
-      [column.subject_id, studentId]
-    );
+    const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
     }
@@ -13971,15 +13966,7 @@ app.post('/journal/retakes/create', requireLogin, writeLimiter, async (req, res)
       return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
 
-    const studentRow = await db.get(
-      `
-        SELECT sg.group_number
-        FROM student_groups sg
-        WHERE sg.subject_id = ? AND sg.student_id = ?
-        LIMIT 1
-      `,
-      [column.subject_id, studentId]
-    );
+    const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
     }
@@ -14119,15 +14106,7 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Retake%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
     }
 
-    const studentRow = await db.get(
-      `
-        SELECT sg.group_number
-        FROM student_groups sg
-        WHERE sg.subject_id = ? AND sg.student_id = ?
-        LIMIT 1
-      `,
-      [column.subject_id, studentId]
-    );
+    const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
     }
@@ -14375,15 +14354,7 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
       return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
 
-    const studentRow = await db.get(
-      `
-        SELECT sg.group_number
-        FROM student_groups sg
-        WHERE sg.subject_id = ? AND sg.student_id = ?
-        LIMIT 1
-      `,
-      [column.subject_id, studentId]
-    );
+    const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
       return res.status(403).send('Forbidden (journal)');
     }
@@ -14525,15 +14496,7 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
       return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
 
-    const studentRow = await db.get(
-      `
-        SELECT sg.group_number
-        FROM student_groups sg
-        WHERE sg.subject_id = ? AND sg.student_id = ?
-        LIMIT 1
-      `,
-      [column.subject_id, studentId]
-    );
+    const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
     }
@@ -14748,15 +14711,7 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Moderation%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
     }
 
-    const studentRow = await db.get(
-      `
-        SELECT sg.group_number
-        FROM student_groups sg
-        WHERE sg.subject_id = ? AND sg.student_id = ?
-        LIMIT 1
-      `,
-      [column.subject_id, studentId]
-    );
+    const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
     }
@@ -14917,15 +14872,7 @@ app.post('/journal/competency/add', requireLogin, writeLimiter, async (req, res)
       return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
 
-    const studentRow = await db.get(
-      `
-        SELECT sg.group_number
-        FROM student_groups sg
-        WHERE sg.subject_id = ? AND sg.student_id = ?
-        LIMIT 1
-      `,
-      [column.subject_id, studentId]
-    );
+    const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
     }
@@ -16048,6 +15995,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
   const selectedSubjectIdRaw = req.query.subject_id ? Number(req.query.subject_id) : null;
   const selectedSubjectId = Number.isFinite(selectedSubjectIdRaw) ? selectedSubjectIdRaw : null;
   const isTeacherMode = hasSessionRole(req, 'teacher');
+  const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
 
   try {
     const subjectRows = isTeacherMode
@@ -16186,10 +16134,10 @@ app.get('/teamwork', requireLogin, async (req, res) => {
 
     const tasks = await db.all(
       `
-        SELECT t.*, s.name AS subject_name, u.full_name AS created_by_name
+        SELECT t.*, s.name AS subject_name, COALESCE(u.full_name, '') AS created_by_name
         FROM teamwork_tasks t
         JOIN subjects s ON s.id = t.subject_id
-        JOIN users u ON u.id = t.created_by
+        LEFT JOIN users u ON u.id = t.created_by${activeUserFilter}
         WHERE ${taskFilters.join(' AND ')}
         ORDER BY t.created_at DESC
       `,
@@ -16215,9 +16163,9 @@ app.get('/teamwork', requireLogin, async (req, res) => {
     const [groups, members, reactionRows, myReactionRows, students, visibilityRows] = await Promise.all([
       db.all(
         `
-          SELECT g.*, u.full_name AS leader_name
+          SELECT g.*, COALESCE(u.full_name, '') AS leader_name
           FROM teamwork_groups g
-          JOIN users u ON u.id = g.leader_id
+          LEFT JOIN users u ON u.id = g.leader_id${activeUserFilter}
           WHERE g.task_id IN (${placeholders})
           ORDER BY g.task_id ASC, g.seminar_group_number NULLS FIRST, g.id ASC
         `,
@@ -16227,7 +16175,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         `
           SELECT m.*, u.full_name AS member_name
           FROM teamwork_members m
-          JOIN users u ON u.id = m.user_id
+          JOIN users u ON u.id = m.user_id${activeUserFilter}
           WHERE m.task_id IN (${placeholders})
         `,
         taskIds
@@ -16254,7 +16202,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
           SELECT u.id, u.full_name, sg.group_number
           FROM users u
           JOIN student_groups sg ON sg.student_id = u.id
-          WHERE sg.subject_id = ? AND u.course_id = ?
+          WHERE sg.subject_id = ? AND u.course_id = ?${activeUserFilter}
           ORDER BY u.full_name ASC
         `,
         [selectedSubject.subject_id, selectedCourseId]
@@ -16277,6 +16225,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
       if (!groupsByTask[group.task_id]) groupsByTask[group.task_id] = [];
       groupsByTask[group.task_id].push({
         ...group,
+        leader_name: String(group.leader_name || '').trim() || '—',
         members: [],
       });
     });
@@ -16364,6 +16313,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
 
         return {
           ...task,
+          created_by_name: String(task.created_by_name || '').trim() || '—',
           groups: taskGroups,
           random_distribution: Number(task.random_distribution) === 1 || task.random_distribution === true,
           member_limits_enabled: Number(task.member_limits_enabled) === 1 || task.member_limits_enabled === true,
@@ -16491,12 +16441,13 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
     }
 
     const groupPlaceholders = targetGroups.map(() => '?').join(',');
+    const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
     const students = await db.all(
       `
         SELECT DISTINCT u.id, u.full_name, sg.group_number
         FROM users u
         JOIN student_groups sg ON sg.student_id = u.id
-        WHERE sg.subject_id = ? AND u.course_id = ? AND sg.group_number IN (${groupPlaceholders})
+        WHERE sg.subject_id = ? AND u.course_id = ?${activeUserFilter} AND sg.group_number IN (${groupPlaceholders})
         ORDER BY u.id ASC
       `,
       [subjectId, subjectRow.course_id || 1, ...targetGroups]
@@ -16843,6 +16794,7 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
 
   const { id: userId } = req.session.user;
   const joinedAt = new Date().toISOString();
+  const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
   try {
     const grpRow = await db.get(
       `
@@ -16909,7 +16861,15 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
     }
 
     if (grpRow.max_members) {
-      const cntRow = await db.get('SELECT COUNT(*) AS cnt FROM teamwork_members WHERE group_id = ?', [groupId]);
+      const cntRow = await db.get(
+        `
+          SELECT COUNT(*) AS cnt
+          FROM teamwork_members tm
+          JOIN users u ON u.id = tm.user_id
+          WHERE tm.group_id = ?${activeUserFilter}
+        `,
+        [groupId]
+      );
       if (Number(cntRow?.cnt || 0) >= Number(grpRow.max_members)) {
         return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Group%20is%20full`);
       }
@@ -16974,6 +16934,7 @@ app.post('/teamwork/group/move-member', requireLogin, writeLimiter, async (req, 
   }
 
   const { id: actorUserId } = req.session.user;
+  const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
   try {
     const taskRow = await db.get('SELECT id, subject_id, created_by FROM teamwork_tasks WHERE id = ?', [taskId]);
     if (!taskRow) {
@@ -17004,7 +16965,15 @@ app.post('/teamwork/group/move-member', requireLogin, writeLimiter, async (req, 
     }
 
     if (targetGroupRow.max_members) {
-      const countRow = await db.get('SELECT COUNT(*) AS cnt FROM teamwork_members WHERE group_id = ?', [targetGroupId]);
+      const countRow = await db.get(
+        `
+          SELECT COUNT(*) AS cnt
+          FROM teamwork_members tm
+          JOIN users u ON u.id = tm.user_id
+          WHERE tm.group_id = ?${activeUserFilter}
+        `,
+        [targetGroupId]
+      );
       if (Number(countRow?.cnt || 0) >= Number(targetGroupRow.max_members)) {
         return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Target%20group%20is%20full`);
       }
@@ -17711,7 +17680,6 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         : normalizeRoleKey(req.session.role || 'student')));
   const courseId = getAdminCourse(req);
   const {
-    tab,
     group_number,
     day,
     subject,
@@ -17723,7 +17691,6 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     history_q,
     history_from,
     history_to,
-    users_status,
     users_q,
     users_group,
     homework_from,
@@ -17734,11 +17701,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     teamwork_to,
     schedule_date,
   } = req.query;
-  const requestedTab = String(tab || '').trim();
-  const usersStatusDefault = requestedTab === 'admin-students' ? 'all' : 'active';
-  const resolvedUsersStatus = ['active', 'inactive', 'all'].includes(String(users_status || ''))
-    ? String(users_status)
-    : usersStatusDefault;
+  const resolvedUsersStatus = 'active';
   const scheduleFilters = [];
   const scheduleParams = [];
   let activeSemester = null;
@@ -17914,11 +17877,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         const userFilters = ['u.course_id = ?'];
         const userParams = [courseId];
         if (usersHasIsActive) {
-          if (resolvedUsersStatus === 'inactive') {
-            userFilters.push('u.is_active = 0');
-          } else if (resolvedUsersStatus !== 'all') {
-            userFilters.push('u.is_active = 1');
-          }
+          userFilters.push('u.is_active = 1');
         }
         if (users_q) {
           userFilters.push('u.full_name ILIKE ?');
@@ -21710,7 +21669,6 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
   }
-  const status = req.query.status;
   const q = req.query.q;
   const group = req.query.group;
   const courseId = getAdminCourse(req);
@@ -21718,11 +21676,7 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
     const userFilters = ['u.course_id = ?'];
     const userParams = [courseId];
     if (usersHasIsActive) {
-      if (status === 'inactive') {
-        userFilters.push('u.is_active = 0');
-      } else if (status !== 'all') {
-        userFilters.push('u.is_active = 1');
-      }
+      userFilters.push('u.is_active = 1');
     }
     if (q) {
       userFilters.push('u.full_name ILIKE ?');
@@ -23978,8 +23932,12 @@ app.get('/starosta', requireStaff, async (req, res) => {
 
   let users = [];
   try {
+    const activeClause = usersHasIsActive ? ' AND is_active = 1' : '';
     users = await db.all(
-      'SELECT id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at, course_id FROM users WHERE course_id = ? ORDER BY full_name',
+      `SELECT id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at, course_id
+       FROM users
+       WHERE course_id = ?${activeClause}
+       ORDER BY full_name`,
       [courseId]
     );
   } catch (err) {
