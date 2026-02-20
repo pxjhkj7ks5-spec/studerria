@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.65",
+      "date": "2026-02-20",
+      "items": [
+        "fix(deploy): restored missing closure lines around scheduler/admin settings block in app.js that caused \"Unexpected end of input\" on startup",
+        "fix(cloud-run): unblocked container boot so service can bind to PORT and pass startup health checks again"
+      ]
+    },
+    {
       "version": "0.9.64",
       "date": "2026-02-20",
       "items": [

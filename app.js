@@ -20902,6 +20902,11 @@ app.post('/admin/api/scheduler/run', requireScheduleGeneratorSectionAccess, asyn
     return res.status(500).json({ error: 'Database error' });
   }
 });
+      }
+    );
+  });
+});
+});
 
 app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   try {
