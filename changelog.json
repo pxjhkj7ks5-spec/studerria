@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.43",
+      "date": "2026-02-20",
+      "items": [
+        "ci: removed remaining GitHub Actions workflow to fully disable GitHub-side CI/CD runs",
+        "ops: prepared repository for Cloud Build-only deployment path (no GitHub deploy secrets required)"
+      ]
+    },
+    {
       "version": "0.9.42",
       "date": "2026-02-20",
       "items": [
