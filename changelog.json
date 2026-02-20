@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.41",
+      "date": "2026-02-20",
+      "items": [
+        "ci(deploy): added preflight validation for required deploy secrets (project/region/service)",
+        "ci(deploy): made Cloud SQL flags conditional so deploy no longer fails when INSTANCE_CONNECTION_NAME is empty"
+      ]
+    },
+    {
       "version": "0.9.40",
       "date": "2026-02-20",
       "items": [
