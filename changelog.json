@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.9.61",
+      "date": "2026-02-20",
+      "items": [
+        "feat(admin-activity): added activity points reset controls in Activity Log for course-wide reset and per-user reset",
+        "feat(api): added POST /admin/activity/reset-points with course-scoped permission checks and active-semester awareness",
+        "feat(activity-points): introduced `activity_points_adjust` entries so point resets keep audit history instead of deleting logs",
+        "audit(admin): added history_log actions `activity_points_reset_course` and `activity_points_reset_user` with reset metadata"
+      ]
+    },
+    {
       "version": "0.9.60",
       "date": "2026-02-20",
       "items": [

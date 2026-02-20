@@ -4414,6 +4414,7 @@ const ACTIVITY_POINTS_CASE =
   "CASE WHEN action_type = 'homework_create' THEN 1 " +
   "WHEN action_type = 'teamwork_task_create' THEN 2 " +
   "WHEN action_type = 'teamwork_group_create' THEN 1 " +
+  "WHEN action_type = 'activity_points_adjust' THEN COALESCE((details::jsonb ->> 'delta')::numeric, 0) " +
   "ELSE 0 END";
 
 const VISIT_DAY_OPTIONS = new Set([7, 14, 30, 60, 90]);
@@ -18450,6 +18451,155 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
           });
         }
       );
+});
+
+app.post('/admin/activity/reset-points', requireActivitySectionAccess, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
+  const courseId = hasSessionRole(req, 'admin')
+    ? getAdminCourse(req)
+    : Number(req.session.user.course_id || 1);
+  let activeSemester = null;
+  try {
+    activeSemester = await getActiveSemester(courseId);
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
+  const semesterId = activeSemester ? Number(activeSemester.id) : null;
+  const actorId = Number(req.session.user.id);
+  const actorName = req.session.user.username || 'admin';
+  const resetScope = String(req.body.reset_scope || '').trim().toLowerCase();
+  const createdAt = new Date().toISOString();
+
+  const resolveUserPoints = async (targetUserId) => {
+    const row = await db.get(
+      `
+        SELECT COALESCE(SUM(${ACTIVITY_POINTS_CASE}), 0) AS points
+        FROM activity_log
+        WHERE user_id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}
+      `,
+      activeSemester ? [targetUserId, courseId, activeSemester.id] : [targetUserId, courseId]
+    );
+    return row ? Number(row.points || 0) : 0;
+  };
+
+  const createPointsResetEntry = async (targetUserId, targetUserName, previousPoints, reasonKey) => {
+    const normalizedPrevious = Math.round(Number(previousPoints || 0) * 100) / 100;
+    const delta = Math.round((0 - normalizedPrevious) * 100) / 100;
+    if (!Number.isFinite(delta) || Math.abs(delta) < 0.0001) {
+      return null;
+    }
+    const details = {
+      reason: reasonKey,
+      delta,
+      previous_points: normalizedPrevious,
+      reset_by_id: actorId,
+      reset_by: actorName,
+    };
+    await db.run(
+      `
+        INSERT INTO activity_log (user_id, user_name, action_type, target_type, target_id, details, created_at, course_id, semester_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        targetUserId,
+        targetUserName || `User ${targetUserId}`,
+        'activity_points_adjust',
+        'user',
+        targetUserId,
+        JSON.stringify(details),
+        createdAt,
+        courseId,
+        semesterId,
+      ]
+    );
+    return details;
+  };
+
+  try {
+    if (resetScope === 'course') {
+      const users = await db.all(
+        `
+          SELECT id, full_name
+          FROM users
+          WHERE course_id = ?${usersHasIsActive ? ' AND is_active = 1' : ''}
+          ORDER BY full_name
+        `,
+        [courseId]
+      );
+      let affectedUsers = 0;
+      let totalResetPoints = 0;
+      for (const user of users || []) {
+        const userId = Number(user.id);
+        if (!Number.isFinite(userId) || userId < 1) continue;
+        const currentPoints = await resolveUserPoints(userId);
+        const details = await createPointsResetEntry(
+          userId,
+          user.full_name || `User ${userId}`,
+          currentPoints,
+          'course_reset'
+        );
+        if (!details) continue;
+        affectedUsers += 1;
+        totalResetPoints += Math.abs(Number(details.previous_points || 0));
+      }
+      logAction(db, req, 'activity_points_reset_course', {
+        course_id: courseId,
+        semester_id: semesterId,
+        affected_users: affectedUsers,
+        total_points_reset: Math.round(totalResetPoints * 100) / 100,
+      });
+      if (affectedUsers < 1) {
+        return res.redirect('/admin?ok=No%20activity%20points%20to%20reset%20for%20this%20course');
+      }
+      return res.redirect(`/admin?ok=${encodeURIComponent(`Activity points reset for ${affectedUsers} users`)}`);
+    }
+
+    if (resetScope === 'user') {
+      const targetUserId = Number(req.body.user_id);
+      if (!Number.isFinite(targetUserId) || targetUserId < 1) {
+        return res.redirect('/admin?err=Select%20a%20user');
+      }
+      const targetUser = await db.get(
+        `
+          SELECT id, full_name
+          FROM users
+          WHERE id = ? AND course_id = ?${usersHasIsActive ? ' AND is_active = 1' : ''}
+          LIMIT 1
+        `,
+        [targetUserId, courseId]
+      );
+      if (!targetUser) {
+        return res.redirect('/admin?err=User%20not%20found%20in%20current%20course');
+      }
+      const currentPoints = await resolveUserPoints(targetUserId);
+      const details = await createPointsResetEntry(
+        targetUserId,
+        targetUser.full_name || `User ${targetUserId}`,
+        currentPoints,
+        'user_reset'
+      );
+      logAction(db, req, 'activity_points_reset_user', {
+        target_user_id: targetUserId,
+        target_user_name: targetUser.full_name || null,
+        course_id: courseId,
+        semester_id: semesterId,
+        previous_points: Math.round(currentPoints * 100) / 100,
+      });
+      if (!details) {
+        return res.redirect('/admin?ok=User%20already%20has%200%20activity%20points');
+      }
+      const targetUserName = targetUser.full_name || `User ${targetUserId}`;
+      return res.redirect(`/admin?ok=${encodeURIComponent(`Activity points reset for ${targetUserName}`)}`);
+    }
+
+    return res.redirect('/admin?err=Invalid%20reset%20scope');
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
 });
 
 app.get('/admin/schedule-list', requireScheduleSectionAccess, async (req, res) => {

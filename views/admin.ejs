@@ -3246,6 +3246,54 @@
 
           <div class="card mb-4">
             <div class="card-body">
+              <h6 class="mb-3"><%= t('admin.resetActivityPoints') %></h6>
+              <div class="row g-3">
+                <div class="col-12 col-lg-6">
+                  <form method="POST" action="/admin/activity/reset-points" class="d-grid gap-2">
+                    <input type="hidden" name="reset_scope" value="course" />
+                    <button
+                      class="btn btn-outline-danger"
+                      type="submit"
+                      data-confirm="<%= t('admin.resetActivityPointsCourseConfirm') %>"
+                      data-confirm-level="danger"
+                    >
+                      <%= t('admin.resetCoursePoints') %>
+                    </button>
+                    <div class="form-text text-muted"><%= t('admin.resetCoursePointsHint') %></div>
+                  </form>
+                </div>
+                <div class="col-12 col-lg-6">
+                  <form method="POST" action="/admin/activity/reset-points">
+                    <input type="hidden" name="reset_scope" value="user" />
+                    <div class="row g-2 align-items-end">
+                      <div class="col-12 col-md-8">
+                        <label class="form-label"><%= t('admin.user') %></label>
+                        <select class="form-select" name="user_id" required>
+                          <option value="" selected disabled><%= t('admin.selectUser') %></option>
+                          <% (users || []).forEach(function(u) { %>
+                            <option value="<%= u.id %>"><%= u.full_name %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="col-12 col-md-4 d-grid">
+                        <button
+                          class="btn btn-outline-warning"
+                          type="submit"
+                          data-confirm="<%= t('admin.resetActivityPointsUserConfirm') %>"
+                          data-confirm-level="warning"
+                        >
+                          <%= t('admin.resetUserPoints') %>
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="card-body">
               <h6 class="mb-3"><%= t('admin.topActive') %></h6>
               <div class="table-responsive">
                 <table class="table table-sm align-middle">
