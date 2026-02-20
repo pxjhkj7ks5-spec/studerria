@@ -5241,6 +5241,20 @@
           });
           return valid;
         };
+        const readJsonSafe = async (response) => {
+          const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+          if (contentType.includes('application/json')) {
+            return response.json();
+          }
+          const rawText = await response.text();
+          if (!rawText) return {};
+          try {
+            return JSON.parse(rawText);
+          } catch (_) {
+            const firstLine = rawText.split('\n')[0] || rawText;
+            return { error: String(firstLine).trim() || 'Save failed' };
+          }
+        };
 
         fields.forEach((field) => {
           field.addEventListener('input', () => {
@@ -5270,7 +5284,7 @@
               headers: { Accept: 'application/json' },
               body: formData,
             });
-            const data = await response.json();
+            const data = await readJsonSafe(response);
             if (!response.ok || !data.ok) {
               throw new Error(data.error || 'Save failed');
             }

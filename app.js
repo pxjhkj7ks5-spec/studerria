@@ -3511,6 +3511,18 @@ function handleDbError(res, err, label) {
   pushRuntimeErrorEvent('db', label, message);
   console.error(`Database error (${label})`, err);
   if (!res.headersSent) {
+    const req = res && res.req ? res.req : null;
+    const wantsJson = Boolean(req)
+      && (
+        String(req.get && req.get('accept') ? req.get('accept') : '').toLowerCase().includes('application/json')
+        || String(req.headers && req.headers.accept ? req.headers.accept : '').toLowerCase().includes('application/json')
+      );
+    if (wantsJson) {
+      if (process.env.DB_DEBUG === 'true') {
+        return res.status(500).json({ error: `Database error (${label})`, details: message });
+      }
+      return res.status(500).json({ error: 'Database error' });
+    }
     if (process.env.DB_DEBUG === 'true') {
       return res.status(500).send(`Database error (${label})`);
     }
@@ -24628,6 +24640,17 @@ const startServer = () => {
 app.use((err, req, res, next) => {
   pushRuntimeErrorEvent('unhandled', 'express_middleware', err && err.message ? err.message : err);
   console.error('Unhandled error', err);
+  const wantsJson = String(req.get && req.get('accept') ? req.get('accept') : '').toLowerCase().includes('application/json')
+    || String(req.headers && req.headers.accept ? req.headers.accept : '').toLowerCase().includes('application/json');
+  if (wantsJson) {
+    if (process.env.DB_DEBUG === 'true') {
+      return res.status(500).json({
+        error: err && err.message ? String(err.message) : 'Internal Server Error',
+        details: err && err.stack ? String(err.stack) : String(err),
+      });
+    }
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
   if (process.env.DB_DEBUG === 'true') {
     return res.status(500).send(err && err.stack ? err.stack : String(err));
   }

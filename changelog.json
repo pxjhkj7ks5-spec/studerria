@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.51",
+      "date": "2026-02-20",
+      "items": [
+        "fix(system-settings): save request now safely parses non-JSON responses on frontend to avoid \"Unexpected token ... is not valid JSON\" crash toast",
+        "fix(api-errors): database/unhandled errors now return JSON for requests with `Accept: application/json` instead of plain text stack",
+        "ux(system-settings): save flow now surfaces real backend error message instead of JSON parse exception"
+      ]
+    },
+    {
       "version": "0.9.50",
       "date": "2026-02-20",
       "items": [
