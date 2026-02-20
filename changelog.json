@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.23",
+      "date": "2026-02-20",
+      "items": [
+        "feat(my-day): added student `What-if` calculator in cockpit (`Пульс та інбокс`) with subject selector and target presets 60/75/90",
+        "feat(api): added `/api/my-day/what-if` endpoint that forecasts required average on remaining journal columns using current weighted grading model",
+        "feat(my-day-data): extended `/my-day` payload with `what_if_subjects` and default subject selection for instant calculator bootstrap"
+      ]
+    },
+    {
       "version": "0.9.22",
       "date": "2026-02-20",
       "items": [

@@ -654,6 +654,110 @@ body.theme-light .inbox-meta {
   color: var(--muted-light);
 }
 
+.whatif-block {
+  margin-top: 0.84rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  padding-top: 0.78rem;
+}
+
+body.theme-light .whatif-block {
+  border-top-color: rgba(15, 23, 42, 0.12);
+}
+
+.whatif-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.54rem;
+}
+
+.whatif-header h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 660;
+}
+
+.whatif-header span {
+  font-size: 0.74rem;
+  color: var(--muted-dark);
+}
+
+body.theme-light .whatif-header span {
+  color: var(--muted-light);
+}
+
+.whatif-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.44rem;
+  align-items: center;
+}
+
+.whatif-targets {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.whatif-target-btn {
+  min-width: 44px;
+}
+
+.whatif-target-btn.is-active {
+  border-color: rgba(96, 165, 250, 0.52);
+  background: rgba(59, 130, 246, 0.26);
+}
+
+body.theme-light .whatif-target-btn.is-active {
+  border-color: rgba(37, 99, 235, 0.46);
+  background: rgba(59, 130, 246, 0.16);
+}
+
+.whatif-result {
+  margin-top: 0.52rem;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  background: rgba(15, 23, 42, 0.18);
+  padding: 0.54rem 0.62rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.24rem;
+}
+
+body.theme-light .whatif-result {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.whatif-result-line {
+  font-size: 0.78rem;
+}
+
+.whatif-positive {
+  color: #86efac;
+}
+
+.whatif-negative {
+  color: #fca5a5;
+}
+
+body.theme-light .whatif-positive {
+  color: #166534;
+}
+
+body.theme-light .whatif-negative {
+  color: #b91c1c;
+}
+
+.muted-line {
+  color: var(--muted-dark);
+}
+
+body.theme-light .muted-line {
+  color: var(--muted-light);
+}
+
 .reminder-block {
   margin-top: 0.92rem;
   border-top: 1px solid rgba(148, 163, 184, 0.22);
@@ -1122,6 +1226,14 @@ body.theme-light .footer-version {
 
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .whatif-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .whatif-targets {
+    justify-content: flex-start;
   }
 
   .reminder-row-split {

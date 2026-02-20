@@ -3851,6 +3851,20 @@ async function buildMyDayData(user, role = 'student') {
   });
   workloadTargets = Array.from(targetMap.values());
   const studentHasOwnSubjects = Boolean((studentGroups || []).length);
+  const whatIfSubjectMap = new Map();
+  (studentGroups || []).forEach((row) => {
+    const subjectId = Number(row.subject_id || 0);
+    if (!Number.isFinite(subjectId) || subjectId < 1) return;
+    if (!whatIfSubjectMap.has(subjectId)) {
+      whatIfSubjectMap.set(subjectId, {
+        subject_id: subjectId,
+        subject_name: row.subject_name || 'Предмет',
+      });
+    }
+  });
+  const whatIfSubjects = Array.from(whatIfSubjectMap.values()).sort((a, b) => (
+    String(a.subject_name || '').localeCompare(String(b.subject_name || ''))
+  ));
 
   const buildScope = (alias) => {
     const chunks = [];
@@ -4435,6 +4449,12 @@ async function buildMyDayData(user, role = 'student') {
     brief.message = `${brief.message} Додатково: ${strongestCompetency.label} зараз серед найсильніших напрямів.`;
   }
 
+  const defaultWhatIfSubjectId = (
+    (riskiestSubject && Number.isFinite(Number(riskiestSubject.subject_id)) && Number(riskiestSubject.subject_id) > 0)
+      ? Number(riskiestSubject.subject_id)
+      : null
+  ) || (whatIfSubjects[0] ? Number(whatIfSubjects[0].subject_id) : null);
+
   return {
     today: todayStr,
     tomorrow: tomorrowStr,
@@ -4457,9 +4477,181 @@ async function buildMyDayData(user, role = 'student') {
     competency_strongest: strongestCompetency,
     competency_weakest: weakestCompetency,
     competency_fastest_growth: fastestGrowingCompetency,
+    what_if_subjects: whatIfSubjects,
+    what_if_default_subject_id: defaultWhatIfSubjectId,
     brief,
     scope_count: workloadTargets.length,
     role: normalizedRole,
+  };
+}
+
+async function buildMyDayWhatIfForecast({
+  userId,
+  courseId,
+  semesterId,
+  subjectId,
+  targetScores = [60, 75, 90],
+}) {
+  const subjectRow = await db.get(
+    `
+      SELECT s.id, s.name
+      FROM student_groups sg
+      JOIN subjects s ON s.id = sg.subject_id
+      WHERE sg.student_id = ?
+        AND s.course_id = ?
+        AND s.visible = 1
+        AND sg.subject_id = ?
+      LIMIT 1
+    `,
+    [userId, courseId, subjectId]
+  );
+  if (!subjectRow) return null;
+
+  const gradingSettings = await ensureSubjectGradingSettings(subjectId, courseId, semesterId, userId);
+  await syncJournalColumnsFromHomework(subjectId, courseId, semesterId, gradingSettings, userId);
+  const columns = await getJournalColumns(subjectId, courseId, semesterId);
+
+  const gradeByColumnId = new Map();
+  if (columns.length) {
+    const columnIds = columns.map((column) => Number(column.id)).filter((id) => Number.isFinite(id) && id > 0);
+    if (columnIds.length) {
+      const rows = await db.all(
+        `
+          SELECT column_id, score
+          FROM journal_grades
+          WHERE student_id = ?
+            AND column_id IN (${columnIds.map(() => '?').join(',')})
+            AND deleted_at IS NULL
+        `,
+        [userId, ...columnIds]
+      );
+      (rows || []).forEach((row) => {
+        const columnId = Number(row.column_id);
+        const score = Number(row.score);
+        if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(score)) return;
+        gradeByColumnId.set(columnId, score);
+      });
+    }
+  }
+
+  const round2 = (value) => Math.round(Number(value || 0) * 100) / 100;
+  const clamp01 = (value) => Math.max(0, Math.min(1, Number(value || 0)));
+  const typeRows = [];
+  let currentFinal = 0;
+  let maxPossibleFinal = 0;
+  let remainingWeightedPotential = 0;
+  let remainingRawMaxTotal = 0;
+  let remainingColumnsCount = 0;
+
+  JOURNAL_SCORING_TYPES.forEach((type) => {
+    const includedColumns = columns.filter((column) => (
+      normalizeColumnType(column.column_type) === type
+      && column.include_in_final
+      && getGradingTypeEnabled(gradingSettings, type)
+    ));
+    if (!includedColumns.length) return;
+
+    const typeWeight = getGradingTypeWeightPoints(gradingSettings, type);
+    const rawMax = includedColumns.reduce((sum, column) => (
+      sum + parsePositiveDecimal(column.max_points, 0)
+    ), 0);
+    if (!(rawMax > 0)) return;
+
+    let rawEarned = 0;
+    let remainingRawMax = 0;
+    let completedColumns = 0;
+    let remainingColumns = 0;
+    includedColumns.forEach((column) => {
+      const maxPoints = parsePositiveDecimal(column.max_points, 0);
+      const score = gradeByColumnId.get(Number(column.id));
+      if (Number.isFinite(score)) {
+        rawEarned += Math.max(0, Math.min(maxPoints, score));
+        completedColumns += 1;
+      } else {
+        remainingRawMax += maxPoints;
+        remainingColumns += 1;
+      }
+    });
+
+    const ratio = clamp01(rawEarned / rawMax);
+    const currentContribution = typeWeight > 0 ? ratio * typeWeight : 0;
+    const typeMaxContribution = typeWeight > 0 ? typeWeight : 0;
+    const typeRemainingPotential = typeWeight > 0
+      ? (remainingRawMax / rawMax) * typeWeight
+      : 0;
+
+    currentFinal += currentContribution;
+    maxPossibleFinal += typeMaxContribution;
+    remainingWeightedPotential += typeRemainingPotential;
+    remainingRawMaxTotal += remainingRawMax;
+    remainingColumnsCount += remainingColumns;
+
+    typeRows.push({
+      type,
+      label: JOURNAL_SCORING_TYPE_META[type]?.label || type,
+      completed_columns: completedColumns,
+      remaining_columns: remainingColumns,
+      raw_earned: round2(rawEarned),
+      raw_max: round2(rawMax),
+      remaining_raw_max: round2(remainingRawMax),
+      current_contribution: round2(currentContribution),
+      max_contribution: round2(typeMaxContribution),
+      remaining_potential: round2(typeRemainingPotential),
+    });
+  });
+
+  const normalizedCurrentFinal = round2(Math.min(100, currentFinal));
+  const normalizedMaxReachable = round2(Math.min(100, normalizedCurrentFinal + remainingWeightedPotential));
+  const uniqueTargets = Array.from(
+    new Set((Array.isArray(targetScores) ? targetScores : [60, 75, 90])
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value >= 0 && value <= 100))
+  ).sort((a, b) => a - b);
+  const targets = uniqueTargets.map((targetValue) => {
+    const target = round2(targetValue);
+    const needed = round2(Math.max(0, target - normalizedCurrentFinal));
+    if (needed <= 0) {
+      return {
+        target,
+        reachable: true,
+        needed_points: 0,
+        required_avg_percent: 0,
+        required_raw_points: 0,
+      };
+    }
+    if (!(remainingWeightedPotential > 0) || needed > remainingWeightedPotential) {
+      return {
+        target,
+        reachable: false,
+        needed_points: needed,
+        required_avg_percent: null,
+        required_raw_points: null,
+      };
+    }
+    const requiredRatio = needed / remainingWeightedPotential;
+    const requiredAvgPercent = round2(requiredRatio * 100);
+    const requiredRawPoints = round2(requiredRatio * remainingRawMaxTotal);
+    return {
+      target,
+      reachable: true,
+      needed_points: needed,
+      required_avg_percent: requiredAvgPercent,
+      required_raw_points: requiredRawPoints,
+    };
+  });
+
+  return {
+    subject: {
+      id: Number(subjectRow.id),
+      name: subjectRow.name || 'Предмет',
+    },
+    current_final_score: normalizedCurrentFinal,
+    max_reachable_final_score: normalizedMaxReachable,
+    remaining_columns_count: remainingColumnsCount,
+    remaining_raw_max: round2(remainingRawMaxTotal),
+    remaining_weighted_potential: round2(remainingWeightedPotential),
+    targets,
+    types: typeRows,
   };
 }
 
@@ -4488,6 +4680,33 @@ app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
   try {
     const myDay = await buildMyDayData(req.session.user, req.session.role);
     return res.json(myDay);
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/my-day/what-if', requireLogin, readLimiter, async (req, res) => {
+  const subjectId = Number(req.query.subject_id);
+  if (!Number.isFinite(subjectId) || subjectId < 1) {
+    return res.status(400).json({ error: 'Invalid subject' });
+  }
+  const target = Number(req.query.target);
+  const targets = Number.isFinite(target) ? [target] : [60, 75, 90];
+  try {
+    const userId = Number(req.session.user.id);
+    const courseId = Number(req.session.user.course_id || 1);
+    const activeSemester = await getActiveSemester(courseId);
+    const forecast = await buildMyDayWhatIfForecast({
+      userId,
+      courseId,
+      semesterId: activeSemester ? Number(activeSemester.id) : null,
+      subjectId,
+      targetScores: targets,
+    });
+    if (!forecast) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    return res.json(forecast);
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
   }

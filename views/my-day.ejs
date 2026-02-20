@@ -24,6 +24,8 @@
       const competencies = Array.isArray(cockpit.competencies) ? cockpit.competencies : [];
       const activity = cockpit.activity_summary || {};
       const reminders = Array.isArray(cockpit.reminders) ? cockpit.reminders : [];
+      const whatIfSubjects = Array.isArray(cockpit.what_if_subjects) ? cockpit.what_if_subjects : [];
+      const defaultWhatIfSubjectId = Number(cockpit.what_if_default_subject_id || 0);
       const briefToneClass = `brief-tone-${brief.tone || 'calm'}`;
 
       const formatShortDate = (value) => {
@@ -210,6 +212,37 @@
                 <a class="btn btn-inline-link" href="<%= item.action_href || '/schedule' %>"><%= item.action_label || 'Відкрити' %></a>
               </div>
             <% }) %>
+          </div>
+
+          <div class="whatif-block" id="whatIfBlock">
+            <div class="whatif-header">
+              <h3>What-if калькулятор</h3>
+              <span>Скільки потрібно на наступних роботах</span>
+            </div>
+            <% if (!whatIfSubjects.length) { %>
+              <div class="empty-state compact">
+                <div class="empty-state-title">Немає доступних предметів</div>
+                <div class="empty-state-subtitle">Калькулятор працює для твоїх предметів з журналу.</div>
+              </div>
+            <% } else { %>
+              <div class="whatif-controls">
+                <select id="whatIfSubject" class="form-select reminder-input">
+                  <% whatIfSubjects.forEach((item) => { %>
+                    <option value="<%= item.subject_id %>" <%= defaultWhatIfSubjectId === Number(item.subject_id) ? 'selected' : '' %>>
+                      <%= item.subject_name %>
+                    </option>
+                  <% }) %>
+                </select>
+                <div class="whatif-targets">
+                  <button type="button" class="btn btn-soft btn-xs whatif-target-btn" data-whatif-target="60">60</button>
+                  <button type="button" class="btn btn-soft btn-xs whatif-target-btn is-active" data-whatif-target="75">75</button>
+                  <button type="button" class="btn btn-soft btn-xs whatif-target-btn" data-whatif-target="90">90</button>
+                </div>
+              </div>
+              <div class="whatif-result" id="whatIfResult">
+                <div class="whatif-result-line">Обери ціль, щоб побачити потрібний темп.</div>
+              </div>
+            <% } %>
           </div>
 
           <div class="reminder-block">
@@ -425,6 +458,81 @@
         return parsed.toLocaleDateString('uk-UA');
       }
 
+      function setActiveWhatIfTarget(target) {
+        selectedWhatIfTarget = Number(target) || 75;
+        whatIfTargetButtons.forEach((button) => {
+          button.classList.toggle('is-active', Number(button.dataset.whatifTarget) === selectedWhatIfTarget);
+        });
+      }
+
+      function renderWhatIfResult(data, target) {
+        if (!whatIfResult) return;
+        const targetEntry = Array.isArray(data?.targets)
+          ? data.targets.find((item) => Number(item.target) === Number(target))
+          : null;
+        if (!targetEntry) {
+          whatIfResult.innerHTML = '<div class="whatif-result-line">Дані для обраної цілі недоступні.</div>';
+          return;
+        }
+
+        if (targetEntry.reachable) {
+          const average = Number(targetEntry.required_avg_percent || 0);
+          const rawPoints = Number(targetEntry.required_raw_points || 0);
+          whatIfResult.innerHTML = `
+            <div class="whatif-result-line">
+              Поточний фінал: <strong>${Number(data.current_final_score || 0)}</strong> / 100
+            </div>
+            <div class="whatif-result-line whatif-positive">
+              Для цілі <strong>${Number(targetEntry.target || target)}</strong> потрібно в середньому
+              <strong>${average}%</strong> на залишку робіт
+              (${rawPoints} з ${Number(data.remaining_raw_max || 0)} сирих балів).
+            </div>
+            <div class="whatif-result-line muted-line">
+              Теоретична стеля: ${Number(data.max_reachable_final_score || 0)} / 100.
+            </div>
+          `;
+          return;
+        }
+
+        whatIfResult.innerHTML = `
+          <div class="whatif-result-line">
+            Поточний фінал: <strong>${Number(data.current_final_score || 0)}</strong> / 100
+          </div>
+          <div class="whatif-result-line whatif-negative">
+            Ціль <strong>${Number(targetEntry.target || target)}</strong> зараз недосяжна
+            (бракує ${Number(targetEntry.needed_points || 0)} балів внеску).
+          </div>
+          <div class="whatif-result-line muted-line">
+            Теоретична стеля: ${Number(data.max_reachable_final_score || 0)} / 100.
+          </div>
+        `;
+      }
+
+      async function loadWhatIf(targetValue) {
+        if (!whatIfSubject || !whatIfResult) return;
+        const subjectId = Number(whatIfSubject.value || 0);
+        if (!subjectId) return;
+        const target = Number(targetValue || selectedWhatIfTarget || 75);
+        setActiveWhatIfTarget(target);
+        whatIfResult.innerHTML = '<div class="whatif-result-line">Рахую прогноз...</div>';
+        try {
+          const params = new URLSearchParams({
+            subject_id: String(subjectId),
+            target: String(target),
+          });
+          const response = await fetch(`/api/my-day/what-if?${params.toString()}`);
+          if (!response.ok) {
+            whatIfResult.innerHTML = '<div class="whatif-result-line">Не вдалося отримати прогноз.</div>';
+            return;
+          }
+          const data = await response.json();
+          renderWhatIfResult(data, target);
+        } catch (err) {
+          console.error(err);
+          whatIfResult.innerHTML = '<div class="whatif-result-line">Помилка при розрахунку прогнозу.</div>';
+        }
+      }
+
       const reminderForm = document.getElementById('reminderForm');
       const toggleReminderForm = document.getElementById('toggleReminderForm');
       const reminderTitle = document.getElementById('reminderTitle');
@@ -436,6 +544,10 @@
       const reminderCancel = document.getElementById('reminderCancel');
       const reminderList = document.getElementById('reminderList');
       let reminders = Array.isArray(myDay.reminders) ? myDay.reminders : [];
+      const whatIfSubject = document.getElementById('whatIfSubject');
+      const whatIfResult = document.getElementById('whatIfResult');
+      const whatIfTargetButtons = Array.from(document.querySelectorAll('.whatif-target-btn'));
+      let selectedWhatIfTarget = 75;
 
       if (reminderDate && myDay.today) {
         reminderDate.value = myDay.today;
@@ -648,6 +760,17 @@
       });
 
       renderReminders(reminders);
+      if (whatIfSubject && whatIfResult) {
+        whatIfSubject.addEventListener('change', () => {
+          loadWhatIf(selectedWhatIfTarget);
+        });
+        whatIfTargetButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            loadWhatIf(Number(button.dataset.whatifTarget || 75));
+          });
+        });
+        loadWhatIf(selectedWhatIfTarget);
+      }
     </script>
     <script src="/js/design-system.js" defer></script>
   </body>
