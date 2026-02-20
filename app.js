@@ -10292,6 +10292,14 @@ const parseCompetencyScore = (rawValue) => {
   if (normalized < COMPETENCY_SCORE_MIN || normalized > COMPETENCY_SCORE_MAX) return NaN;
   return normalized;
 };
+const normalizeCompetencyKeyArray = (rawValue) => {
+  const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+  return Array.from(new Set(
+    values
+      .map((item) => normalizeCompetencyKey(item))
+      .filter((item) => Boolean(item))
+  ));
+};
 const getCompetencyLabelByKey = (key) => {
   const found = COMPETENCY_DEFINITIONS.find((item) => item.key === key);
   return found ? found.label : key;
@@ -13175,6 +13183,7 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       `
         SELECT
           ce.id,
+          ce.column_id,
           ce.competency_key,
           ce.score,
           ce.note,
@@ -13195,6 +13204,19 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       `,
       [Number(column.subject_id), studentId, columnId]
     );
+    const competencyQuickValues = {};
+    COMPETENCY_DEFINITIONS.forEach((definition) => {
+      competencyQuickValues[definition.key] = 0;
+    });
+    const checklistResolved = new Set();
+    (competencyRows || []).forEach((row) => {
+      const sourceType = String(row?.source_type || '').toLowerCase();
+      const key = normalizeCompetencyKey(row?.competency_key);
+      if (!key || sourceType !== 'checklist' || checklistResolved.has(key)) return;
+      const score = Number(row?.score);
+      competencyQuickValues[key] = Number.isFinite(score) && score > 0 ? 1 : 0;
+      checklistResolved.add(key);
+    });
     const canAddCompetencySignal = (
       teacherJournalMode
       && !subjectIsClosed
@@ -13292,6 +13314,7 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
         score_max: COMPETENCY_SCORE_MAX,
         note_max_length: COMPETENCY_NOTE_MAX_LENGTH,
       },
+      competency_quick_values: competencyQuickValues,
       competency_signals: (competencyRows || []).map((row) => {
         const key = normalizeCompetencyKey(row.competency_key);
         return {
@@ -15099,6 +15122,141 @@ app.post('/journal/competency/add', requireLogin, writeLimiter, async (req, res)
     );
     return res.redirect(
       `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Компетентнісний сигнал додано')}`
+    );
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/competency/checklist/save', requireLogin, writeLimiter, async (req, res) => {
+  const columnId = Number(req.body.column_id);
+  const studentId = Number(req.body.student_id);
+  const checkedKeysSet = new Set(normalizeCompetencyKeyArray(req.body.competency_keys));
+
+  if (
+    !Number.isFinite(columnId) || columnId < 1
+    || !Number.isFinite(studentId) || studentId < 1
+  ) {
+    return res.redirect('/journal?err=Invalid%20competency%20target');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.*,
+          h.group_number AS homework_group_number
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+        LIMIT 1
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.redirect('/journal?err=Column%20not%20found');
+    }
+    if (isJournalColumnLocked(column)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+    }
+
+    const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
+    if (!studentRow) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const studentGroup = Number(studentRow.group_number || 0);
+      if (!access.allowAll && !access.groups.has(studentGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    const competencyKeys = COMPETENCY_DEFINITIONS.map((item) => item.key);
+    await withTransaction(async (client) => {
+      const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
+      await query(
+        `
+          DELETE FROM competency_evaluations
+          WHERE subject_id = ?
+            AND column_id = ?
+            AND student_id = ?
+            AND source_type = 'checklist'
+        `,
+        [Number(column.subject_id || 0), columnId, studentId]
+      );
+      for (const competencyKey of competencyKeys) {
+        const score = checkedKeysSet.has(competencyKey) ? 1 : 0;
+        await query(
+          `
+            INSERT INTO competency_evaluations
+              (
+                course_id,
+                semester_id,
+                subject_id,
+                column_id,
+                student_id,
+                competency_key,
+                score,
+                note,
+                source_type,
+                created_by,
+                created_at,
+                updated_at
+              )
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'checklist', ?, NOW(), NOW())
+          `,
+          [
+            Number(column.course_id || 0) || null,
+            column.semester_id ? Number(column.semester_id) : null,
+            Number(column.subject_id || 0),
+            columnId,
+            studentId,
+            competencyKey,
+            score,
+            Number(req.session.user.id),
+          ]
+        );
+      }
+    });
+
+    logActivity(
+      db,
+      req,
+      'journal_competency_checklist_save',
+      'competency_evaluation',
+      null,
+      {
+        subject_id: Number(column.subject_id),
+        column_id: columnId,
+        student_id: studentId,
+        checked_keys: Array.from(checkedKeysSet),
+        updated_keys_total: competencyKeys.length,
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(
+      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Компетентності збережено (+1/+0)')}`
     );
   } catch (err) {
     return res.redirect('/journal?err=Database%20error');

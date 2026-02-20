@@ -816,16 +816,34 @@
               <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
                 <div>
                   <div class="text-muted small mb-1">Компетентнісні сигнали</div>
-                  <div class="small text-muted">Оцінка 0-5 для компетенцій по цій роботі з короткою нотаткою.</div>
+                  <div class="small text-muted">Швидка оцінка 8 компетентностей по цій роботі: чекбокс = +1, без чекбокса = +0.</div>
                 </div>
               </div>
               <div id="journalCompetencyList" class="journal-competency-list">
                 <div class="text-muted small">Сигналів поки немає.</div>
               </div>
               <% if (canEditJournal) { %>
+                <form
+                  id="journalCompetencyChecklistForm"
+                  method="POST"
+                  action="/journal/competency/checklist/save"
+                  class="journal-competency-checklist-form mt-3"
+                  autocomplete="off"
+                >
+                  <input type="hidden" name="column_id" id="journalCompetencyChecklistColumnId" />
+                  <input type="hidden" name="student_id" id="journalCompetencyChecklistStudentId" />
+                  <div id="journalCompetencyChecklistGrid" class="journal-competency-checklist-grid">
+                    <div class="text-muted small">Дані компетентностей завантажуються...</div>
+                  </div>
+                  <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mt-2">
+                    <span class="small text-muted">Після збереження система оновить усі 8 компетентностей як +1 або +0.</span>
+                    <button class="btn btn-sm btn-outline-info" type="submit" id="journalCompetencyChecklistSubmitBtn">Зберегти +1/+0</button>
+                  </div>
+                </form>
                 <form id="journalCompetencyCreateForm" method="POST" action="/journal/competency/add" class="journal-competency-create-form mt-3" autocomplete="off">
                   <input type="hidden" name="column_id" id="journalCompetencyCreateColumnId" />
                   <input type="hidden" name="student_id" id="journalCompetencyCreateStudentId" />
+                  <div class="small text-muted mb-2">Додатковий ручний сигнал (0-5), якщо потрібно точніше оцінити конкретну компетентність.</div>
                   <div class="row g-2 align-items-end">
                     <div class="col-12 col-md-5">
                       <label class="form-label form-label-sm mb-1">Компетенція</label>
@@ -1070,6 +1088,11 @@
       const moderationSubmitBtn = document.getElementById('journalModerationSubmitBtn');
       const competencySectionEl = document.getElementById('journalCompetencySection');
       const competencyListEl = document.getElementById('journalCompetencyList');
+      const competencyChecklistForm = document.getElementById('journalCompetencyChecklistForm');
+      const competencyChecklistColumnInput = document.getElementById('journalCompetencyChecklistColumnId');
+      const competencyChecklistStudentInput = document.getElementById('journalCompetencyChecklistStudentId');
+      const competencyChecklistGridEl = document.getElementById('journalCompetencyChecklistGrid');
+      const competencyChecklistSubmitBtn = document.getElementById('journalCompetencyChecklistSubmitBtn');
       const competencyCreateForm = document.getElementById('journalCompetencyCreateForm');
       const competencyCreateColumnInput = document.getElementById('journalCompetencyCreateColumnId');
       const competencyCreateStudentInput = document.getElementById('journalCompetencyCreateStudentId');
@@ -1686,6 +1709,9 @@
         const scoreMin = Number(competencyMeta.score_min ?? 0);
         const scoreMax = Number(competencyMeta.score_max ?? 5);
         const noteMaxLength = Number(competencyMeta.note_max_length || 1200);
+        const quickValuesRaw = (data && data.competency_quick_values && typeof data.competency_quick_values === 'object')
+          ? data.competency_quick_values
+          : {};
 
         if (!signals.length) {
           competencyListEl.innerHTML = '<div class="text-muted small">Сигналів поки немає.</div>';
@@ -1697,13 +1723,18 @@
             const createdAt = item && item.created_at ? formatDateTime(item.created_at) : '';
             const author = item && item.created_by_name ? String(item.created_by_name) : '';
             const sourceType = String(item && item.source_type ? item.source_type : 'manual');
-            const sourceLabel = sourceType === 'column' ? 'Авто' : 'Ручний';
+            const sourceLabel = sourceType === 'column'
+              ? 'Авто'
+              : sourceType === 'checklist'
+                ? '+1/+0'
+                : 'Ручний';
+            const scoreScaleMax = sourceType === 'checklist' ? 1 : scoreMax;
             const note = String(item && item.note ? item.note : '');
             return `
               <article class="journal-competency-item">
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                   <strong>${escapeHtml(label)}</strong>
-                  <span class="status-chip status-chip--info">${escapeHtml(scoreDisplay)} / ${escapeHtml(formatNumber(scoreMax))}</span>
+                  <span class="status-chip status-chip--info">${escapeHtml(scoreDisplay)} / ${escapeHtml(formatNumber(scoreScaleMax))}</span>
                   <span class="status-chip status-chip--neutral">${escapeHtml(sourceLabel)}</span>
                 </div>
                 <div class="journal-competency-meta">
@@ -1714,6 +1745,48 @@
               </article>
             `;
           }).join('');
+        }
+
+        if (competencyChecklistForm) {
+          competencyChecklistForm.classList.toggle('d-none', !canEditJournal);
+          if (competencyChecklistColumnInput) competencyChecklistColumnInput.value = String(currentCellColumnId || 0);
+          if (competencyChecklistStudentInput) competencyChecklistStudentInput.value = String(currentCellStudentId || 0);
+          if (competencyChecklistGridEl) {
+            if (!definitions.length) {
+              competencyChecklistGridEl.innerHTML = '<div class="text-muted small">Немає визначених компетентностей.</div>';
+            } else {
+              competencyChecklistGridEl.innerHTML = definitions.map((item) => {
+                const key = String(item && item.key ? item.key : '');
+                const label = String(item && item.label ? item.label : key);
+                const isChecked = Number(quickValuesRaw[key] || 0) > 0;
+                return `
+                  <label class="journal-competency-check-item">
+                    <span class="journal-competency-check-main">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="competency_keys"
+                        value="${escapeHtml(key)}"
+                        ${isChecked ? 'checked' : ''}
+                        ${canAdd ? '' : 'disabled'}
+                      />
+                      <span class="journal-competency-check-label">${escapeHtml(label)}</span>
+                    </span>
+                    <span class="status-chip status-chip--neutral journal-competency-check-score" data-score-chip>${isChecked ? '+1' : '+0'}</span>
+                  </label>
+                `;
+              }).join('');
+              const checkboxEls = Array.from(competencyChecklistGridEl.querySelectorAll('input[type="checkbox"][name="competency_keys"]'));
+              checkboxEls.forEach((checkboxEl) => {
+                checkboxEl.addEventListener('change', () => {
+                  const scoreChipEl = checkboxEl.closest('.journal-competency-check-item')?.querySelector('[data-score-chip]');
+                  if (!scoreChipEl) return;
+                  scoreChipEl.textContent = checkboxEl.checked ? '+1' : '+0';
+                });
+              });
+            }
+          }
+          if (competencyChecklistSubmitBtn) competencyChecklistSubmitBtn.disabled = !canAdd;
         }
 
         if (!competencyCreateForm) return;

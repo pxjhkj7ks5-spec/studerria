@@ -682,6 +682,43 @@ body.theme-dark.page-journal .journal-table thead th {
   color: var(--ds-text1);
 }
 
+.page-journal .journal-competency-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.page-journal .journal-competency-check-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 78%, transparent);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+}
+
+.page-journal .journal-competency-check-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.page-journal .journal-competency-check-label {
+  font-size: 0.88rem;
+  color: var(--ds-text1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-journal .journal-competency-check-score {
+  min-width: 36px;
+  text-align: center;
+}
+
 .page-journal .journal-competency-create-form .form-control,
 .page-journal .journal-competency-create-form .form-select {
   border-radius: 10px;
