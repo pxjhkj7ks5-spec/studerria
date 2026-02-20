@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.42",
+      "date": "2026-02-20",
+      "items": [
+        "ci: disabled automatic GitHub Actions runs on push (manual запуск only)",
+        "ci: removed GitHub-based GCP deploy steps to avoid duplicate pipeline and extra GitHub usage"
+      ]
+    },
+    {
       "version": "0.9.41",
       "date": "2026-02-20",
       "items": [
