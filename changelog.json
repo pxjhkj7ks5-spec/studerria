@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.39",
+      "date": "2026-02-20",
+      "items": [
+        "fix(ci): unblocked `Test` stage in GitHub Actions by replacing placeholder failing `npm test` script with non-failing message",
+        "chore(release): patch version bump for successful deploy pipeline rerun"
+      ]
+    },
+    {
       "version": "0.9.38",
       "date": "2026-02-20",
       "items": [
