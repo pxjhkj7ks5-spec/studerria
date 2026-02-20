@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.45",
+      "date": "2026-02-20",
+      "items": [
+        "fix(admin-users): user modal now fills Last Login IP/Device from registration trace when login has not happened yet",
+        "fix(admin-users): users list API and initial admin render now fallback to latest registration IP/user-agent for immediate display without full login",
+        "ux(forensics): modal now auto-populates Last Login timestamp with register-event time when login timestamp is missing"
+      ]
+    },
+    {
       "version": "0.9.44",
       "date": "2026-02-20",
       "items": [

@@ -5852,6 +5852,29 @@
           const agentCount = Array.isArray(evidence.user_agents) ? evidence.user_agents.length : 0;
           meta.textContent = `${sourceLabel} · IP: ${ipCount} · Session: ${sessionCount} · Device: ${agentCount}`;
 
+          const registerEvent = evidence.register_event || null;
+          const inferredEvents = Array.isArray(evidence.inferred_register_events) ? evidence.inferred_register_events : [];
+          const inferredFirst = inferredEvents.length ? inferredEvents[0] : null;
+          const fallbackIp = registerEvent?.ip || inferredFirst?.ip || (Array.isArray(evidence.ips) ? evidence.ips[0] : null);
+          const fallbackAgent = registerEvent?.user_agent
+            || inferredFirst?.user_agent
+            || (Array.isArray(evidence.user_agents) ? evidence.user_agents[0] : null);
+          const fallbackSeenAt = registerEvent?.created_at || inferredFirst?.last_seen_at || inferredFirst?.first_seen_at;
+
+          const uaIp = document.getElementById('uaIp');
+          const uaAgent = document.getElementById('uaAgent');
+          const uaLoginAt = document.getElementById('uaLoginAt');
+          const isMissing = (value) => !value || value === '-';
+          if (uaIp && isMissing(uaIp.textContent) && fallbackIp) {
+            uaIp.textContent = String(fallbackIp);
+          }
+          if (uaAgent && isMissing(uaAgent.textContent) && fallbackAgent) {
+            uaAgent.textContent = String(fallbackAgent);
+          }
+          if (uaLoginAt && isMissing(uaLoginAt.textContent) && fallbackSeenAt) {
+            uaLoginAt.textContent = `${fallbackSeenAt} (register)`;
+          }
+
           if (data.suspected_owner) {
             const owner = data.suspected_owner;
             const ownerRole = getRoleLabel(normalizeRoleKeyClient(owner.role || 'student'));

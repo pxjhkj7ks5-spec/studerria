@@ -16107,26 +16107,47 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         }
         const homeworkTags = Array.isArray(tagRows) ? tagRows.map((row) => row.name) : [];
         ensureUsersSchema(() => {
-        const userFilters = ['course_id = ?'];
+        const userFilters = ['u.course_id = ?'];
         const userParams = [courseId];
         if (usersHasIsActive) {
           if (resolvedUsersStatus === 'inactive') {
-            userFilters.push('is_active = 0');
+            userFilters.push('u.is_active = 0');
           } else if (resolvedUsersStatus !== 'all') {
-            userFilters.push('is_active = 1');
+            userFilters.push('u.is_active = 1');
           }
         }
         if (users_q) {
-          userFilters.push('full_name ILIKE ?');
+          userFilters.push('u.full_name ILIKE ?');
           userParams.push(`%${users_q}%`);
         }
         if (users_group) {
-          userFilters.push('schedule_group = ?');
+          userFilters.push('u.schedule_group = ?');
           userParams.push(users_group);
         }
         const userWhere = userFilters.length ? `WHERE ${userFilters.join(' AND ')}` : '';
         db.all(
-          `SELECT id, full_name, role, schedule_group, course_id, ${usersHasIsActive ? 'is_active,' : ''} last_login_ip, last_user_agent, last_login_at FROM users ${userWhere} ORDER BY full_name`,
+          `
+            SELECT
+              u.id,
+              u.full_name,
+              u.role,
+              u.schedule_group,
+              u.course_id,
+              ${usersHasIsActive ? 'u.is_active,' : ''}
+              COALESCE(NULLIF(u.last_login_ip, ''), NULLIF(reg.ip, '')) AS last_login_ip,
+              COALESCE(NULLIF(u.last_user_agent, ''), NULLIF(reg.user_agent, '')) AS last_user_agent,
+              u.last_login_at
+            FROM users u
+            LEFT JOIN LATERAL (
+              SELECT re.ip, re.user_agent
+              FROM user_registration_events re
+              WHERE re.user_id = u.id
+              ORDER BY re.created_at DESC
+              LIMIT 1
+            ) reg ON true
+            ${userWhere}
+            ORDER BY u.full_name
+          `,
           userParams,
           (userErr, users) => {
             if (userErr) {
@@ -19545,28 +19566,48 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
   const group = req.query.group;
   const courseId = getAdminCourse(req);
   ensureUsersSchema(() => {
-    const userFilters = ['course_id = ?'];
+    const userFilters = ['u.course_id = ?'];
     const userParams = [courseId];
     if (usersHasIsActive) {
       if (status === 'inactive') {
-        userFilters.push('is_active = 0');
+        userFilters.push('u.is_active = 0');
       } else if (status !== 'all') {
-        userFilters.push('is_active = 1');
+        userFilters.push('u.is_active = 1');
       }
     }
     if (q) {
-      userFilters.push('full_name ILIKE ?');
+      userFilters.push('u.full_name ILIKE ?');
       userParams.push(`%${q}%`);
     }
     if (group) {
-      userFilters.push('schedule_group = ?');
+      userFilters.push('u.schedule_group = ?');
       userParams.push(group);
     }
     const userWhere = userFilters.length ? `WHERE ${userFilters.join(' AND ')}` : '';
-    const cols = usersHasIsActive ? 'id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at'
-      : 'id, full_name, role, schedule_group, last_login_ip, last_user_agent, last_login_at';
+    const activeColumn = usersHasIsActive ? 'u.is_active,' : '';
     db.all(
-      `SELECT ${cols}, course_id FROM users ${userWhere} ORDER BY full_name`,
+      `
+        SELECT
+          u.id,
+          u.full_name,
+          u.role,
+          u.schedule_group,
+          ${activeColumn}
+          COALESCE(NULLIF(u.last_login_ip, ''), NULLIF(reg.ip, '')) AS last_login_ip,
+          COALESCE(NULLIF(u.last_user_agent, ''), NULLIF(reg.user_agent, '')) AS last_user_agent,
+          u.last_login_at,
+          u.course_id
+        FROM users u
+        LEFT JOIN LATERAL (
+          SELECT re.ip, re.user_agent
+          FROM user_registration_events re
+          WHERE re.user_id = u.id
+          ORDER BY re.created_at DESC
+          LIMIT 1
+        ) reg ON true
+        ${userWhere}
+        ORDER BY u.full_name
+      `,
       userParams,
       (userErr, users) => {
         if (userErr) {
