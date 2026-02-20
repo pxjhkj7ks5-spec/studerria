@@ -6442,10 +6442,12 @@ const parseDbIntegerArray = (value) => {
   return [];
 };
 
-const isDataQualityCompatibilityError = (err) => {
+const isDbSchemaCompatibilityError = (err) => {
   const code = String(err && err.code ? err.code : '').trim();
   return code === '42P01' || code === '42703';
 };
+
+const isDataQualityCompatibilityError = (err) => isDbSchemaCompatibilityError(err);
 
 const buildDataQualityCheck = ({
   key,
@@ -10843,80 +10845,92 @@ const canUseTeacherJournalMode = (req, journalScope) => {
 };
 
 async function ensureSubjectGradingSettings(subjectId, courseId, semesterId, userId) {
-  await db.run(
-    `
-      INSERT INTO subject_grading_settings
-      (
-        subject_id, course_id, semester_id,
-        homework_enabled, seminar_enabled, exam_enabled, credit_enabled, custom_enabled,
-        homework_max_points, seminar_max_points, exam_max_points, credit_max_points, custom_max_points,
-        homework_weight_points, seminar_weight_points, exam_weight_points, credit_weight_points, custom_weight_points,
-        final_max_points, created_by, updated_by, created_at, updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 100, ?, ?, NOW(), NOW())
-      ON CONFLICT (subject_id) DO NOTHING
-    `,
-    [
-      subjectId,
-      courseId || null,
-      semesterId || null,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.homework_enabled,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_enabled,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.exam_enabled,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.credit_enabled,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.custom_enabled,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.homework_weight_points,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_weight_points,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.exam_weight_points,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.credit_weight_points,
-      DEFAULT_SUBJECT_GRADING_SETTINGS.custom_weight_points,
-      userId || null,
-      userId || null,
-    ]
-  );
-  const row = await db.get(
-    `
-      SELECT *
-      FROM subject_grading_settings
-      WHERE subject_id = ?
-      LIMIT 1
-    `,
-    [subjectId]
-  );
-  if (!row) {
+  try {
+    await db.run(
+      `
+        INSERT INTO subject_grading_settings
+        (
+          subject_id, course_id, semester_id,
+          homework_enabled, seminar_enabled, exam_enabled, credit_enabled, custom_enabled,
+          homework_max_points, seminar_max_points, exam_max_points, credit_max_points, custom_max_points,
+          homework_weight_points, seminar_weight_points, exam_weight_points, credit_weight_points, custom_weight_points,
+          final_max_points, created_by, updated_by, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 100, ?, ?, NOW(), NOW())
+        ON CONFLICT (subject_id) DO NOTHING
+      `,
+      [
+        subjectId,
+        courseId || null,
+        semesterId || null,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.homework_enabled,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_enabled,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.exam_enabled,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.credit_enabled,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.custom_enabled,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.homework_weight_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_weight_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.exam_weight_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.credit_weight_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.custom_weight_points,
+        userId || null,
+        userId || null,
+      ]
+    );
+    const row = await db.get(
+      `
+        SELECT *
+        FROM subject_grading_settings
+        WHERE subject_id = ?
+        LIMIT 1
+      `,
+      [subjectId]
+    );
+    if (!row) {
+      return {
+        ...DEFAULT_SUBJECT_GRADING_SETTINGS,
+        is_closed: 0,
+        closed_by: null,
+        closed_at: null,
+      };
+    }
     return {
-      ...DEFAULT_SUBJECT_GRADING_SETTINGS,
-      is_closed: 0,
-      closed_by: null,
-      closed_at: null,
+      homework_enabled: parseBinaryFlag(row.homework_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_enabled),
+      seminar_enabled: parseBinaryFlag(row.seminar_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_enabled),
+      exam_enabled: parseBinaryFlag(row.exam_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_enabled),
+      credit_enabled: parseBinaryFlag(row.credit_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_enabled),
+      custom_enabled: parseBinaryFlag(row.custom_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_enabled),
+      homework_max_points: parsePositiveDecimal(row.homework_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points),
+      seminar_max_points: parsePositiveDecimal(row.seminar_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points),
+      exam_max_points: parsePositiveDecimal(row.exam_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points),
+      credit_max_points: parsePositiveDecimal(row.credit_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points),
+      custom_max_points: parsePositiveDecimal(row.custom_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points),
+      homework_weight_points: parseNonNegativeDecimal(row.homework_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_weight_points),
+      seminar_weight_points: parseNonNegativeDecimal(row.seminar_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_weight_points),
+      exam_weight_points: parseNonNegativeDecimal(row.exam_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_weight_points),
+      credit_weight_points: parseNonNegativeDecimal(row.credit_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_weight_points),
+      custom_weight_points: parseNonNegativeDecimal(row.custom_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_weight_points),
+      final_max_points: 100,
+      is_closed: parseBinaryFlag(row.is_closed, 0),
+      closed_by: Number.isFinite(Number(row.closed_by)) ? Number(row.closed_by) : null,
+      closed_at: row.closed_at || null,
     };
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return {
+        ...DEFAULT_SUBJECT_GRADING_SETTINGS,
+        is_closed: 0,
+        closed_by: null,
+        closed_at: null,
+      };
+    }
+    throw err;
   }
-  return {
-    homework_enabled: parseBinaryFlag(row.homework_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_enabled),
-    seminar_enabled: parseBinaryFlag(row.seminar_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_enabled),
-    exam_enabled: parseBinaryFlag(row.exam_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_enabled),
-    credit_enabled: parseBinaryFlag(row.credit_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_enabled),
-    custom_enabled: parseBinaryFlag(row.custom_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_enabled),
-    homework_max_points: parsePositiveDecimal(row.homework_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points),
-    seminar_max_points: parsePositiveDecimal(row.seminar_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points),
-    exam_max_points: parsePositiveDecimal(row.exam_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points),
-    credit_max_points: parsePositiveDecimal(row.credit_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points),
-    custom_max_points: parsePositiveDecimal(row.custom_max_points, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points),
-    homework_weight_points: parseNonNegativeDecimal(row.homework_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_weight_points),
-    seminar_weight_points: parseNonNegativeDecimal(row.seminar_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_weight_points),
-    exam_weight_points: parseNonNegativeDecimal(row.exam_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.exam_weight_points),
-    credit_weight_points: parseNonNegativeDecimal(row.credit_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_weight_points),
-    custom_weight_points: parseNonNegativeDecimal(row.custom_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_weight_points),
-    final_max_points: 100,
-    is_closed: parseBinaryFlag(row.is_closed, 0),
-    closed_by: Number.isFinite(Number(row.closed_by)) ? Number(row.closed_by) : null,
-    closed_at: row.closed_at || null,
-  };
 }
 
 async function getJournalSubjectClosureState(subjectId) {
@@ -11727,7 +11741,68 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
       COALESCE(h.custom_due_date, h.class_date, h.created_at, jc.created_at::text) ASC,
       jc.id ASC
   `;
-  const rows = await db.all(sql, params);
+  let rows = [];
+  try {
+    rows = await db.all(sql, params);
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    try {
+      const legacyParams = [subjectId, courseId];
+      let legacySql = `
+        SELECT
+          jc.id,
+          jc.subject_id,
+          jc.course_id,
+          jc.semester_id,
+          jc.source_type,
+          jc.source_homework_id,
+          jc.title,
+          jc.column_type,
+          jc.max_points,
+          CASE WHEN LOWER(COALESCE(jc.column_type, '')) = 'credit' THEN 1 ELSE 0 END AS is_credit,
+          COALESCE(jc.position, 0) AS position,
+          0::int AS grades_count,
+          h.description AS homework_description,
+          h.custom_due_date,
+          h.class_date,
+          h.group_number AS homework_group_number,
+          h.day_of_week AS homework_day_of_week,
+          h.class_number AS homework_class_number,
+          h.meeting_url AS homework_meeting_url,
+          h.link_url AS homework_link_url,
+          h.file_path AS homework_file_path,
+          h.file_name AS homework_file_name,
+          0::int AS homework_is_custom_deadline,
+          0::int AS homework_is_control,
+          0::int AS homework_is_credit,
+          0::int AS homework_is_teacher_homework,
+          h.created_at AS homework_created_at,
+          h.created_by AS homework_created_by,
+          h.created_by_id AS homework_created_by_id,
+          u.full_name AS homework_created_by_name
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        LEFT JOIN users u ON u.id = h.created_by_id
+        WHERE jc.subject_id = ?
+          AND jc.course_id = ?
+      `;
+      if (semesterId) {
+        legacySql += ' AND (jc.semester_id = ? OR jc.semester_id IS NULL)';
+        legacyParams.push(semesterId);
+      } else {
+        legacySql += ' AND jc.semester_id IS NULL';
+      }
+      legacySql += ' ORDER BY COALESCE(jc.position, 0) ASC, jc.id ASC';
+      rows = await db.all(legacySql, legacyParams);
+    } catch (legacyErr) {
+      if (!isDbSchemaCompatibilityError(legacyErr)) {
+        throw legacyErr;
+      }
+      rows = [];
+    }
+  }
   const normalizedRows = (rows || []).map((row) => {
     const sourceHomeworkId = row.source_homework_id ? Number(row.source_homework_id) : null;
     const sourceHomeworkIsTeacher = Number(row.homework_is_teacher_homework || 0) === 1;
@@ -11885,29 +11960,36 @@ async function buildJournalAttendanceContext({
   const semesterFilter = buildExactSemesterCondition('ar', semesterId);
   let recordsByStudentId = new Map();
   if (studentIds.length) {
-    const rows = await db.all(
-      `
-        SELECT ar.student_id, ar.status, ar.reason, ar.marked_at
-        FROM attendance_records ar
-        WHERE ar.subject_id = ?
-          AND ar.course_id = ?
-          ${semesterFilter.clause}
-          AND ar.class_date = ?
-          AND ar.class_number = ?
-          AND ar.student_id IN (${studentIds.map(() => '?').join(',')})
-      `,
-      [subjectId, courseId, ...semesterFilter.params, normalizedDate, normalizedClassNumber, ...studentIds]
-    );
-    recordsByStudentId = new Map(
-      (rows || []).map((row) => [
-        Number(row.student_id),
-        {
-          status: normalizeAttendanceStatus(row.status),
-          reason: String(row.reason || ''),
-          marked_at: row.marked_at || null,
-        },
-      ])
-    );
+    try {
+      const rows = await db.all(
+        `
+          SELECT ar.student_id, ar.status, ar.reason, ar.marked_at
+          FROM attendance_records ar
+          WHERE ar.subject_id = ?
+            AND ar.course_id = ?
+            ${semesterFilter.clause}
+            AND ar.class_date = ?
+            AND ar.class_number = ?
+            AND ar.student_id IN (${studentIds.map(() => '?').join(',')})
+        `,
+        [subjectId, courseId, ...semesterFilter.params, normalizedDate, normalizedClassNumber, ...studentIds]
+      );
+      recordsByStudentId = new Map(
+        (rows || []).map((row) => [
+          Number(row.student_id),
+          {
+            status: normalizeAttendanceStatus(row.status),
+            reason: String(row.reason || ''),
+            marked_at: row.marked_at || null,
+          },
+        ])
+      );
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+      recordsByStudentId = new Map();
+    }
   }
 
   const summary = {
@@ -11942,57 +12024,64 @@ async function buildJournalAttendanceContext({
   let studentSummary = null;
   const safeStudentViewId = Number(studentViewUserId || 0);
   if (Number.isFinite(safeStudentViewId) && safeStudentViewId > 0) {
-    const groupedRows = await db.all(
-      `
-        SELECT ar.status, COUNT(*) AS count
-        FROM attendance_records ar
-        WHERE ar.subject_id = ?
-          AND ar.course_id = ?
-          ${semesterFilter.clause}
-          AND ar.student_id = ?
-        GROUP BY ar.status
-      `,
-      [subjectId, courseId, ...semesterFilter.params, safeStudentViewId]
-    );
-    const recentRows = await db.all(
-      `
-        SELECT ar.class_date, ar.class_number, ar.status, ar.reason, ar.marked_at
-        FROM attendance_records ar
-        WHERE ar.subject_id = ?
-          AND ar.course_id = ?
-          ${semesterFilter.clause}
-          AND ar.student_id = ?
-        ORDER BY ar.class_date DESC, ar.class_number DESC
-        LIMIT 8
-      `,
-      [subjectId, courseId, ...semesterFilter.params, safeStudentViewId]
-    );
-    const grouped = {
-      present: 0,
-      late: 0,
-      absent: 0,
-      excused: 0,
-    };
-    (groupedRows || []).forEach((row) => {
-      const status = normalizeAttendanceStatus(row.status);
-      if (!status) return;
-      grouped[status] = Number(row.count || 0);
-    });
-    const attendedTotal = Number(grouped.present || 0) + Number(grouped.late || 0);
-    const recordsTotal = attendedTotal + Number(grouped.absent || 0) + Number(grouped.excused || 0);
-    studentSummary = {
-      ...grouped,
-      total: recordsTotal,
-      attended_total: attendedTotal,
-      attendance_rate: recordsTotal > 0 ? Math.round((attendedTotal / recordsTotal) * 100) : null,
-      recent_records: (recentRows || []).map((row) => ({
-        class_date: toDateOnly(row.class_date),
-        class_number: Number(row.class_number || 0),
-        status: normalizeAttendanceStatus(row.status),
-        reason: String(row.reason || ''),
-        marked_at: row.marked_at || null,
-      })),
-    };
+    try {
+      const groupedRows = await db.all(
+        `
+          SELECT ar.status, COUNT(*) AS count
+          FROM attendance_records ar
+          WHERE ar.subject_id = ?
+            AND ar.course_id = ?
+            ${semesterFilter.clause}
+            AND ar.student_id = ?
+          GROUP BY ar.status
+        `,
+        [subjectId, courseId, ...semesterFilter.params, safeStudentViewId]
+      );
+      const recentRows = await db.all(
+        `
+          SELECT ar.class_date, ar.class_number, ar.status, ar.reason, ar.marked_at
+          FROM attendance_records ar
+          WHERE ar.subject_id = ?
+            AND ar.course_id = ?
+            ${semesterFilter.clause}
+            AND ar.student_id = ?
+          ORDER BY ar.class_date DESC, ar.class_number DESC
+          LIMIT 8
+        `,
+        [subjectId, courseId, ...semesterFilter.params, safeStudentViewId]
+      );
+      const grouped = {
+        present: 0,
+        late: 0,
+        absent: 0,
+        excused: 0,
+      };
+      (groupedRows || []).forEach((row) => {
+        const status = normalizeAttendanceStatus(row.status);
+        if (!status) return;
+        grouped[status] = Number(row.count || 0);
+      });
+      const attendedTotal = Number(grouped.present || 0) + Number(grouped.late || 0);
+      const recordsTotal = attendedTotal + Number(grouped.absent || 0) + Number(grouped.excused || 0);
+      studentSummary = {
+        ...grouped,
+        total: recordsTotal,
+        attended_total: attendedTotal,
+        attendance_rate: recordsTotal > 0 ? Math.round((attendedTotal / recordsTotal) * 100) : null,
+        recent_records: (recentRows || []).map((row) => ({
+          class_date: toDateOnly(row.class_date),
+          class_number: Number(row.class_number || 0),
+          status: normalizeAttendanceStatus(row.status),
+          reason: String(row.reason || ''),
+          marked_at: row.marked_at || null,
+        })),
+      };
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+      studentSummary = null;
+    }
   }
 
   let quickCurrentSlot = {
@@ -12132,7 +12221,13 @@ async function buildJournalMatrix({
 }) {
   const gradingSettings = await ensureSubjectGradingSettings(subjectId, courseId, semesterId, actorUserId);
   if (Number(gradingSettings?.is_closed || 0) !== 1) {
-    await syncJournalColumnsFromHomework(subjectId, courseId, semesterId, gradingSettings, actorUserId);
+    try {
+      await syncJournalColumnsFromHomework(subjectId, courseId, semesterId, gradingSettings, actorUserId);
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+    }
   }
 
   let columns = await getJournalColumns(subjectId, courseId, semesterId);
@@ -12190,8 +12285,18 @@ async function buildJournalMatrix({
     } else {
       teacherHomeworkSql += ' AND h.semester_id IS NULL';
     }
-    const teacherHomeworkRows = await db.all(teacherHomeworkSql, teacherHomeworkParams);
-    teacherBatchLookup = buildTeacherHomeworkBatchLookup(teacherHomeworkRows || []);
+    try {
+      const teacherHomeworkRows = await db.all(teacherHomeworkSql, teacherHomeworkParams);
+      teacherBatchLookup = buildTeacherHomeworkBatchLookup(teacherHomeworkRows || []);
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+      teacherBatchLookup = {
+        byHomeworkId: new Map(),
+        byBatchGroup: new Map(),
+      };
+    }
   }
 
   if (groupFilterSet && groupFilterSet.size) {
@@ -12215,30 +12320,60 @@ async function buildJournalMatrix({
   const studentIds = students.map((student) => student.id);
   let gradesByKey = new Map();
   if (columnIds.length && studentIds.length) {
-    const rows = await db.all(
-      `
-        SELECT
-          jg.column_id,
-          jg.student_id,
-          jg.score,
-          jg.teacher_comment,
-          jg.submission_status,
-          jg.graded_at,
-          jg.graded_by,
-          jgm.status AS moderation_status,
-          jgm.moderated_score,
-          jgm.reviewed_at AS moderation_reviewed_at,
-          jgm.reviewed_by AS moderation_reviewed_by
-        FROM journal_grades jg
-        LEFT JOIN journal_grade_moderations jgm
-          ON jgm.column_id = jg.column_id
-         AND jgm.student_id = jg.student_id
-        WHERE jg.column_id IN (${columnIds.map(() => '?').join(',')})
-          AND jg.student_id IN (${studentIds.map(() => '?').join(',')})
-          AND jg.deleted_at IS NULL
-      `,
-      [...columnIds, ...studentIds]
-    );
+    let rows = [];
+    try {
+      rows = await db.all(
+        `
+          SELECT
+            jg.column_id,
+            jg.student_id,
+            jg.score,
+            jg.teacher_comment,
+            jg.submission_status,
+            jg.graded_at,
+            jg.graded_by,
+            jgm.status AS moderation_status,
+            jgm.moderated_score,
+            jgm.reviewed_at AS moderation_reviewed_at,
+            jgm.reviewed_by AS moderation_reviewed_by
+          FROM journal_grades jg
+          LEFT JOIN journal_grade_moderations jgm
+            ON jgm.column_id = jg.column_id
+           AND jgm.student_id = jg.student_id
+          WHERE jg.column_id IN (${columnIds.map(() => '?').join(',')})
+            AND jg.student_id IN (${studentIds.map(() => '?').join(',')})
+            AND jg.deleted_at IS NULL
+        `,
+        [...columnIds, ...studentIds]
+      );
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+      try {
+        rows = await db.all(
+          `
+            SELECT
+              jg.column_id,
+              jg.student_id,
+              jg.score,
+              jg.teacher_comment,
+              jg.submission_status,
+              jg.graded_at,
+              jg.graded_by
+            FROM journal_grades jg
+            WHERE jg.column_id IN (${columnIds.map(() => '?').join(',')})
+              AND jg.student_id IN (${studentIds.map(() => '?').join(',')})
+          `,
+          [...columnIds, ...studentIds]
+        );
+      } catch (legacyErr) {
+        if (!isDbSchemaCompatibilityError(legacyErr)) {
+          throw legacyErr;
+        }
+        rows = [];
+      }
+    }
     gradesByKey = new Map(
       (rows || []).map((row) => [
         `${Number(row.column_id)}|${Number(row.student_id)}`,
@@ -12306,15 +12441,23 @@ async function buildJournalMatrix({
 
   let submissionsByKey = new Map();
   if (homeworkIds.length && studentIds.length) {
-    const rows = await db.all(
-      `
-        SELECT homework_id, student_id, submission_text, link_url, file_path, file_name, submitted_at, updated_at
-        FROM homework_submissions
-        WHERE homework_id IN (${homeworkIds.map(() => '?').join(',')})
-          AND student_id IN (${studentIds.map(() => '?').join(',')})
-      `,
-      [...homeworkIds, ...studentIds]
-    );
+    let rows = [];
+    try {
+      rows = await db.all(
+        `
+          SELECT homework_id, student_id, submission_text, link_url, file_path, file_name, submitted_at, updated_at
+          FROM homework_submissions
+          WHERE homework_id IN (${homeworkIds.map(() => '?').join(',')})
+            AND student_id IN (${studentIds.map(() => '?').join(',')})
+        `,
+        [...homeworkIds, ...studentIds]
+      );
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+      rows = [];
+    }
     submissionsByKey = new Map(
       (rows || []).map((row) => [
         `${Number(row.homework_id)}|${Number(row.student_id)}`,

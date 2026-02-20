@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.70",
+      "date": "2026-02-20",
+      "items": [
+        "fix(journal-page): added schema-compatibility fallback so Journal page no longer crashes with `Database error (journal.page)` on legacy DB structures",
+        "fix(journal-compat): guarded grading/columns/attendance queries against missing legacy tables or columns (`42P01`/`42703`) and render baseline journal data instead"
+      ]
+    },
+    {
       "version": "0.9.69",
       "date": "2026-02-20",
       "items": [
