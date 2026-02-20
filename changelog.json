@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.40",
+      "date": "2026-02-20",
+      "items": [
+        "ci(deploy): switched GitHub Actions GCP auth from service-account key to Workload Identity Federation (OIDC)",
+        "ci(deploy): added workflow permissions for OIDC token issuance (id-token: write)"
+      ]
+    },
+    {
       "version": "0.9.39",
       "date": "2026-02-20",
       "items": [
