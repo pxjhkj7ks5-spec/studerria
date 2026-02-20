@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.66",
+      "date": "2026-02-20",
+      "items": [
+        "fix(my-day-footer): restyled My Day footer metadata block to compact glass-pill layout (v/build/changelog) matching other pages",
+        "fix(my-day-footer): removed default button look for build/changelog controls and restored consistent hover/contrast in dark and light themes"
+      ]
+    },
+    {
       "version": "0.9.65",
       "date": "2026-02-20",
       "items": [
