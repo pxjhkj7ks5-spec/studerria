@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.46",
+      "date": "2026-02-20",
+      "items": [
+        "fix(admin-visit-analytics): hardened recent visits renderer with full HTML escaping for user/role/page/path fields to prevent row breakage by malformed data",
+        "fix(admin-visit-analytics): improved recent visits date parsing fallback so invalid timestamps no longer break table rendering"
+      ]
+    },
+    {
       "version": "0.9.45",
       "date": "2026-02-20",
       "items": [

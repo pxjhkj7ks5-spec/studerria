@@ -4295,14 +4295,21 @@
           return;
         }
         visitRecentBody.innerHTML = rows.map((row) => {
-          const at = row.created_at ? new Date(row.created_at).toLocaleString('uk-UA') : '—';
+          const parsedDate = row && row.created_at ? new Date(row.created_at) : null;
+          const at = parsedDate && !Number.isNaN(parsedDate.getTime())
+            ? parsedDate.toLocaleString('uk-UA')
+            : '—';
+          const userName = escapeHtml(row && row.user_name ? String(row.user_name) : 'Guest');
+          const roleLabel = escapeHtml(prettyVisitRoleLabel(row && row.role_key ? row.role_key : 'guest'));
+          const pageLabel = escapeHtml(prettyVisitPageLabel(row && row.page_key ? row.page_key : 'unknown'));
+          const routePath = escapeHtml(row && row.route_path ? String(row.route_path) : '/');
           return `
             <tr>
-              <td>${at}</td>
-              <td>${row.user_name || 'Guest'}</td>
-              <td>${prettyVisitRoleLabel(row.role_key)}</td>
-              <td>${prettyVisitPageLabel(row.page_key)}</td>
-              <td>${row.route_path || '/'}</td>
+              <td>${escapeHtml(at)}</td>
+              <td>${userName}</td>
+              <td>${roleLabel}</td>
+              <td>${pageLabel}</td>
+              <td>${routePath}</td>
             </tr>
           `;
         }).join('');
