@@ -7453,6 +7453,7 @@ const JOURNAL_SCORING_TYPE_META = {
 const JOURNAL_GRADE_UNDO_SECONDS = 30;
 const JOURNAL_SUBJECT_CLOSE_EVENT_TYPE = 'closed';
 const JOURNAL_SUBJECT_CLOSED_ERROR = 'Предмет закрито. Редагування журналу вимкнено.';
+const SEMESTER_ARCHIVE_UPLOADS_DIR = 'semester-archives';
 const JOURNAL_RETAKE_KINDS = ['retake', 'makeup'];
 const JOURNAL_RETAKE_KIND_META = {
   retake: { key: 'retake', label: 'Перездача' },
@@ -8076,6 +8077,193 @@ function writeJournalClosureExportFile({
     fileName,
     absolutePath,
     filePath: `/uploads/${relativeToUploads}`,
+  };
+}
+
+const normalizeArchiveFileSlug = (rawValue, fallback = 'item') => {
+  const safeFallback = String(fallback || 'item')
+    .replace(/[^a-zA-Z0-9-_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'item';
+  const normalized = String(rawValue || '')
+    .replace(/[^a-zA-Z0-9-_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+  return normalized || safeFallback;
+};
+
+function writeSemesterArchiveFile({
+  courseId,
+  semesterId,
+  fileName,
+  content,
+}) {
+  const safeCourseId = Number(courseId || 0);
+  const safeSemesterId = Number(semesterId || 0);
+  const safeFileName = String(fileName || '').trim() || `semester-${safeSemesterId}-archive.csv`;
+  const directory = path.join(
+    uploadsDir,
+    SEMESTER_ARCHIVE_UPLOADS_DIR,
+    `course-${safeCourseId}`,
+    `semester-${safeSemesterId}`
+  );
+  fs.mkdirSync(directory, { recursive: true });
+  const absolutePath = path.join(directory, safeFileName);
+  fs.writeFileSync(absolutePath, String(content || ''), 'utf8');
+  const relativeToUploads = path.relative(uploadsDir, absolutePath).split(path.sep).join('/');
+  return {
+    fileName: safeFileName,
+    absolutePath,
+    filePath: `/uploads/${relativeToUploads}`,
+    directory,
+  };
+}
+
+async function buildSemesterJournalArchiveSnapshot({
+  courseId,
+  semester,
+  actorUserId,
+}) {
+  const safeCourseId = Number(courseId || 0);
+  const safeSemesterId = Number(semester?.id || 0);
+  const semesterTitle = String(semester?.title || '').trim() || `Semester ${safeSemesterId}`;
+  const timestamp = new Date();
+  const timestampToken = timestamp.toISOString().replace(/[:.]/g, '-');
+
+  const subjectRows = await db.all(
+    `
+      SELECT DISTINCT s.id AS subject_id, s.name AS subject_name
+      FROM subjects s
+      JOIN journal_columns jc ON jc.subject_id = s.id
+      WHERE s.course_id = ?
+        AND jc.course_id = ?
+        AND jc.semester_id = ?
+        AND COALESCE(jc.is_archived, 0) = 0
+      ORDER BY s.name ASC, s.id ASC
+    `,
+    [safeCourseId, safeCourseId, safeSemesterId]
+  );
+
+  const summaryLines = [
+    ['course_id', 'semester_id', 'semester_title', 'generated_at']
+      .map((value) => escapeCsvValue(value)).join(','),
+    [safeCourseId, safeSemesterId, semesterTitle, timestamp.toISOString()]
+      .map((value) => escapeCsvValue(value)).join(','),
+    '',
+    ['subject_id', 'subject_name', 'student_id', 'student_name', 'group_number', 'final_score_100', 'weighted_earned', 'raw_earned', 'raw_max']
+      .map((value) => escapeCsvValue(value)).join(','),
+  ];
+  const manifestLines = [
+    ['subject_id', 'subject_name', 'rows', 'columns', 'file_name', 'file_path']
+      .map((value) => escapeCsvValue(value)).join(','),
+  ];
+
+  let studentsRowsCount = 0;
+  const subjectFiles = [];
+
+  for (const subject of (subjectRows || [])) {
+    const subjectId = Number(subject.subject_id || 0);
+    if (!Number.isFinite(subjectId) || subjectId < 1) continue;
+    const subjectName = String(subject.subject_name || '').trim() || `Subject ${subjectId}`;
+    const matrix = await buildJournalMatrix({
+      subjectId,
+      courseId: safeCourseId,
+      semesterId: safeSemesterId,
+      actorUserId: Number(actorUserId || 0) || null,
+      groupFilterSet: null,
+      studentFilterIds: [],
+    });
+    const detailedCsv = buildJournalClosureCsv({
+      subjectName,
+      courseName: `Course ${safeCourseId}`,
+      semesterTitle,
+      closedAt: timestamp,
+      columns: matrix.columns || [],
+      rows: matrix.rows || [],
+    });
+    const subjectSlug = normalizeArchiveFileSlug(subjectName, `subject-${subjectId}`);
+    const subjectFile = writeSemesterArchiveFile({
+      courseId: safeCourseId,
+      semesterId: safeSemesterId,
+      fileName: `semester-${safeSemesterId}-subject-${subjectId}-${subjectSlug}-${timestampToken}.csv`,
+      content: detailedCsv.csv,
+    });
+    subjectFiles.push({
+      subject_id: subjectId,
+      subject_name: subjectName,
+      file_name: subjectFile.fileName,
+      file_path: subjectFile.filePath,
+      rows: Number(detailedCsv.exportRowsCount || 0),
+      columns: Number(detailedCsv.exportColumnsCount || 0),
+    });
+    manifestLines.push(
+      [
+        subjectId,
+        subjectName,
+        Number(detailedCsv.exportRowsCount || 0),
+        Number(detailedCsv.exportColumnsCount || 0),
+        subjectFile.fileName,
+        subjectFile.filePath,
+      ].map((value) => escapeCsvValue(value)).join(',')
+    );
+
+    (matrix.rows || []).forEach((row) => {
+      const student = row?.student || {};
+      summaryLines.push(
+        [
+          subjectId,
+          subjectName,
+          Number(student.id || 0),
+          String(student.full_name || '').trim() || 'Студент',
+          Number(student.group_number || 0),
+          formatJournalClosureCsvNumber(row?.final_score),
+          formatJournalClosureCsvNumber(row?.weighted_earned),
+          formatJournalClosureCsvNumber(row?.raw_earned),
+          formatJournalClosureCsvNumber(row?.raw_max),
+        ].map((value) => escapeCsvValue(value)).join(',')
+      );
+      studentsRowsCount += 1;
+    });
+  }
+
+  const summaryContent = summaryLines.join('\n');
+  const manifestContent = manifestLines.join('\n');
+  const summaryFile = writeSemesterArchiveFile({
+    courseId: safeCourseId,
+    semesterId: safeSemesterId,
+    fileName: `semester-${safeSemesterId}-archive-summary-${timestampToken}.csv`,
+    content: summaryContent,
+  });
+  const latestSummaryFile = writeSemesterArchiveFile({
+    courseId: safeCourseId,
+    semesterId: safeSemesterId,
+    fileName: `semester-${safeSemesterId}-archive-summary-latest.csv`,
+    content: summaryContent,
+  });
+  const manifestFile = writeSemesterArchiveFile({
+    courseId: safeCourseId,
+    semesterId: safeSemesterId,
+    fileName: `semester-${safeSemesterId}-archive-manifest-${timestampToken}.csv`,
+    content: manifestContent,
+  });
+  const latestManifestFile = writeSemesterArchiveFile({
+    courseId: safeCourseId,
+    semesterId: safeSemesterId,
+    fileName: `semester-${safeSemesterId}-archive-manifest-latest.csv`,
+    content: manifestContent,
+  });
+
+  return {
+    summary_file: summaryFile,
+    summary_file_latest: latestSummaryFile,
+    manifest_file: manifestFile,
+    manifest_file_latest: latestManifestFile,
+    subject_files: subjectFiles,
+    subjects_count: subjectFiles.length,
+    students_rows_count: studentsRowsCount,
+    generated_at: timestamp.toISOString(),
   };
 }
 
@@ -20376,6 +20564,130 @@ app.post('/admin/semesters/archive/:id', requireSemestersSectionAccess, (req, re
     invalidateSemestersCache(courseId);
     return res.redirect('/admin?ok=Semester%20archived');
   });
+});
+
+app.post('/admin/semesters/finalize/:id', requireSemestersSectionAccess, async (req, res) => {
+  const semesterId = Number(req.params.id);
+  const courseId = getAdminCourse(req);
+  if (!Number.isFinite(semesterId) || semesterId < 1) {
+    return res.redirect('/admin?err=Invalid%20semester');
+  }
+
+  try {
+    const semester = await db.get(
+      `
+        SELECT id, title, start_date, weeks_count, is_active, is_archived
+        FROM semesters
+        WHERE id = ? AND course_id = ?
+        LIMIT 1
+      `,
+      [semesterId, courseId]
+    );
+    if (!semester) {
+      return res.redirect('/admin?err=Semester%20not%20found');
+    }
+
+    const archiveSnapshot = await buildSemesterJournalArchiveSnapshot({
+      courseId,
+      semester,
+      actorUserId: Number(req.session.user.id),
+    });
+
+    await withTransaction(async (client) => {
+      const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
+      await query(
+        `
+          UPDATE semesters
+          SET is_archived = 1,
+              is_active = 0
+          WHERE id = ?
+            AND course_id = ?
+        `,
+        [semesterId, courseId]
+      );
+      await query(
+        `
+          UPDATE journal_columns
+          SET is_locked = 1,
+              locked_by = ?,
+              locked_at = COALESCE(locked_at, NOW()),
+              updated_at = NOW()
+          WHERE course_id = ?
+            AND semester_id = ?
+            AND COALESCE(is_archived, 0) = 0
+        `,
+        [Number(req.session.user.id), courseId, semesterId]
+      );
+    });
+
+    logAction(db, req, 'semester_finalize', {
+      id: semesterId,
+      archive_summary_file: archiveSnapshot.summary_file?.filePath || null,
+      archive_manifest_file: archiveSnapshot.manifest_file?.filePath || null,
+      subjects_count: Number(archiveSnapshot.subjects_count || 0),
+      students_rows_count: Number(archiveSnapshot.students_rows_count || 0),
+      generated_at: archiveSnapshot.generated_at || null,
+    });
+    logActivity(
+      db,
+      req,
+      'semester_finalize',
+      'semester',
+      semesterId,
+      {
+        archive_summary_file: archiveSnapshot.summary_file?.filePath || null,
+        archive_manifest_file: archiveSnapshot.manifest_file?.filePath || null,
+        subjects_count: Number(archiveSnapshot.subjects_count || 0),
+        students_rows_count: Number(archiveSnapshot.students_rows_count || 0),
+      },
+      courseId,
+      semesterId
+    );
+    invalidateSemestersCache(courseId);
+    return res.redirect(
+      `/admin?ok=${encodeURIComponent(`Semester finalized: archived + journals locked + backup generated (${Number(archiveSnapshot.subjects_count || 0)} subjects)`)}`
+    );
+  } catch (err) {
+    return handleDbError(res, err, 'admin.semesters.finalize');
+  }
+});
+
+app.get('/admin/semesters/archive-export/:id', requireSemestersSectionAccess, async (req, res) => {
+  const semesterId = Number(req.params.id);
+  const courseId = getAdminCourse(req);
+  if (!Number.isFinite(semesterId) || semesterId < 1) {
+    return res.redirect('/admin?err=Invalid%20semester');
+  }
+
+  try {
+    const semester = await db.get(
+      `
+        SELECT id
+        FROM semesters
+        WHERE id = ? AND course_id = ?
+        LIMIT 1
+      `,
+      [semesterId, courseId]
+    );
+    if (!semester) {
+      return res.redirect('/admin?err=Semester%20not%20found');
+    }
+
+    const archiveDir = path.join(
+      uploadsDir,
+      SEMESTER_ARCHIVE_UPLOADS_DIR,
+      `course-${courseId}`,
+      `semester-${semesterId}`
+    );
+    const latestSummaryFileName = `semester-${semesterId}-archive-summary-latest.csv`;
+    const absolutePath = path.join(archiveDir, latestSummaryFileName);
+    if (!fs.existsSync(absolutePath)) {
+      return res.redirect('/admin?err=Archive%20summary%20not%20found');
+    }
+    return res.download(absolutePath, latestSummaryFileName);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.semesters.archiveExport');
+  }
 });
 
 app.post('/admin/semesters/restore/:id', requireSemestersSectionAccess, (req, res) => {

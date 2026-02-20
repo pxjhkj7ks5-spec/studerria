@@ -2448,6 +2448,7 @@
                           <form id="semester-active-<%= sem.id %>" method="POST" action="/admin/semesters/set-active/<%= sem.id %>"></form>
                           <form id="semester-restore-<%= sem.id %>" method="POST" action="/admin/semesters/restore/<%= sem.id %>"></form>
                           <form id="semester-archive-<%= sem.id %>" method="POST" action="/admin/semesters/archive/<%= sem.id %>"></form>
+                          <form id="semester-finalize-<%= sem.id %>" method="POST" action="/admin/semesters/finalize/<%= sem.id %>"></form>
                           <form id="semester-delete-<%= sem.id %>" method="POST" action="/admin/semesters/delete/<%= sem.id %>"></form>
                           <form id="semester-hard-delete-<%= sem.id %>" method="POST" action="/admin/semesters/hard-delete/<%= sem.id %>"></form>
                           <div class="dropdown">
@@ -2464,6 +2465,19 @@
                               <% } else { %>
                                 <li><button class="dropdown-item" type="submit" form="semester-archive-<%= sem.id %>" data-confirm="Archive this semester?" data-confirm-level="warning">Archive</button></li>
                               <% } %>
+                              <li>
+                                <button
+                                  class="dropdown-item text-warning"
+                                  type="submit"
+                                  form="semester-finalize-<%= sem.id %>"
+                                  data-confirm="Finalize semester? This will archive semester, lock journal columns, and generate backup CSV exports."
+                                  data-confirm-level="warning"
+                                  data-confirm-typed="FINALIZE"
+                                >
+                                  Finalize semester
+                                </button>
+                              </li>
+                              <li><a class="dropdown-item" href="/admin/semesters/archive-export/<%= sem.id %>">Download archive CSV</a></li>
                               <li><hr class="dropdown-divider" /></li>
                               <li><button class="dropdown-item text-danger" type="submit" form="semester-delete-<%= sem.id %>" data-confirm="Delete this semester? This cannot be undone." data-confirm-level="danger">Delete</button></li>
                               <li>
