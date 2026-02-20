@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.68",
+      "date": "2026-02-20",
+      "items": [
+        "fix(admin-users): removed inactive/all status switch from Users tab so this section stays active-only",
+        "fix(admin-users): added extra front-end guard to hide inactive rows even if they appear in a payload"
+      ]
+    },
+    {
       "version": "0.9.67",
       "date": "2026-02-20",
       "items": [
