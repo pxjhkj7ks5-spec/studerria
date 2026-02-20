@@ -164,6 +164,7 @@ const JOURNAL_OWN_PERMISSION = 'journal-own';
 const JOURNAL_FULL_PERMISSION = 'journal-full';
 const REVIEW_QUEUE_OVERDUE_HOURS = 48;
 const REVIEW_QUEUE_ITEM_LIMIT = 120;
+const HOMEWORK_REVIEW_SLA_SUBJECT_LIMIT = 8;
 const REVIEW_QUEUE_FEEDBACK_TEMPLATES = [
   {
     key: 'strong',
@@ -4373,6 +4374,136 @@ async function buildMyDayReviewQueue({
     items: limitedItems,
     truncated: allItems.length > REVIEW_QUEUE_ITEM_LIMIT,
     templates: REVIEW_QUEUE_FEEDBACK_TEMPLATES,
+  };
+}
+
+async function buildAdminHomeworkReviewSla({
+  userId,
+  courseId,
+  semesterId = null,
+  roleKeys = [],
+  now = new Date(),
+}) {
+  const subjectOptions = await getMyDayReviewSubjects({
+    userId,
+    courseId,
+    roleKeys,
+  });
+  const subjectIds = Array.from(
+    new Set(
+      (subjectOptions || [])
+        .map((item) => Number(item?.subject_id || 0))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    )
+  );
+  const emptyResult = {
+    enabled: true,
+    threshold_hours: REVIEW_QUEUE_OVERDUE_HOURS,
+    submissions_total: 0,
+    ungraded_total: 0,
+    overdue_ungraded_total: 0,
+    subjects_at_risk: 0,
+    subjects_with_ungraded: 0,
+    max_wait_hours: 0,
+    by_subject: [],
+  };
+  if (!subjectIds.length) {
+    return emptyResult;
+  }
+
+  const placeholders = subjectIds.map(() => '?').join(',');
+  const params = [now.toISOString(), REVIEW_QUEUE_OVERDUE_HOURS, courseId];
+  const semesterClause = semesterId
+    ? 'AND (h.semester_id = ? OR h.semester_id IS NULL)'
+    : 'AND h.semester_id IS NULL';
+  if (semesterId) {
+    params.push(semesterId);
+  }
+  params.push(...subjectIds);
+
+  const rows = await db.all(
+    `
+      SELECT
+        h.subject_id,
+        COALESCE(s.name, 'Предмет') AS subject_name,
+        COUNT(*)::int AS submissions_total,
+        COUNT(*) FILTER (WHERE jg.id IS NULL)::int AS ungraded_total,
+        COUNT(*) FILTER (
+          WHERE jg.id IS NULL
+            AND hs.submitted_at <= (?::timestamptz - (? * INTERVAL '1 hour'))
+        )::int AS overdue_ungraded_total,
+        MIN(hs.submitted_at) FILTER (WHERE jg.id IS NULL) AS oldest_ungraded_at
+      FROM homework_submissions hs
+      JOIN homework h ON h.id = hs.homework_id
+      JOIN subjects s ON s.id = h.subject_id
+      LEFT JOIN journal_columns jc
+        ON jc.source_homework_id = h.id
+       AND COALESCE(jc.is_archived, 0) = 0
+      LEFT JOIN journal_grades jg
+        ON jg.column_id = jc.id
+       AND jg.student_id = hs.student_id
+       AND jg.deleted_at IS NULL
+      WHERE h.course_id = ?
+        ${semesterClause}
+        AND COALESCE(h.is_teacher_homework, 0) = 1
+        AND h.subject_id IN (${placeholders})
+      GROUP BY h.subject_id, s.name
+      ORDER BY overdue_ungraded_total DESC, ungraded_total DESC, subject_name ASC
+    `,
+    params
+  );
+
+  const nowMs = now.getTime();
+  const bySubject = (rows || []).map((row) => {
+    const oldestUngradedAt = row.oldest_ungraded_at ? String(row.oldest_ungraded_at) : null;
+    const oldestMs = oldestUngradedAt ? new Date(oldestUngradedAt).getTime() : Number.NaN;
+    const waitHours = Number.isFinite(oldestMs)
+      ? Math.max(0, Math.floor((nowMs - oldestMs) / (60 * 60 * 1000)))
+      : 0;
+    return {
+      subject_id: Number(row.subject_id || 0),
+      subject_name: String(row.subject_name || 'Предмет'),
+      submissions_total: Number(row.submissions_total || 0),
+      ungraded_total: Number(row.ungraded_total || 0),
+      overdue_ungraded_total: Number(row.overdue_ungraded_total || 0),
+      oldest_ungraded_at: oldestUngradedAt,
+      oldest_wait_hours: waitHours,
+    };
+  });
+
+  const summary = bySubject.reduce((acc, row) => {
+    acc.submissions_total += Number(row.submissions_total || 0);
+    acc.ungraded_total += Number(row.ungraded_total || 0);
+    acc.overdue_ungraded_total += Number(row.overdue_ungraded_total || 0);
+    if (Number(row.overdue_ungraded_total || 0) > 0) {
+      acc.subjects_at_risk += 1;
+    }
+    if (Number(row.ungraded_total || 0) > 0) {
+      acc.subjects_with_ungraded += 1;
+    }
+    acc.max_wait_hours = Math.max(acc.max_wait_hours, Number(row.oldest_wait_hours || 0));
+    return acc;
+  }, {
+    submissions_total: 0,
+    ungraded_total: 0,
+    overdue_ungraded_total: 0,
+    subjects_at_risk: 0,
+    subjects_with_ungraded: 0,
+    max_wait_hours: 0,
+  });
+
+  return {
+    enabled: true,
+    threshold_hours: REVIEW_QUEUE_OVERDUE_HOURS,
+    submissions_total: summary.submissions_total,
+    ungraded_total: summary.ungraded_total,
+    overdue_ungraded_total: summary.overdue_ungraded_total,
+    subjects_at_risk: summary.subjects_at_risk,
+    subjects_with_ungraded: summary.subjects_with_ungraded,
+    max_wait_hours: summary.max_wait_hours,
+    by_subject: bySubject
+      .filter((item) => Number(item.ungraded_total || 0) > 0 || Number(item.overdue_ungraded_total || 0) > 0)
+      .slice(0, HOMEWORK_REVIEW_SLA_SUBJECT_LIMIT),
   };
 }
 
@@ -15966,12 +16097,16 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       ? new Date(`${labels[0]}T00:00:00.000Z`).toISOString()
       : new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
     const courseId = getAdminCourse(req);
+    const userId = Number(req?.session?.user?.id || 0);
+    const roleKeys = getSessionRoleList(req);
+    const activeSemester = await getActiveSemester(courseId);
     const uniqueExpr = "COALESCE(v.user_id::text, NULLIF(v.session_id, ''), NULLIF(v.ip, ''), 'guest')";
     const excludeAdminClause = excludeAdmin
       ? "AND COALESCE(NULLIF(v.role_key, ''), 'guest') <> 'admin'"
       : '';
+    const now = new Date();
 
-    const [summaryRow, dailyRows, topPagesRows, roleRows, recentRows] = await Promise.all([
+    const [summaryRow, dailyRows, topPagesRows, roleRows, recentRows, homeworkSla] = await Promise.all([
       db.get(
         `
           SELECT
@@ -16049,6 +16184,13 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
         `,
         [courseId, sinceIso]
       ),
+      buildAdminHomeworkReviewSla({
+        userId,
+        courseId,
+        semesterId: activeSemester ? Number(activeSemester.id) : null,
+        roleKeys,
+        now,
+      }),
     ]);
 
     const dailyMap = new Map();
@@ -16097,6 +16239,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
         page_key: row.page_key || 'unknown',
         route_path: row.route_path || '/',
       })),
+      homework_sla: homeworkSla,
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.visitAnalytics.fetch');

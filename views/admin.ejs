@@ -2661,6 +2661,49 @@
                 </div>
               </div>
 
+              <div class="mt-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                  <h6 class="mb-0">SLA перевірки ДЗ <span class="small text-muted" id="homeworkSlaThresholdLabel">(>48 год)</span></h6>
+                  <div class="small text-muted">Скільки зданих ДЗ очікують перевірку довше за поріг.</div>
+                </div>
+                <div class="visit-analytics-grid">
+                  <div class="visit-metric-card">
+                    <div class="small text-muted">Прострочені SLA</div>
+                    <div class="visit-metric-value" id="visitSlaMetricOverdue">—</div>
+                  </div>
+                  <div class="visit-metric-card">
+                    <div class="small text-muted">Неперевірені ДЗ</div>
+                    <div class="visit-metric-value" id="visitSlaMetricUngraded">—</div>
+                  </div>
+                  <div class="visit-metric-card">
+                    <div class="small text-muted">Предмети в ризику</div>
+                    <div class="visit-metric-value" id="visitSlaMetricSubjects">—</div>
+                  </div>
+                  <div class="visit-metric-card">
+                    <div class="small text-muted">Макс. очікування</div>
+                    <div class="visit-metric-value" id="visitSlaMetricMaxWait">—</div>
+                  </div>
+                </div>
+                <div class="table-responsive mt-2">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Предмет</th>
+                        <th>Прострочені</th>
+                        <th>Неперевірені</th>
+                        <th>Найдовше очікує</th>
+                        <th>Здач за період</th>
+                      </tr>
+                    </thead>
+                    <tbody id="homeworkSlaBody">
+                      <tr>
+                        <td colspan="5" class="text-muted">Завантаження…</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               <div class="visit-chart-wrap mt-3">
                 <canvas id="visitAnalyticsChart" height="120"></canvas>
               </div>
@@ -3904,6 +3947,12 @@
       const visitMetricUnique = document.getElementById('visitMetricUnique');
       const visitMetricSigned = document.getElementById('visitMetricSigned');
       const visitMetricDays = document.getElementById('visitMetricDays');
+      const homeworkSlaThresholdLabel = document.getElementById('homeworkSlaThresholdLabel');
+      const visitSlaMetricOverdue = document.getElementById('visitSlaMetricOverdue');
+      const visitSlaMetricUngraded = document.getElementById('visitSlaMetricUngraded');
+      const visitSlaMetricSubjects = document.getElementById('visitSlaMetricSubjects');
+      const visitSlaMetricMaxWait = document.getElementById('visitSlaMetricMaxWait');
+      const homeworkSlaBody = document.getElementById('homeworkSlaBody');
       const visitChartCanvas = document.getElementById('visitAnalyticsChart');
       const visitChartCtor =
         typeof window !== 'undefined' && window.Chart ? window.Chart : null;
@@ -3913,6 +3962,17 @@
       const formatVisitNumber = (value) => {
         const n = Number(value || 0);
         return new Intl.NumberFormat('uk-UA').format(Number.isFinite(n) ? n : 0);
+      };
+      const formatSlaWait = (value) => {
+        const hours = Number(value || 0);
+        if (!Number.isFinite(hours) || hours <= 0) return '—';
+        if (hours >= 72) {
+          return `${(hours / 24).toFixed(1)} дн`;
+        }
+        if (hours >= 24) {
+          return `${Math.round(hours / 24)} дн`;
+        }
+        return `${Math.round(hours)} год`;
       };
 
       const prettyVisitPageLabel = (key) => {
@@ -4008,6 +4068,42 @@
         }).join('');
       };
 
+      const renderHomeworkSla = (sla) => {
+        const data = sla && typeof sla === 'object' ? sla : null;
+        const thresholdHours = Number(data && data.threshold_hours ? data.threshold_hours : 48);
+        if (homeworkSlaThresholdLabel) {
+          homeworkSlaThresholdLabel.textContent = `(>${formatVisitNumber(thresholdHours)} год)`;
+        }
+        if (visitSlaMetricOverdue) {
+          visitSlaMetricOverdue.textContent = formatVisitNumber(data && data.overdue_ungraded_total);
+        }
+        if (visitSlaMetricUngraded) {
+          visitSlaMetricUngraded.textContent = formatVisitNumber(data && data.ungraded_total);
+        }
+        if (visitSlaMetricSubjects) {
+          visitSlaMetricSubjects.textContent = formatVisitNumber(data && data.subjects_at_risk);
+        }
+        if (visitSlaMetricMaxWait) {
+          visitSlaMetricMaxWait.textContent = formatSlaWait(data && data.max_wait_hours);
+        }
+        if (!homeworkSlaBody) return;
+        const rows = Array.isArray(data && data.by_subject ? data.by_subject : [])
+          .filter((row) => Number(row && row.ungraded_total || 0) > 0 || Number(row && row.overdue_ungraded_total || 0) > 0);
+        if (!rows.length) {
+          homeworkSlaBody.innerHTML = '<tr><td colspan="5" class="text-muted">Неперевірених робіт понад SLA немає.</td></tr>';
+          return;
+        }
+        homeworkSlaBody.innerHTML = rows.map((row) => `
+          <tr>
+            <td>${escapeHtml(row.subject_name || 'Предмет')}</td>
+            <td>${formatVisitNumber(row.overdue_ungraded_total)}</td>
+            <td>${formatVisitNumber(row.ungraded_total)}</td>
+            <td>${formatSlaWait(row.oldest_wait_hours)}</td>
+            <td>${formatVisitNumber(row.submissions_total)}</td>
+          </tr>
+        `).join('');
+      };
+
       const renderVisitChart = (dailyRows) => {
         if (!visitChartCanvas || !visitChartCtor) return;
         const labels = (dailyRows || []).map((row) => row.day || '');
@@ -4091,10 +4187,12 @@
           renderVisitTopPages(data.top_pages || []);
           renderVisitRoles(data.roles || []);
           renderVisitRecent(data.recent || []);
+          renderHomeworkSla(data.homework_sla || null);
         } catch (err) {
           renderVisitTopPages([]);
           renderVisitRoles([]);
           renderVisitRecent([]);
+          renderHomeworkSla(null);
           if (visitMetricTotal) visitMetricTotal.textContent = '—';
           if (visitMetricUnique) visitMetricUnique.textContent = '—';
           if (visitMetricSigned) visitMetricSigned.textContent = '—';

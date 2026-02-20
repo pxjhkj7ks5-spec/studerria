@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.30",
+      "date": "2026-02-20",
+      "items": [
+        "feat(admin-analytics): added Homework Review SLA panel in Visit Analytics with overdue/ungraded metrics and per-subject backlog table",
+        "feat(api): /admin/visit-analytics.json now returns homework_sla payload (threshold, totals, risk subjects, max wait, subject rows)",
+        "feat(scope): Homework SLA data is role-scoped via Role Studio access (teacher sees assigned subjects, deanery/admin see full course scope)"
+      ]
+    },
+    {
       "version": "0.9.29",
       "date": "2026-02-20",
       "items": [
