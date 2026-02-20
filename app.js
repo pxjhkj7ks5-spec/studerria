@@ -4,7 +4,7 @@ const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 const path = require('path');
 const fs = require('fs');
-const { randomUUID } = require('crypto');
+const { randomUUID, createHash } = require('crypto');
 const multer = require('multer');
 const { Pool } = require('pg');
 const { WebSocketServer } = require('ws');
@@ -397,6 +397,14 @@ const ACTIVITY_LOG_RETENTION_DAYS_DEFAULT = normalizeRetentionDays(
   process.env.ACTIVITY_LOG_RETENTION_DAYS,
   365
 );
+const SECURITY_IP_RETENTION_DAYS_DEFAULT = normalizeRetentionDays(
+  process.env.SECURITY_IP_RETENTION_DAYS,
+  180
+);
+const SECURITY_USER_AGENT_RETENTION_DAYS_DEFAULT = normalizeRetentionDays(
+  process.env.SECURITY_USER_AGENT_RETENTION_DAYS,
+  120
+);
 
 const DEFAULT_SETTINGS = {
   session_duration_days: 14,
@@ -412,6 +420,9 @@ const DEFAULT_SETTINGS = {
   security_admin_ip_allowlist: '',
   security_registration_alert_threshold: 3,
   security_registration_alert_window_minutes: 120,
+  security_auto_quarantine_enabled: true,
+  security_ip_retention_days: SECURITY_IP_RETENTION_DAYS_DEFAULT,
+  security_user_agent_retention_days: SECURITY_USER_AGENT_RETENTION_DAYS_DEFAULT,
   role_permissions: { ...DEFAULT_ROLE_PERMISSIONS },
 };
 let settingsCache = { ...DEFAULT_SETTINGS };
@@ -432,6 +443,9 @@ const SYSTEM_SETTINGS_AUDIT_KEYS = [
   'security_admin_ip_allowlist',
   'security_registration_alert_threshold',
   'security_registration_alert_window_minutes',
+  'security_auto_quarantine_enabled',
+  'security_ip_retention_days',
+  'security_user_agent_retention_days',
 ];
 
 function resolveSessionTtlDays(rawDays) {
@@ -798,6 +812,18 @@ const refreshSettingsCache = async () => {
       parsed.security_registration_alert_window_minutes = normalizeSecurityRegistrationAlertWindowMinutes(
         row.value,
         DEFAULT_SETTINGS.security_registration_alert_window_minutes
+      );
+    } else if (row.key === 'security_auto_quarantine_enabled') {
+      parsed.security_auto_quarantine_enabled = String(row.value).toLowerCase() === 'true';
+    } else if (row.key === 'security_ip_retention_days') {
+      parsed.security_ip_retention_days = normalizeRetentionDays(
+        row.value,
+        DEFAULT_SETTINGS.security_ip_retention_days
+      );
+    } else if (row.key === 'security_user_agent_retention_days') {
+      parsed.security_user_agent_retention_days = normalizeRetentionDays(
+        row.value,
+        DEFAULT_SETTINGS.security_user_agent_retention_days
       );
     } else if (row.key === 'role_permissions') {
       try {
@@ -3029,6 +3055,185 @@ function resolveForensicsRiskState(scoreRaw) {
   return { key: 'clear', label: 'Ознак ризику не виявлено' };
 }
 
+const SECURITY_CASE_SCORE_WATCH = 50;
+const SECURITY_CASE_SCORE_HIGH = 90;
+const SECURITY_ALERT_LOOKBACK_HOURS = 72;
+const SECURITY_SESSION_LIST_LIMIT = 120;
+const STEPUP_CODE_ROLE = 'ROLE';
+const STEPUP_CODE_BULK = 'BULK';
+const STEPUP_CODE_FINALIZE = 'FINALIZE';
+
+function normalizeSecurityCaseLevel(rawLevel) {
+  const normalized = String(rawLevel || '').trim().toLowerCase();
+  if (normalized === 'high-risk' || normalized === 'high' || normalized === 'risk') return 'high-risk';
+  if (normalized === 'watch' || normalized === 'warning') return 'watch';
+  return 'normal';
+}
+
+function normalizeSecurityCaseStatus(rawStatus) {
+  const normalized = String(rawStatus || '').trim().toLowerCase();
+  if (normalized === 'confirmed') return 'confirmed';
+  if (normalized === 'closed') return 'closed';
+  return 'open';
+}
+
+function resolveSecurityCaseLevel(scoreRaw) {
+  const score = Number(scoreRaw || 0);
+  if (score >= SECURITY_CASE_SCORE_HIGH) {
+    return { key: 'high-risk', label: 'Високий ризик' };
+  }
+  if (score >= SECURITY_CASE_SCORE_WATCH) {
+    return { key: 'watch', label: 'Під наглядом' };
+  }
+  return { key: 'normal', label: 'Нормально' };
+}
+
+function normalizeRoleListForAudit(rawRoles) {
+  return normalizeRoleList(Array.isArray(rawRoles) ? rawRoles : []);
+}
+
+function safeJsonParse(rawValue, fallbackValue = null) {
+  if (rawValue === null || rawValue === undefined) return fallbackValue;
+  if (typeof rawValue === 'object') return rawValue;
+  try {
+    return JSON.parse(String(rawValue));
+  } catch (_) {
+    return fallbackValue;
+  }
+}
+
+function isStepUpPhraseValid(rawValue, expectedPhrase) {
+  const expected = String(expectedPhrase || '').trim().toUpperCase();
+  if (!expected) return true;
+  return String(rawValue || '').trim().toUpperCase() === expected;
+}
+
+function buildGradeAuditState(gradeRow) {
+  if (!gradeRow) return null;
+  const score = Number(gradeRow.score);
+  return {
+    score: Number.isFinite(score) ? Math.round(score * 100) / 100 : null,
+    teacher_comment: gradeRow.teacher_comment ? String(gradeRow.teacher_comment) : null,
+    submission_status: gradeRow.submission_status ? String(gradeRow.submission_status) : null,
+    graded_by: Number.isFinite(Number(gradeRow.graded_by)) ? Number(gradeRow.graded_by) : null,
+    graded_at: toIsoStringSafe(gradeRow.graded_at),
+    deleted_at: toIsoStringSafe(gradeRow.deleted_at),
+    deleted_by: Number.isFinite(Number(gradeRow.deleted_by)) ? Number(gradeRow.deleted_by) : null,
+  };
+}
+
+function computeGradeAuditHash({
+  columnId,
+  studentId,
+  actionType,
+  actorUserId,
+  beforeState,
+  afterState,
+  previousHash,
+  createdAt,
+}) {
+  const payload = {
+    column_id: Number(columnId),
+    student_id: Number(studentId),
+    action_type: String(actionType || 'update'),
+    actor_user_id: Number.isFinite(Number(actorUserId)) ? Number(actorUserId) : null,
+    before_state: beforeState || null,
+    after_state: afterState || null,
+    created_at: String(createdAt || new Date().toISOString()),
+  };
+  const serialized = JSON.stringify(payload);
+  return createHash('sha256')
+    .update(`${String(previousHash || '')}|${serialized}`)
+    .digest('hex');
+}
+
+async function appendJournalGradeHashAudit({
+  columnId,
+  studentId,
+  subjectId = null,
+  courseId = null,
+  semesterId = null,
+  actorUserId = null,
+  actionType = 'grade_update',
+  beforeState = null,
+  afterState = null,
+  note = null,
+}) {
+  const normalizedColumnId = Number(columnId);
+  const normalizedStudentId = Number(studentId);
+  if (!Number.isFinite(normalizedColumnId) || normalizedColumnId < 1) return null;
+  if (!Number.isFinite(normalizedStudentId) || normalizedStudentId < 1) return null;
+
+  let previousHash = null;
+  try {
+    const prevRow = await db.get(
+      `
+        SELECT entry_hash
+        FROM journal_grade_hash_audit
+        WHERE column_id = ?
+          AND student_id = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      `,
+      [normalizedColumnId, normalizedStudentId]
+    );
+    previousHash = prevRow && prevRow.entry_hash ? String(prevRow.entry_hash) : null;
+  } catch (_) {
+    previousHash = null;
+  }
+
+  const createdAt = new Date().toISOString();
+  const entryHash = computeGradeAuditHash({
+    columnId: normalizedColumnId,
+    studentId: normalizedStudentId,
+    actionType,
+    actorUserId,
+    beforeState,
+    afterState,
+    previousHash,
+    createdAt,
+  });
+
+  await db.run(
+    `
+      INSERT INTO journal_grade_hash_audit
+        (
+          column_id,
+          student_id,
+          subject_id,
+          course_id,
+          semester_id,
+          actor_user_id,
+          action_type,
+          before_state,
+          after_state,
+          previous_hash,
+          entry_hash,
+          note,
+          created_at
+        )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      normalizedColumnId,
+      normalizedStudentId,
+      Number.isFinite(Number(subjectId)) ? Number(subjectId) : null,
+      Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+      Number.isFinite(Number(semesterId)) ? Number(semesterId) : null,
+      Number.isFinite(Number(actorUserId)) ? Number(actorUserId) : null,
+      String(actionType || 'grade_update').trim() || 'grade_update',
+      beforeState ? JSON.stringify(beforeState) : null,
+      afterState ? JSON.stringify(afterState) : null,
+      previousHash,
+      entryHash,
+      note ? String(note).slice(0, 240) : null,
+      createdAt,
+    ]
+  );
+
+  return entryHash;
+}
+
 function toIsoStringSafe(rawValue) {
   const parsed = new Date(rawValue);
   if (Number.isNaN(parsed.getTime())) return null;
@@ -3223,7 +3428,16 @@ async function evaluateRegistrationSecuritySignals({
     ])).filter((id) => Number(id) !== Number(userId)).slice(0, 12),
   };
   const message = `Registration anomaly: ${reasons.slice(0, 3).join(' | ') || 'multi-account pattern'}`;
-  pushRuntimeErrorEvent('security', 'registration-anomaly', message, signalPayload);
+  await emitSecurityAlertEvent({
+    alertKey: 'registration-anomaly',
+    severity: risk.key === 'high' ? 'high' : 'medium',
+    title: 'Registration anomaly detected',
+    message,
+    userId: Number(userId) || null,
+    courseId: Number.isFinite(numericCourseId) ? numericCourseId : null,
+    details: signalPayload,
+    dedupKey: `registration|${normalizedIp || '-'}|${normalizedSession || '-'}|${normalizedFingerprint || '-'}|${risk.key}`,
+  });
   return {
     risk: {
       score,
@@ -3239,7 +3453,7 @@ async function evaluateRegistrationSecuritySignals({
 
 async function recordUserRegistrationEvent({ userId, fullName, ip, userAgent, sessionId, source = 'register_form', courseId = null }) {
   const normalizedUserId = Number(userId);
-  if (!Number.isFinite(normalizedUserId) || normalizedUserId <= 0) return;
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId <= 0) return null;
   const normalizedName = String(fullName || '').trim() || `User ${normalizedUserId}`;
   const normalizedIp = normalizeForensicsIp(ip);
   const normalizedAgent = normalizeForensicsAgent(userAgent);
@@ -3272,8 +3486,9 @@ async function recordUserRegistrationEvent({ userId, fullName, ip, userAgent, se
       Number.isFinite(Number(courseId)) ? Number(courseId) : null,
     ]
   );
+  let evaluation = null;
   try {
-    await evaluateRegistrationSecuritySignals({
+    evaluation = await evaluateRegistrationSecuritySignals({
       userId: normalizedUserId,
       ip: normalizedIp,
       sessionId: normalizedSessionId,
@@ -3284,6 +3499,902 @@ async function recordUserRegistrationEvent({ userId, fullName, ip, userAgent, se
   } catch (err) {
     console.error('Database error (register.security_signals)', err);
   }
+  return {
+    user_id: normalizedUserId,
+    ip: normalizedIp,
+    session_id: normalizedSessionId,
+    device_fingerprint: buildForensicsDeviceFingerprint(normalizedAgent),
+    source: normalizedSource,
+    course_id: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+    security: evaluation,
+  };
+}
+
+function normalizeSecurityAlertSeverity(rawSeverity) {
+  const normalized = String(rawSeverity || '').trim().toLowerCase();
+  if (['critical', 'high', 'medium', 'low'].includes(normalized)) {
+    return normalized;
+  }
+  return 'medium';
+}
+
+function trimSecurityText(rawValue, maxLength = 240) {
+  const text = String(rawValue || '').trim();
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 3)}...`;
+}
+
+async function emitSecurityAlertEvent({
+  alertKey,
+  severity = 'medium',
+  title,
+  message,
+  userId = null,
+  courseId = null,
+  details = null,
+  dedupKey = null,
+}) {
+  const normalizedAlertKey = String(alertKey || '').trim().toLowerCase() || 'security-alert';
+  const normalizedSeverity = normalizeSecurityAlertSeverity(severity);
+  const normalizedTitle = trimSecurityText(title || normalizedAlertKey, 120) || normalizedAlertKey;
+  const normalizedMessage = trimSecurityText(message || normalizedTitle, 500) || normalizedTitle;
+  const normalizedDedupKey = String(dedupKey || '').trim();
+  const alertSignature = normalizedDedupKey
+    ? `alert|${normalizedDedupKey}`
+    : '';
+  if (alertSignature && !shouldEmitSecurityAlert(alertSignature)) {
+    return { deduped: true };
+  }
+
+  let insertedId = null;
+  let createdAt = new Date().toISOString();
+  const payload = details && typeof details === 'object' ? details : {};
+  try {
+    const row = await db.get(
+      `
+        INSERT INTO security_alert_events
+          (
+            user_id,
+            course_id,
+            alert_key,
+            severity,
+            title,
+            message,
+            details,
+            dedup_key,
+            created_at
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        RETURNING id, created_at
+      `,
+      [
+        Number.isFinite(Number(userId)) ? Number(userId) : null,
+        Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+        normalizedAlertKey,
+        normalizedSeverity,
+        normalizedTitle,
+        normalizedMessage,
+        Object.keys(payload).length ? JSON.stringify(payload) : null,
+        normalizedDedupKey || null,
+      ]
+    );
+    insertedId = row && row.id ? Number(row.id) : null;
+    if (row && row.created_at) {
+      createdAt = toIsoStringSafe(row.created_at) || createdAt;
+    }
+  } catch (err) {
+    console.error('Database error (security.alert.insert)', err);
+  }
+
+  pushRuntimeErrorEvent('security', normalizedAlertKey, normalizedMessage, {
+    user_id: Number.isFinite(Number(userId)) ? Number(userId) : null,
+    course_id: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+    severity: normalizedSeverity,
+    details: payload,
+  });
+  broadcast('security_alert', {
+    id: insertedId,
+    alert_key: normalizedAlertKey,
+    severity: normalizedSeverity,
+    title: normalizedTitle,
+    message: normalizedMessage,
+    created_at: createdAt,
+    user_id: Number.isFinite(Number(userId)) ? Number(userId) : null,
+    course_id: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+  });
+
+  return {
+    id: insertedId,
+    alert_key: normalizedAlertKey,
+    severity: normalizedSeverity,
+    title: normalizedTitle,
+    message: normalizedMessage,
+    created_at: createdAt,
+  };
+}
+
+async function getUserRoleSnapshot(userId, fallbackRole = 'student') {
+  const normalizedUserId = Number(userId);
+  const fallback = normalizeRoleKey(fallbackRole || 'student');
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId < 1) {
+    return { role_keys: [fallback], primary_role: fallback };
+  }
+  const [userRow, assignment] = await Promise.all([
+    db.get('SELECT role FROM users WHERE id = ? LIMIT 1', [normalizedUserId]),
+    getUserRoleAssignmentsForUserIds([normalizedUserId]),
+  ]);
+  const roleKeys = normalizeRoleList(
+    (assignment && assignment.roleKeysByUser && assignment.roleKeysByUser[normalizedUserId])
+      || [normalizeRoleKey((userRow && userRow.role) || fallback)]
+  );
+  const primaryRole = normalizeRoleKey(
+    (assignment && assignment.primaryRoleByUser && assignment.primaryRoleByUser[normalizedUserId])
+    || (userRow && userRow.role)
+    || roleKeys[0]
+    || fallback
+  );
+  return {
+    role_keys: roleKeys.length ? roleKeys : [fallback],
+    primary_role: primaryRole || fallback,
+  };
+}
+
+async function recordUserRoleChangeEvent({
+  userId,
+  actorUserId = null,
+  actorName = null,
+  courseId = null,
+  source = 'admin_users_roles',
+  reason = null,
+  beforeRoles = [],
+  afterRoles = [],
+  beforePrimaryRole = null,
+  afterPrimaryRole = null,
+  targetFullName = null,
+}) {
+  const normalizedUserId = Number(userId);
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId < 1) return null;
+  const normalizedBefore = normalizeRoleListForAudit(beforeRoles);
+  const normalizedAfter = normalizeRoleListForAudit(afterRoles);
+  const normalizedBeforePrimary = normalizeRoleKey(beforePrimaryRole || normalizedBefore[0] || 'student');
+  const normalizedAfterPrimary = normalizeRoleKey(afterPrimaryRole || normalizedAfter[0] || 'student');
+  const beforeKey = `${normalizedBefore.join(',')}|${normalizedBeforePrimary}`;
+  const afterKey = `${normalizedAfter.join(',')}|${normalizedAfterPrimary}`;
+  if (beforeKey === afterKey) return null;
+
+  const normalizedSource = String(source || 'admin_users_roles').trim().toLowerCase();
+  const normalizedReason = trimSecurityText(reason, 500) || null;
+  const normalizedTargetName = trimSecurityText(targetFullName, 180) || null;
+
+  await db.run(
+    `
+      INSERT INTO user_role_change_events
+        (
+          user_id,
+          target_full_name,
+          actor_user_id,
+          actor_name,
+          course_id,
+          source,
+          before_roles,
+          after_roles,
+          before_primary_role,
+          after_primary_role,
+          reason,
+          created_at
+        )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `,
+    [
+      normalizedUserId,
+      normalizedTargetName,
+      Number.isFinite(Number(actorUserId)) ? Number(actorUserId) : null,
+      actorName ? String(actorName).trim() : null,
+      Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+      ['admin_users_roles', 'admin_users_role', 'teacher_request_approve', 'teacher_request_reject'].includes(normalizedSource)
+        ? normalizedSource
+        : 'admin_users_roles',
+      JSON.stringify(normalizedBefore),
+      JSON.stringify(normalizedAfter),
+      normalizedBeforePrimary,
+      normalizedAfterPrimary,
+      normalizedReason,
+    ]
+  );
+
+  const elevated = ['admin', 'deanery'].some(
+    (role) => normalizedAfter.includes(role) && !normalizedBefore.includes(role)
+  );
+  if (elevated) {
+    await emitSecurityAlertEvent({
+      alertKey: 'role-elevation',
+      severity: 'high',
+      title: 'Privileged role elevation',
+      message: `${normalizedTargetName || `User ${normalizedUserId}`} отримав(ла) підвищені права`,
+      userId: normalizedUserId,
+      courseId: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+      details: {
+        before_roles: normalizedBefore,
+        after_roles: normalizedAfter,
+        actor_user_id: Number.isFinite(Number(actorUserId)) ? Number(actorUserId) : null,
+      },
+      dedupKey: `role-elevation|${normalizedUserId}|${normalizedAfter.join(',')}`,
+    });
+  }
+
+  return {
+    user_id: normalizedUserId,
+    before_roles: normalizedBefore,
+    after_roles: normalizedAfter,
+    before_primary_role: normalizedBeforePrimary,
+    after_primary_role: normalizedAfterPrimary,
+  };
+}
+
+async function recordAuthFailureEvent({
+  attemptedName,
+  userId = null,
+  ip = null,
+  userAgent = null,
+  sessionId = null,
+  courseId = null,
+}) {
+  const normalizedName = String(attemptedName || '').trim().replace(/\s+/g, ' ');
+  const normalizedIp = normalizeForensicsIp(ip);
+  const normalizedAgent = normalizeForensicsAgent(userAgent);
+  const normalizedSessionId = normalizeForensicsToken(sessionId);
+  const normalizedUserId = Number.isFinite(Number(userId)) ? Number(userId) : null;
+  const normalizedCourseId = Number.isFinite(Number(courseId)) ? Number(courseId) : null;
+  const normalizedNameKey = normalizedName.toLowerCase();
+  await db.run(
+    `
+      INSERT INTO auth_failure_events
+        (
+          attempted_full_name,
+          normalized_full_name,
+          user_id,
+          ip,
+          user_agent,
+          session_id,
+          source,
+          course_id,
+          created_at
+        )
+      VALUES (?, ?, ?, ?, ?, ?, 'login', ?, NOW())
+    `,
+    [
+      normalizedName || null,
+      normalizedNameKey || null,
+      normalizedUserId,
+      normalizedIp,
+      normalizedAgent,
+      normalizedSessionId,
+      normalizedCourseId,
+    ]
+  );
+
+  if (normalizedIp && !isSecurityAdminIpAllowlisted(normalizedIp)) {
+    const ipBurstRow = await db.get(
+      `
+        SELECT COUNT(*)::int AS count, COUNT(DISTINCT COALESCE(user_id, -id))::int AS actors_count
+        FROM auth_failure_events
+        WHERE ip = ?
+          AND created_at >= NOW() - INTERVAL '10 minutes'
+      `,
+      [normalizedIp]
+    );
+    const burstCount = Number(ipBurstRow && ipBurstRow.count ? ipBurstRow.count : 0);
+    if (burstCount >= 10) {
+      await emitSecurityAlertEvent({
+        alertKey: 'auth-failure-ip-burst',
+        severity: 'high',
+        title: 'Mass failed logins from one IP',
+        message: `${normalizedIp}: ${burstCount} невдалих логінів за 10 хв`,
+        userId: normalizedUserId,
+        courseId: normalizedCourseId,
+        details: {
+          ip: normalizedIp,
+          failures_10m: burstCount,
+        },
+        dedupKey: `auth-failure-ip|${normalizedIp}|${Math.floor(Date.now() / (10 * 60 * 1000))}`,
+      });
+    }
+  }
+
+  if (normalizedUserId) {
+    const userFailureRow = await db.get(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS failed_24h,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS failed_7d
+        FROM auth_failure_events
+        WHERE user_id = ?
+      `,
+      [normalizedUserId]
+    );
+    const failed24h = Number(userFailureRow && userFailureRow.failed_24h ? userFailureRow.failed_24h : 0);
+    if (failed24h >= 6) {
+      await emitSecurityAlertEvent({
+        alertKey: 'auth-failure-user-spike',
+        severity: 'medium',
+        title: 'User login failures spike',
+        message: `${normalizedName || `User ${normalizedUserId}`}: ${failed24h} невдалих входів за 24г`,
+        userId: normalizedUserId,
+        courseId: normalizedCourseId,
+        details: {
+          failed_24h: failed24h,
+          failed_7d: Number(userFailureRow && userFailureRow.failed_7d ? userFailureRow.failed_7d : 0),
+        },
+        dedupKey: `auth-failure-user|${normalizedUserId}|${Math.floor(Date.now() / (60 * 60 * 1000))}`,
+      });
+    }
+    try {
+      await recomputeUserSecurityCase(normalizedUserId, {
+        allowAutoQuarantine: false,
+        courseId: normalizedCourseId,
+      });
+    } catch (err) {
+      console.error('Database error (security_case.auth_failure_recompute)', err);
+    }
+  }
+}
+
+function parseSessionPayload(rawSession) {
+  if (rawSession === null || rawSession === undefined) return null;
+  if (typeof rawSession === 'object') return rawSession;
+  return safeJsonParse(rawSession, null);
+}
+
+function getSessionUserId(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  const directId = Number(payload?.user?.id);
+  if (Number.isFinite(directId) && directId > 0) return directId;
+  return null;
+}
+
+async function listUserSessions(userId, currentSessionId = null) {
+  const normalizedUserId = Number(userId);
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId < 1) return [];
+  const sessionUserIdExpr = "CASE WHEN (sess::jsonb -> 'user' ->> 'id') ~ '^[0-9]+$' THEN (sess::jsonb -> 'user' ->> 'id')::int ELSE NULL END";
+  const rows = await db.all(
+    `
+      SELECT sid, sess, expire
+      FROM ${sessionTableName}
+      WHERE ${sessionUserIdExpr} = ?
+      ORDER BY expire DESC
+      LIMIT ${SECURITY_SESSION_LIST_LIMIT}
+    `,
+    [normalizedUserId]
+  );
+  return (rows || []).map((row) => {
+    const payload = parseSessionPayload(row.sess);
+    const user = payload && payload.user && typeof payload.user === 'object' ? payload.user : {};
+    const current = String(row.sid || '') === String(currentSessionId || '');
+    const lastSeenAt = payload && payload.last_seen_at ? toIsoStringSafe(payload.last_seen_at) : null;
+    return {
+      sid: String(row.sid || ''),
+      is_current: current,
+      expire_at: toIsoStringSafe(row.expire),
+      created_at: payload && payload.session_created_at ? toIsoStringSafe(payload.session_created_at) : null,
+      last_seen_at: lastSeenAt,
+      last_seen_route: payload && payload.last_seen_route ? String(payload.last_seen_route) : null,
+      ip: payload && payload.last_seen_ip ? normalizeForensicsIp(payload.last_seen_ip) : null,
+      user_agent: payload && payload.last_seen_user_agent ? normalizeForensicsAgent(payload.last_seen_user_agent) : null,
+      remember_me: payload && typeof payload.rememberMe !== 'undefined' ? Boolean(payload.rememberMe) : null,
+      user_name: user && user.username ? String(user.username) : null,
+      user_id: getSessionUserId(payload),
+    };
+  });
+}
+
+async function revokeUserSessions(userId, { excludeSessionId = null } = {}) {
+  const normalizedUserId = Number(userId);
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId < 1) return 0;
+  const normalizedExcludeSid = String(excludeSessionId || '').trim();
+  const sessionUserIdExpr = "CASE WHEN (sess::jsonb -> 'user' ->> 'id') ~ '^[0-9]+$' THEN (sess::jsonb -> 'user' ->> 'id')::int ELSE NULL END";
+  const result = normalizedExcludeSid
+    ? await db.run(
+        `
+          DELETE FROM ${sessionTableName}
+          WHERE ${sessionUserIdExpr} = ?
+            AND sid <> ?
+        `,
+        [normalizedUserId, normalizedExcludeSid]
+      )
+    : await db.run(
+        `
+          DELETE FROM ${sessionTableName}
+          WHERE ${sessionUserIdExpr} = ?
+        `,
+        [normalizedUserId]
+      );
+  return Number(result && result.changes ? result.changes : 0);
+}
+
+async function recomputeUserSecurityCase(userId, options = {}) {
+  const normalizedUserId = Number(userId);
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId < 1) return null;
+
+  const user = await db.get(
+    `
+      SELECT id, full_name, role, is_active, course_id, last_login_ip, last_user_agent, last_login_at
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [normalizedUserId]
+  );
+  if (!user) return null;
+
+  const courseId = Number.isFinite(Number(options.courseId))
+    ? Number(options.courseId)
+    : (Number.isFinite(Number(user.course_id)) ? Number(user.course_id) : null);
+  const allowlistedIp = isSecurityAdminIpAllowlisted(user.last_login_ip);
+  const userFingerprint = buildForensicsDeviceFingerprint(user.last_user_agent);
+
+  const registrationEvent = await db.get(
+    `
+      SELECT ip, device_fingerprint, session_id, created_at
+      FROM user_registration_events
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    [normalizedUserId]
+  );
+
+  const userSessionRows = await db.all(
+    `
+      SELECT DISTINCT session_id
+      FROM site_visit_events
+      WHERE user_id = ?
+        AND session_id IS NOT NULL
+      ORDER BY session_id ASC
+      LIMIT 4
+    `,
+    [normalizedUserId]
+  );
+  const userSessionIds = (userSessionRows || [])
+    .map((row) => normalizeForensicsToken(row.session_id))
+    .filter(Boolean);
+
+  const userDeviceSet = new Set();
+  if (userFingerprint) userDeviceSet.add(userFingerprint);
+  if (registrationEvent && registrationEvent.device_fingerprint) {
+    userDeviceSet.add(String(registrationEvent.device_fingerprint));
+  }
+
+  const [failureRow, roleChangeRow, alertRow, sharedIpRow, sharedSessionRow, sharedDeviceRow, loginIpRow] = await Promise.all([
+    db.get(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS failed_24h,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS failed_7d
+        FROM auth_failure_events
+        WHERE user_id = ?
+      `,
+      [normalizedUserId]
+    ),
+    db.get(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS changes_30d,
+          COUNT(*) FILTER (
+            WHERE created_at >= NOW() - INTERVAL '30 days'
+              AND EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements_text(after_roles) AS role_key
+                WHERE role_key IN ('admin', 'deanery')
+              )
+          )::int AS privileged_changes_30d
+        FROM user_role_change_events
+        WHERE user_id = ?
+      `,
+      [normalizedUserId]
+    ),
+    db.get(
+      `
+        SELECT COUNT(*) FILTER (
+          WHERE resolved_at IS NULL
+            AND created_at >= NOW() - (?::int * INTERVAL '1 hour')
+        )::int AS open_alerts
+        FROM security_alert_events
+        WHERE user_id = ?
+      `,
+      [SECURITY_ALERT_LOOKBACK_HOURS, normalizedUserId]
+    ),
+    registrationEvent && registrationEvent.ip && !isSecurityAdminIpAllowlisted(registrationEvent.ip)
+      ? db.get(
+          `
+            SELECT COUNT(DISTINCT user_id)::int AS users_count
+            FROM (
+              SELECT user_id
+              FROM login_history
+              WHERE ip = ?
+                AND user_id IS NOT NULL
+              UNION ALL
+              SELECT user_id
+              FROM user_registration_events
+              WHERE ip = ?
+                AND user_id IS NOT NULL
+            ) src
+            WHERE user_id <> ?
+          `,
+          [registrationEvent.ip, registrationEvent.ip, normalizedUserId]
+        )
+      : Promise.resolve({ users_count: 0 }),
+    userSessionIds.length
+      ? db.get(
+          `
+            SELECT COUNT(DISTINCT user_id)::int AS users_count
+            FROM site_visit_events
+            WHERE session_id = ANY(?::text[])
+              AND user_id IS NOT NULL
+              AND user_id <> ?
+          `,
+          [userSessionIds, normalizedUserId]
+        )
+      : Promise.resolve({ users_count: 0 }),
+    userDeviceSet.size
+      ? db.get(
+          `
+            SELECT COUNT(DISTINCT user_id)::int AS users_count
+            FROM user_registration_events
+            WHERE device_fingerprint = ANY(?::text[])
+              AND user_id IS NOT NULL
+              AND user_id <> ?
+          `,
+          [Array.from(userDeviceSet), normalizedUserId]
+        )
+      : Promise.resolve({ users_count: 0 }),
+    user.last_login_ip && !allowlistedIp
+      ? db.get(
+          `
+            SELECT
+              COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS total_30d,
+              COUNT(*) FILTER (
+                WHERE created_at >= NOW() - INTERVAL '30 days'
+                  AND ip = ?
+              )::int AS ip_hits_30d
+            FROM login_history
+            WHERE user_id = ?
+          `,
+          [user.last_login_ip, normalizedUserId]
+        )
+      : Promise.resolve({ total_30d: 0, ip_hits_30d: 0 }),
+  ]);
+
+  let registrationIpCluster = 0;
+  let registrationDeviceCluster = 0;
+  if (registrationEvent && registrationEvent.created_at) {
+    const createdAtIso = toIsoStringSafe(registrationEvent.created_at);
+    if (createdAtIso && registrationEvent.ip && !isSecurityAdminIpAllowlisted(registrationEvent.ip)) {
+      const row = await db.get(
+        `
+          SELECT COUNT(DISTINCT user_id)::int AS users_count
+          FROM user_registration_events
+          WHERE ip = ?
+            AND created_at BETWEEN (?::timestamptz - INTERVAL '10 minutes')
+                              AND (?::timestamptz + INTERVAL '10 minutes')
+        `,
+        [registrationEvent.ip, createdAtIso, createdAtIso]
+      );
+      registrationIpCluster = Number(row && row.users_count ? row.users_count : 0);
+    }
+    if (createdAtIso && registrationEvent.device_fingerprint) {
+      const row = await db.get(
+        `
+          SELECT COUNT(DISTINCT user_id)::int AS users_count
+          FROM user_registration_events
+          WHERE device_fingerprint = ?
+            AND created_at BETWEEN (?::timestamptz - INTERVAL '10 minutes')
+                              AND (?::timestamptz + INTERVAL '10 minutes')
+        `,
+        [registrationEvent.device_fingerprint, createdAtIso, createdAtIso]
+      );
+      registrationDeviceCluster = Number(row && row.users_count ? row.users_count : 0);
+    }
+  }
+
+  const counters = {
+    failed_24h: Number(failureRow && failureRow.failed_24h ? failureRow.failed_24h : 0),
+    failed_7d: Number(failureRow && failureRow.failed_7d ? failureRow.failed_7d : 0),
+    role_changes_30d: Number(roleChangeRow && roleChangeRow.changes_30d ? roleChangeRow.changes_30d : 0),
+    privileged_role_changes_30d: Number(roleChangeRow && roleChangeRow.privileged_changes_30d ? roleChangeRow.privileged_changes_30d : 0),
+    open_alerts_72h: Number(alertRow && alertRow.open_alerts ? alertRow.open_alerts : 0),
+    shared_ip_users: Number(sharedIpRow && sharedIpRow.users_count ? sharedIpRow.users_count : 0),
+    shared_session_users: Number(sharedSessionRow && sharedSessionRow.users_count ? sharedSessionRow.users_count : 0),
+    shared_device_users: Number(sharedDeviceRow && sharedDeviceRow.users_count ? sharedDeviceRow.users_count : 0),
+    registration_ip_cluster_10m: Number(registrationIpCluster || 0),
+    registration_device_cluster_10m: Number(registrationDeviceCluster || 0),
+  };
+
+  let score = Number(options.extraScore || 0);
+  const reasons = Array.isArray(options.extraReasons) ? options.extraReasons.slice(0, 8) : [];
+  if (counters.shared_session_users >= 1) {
+    score += 48 + Math.min(24, counters.shared_session_users * 6);
+    reasons.push(`Спільна session з іншими акаунтами (${counters.shared_session_users})`);
+  }
+  if (counters.shared_ip_users >= 2 && !allowlistedIp) {
+    score += 18 + Math.min(22, (counters.shared_ip_users - 2) * 7);
+    reasons.push(`IP збігається з іншими акаунтами (${counters.shared_ip_users})`);
+  }
+  if (counters.shared_device_users >= 2) {
+    score += 20 + Math.min(24, (counters.shared_device_users - 2) * 6);
+    reasons.push(`Device fingerprint збігається (${counters.shared_device_users})`);
+  }
+  if (counters.failed_24h >= 5) {
+    score += 22;
+    reasons.push(`Багато невдалих логінів за 24г (${counters.failed_24h})`);
+  }
+  if (counters.failed_7d >= 12) {
+    score += 12;
+    reasons.push(`Підвищена кількість невдалих логінів за 7д (${counters.failed_7d})`);
+  }
+  if (counters.privileged_role_changes_30d >= 1) {
+    score += 28;
+    reasons.push(`Було підвищення до привілейованої ролі (${counters.privileged_role_changes_30d})`);
+  } else if (counters.role_changes_30d >= 3) {
+    score += 14;
+    reasons.push(`Часті зміни ролей (${counters.role_changes_30d})`);
+  }
+  if (counters.registration_ip_cluster_10m >= 3) {
+    score += 34;
+    reasons.push(`Кластер реєстрацій з одного IP за 10 хв (${counters.registration_ip_cluster_10m})`);
+  }
+  if (counters.registration_device_cluster_10m >= 3) {
+    score += 26;
+    reasons.push(`Кластер реєстрацій з одного device за 10 хв (${counters.registration_device_cluster_10m})`);
+  }
+  if (!allowlistedIp) {
+    const total30d = Number(loginIpRow && loginIpRow.total_30d ? loginIpRow.total_30d : 0);
+    const ipHits30d = Number(loginIpRow && loginIpRow.ip_hits_30d ? loginIpRow.ip_hits_30d : 0);
+    const lastLoginAt = toIsoStringSafe(user.last_login_at);
+    if (total30d >= 4 && ipHits30d <= 1 && lastLoginAt) {
+      const lastLoginTs = new Date(lastLoginAt).getTime();
+      if (Number.isFinite(lastLoginTs) && Date.now() - lastLoginTs <= (7 * 24 * 60 * 60 * 1000)) {
+        score += 10;
+        reasons.push('Новий IP в останній активності');
+      }
+    }
+  }
+  if (counters.open_alerts_72h > 0) {
+    score += Math.min(20, counters.open_alerts_72h * 5);
+    reasons.push(`Є активні security alerts (${counters.open_alerts_72h})`);
+  }
+  if (allowlistedIp) {
+    reasons.push('IP у allowlist адміністратора (знижено чутливість)');
+  }
+
+  const resolvedLevel = resolveSecurityCaseLevel(score);
+  const existingCase = await db.get(
+    `
+      SELECT *
+      FROM user_security_cases
+      WHERE user_id = ?
+      LIMIT 1
+    `,
+    [normalizedUserId]
+  );
+  const existingStatus = normalizeSecurityCaseStatus(existingCase && existingCase.status ? existingCase.status : 'open');
+  const shouldReopen = existingStatus === 'closed' && resolvedLevel.key === 'high-risk';
+  const nextStatus = shouldReopen ? 'open' : existingStatus;
+
+  let autoQuarantined = existingCase && existingCase.auto_quarantined
+    ? (existingCase.auto_quarantined === true || Number(existingCase.auto_quarantined) === 1)
+    : false;
+  if (
+    options.allowAutoQuarantine
+    && settingsCache.security_auto_quarantine_enabled
+    && resolvedLevel.key === 'high-risk'
+    && Number(user.is_active) === 1
+  ) {
+    await db.run('UPDATE users SET is_active = 0 WHERE id = ? AND is_active = 1', [normalizedUserId]);
+    autoQuarantined = true;
+    broadcast('users_updated');
+    await emitSecurityAlertEvent({
+      alertKey: 'auto-quarantine',
+      severity: 'critical',
+      title: 'Account auto-quarantined',
+      message: `${String(user.full_name || `User ${normalizedUserId}`)} переведено в inactive через high-risk сигнал`,
+      userId: normalizedUserId,
+      courseId,
+      details: {
+        risk_score: Math.round(score),
+        reasons: reasons.slice(0, 6),
+      },
+      dedupKey: `auto-quarantine|${normalizedUserId}|${Math.floor(Date.now() / (60 * 60 * 1000))}`,
+    });
+  }
+
+  if (existingCase) {
+    await db.run(
+      `
+        UPDATE user_security_cases
+        SET risk_score = ?,
+            risk_level = ?,
+            status = ?,
+            reason = ?,
+            reason_details = ?,
+            signal_counters = ?,
+            allowlisted = ?,
+            auto_quarantined = ?,
+            last_risk_at = NOW(),
+            last_recomputed_at = NOW(),
+            updated_at = NOW(),
+            closed_by = CASE WHEN ? THEN NULL ELSE closed_by END,
+            closed_at = CASE WHEN ? THEN NULL ELSE closed_at END
+        WHERE user_id = ?
+      `,
+      [
+        Math.round(score),
+        resolvedLevel.key,
+        nextStatus,
+        reasons.length ? reasons.slice(0, 6).join(' · ') : null,
+        reasons.length ? JSON.stringify(reasons.slice(0, 10)) : null,
+        JSON.stringify(counters),
+        allowlistedIp ? 1 : 0,
+        autoQuarantined ? 1 : 0,
+        shouldReopen ? 1 : 0,
+        shouldReopen ? 1 : 0,
+        normalizedUserId,
+      ]
+    );
+  } else {
+    await db.run(
+      `
+        INSERT INTO user_security_cases
+          (
+            user_id,
+            risk_score,
+            risk_level,
+            status,
+            reason,
+            reason_details,
+            signal_counters,
+            auto_quarantined,
+            allowlisted,
+            last_risk_at,
+            last_recomputed_at,
+            created_at,
+            updated_at
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW(), NOW())
+      `,
+      [
+        normalizedUserId,
+        Math.round(score),
+        resolvedLevel.key,
+        resolvedLevel.key === 'high-risk' ? 'open' : 'open',
+        reasons.length ? reasons.slice(0, 6).join(' · ') : null,
+        reasons.length ? JSON.stringify(reasons.slice(0, 10)) : null,
+        JSON.stringify(counters),
+        autoQuarantined ? 1 : 0,
+        allowlistedIp ? 1 : 0,
+      ]
+    );
+  }
+
+  const updatedCase = await db.get(
+    `
+      SELECT
+        usc.*,
+        u_confirm.full_name AS confirmed_by_name,
+        u_closed.full_name AS closed_by_name
+      FROM user_security_cases usc
+      LEFT JOIN users u_confirm ON u_confirm.id = usc.confirmed_by
+      LEFT JOIN users u_closed ON u_closed.id = usc.closed_by
+      WHERE usc.user_id = ?
+      LIMIT 1
+    `,
+    [normalizedUserId]
+  );
+
+  return {
+    user_id: normalizedUserId,
+    score: Math.round(score),
+    level: resolvedLevel.key,
+    label: resolvedLevel.label,
+    reasons: reasons.slice(0, 10),
+    counters,
+    allowlisted: allowlistedIp,
+    case: updatedCase,
+  };
+}
+
+async function getUserSecurityCaseWithActors(userId) {
+  const normalizedUserId = Number(userId);
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId < 1) return null;
+  return db.get(
+    `
+      SELECT
+        usc.*,
+        u_confirm.full_name AS confirmed_by_name,
+        u_closed.full_name AS closed_by_name
+      FROM user_security_cases usc
+      LEFT JOIN users u_confirm ON u_confirm.id = usc.confirmed_by
+      LEFT JOIN users u_closed ON u_closed.id = usc.closed_by
+      WHERE usc.user_id = ?
+      LIMIT 1
+    `,
+    [normalizedUserId]
+  );
+}
+
+function buildForensicsGraphPayload(targetUser, evidence = {}, matches = []) {
+  const nodes = [];
+  const edges = [];
+  const seenNodes = new Set();
+  const addNode = (id, type, label, meta = {}) => {
+    const key = String(id || '').trim();
+    if (!key || seenNodes.has(key)) return;
+    seenNodes.add(key);
+    nodes.push({
+      id: key,
+      type,
+      label: String(label || key),
+      ...meta,
+    });
+  };
+  const addEdge = (from, to, relation) => {
+    const source = String(from || '').trim();
+    const target = String(to || '').trim();
+    if (!source || !target || source === target) return;
+    edges.push({
+      from: source,
+      to: target,
+      relation: String(relation || 'link'),
+    });
+  };
+
+  const targetNodeId = `user:${Number(targetUser && targetUser.id ? targetUser.id : 0)}`;
+  addNode(targetNodeId, 'user', targetUser && targetUser.full_name ? targetUser.full_name : 'Target', { role: targetUser && targetUser.role ? targetUser.role : 'student' });
+
+  const ips = Array.isArray(evidence.ips) ? evidence.ips : [];
+  const sessions = Array.isArray(evidence.session_ids) ? evidence.session_ids : [];
+  const devices = Array.isArray(evidence.device_fingerprints) ? evidence.device_fingerprints : [];
+  ips.slice(0, 8).forEach((ip) => {
+    const id = `ip:${ip}`;
+    addNode(id, 'ip', ip);
+    addEdge(targetNodeId, id, 'ip');
+  });
+  sessions.slice(0, 8).forEach((sessionId) => {
+    const id = `session:${sessionId}`;
+    addNode(id, 'session', sessionId.length > 14 ? `${sessionId.slice(0, 12)}...` : sessionId);
+    addEdge(targetNodeId, id, 'session');
+  });
+  devices.slice(0, 8).forEach((fingerprint) => {
+    const id = `device:${fingerprint}`;
+    addNode(id, 'device', fingerprint.length > 26 ? `${fingerprint.slice(0, 24)}...` : fingerprint);
+    addEdge(targetNodeId, id, 'device');
+  });
+
+  (Array.isArray(matches) ? matches : []).slice(0, 8).forEach((match) => {
+    const userId = Number(match && match.user_id ? match.user_id : 0);
+    if (!Number.isFinite(userId) || userId < 1) return;
+    const matchNodeId = `user:${userId}`;
+    addNode(matchNodeId, 'user', match.full_name || `User ${userId}`, {
+      role: match.role || 'student',
+      score: Number(match.score || 0),
+    });
+    addEdge(targetNodeId, matchNodeId, 'suspected-link');
+    (Array.isArray(match.ip_hits) ? match.ip_hits : []).slice(0, 4).forEach((ip) => {
+      const id = `ip:${ip}`;
+      addNode(id, 'ip', ip);
+      addEdge(matchNodeId, id, 'ip');
+    });
+    (Array.isArray(match.session_hits) ? match.session_hits : []).slice(0, 4).forEach((sessionId) => {
+      const id = `session:${sessionId}`;
+      addNode(id, 'session', sessionId.length > 14 ? `${sessionId.slice(0, 12)}...` : sessionId);
+      addEdge(matchNodeId, id, 'session');
+    });
+  });
+
+  return {
+    nodes: nodes.slice(0, 60),
+    edges: edges.slice(0, 120),
+  };
 }
 
 function applyRememberMe(req, remember) {
@@ -3446,6 +4557,14 @@ const maybeCleanupVisitEvents = async () => {
     settingsCache.activity_log_retention_days,
     ACTIVITY_LOG_RETENTION_DAYS
   );
+  const securityIpRetentionDays = normalizeRetentionDays(
+    settingsCache.security_ip_retention_days,
+    SECURITY_IP_RETENTION_DAYS_DEFAULT
+  );
+  const securityUserAgentRetentionDays = normalizeRetentionDays(
+    settingsCache.security_user_agent_retention_days,
+    SECURITY_USER_AGENT_RETENTION_DAYS_DEFAULT
+  );
   try {
     await db.run(
       "DELETE FROM site_visit_events WHERE created_at < NOW() - (?::int * INTERVAL '1 day')",
@@ -3469,6 +4588,58 @@ const maybeCleanupVisitEvents = async () => {
     );
   } catch (err) {
     console.error('Database error (visit.cleanup.activity_log)', err);
+  }
+  try {
+    await Promise.all([
+      db.run(
+        "UPDATE site_visit_events SET ip = NULL WHERE ip IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
+        [securityIpRetentionDays]
+      ),
+      db.run(
+        "UPDATE login_history SET ip = NULL WHERE ip IS NOT NULL AND created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')",
+        [securityIpRetentionDays]
+      ),
+      db.run(
+        "UPDATE user_registration_events SET ip = NULL WHERE ip IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
+        [securityIpRetentionDays]
+      ),
+      db.run(
+        "UPDATE auth_failure_events SET ip = NULL WHERE ip IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
+        [securityIpRetentionDays]
+      ),
+      db.run(
+        "UPDATE users SET last_login_ip = NULL WHERE last_login_ip IS NOT NULL AND last_login_at < NOW() - (?::int * INTERVAL '1 day')",
+        [securityIpRetentionDays]
+      ),
+    ]);
+  } catch (err) {
+    console.error('Database error (visit.cleanup.security_ip)', err);
+  }
+  try {
+    await Promise.all([
+      db.run(
+        "UPDATE site_visit_events SET user_agent = NULL WHERE user_agent IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
+        [securityUserAgentRetentionDays]
+      ),
+      db.run(
+        "UPDATE login_history SET user_agent = NULL WHERE user_agent IS NOT NULL AND created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')",
+        [securityUserAgentRetentionDays]
+      ),
+      db.run(
+        "UPDATE user_registration_events SET user_agent = NULL WHERE user_agent IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
+        [securityUserAgentRetentionDays]
+      ),
+      db.run(
+        "UPDATE auth_failure_events SET user_agent = NULL WHERE user_agent IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
+        [securityUserAgentRetentionDays]
+      ),
+      db.run(
+        "UPDATE users SET last_user_agent = NULL WHERE last_user_agent IS NOT NULL AND last_login_at < NOW() - (?::int * INTERVAL '1 day')",
+        [securityUserAgentRetentionDays]
+      ),
+    ]);
+  } catch (err) {
+    console.error('Database error (visit.cleanup.security_user_agent)', err);
   } finally {
     visitCleanupInFlight = false;
   }
@@ -3572,7 +4743,12 @@ function getStaffPanelBase(req, courseId) {
 }
 
 function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[key]) {
-  if (key === 'allow_homework_creation' || key === 'allow_custom_deadlines' || key === 'allow_messages') {
+  if (
+    key === 'allow_homework_creation'
+    || key === 'allow_custom_deadlines'
+    || key === 'allow_messages'
+    || key === 'security_auto_quarantine_enabled'
+  ) {
     const normalized = String(rawValue).trim().toLowerCase();
     if (['1', 'true', 'on', 'yes'].includes(normalized)) return true;
     if (['0', 'false', 'off', 'no'].includes(normalized)) return false;
@@ -3595,6 +4771,12 @@ function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[k
   if (key === 'activity_log_retention_days') {
     return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.activity_log_retention_days);
   }
+  if (key === 'security_ip_retention_days') {
+    return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.security_ip_retention_days);
+  }
+  if (key === 'security_user_agent_retention_days') {
+    return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.security_user_agent_retention_days);
+  }
   if (key === 'security_registration_alert_threshold') {
     return normalizeSecurityRegistrationAlertThreshold(parsed, DEFAULT_SETTINGS.security_registration_alert_threshold);
   }
@@ -3616,17 +4798,16 @@ function buildSystemSettingsAuditState(source = settingsCache) {
 }
 
 async function persistSystemSettingsState(nextState) {
-  const stmt = db.prepare(
-    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value'
-  );
   const normalized = buildSystemSettingsAuditState(nextState || {});
-  SYSTEM_SETTINGS_AUDIT_KEYS.forEach((key) => {
-    const value = normalized[key];
-    if (typeof value === 'boolean') {
-      stmt.run(key, value ? 'true' : 'false');
-      return;
+  await withTransaction(async (client) => {
+    for (const key of SYSTEM_SETTINGS_AUDIT_KEYS) {
+      const value = normalized[key];
+      await txRun(
+        client,
+        'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
+        [key, typeof value === 'boolean' ? (value ? 'true' : 'false') : String(value)]
+      );
     }
-    stmt.run(key, String(value));
   });
   await refreshSettingsCache();
   return buildSystemSettingsAuditState(settingsCache);
@@ -3934,6 +5115,15 @@ app.use((req, _res, next) => {
     userAgent: req.headers['user-agent'] || null,
     createdAt: new Date().toISOString(),
   };
+  if (req.session && payload.userId) {
+    if (!req.session.session_created_at) {
+      req.session.session_created_at = payload.createdAt;
+    }
+    req.session.last_seen_at = payload.createdAt;
+    req.session.last_seen_route = payload.routePath;
+    req.session.last_seen_ip = normalizeForensicsIp(getClientIp(req));
+    req.session.last_seen_user_agent = normalizeForensicsAgent(req.headers['user-agent'] || null);
+  }
   recordSiteVisit(payload).catch((err) => {
     console.error('Database error (visit.insert)', err);
   });
@@ -4244,6 +5434,16 @@ app.post('/login', authLimiter, async (req, res) => {
       (err, user) => {
         const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
         if (err || !user || !validHash) {
+          recordAuthFailureEvent({
+            attemptedName: normalizedName,
+            userId: user && user.id ? Number(user.id) : null,
+            ip: getClientIp(req),
+            userAgent: req.headers['user-agent'] || null,
+            sessionId: req.sessionID || null,
+            courseId: user && Number.isFinite(Number(user.course_id)) ? Number(user.course_id) : null,
+          }).catch((failureErr) => {
+            console.error('Database error (login.auth_failure)', failureErr);
+          });
           return res.redirect('/login?error=1');
         }
         const role = normalizeRoleKey(user.role);
@@ -4272,6 +5472,11 @@ app.post('/login', authLimiter, async (req, res) => {
         const remember = isRememberRequested(remember_me);
         req.session.rememberMe = remember;
         applyRememberMe(req, remember);
+        req.session.session_created_at = req.session.session_created_at || loginAt;
+        req.session.last_seen_at = loginAt;
+        req.session.last_seen_route = '/login';
+        req.session.last_seen_ip = loginIp;
+        req.session.last_seen_user_agent = loginUserAgent;
 
         req.session.save(() => {
           if (role === 'admin') {
@@ -4313,8 +5518,9 @@ app.post('/register', registerLimiter, async (req, res) => {
     if (!row || !row.id) {
       return res.redirect('/register?error=Database%20error');
     }
+    let registrationSignals = null;
     try {
-      await recordUserRegistrationEvent({
+      registrationSignals = await recordUserRegistrationEvent({
         userId: row.id,
         fullName: normalizedName,
         ip: getClientIp(req),
@@ -4325,6 +5531,30 @@ app.post('/register', registerLimiter, async (req, res) => {
       });
     } catch (eventErr) {
       console.error('Database error (register.registration_event)', eventErr);
+    }
+    try {
+      const signalRisk = registrationSignals && registrationSignals.security && registrationSignals.security.risk
+        ? registrationSignals.security.risk
+        : null;
+      const securityCase = await recomputeUserSecurityCase(row.id, {
+        allowAutoQuarantine: true,
+        courseId: null,
+        extraScore: Number(signalRisk && signalRisk.score ? signalRisk.score : 0),
+        extraReasons: Array.isArray(signalRisk && signalRisk.reasons ? signalRisk.reasons : [])
+          ? signalRisk.reasons
+          : [],
+      });
+      const isQuarantined = securityCase
+        && securityCase.case
+        && (securityCase.case.auto_quarantined === true || Number(securityCase.case.auto_quarantined) === 1);
+      if (isQuarantined) {
+        logAction(db, req, 'register_quarantined', { user_id: row.id, full_name: normalizedName });
+        req.session.pendingUserId = null;
+        req.session.rememberMe = false;
+        return res.redirect('/login?error=Account%20pending%20review');
+      }
+    } catch (securityErr) {
+      console.error('Database error (register.security_case)', securityErr);
     }
     req.session.pendingUserId = row.id;
     req.session.rememberMe = isRememberRequested(remember_me);
@@ -12081,6 +13311,18 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
       );
     }
 
+    const beforeGradeRow = await db.get(
+      `
+        SELECT score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
+        FROM journal_grades
+        WHERE column_id = ?
+          AND student_id = ?
+        LIMIT 1
+      `,
+      [columnId, studentId]
+    );
+    const beforeGradeState = buildGradeAuditState(beforeGradeRow);
+
     await db.run(
       `
         INSERT INTO journal_grades
@@ -12105,6 +13347,27 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
         submissionStatus,
       ]
     );
+    const afterGradeRow = await db.get(
+      `
+        SELECT score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
+        FROM journal_grades
+        WHERE column_id = ?
+          AND student_id = ?
+        LIMIT 1
+      `,
+      [columnId, studentId]
+    );
+    await appendJournalGradeHashAudit({
+      columnId,
+      studentId,
+      subjectId: Number(column.subject_id || 0),
+      courseId: Number(column.course_id || req.session.user.course_id || 1),
+      semesterId: column.semester_id ? Number(column.semester_id) : null,
+      actorUserId: Number(req.session.user.id),
+      actionType: 'grade_save',
+      beforeState: beforeGradeState,
+      afterState: buildGradeAuditState(afterGradeRow),
+    });
     await upsertJournalModerationPending({
       column,
       studentId,
@@ -12161,6 +13424,9 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
   }
   if (normalizedEntries.length > 500) {
     return res.redirect('/journal?err=Bulk%20limit%20exceeded');
+  }
+  if (!isStepUpPhraseValid(req.body.stepup_code, STEPUP_CODE_BULK)) {
+    return res.redirect('/journal?err=Type%20BULK%20to%20confirm');
   }
 
   try {
@@ -12295,6 +13561,16 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
       if (entry.teacher_comment.length > 2000) {
         return res.redirect(`/journal?subject_id=${column.subject_id}&err=Comment%20is%20too%20long`);
       }
+      const beforeGradeRow = await db.get(
+        `
+          SELECT score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
+          FROM journal_grades
+          WHERE column_id = ?
+            AND student_id = ?
+          LIMIT 1
+        `,
+        [columnId, entry.student_id]
+      );
       const submissionStatus = await resolveSubmissionStatusForStudent(entry.student_id);
       await db.run(
         `
@@ -12320,6 +13596,27 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
           submissionStatus,
         ]
       );
+      const afterGradeRow = await db.get(
+        `
+          SELECT score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
+          FROM journal_grades
+          WHERE column_id = ?
+            AND student_id = ?
+          LIMIT 1
+        `,
+        [columnId, entry.student_id]
+      );
+      await appendJournalGradeHashAudit({
+        columnId,
+        studentId: entry.student_id,
+        subjectId: Number(column.subject_id || 0),
+        courseId: Number(column.course_id || req.session.user.course_id || 1),
+        semesterId: column.semester_id ? Number(column.semester_id) : null,
+        actorUserId: Number(req.session.user.id),
+        actionType: 'grade_bulk_save',
+        beforeState: buildGradeAuditState(beforeGradeRow),
+        afterState: buildGradeAuditState(afterGradeRow),
+      });
       await upsertJournalModerationPending({
         column,
         studentId: entry.student_id,
@@ -12421,7 +13718,7 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
 
     const activeGrade = await db.get(
       `
-        SELECT id
+        SELECT id, score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
         FROM journal_grades
         WHERE column_id = ? AND student_id = ?
           AND deleted_at IS NULL
@@ -12432,6 +13729,7 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
     if (!activeGrade) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Оцінка%20не%20знайдена`);
     }
+    const beforeGradeState = buildGradeAuditState(activeGrade);
 
     await db.run(
       `
@@ -12451,6 +13749,27 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
       `,
       [columnId, studentId]
     );
+    const afterGradeRow = await db.get(
+      `
+        SELECT score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
+        FROM journal_grades
+        WHERE column_id = ?
+          AND student_id = ?
+        LIMIT 1
+      `,
+      [columnId, studentId]
+    );
+    await appendJournalGradeHashAudit({
+      columnId,
+      studentId,
+      subjectId: Number(column.subject_id || 0),
+      courseId: Number(column.course_id || req.session.user.course_id || 1),
+      semesterId: column.semester_id ? Number(column.semester_id) : null,
+      actorUserId: Number(req.session.user.id),
+      actionType: 'grade_delete',
+      beforeState: beforeGradeState,
+      afterState: buildGradeAuditState(afterGradeRow),
+    });
 
     logActivity(
       db,
@@ -12542,7 +13861,7 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
 
     const restorable = await db.get(
       `
-        SELECT id
+        SELECT id, score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
         FROM journal_grades
         WHERE column_id = ? AND student_id = ?
           AND deleted_at IS NOT NULL
@@ -12554,6 +13873,7 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
     if (!restorable) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Час%20на%20відновлення%20оцінки%20минув`);
     }
+    const beforeGradeState = buildGradeAuditState(restorable);
 
     await db.run(
       `
@@ -12564,6 +13884,27 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
       `,
       [columnId, studentId]
     );
+    const afterGradeRow = await db.get(
+      `
+        SELECT score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
+        FROM journal_grades
+        WHERE column_id = ?
+          AND student_id = ?
+        LIMIT 1
+      `,
+      [columnId, studentId]
+    );
+    await appendJournalGradeHashAudit({
+      columnId,
+      studentId,
+      subjectId: Number(column.subject_id || 0),
+      courseId: Number(column.course_id || req.session.user.course_id || 1),
+      semesterId: column.semester_id ? Number(column.semester_id) : null,
+      actorUserId: Number(req.session.user.id),
+      actionType: 'grade_restore',
+      beforeState: beforeGradeState,
+      afterState: buildGradeAuditState(afterGradeRow),
+    });
 
     logActivity(
       db,
@@ -12821,6 +14162,21 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Спроба%20не%20знайдена`);
     }
 
+    const beforeGradeState = (countInFinal === 1 && Number.isFinite(score))
+      ? buildGradeAuditState(
+          await db.get(
+            `
+              SELECT score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
+              FROM journal_grades
+              WHERE column_id = ?
+                AND student_id = ?
+              LIMIT 1
+            `,
+            [columnId, studentId]
+          )
+        )
+      : null;
+
     const gradedBy = status === 'graded' && Number.isFinite(score) ? Number(req.session.user.id) : null;
     await withTransaction(async (client) => {
       const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
@@ -12923,6 +14279,29 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
         }
       }
     });
+    if (countInFinal === 1 && Number.isFinite(score)) {
+      const afterGradeRow = await db.get(
+        `
+          SELECT score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
+          FROM journal_grades
+          WHERE column_id = ?
+            AND student_id = ?
+          LIMIT 1
+        `,
+        [columnId, studentId]
+      );
+      await appendJournalGradeHashAudit({
+        columnId,
+        studentId,
+        subjectId: Number(column.subject_id || 0),
+        courseId: Number(column.course_id || req.session.user.course_id || 1),
+        semesterId: column.semester_id ? Number(column.semester_id) : null,
+        actorUserId: Number(req.session.user.id),
+        actionType: 'grade_retake_apply',
+        beforeState: beforeGradeState,
+        afterState: buildGradeAuditState(afterGradeRow),
+      });
+    }
 
     logActivity(
       db,
@@ -13195,6 +14574,21 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
     }
 
     const isFinalStatus = ['approved', 'rejected'].includes(status);
+    const willApplyResolvedScore = status === 'approved' && applyResolvedScore && Number.isFinite(resolvedScore);
+    const beforeGradeState = willApplyResolvedScore
+      ? buildGradeAuditState(
+          await db.get(
+            `
+              SELECT score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
+              FROM journal_grades
+              WHERE column_id = ?
+                AND student_id = ?
+              LIMIT 1
+            `,
+            [columnId, studentId]
+          )
+        )
+      : null;
     await withTransaction(async (client) => {
       const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
       await query(
@@ -13218,7 +14612,7 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
         ]
       );
 
-      if (status === 'approved' && applyResolvedScore && Number.isFinite(resolvedScore)) {
+      if (willApplyResolvedScore) {
         await query(
           `
             INSERT INTO journal_grades
@@ -13244,6 +14638,29 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
         );
       }
     });
+    if (willApplyResolvedScore) {
+      const afterGradeRow = await db.get(
+        `
+          SELECT score, teacher_comment, submission_status, graded_by, graded_at, deleted_at, deleted_by
+          FROM journal_grades
+          WHERE column_id = ?
+            AND student_id = ?
+          LIMIT 1
+        `,
+        [columnId, studentId]
+      );
+      await appendJournalGradeHashAudit({
+        columnId,
+        studentId,
+        subjectId: Number(column.subject_id || 0),
+        courseId: Number(column.course_id || req.session.user.course_id || 1),
+        semesterId: column.semester_id ? Number(column.semester_id) : null,
+        actorUserId: Number(req.session.user.id),
+        actionType: 'grade_appeal_apply',
+        beforeState: beforeGradeState,
+        afterState: buildGradeAuditState(afterGradeRow),
+      });
+    }
 
     logActivity(
       db,
@@ -16523,7 +17940,11 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
               ${usersHasIsActive ? 'u.is_active,' : ''}
               COALESCE(NULLIF(u.last_login_ip, ''), NULLIF(reg.ip, '')) AS last_login_ip,
               COALESCE(NULLIF(u.last_user_agent, ''), NULLIF(reg.user_agent, '')) AS last_user_agent,
-              u.last_login_at
+              u.last_login_at,
+              COALESCE(usc.risk_level, 'normal') AS security_risk_level,
+              COALESCE(usc.status, 'open') AS security_case_status,
+              COALESCE(usc.risk_score, 0)::int AS security_risk_score,
+              usc.updated_at AS security_case_updated_at
             FROM users u
             LEFT JOIN LATERAL (
               SELECT re.ip, re.user_agent
@@ -16532,6 +17953,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
               ORDER BY re.created_at DESC
               LIMIT 1
             ) reg ON true
+            LEFT JOIN user_security_cases usc ON usc.user_id = u.id
             ${userWhere}
             ORDER BY u.full_name
           `,
@@ -19081,6 +20503,18 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   const securityRegistrationAlertWindowMinutes = windowProvided
     ? windowParsed
     : Number(settingsCache.security_registration_alert_window_minutes || DEFAULT_SETTINGS.security_registration_alert_window_minutes);
+  const securityAutoQuarantineSource = Object.prototype.hasOwnProperty.call(body, 'security_auto_quarantine_enabled')
+    ? body.security_auto_quarantine_enabled
+    : settingsCache.security_auto_quarantine_enabled;
+  const securityAutoQuarantineEnabled = String(securityAutoQuarantineSource).toLowerCase() === 'true';
+  const securityIpRetentionRaw = Object.prototype.hasOwnProperty.call(body, 'security_ip_retention_days')
+    ? body.security_ip_retention_days
+    : settingsCache.security_ip_retention_days;
+  const securityUaRetentionRaw = Object.prototype.hasOwnProperty.call(body, 'security_user_agent_retention_days')
+    ? body.security_user_agent_retention_days
+    : settingsCache.security_user_agent_retention_days;
+  const securityIpRetentionDays = Number(securityIpRetentionRaw);
+  const securityUserAgentRetentionDays = Number(securityUaRetentionRaw);
   const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   if (
     Number.isNaN(sessionDays) || sessionDays <= 0 ||
@@ -19090,6 +20524,8 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     Number.isNaN(siteVisitRetentionDays) ||
     Number.isNaN(loginHistoryRetentionDays) ||
     Number.isNaN(activityLogRetentionDays) ||
+    Number.isNaN(securityIpRetentionDays) ||
+    Number.isNaN(securityUserAgentRetentionDays) ||
     (thresholdProvided && Number.isNaN(securityRegistrationAlertThreshold)) ||
     (windowProvided && Number.isNaN(securityRegistrationAlertWindowMinutes))
   ) {
@@ -19106,6 +20542,10 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     loginHistoryRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
     activityLogRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
     activityLogRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
+    securityIpRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
+    securityIpRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
+    securityUserAgentRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
+    securityUserAgentRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
     (thresholdProvided && (
       securityRegistrationAlertThreshold < SECURITY_REGISTRATION_ALERT_THRESHOLD_MIN ||
       securityRegistrationAlertThreshold > SECURITY_REGISTRATION_ALERT_THRESHOLD_MAX
@@ -19142,6 +20582,15 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
       security_registration_alert_window_minutes: normalizeSecurityRegistrationAlertWindowMinutes(
         securityRegistrationAlertWindowMinutes,
         DEFAULT_SETTINGS.security_registration_alert_window_minutes
+      ),
+      security_auto_quarantine_enabled: Boolean(securityAutoQuarantineEnabled),
+      security_ip_retention_days: normalizeRetentionDays(
+        securityIpRetentionDays,
+        DEFAULT_SETTINGS.security_ip_retention_days
+      ),
+      security_user_agent_retention_days: normalizeRetentionDays(
+        securityUserAgentRetentionDays,
+        DEFAULT_SETTINGS.security_user_agent_retention_days
       ),
     };
     const changes = Object.keys(nextSettings).reduce((acc, key) => {
@@ -19524,7 +20973,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
         v.route_path
       FROM site_visit_events v
       LEFT JOIN users u ON u.id = v.user_id
-      WHERE v.course_id = ?
+      WHERE (v.course_id = ? OR v.course_id IS NULL)
         AND v.created_at >= ?
     `;
     const recentFilteredSql = `
@@ -19706,6 +21155,230 @@ app.get('/admin/data-quality.json', requireVisitAnalyticsSectionAccess, async (r
   }
 });
 
+app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.securityDashboard.init');
+  }
+  try {
+    const courseId = getAdminCourse(req);
+    const adminAllowlist = parseSecurityAdminIpAllowlist(settingsCache.security_admin_ip_allowlist);
+    const [summaryRow, riskyRows, alertsRows, ipRows, deviceRows] = await Promise.all([
+      db.get(
+        `
+          SELECT
+            COUNT(*)::int AS total_cases,
+            COUNT(*) FILTER (WHERE usc.risk_level = 'high-risk')::int AS high_risk_total,
+            COUNT(*) FILTER (WHERE usc.risk_level = 'watch')::int AS watch_total,
+            COUNT(*) FILTER (WHERE usc.risk_level = 'normal')::int AS normal_total,
+            COUNT(*) FILTER (WHERE usc.status IN ('open', 'confirmed'))::int AS open_cases,
+            COUNT(*) FILTER (WHERE usc.status = 'confirmed')::int AS confirmed_cases,
+            COUNT(*) FILTER (WHERE usc.status = 'closed')::int AS closed_cases,
+            COUNT(*) FILTER (
+              WHERE usc.status IN ('open', 'confirmed')
+                AND usc.updated_at <= NOW() - INTERVAL '24 hours'
+            )::int AS overdue_24h,
+            COUNT(*) FILTER (
+              WHERE usc.status IN ('open', 'confirmed')
+                AND usc.updated_at <= NOW() - INTERVAL '72 hours'
+            )::int AS overdue_72h
+          FROM user_security_cases usc
+          JOIN users u ON u.id = usc.user_id
+          WHERE u.course_id = ?
+        `,
+        [courseId]
+      ),
+      db.all(
+        `
+          SELECT
+            usc.user_id,
+            u.full_name,
+            u.role,
+            usc.risk_level,
+            usc.risk_score,
+            usc.status,
+            usc.reason,
+            usc.updated_at
+          FROM user_security_cases usc
+          JOIN users u ON u.id = usc.user_id
+          WHERE u.course_id = ?
+          ORDER BY
+            CASE usc.risk_level
+              WHEN 'high-risk' THEN 3
+              WHEN 'watch' THEN 2
+              ELSE 1
+            END DESC,
+            usc.risk_score DESC,
+            usc.updated_at DESC
+          LIMIT 16
+        `,
+        [courseId]
+      ),
+      db.all(
+        `
+          SELECT
+            sae.id,
+            sae.user_id,
+            u.full_name AS user_name,
+            sae.alert_key,
+            sae.severity,
+            sae.title,
+            sae.message,
+            sae.created_at
+          FROM security_alert_events sae
+          LEFT JOIN users u ON u.id = sae.user_id
+          WHERE (sae.course_id = ? OR sae.course_id IS NULL)
+            AND sae.resolved_at IS NULL
+            AND sae.created_at >= NOW() - INTERVAL '14 days'
+          ORDER BY sae.created_at DESC
+          LIMIT 24
+        `,
+        [courseId]
+      ),
+      db.all(
+        `
+          WITH ip_events AS (
+            SELECT ip, user_id, created_at
+            FROM login_history
+            WHERE ip IS NOT NULL
+              AND created_at >= NOW() - INTERVAL '14 days'
+              AND (course_id = ? OR course_id IS NULL)
+            UNION ALL
+            SELECT ip, user_id, created_at
+            FROM user_registration_events
+            WHERE ip IS NOT NULL
+              AND created_at >= NOW() - INTERVAL '14 days'
+              AND (course_id = ? OR course_id IS NULL)
+            UNION ALL
+            SELECT ip, user_id, created_at
+            FROM auth_failure_events
+            WHERE ip IS NOT NULL
+              AND created_at >= NOW() - INTERVAL '14 days'
+              AND (course_id = ? OR course_id IS NULL)
+          )
+          SELECT
+            ip,
+            COUNT(*)::int AS events_count,
+            COUNT(DISTINCT user_id)::int AS users_count,
+            MAX(created_at) AS last_seen_at
+          FROM ip_events
+          GROUP BY ip
+          ORDER BY users_count DESC, events_count DESC, last_seen_at DESC
+          LIMIT 16
+        `,
+        [courseId, courseId, courseId]
+      ),
+      db.all(
+        `
+          WITH device_events AS (
+            SELECT
+              device_fingerprint AS device_key,
+              user_id,
+              created_at,
+              device_fingerprint AS sample_label
+            FROM user_registration_events
+            WHERE device_fingerprint IS NOT NULL
+              AND created_at >= NOW() - INTERVAL '21 days'
+              AND (course_id = ? OR course_id IS NULL)
+            UNION ALL
+            SELECT
+              md5(lower(user_agent)) AS device_key,
+              user_id,
+              created_at,
+              LEFT(user_agent, 120) AS sample_label
+            FROM login_history
+            WHERE user_agent IS NOT NULL
+              AND created_at >= NOW() - INTERVAL '21 days'
+              AND (course_id = ? OR course_id IS NULL)
+          )
+          SELECT
+            device_key,
+            MAX(sample_label) AS sample_label,
+            COUNT(*)::int AS events_count,
+            COUNT(DISTINCT user_id)::int AS users_count,
+            MAX(created_at) AS last_seen_at
+          FROM device_events
+          GROUP BY device_key
+          ORDER BY users_count DESC, events_count DESC, last_seen_at DESC
+          LIMIT 16
+        `,
+        [courseId, courseId]
+      ),
+    ]);
+
+    const ipItems = (ipRows || [])
+      .filter((row) => row && row.ip && !isSecurityAdminIpAllowlisted(row.ip, adminAllowlist))
+      .map((row) => ({
+        ip: normalizeForensicsIp(row.ip),
+        events_count: Number(row.events_count || 0),
+        users_count: Number(row.users_count || 0),
+        last_seen_at: toIsoStringSafe(row.last_seen_at),
+      }))
+      .slice(0, 10);
+
+    const deviceItems = (deviceRows || []).map((row) => ({
+      device_key: String(row.device_key || ''),
+      sample_label: String(row.sample_label || '').trim(),
+      events_count: Number(row.events_count || 0),
+      users_count: Number(row.users_count || 0),
+      last_seen_at: toIsoStringSafe(row.last_seen_at),
+    })).slice(0, 10);
+
+    return res.json({
+      ok: true,
+      generated_at: new Date().toISOString(),
+      summary: {
+        total_cases: Number(summaryRow && summaryRow.total_cases ? summaryRow.total_cases : 0),
+        high_risk_total: Number(summaryRow && summaryRow.high_risk_total ? summaryRow.high_risk_total : 0),
+        watch_total: Number(summaryRow && summaryRow.watch_total ? summaryRow.watch_total : 0),
+        normal_total: Number(summaryRow && summaryRow.normal_total ? summaryRow.normal_total : 0),
+        open_cases: Number(summaryRow && summaryRow.open_cases ? summaryRow.open_cases : 0),
+        confirmed_cases: Number(summaryRow && summaryRow.confirmed_cases ? summaryRow.confirmed_cases : 0),
+        closed_cases: Number(summaryRow && summaryRow.closed_cases ? summaryRow.closed_cases : 0),
+        overdue_24h: Number(summaryRow && summaryRow.overdue_24h ? summaryRow.overdue_24h : 0),
+        overdue_72h: Number(summaryRow && summaryRow.overdue_72h ? summaryRow.overdue_72h : 0),
+      },
+      risky_accounts: (riskyRows || []).map((row) => ({
+        user_id: Number(row.user_id),
+        full_name: String(row.full_name || ''),
+        role: normalizeRoleKey(row.role || 'student'),
+        risk_level: normalizeSecurityCaseLevel(row.risk_level),
+        risk_score: Number(row.risk_score || 0),
+        status: normalizeSecurityCaseStatus(row.status),
+        reason: String(row.reason || ''),
+        updated_at: toIsoStringSafe(row.updated_at),
+      })),
+      open_alerts: (alertsRows || []).map((row) => ({
+        id: Number(row.id),
+        user_id: Number.isFinite(Number(row.user_id)) ? Number(row.user_id) : null,
+        user_name: row.user_name ? String(row.user_name) : '',
+        alert_key: String(row.alert_key || ''),
+        severity: normalizeSecurityAlertSeverity(row.severity),
+        title: String(row.title || ''),
+        message: String(row.message || ''),
+        created_at: toIsoStringSafe(row.created_at),
+      })),
+      top_ips: ipItems,
+      top_devices: deviceItems,
+      settings: {
+        auto_quarantine_enabled: Boolean(settingsCache.security_auto_quarantine_enabled),
+        allowlist_count: adminAllowlist.length,
+        ip_retention_days: normalizeRetentionDays(
+          settingsCache.security_ip_retention_days,
+          SECURITY_IP_RETENTION_DAYS_DEFAULT
+        ),
+        user_agent_retention_days: normalizeRetentionDays(
+          settingsCache.security_user_agent_retention_days,
+          SECURITY_USER_AGENT_RETENTION_DAYS_DEFAULT
+        ),
+      },
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.securityDashboard.fetch');
+  }
+});
+
 app.get('/admin/system-health.json', requireVisitAnalyticsSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
@@ -19804,6 +21477,15 @@ app.get('/admin/system-health.json', requireVisitAnalyticsSectionAccess, async (
         registration_alert_window_minutes: normalizeSecurityRegistrationAlertWindowMinutes(
           settingsCache.security_registration_alert_window_minutes,
           DEFAULT_SETTINGS.security_registration_alert_window_minutes
+        ),
+        auto_quarantine_enabled: Boolean(settingsCache.security_auto_quarantine_enabled),
+        ip_retention_days: normalizeRetentionDays(
+          settingsCache.security_ip_retention_days,
+          SECURITY_IP_RETENTION_DAYS_DEFAULT
+        ),
+        user_agent_retention_days: normalizeRetentionDays(
+          settingsCache.security_user_agent_retention_days,
+          SECURITY_USER_AGENT_RETENTION_DAYS_DEFAULT
         ),
       },
       migrations: {
@@ -20063,7 +21745,11 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
           COALESCE(NULLIF(u.last_login_ip, ''), NULLIF(reg.ip, '')) AS last_login_ip,
           COALESCE(NULLIF(u.last_user_agent, ''), NULLIF(reg.user_agent, '')) AS last_user_agent,
           u.last_login_at,
-          u.course_id
+          u.course_id,
+          COALESCE(usc.risk_level, 'normal') AS security_risk_level,
+          COALESCE(usc.status, 'open') AS security_case_status,
+          COALESCE(usc.risk_score, 0)::int AS security_risk_score,
+          usc.updated_at AS security_case_updated_at
         FROM users u
         LEFT JOIN LATERAL (
           SELECT re.ip, re.user_agent
@@ -20072,6 +21758,7 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
           ORDER BY re.created_at DESC
           LIMIT 1
         ) reg ON true
+        LEFT JOIN user_security_cases usc ON usc.user_id = u.id
         ${userWhere}
         ORDER BY u.full_name
       `,
@@ -20837,6 +22524,260 @@ app.get('/admin/user-logins.json', requireActivitySectionAccess, (req, res) => {
   );
 });
 
+app.get('/admin/users/:id/sessions.json', requireUsersSectionAccess, async (req, res) => {
+  const targetUserId = Number(req.params.id);
+  if (!Number.isFinite(targetUserId) || targetUserId < 1) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+  try {
+    await ensureDbReady();
+    const scopedCourseId = getAdminCourse(req);
+    const canCrossCourse = hasSessionRole(req, 'admin');
+    const targetSql = canCrossCourse
+      ? 'SELECT id, full_name, course_id FROM users WHERE id = ? LIMIT 1'
+      : 'SELECT id, full_name, course_id FROM users WHERE id = ? AND course_id = ? LIMIT 1';
+    const targetParams = canCrossCourse ? [targetUserId] : [targetUserId, scopedCourseId];
+    const targetUser = await db.get(targetSql, targetParams);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const sessions = await listUserSessions(targetUserId, req.sessionID || null);
+    return res.json({
+      ok: true,
+      user_id: targetUserId,
+      sessions,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.users.sessions');
+  }
+});
+
+app.post('/admin/users/:id/sessions/revoke-all', requireUsersSectionAccess, writeLimiter, async (req, res) => {
+  const targetUserId = Number(req.params.id);
+  if (!Number.isFinite(targetUserId) || targetUserId < 1) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+  try {
+    await ensureDbReady();
+    const scopedCourseId = getAdminCourse(req);
+    const canCrossCourse = hasSessionRole(req, 'admin');
+    const targetSql = canCrossCourse
+      ? 'SELECT id, full_name, course_id FROM users WHERE id = ? LIMIT 1'
+      : 'SELECT id, full_name, course_id FROM users WHERE id = ? AND course_id = ? LIMIT 1';
+    const targetParams = canCrossCourse ? [targetUserId] : [targetUserId, scopedCourseId];
+    const targetUser = await db.get(targetSql, targetParams);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const keepCurrent = parseBinaryFlag(req.body.keep_current, 1) === 1;
+    const revokedCount = await revokeUserSessions(targetUserId, {
+      excludeSessionId: keepCurrent ? (req.sessionID || null) : null,
+    });
+    logAction(db, req, 'user_sessions_revoke_all', {
+      user_id: targetUserId,
+      keep_current: keepCurrent,
+      revoked_count: revokedCount,
+    });
+    await emitSecurityAlertEvent({
+      alertKey: 'sessions-revoked',
+      severity: 'medium',
+      title: 'User sessions revoked',
+      message: `Сесії користувача ${targetUser.full_name || targetUserId} скасовано (${revokedCount})`,
+      userId: targetUserId,
+      courseId: Number(targetUser.course_id || scopedCourseId || 0) || null,
+      details: {
+        revoked_count: revokedCount,
+        keep_current: keepCurrent,
+        actor_user_id: Number(req.session.user.id),
+      },
+      dedupKey: `sessions-revoked|${targetUserId}|${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+    });
+    return res.json({ ok: true, revoked_count: revokedCount });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.users.sessions.revokeAll');
+  }
+});
+
+app.post('/admin/users/:id/risk-case', requireUsersSectionAccess, writeLimiter, async (req, res) => {
+  const targetUserId = Number(req.params.id);
+  if (!Number.isFinite(targetUserId) || targetUserId < 1) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+  try {
+    await ensureDbReady();
+    const scopedCourseId = getAdminCourse(req);
+    const canCrossCourse = hasSessionRole(req, 'admin');
+    const targetSql = canCrossCourse
+      ? 'SELECT id, full_name, course_id, is_active, role FROM users WHERE id = ? LIMIT 1'
+      : 'SELECT id, full_name, course_id, is_active, role FROM users WHERE id = ? AND course_id = ? LIMIT 1';
+    const targetParams = canCrossCourse ? [targetUserId] : [targetUserId, scopedCourseId];
+    const targetUser = await db.get(targetSql, targetParams);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const action = String(req.body.action || 'save').trim().toLowerCase();
+    if (action === 'refresh') {
+      const recomputed = await recomputeUserSecurityCase(targetUserId, {
+        allowAutoQuarantine: false,
+        courseId: Number.isFinite(Number(targetUser.course_id)) ? Number(targetUser.course_id) : null,
+      });
+      const refreshedCase = await getUserSecurityCaseWithActors(targetUserId);
+      return res.json({
+        ok: true,
+        recomputed: true,
+        score: recomputed ? recomputed.score : 0,
+        level: recomputed ? recomputed.level : 'normal',
+        reasons: recomputed ? recomputed.reasons : [],
+        case: refreshedCase,
+      });
+    }
+
+    const existingCase = await getUserSecurityCaseWithActors(targetUserId);
+    const hasLevel = typeof req.body.risk_level !== 'undefined' && String(req.body.risk_level).trim() !== '';
+    const hasStatus = typeof req.body.status !== 'undefined' && String(req.body.status).trim() !== '';
+    const hasScore = typeof req.body.risk_score !== 'undefined' && String(req.body.risk_score).trim() !== '';
+    const requestedLevel = hasLevel
+      ? normalizeSecurityCaseLevel(req.body.risk_level)
+      : normalizeSecurityCaseLevel(existingCase && existingCase.risk_level ? existingCase.risk_level : 'normal');
+    let requestedStatus = hasStatus
+      ? normalizeSecurityCaseStatus(req.body.status)
+      : normalizeSecurityCaseStatus(existingCase && existingCase.status ? existingCase.status : 'open');
+    const parsedScore = hasScore ? Number(req.body.risk_score) : NaN;
+    let riskScore = Number.isFinite(parsedScore)
+      ? Math.max(0, Math.round(parsedScore))
+      : Number(existingCase && existingCase.risk_score ? existingCase.risk_score : 0);
+    if (requestedLevel === 'high-risk' && riskScore < SECURITY_CASE_SCORE_HIGH) {
+      riskScore = SECURITY_CASE_SCORE_HIGH;
+    } else if (requestedLevel === 'watch' && riskScore < SECURITY_CASE_SCORE_WATCH) {
+      riskScore = SECURITY_CASE_SCORE_WATCH;
+    } else if (requestedLevel === 'normal' && riskScore >= SECURITY_CASE_SCORE_WATCH) {
+      riskScore = 20;
+    }
+    const reason = trimSecurityText(req.body.reason, 600) || null;
+    const resolutionNote = trimSecurityText(req.body.resolution_note, 600) || null;
+    const actorUserId = Number(req.session.user.id);
+
+    if (action === 'confirm') {
+      requestedStatus = 'confirmed';
+    } else if (action === 'close') {
+      requestedStatus = 'closed';
+    } else if (action === 'reopen') {
+      requestedStatus = 'open';
+    }
+
+    if (existingCase) {
+      await db.run(
+        `
+          UPDATE user_security_cases
+          SET risk_score = ?,
+              risk_level = ?,
+              status = ?,
+              reason = ?,
+              resolution_note = ?,
+              updated_at = NOW(),
+              confirmed_by = CASE WHEN ? THEN ? ELSE confirmed_by END,
+              confirmed_at = CASE WHEN ? THEN NOW() ELSE confirmed_at END,
+              closed_by = CASE WHEN ? THEN ? WHEN ? THEN NULL ELSE closed_by END,
+              closed_at = CASE WHEN ? THEN NOW() WHEN ? THEN NULL ELSE closed_at END
+          WHERE user_id = ?
+        `,
+        [
+          riskScore,
+          requestedLevel,
+          requestedStatus,
+          reason || existingCase.reason || null,
+          resolutionNote || existingCase.resolution_note || null,
+          action === 'confirm' ? 1 : 0,
+          actorUserId,
+          action === 'confirm' ? 1 : 0,
+          action === 'close' ? 1 : 0,
+          actorUserId,
+          action === 'reopen' ? 1 : 0,
+          action === 'close' ? 1 : 0,
+          action === 'reopen' ? 1 : 0,
+          targetUserId,
+        ]
+      );
+    } else {
+      await db.run(
+        `
+          INSERT INTO user_security_cases
+            (
+              user_id,
+              risk_score,
+              risk_level,
+              status,
+              reason,
+              resolution_note,
+              signal_counters,
+              auto_quarantined,
+              allowlisted,
+              confirmed_by,
+              confirmed_at,
+              closed_by,
+              closed_at,
+              last_risk_at,
+              last_recomputed_at,
+              created_at,
+              updated_at
+            )
+          VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, NOW(), NOW(), NOW(), NOW())
+        `,
+        [
+          targetUserId,
+          riskScore,
+          requestedLevel,
+          requestedStatus,
+          reason,
+          resolutionNote,
+          JSON.stringify({ manual: true }),
+          action === 'confirm' ? actorUserId : null,
+          action === 'confirm' ? new Date().toISOString() : null,
+          action === 'close' ? actorUserId : null,
+          action === 'close' ? new Date().toISOString() : null,
+        ]
+      );
+    }
+
+    const shouldQuarantine = (
+      requestedLevel === 'high-risk'
+      && settingsCache.security_auto_quarantine_enabled
+      && Number(targetUser.is_active) === 1
+      && action !== 'close'
+    );
+    if (shouldQuarantine) {
+      await db.run('UPDATE users SET is_active = 0 WHERE id = ? AND is_active = 1', [targetUserId]);
+      await db.run(
+        `
+          UPDATE user_security_cases
+          SET auto_quarantined = true,
+              updated_at = NOW()
+          WHERE user_id = ?
+        `,
+        [targetUserId]
+      );
+      broadcast('users_updated');
+    }
+
+    logAction(db, req, 'user_security_case_update', {
+      user_id: targetUserId,
+      action,
+      risk_level: requestedLevel,
+      status: requestedStatus,
+      risk_score: riskScore,
+    });
+    const updatedCase = await getUserSecurityCaseWithActors(targetUserId);
+    return res.json({
+      ok: true,
+      case: updatedCase,
+      quarantined: shouldQuarantine,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.users.riskCase.update');
+  }
+});
+
 app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
@@ -21379,6 +23320,71 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 4);
 
+    let securityCase = await getUserSecurityCaseWithActors(targetUserId);
+    try {
+      const recomputed = await recomputeUserSecurityCase(targetUserId, {
+        allowAutoQuarantine: false,
+        courseId: Number.isFinite(Number(targetUser.course_id)) ? Number(targetUser.course_id) : null,
+      });
+      if (recomputed && recomputed.case) {
+        securityCase = recomputed.case;
+      }
+    } catch (recomputeErr) {
+      console.error('Database error (admin.users.forensics.recompute)', recomputeErr);
+    }
+
+    const normalizedSecurityCase = securityCase
+      ? {
+          user_id: Number(securityCase.user_id),
+          risk_score: Number(securityCase.risk_score || 0),
+          risk_level: normalizeSecurityCaseLevel(securityCase.risk_level),
+          status: normalizeSecurityCaseStatus(securityCase.status),
+          reason: String(securityCase.reason || ''),
+          resolution_note: String(securityCase.resolution_note || ''),
+          auto_quarantined: securityCase.auto_quarantined === true || Number(securityCase.auto_quarantined) === 1,
+          allowlisted: securityCase.allowlisted === true || Number(securityCase.allowlisted) === 1,
+          updated_at: parseTs(securityCase.updated_at),
+          last_recomputed_at: parseTs(securityCase.last_recomputed_at),
+          confirmed_at: parseTs(securityCase.confirmed_at),
+          confirmed_by_name: securityCase.confirmed_by_name ? String(securityCase.confirmed_by_name) : '',
+          closed_at: parseTs(securityCase.closed_at),
+          closed_by_name: securityCase.closed_by_name ? String(securityCase.closed_by_name) : '',
+        }
+      : null;
+
+    const graph = buildForensicsGraphPayload(
+      {
+        id: targetUser.id,
+        full_name: targetUser.full_name,
+        role: normalizeRoleKey(targetUser.role || 'student'),
+      },
+      {
+        ips: evidenceIps,
+        session_ids: evidenceSessions,
+        device_fingerprints: evidenceFingerprints,
+      },
+      matches
+    );
+
+    const caseRiskLevel = normalizedSecurityCase ? normalizedSecurityCase.risk_level : null;
+    const caseRiskLabel = caseRiskLevel === 'high-risk'
+      ? 'Високий ризик'
+      : (caseRiskLevel === 'watch'
+        ? 'Під наглядом'
+        : 'Нормальний ризик');
+    const finalRiskLevel = caseRiskLevel && caseRiskLevel !== 'normal'
+      ? caseRiskLevel
+      : riskLevel;
+    const finalRiskLabel = caseRiskLevel && caseRiskLevel !== 'normal'
+      ? caseRiskLabel
+      : riskLabel;
+    const finalRiskScore = normalizedSecurityCase
+      ? Math.max(Number(normalizedSecurityCase.risk_score || 0), Number(riskScore || 0))
+      : Number(riskScore || 0);
+    if (normalizedSecurityCase && normalizedSecurityCase.reason) {
+      riskReasons.unshift(`Кейс: ${normalizedSecurityCase.reason}`);
+    }
+
     return res.json({
       target: {
         id: targetUser.id,
@@ -21416,9 +23422,9 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
         has_login_history: (targetLoginRows || []).length > 0,
       },
       risk: {
-        score: Number(riskScore || 0),
-        level: riskLevel,
-        label: riskLabel,
+        score: Number(finalRiskScore || 0),
+        level: finalRiskLevel,
+        label: finalRiskLabel,
         reasons: riskReasons.slice(0, 5),
         allowlisted: allowlistedEvidenceIps.length > 0,
         recent_alerts_count: securityAlertsForTarget.length,
@@ -21428,6 +23434,8 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
           message: String(event.message || ''),
         })),
       },
+      security_case: normalizedSecurityCase,
+      graph,
       suspected_owner: suspectedOwner,
       matches,
     });
@@ -23005,8 +25013,28 @@ app.post('/admin/teacher-requests/:userId/approve', requireTeachersSectionAccess
   }
   try {
     await ensureDbReady();
+    const courseId = getAdminCourse(req);
+    const targetUser = await db.get('SELECT id, full_name, role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    if (!targetUser) {
+      return res.redirect('/admin?err=User%20not%20found');
+    }
+    const beforeSnapshot = await getUserRoleSnapshot(userId, targetUser.role || 'student');
     await db.run('UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?', ['approved', userId]);
-    await db.run('UPDATE users SET role = ? WHERE id = ?', ['teacher', userId]);
+    await assignUserRoles(userId, ['teacher'], { preferredPrimary: 'teacher' });
+    await recordUserRoleChangeEvent({
+      userId,
+      actorUserId: Number(req.session.user.id),
+      actorName: req.session.user.username,
+      courseId,
+      source: 'teacher_request_approve',
+      reason: 'Teacher request approved',
+      beforeRoles: beforeSnapshot.role_keys,
+      afterRoles: ['teacher'],
+      beforePrimaryRole: beforeSnapshot.primary_role,
+      afterPrimaryRole: 'teacher',
+      targetFullName: targetUser.full_name || null,
+    });
+    await recomputeUserSecurityCase(userId, { courseId, allowAutoQuarantine: false });
     logAction(db, req, 'teacher_request_approve', { user_id: userId });
     broadcast('users_updated');
     return res.redirect('/admin?ok=Teacher%20approved');
@@ -23023,8 +25051,28 @@ app.post('/admin/teacher-requests/:userId/reject', requireTeachersSectionAccess,
   }
   try {
     await ensureDbReady();
+    const courseId = getAdminCourse(req);
+    const targetUser = await db.get('SELECT id, full_name, role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    if (!targetUser) {
+      return res.redirect('/admin?err=User%20not%20found');
+    }
+    const beforeSnapshot = await getUserRoleSnapshot(userId, targetUser.role || 'student');
     await db.run('UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?', ['rejected', userId]);
-    await db.run('UPDATE users SET role = ? WHERE id = ?', ['student', userId]);
+    await assignUserRoles(userId, ['student'], { preferredPrimary: 'student' });
+    await recordUserRoleChangeEvent({
+      userId,
+      actorUserId: Number(req.session.user.id),
+      actorName: req.session.user.username,
+      courseId,
+      source: 'teacher_request_reject',
+      reason: 'Teacher request rejected',
+      beforeRoles: beforeSnapshot.role_keys,
+      afterRoles: ['student'],
+      beforePrimaryRole: beforeSnapshot.primary_role,
+      afterPrimaryRole: 'student',
+      targetFullName: targetUser.full_name || null,
+    });
+    await recomputeUserSecurityCase(userId, { courseId, allowAutoQuarantine: false });
     logAction(db, req, 'teacher_request_reject', { user_id: userId });
     broadcast('users_updated');
     return res.redirect('/admin?ok=Teacher%20rejected');
@@ -23555,6 +25603,9 @@ app.post('/admin/semesters/finalize/:id', requireSemestersSectionAccess, async (
   if (!Number.isFinite(semesterId) || semesterId < 1) {
     return res.redirect('/admin?err=Invalid%20semester');
   }
+  if (!isStepUpPhraseValid(req.body.confirm_phrase || req.body.stepup_code, STEPUP_CODE_FINALIZE)) {
+    return res.redirect('/admin?err=Type%20FINALIZE%20to%20confirm');
+  }
 
   try {
     const semester = await db.get(
@@ -24007,17 +26058,35 @@ app.post('/admin/users/roles', requireRoleAccessSectionAccess, async (req, res) 
   if (!Number.isFinite(userId) || userId < 1 || !selectedRoles.length) {
     return res.redirect('/admin?err=Invalid%20role%20selection');
   }
+  if (!isStepUpPhraseValid(req.body.stepup_code, STEPUP_CODE_ROLE)) {
+    return res.redirect('/admin?err=Type%20ROLE%20to%20confirm');
+  }
   try {
     await ensureDbReady();
-    const user = await db.get('SELECT id, role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    const user = await db.get('SELECT id, role, full_name FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
     if (!user) {
       return res.redirect('/admin?err=User%20not%20found');
     }
     if (Number(userId) === Number(req.session.user.id) && !selectedRoles.includes('admin')) {
       return res.redirect('/admin?err=Cannot%20remove%20your%20own%20admin%20role');
     }
+    const beforeSnapshot = await getUserRoleSnapshot(userId, user.role || 'student');
     const preferredPrimary = req.body.primary_role || user.role || 'student';
     const result = await assignUserRoles(userId, selectedRoles, { preferredPrimary });
+    await recordUserRoleChangeEvent({
+      userId,
+      actorUserId: Number(req.session.user.id),
+      actorName: req.session.user.username,
+      courseId,
+      source: 'admin_users_roles',
+      reason: 'Role Studio update',
+      beforeRoles: beforeSnapshot.role_keys,
+      afterRoles: result.roleKeys,
+      beforePrimaryRole: beforeSnapshot.primary_role,
+      afterPrimaryRole: result.primaryRoleKey,
+      targetFullName: user.full_name || null,
+    });
+    await recomputeUserSecurityCase(userId, { courseId, allowAutoQuarantine: false });
     logAction(db, req, 'user_roles_change', { user_id: userId, role_keys: result.roleKeys, primary_role: result.primaryRoleKey });
     broadcast('users_updated');
     return res.redirect('/admin?ok=Roles%20updated');
@@ -24038,6 +26107,9 @@ app.post('/admin/users/role', requireRoleAccessSectionAccess, async (req, res) =
   if (!user_id || !roleKey || !['student', 'admin', 'starosta', 'deanery', 'teacher'].includes(roleKey)) {
     return res.redirect('/admin?err=Invalid%20role');
   }
+  if (!isStepUpPhraseValid(req.body.stepup_code, STEPUP_CODE_ROLE)) {
+    return res.redirect('/admin?err=Type%20ROLE%20to%20confirm');
+  }
   const userId = Number(user_id);
   const courseId = getAdminCourse(req);
   if (!Number.isFinite(userId) || userId < 1) {
@@ -24048,11 +26120,26 @@ app.post('/admin/users/role', requireRoleAccessSectionAccess, async (req, res) =
   }
   try {
     await ensureDbReady();
-    const user = await db.get('SELECT id, role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    const user = await db.get('SELECT id, role, full_name FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
     if (!user) {
       return res.redirect('/admin?err=User%20not%20found');
     }
+    const beforeSnapshot = await getUserRoleSnapshot(userId, user.role || 'student');
     await assignUserRoles(userId, [roleKey], { preferredPrimary: roleKey });
+    await recordUserRoleChangeEvent({
+      userId,
+      actorUserId: Number(req.session.user.id),
+      actorName: req.session.user.username,
+      courseId,
+      source: 'admin_users_role',
+      reason: 'Legacy role update',
+      beforeRoles: beforeSnapshot.role_keys,
+      afterRoles: [roleKey],
+      beforePrimaryRole: beforeSnapshot.primary_role,
+      afterPrimaryRole: roleKey,
+      targetFullName: user.full_name || null,
+    });
+    await recomputeUserSecurityCase(userId, { courseId, allowAutoQuarantine: false });
     logAction(db, req, 'user_role_change', { user_id: userId, role: roleKey });
     broadcast('users_updated');
     return res.redirect('/admin?ok=Role%20updated');

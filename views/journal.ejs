@@ -831,6 +831,7 @@
               <input type="hidden" name="subject_id" value="<%= selectedSubject ? selectedSubject.subject_id : '' %>" />
               <input type="hidden" name="column_id" id="journalBulkColumnId" />
               <input type="hidden" name="entries_json" id="journalBulkEntriesJson" />
+              <input type="hidden" name="stepup_code" id="journalBulkStepupCode" value="" />
               <div class="mb-2">
                 <div class="text-muted small">Колонка</div>
                 <div class="fw-semibold" id="journalBulkColumnTitle">-</div>
@@ -962,6 +963,7 @@
       const bulkForm = document.getElementById('journalBulkForm');
       const bulkColumnIdInput = document.getElementById('journalBulkColumnId');
       const bulkEntriesInput = document.getElementById('journalBulkEntriesJson');
+      const bulkStepupInput = document.getElementById('journalBulkStepupCode');
       const bulkColumnTitleEl = document.getElementById('journalBulkColumnTitle');
       const bulkPasteEl = document.getElementById('journalBulkPaste');
       const bulkPreviewEl = document.getElementById('journalBulkPreview');
@@ -1857,6 +1859,17 @@
           const valid = parseBulkInput();
           if (!valid) {
             event.preventDefault();
+            return;
+          }
+          if (canEditJournal) {
+            const typed = window.prompt('Для масового оцінювання введіть BULK');
+            if (String(typed || '').trim().toUpperCase() !== 'BULK') {
+              event.preventDefault();
+              return;
+            }
+            if (bulkStepupInput) {
+              bulkStepupInput.value = 'BULK';
+            }
           }
         });
       }

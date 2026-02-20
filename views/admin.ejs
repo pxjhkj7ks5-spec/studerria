@@ -991,6 +991,13 @@
                           required
                         />
                       </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Auto-quarantine high-risk accounts</label>
+                        <select class="form-select" name="security_auto_quarantine_enabled" data-settings-field>
+                          <option value="true" <%= (settings && settings.security_auto_quarantine_enabled) ? 'selected' : '' %>>Enabled</option>
+                          <option value="false" <%= (settings && settings.security_auto_quarantine_enabled) ? '' : 'selected' %>>Disabled</option>
+                        </select>
+                      </div>
                       <div class="col-12">
                         <label class="form-label">Admin IP allowlist (ignore in forensics/alerts)</label>
                         <textarea
@@ -1139,6 +1146,32 @@
                           class="form-control"
                           name="activity_log_retention_days"
                           value="<%= (settings && settings.activity_log_retention_days) || 365 %>"
+                          data-settings-field
+                          required
+                        />
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Security IP retention (days)</label>
+                        <input
+                          type="number"
+                          min="14"
+                          max="3650"
+                          class="form-control"
+                          name="security_ip_retention_days"
+                          value="<%= (settings && settings.security_ip_retention_days) || 180 %>"
+                          data-settings-field
+                          required
+                        />
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Security device retention (days)</label>
+                        <input
+                          type="number"
+                          min="14"
+                          max="3650"
+                          class="form-control"
+                          name="security_user_agent_retention_days"
+                          value="<%= (settings && settings.security_user_agent_retention_days) || 120 %>"
                           data-settings-field
                           required
                         />
@@ -1912,6 +1945,11 @@
                   <% const rowPrimaryRole = u.primary_role || userPrimaryRoleMapData[u.id] || rowRoleKeys[0] || u.role || 'student'; %>
                   <% const hasAdminRole = rowRoleKeys.includes('admin'); %>
                   <% const rowRolesLabel = rowRoleKeys.map((key) => roleLabelMapData[key] || key).join(', '); %>
+                  <% const rowRiskLevel = String(u.security_risk_level || 'normal'); %>
+                  <% const rowRiskStatus = String(u.security_case_status || 'open'); %>
+                  <% const rowRiskScore = Number(u.security_risk_score || 0); %>
+                  <% const rowRiskClass = rowRiskLevel === 'high-risk' ? 'danger' : (rowRiskLevel === 'watch' ? 'warning' : 'secondary'); %>
+                  <% const rowRiskLabel = rowRiskLevel === 'high-risk' ? 'High-risk' : (rowRiskLevel === 'watch' ? 'Watch' : 'Normal'); %>
                   <tr
                     class="user-row"
                     data-user-id="<%= u.id %>"
@@ -1925,6 +1963,10 @@
                     data-user-ip="<%= u.last_login_ip || '' %>"
                     data-user-agent="<%= u.last_user_agent || '' %>"
                     data-user-login="<%= u.last_login_at || '' %>"
+                    data-security-risk-level="<%= rowRiskLevel %>"
+                    data-security-risk-status="<%= rowRiskStatus %>"
+                    data-security-risk-score="<%= rowRiskScore %>"
+                    data-security-case-updated="<%= u.security_case_updated_at || '' %>"
                   >
                     <td>
                       <% if (!hasAdminRole) { %>
@@ -1936,6 +1978,12 @@
                       <span class="badge text-bg-<%= rowPrimaryRole === 'admin' ? 'primary' : (rowPrimaryRole === 'starosta' ? 'warning' : (rowPrimaryRole === 'deanery' ? 'info' : 'secondary')) %>">
                         <%= rowRolesLabel %>
                       </span>
+                      <div class="mt-1">
+                        <span class="badge text-bg-<%= rowRiskClass %>">
+                          <%= rowRiskLabel %> · <%= rowRiskScore %>
+                        </span>
+                        <span class="badge text-bg-light text-dark"><%= rowRiskStatus %></span>
+                      </div>
                     </td>
                     <td>
                       <% 
@@ -2485,7 +2533,9 @@
                           <form id="semester-active-<%= sem.id %>" method="POST" action="/admin/semesters/set-active/<%= sem.id %>"></form>
                           <form id="semester-restore-<%= sem.id %>" method="POST" action="/admin/semesters/restore/<%= sem.id %>"></form>
                           <form id="semester-archive-<%= sem.id %>" method="POST" action="/admin/semesters/archive/<%= sem.id %>"></form>
-                          <form id="semester-finalize-<%= sem.id %>" method="POST" action="/admin/semesters/finalize/<%= sem.id %>"></form>
+                          <form id="semester-finalize-<%= sem.id %>" method="POST" action="/admin/semesters/finalize/<%= sem.id %>">
+                            <input type="hidden" name="confirm_phrase" value="" />
+                          </form>
                           <form id="semester-delete-<%= sem.id %>" method="POST" action="/admin/semesters/delete/<%= sem.id %>"></form>
                           <form id="semester-hard-delete-<%= sem.id %>" method="POST" action="/admin/semesters/hard-delete/<%= sem.id %>"></form>
                           <div class="dropdown">
@@ -2903,6 +2953,115 @@
                       <tr><td colspan="5" class="text-muted">Завантаження…</td></tr>
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                  <h6 class="mb-1">Security dashboard</h6>
+                  <div class="small text-muted">Ризики акаунтів, алерти, підозрілі IP/девайси та SLA розбору.</div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge text-bg-secondary" id="securityDashboardStatusBadge">Loading…</span>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" id="securityDashboardRefresh">Оновити security</button>
+                </div>
+              </div>
+
+              <div class="visit-analytics-grid">
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Open cases</div>
+                  <div class="visit-metric-value" id="securityMetricOpenCases">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">High-risk</div>
+                  <div class="visit-metric-value" id="securityMetricHighRisk">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Watch</div>
+                  <div class="visit-metric-value" id="securityMetricWatch">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Overdue 72h</div>
+                  <div class="visit-metric-value" id="securityMetricOverdue72h">—</div>
+                </div>
+              </div>
+              <div class="small text-muted mt-2" id="securityDashboardGeneratedAt">—</div>
+
+              <div class="row g-3 mt-1">
+                <div class="col-12 col-xl-6">
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Акаунт</th>
+                          <th>Ризик</th>
+                          <th>Статус</th>
+                          <th>Score</th>
+                        </tr>
+                      </thead>
+                      <tbody id="securityRiskyBody">
+                        <tr><td colspan="4" class="text-muted">Завантаження…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="col-12 col-xl-6">
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Severity</th>
+                          <th>Alert</th>
+                          <th>Користувач</th>
+                          <th>Коли</th>
+                        </tr>
+                      </thead>
+                      <tbody id="securityAlertsBody">
+                        <tr><td colspan="4" class="text-muted">Завантаження…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row g-3 mt-1">
+                <div class="col-12 col-xl-6">
+                  <h6 class="mb-2">Top IP (14 днів)</h6>
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>IP</th>
+                          <th>Users</th>
+                          <th>Events</th>
+                        </tr>
+                      </thead>
+                      <tbody id="securityIpsBody">
+                        <tr><td colspan="3" class="text-muted">Завантаження…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="col-12 col-xl-6">
+                  <h6 class="mb-2">Top devices (21 день)</h6>
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Device</th>
+                          <th>Users</th>
+                          <th>Events</th>
+                        </tr>
+                      </thead>
+                      <tbody id="securityDevicesBody">
+                        <tr><td colspan="3" class="text-muted">Завантаження…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3469,8 +3628,74 @@
               <ul id="uaForensicsMatches" class="list-group list-group-flush mt-2"></ul>
             </div>
 
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>Risk case:</strong>
+                <button class="btn btn-sm btn-outline-secondary glass" type="button" id="uaRiskRefreshBtn">Refresh score</button>
+              </div>
+              <input type="hidden" id="uaRiskUserId" />
+              <div class="row g-2 mt-1">
+                <div class="col-12 col-md-4">
+                  <label class="form-label">Risk level</label>
+                  <select class="form-select" id="uaRiskLevel">
+                    <option value="normal">Normal</option>
+                    <option value="watch">Watch</option>
+                    <option value="high-risk">High-risk</option>
+                  </select>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label">Status</label>
+                  <select class="form-select" id="uaRiskStatus">
+                    <option value="open">Open</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label">Risk score</label>
+                  <input class="form-control" type="number" min="0" max="500" id="uaRiskScore" />
+                </div>
+              </div>
+              <div class="mt-2">
+                <label class="form-label">Reason</label>
+                <textarea class="form-control" rows="2" maxlength="600" id="uaRiskReason"></textarea>
+              </div>
+              <div class="mt-2">
+                <label class="form-label">Resolution note</label>
+                <textarea class="form-control" rows="2" maxlength="600" id="uaRiskResolution"></textarea>
+              </div>
+              <div class="small text-muted mt-2" id="uaRiskCaseMeta">No case data yet</div>
+              <div class="d-flex flex-wrap gap-2 mt-2">
+                <button class="btn btn-sm btn-outline-primary glass" type="button" id="uaRiskSaveBtn">Save case</button>
+                <button class="btn btn-sm btn-outline-warning glass" type="button" id="uaRiskConfirmBtn">Confirm</button>
+                <button class="btn btn-sm btn-outline-secondary glass" type="button" id="uaRiskReopenBtn">Reopen</button>
+                <button class="btn btn-sm btn-outline-danger glass" type="button" id="uaRiskCloseBtn">Close</button>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>Active sessions:</strong>
+                <button class="btn btn-sm btn-outline-secondary glass" type="button" id="uaSessionsRefreshBtn">Refresh</button>
+              </div>
+              <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" id="uaSessionsKeepCurrent" checked />
+                <label class="form-check-label" for="uaSessionsKeepCurrent">Keep current admin session</label>
+              </div>
+              <button class="btn btn-sm btn-outline-danger glass mt-2" type="button" id="uaSessionsRevokeBtn">Revoke all sessions</button>
+              <ul id="uaSessionsList" class="list-group list-group-flush mt-2"></ul>
+            </div>
+
+            <div class="mb-3">
+              <strong>Forensics graph:</strong>
+              <div class="small text-muted mt-1" id="uaForensicsGraphMeta">No graph yet</div>
+              <div class="mt-2" id="uaForensicsGraphNodes"></div>
+              <div class="mt-2" id="uaForensicsGraphEdges"></div>
+            </div>
+
             <form method="POST" action="/admin/users/roles" class="mb-3" id="uaRolesForm" <%= sectionAllowed('admin-role-access') ? '' : 'style="display:none"' %>>
               <input type="hidden" name="user_id" id="uaRolesUserId" />
+              <input type="hidden" name="stepup_code" id="uaRolesStepupCode" value="" />
               <label class="form-label">Assign roles</label>
               <select class="form-select mb-2" name="role_keys[]" id="uaRolesSelect" multiple size="6" required></select>
               <label class="form-label">Primary role</label>
@@ -4202,6 +4427,17 @@
       const dataQualityMetricSubjects = document.getElementById('dataQualityMetricSubjects');
       const dataQualityGeneratedAt = document.getElementById('dataQualityGeneratedAt');
       const dataQualityBody = document.getElementById('dataQualityBody');
+      const securityDashboardRefreshBtn = document.getElementById('securityDashboardRefresh');
+      const securityDashboardStatusBadge = document.getElementById('securityDashboardStatusBadge');
+      const securityDashboardGeneratedAt = document.getElementById('securityDashboardGeneratedAt');
+      const securityMetricOpenCases = document.getElementById('securityMetricOpenCases');
+      const securityMetricHighRisk = document.getElementById('securityMetricHighRisk');
+      const securityMetricWatch = document.getElementById('securityMetricWatch');
+      const securityMetricOverdue72h = document.getElementById('securityMetricOverdue72h');
+      const securityRiskyBody = document.getElementById('securityRiskyBody');
+      const securityAlertsBody = document.getElementById('securityAlertsBody');
+      const securityIpsBody = document.getElementById('securityIpsBody');
+      const securityDevicesBody = document.getElementById('securityDevicesBody');
       const visitChartCanvas = document.getElementById('visitAnalyticsChart');
       const visitChartCtor =
         typeof window !== 'undefined' && window.Chart ? window.Chart : null;
@@ -4209,6 +4445,7 @@
       let visitAnalyticsLoading = false;
       let systemHealthLoading = false;
       let dataQualityLoading = false;
+      let securityDashboardLoading = false;
 
       const formatVisitNumber = (value) => {
         const n = Number(value || 0);
@@ -4664,6 +4901,172 @@
         }
       };
 
+      const setSecurityDashboardLoading = (loading) => {
+        securityDashboardLoading = !!loading;
+        if (securityDashboardRefreshBtn) {
+          securityDashboardRefreshBtn.disabled = securityDashboardLoading;
+          securityDashboardRefreshBtn.textContent = securityDashboardLoading ? 'Оновлення…' : 'Оновити security';
+        }
+      };
+
+      const getSecurityRiskBadgeClass = (value) => {
+        const key = String(value || '').trim().toLowerCase();
+        if (key === 'high-risk') return 'text-bg-danger';
+        if (key === 'watch') return 'text-bg-warning';
+        return 'text-bg-secondary';
+      };
+
+      const getSecurityStatusBadgeClass = (value) => {
+        const key = String(value || '').trim().toLowerCase();
+        if (key === 'confirmed') return 'text-bg-warning';
+        if (key === 'closed') return 'text-bg-success';
+        return 'text-bg-secondary';
+      };
+
+      const formatSecurityRiskLabel = (value) => {
+        const key = String(value || '').trim().toLowerCase();
+        if (key === 'high-risk') return 'High-risk';
+        if (key === 'watch') return 'Watch';
+        return 'Normal';
+      };
+
+      const renderSecurityDashboard = (payload) => {
+        const data = payload && typeof payload === 'object' ? payload : null;
+        if (!data) {
+          if (securityDashboardStatusBadge) {
+            securityDashboardStatusBadge.className = 'badge text-bg-secondary';
+            securityDashboardStatusBadge.textContent = 'Unavailable';
+          }
+          if (securityMetricOpenCases) securityMetricOpenCases.textContent = '—';
+          if (securityMetricHighRisk) securityMetricHighRisk.textContent = '—';
+          if (securityMetricWatch) securityMetricWatch.textContent = '—';
+          if (securityMetricOverdue72h) securityMetricOverdue72h.textContent = '—';
+          if (securityDashboardGeneratedAt) securityDashboardGeneratedAt.textContent = 'Оновлено: —';
+          if (securityRiskyBody) securityRiskyBody.innerHTML = '<tr><td colspan="4" class="text-muted">Не вдалось завантажити кейси.</td></tr>';
+          if (securityAlertsBody) securityAlertsBody.innerHTML = '<tr><td colspan="4" class="text-muted">Не вдалось завантажити алерти.</td></tr>';
+          if (securityIpsBody) securityIpsBody.innerHTML = '<tr><td colspan="3" class="text-muted">Не вдалось завантажити IP.</td></tr>';
+          if (securityDevicesBody) securityDevicesBody.innerHTML = '<tr><td colspan="3" class="text-muted">Не вдалось завантажити devices.</td></tr>';
+          return;
+        }
+
+        const summary = data.summary || {};
+        const highRiskTotal = Number(summary.high_risk_total || 0);
+        const openCases = Number(summary.open_cases || 0);
+        const overdue72h = Number(summary.overdue_72h || 0);
+
+        if (securityDashboardStatusBadge) {
+          const badgeClass = highRiskTotal > 0
+            ? 'text-bg-danger'
+            : (openCases > 0 ? 'text-bg-warning' : 'text-bg-success');
+          const badgeLabel = highRiskTotal > 0
+            ? 'High-risk present'
+            : (openCases > 0 ? 'Open cases' : 'Stable');
+          securityDashboardStatusBadge.className = `badge ${badgeClass}`;
+          securityDashboardStatusBadge.textContent = badgeLabel;
+        }
+        if (securityMetricOpenCases) securityMetricOpenCases.textContent = formatVisitNumber(openCases);
+        if (securityMetricHighRisk) securityMetricHighRisk.textContent = formatVisitNumber(highRiskTotal);
+        if (securityMetricWatch) securityMetricWatch.textContent = formatVisitNumber(summary.watch_total);
+        if (securityMetricOverdue72h) securityMetricOverdue72h.textContent = formatVisitNumber(overdue72h);
+
+        if (securityDashboardGeneratedAt) {
+          const generatedAt = data.generated_at ? new Date(data.generated_at) : null;
+          securityDashboardGeneratedAt.textContent = generatedAt && !Number.isNaN(generatedAt.getTime())
+            ? `Оновлено: ${generatedAt.toLocaleString('uk-UA')}`
+            : 'Оновлено: —';
+        }
+
+        if (securityRiskyBody) {
+          const rows = Array.isArray(data.risky_accounts) ? data.risky_accounts.slice(0, 10) : [];
+          if (!rows.length) {
+            securityRiskyBody.innerHTML = '<tr><td colspan="4" class="text-muted">Ризикових кейсів за курсом немає.</td></tr>';
+          } else {
+            securityRiskyBody.innerHTML = rows.map((row) => `
+              <tr>
+                <td>${escapeHtml(row.full_name || '-')}</td>
+                <td><span class="badge ${getSecurityRiskBadgeClass(row.risk_level)}">${escapeHtml(formatSecurityRiskLabel(row.risk_level))}</span></td>
+                <td><span class="badge ${getSecurityStatusBadgeClass(row.status)}">${escapeHtml(String(row.status || 'open'))}</span></td>
+                <td>${formatVisitNumber(row.risk_score)}</td>
+              </tr>
+            `).join('');
+          }
+        }
+
+        if (securityAlertsBody) {
+          const rows = Array.isArray(data.open_alerts) ? data.open_alerts.slice(0, 10) : [];
+          if (!rows.length) {
+            securityAlertsBody.innerHTML = '<tr><td colspan="4" class="text-muted">Активних алертів немає.</td></tr>';
+          } else {
+            securityAlertsBody.innerHTML = rows.map((row) => {
+              const at = row.created_at ? new Date(row.created_at) : null;
+              const atText = at && !Number.isNaN(at.getTime()) ? at.toLocaleString('uk-UA') : '—';
+              return `
+                <tr>
+                  <td><span class="badge ${incidentSeverityClass(row.severity)}">${escapeHtml(String(row.severity || '').toUpperCase())}</span></td>
+                  <td>${escapeHtml(row.title || row.alert_key || 'Alert')}</td>
+                  <td>${escapeHtml(row.user_name || '—')}</td>
+                  <td>${escapeHtml(atText)}</td>
+                </tr>
+              `;
+            }).join('');
+          }
+        }
+
+        if (securityIpsBody) {
+          const rows = Array.isArray(data.top_ips) ? data.top_ips.slice(0, 10) : [];
+          if (!rows.length) {
+            securityIpsBody.innerHTML = '<tr><td colspan="3" class="text-muted">Підозрілих IP за період немає.</td></tr>';
+          } else {
+            securityIpsBody.innerHTML = rows.map((row) => `
+              <tr>
+                <td>${escapeHtml(row.ip || '—')}</td>
+                <td>${formatVisitNumber(row.users_count)}</td>
+                <td>${formatVisitNumber(row.events_count)}</td>
+              </tr>
+            `).join('');
+          }
+        }
+
+        if (securityDevicesBody) {
+          const rows = Array.isArray(data.top_devices) ? data.top_devices.slice(0, 10) : [];
+          if (!rows.length) {
+            securityDevicesBody.innerHTML = '<tr><td colspan="3" class="text-muted">Підозрілих девайсів за період немає.</td></tr>';
+          } else {
+            securityDevicesBody.innerHTML = rows.map((row) => `
+              <tr>
+                <td>${escapeHtml(row.sample_label || row.device_key || 'device')}</td>
+                <td>${formatVisitNumber(row.users_count)}</td>
+                <td>${formatVisitNumber(row.events_count)}</td>
+              </tr>
+            `).join('');
+          }
+        }
+      };
+
+      const loadSecurityDashboard = async () => {
+        if (!visitAnalyticsPanel || securityDashboardLoading) return;
+        setSecurityDashboardLoading(true);
+        try {
+          const res = await fetch('/admin/security-dashboard.json', {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+          });
+          if (!res.ok) {
+            throw new Error(`Security dashboard ${res.status}`);
+          }
+          const data = await res.json();
+          if (!data || !data.ok) {
+            throw new Error('Security dashboard payload invalid');
+          }
+          renderSecurityDashboard(data);
+        } catch (err) {
+          renderSecurityDashboard(null);
+          showToast('error', 'Не вдалось завантажити security dashboard.');
+        } finally {
+          setSecurityDashboardLoading(false);
+        }
+      };
+
       const renderVisitChart = (dailyRows) => {
         if (!visitChartCanvas || !visitChartCtor) return;
         const labels = (dailyRows || []).map((row) => row.day || '');
@@ -4787,6 +5190,7 @@
         loadVisitAnalytics();
         loadSystemHealth();
         loadDataQuality();
+        loadSecurityDashboard();
       };
 
       if (visitAnalyticsPanel) {
@@ -4795,6 +5199,7 @@
             loadVisitAnalytics();
             loadSystemHealth();
             loadDataQuality();
+            loadSecurityDashboard();
           });
         }
         if (visitDaysSelect) {
@@ -4809,11 +5214,15 @@
         if (dataQualityRefreshBtn) {
           dataQualityRefreshBtn.addEventListener('click', loadDataQuality);
         }
+        if (securityDashboardRefreshBtn) {
+          securityDashboardRefreshBtn.addEventListener('click', loadSecurityDashboard);
+        }
         window.addEventListener('admin:visit-analytics-opened', refreshVisitAnalyticsOnOpen);
         if (isVisitAnalyticsVisible()) {
           loadVisitAnalytics();
           loadSystemHealth();
           loadDataQuality();
+          loadSecurityDashboard();
         }
       }
 
@@ -4828,7 +5237,22 @@
         const level = trigger.dataset.confirmLevel || 'danger';
         const typed = trigger.dataset.confirmTyped || '';
         const ok = await openConfirmModal({ message, level, typed });
-        if (ok) form.submit();
+        if (!ok) return;
+        if (typed) {
+          let confirmPhraseInput = form.querySelector('input[name="confirm_phrase"]');
+          if (!confirmPhraseInput) {
+            confirmPhraseInput = document.createElement('input');
+            confirmPhraseInput.type = 'hidden';
+            confirmPhraseInput.name = 'confirm_phrase';
+            form.appendChild(confirmPhraseInput);
+          }
+          confirmPhraseInput.value = typed;
+          const stepupInput = form.querySelector('input[name="stepup_code"]');
+          if (stepupInput && !String(stepupInput.value || '').trim()) {
+            stepupInput.value = typed;
+          }
+        }
+        form.submit();
       });
 
       const importScopeData = {
@@ -5242,17 +5666,13 @@
           return valid;
         };
         const readJsonSafe = async (response) => {
-          const contentType = String(response.headers.get('content-type') || '').toLowerCase();
-          if (contentType.includes('application/json')) {
-            return response.json();
-          }
           const rawText = await response.text();
           if (!rawText) return {};
           try {
             return JSON.parse(rawText);
-          } catch (_) {
+          } catch (parseErr) {
             const firstLine = rawText.split('\n')[0] || rawText;
-            return { error: String(firstLine).trim() || 'Save failed' };
+            return { error: String(firstLine).trim() || String(parseErr && parseErr.message ? parseErr.message : 'Save failed') };
           }
         };
 
@@ -5706,6 +6126,15 @@
             const rolesLabel = mapRoleKeysToLabels(roleKeys);
             const hasAdminRole = roleKeys.includes('admin');
             const badgeClass = getPrimaryRoleClass(primaryRole);
+            const securityRiskLevel = String(u.security_risk_level || 'normal');
+            const securityRiskStatus = String(u.security_case_status || 'open');
+            const securityRiskScore = Number(u.security_risk_score || 0);
+            const riskBadgeClass = securityRiskLevel === 'high-risk'
+              ? 'danger'
+              : (securityRiskLevel === 'watch' ? 'warning' : 'secondary');
+            const riskBadgeLabel = securityRiskLevel === 'high-risk'
+              ? 'High-risk'
+              : (securityRiskLevel === 'watch' ? 'Watch' : 'Normal');
             const checkbox = !hasAdminRole
               ? `<input type="checkbox" name="delete_user_ids" value="${u.id}" form="deleteUsersForm" />`
               : '';
@@ -5744,10 +6173,20 @@
                   data-user-active="${isActive}"
                   data-user-ip="${u.last_login_ip || ''}"
                   data-user-agent="${(u.last_user_agent || '').replace(/\"/g, '&quot;')}"
-                  data-user-login="${u.last_login_at || ''}">
+                  data-user-login="${u.last_login_at || ''}"
+                  data-security-risk-level="${securityRiskLevel}"
+                  data-security-risk-status="${securityRiskStatus}"
+                  data-security-risk-score="${securityRiskScore}"
+                  data-security-case-updated="${u.security_case_updated_at || ''}">
                 <td>${checkbox}</td>
                 <td>${u.full_name}</td>
-                <td><span class="badge text-bg-${badgeClass}">${escapeHtml(rolesLabel)}</span></td>
+                <td>
+                  <span class="badge text-bg-${badgeClass}">${escapeHtml(rolesLabel)}</span>
+                  <div class="mt-1">
+                    <span class="badge text-bg-${riskBadgeClass}">${escapeHtml(riskBadgeLabel)} · ${securityRiskScore}</span>
+                    <span class="badge text-bg-light text-dark">${escapeHtml(securityRiskStatus)}</span>
+                  </div>
+                </td>
                 <td>${subjectsBtn}</td>
                 <td>
                   <form method="POST" action="/admin/student-groups/set" class="row g-2">
@@ -5848,6 +6287,14 @@
             if (msg.type === 'history_updated') {
               refreshHistory();
             }
+            if (msg.type === 'security_alert') {
+              const payload = msg && msg.payload ? msg.payload : {};
+              const alertTitle = payload && payload.title ? String(payload.title) : 'Security alert';
+              if (visitAnalyticsPanel && isVisitAnalyticsVisible()) {
+                loadSecurityDashboard();
+              }
+              showToast('error', alertTitle);
+            }
           } catch (e) {
             return;
           }
@@ -5909,7 +6356,7 @@
       }
 
       function getForensicsRiskClass(level) {
-        if (level === 'high') return 'text-bg-danger';
+        if (level === 'high' || level === 'high-risk') return 'text-bg-danger';
         if (level === 'watch') return 'text-bg-warning';
         if (level === 'low') return 'text-bg-info';
         if (level === 'suppressed') return 'text-bg-success';
@@ -5921,6 +6368,175 @@
         if (source === 'inferred_site_visits') return 'Inferred from register visits';
         if (source === 'login_only') return 'Login history only';
         return 'Unknown source';
+      }
+
+      const uaRiskUserIdInput = document.getElementById('uaRiskUserId');
+      const uaRiskLevelInput = document.getElementById('uaRiskLevel');
+      const uaRiskStatusInput = document.getElementById('uaRiskStatus');
+      const uaRiskScoreInput = document.getElementById('uaRiskScore');
+      const uaRiskReasonInput = document.getElementById('uaRiskReason');
+      const uaRiskResolutionInput = document.getElementById('uaRiskResolution');
+      const uaRiskCaseMeta = document.getElementById('uaRiskCaseMeta');
+      const uaRiskRefreshBtn = document.getElementById('uaRiskRefreshBtn');
+      const uaRiskSaveBtn = document.getElementById('uaRiskSaveBtn');
+      const uaRiskConfirmBtn = document.getElementById('uaRiskConfirmBtn');
+      const uaRiskCloseBtn = document.getElementById('uaRiskCloseBtn');
+      const uaRiskReopenBtn = document.getElementById('uaRiskReopenBtn');
+      const uaSessionsList = document.getElementById('uaSessionsList');
+      const uaSessionsRefreshBtn = document.getElementById('uaSessionsRefreshBtn');
+      const uaSessionsRevokeBtn = document.getElementById('uaSessionsRevokeBtn');
+      const uaSessionsKeepCurrent = document.getElementById('uaSessionsKeepCurrent');
+      const uaForensicsGraphMeta = document.getElementById('uaForensicsGraphMeta');
+      const uaForensicsGraphNodes = document.getElementById('uaForensicsGraphNodes');
+      const uaForensicsGraphEdges = document.getElementById('uaForensicsGraphEdges');
+
+      const setRiskCaseMeta = (caseRow) => {
+        if (!uaRiskCaseMeta) return;
+        if (!caseRow) {
+          uaRiskCaseMeta.textContent = 'No case data yet';
+          return;
+        }
+        const status = String(caseRow.status || 'open');
+        const updatedAt = caseRow.updated_at ? new Date(caseRow.updated_at) : null;
+        const updatedText = updatedAt && !Number.isNaN(updatedAt.getTime())
+          ? updatedAt.toLocaleString('uk-UA')
+          : '—';
+        const confirmedBy = caseRow.confirmed_by_name ? String(caseRow.confirmed_by_name) : '';
+        const closedBy = caseRow.closed_by_name ? String(caseRow.closed_by_name) : '';
+        const tail = [];
+        if (confirmedBy) tail.push(`confirmed: ${confirmedBy}`);
+        if (closedBy) tail.push(`closed: ${closedBy}`);
+        if (caseRow.auto_quarantined) tail.push('auto-quarantined');
+        uaRiskCaseMeta.textContent = `Status: ${status} · updated: ${updatedText}${tail.length ? ` · ${tail.join(' · ')}` : ''}`;
+      };
+
+      const applyRiskCaseInputs = (caseRow, fallbackRisk = null) => {
+        const risk = fallbackRisk && typeof fallbackRisk === 'object' ? fallbackRisk : {};
+        if (uaRiskLevelInput) {
+          uaRiskLevelInput.value = String(caseRow && caseRow.risk_level ? caseRow.risk_level : (risk.level || 'normal'));
+        }
+        if (uaRiskStatusInput) {
+          uaRiskStatusInput.value = String(caseRow && caseRow.status ? caseRow.status : 'open');
+        }
+        if (uaRiskScoreInput) {
+          const score = Number(caseRow && caseRow.risk_score ? caseRow.risk_score : (risk.score || 0));
+          uaRiskScoreInput.value = Number.isFinite(score) ? String(Math.max(0, Math.round(score))) : '0';
+        }
+        if (uaRiskReasonInput) {
+          uaRiskReasonInput.value = String(caseRow && caseRow.reason ? caseRow.reason : '');
+        }
+        if (uaRiskResolutionInput) {
+          uaRiskResolutionInput.value = String(caseRow && caseRow.resolution_note ? caseRow.resolution_note : '');
+        }
+        setRiskCaseMeta(caseRow);
+      };
+
+      const renderForensicsGraph = (graph) => {
+        if (!uaForensicsGraphMeta || !uaForensicsGraphNodes || !uaForensicsGraphEdges) return;
+        const nodes = Array.isArray(graph && graph.nodes) ? graph.nodes : [];
+        const edges = Array.isArray(graph && graph.edges) ? graph.edges : [];
+        uaForensicsGraphMeta.textContent = `Nodes: ${nodes.length} · Links: ${edges.length}`;
+        if (!nodes.length) {
+          uaForensicsGraphNodes.innerHTML = '<div class="small text-muted">No graph nodes</div>';
+          uaForensicsGraphEdges.innerHTML = '<div class="small text-muted">No graph links</div>';
+          return;
+        }
+        uaForensicsGraphNodes.innerHTML = `
+          <div class="d-flex flex-wrap gap-1">
+            ${nodes.slice(0, 20).map((node) => {
+              const type = String(node.type || '').toLowerCase();
+              const badgeClass = type === 'user'
+                ? 'text-bg-primary'
+                : (type === 'ip'
+                  ? 'text-bg-danger'
+                  : (type === 'session' ? 'text-bg-warning' : 'text-bg-info'));
+              return `<span class="badge ${badgeClass}">${escapeHtml(node.label || node.id || 'node')}</span>`;
+            }).join('')}
+          </div>
+        `;
+        uaForensicsGraphEdges.innerHTML = edges.length
+          ? `<div class="small">${edges.slice(0, 16).map((edge) => {
+            const left = String(edge.from || '').replace(/^.*:/, '');
+            const right = String(edge.to || '').replace(/^.*:/, '');
+            return `${escapeHtml(left)} → ${escapeHtml(right)}`;
+          }).join(' · ')}</div>`
+          : '<div class="small text-muted">No graph links</div>';
+      };
+
+      async function loadUserSessions(userId) {
+        if (!uaSessionsList) return;
+        uaSessionsList.innerHTML = '<li class="list-group-item text-muted">Loading…</li>';
+        try {
+          const res = await fetch(`/admin/users/${encodeURIComponent(userId)}/sessions.json`, {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            throw new Error(data && data.error ? data.error : 'sessions_load_failed');
+          }
+          const rows = Array.isArray(data.sessions) ? data.sessions : [];
+          if (!rows.length) {
+            uaSessionsList.innerHTML = '<li class="list-group-item text-muted">No active sessions</li>';
+            return;
+          }
+          uaSessionsList.innerHTML = rows.map((row) => {
+            const lastSeen = row.last_seen_at ? new Date(row.last_seen_at) : null;
+            const lastSeenText = lastSeen && !Number.isNaN(lastSeen.getTime())
+              ? lastSeen.toLocaleString('uk-UA')
+              : '—';
+            const route = row.last_seen_route ? String(row.last_seen_route) : '/';
+            const ip = row.ip ? String(row.ip) : '—';
+            const marker = row.is_current ? '<span class="badge text-bg-success ms-1">current</span>' : '';
+            return `
+              <li class="list-group-item">
+                <div class="fw-semibold">${escapeHtml(route)}${marker}</div>
+                <div class="small text-muted">${escapeHtml(lastSeenText)} · ${escapeHtml(ip)}</div>
+              </li>
+            `;
+          }).join('');
+        } catch (err) {
+          uaSessionsList.innerHTML = '<li class="list-group-item text-muted">Failed to load sessions</li>';
+        }
+      }
+
+      async function updateUserRiskCase(action = 'save') {
+        const userId = Number(uaRiskUserIdInput && uaRiskUserIdInput.value ? uaRiskUserIdInput.value : 0);
+        if (!Number.isFinite(userId) || userId < 1) return;
+        const body = new URLSearchParams();
+        body.set('action', action);
+        body.set('risk_level', uaRiskLevelInput ? uaRiskLevelInput.value : 'normal');
+        body.set('status', uaRiskStatusInput ? uaRiskStatusInput.value : 'open');
+        body.set('risk_score', uaRiskScoreInput ? uaRiskScoreInput.value : '0');
+        body.set('reason', uaRiskReasonInput ? uaRiskReasonInput.value : '');
+        body.set('resolution_note', uaRiskResolutionInput ? uaRiskResolutionInput.value : '');
+        try {
+          const res = await fetch(`/admin/users/${encodeURIComponent(userId)}/risk-case`, {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            },
+            body: body.toString(),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            throw new Error(data && data.error ? data.error : 'risk_case_update_failed');
+          }
+          applyRiskCaseInputs(data.case || null, {
+            level: data.level,
+            score: data.score,
+          });
+          if (action !== 'refresh') {
+            showToast('success', 'Risk case updated.');
+          }
+          refreshUsers();
+          if (visitAnalyticsPanel && isVisitAnalyticsVisible()) {
+            loadSecurityDashboard();
+          }
+        } catch (err) {
+          showToast('error', err.message || 'Failed to update risk case');
+        }
       }
 
       async function loadUserForensics(userId) {
@@ -5962,6 +6578,8 @@
             </div>
             ${riskReasons.length ? `<div class="small text-muted mt-1">${riskReasons.map((v) => escapeHtml(v)).join(' · ')}</div>` : ''}
           `;
+          applyRiskCaseInputs(data.security_case || null, risk);
+          renderForensicsGraph(data.graph || null);
 
           const registerEvent = evidence.register_event || null;
           const inferredEvents = Array.isArray(evidence.inferred_register_events) ? evidence.inferred_register_events : [];
@@ -6003,41 +6621,43 @@
 
           if (!Array.isArray(data.matches) || !data.matches.length) {
             matchesList.innerHTML = '<li class="list-group-item text-muted">No matches yet</li>';
-            return;
-          }
-
-          matchesList.innerHTML = data.matches
-            .map((match) => {
-              const roleLabel = getRoleLabel(normalizeRoleKeyClient(match.role || 'student'));
-              const confidenceClass = getForensicsConfidenceClass(match.confidence);
-              const ipHits = Array.isArray(match.ip_hits) && match.ip_hits.length
-                ? `IP: ${match.ip_hits.map((v) => escapeHtml(v)).join(', ')}`
-                : '';
-              const sessionHits = Array.isArray(match.session_hits) && match.session_hits.length
-                ? `Session: ${match.session_hits.map((v) => escapeHtml(v)).join(', ')}`
-                : '';
-              const reasons = Array.isArray(match.reasons) ? match.reasons.slice(0, 4) : [];
-              const details = [ipHits, sessionHits].filter(Boolean).join(' · ');
-              return `
-                <li class="list-group-item">
-                  <div class="d-flex justify-content-between align-items-start gap-2">
-                    <div>
-                      <div class="fw-semibold">${escapeHtml(match.full_name || '')}</div>
-                      <div class="small text-muted">${escapeHtml(roleLabel)}</div>
+          } else {
+            matchesList.innerHTML = data.matches
+              .map((match) => {
+                const roleLabel = getRoleLabel(normalizeRoleKeyClient(match.role || 'student'));
+                const confidenceClass = getForensicsConfidenceClass(match.confidence);
+                const ipHits = Array.isArray(match.ip_hits) && match.ip_hits.length
+                  ? `IP: ${match.ip_hits.map((v) => escapeHtml(v)).join(', ')}`
+                  : '';
+                const sessionHits = Array.isArray(match.session_hits) && match.session_hits.length
+                  ? `Session: ${match.session_hits.map((v) => escapeHtml(v)).join(', ')}`
+                  : '';
+                const reasons = Array.isArray(match.reasons) ? match.reasons.slice(0, 4) : [];
+                const details = [ipHits, sessionHits].filter(Boolean).join(' · ');
+                return `
+                  <li class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                      <div>
+                        <div class="fw-semibold">${escapeHtml(match.full_name || '')}</div>
+                        <div class="small text-muted">${escapeHtml(roleLabel)}</div>
+                      </div>
+                      <span class="badge ${confidenceClass}">${escapeHtml(match.confidence_label || '')} · ${Number(match.score || 0)}</span>
                     </div>
-                    <span class="badge ${confidenceClass}">${escapeHtml(match.confidence_label || '')} · ${Number(match.score || 0)}</span>
-                  </div>
-                  ${details ? `<div class="small text-muted mt-1">${details}</div>` : ''}
-                  ${reasons.length ? `<div class="small mt-1">${reasons.map((v) => escapeHtml(v)).join(' · ')}</div>` : ''}
-                </li>
-              `;
-            })
-            .join('');
+                    ${details ? `<div class="small text-muted mt-1">${details}</div>` : ''}
+                    ${reasons.length ? `<div class="small mt-1">${reasons.map((v) => escapeHtml(v)).join(' · ')}</div>` : ''}
+                  </li>
+                `;
+              })
+              .join('');
+          }
+          loadUserSessions(userId);
         } catch (err) {
           meta.textContent = 'Failed to load forensics';
           riskEl.innerHTML = '';
           guess.innerHTML = '';
           matchesList.innerHTML = '<li class="list-group-item text-muted">Failed to load</li>';
+          setRiskCaseMeta(null);
+          renderForensicsGraph(null);
         }
       }
 
@@ -6057,6 +6677,9 @@
             const userIp = row.dataset.userIp || '-';
             const userAgent = row.dataset.userAgent || '-';
             const userLogin = row.dataset.userLogin || '-';
+            const userRiskLevel = row.dataset.securityRiskLevel || 'normal';
+            const userRiskStatus = row.dataset.securityRiskStatus || 'open';
+            const userRiskScore = Number(row.dataset.securityRiskScore || 0);
 
             document.getElementById('uaName').textContent = userName;
             document.getElementById('uaRole').textContent = getRoleLabel(userRole);
@@ -6071,6 +6694,9 @@
             document.getElementById('uaPassUserId').value = userId;
             document.getElementById('uaDeleteUserId').value = userId;
             document.getElementById('uaCourseUserId').value = userId;
+            if (uaRiskUserIdInput) uaRiskUserIdInput.value = String(userId);
+            applyRiskCaseInputs(null, { level: userRiskLevel, score: userRiskScore });
+            if (uaRiskStatusInput) uaRiskStatusInput.value = String(userRiskStatus || 'open');
             populateRoleEditor(roleCatalogBootstrap, userRoleKeys, userRole);
             hydrateUserRoleEditor(userId, userRoleKeys, userRole);
             if (document.getElementById('uaCourseSelect')) {
@@ -6084,8 +6710,55 @@
             if (forensicsRefreshBtn) {
               forensicsRefreshBtn.onclick = () => loadUserForensics(userId);
             }
+            if (uaRiskRefreshBtn) {
+              uaRiskRefreshBtn.onclick = () => updateUserRiskCase('refresh');
+            }
+            if (uaRiskSaveBtn) {
+              uaRiskSaveBtn.onclick = () => updateUserRiskCase('save');
+            }
+            if (uaRiskConfirmBtn) {
+              uaRiskConfirmBtn.onclick = () => updateUserRiskCase('confirm');
+            }
+            if (uaRiskCloseBtn) {
+              uaRiskCloseBtn.onclick = () => updateUserRiskCase('close');
+            }
+            if (uaRiskReopenBtn) {
+              uaRiskReopenBtn.onclick = () => updateUserRiskCase('reopen');
+            }
+            if (uaSessionsRefreshBtn) {
+              uaSessionsRefreshBtn.onclick = () => loadUserSessions(userId);
+            }
+            if (uaSessionsRevokeBtn) {
+              uaSessionsRevokeBtn.onclick = async () => {
+                const ok = await openConfirmModal({
+                  message: 'Revoke all active sessions for this account?',
+                  level: 'danger',
+                  typed: 'REVOKE',
+                });
+                if (!ok) return;
+                const body = new URLSearchParams();
+                body.set('keep_current', uaSessionsKeepCurrent && uaSessionsKeepCurrent.checked ? '1' : '0');
+                const response = await fetch(`/admin/users/${encodeURIComponent(userId)}/sessions/revoke-all`, {
+                  method: 'POST',
+                  headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                  },
+                  body: body.toString(),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.ok) {
+                  showToast('error', payload.error || 'Failed to revoke sessions');
+                  return;
+                }
+                showToast('success', `Revoked sessions: ${Number(payload.revoked_count || 0)}`);
+                loadUserSessions(userId);
+                if (visitAnalyticsPanel && isVisitAnalyticsVisible()) {
+                  loadSecurityDashboard();
+                }
+              };
+            }
             loadUserForensics(userId);
-
             const deleteBtn = document.getElementById('uaDeleteBtn');
             deleteBtn.onclick = async () => {
               const ok = await openConfirmModal({ message: 'Deactivate this user?', level: 'warning' });
@@ -6205,10 +6878,32 @@
       });
 
       const uaRolesSelect = document.getElementById('uaRolesSelect');
+      const uaRolesForm = document.getElementById('uaRolesForm');
+      const uaRolesStepupCode = document.getElementById('uaRolesStepupCode');
       if (uaRolesSelect) {
         uaRolesSelect.addEventListener('change', () => {
           const primarySelect = document.getElementById('uaPrimaryRole');
           setPrimaryRoleOptions(getSelectedRoleKeys(), primarySelect ? primarySelect.value : '');
+        });
+      }
+      if (uaRolesForm) {
+        uaRolesForm.addEventListener('submit', async (event) => {
+          if (uaRolesForm.dataset.stepupConfirmed === '1') {
+            uaRolesForm.dataset.stepupConfirmed = '0';
+            return;
+          }
+          event.preventDefault();
+          const ok = await openConfirmModal({
+            message: 'Підтвердіть зміну ролей користувача.',
+            level: 'warning',
+            typed: 'ROLE',
+          });
+          if (!ok) return;
+          if (uaRolesStepupCode) {
+            uaRolesStepupCode.value = 'ROLE';
+          }
+          uaRolesForm.dataset.stepupConfirmed = '1';
+          uaRolesForm.submit();
         });
       }
 

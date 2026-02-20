@@ -1,6 +1,19 @@
 {
   "items": [
     {
+      "version": "0.9.53",
+      "date": "2026-02-20",
+      "items": [
+        "feat(security-admin): added full Security dashboard in Admin Visit Analytics (risk cases, open alerts, top suspicious IPs/devices, overdue SLA counters)",
+        "feat(users-forensics): user modal now includes editable risk-case controls (normal/watch/high-risk, status, reason, resolution), active-session listing/revoke-all, and account-link graph",
+        "feat(step-up): enforced interactive step-up in UI for critical role reassignment (`ROLE`) and journal bulk grading (`BULK`), plus typed confirm propagation for finalize actions",
+        "fix(system-settings): settings persistence now runs in a transaction with awaited writes, which fixes non-saved fields (including admin IP allowlist)",
+        "fix(system-settings-ui): added missing security settings fields (auto-quarantine, IP retention, device retention) to Admin System Settings form",
+        "fix(visit-analytics): recent visits now include course-scoped rows with `course_id IS NULL` fallback to prevent empty \"Останні візити\" block",
+        "fix(forensics-api): `/admin/users/:id/forensics.json` now returns recalculated `security_case` state and graph payload for immediate modal rendering"
+      ]
+    },
+    {
       "version": "0.9.52",
       "date": "2026-02-20",
       "items": [
