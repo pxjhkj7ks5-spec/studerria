@@ -965,6 +965,43 @@
                           required
                         />
                       </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Register alert threshold (accounts)</label>
+                        <input
+                          type="number"
+                          min="2"
+                          max="20"
+                          class="form-control"
+                          name="security_registration_alert_threshold"
+                          value="<%= (settings && settings.security_registration_alert_threshold) || 3 %>"
+                          data-settings-field
+                          required
+                        />
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Register alert window (minutes)</label>
+                        <input
+                          type="number"
+                          min="15"
+                          max="1440"
+                          class="form-control"
+                          name="security_registration_alert_window_minutes"
+                          value="<%= (settings && settings.security_registration_alert_window_minutes) || 120 %>"
+                          data-settings-field
+                          required
+                        />
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label">Admin IP allowlist (ignore in forensics/alerts)</label>
+                        <textarea
+                          class="form-control"
+                          name="security_admin_ip_allowlist"
+                          rows="3"
+                          placeholder="One IP or rule per line, e.g.&#10;127.0.0.1&#10;192.168.1.*&#10;10.0.0.0/24"
+                          data-settings-field
+                        ><%= (settings && settings.security_admin_ip_allowlist) || '' %></textarea>
+                        <div class="small text-muted mt-1">Підтримка: exact IP, wildcard with *, CIDR for IPv4.</div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3424,6 +3461,7 @@
                 <button class="btn btn-sm btn-outline-secondary glass" type="button" id="uaForensicsRefreshBtn">Refresh</button>
               </div>
               <div class="small text-muted mt-2" id="uaForensicsMeta">No data yet</div>
+              <div class="mt-2" id="uaForensicsRisk"></div>
               <div class="mt-2" id="uaForensicsGuess"></div>
               <ul id="uaForensicsMatches" class="list-group list-group-flush mt-2"></ul>
             </div>
@@ -5831,6 +5869,14 @@
         return 'text-bg-secondary';
       }
 
+      function getForensicsRiskClass(level) {
+        if (level === 'high') return 'text-bg-danger';
+        if (level === 'watch') return 'text-bg-warning';
+        if (level === 'low') return 'text-bg-info';
+        if (level === 'suppressed') return 'text-bg-success';
+        return 'text-bg-secondary';
+      }
+
       function getForensicsSourceLabel(source) {
         if (source === 'registration_event') return 'Registration event';
         if (source === 'inferred_site_visits') return 'Inferred from register visits';
@@ -5841,9 +5887,11 @@
       async function loadUserForensics(userId) {
         const matchesList = document.getElementById('uaForensicsMatches');
         const meta = document.getElementById('uaForensicsMeta');
+        const riskEl = document.getElementById('uaForensicsRisk');
         const guess = document.getElementById('uaForensicsGuess');
-        if (!matchesList || !meta || !guess) return;
+        if (!matchesList || !meta || !guess || !riskEl) return;
         meta.textContent = 'Loading forensics…';
+        riskEl.innerHTML = '';
         guess.innerHTML = '';
         matchesList.innerHTML = '<li class="list-group-item text-muted">Loading…</li>';
         try {
@@ -5855,9 +5903,26 @@
           const evidence = data.evidence || {};
           const sourceLabel = getForensicsSourceLabel(evidence.source);
           const ipCount = Array.isArray(evidence.ips) ? evidence.ips.length : 0;
+          const ignoredIpCount = Array.isArray(evidence.ignored_ips) ? evidence.ignored_ips.length : 0;
           const sessionCount = Array.isArray(evidence.session_ids) ? evidence.session_ids.length : 0;
           const agentCount = Array.isArray(evidence.user_agents) ? evidence.user_agents.length : 0;
-          meta.textContent = `${sourceLabel} · IP: ${ipCount} · Session: ${sessionCount} · Device: ${agentCount}`;
+          meta.textContent = `${sourceLabel} · IP: ${ipCount} · Ignored IP: ${ignoredIpCount} · Session: ${sessionCount} · Device: ${agentCount}`;
+
+          const risk = data.risk || {};
+          const riskBadgeClass = getForensicsRiskClass(String(risk.level || 'clear'));
+          const riskLabel = String(risk.label || 'Ознак ризику не виявлено');
+          const riskScore = Number(risk.score || 0);
+          const riskReasons = Array.isArray(risk.reasons) ? risk.reasons.slice(0, 3) : [];
+          const riskAlerts = Number(risk.recent_alerts_count || 0);
+          riskEl.innerHTML = `
+            <div class="small d-flex flex-wrap align-items-center gap-2">
+              <span>Risk:</span>
+              <span class="badge ${riskBadgeClass}">${escapeHtml(riskLabel)} · ${riskScore}</span>
+              ${riskAlerts > 0 ? `<span class="badge text-bg-danger">Alerts ${riskAlerts}</span>` : ''}
+              ${risk.allowlisted ? '<span class="badge text-bg-success">Allowlist active</span>' : ''}
+            </div>
+            ${riskReasons.length ? `<div class="small text-muted mt-1">${riskReasons.map((v) => escapeHtml(v)).join(' · ')}</div>` : ''}
+          `;
 
           const registerEvent = evidence.register_event || null;
           const inferredEvents = Array.isArray(evidence.inferred_register_events) ? evidence.inferred_register_events : [];
@@ -5931,6 +5996,7 @@
             .join('');
         } catch (err) {
           meta.textContent = 'Failed to load forensics';
+          riskEl.innerHTML = '';
           guess.innerHTML = '';
           matchesList.innerHTML = '<li class="list-group-item text-muted">Failed to load</li>';
         }

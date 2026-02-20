@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.9.47",
+      "date": "2026-02-20",
+      "items": [
+        "feat(security-settings): added admin IP allowlist and registration-anomaly controls (threshold/window) in System Settings with audit+rollback support",
+        "feat(forensics): account forensics now ignores allowlisted IPs, exposes ignored IPs separately, and returns risk status/reasons with recent security alert count",
+        "feat(security-alerts): registration flow now emits deduplicated security incidents for multi-account IP/session/fingerprint patterns (excluded for allowlisted admin IPs)",
+        "ux(admin-users): user modal now shows forensics risk badge, ignored-IP indicator, and alert counter for faster suspicious-account triage",
+        "feat(system-health): incident severity map now treats security events as high priority"
+      ]
+    },
+    {
       "version": "0.9.46",
       "date": "2026-02-20",
       "items": [

@@ -371,7 +371,10 @@ async function up(pool) {
       ('session_duration_days', '14'),
       ('max_file_size_mb', '20'),
       ('allow_homework_creation', 'true'),
-      ('min_team_members', '2')
+      ('min_team_members', '2'),
+      ('security_admin_ip_allowlist', ''),
+      ('security_registration_alert_threshold', '3'),
+      ('security_registration_alert_window_minutes', '120')
       ON CONFLICT (key) DO NOTHING
     `
   );

@@ -90,6 +90,7 @@ function getRuntimeErrorSummary(now = Date.now()) {
     scheduler: 0,
     unhandled: 0,
     session: 0,
+    security: 0,
     unknown: 0,
   };
   const topLabelMap = new Map();
@@ -122,7 +123,7 @@ function getRuntimeErrorSummary(now = Date.now()) {
 function resolveIncidentSeverity(kindRaw) {
   const kind = String(kindRaw || '').trim().toLowerCase();
   if (kind === 'unhandled') return 'critical';
-  if (kind === 'session' || kind === 'scheduler') return 'high';
+  if (kind === 'session' || kind === 'scheduler' || kind === 'security') return 'high';
   if (kind === 'db') return 'medium';
   return 'low';
 }
@@ -368,6 +369,12 @@ const COURSE_KIND_OPTIONS = [
 
 const SETTINGS_RETENTION_MIN_DAYS = 14;
 const SETTINGS_RETENTION_MAX_DAYS = 3650;
+const SECURITY_REGISTRATION_ALERT_THRESHOLD_MIN = 2;
+const SECURITY_REGISTRATION_ALERT_THRESHOLD_MAX = 20;
+const SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MIN = 15;
+const SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MAX = 1440;
+const SECURITY_ADMIN_IP_ALLOWLIST_LIMIT = 120;
+const SECURITY_ADMIN_IP_RULE_MAX_LENGTH = 64;
 
 function normalizeRetentionDays(rawValue, fallbackDays) {
   const parsed = Number(rawValue);
@@ -402,6 +409,9 @@ const DEFAULT_SETTINGS = {
   site_visit_retention_days: SITE_VISIT_RETENTION_DAYS_DEFAULT,
   login_history_retention_days: LOGIN_HISTORY_RETENTION_DAYS_DEFAULT,
   activity_log_retention_days: ACTIVITY_LOG_RETENTION_DAYS_DEFAULT,
+  security_admin_ip_allowlist: '',
+  security_registration_alert_threshold: 3,
+  security_registration_alert_window_minutes: 120,
   role_permissions: { ...DEFAULT_ROLE_PERMISSIONS },
 };
 let settingsCache = { ...DEFAULT_SETTINGS };
@@ -419,6 +429,9 @@ const SYSTEM_SETTINGS_AUDIT_KEYS = [
   'site_visit_retention_days',
   'login_history_retention_days',
   'activity_log_retention_days',
+  'security_admin_ip_allowlist',
+  'security_registration_alert_threshold',
+  'security_registration_alert_window_minutes',
 ];
 
 function resolveSessionTtlDays(rawDays) {
@@ -774,6 +787,18 @@ const refreshSettingsCache = async () => {
       parsed.login_history_retention_days = normalizeRetentionDays(row.value, DEFAULT_SETTINGS.login_history_retention_days);
     } else if (row.key === 'activity_log_retention_days') {
       parsed.activity_log_retention_days = normalizeRetentionDays(row.value, DEFAULT_SETTINGS.activity_log_retention_days);
+    } else if (row.key === 'security_admin_ip_allowlist') {
+      parsed.security_admin_ip_allowlist = normalizeSecurityAdminIpAllowlist(row.value);
+    } else if (row.key === 'security_registration_alert_threshold') {
+      parsed.security_registration_alert_threshold = normalizeSecurityRegistrationAlertThreshold(
+        row.value,
+        DEFAULT_SETTINGS.security_registration_alert_threshold
+      );
+    } else if (row.key === 'security_registration_alert_window_minutes') {
+      parsed.security_registration_alert_window_minutes = normalizeSecurityRegistrationAlertWindowMinutes(
+        row.value,
+        DEFAULT_SETTINGS.security_registration_alert_window_minutes
+      );
     } else if (row.key === 'role_permissions') {
       try {
         const raw = JSON.parse(row.value);
@@ -2877,6 +2902,104 @@ function normalizeForensicsToken(rawValue) {
   return value || null;
 }
 
+function normalizeSecurityRegistrationAlertThreshold(rawValue, fallback = DEFAULT_SETTINGS.security_registration_alert_threshold) {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return Number(fallback);
+  const rounded = Math.floor(parsed);
+  if (rounded < SECURITY_REGISTRATION_ALERT_THRESHOLD_MIN) return Number(fallback);
+  if (rounded > SECURITY_REGISTRATION_ALERT_THRESHOLD_MAX) return SECURITY_REGISTRATION_ALERT_THRESHOLD_MAX;
+  return rounded;
+}
+
+function normalizeSecurityRegistrationAlertWindowMinutes(rawValue, fallback = DEFAULT_SETTINGS.security_registration_alert_window_minutes) {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return Number(fallback);
+  const rounded = Math.floor(parsed);
+  if (rounded < SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MIN) return Number(fallback);
+  if (rounded > SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MAX) return SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MAX;
+  return rounded;
+}
+
+function parseSecurityAdminIpAllowlist(rawValue) {
+  const input = String(rawValue || '');
+  const seen = new Set();
+  const rules = [];
+  input
+    .split(/[\n,;]+/)
+    .map((chunk) => String(chunk || '').trim())
+    .filter(Boolean)
+    .forEach((chunk) => {
+      const cleaned = chunk.replace(/\s+/g, '').slice(0, SECURITY_ADMIN_IP_RULE_MAX_LENGTH);
+      if (!cleaned) return;
+      const normalized = normalizeForensicsIp(cleaned) || cleaned;
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      rules.push(normalized);
+    });
+  return rules.slice(0, SECURITY_ADMIN_IP_ALLOWLIST_LIMIT);
+}
+
+function normalizeSecurityAdminIpAllowlist(rawValue) {
+  return parseSecurityAdminIpAllowlist(rawValue).join('\n');
+}
+
+function parseIpv4ToInt(rawIp) {
+  const ip = String(rawIp || '').trim();
+  const parts = ip.split('.');
+  if (parts.length !== 4) return null;
+  let acc = 0;
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part)) return null;
+    const value = Number(part);
+    if (!Number.isInteger(value) || value < 0 || value > 255) return null;
+    acc = (acc << 8) + value;
+  }
+  return acc >>> 0;
+}
+
+function parseIpv4CidrRule(rawRule) {
+  const value = String(rawRule || '').trim();
+  const segments = value.split('/');
+  if (segments.length !== 2) return null;
+  const ipInt = parseIpv4ToInt(segments[0]);
+  if (ipInt === null) return null;
+  const prefix = Number(segments[1]);
+  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32) return null;
+  const mask = prefix === 0 ? 0 : ((0xffffffff << (32 - prefix)) >>> 0);
+  return {
+    network: ipInt & mask,
+    mask,
+  };
+}
+
+function isSecurityAdminIpAllowlisted(rawIp, rawAllowlist = settingsCache.security_admin_ip_allowlist) {
+  const ip = normalizeForensicsIp(rawIp);
+  if (!ip) return false;
+  const rules = Array.isArray(rawAllowlist)
+    ? rawAllowlist
+    : parseSecurityAdminIpAllowlist(rawAllowlist);
+  if (!rules.length) return false;
+  const normalizedIp = String(ip).toLowerCase();
+  const ipInt = parseIpv4ToInt(normalizedIp);
+  for (const rawRule of rules) {
+    const rule = String(rawRule || '').trim().toLowerCase();
+    if (!rule) continue;
+    if (rule === normalizedIp) return true;
+    if (rule.endsWith('*')) {
+      const prefix = rule.slice(0, -1);
+      if (prefix && normalizedIp.startsWith(prefix)) return true;
+      continue;
+    }
+    if (rule.includes('/')) {
+      const cidr = parseIpv4CidrRule(rule);
+      if (!cidr || ipInt === null) continue;
+      if ((ipInt & cidr.mask) === cidr.network) return true;
+    }
+  }
+  return false;
+}
+
 function buildForensicsDeviceFingerprint(rawValue) {
   const normalized = normalizeForensicsAgent(rawValue);
   if (!normalized) return null;
@@ -2898,10 +3021,220 @@ function resolveForensicsConfidence(scoreRaw) {
   return { key: 'weak', label: 'Слабка' };
 }
 
+function resolveForensicsRiskState(scoreRaw) {
+  const score = Number(scoreRaw || 0);
+  if (score >= 90) return { key: 'high', label: 'Високий ризик' };
+  if (score >= 50) return { key: 'watch', label: 'Під наглядом' };
+  if (score >= 20) return { key: 'low', label: 'Низький ризик' };
+  return { key: 'clear', label: 'Ознак ризику не виявлено' };
+}
+
 function toIsoStringSafe(rawValue) {
   const parsed = new Date(rawValue);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString();
+}
+
+const securityAlertDedupCache = new Map();
+const SECURITY_ALERT_DEDUP_TTL_MS = 20 * 60 * 1000;
+const SECURITY_ALERT_DEDUP_MAX_KEYS = 500;
+
+function shouldEmitSecurityAlert(signature, nowMs = Date.now()) {
+  const key = String(signature || '').trim();
+  if (!key) return false;
+  const prevTs = Number(securityAlertDedupCache.get(key) || 0);
+  if (prevTs && nowMs - prevTs < SECURITY_ALERT_DEDUP_TTL_MS) {
+    return false;
+  }
+  securityAlertDedupCache.set(key, nowMs);
+  if (securityAlertDedupCache.size > SECURITY_ALERT_DEDUP_MAX_KEYS) {
+    const cutoff = nowMs - (SECURITY_ALERT_DEDUP_TTL_MS * 2);
+    for (const [cacheKey, ts] of securityAlertDedupCache.entries()) {
+      if (Number(ts || 0) < cutoff) {
+        securityAlertDedupCache.delete(cacheKey);
+      }
+    }
+  }
+  return true;
+}
+
+function resolveRegistrationSecurityRiskLevel(scoreRaw) {
+  const score = Number(scoreRaw || 0);
+  if (score >= 95) return { key: 'high', label: 'High' };
+  if (score >= 55) return { key: 'medium', label: 'Medium' };
+  if (score >= 28) return { key: 'low', label: 'Low' };
+  return { key: 'none', label: 'None' };
+}
+
+async function evaluateRegistrationSecuritySignals({
+  userId,
+  ip,
+  sessionId,
+  deviceFingerprint,
+  source = 'register_form',
+  courseId = null,
+}) {
+  const normalizedSource = String(source || '').trim().toLowerCase() || 'register_form';
+  if (normalizedSource !== 'register_form') {
+    return {
+      risk: { score: 0, level: 'none', label: 'None', reasons: [] },
+      allowlisted: false,
+      skipped: true,
+    };
+  }
+  const normalizedIp = normalizeForensicsIp(ip);
+  const normalizedSession = normalizeForensicsToken(sessionId);
+  const normalizedFingerprint = normalizeForensicsToken(deviceFingerprint);
+  if (!normalizedIp && !normalizedSession && !normalizedFingerprint) {
+    return {
+      risk: { score: 0, level: 'none', label: 'None', reasons: [] },
+      allowlisted: false,
+      skipped: true,
+    };
+  }
+
+  const allowlist = parseSecurityAdminIpAllowlist(settingsCache.security_admin_ip_allowlist);
+  const isAllowlistedIp = isSecurityAdminIpAllowlisted(normalizedIp, allowlist);
+  if (isAllowlistedIp) {
+    return {
+      risk: {
+        score: 0,
+        level: 'none',
+        label: 'Suppressed',
+        reasons: [`IP ${normalizedIp} is in admin allowlist`],
+      },
+      allowlisted: true,
+      skipped: true,
+    };
+  }
+
+  const windowMinutes = normalizeSecurityRegistrationAlertWindowMinutes(
+    settingsCache.security_registration_alert_window_minutes,
+    DEFAULT_SETTINGS.security_registration_alert_window_minutes
+  );
+  const threshold = normalizeSecurityRegistrationAlertThreshold(
+    settingsCache.security_registration_alert_threshold,
+    DEFAULT_SETTINGS.security_registration_alert_threshold
+  );
+  const numericCourseId = Number.isFinite(Number(courseId)) ? Number(courseId) : null;
+
+  const loadDistinctUsersCount = async (column, value) => {
+    if (!value) {
+      return { users_count: 0, sample_user_ids: [] };
+    }
+    const params = [value, windowMinutes];
+    let sql = `
+      SELECT
+        COUNT(DISTINCT user_id)::int AS users_count,
+        ARRAY_AGG(DISTINCT user_id ORDER BY user_id DESC) FILTER (WHERE user_id IS NOT NULL) AS sample_user_ids
+      FROM user_registration_events
+      WHERE ${column} = ?
+        AND created_at >= NOW() - (?::int * INTERVAL '1 minute')
+    `;
+    if (Number.isFinite(numericCourseId)) {
+      sql += ' AND (course_id IS NULL OR course_id = ?) ';
+      params.push(numericCourseId);
+    }
+    const row = await db.get(sql, params);
+    const sampleIds = Array.isArray(row?.sample_user_ids)
+      ? row.sample_user_ids.map((id) => Number(id)).filter((id) => Number.isFinite(id))
+      : [];
+    return {
+      users_count: Number(row?.users_count || 0),
+      sample_user_ids: sampleIds.slice(0, 12),
+    };
+  };
+
+  const [ipSignal, sessionSignal, fingerprintSignal] = await Promise.all([
+    loadDistinctUsersCount('ip', normalizedIp),
+    loadDistinctUsersCount('session_id', normalizedSession),
+    loadDistinctUsersCount('device_fingerprint', normalizedFingerprint),
+  ]);
+
+  let score = 0;
+  const reasons = [];
+  if (normalizedIp && ipSignal.users_count >= threshold) {
+    score += 44 + Math.max(0, (ipSignal.users_count - threshold) * 6);
+    reasons.push(`IP reused by ${ipSignal.users_count} accounts in ${windowMinutes}m`);
+  }
+  if (normalizedSession && sessionSignal.users_count >= 2) {
+    score += 62 + Math.max(0, (sessionSignal.users_count - 2) * 8);
+    reasons.push(`Session reused by ${sessionSignal.users_count} accounts`);
+  }
+  if (normalizedFingerprint && fingerprintSignal.users_count >= threshold) {
+    score += 30 + Math.max(0, (fingerprintSignal.users_count - threshold) * 5);
+    reasons.push(`Fingerprint reused by ${fingerprintSignal.users_count} accounts`);
+  }
+  if (reasons.length >= 2) {
+    score += 12;
+  }
+  const risk = resolveRegistrationSecurityRiskLevel(score);
+  const shouldAlert = risk.key === 'high' || risk.key === 'medium';
+  if (!shouldAlert) {
+    return {
+      risk: {
+        score,
+        level: risk.key,
+        label: risk.label,
+        reasons: reasons.slice(0, 4),
+      },
+      allowlisted: false,
+      skipped: false,
+    };
+  }
+  const signature = [
+    'registration-pattern',
+    normalizedIp || '-',
+    normalizedSession || '-',
+    normalizedFingerprint || '-',
+    String(risk.key),
+  ].join('|');
+  if (!shouldEmitSecurityAlert(signature)) {
+    return {
+      risk: {
+        score,
+        level: risk.key,
+        label: risk.label,
+        reasons: reasons.slice(0, 4),
+      },
+      allowlisted: false,
+      skipped: false,
+      deduped: true,
+    };
+  }
+
+  const signalPayload = {
+    user_id: Number(userId) || null,
+    ip: normalizedIp || null,
+    session_id: normalizedSession || null,
+    device_fingerprint: normalizedFingerprint || null,
+    score,
+    threshold,
+    window_minutes: windowMinutes,
+    counts: {
+      ip_users: Number(ipSignal.users_count || 0),
+      session_users: Number(sessionSignal.users_count || 0),
+      fingerprint_users: Number(fingerprintSignal.users_count || 0),
+    },
+    sample_user_ids: Array.from(new Set([
+      ...(ipSignal.sample_user_ids || []),
+      ...(sessionSignal.sample_user_ids || []),
+      ...(fingerprintSignal.sample_user_ids || []),
+    ])).filter((id) => Number(id) !== Number(userId)).slice(0, 12),
+  };
+  const message = `Registration anomaly: ${reasons.slice(0, 3).join(' | ') || 'multi-account pattern'}`;
+  pushRuntimeErrorEvent('security', 'registration-anomaly', message, signalPayload);
+  return {
+    risk: {
+      score,
+      level: risk.key,
+      label: risk.label,
+      reasons: reasons.slice(0, 4),
+    },
+    allowlisted: false,
+    skipped: false,
+    alerted: true,
+  };
 }
 
 async function recordUserRegistrationEvent({ userId, fullName, ip, userAgent, sessionId, source = 'register_form', courseId = null }) {
@@ -2939,6 +3272,18 @@ async function recordUserRegistrationEvent({ userId, fullName, ip, userAgent, se
       Number.isFinite(Number(courseId)) ? Number(courseId) : null,
     ]
   );
+  try {
+    await evaluateRegistrationSecuritySignals({
+      userId: normalizedUserId,
+      ip: normalizedIp,
+      sessionId: normalizedSessionId,
+      deviceFingerprint: buildForensicsDeviceFingerprint(normalizedAgent),
+      source: normalizedSource,
+      courseId: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+    });
+  } catch (err) {
+    console.error('Database error (register.security_signals)', err);
+  }
 }
 
 function applyRememberMe(req, remember) {
@@ -3204,6 +3549,10 @@ function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[k
     if (['0', 'false', 'off', 'no'].includes(normalized)) return false;
     return Boolean(fallback);
   }
+  if (key === 'security_admin_ip_allowlist') {
+    const sourceValue = rawValue === undefined || rawValue === null ? (fallback || '') : rawValue;
+    return normalizeSecurityAdminIpAllowlist(sourceValue);
+  }
   const parsed = Number(rawValue);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return Number(fallback || 0);
@@ -3216,6 +3565,15 @@ function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[k
   }
   if (key === 'activity_log_retention_days') {
     return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.activity_log_retention_days);
+  }
+  if (key === 'security_registration_alert_threshold') {
+    return normalizeSecurityRegistrationAlertThreshold(parsed, DEFAULT_SETTINGS.security_registration_alert_threshold);
+  }
+  if (key === 'security_registration_alert_window_minutes') {
+    return normalizeSecurityRegistrationAlertWindowMinutes(
+      parsed,
+      DEFAULT_SETTINGS.security_registration_alert_window_minutes
+    );
   }
   return Math.round(parsed);
 }
@@ -18673,6 +19031,9 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   const siteVisitRetentionDays = Number(req.body.site_visit_retention_days);
   const loginHistoryRetentionDays = Number(req.body.login_history_retention_days);
   const activityLogRetentionDays = Number(req.body.activity_log_retention_days);
+  const securityAdminIpAllowlist = String(req.body.security_admin_ip_allowlist || '');
+  const securityRegistrationAlertThreshold = Number(req.body.security_registration_alert_threshold);
+  const securityRegistrationAlertWindowMinutes = Number(req.body.security_registration_alert_window_minutes);
   const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   if (
     Number.isNaN(sessionDays) || sessionDays <= 0 ||
@@ -18681,7 +19042,9 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     Number.isNaN(scheduleRefreshMinutes) || scheduleRefreshMinutes <= 0 ||
     Number.isNaN(siteVisitRetentionDays) ||
     Number.isNaN(loginHistoryRetentionDays) ||
-    Number.isNaN(activityLogRetentionDays)
+    Number.isNaN(activityLogRetentionDays) ||
+    Number.isNaN(securityRegistrationAlertThreshold) ||
+    Number.isNaN(securityRegistrationAlertWindowMinutes)
   ) {
     if (wantsJson) {
       return res.status(400).json({ error: 'Invalid settings' });
@@ -18695,7 +19058,11 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     loginHistoryRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
     loginHistoryRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
     activityLogRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
-    activityLogRetentionDays > SETTINGS_RETENTION_MAX_DAYS
+    activityLogRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
+    securityRegistrationAlertThreshold < SECURITY_REGISTRATION_ALERT_THRESHOLD_MIN ||
+    securityRegistrationAlertThreshold > SECURITY_REGISTRATION_ALERT_THRESHOLD_MAX ||
+    securityRegistrationAlertWindowMinutes < SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MIN ||
+    securityRegistrationAlertWindowMinutes > SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MAX
   ) {
     if (wantsJson) {
       return res.status(400).json({ error: 'Invalid settings' });
@@ -18716,6 +19083,15 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
       site_visit_retention_days: normalizeRetentionDays(siteVisitRetentionDays, DEFAULT_SETTINGS.site_visit_retention_days),
       login_history_retention_days: normalizeRetentionDays(loginHistoryRetentionDays, DEFAULT_SETTINGS.login_history_retention_days),
       activity_log_retention_days: normalizeRetentionDays(activityLogRetentionDays, DEFAULT_SETTINGS.activity_log_retention_days),
+      security_admin_ip_allowlist: normalizeSecurityAdminIpAllowlist(securityAdminIpAllowlist),
+      security_registration_alert_threshold: normalizeSecurityRegistrationAlertThreshold(
+        securityRegistrationAlertThreshold,
+        DEFAULT_SETTINGS.security_registration_alert_threshold
+      ),
+      security_registration_alert_window_minutes: normalizeSecurityRegistrationAlertWindowMinutes(
+        securityRegistrationAlertWindowMinutes,
+        DEFAULT_SETTINGS.security_registration_alert_window_minutes
+      ),
     };
     const changes = Object.keys(nextSettings).reduce((acc, key) => {
       if (String(settingsCache[key]) !== String(nextSettings[key])) {
@@ -19338,6 +19714,17 @@ app.get('/admin/system-health.json', requireVisitAnalyticsSectionAccess, async (
         last_result: schedulerHealthState.last_result || null,
         last_error_at: schedulerHealthState.last_error_at || null,
         last_error: schedulerHealthState.last_error || null,
+      },
+      security: {
+        admin_ip_allowlist_count: parseSecurityAdminIpAllowlist(settingsCache.security_admin_ip_allowlist).length,
+        registration_alert_threshold: normalizeSecurityRegistrationAlertThreshold(
+          settingsCache.security_registration_alert_threshold,
+          DEFAULT_SETTINGS.security_registration_alert_threshold
+        ),
+        registration_alert_window_minutes: normalizeSecurityRegistrationAlertWindowMinutes(
+          settingsCache.security_registration_alert_window_minutes,
+          DEFAULT_SETTINGS.security_registration_alert_window_minutes
+        ),
       },
       migrations: {
         total_available: availableIds.length,
@@ -20555,7 +20942,10 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
     };
 
     const evidenceSessions = Array.from(evidenceSessionsSet).filter((v) => String(v).trim().length);
-    const evidenceIps = Array.from(evidenceIpsSet).filter((v) => String(v).trim().length);
+    const rawEvidenceIps = Array.from(evidenceIpsSet).filter((v) => String(v).trim().length);
+    const adminIpAllowlist = parseSecurityAdminIpAllowlist(settingsCache.security_admin_ip_allowlist);
+    const allowlistedEvidenceIps = rawEvidenceIps.filter((ip) => isSecurityAdminIpAllowlisted(ip, adminIpAllowlist));
+    const evidenceIps = rawEvidenceIps.filter((ip) => !isSecurityAdminIpAllowlisted(ip, adminIpAllowlist));
     const evidenceAgents = Array.from(evidenceAgentsSet).filter((v) => String(v).trim().length);
     const evidenceFingerprints = Array.from(evidenceFingerprintsSet).filter((v) => String(v).trim().length);
 
@@ -20862,6 +21252,52 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
       .slice(0, 10);
 
     const suspectedOwner = matches.length && matches[0].score >= 35 ? matches[0] : null;
+    const confidenceRank = { high: 3, medium: 2, low: 1, weak: 0 };
+    const strongMatches = matches.filter((row) => Number(confidenceRank[row.confidence] || 0) >= 2).length;
+    const riskReasons = [];
+    let riskScore = 0;
+    if (suspectedOwner) {
+      riskScore += Number(suspectedOwner.score || 0) >= 110 ? 62 : 36;
+      riskReasons.push(`Ймовірний власник: ${suspectedOwner.full_name}`);
+    }
+    if (strongMatches >= 2) {
+      riskScore += 24;
+      riskReasons.push(`Кілька сильних збігів (${strongMatches})`);
+    }
+    if (evidenceSessions.length) {
+      riskScore += 14;
+      riskReasons.push(`Є збіги по session (${evidenceSessions.length})`);
+    }
+    if (evidenceIps.length) {
+      riskScore += 10;
+      riskReasons.push(`Є збіги по IP (${evidenceIps.length})`);
+    }
+    if (allowlistedEvidenceIps.length) {
+      riskReasons.push(`IP у allowlist (ігнор): ${allowlistedEvidenceIps.join(', ')}`);
+    }
+    const hasSuppressedOnly =
+      allowlistedEvidenceIps.length > 0 &&
+      !evidenceIps.length &&
+      !evidenceSessions.length &&
+      !strongMatches;
+    const resolvedRisk = resolveForensicsRiskState(riskScore);
+    const riskLevel = hasSuppressedOnly ? 'suppressed' : resolvedRisk.key;
+    const riskLabel = hasSuppressedOnly ? 'Збіги приглушено (allowlist)' : resolvedRisk.label;
+    const securityAlertWindowMs = SYSTEM_INCIDENT_WINDOW_HOURS * 60 * 60 * 1000;
+    const securityAlertsForTarget = runtimeErrorEvents
+      .filter((event) => {
+        if (String(event?.kind || '').toLowerCase() !== 'security') return false;
+        const createdAtMs = new Date(event.created_at).getTime();
+        if (!Number.isFinite(createdAtMs) || Date.now() - createdAtMs > securityAlertWindowMs) {
+          return false;
+        }
+        const directUserId = Number(event.user_id || 0);
+        if (directUserId === targetUserId) return true;
+        const sampleIds = Array.isArray(event.sample_user_ids) ? event.sample_user_ids : [];
+        return sampleIds.some((id) => Number(id) === targetUserId);
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 4);
 
     return res.json({
       target: {
@@ -20876,6 +21312,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
       evidence: {
         source: registrationEvent ? 'registration_event' : (inferredRegistrationRows.length ? 'inferred_site_visits' : 'login_only'),
         ips: evidenceIps,
+        ignored_ips: allowlistedEvidenceIps,
         session_ids: evidenceSessions,
         user_agents: evidenceAgents,
         device_fingerprints: evidenceFingerprints,
@@ -20897,6 +21334,19 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
           last_seen_at: parseTs(row.last_seen_at),
         })),
         has_login_history: (targetLoginRows || []).length > 0,
+      },
+      risk: {
+        score: Number(riskScore || 0),
+        level: riskLevel,
+        label: riskLabel,
+        reasons: riskReasons.slice(0, 5),
+        allowlisted: allowlistedEvidenceIps.length > 0,
+        recent_alerts_count: securityAlertsForTarget.length,
+        recent_alerts: securityAlertsForTarget.map((event) => ({
+          created_at: parseTs(event.created_at),
+          label: String(event.label || 'security'),
+          message: String(event.message || ''),
+        })),
       },
       suspected_owner: suspectedOwner,
       matches,
