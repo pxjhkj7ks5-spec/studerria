@@ -22290,6 +22290,8 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
   }
+  const rawStatus = String(req.query.status || 'active').trim().toLowerCase();
+  const status = rawStatus === 'inactive' || rawStatus === 'all' ? rawStatus : 'active';
   const q = req.query.q;
   const group = req.query.group;
   const courseId = getAdminCourse(req);
@@ -22297,7 +22299,11 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
     const userFilters = ['u.course_id = ?'];
     const userParams = [courseId];
     if (usersHasIsActive) {
-      userFilters.push('u.is_active = 1');
+      if (status === 'inactive') {
+        userFilters.push('u.is_active = 0');
+      } else if (status === 'active') {
+        userFilters.push('u.is_active = 1');
+      }
     }
     if (q) {
       userFilters.push('u.full_name ILIKE ?');

@@ -1898,6 +1898,8 @@
           <div class="d-flex flex-wrap gap-2 mb-2">
             <div class="btn-group btn-group-sm" role="group">
               <button class="btn btn-outline-primary" type="button" data-users-status="active"><%= t('admin.active') %></button>
+              <button class="btn btn-outline-primary" type="button" data-users-status="inactive"><%= t('admin.inactive') %></button>
+              <button class="btn btn-outline-primary" type="button" data-users-status="all"><%= t('admin.all') %></button>
             </div>
             <div class="btn-group btn-group-sm" role="group">
               <button class="btn btn-outline-primary" type="button" data-role-filter="all"><%= t('admin.allRoles') %></button>
@@ -1929,7 +1931,10 @@
                 data-group="<%= (filters && filters.users_group) || '' %>"
               >
                 <% (users || []).filter(function(u) { %>
+                  <% const statusValue = usersStatus || 'active'; %>
                   <% const isActive = typeof u.is_active === 'undefined' ? 1 : Number(u.is_active); %>
+                  <% if (statusValue === 'inactive') return isActive === 0; %>
+                  <% if (statusValue === 'all') return true; %>
                   <% return isActive !== 0; %>
                 <% }).forEach(function(u) { %>
                   <% const rowRoleKeys = Array.isArray(u.role_keys) && u.role_keys.length
@@ -6343,6 +6348,7 @@
         const tbody = document.getElementById('usersTableBody');
         if (!tbody) return;
         const currentUserId = tbody.dataset.currentUserId;
+        const status = tbody.dataset.status || 'active';
         const subjectMap = new Map();
         data.subjects.forEach((s) => subjectMap.set(String(s.id), s));
         const courseMap = new Map();
@@ -6356,7 +6362,10 @@
         const users = Array.isArray(data.users) ? data.users : [];
         const visibleUsers = users.filter((u) => {
           const rawActive = typeof u?.is_active === 'undefined' ? 1 : Number(u.is_active);
-          return Number.isNaN(rawActive) ? true : rawActive !== 0;
+          const isActive = Number.isNaN(rawActive) ? 1 : (rawActive === 0 ? 0 : 1);
+          if (status === 'inactive') return isActive === 0;
+          if (status === 'all') return true;
+          return isActive !== 0;
         });
 
         tbody.innerHTML = visibleUsers
@@ -6487,11 +6496,12 @@
               </td>
             </tr>
           `).join('');
+          const status = tbodyEl.dataset.status || 'active';
           const courseId = tbodyEl.dataset.courseId || '1';
           const q = tbodyEl.dataset.search || '';
           const group = tbodyEl.dataset.group || '';
           const res = await fetch(
-            `/admin/users.json?course=${encodeURIComponent(courseId)}&q=${encodeURIComponent(
+            `/admin/users.json?status=${encodeURIComponent(status)}&course=${encodeURIComponent(courseId)}&q=${encodeURIComponent(
               q
             )}&group=${encodeURIComponent(group)}`
           );

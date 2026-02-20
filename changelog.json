@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.69",
+      "date": "2026-02-20",
+      "items": [
+        "fix(admin-users): restored Active/Inactive/All status switch in Users tab",
+        "fix(admin-users): /admin/users.json now applies `status` filter, so inactive users can be opened and managed from Users tab"
+      ]
+    },
+    {
       "version": "0.9.68",
       "date": "2026-02-20",
       "items": [
