@@ -7934,6 +7934,47 @@ async function getJournalSubjectClosureState(subjectId) {
   };
 }
 
+async function getPreviousSemesterForCourse(courseId, currentSemester = null) {
+  const safeCourseId = Number(courseId || 0);
+  if (!Number.isFinite(safeCourseId) || safeCourseId < 1) return null;
+
+  const currentSemesterId = Number(currentSemester?.id || 0);
+  const currentSemesterStart = String(currentSemester?.start_date || '').trim();
+  if (!Number.isFinite(currentSemesterId) || currentSemesterId < 1) return null;
+
+  let row = null;
+  if (currentSemesterStart) {
+    row = await db.get(
+      `
+        SELECT id, title, start_date, weeks_count, is_active, is_archived
+        FROM semesters
+        WHERE course_id = ?
+          AND id <> ?
+          AND (start_date < ? OR (start_date = ? AND id < ?))
+        ORDER BY start_date DESC, id DESC
+        LIMIT 1
+      `,
+      [safeCourseId, currentSemesterId, currentSemesterStart, currentSemesterStart, currentSemesterId]
+    );
+  }
+
+  if (!row) {
+    row = await db.get(
+      `
+        SELECT id, title, start_date, weeks_count, is_active, is_archived
+        FROM semesters
+        WHERE course_id = ?
+          AND id <> ?
+        ORDER BY start_date DESC, id DESC
+        LIMIT 1
+      `,
+      [safeCourseId, currentSemesterId]
+    );
+  }
+
+  return row || null;
+}
+
 const formatJournalClosureCsvNumber = (rawValue) => {
   const numberValue = Number(rawValue);
   if (!Number.isFinite(numberValue)) return '';
@@ -11421,6 +11462,189 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
     return res.redirect(`/journal?subject_id=${subjectId}&ok=Колонку%20додано`);
   } catch (err) {
     return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/template/import-previous', requireLogin, writeLimiter, async (req, res) => {
+  const subjectId = Number(req.body.subject_id);
+  if (!Number.isFinite(subjectId) || subjectId < 1) {
+    return res.redirect('/journal?err=Invalid%20subject');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const subjectOptions = await getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode);
+    const selectedSubject = (subjectOptions || []).find((subject) => Number(subject.subject_id) === subjectId);
+    if (!selectedSubject) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const courseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
+    const activeSemester = await getActiveSemester(courseId);
+    const semesterId = activeSemester ? Number(activeSemester.id) : null;
+    if (!Number.isFinite(semesterId) || semesterId < 1) {
+      return res.redirect(`/journal?subject_id=${subjectId}&err=${encodeURIComponent('Активний семестр не знайдено')}`);
+    }
+
+    const subjectClosure = await getJournalSubjectClosureState(subjectId);
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(subjectId));
+    }
+
+    const previousSemester = await getPreviousSemesterForCourse(courseId, activeSemester);
+    if (!previousSemester || !Number.isFinite(Number(previousSemester.id))) {
+      return res.redirect(`/journal?subject_id=${subjectId}&err=${encodeURIComponent('Попередній семестр для імпорту не знайдено')}`);
+    }
+    const previousSemesterId = Number(previousSemester.id);
+
+    const sourceColumns = await db.all(
+      `
+        SELECT
+          id,
+          title,
+          column_type,
+          max_points,
+          include_in_final,
+          is_credit,
+          position
+        FROM journal_columns
+        WHERE subject_id = ?
+          AND course_id = ?
+          AND semester_id = ?
+          AND source_type = 'manual'
+          AND source_homework_id IS NULL
+          AND COALESCE(is_archived, 0) = 0
+        ORDER BY COALESCE(is_credit, 0) ASC, COALESCE(position, 0) ASC, id ASC
+      `,
+      [subjectId, courseId, previousSemesterId]
+    );
+    if (!Array.isArray(sourceColumns) || !sourceColumns.length) {
+      return res.redirect(
+        `/journal?subject_id=${subjectId}&err=${encodeURIComponent('У попередньому семестрі немає ручних колонок для імпорту')}`
+      );
+    }
+
+    const currentColumns = await db.all(
+      `
+        SELECT
+          id,
+          title,
+          column_type,
+          max_points,
+          include_in_final,
+          is_credit,
+          position
+        FROM journal_columns
+        WHERE subject_id = ?
+          AND course_id = ?
+          AND semester_id = ?
+          AND source_type = 'manual'
+          AND source_homework_id IS NULL
+          AND COALESCE(is_archived, 0) = 0
+      `,
+      [subjectId, courseId, semesterId]
+    );
+
+    const normalizeTemplateColumnKey = (row) => {
+      const title = String(row?.title || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const columnType = normalizeColumnType(row?.column_type);
+      const isCredit = Number(row?.is_credit || 0) === 1 ? 1 : 0;
+      const includeInFinal = Number(row?.include_in_final ?? 1) === 1 ? 1 : 0;
+      const maxPoints = parsePositiveDecimal(row?.max_points, 10);
+      return [
+        title,
+        columnType,
+        String(isCredit),
+        String(includeInFinal),
+        formatJournalClosureCsvNumber(maxPoints),
+      ].join('|');
+    };
+
+    const existingKeys = new Set((currentColumns || []).map((row) => normalizeTemplateColumnKey(row)));
+    let maxNonCreditPosition = 0;
+    let maxCreditPosition = 0;
+    (currentColumns || []).forEach((row) => {
+      const position = Number(row?.position || 0);
+      if (Number(row?.is_credit || 0) === 1) {
+        if (position > maxCreditPosition) maxCreditPosition = position;
+      } else if (position > maxNonCreditPosition) {
+        maxNonCreditPosition = position;
+      }
+    });
+
+    let insertedCount = 0;
+    let skippedCount = 0;
+    for (const sourceColumn of sourceColumns) {
+      const dedupeKey = normalizeTemplateColumnKey(sourceColumn);
+      if (existingKeys.has(dedupeKey)) {
+        skippedCount += 1;
+        continue;
+      }
+      const isCredit = Number(sourceColumn.is_credit || 0) === 1;
+      const nextPosition = isCredit ? (maxCreditPosition + 10) : (maxNonCreditPosition + 10);
+      if (isCredit) maxCreditPosition = nextPosition;
+      else maxNonCreditPosition = nextPosition;
+
+      await db.run(
+        `
+          INSERT INTO journal_columns
+            (
+              subject_id, course_id, semester_id, source_type, source_homework_id,
+              title, column_type, max_points, position, is_credit, include_in_final,
+              created_by, created_at, updated_at
+            )
+          VALUES (?, ?, ?, 'manual', NULL, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        `,
+        [
+          subjectId,
+          courseId,
+          semesterId,
+          String(sourceColumn.title || '').trim() || 'Колонка',
+          normalizeColumnType(sourceColumn.column_type),
+          parsePositiveDecimal(sourceColumn.max_points, 10),
+          nextPosition,
+          isCredit ? 1 : 0,
+          Number(sourceColumn.include_in_final ?? 1) === 1 ? 1 : 0,
+          Number(req.session.user.id),
+        ]
+      );
+      existingKeys.add(dedupeKey);
+      insertedCount += 1;
+    }
+
+    if (insertedCount < 1) {
+      return res.redirect(
+        `/journal?subject_id=${subjectId}&ok=${encodeURIComponent('Шаблон уже актуальний: нових колонок для імпорту немає')}`
+      );
+    }
+
+    logActivity(
+      db,
+      req,
+      'journal_template_import_previous',
+      'journal_column',
+      null,
+      {
+        subject_id: subjectId,
+        source_semester_id: previousSemesterId,
+        source_semester_title: String(previousSemester.title || ''),
+        imported_columns_count: insertedCount,
+        skipped_columns_count: skippedCount,
+      },
+      courseId,
+      semesterId
+    );
+    return res.redirect(
+      `/journal?subject_id=${subjectId}&ok=${encodeURIComponent(`Імпортовано ${insertedCount} колонок з попереднього семестру`)}`
+    );
+  } catch (err) {
+    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
   }
 });
 

@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.9.34",
+      "date": "2026-02-20",
+      "items": [
+        "feat(journal-template): added `Імпортувати шаблон` action in journal grading settings to clone manual columns from previous semester in one click",
+        "feat(api): added `POST /journal/template/import-previous` with teacher scope checks, subject-closed guard, and previous-semester lookup by course timeline",
+        "feat(journal-template): import is deduplicated by column fingerprint (title/type/max/final/credit) and preserves include-in-final, type, max points, and credit ordering",
+        "feat(audit): added `journal_template_import_previous` activity log entry with imported/skipped counters and source semester metadata"
+      ]
+    },
+    {
       "version": "0.9.33",
       "date": "2026-02-20",
       "items": [
