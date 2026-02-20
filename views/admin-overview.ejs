@@ -357,6 +357,7 @@
       <% } %>
 
       <% const stats = dashboardStats || { users: 0, subjects: 0, homework: 0, teamworkTasks: 0, teamworkGroups: 0, teamworkMembers: 0 }; %>
+      <% const pulse = coursePulse || { summary: {}, subjects: [] }; %>
       <div class="card mb-4">
         <div class="card-body">
           <div class="row g-3 mb-4">
@@ -432,6 +433,93 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+              <h5 class="mb-1">Course Pulse</h5>
+              <div class="text-muted small">Ризик-групи, прогули, SLA перевірки ДЗ та просідання по предметах.</div>
+            </div>
+            <div class="text-muted small">
+              Оновлено: <%= pulse.generated_at ? new Date(pulse.generated_at).toLocaleString('uk-UA') : '-' %>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-6 col-lg-3">
+              <div class="stat-tile">
+                <div class="text-muted small">Студенти в ризику</div>
+                <div class="h4 mb-0"><%= Number(pulse.summary.risk_students_share || 0) %>%</div>
+                <div class="text-muted small"><%= Number(pulse.summary.students_at_risk || 0) %> / <%= Number(pulse.summary.students_total || 0) %></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="stat-tile">
+                <div class="text-muted small">SLA > 48г</div>
+                <div class="h4 mb-0"><%= Number(pulse.summary.sla_overdue_share || 0) %>%</div>
+                <div class="text-muted small"><%= Number(pulse.summary.sla_overdue_ungraded_total || 0) %> прострочених перевірок</div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="stat-tile">
+                <div class="text-muted small">Прогули (30 днів)</div>
+                <div class="h4 mb-0"><%= Number(pulse.summary.attendance_absent_share || 0) %>%</div>
+                <div class="text-muted small">Запізнення: <%= Number(pulse.summary.attendance_late_share || 0) %>%</div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="stat-tile">
+                <div class="text-muted small">High risk студенти</div>
+                <div class="h4 mb-0"><%= Number(pulse.summary.high_risk_students || 0) %></div>
+                <div class="text-muted small">Прострочених ДЗ: <%= Number(pulse.summary.overdue_homework_total || 0) %></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Предмет</th>
+                  <th>Ризик-студенти</th>
+                  <th>Прострочені ДЗ</th>
+                  <th>SLA >48г</th>
+                  <th>Середній бал (30д)</th>
+                  <th>Δ до попер. 30д</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!Array.isArray(pulse.subjects) || !pulse.subjects.length) { %>
+                  <tr>
+                    <td colspan="6" class="text-muted">Поки немає достатньо даних для course pulse.</td>
+                  </tr>
+                <% } else { %>
+                  <% pulse.subjects.forEach((item) => { %>
+                    <% const delta = Number(item.delta_score_percent || 0); %>
+                    <tr>
+                      <td><%= item.subject_name || 'Предмет' %></td>
+                      <td><%= Number(item.at_risk_students || 0) %></td>
+                      <td><%= Number(item.overdue_homework_total || 0) %></td>
+                      <td><%= Number(item.sla_overdue_ungraded || 0) %></td>
+                      <td><%= item.recent_score_percent === null || typeof item.recent_score_percent === 'undefined' ? '—' : `${Number(item.recent_score_percent)}%` %></td>
+                      <td class="<%= delta < 0 ? 'text-danger' : (delta > 0 ? 'text-success' : 'text-muted') %>">
+                        <% if (item.delta_score_percent === null || typeof item.delta_score_percent === 'undefined') { %>
+                          —
+                        <% } else if (delta > 0) { %>
+                          +<%= delta %>%
+                        <% } else { %>
+                          <%= delta %>%
+                        <% } %>
+                      </td>
+                    </tr>
+                  <% }); %>
+                <% } %>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

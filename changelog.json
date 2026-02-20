@@ -1,6 +1,19 @@
 {
   "items": [
     {
+      "version": "0.9.37",
+      "date": "2026-02-20",
+      "items": [
+        "feat(journal-moderation): added second-reviewer workflow for exam/credit cells with pending/approved/adjusted/rejected states and score override support",
+        "feat(api): added `POST /journal/moderation/update` and `POST /journal/competency/add` with full journal scope checks, subject-close guards, and audit activity logging",
+        "feat(journal-ui): extended cell modal with moderation panel and competency signals panel (history + quick add form) for teacher/admin/deanery flows",
+        "feat(competencies): added migration `027_journal_moderation_competencies` with `journal_grade_moderations` and `competency_evaluations` tables + indexes",
+        "feat(my-day): competency profile now consumes real competency signals (student personal profile and staff cohort scope) with heuristic fallback when signals are missing",
+        "fix(calculations): My Day grade vectors and what-if forecast now respect moderated adjusted scores instead of only raw journal grades",
+        "feat(admin-overview): added Course Pulse card with risk/SLA/attendance KPIs and per-subject pulse table"
+      ]
+    },
+    {
       "version": "0.9.36",
       "date": "2026-02-20",
       "items": [

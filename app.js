@@ -5213,6 +5213,369 @@ async function buildAdminDataQualityDiagnostics({
   return result;
 }
 
+async function buildCoursePulseAnalytics({
+  courseId,
+  semesterId = null,
+  now = new Date(),
+}) {
+  const safeCourseId = Number(courseId || 0);
+  const safeSemesterId = Number(semesterId || 0);
+  const hasSemester = Number.isInteger(safeSemesterId) && safeSemesterId > 0;
+  const today = formatLocalDate(now);
+  const recentDate = formatLocalDate(addDays(now, -30));
+  const previousDate = formatLocalDate(addDays(now, -60));
+  const recentIso = new Date(`${recentDate}T00:00:00.000Z`).toISOString();
+  const previousIso = new Date(`${previousDate}T00:00:00.000Z`).toISOString();
+  const summary = {
+    students_total: 0,
+    students_at_risk: 0,
+    high_risk_students: 0,
+    risk_students_share: 0,
+    overdue_homework_total: 0,
+    sla_submissions_total: 0,
+    sla_ungraded_total: 0,
+    sla_overdue_ungraded_total: 0,
+    sla_overdue_share: 0,
+    attendance_absent_share: 0,
+    attendance_late_share: 0,
+  };
+  const emptyResult = {
+    generated_at: new Date().toISOString(),
+    course_id: Number.isFinite(safeCourseId) && safeCourseId > 0 ? safeCourseId : null,
+    semester_id: hasSemester ? safeSemesterId : null,
+    summary,
+    subjects: [],
+  };
+  if (!Number.isFinite(safeCourseId) || safeCourseId < 1) {
+    return emptyResult;
+  }
+
+  const homeworkSemesterClause = hasSemester
+    ? 'AND (h.semester_id = ? OR h.semester_id IS NULL)'
+    : 'AND h.semester_id IS NULL';
+  const journalSemesterClause = hasSemester
+    ? 'AND (jc.semester_id = ? OR jc.semester_id IS NULL)'
+    : 'AND jc.semester_id IS NULL';
+  const attendanceSemesterClause = hasSemester
+    ? 'AND (ar.semester_id = ? OR ar.semester_id IS NULL)'
+    : 'AND ar.semester_id IS NULL';
+
+  const [
+    studentsRow,
+    riskRow,
+    homeworkSlaRow,
+    attendanceRow,
+    trendRows,
+    overdueBySubjectRows,
+    slaBySubjectRows,
+  ] = await Promise.all([
+    db.get(
+      `
+        SELECT COUNT(*)::int AS count
+        FROM users
+        WHERE course_id = ?
+          AND is_active = 1
+          AND LOWER(COALESCE(role, 'student')) = 'student'
+      `,
+      [safeCourseId]
+    ),
+    db.get(
+      `
+        WITH overdue AS (
+          SELECT
+            sg.student_id,
+            COUNT(*)::int AS overdue_count
+          FROM student_groups sg
+          JOIN homework h
+            ON h.subject_id = sg.subject_id
+           AND (h.group_number = sg.group_number OR h.group_number IS NULL)
+          WHERE h.course_id = ?
+            ${homeworkSemesterClause}
+            AND COALESCE(h.is_teacher_homework, 0) = 1
+            AND COALESCE(h.status, 'published') = 'published'
+            AND COALESCE(NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''), NULLIF(TRIM(COALESCE(h.class_date, '')), '')) < ?
+            AND NOT EXISTS (
+              SELECT 1
+              FROM homework_submissions hs
+              WHERE hs.homework_id = h.id
+                AND hs.student_id = sg.student_id
+            )
+          GROUP BY sg.student_id
+        )
+        SELECT
+          COUNT(*) FILTER (WHERE overdue_count >= 1)::int AS any_risk_students,
+          COUNT(*) FILTER (WHERE overdue_count >= 2)::int AS high_risk_students,
+          COALESCE(SUM(overdue_count), 0)::int AS overdue_total
+        FROM overdue
+      `,
+      hasSemester ? [safeCourseId, safeSemesterId, today] : [safeCourseId, today]
+    ),
+    db.get(
+      `
+        SELECT
+          COUNT(*)::int AS submissions_total,
+          COUNT(*) FILTER (WHERE jg.id IS NULL)::int AS ungraded_total,
+          COUNT(*) FILTER (
+            WHERE jg.id IS NULL
+              AND hs.submitted_at <= (?::timestamptz - (48 * INTERVAL '1 hour'))
+          )::int AS overdue_ungraded_total
+        FROM homework_submissions hs
+        JOIN homework h ON h.id = hs.homework_id
+        LEFT JOIN journal_columns jc
+          ON jc.source_homework_id = h.id
+         AND COALESCE(jc.is_archived, 0) = 0
+        LEFT JOIN journal_grades jg
+          ON jg.column_id = jc.id
+         AND jg.student_id = hs.student_id
+         AND jg.deleted_at IS NULL
+        WHERE h.course_id = ?
+          ${homeworkSemesterClause}
+          AND COALESCE(h.is_teacher_homework, 0) = 1
+      `,
+      hasSemester ? [now.toISOString(), safeCourseId, safeSemesterId] : [now.toISOString(), safeCourseId]
+    ),
+    db.get(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE ar.status = 'absent')::int AS absent_count,
+          COUNT(*) FILTER (WHERE ar.status = 'late')::int AS late_count,
+          COUNT(*)::int AS total_records
+        FROM attendance_records ar
+        JOIN users u ON u.id = ar.student_id
+        WHERE ar.course_id = ?
+          ${attendanceSemesterClause}
+          AND ar.class_date >= ?
+          AND u.course_id = ?
+      `,
+      hasSemester
+        ? [safeCourseId, safeSemesterId, recentDate, safeCourseId]
+        : [safeCourseId, recentDate, safeCourseId]
+    ),
+    db.all(
+      `
+        SELECT
+          jc.subject_id,
+          COALESCE(s.name, 'Предмет') AS subject_name,
+          AVG(CASE WHEN jg.graded_at >= ? THEN (jg.score / NULLIF(jc.max_points, 0)) END) AS recent_ratio,
+          AVG(CASE WHEN jg.graded_at >= ? AND jg.graded_at < ? THEN (jg.score / NULLIF(jc.max_points, 0)) END) AS previous_ratio,
+          COUNT(*) FILTER (WHERE jg.graded_at >= ?)::int AS recent_count,
+          COUNT(*) FILTER (WHERE jg.graded_at >= ? AND jg.graded_at < ?)::int AS previous_count
+        FROM journal_grades jg
+        JOIN journal_columns jc ON jc.id = jg.column_id
+        LEFT JOIN subjects s ON s.id = jc.subject_id
+        WHERE jc.course_id = ?
+          ${journalSemesterClause}
+          AND COALESCE(jc.is_archived, 0) = 0
+          AND jg.deleted_at IS NULL
+        GROUP BY jc.subject_id, s.name
+        HAVING
+          COUNT(*) FILTER (WHERE jg.graded_at >= ?) > 0
+          OR COUNT(*) FILTER (WHERE jg.graded_at >= ? AND jg.graded_at < ?) > 0
+        ORDER BY subject_name ASC
+      `,
+      hasSemester
+        ? [
+            recentIso,
+            previousIso,
+            recentIso,
+            recentIso,
+            previousIso,
+            recentIso,
+            safeCourseId,
+            safeSemesterId,
+            recentIso,
+            previousIso,
+            recentIso,
+          ]
+        : [
+            recentIso,
+            previousIso,
+            recentIso,
+            recentIso,
+            previousIso,
+            recentIso,
+            safeCourseId,
+            recentIso,
+            previousIso,
+            recentIso,
+          ]
+    ),
+    db.all(
+      `
+        SELECT
+          h.subject_id,
+          COALESCE(s.name, 'Предмет') AS subject_name,
+          COUNT(*)::int AS overdue_homework_total,
+          COUNT(DISTINCT sg.student_id)::int AS at_risk_students
+        FROM student_groups sg
+        JOIN homework h
+          ON h.subject_id = sg.subject_id
+         AND (h.group_number = sg.group_number OR h.group_number IS NULL)
+        LEFT JOIN subjects s ON s.id = h.subject_id
+        WHERE h.course_id = ?
+          ${homeworkSemesterClause}
+          AND COALESCE(h.is_teacher_homework, 0) = 1
+          AND COALESCE(h.status, 'published') = 'published'
+          AND COALESCE(NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''), NULLIF(TRIM(COALESCE(h.class_date, '')), '')) < ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM homework_submissions hs
+            WHERE hs.homework_id = h.id
+              AND hs.student_id = sg.student_id
+          )
+        GROUP BY h.subject_id, s.name
+        ORDER BY overdue_homework_total DESC, subject_name ASC
+      `,
+      hasSemester ? [safeCourseId, safeSemesterId, today] : [safeCourseId, today]
+    ),
+    db.all(
+      `
+        SELECT
+          h.subject_id,
+          COALESCE(s.name, 'Предмет') AS subject_name,
+          COUNT(*) FILTER (
+            WHERE jg.id IS NULL
+              AND hs.submitted_at <= (?::timestamptz - (48 * INTERVAL '1 hour'))
+          )::int AS sla_overdue_ungraded
+        FROM homework_submissions hs
+        JOIN homework h ON h.id = hs.homework_id
+        LEFT JOIN subjects s ON s.id = h.subject_id
+        LEFT JOIN journal_columns jc
+          ON jc.source_homework_id = h.id
+         AND COALESCE(jc.is_archived, 0) = 0
+        LEFT JOIN journal_grades jg
+          ON jg.column_id = jc.id
+         AND jg.student_id = hs.student_id
+         AND jg.deleted_at IS NULL
+        WHERE h.course_id = ?
+          ${homeworkSemesterClause}
+          AND COALESCE(h.is_teacher_homework, 0) = 1
+        GROUP BY h.subject_id, s.name
+        ORDER BY sla_overdue_ungraded DESC, subject_name ASC
+      `,
+      hasSemester ? [now.toISOString(), safeCourseId, safeSemesterId] : [now.toISOString(), safeCourseId]
+    ),
+  ]);
+
+  const studentsTotal = Number(studentsRow?.count || 0);
+  const studentsAtRisk = Number(riskRow?.any_risk_students || 0);
+  const highRiskStudents = Number(riskRow?.high_risk_students || 0);
+  const overdueHomeworkTotal = Number(riskRow?.overdue_total || 0);
+  const submissionsTotal = Number(homeworkSlaRow?.submissions_total || 0);
+  const ungradedTotal = Number(homeworkSlaRow?.ungraded_total || 0);
+  const overdueUngradedTotal = Number(homeworkSlaRow?.overdue_ungraded_total || 0);
+  const attendanceTotal = Number(attendanceRow?.total_records || 0);
+  const attendanceAbsent = Number(attendanceRow?.absent_count || 0);
+  const attendanceLate = Number(attendanceRow?.late_count || 0);
+
+  const riskStudentsShare = studentsTotal > 0 ? Math.round((studentsAtRisk / studentsTotal) * 100) : 0;
+  const slaOverdueShare = submissionsTotal > 0 ? Math.round((overdueUngradedTotal / submissionsTotal) * 100) : 0;
+  const attendanceAbsentShare = attendanceTotal > 0 ? Math.round((attendanceAbsent / attendanceTotal) * 100) : 0;
+  const attendanceLateShare = attendanceTotal > 0 ? Math.round((attendanceLate / attendanceTotal) * 100) : 0;
+
+  const bySubject = new Map();
+  (trendRows || []).forEach((row) => {
+    const subjectId = Number(row.subject_id || 0);
+    if (!Number.isFinite(subjectId) || subjectId < 1) return;
+    const recentRatio = Number(row.recent_ratio);
+    const previousRatio = Number(row.previous_ratio);
+    const recentPercent = Number.isFinite(recentRatio) ? Math.round(recentRatio * 100) : null;
+    const previousPercent = Number.isFinite(previousRatio) ? Math.round(previousRatio * 100) : null;
+    bySubject.set(subjectId, {
+      subject_id: subjectId,
+      subject_name: String(row.subject_name || 'Предмет'),
+      recent_score_percent: recentPercent,
+      previous_score_percent: previousPercent,
+      delta_score_percent: (
+        recentPercent === null || previousPercent === null
+          ? null
+          : (recentPercent - previousPercent)
+      ),
+      recent_grade_events: Number(row.recent_count || 0),
+      previous_grade_events: Number(row.previous_count || 0),
+      overdue_homework_total: 0,
+      at_risk_students: 0,
+      sla_overdue_ungraded: 0,
+    });
+  });
+  (overdueBySubjectRows || []).forEach((row) => {
+    const subjectId = Number(row.subject_id || 0);
+    if (!Number.isFinite(subjectId) || subjectId < 1) return;
+    if (!bySubject.has(subjectId)) {
+      bySubject.set(subjectId, {
+        subject_id: subjectId,
+        subject_name: String(row.subject_name || 'Предмет'),
+        recent_score_percent: null,
+        previous_score_percent: null,
+        delta_score_percent: null,
+        recent_grade_events: 0,
+        previous_grade_events: 0,
+        overdue_homework_total: 0,
+        at_risk_students: 0,
+        sla_overdue_ungraded: 0,
+      });
+    }
+    const target = bySubject.get(subjectId);
+    target.overdue_homework_total = Number(row.overdue_homework_total || 0);
+    target.at_risk_students = Number(row.at_risk_students || 0);
+  });
+  (slaBySubjectRows || []).forEach((row) => {
+    const subjectId = Number(row.subject_id || 0);
+    if (!Number.isFinite(subjectId) || subjectId < 1) return;
+    if (!bySubject.has(subjectId)) {
+      bySubject.set(subjectId, {
+        subject_id: subjectId,
+        subject_name: String(row.subject_name || 'Предмет'),
+        recent_score_percent: null,
+        previous_score_percent: null,
+        delta_score_percent: null,
+        recent_grade_events: 0,
+        previous_grade_events: 0,
+        overdue_homework_total: 0,
+        at_risk_students: 0,
+        sla_overdue_ungraded: 0,
+      });
+    }
+    const target = bySubject.get(subjectId);
+    target.sla_overdue_ungraded = Number(row.sla_overdue_ungraded || 0);
+  });
+
+  const subjects = Array.from(bySubject.values())
+    .sort((a, b) => {
+      const severityA = (Number(a.at_risk_students || 0) * 100)
+        + (Number(a.sla_overdue_ungraded || 0) * 10)
+        + Number(a.overdue_homework_total || 0)
+        + (Number(a.delta_score_percent || 0) < 0 ? Math.abs(Number(a.delta_score_percent || 0)) : 0);
+      const severityB = (Number(b.at_risk_students || 0) * 100)
+        + (Number(b.sla_overdue_ungraded || 0) * 10)
+        + Number(b.overdue_homework_total || 0)
+        + (Number(b.delta_score_percent || 0) < 0 ? Math.abs(Number(b.delta_score_percent || 0)) : 0);
+      if (severityA !== severityB) return severityB - severityA;
+      return String(a.subject_name || '').localeCompare(String(b.subject_name || ''));
+    })
+    .slice(0, 10);
+
+  return {
+    generated_at: new Date().toISOString(),
+    course_id: safeCourseId,
+    semester_id: hasSemester ? safeSemesterId : null,
+    summary: {
+      students_total: studentsTotal,
+      students_at_risk: studentsAtRisk,
+      high_risk_students: highRiskStudents,
+      risk_students_share: riskStudentsShare,
+      overdue_homework_total: overdueHomeworkTotal,
+      sla_submissions_total: submissionsTotal,
+      sla_ungraded_total: ungradedTotal,
+      sla_overdue_ungraded_total: overdueUngradedTotal,
+      sla_overdue_share: slaOverdueShare,
+      attendance_absent_share: attendanceAbsentShare,
+      attendance_late_share: attendanceLateShare,
+    },
+    subjects,
+  };
+}
+
 async function buildMyDayData(user, role = 'student', roleList = []) {
   const courseId = Number(user.course_id || 1);
   const activeSemester = await getActiveSemester(courseId);
@@ -5631,9 +5994,19 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       : 'AND jc.semester_id IS NULL';
     gradeRows = await db.all(
       `
-        SELECT jc.column_type, jc.max_points, jg.score, jg.graded_at
+        SELECT
+          jc.column_type,
+          jc.max_points,
+          CASE
+            WHEN jgm.status = 'adjusted' AND jgm.moderated_score IS NOT NULL THEN jgm.moderated_score
+            ELSE jg.score
+          END AS score,
+          jg.graded_at
         FROM journal_columns jc
         JOIN journal_grades jg ON jg.column_id = jc.id
+        LEFT JOIN journal_grade_moderations jgm
+          ON jgm.column_id = jg.column_id
+         AND jgm.student_id = jg.student_id
         WHERE jg.student_id = ?
           AND jc.course_id = ?
           ${semesterClause}
@@ -5643,6 +6016,72 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       `,
       params
     );
+  }
+  let competencySignalRows = [];
+  if (studentHasOwnSubjects && subjectIds.length) {
+    const placeholders = subjectIds.map(() => '?').join(',');
+    const params = [user.id, courseId];
+    if (activeSemester) {
+      params.push(activeSemester.id);
+    }
+    params.push(...subjectIds);
+    const semesterClause = activeSemester
+      ? 'AND (ce.semester_id = ? OR ce.semester_id IS NULL)'
+      : 'AND ce.semester_id IS NULL';
+    competencySignalRows = await db.all(
+      `
+        SELECT ce.competency_key, ce.score, ce.created_at
+        FROM competency_evaluations ce
+        WHERE ce.student_id = ?
+          AND (ce.course_id = ? OR ce.course_id IS NULL)
+          ${semesterClause}
+          AND ce.subject_id IN (${placeholders})
+        ORDER BY ce.created_at DESC
+        LIMIT 1200
+      `,
+      params
+    );
+  } else if (isStaffRole && workloadTargets.length) {
+    const scopeChunks = [];
+    const scopeParams = [];
+    workloadTargets.forEach((target) => {
+      const subjectId = Number(target.subject_id || 0);
+      if (!Number.isFinite(subjectId) || subjectId < 1) return;
+      if (target.group_number === null) {
+        scopeChunks.push('(ce.subject_id = ?)');
+        scopeParams.push(subjectId);
+        return;
+      }
+      const groupNumber = Number(target.group_number || 0);
+      if (!Number.isInteger(groupNumber) || groupNumber < 1) return;
+      scopeChunks.push('(ce.subject_id = ? AND sg.group_number = ?)');
+      scopeParams.push(subjectId, groupNumber);
+    });
+    if (scopeChunks.length) {
+      const params = [courseId];
+      if (activeSemester) {
+        params.push(activeSemester.id);
+      }
+      params.push(...scopeParams);
+      const semesterClause = activeSemester
+        ? 'AND (ce.semester_id = ? OR ce.semester_id IS NULL)'
+        : 'AND ce.semester_id IS NULL';
+      competencySignalRows = await db.all(
+        `
+          SELECT ce.competency_key, ce.score, ce.created_at
+          FROM competency_evaluations ce
+          JOIN student_groups sg
+            ON sg.student_id = ce.student_id
+           AND sg.subject_id = ce.subject_id
+          WHERE (ce.course_id = ? OR ce.course_id IS NULL)
+            ${semesterClause}
+            AND (${scopeChunks.join(' OR ')})
+          ORDER BY ce.created_at DESC
+          LIMIT 2400
+        `,
+        params
+      );
+    }
   }
 
   const feedbackSince = addDays(now, -14).getTime();
@@ -5766,6 +6205,8 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
   }
 
   const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+  const hasGradeSignals = Array.isArray(gradeRows) && gradeRows.length > 0;
+  const heuristicFallback = hasGradeSignals ? 0.52 : 0;
   const avg = (values, fallback = 0.52) => {
     if (!Array.isArray(values) || !values.length) return fallback;
     return values.reduce((acc, item) => acc + item, 0) / values.length;
@@ -5797,72 +6238,90 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
   });
 
   const weightVector = (buckets) => ({
-    homework: avg(buckets.homework),
-    seminar: avg(buckets.seminar),
-    exam: avg(buckets.exam),
-    credit: avg(buckets.credit),
-    custom: avg(buckets.custom),
+    homework: avg(buckets.homework, heuristicFallback),
+    seminar: avg(buckets.seminar, heuristicFallback),
+    exam: avg(buckets.exam, heuristicFallback),
+    credit: avg(buckets.credit, heuristicFallback),
+    custom: avg(buckets.custom, heuristicFallback),
   });
 
   const baseVector = weightVector(baseBuckets);
   const recentVector = weightVector(recentBuckets);
   const previousVector = weightVector(previousBuckets);
-  const selfOrgSignal = onTimeShare === null ? 0.52 : clamp01(onTimeShare / 100);
-
-  const competencyDefinitions = [
-    {
-      key: 'leadership',
-      label: 'Лідерство',
-      compute: (vector) => (vector.custom * 0.45) + (vector.seminar * 0.35) + (vector.exam * 0.2),
-    },
-    {
-      key: 'negotiation',
-      label: 'Перемовини',
-      compute: (vector) => (vector.seminar * 0.45) + (vector.custom * 0.35) + (vector.exam * 0.2),
-    },
-    {
-      key: 'communication',
-      label: 'Ораторика',
-      compute: (vector) => (vector.seminar * 0.55) + (vector.custom * 0.25) + (vector.homework * 0.2),
-    },
-    {
-      key: 'analysis',
-      label: 'Аналітика',
-      compute: (vector) => (vector.exam * 0.55) + (vector.homework * 0.3) + (vector.custom * 0.15),
-    },
-    {
-      key: 'teamwork',
-      label: 'Командність',
-      compute: (vector) => (vector.seminar * 0.45) + (vector.credit * 0.3) + (vector.custom * 0.25),
-    },
-    {
-      key: 'self_organization',
-      label: 'Самоорганізація',
-      compute: (vector) => (vector.homework * 0.45) + (vector.credit * 0.25) + (selfOrgSignal * 0.3),
-    },
-  ];
-
-  const competencies = competencyDefinitions.map((definition) => {
-    const scoreRaw = clamp01(definition.compute(baseVector));
-    const recentRaw = clamp01(definition.compute(recentVector));
-    const previousRaw = clamp01(definition.compute(previousVector));
-    const delta = Math.round((recentRaw - previousRaw) * 100);
+  const selfOrgSignal = onTimeShare === null ? heuristicFallback : clamp01(onTimeShare / 100);
+  const competencyHeuristic = {
+    leadership: (vector) => (vector.custom * 0.45) + (vector.seminar * 0.35) + (vector.exam * 0.2),
+    negotiation: (vector) => (vector.seminar * 0.45) + (vector.custom * 0.35) + (vector.exam * 0.2),
+    communication: (vector) => (vector.seminar * 0.55) + (vector.custom * 0.25) + (vector.homework * 0.2),
+    analysis: (vector) => (vector.exam * 0.55) + (vector.homework * 0.3) + (vector.custom * 0.15),
+    teamwork: (vector) => (vector.seminar * 0.45) + (vector.credit * 0.3) + (vector.custom * 0.25),
+    self_organization: (vector) => (vector.homework * 0.45) + (vector.credit * 0.25) + (selfOrgSignal * 0.3),
+    critical_thinking: (vector) => (vector.exam * 0.45) + (vector.analysis * 0.35) + (vector.seminar * 0.2),
+    resilience: (vector) => (selfOrgSignal * 0.45) + (vector.credit * 0.25) + (vector.homework * 0.3),
+  };
+  const baseWithDerived = {
+    ...baseVector,
+    analysis: (baseVector.exam * 0.55) + (baseVector.homework * 0.3) + (baseVector.custom * 0.15),
+  };
+  const recentWithDerived = {
+    ...recentVector,
+    analysis: (recentVector.exam * 0.55) + (recentVector.homework * 0.3) + (recentVector.custom * 0.15),
+  };
+  const previousWithDerived = {
+    ...previousVector,
+    analysis: (previousVector.exam * 0.55) + (previousVector.homework * 0.3) + (previousVector.custom * 0.15),
+  };
+  const buildHeuristicProfile = () => {
+    const competencies = COMPETENCY_DEFINITIONS.map((definition) => {
+      const compute = competencyHeuristic[definition.key] || ((vector) => (
+        (vector.homework + vector.seminar + vector.exam + vector.credit + vector.custom) / 5
+      ));
+      const scoreRaw = clamp01(compute(baseWithDerived));
+      const recentRaw = clamp01(compute(recentWithDerived));
+      const previousRaw = clamp01(compute(previousWithDerived));
+      const delta = Math.round((recentRaw - previousRaw) * 100);
+      return {
+        key: definition.key,
+        label: definition.label,
+        score: Math.round(scoreRaw * 100),
+        delta,
+        trend: delta >= 3 ? 'up' : (delta <= -3 ? 'down' : 'steady'),
+        has_data: hasGradeSignals,
+      };
+    });
+    const sortedByScore = [...competencies].sort((a, b) => b.score - a.score);
+    const sortedByDelta = [...competencies].sort((a, b) => b.delta - a.delta);
+    const strongest = sortedByScore[0] || null;
+    const weakest = sortedByScore[sortedByScore.length - 1] || null;
+    const fastestGrowth = sortedByDelta[0] || null;
+    const average = competencies.length
+      ? Math.round(competencies.reduce((sum, item) => sum + item.score, 0) / competencies.length)
+      : 0;
     return {
-      key: definition.key,
-      label: definition.label,
-      score: Math.round(scoreRaw * 100),
-      delta,
-      trend: delta >= 3 ? 'up' : (delta <= -3 ? 'down' : 'steady'),
+      competencies,
+      strongest,
+      weakest,
+      fastest_growth: fastestGrowth,
+      average,
+      populated_count: hasGradeSignals ? competencies.length : 0,
     };
-  });
-
-  const sortedByScore = [...competencies].sort((a, b) => b.score - a.score);
-  const sortedByDelta = [...competencies].sort((a, b) => b.delta - a.delta);
-  const strongestCompetency = sortedByScore[0] || null;
-  const weakestCompetency = sortedByScore[sortedByScore.length - 1] || null;
-  const fastestGrowingCompetency = sortedByDelta[0] || null;
-  const competencyAverage = competencies.length
-    ? Math.round(competencies.reduce((sum, item) => sum + item.score, 0) / competencies.length)
+  };
+  let competencyProfile = buildHeuristicProfile();
+  if (Array.isArray(competencySignalRows) && competencySignalRows.length) {
+    competencyProfile = buildCompetencyProfileFromSignalRows({
+      signalRows: competencySignalRows,
+      includeEmpty: true,
+      now,
+    });
+  }
+  const competencies = Array.isArray(competencyProfile.competencies)
+    ? competencyProfile.competencies
+    : [];
+  const strongestCompetency = competencyProfile.strongest || null;
+  const weakestCompetency = competencyProfile.weakest || null;
+  const fastestGrowingCompetency = competencyProfile.fastest_growth || null;
+  const competencyAverage = Number.isFinite(Number(competencyProfile.average))
+    ? Number(competencyProfile.average)
     : 0;
 
   const activitySummary = {
@@ -6081,11 +6540,19 @@ async function buildMyDayWhatIfForecast({
     if (columnIds.length) {
       const rows = await db.all(
         `
-          SELECT column_id, score
-          FROM journal_grades
-          WHERE student_id = ?
-            AND column_id IN (${columnIds.map(() => '?').join(',')})
-            AND deleted_at IS NULL
+          SELECT
+            jg.column_id,
+            CASE
+              WHEN jgm.status = 'adjusted' AND jgm.moderated_score IS NOT NULL THEN jgm.moderated_score
+              ELSE jg.score
+            END AS score
+          FROM journal_grades jg
+          LEFT JOIN journal_grade_moderations jgm
+            ON jgm.column_id = jg.column_id
+           AND jgm.student_id = jg.student_id
+          WHERE jg.student_id = ?
+            AND jg.column_id IN (${columnIds.map(() => '?').join(',')})
+            AND jg.deleted_at IS NULL
         `,
         [userId, ...columnIds]
       );
@@ -8008,6 +8475,28 @@ const JOURNAL_APPEAL_STATUS_META = {
 const JOURNAL_APPEAL_REASON_MAX_LENGTH = 2400;
 const JOURNAL_APPEAL_COMMENT_MAX_LENGTH = 2400;
 const JOURNAL_APPEAL_SLA_HOURS = 72;
+const JOURNAL_MODERATION_STATUSES = ['pending', 'approved', 'adjusted', 'rejected'];
+const JOURNAL_MODERATION_STATUS_META = {
+  pending: { key: 'pending', label: 'Очікує другого рецензента' },
+  approved: { key: 'approved', label: 'Підтверджено' },
+  adjusted: { key: 'adjusted', label: 'Скориговано' },
+  rejected: { key: 'rejected', label: 'Відхилено' },
+};
+const JOURNAL_MODERATION_COMMENT_MAX_LENGTH = 2400;
+const COMPETENCY_DEFINITIONS = [
+  { key: 'leadership', label: 'Лідерство' },
+  { key: 'negotiation', label: 'Перемовини' },
+  { key: 'communication', label: 'Ораторика' },
+  { key: 'analysis', label: 'Аналітика' },
+  { key: 'teamwork', label: 'Командність' },
+  { key: 'self_organization', label: 'Самоорганізація' },
+  { key: 'critical_thinking', label: 'Критичне мислення' },
+  { key: 'resilience', label: 'Стійкість' },
+];
+const COMPETENCY_KEYS = new Set(COMPETENCY_DEFINITIONS.map((item) => item.key));
+const COMPETENCY_SCORE_MIN = 0;
+const COMPETENCY_SCORE_MAX = 5;
+const COMPETENCY_NOTE_MAX_LENGTH = 1200;
 const ATTENDANCE_STATUS_OPTIONS = ['present', 'late', 'absent', 'excused'];
 const ATTENDANCE_STATUS_META = {
   present: { key: 'present', label: 'Присутній' },
@@ -8055,6 +8544,27 @@ const normalizeJournalAppealStatus = (rawValue) => {
 };
 const normalizeJournalAppealReason = (rawValue) => String(rawValue || '').trim().slice(0, JOURNAL_APPEAL_REASON_MAX_LENGTH);
 const normalizeJournalAppealComment = (rawValue) => String(rawValue || '').trim().slice(0, JOURNAL_APPEAL_COMMENT_MAX_LENGTH);
+const normalizeJournalModerationStatus = (rawValue) => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  return JOURNAL_MODERATION_STATUSES.includes(normalized) ? normalized : 'pending';
+};
+const normalizeJournalModerationComment = (rawValue) => String(rawValue || '').trim().slice(0, JOURNAL_MODERATION_COMMENT_MAX_LENGTH);
+const normalizeCompetencyKey = (rawValue) => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  return COMPETENCY_KEYS.has(normalized) ? normalized : '';
+};
+const normalizeCompetencyNote = (rawValue) => String(rawValue || '').trim().slice(0, COMPETENCY_NOTE_MAX_LENGTH);
+const parseCompetencyScore = (rawValue) => {
+  const parsed = Number(String(rawValue || '').replace(',', '.'));
+  if (!Number.isFinite(parsed)) return NaN;
+  const normalized = Math.round(parsed * 100) / 100;
+  if (normalized < COMPETENCY_SCORE_MIN || normalized > COMPETENCY_SCORE_MAX) return NaN;
+  return normalized;
+};
+const getCompetencyLabelByKey = (key) => {
+  const found = COMPETENCY_DEFINITIONS.find((item) => item.key === key);
+  return found ? found.label : key;
+};
 
 const normalizeAttendanceStatus = (rawValue) => {
   const normalized = String(rawValue || '').trim().toLowerCase();
@@ -8282,6 +8792,161 @@ const getDefaultMaxPointsByType = (gradingSettings, columnType) => {
   if (columnType === 'exam') return Number(safeSettings.exam_max_points || 40);
   if (columnType === 'credit') return Number(safeSettings.credit_max_points || 20);
   return Number(safeSettings.custom_max_points || 10);
+};
+
+const isJournalModerationRequiredColumn = (column) => {
+  const type = normalizeColumnType(column?.column_type);
+  if (type === 'exam' || type === 'credit') return true;
+  return Number(column?.is_credit || 0) === 1;
+};
+
+const resolveEffectiveGradeScore = (grade, moderation) => {
+  const originalScore = Number(grade?.score);
+  const moderatedScore = Number(moderation?.moderated_score);
+  const moderationStatus = normalizeJournalModerationStatus(moderation?.status);
+  if (moderationStatus === 'adjusted' && Number.isFinite(moderatedScore)) {
+    return moderatedScore;
+  }
+  return Number.isFinite(originalScore) ? originalScore : null;
+};
+
+async function upsertJournalModerationPending({
+  column,
+  studentId,
+  score,
+  actorUserId,
+}) {
+  if (!isJournalModerationRequiredColumn(column)) return;
+  const safeScore = Number(score);
+  if (!Number.isFinite(safeScore)) return;
+  await db.run(
+    `
+      INSERT INTO journal_grade_moderations
+      (
+        subject_id,
+        course_id,
+        semester_id,
+        column_id,
+        student_id,
+        status,
+        original_score,
+        moderated_score,
+        moderation_comment,
+        created_by,
+        created_at,
+        reviewed_by,
+        reviewed_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, 'pending', ?, NULL, NULL, ?, NOW(), NULL, NULL, NOW())
+      ON CONFLICT (column_id, student_id)
+      DO UPDATE SET
+        status = 'pending',
+        original_score = EXCLUDED.original_score,
+        moderated_score = NULL,
+        moderation_comment = NULL,
+        reviewed_by = NULL,
+        reviewed_at = NULL,
+        updated_at = NOW()
+    `,
+    [
+      Number(column.subject_id || 0),
+      Number(column.course_id || 0) || null,
+      column.semester_id ? Number(column.semester_id) : null,
+      Number(column.id || 0),
+      Number(studentId || 0),
+      safeScore,
+      Number(actorUserId || 0) || null,
+    ]
+  );
+}
+
+const buildCompetencyProfileFromSignalRows = ({
+  signalRows = [],
+  includeEmpty = true,
+  now = new Date(),
+}) => {
+  const safeRows = Array.isArray(signalRows) ? signalRows : [];
+  const nowMs = now.getTime();
+  const recentSince = nowMs - (30 * 24 * 60 * 60 * 1000);
+  const previousSince = nowMs - (60 * 24 * 60 * 60 * 1000);
+
+  const scoreByKey = new Map();
+  COMPETENCY_DEFINITIONS.forEach((item) => {
+    scoreByKey.set(item.key, {
+      all: [],
+      recent: [],
+      previous: [],
+    });
+  });
+
+  safeRows.forEach((row) => {
+    const key = normalizeCompetencyKey(row?.competency_key);
+    if (!key || !scoreByKey.has(key)) return;
+    const score = Number(row?.score);
+    if (!Number.isFinite(score)) return;
+    const clippedScore = Math.max(COMPETENCY_SCORE_MIN, Math.min(COMPETENCY_SCORE_MAX, score));
+    const createdAtMs = row?.created_at ? new Date(row.created_at).getTime() : Number.NaN;
+    const bucket = scoreByKey.get(key);
+    bucket.all.push(clippedScore);
+    if (Number.isFinite(createdAtMs) && createdAtMs >= recentSince) {
+      bucket.recent.push(clippedScore);
+    } else if (Number.isFinite(createdAtMs) && createdAtMs >= previousSince && createdAtMs < recentSince) {
+      bucket.previous.push(clippedScore);
+    }
+  });
+
+  const toPercent = (value) => Math.round((Math.max(COMPETENCY_SCORE_MIN, Math.min(COMPETENCY_SCORE_MAX, value)) / COMPETENCY_SCORE_MAX) * 100);
+  const avg = (values) => {
+    if (!Array.isArray(values) || !values.length) return null;
+    const sum = values.reduce((acc, item) => acc + Number(item || 0), 0);
+    return sum / values.length;
+  };
+
+  const competencies = COMPETENCY_DEFINITIONS.map((definition) => {
+    const bucket = scoreByKey.get(definition.key) || { all: [], recent: [], previous: [] };
+    const allAvg = avg(bucket.all);
+    const recentAvg = avg(bucket.recent);
+    const previousAvg = avg(bucket.previous);
+    const score = allAvg === null ? null : toPercent(allAvg);
+    const delta = (recentAvg === null || previousAvg === null)
+      ? 0
+      : (toPercent(recentAvg) - toPercent(previousAvg));
+    return {
+      key: definition.key,
+      label: definition.label,
+      score: score === null ? 0 : score,
+      delta: Math.round(delta),
+      trend: delta >= 3 ? 'up' : (delta <= -3 ? 'down' : 'steady'),
+      has_data: allAvg !== null,
+    };
+  }).filter((item) => includeEmpty || item.has_data);
+
+  const withData = competencies.filter((item) => item.has_data);
+  const sortedByScore = [...withData].sort((a, b) => b.score - a.score);
+  const sortedByDelta = [...withData].sort((a, b) => b.delta - a.delta);
+  const strongest = sortedByScore[0] || null;
+  const weakest = sortedByScore.length ? sortedByScore[sortedByScore.length - 1] : null;
+  const fastestGrowth = sortedByDelta[0] || null;
+  const average = withData.length
+    ? Math.round(withData.reduce((sum, item) => sum + Number(item.score || 0), 0) / withData.length)
+    : 0;
+
+  return {
+    competencies: competencies.map((item) => ({
+      key: item.key,
+      label: item.label,
+      score: Math.max(0, Math.min(100, Number(item.score || 0))),
+      delta: Number(item.delta || 0),
+      trend: item.trend || 'steady',
+      has_data: Boolean(item.has_data),
+    })),
+    strongest,
+    weakest,
+    fastest_growth: fastestGrowth,
+    average,
+    populated_count: withData.length,
+  };
 };
 
 const buildHomeworkJournalTitle = (homeworkRow) => {
@@ -9643,11 +10308,25 @@ async function buildJournalMatrix({
   if (columnIds.length && studentIds.length) {
     const rows = await db.all(
       `
-        SELECT column_id, student_id, score, teacher_comment, submission_status, graded_at
-        FROM journal_grades
-        WHERE column_id IN (${columnIds.map(() => '?').join(',')})
-          AND student_id IN (${studentIds.map(() => '?').join(',')})
-          AND deleted_at IS NULL
+        SELECT
+          jg.column_id,
+          jg.student_id,
+          jg.score,
+          jg.teacher_comment,
+          jg.submission_status,
+          jg.graded_at,
+          jg.graded_by,
+          jgm.status AS moderation_status,
+          jgm.moderated_score,
+          jgm.reviewed_at AS moderation_reviewed_at,
+          jgm.reviewed_by AS moderation_reviewed_by
+        FROM journal_grades jg
+        LEFT JOIN journal_grade_moderations jgm
+          ON jgm.column_id = jg.column_id
+         AND jgm.student_id = jg.student_id
+        WHERE jg.column_id IN (${columnIds.map(() => '?').join(',')})
+          AND jg.student_id IN (${studentIds.map(() => '?').join(',')})
+          AND jg.deleted_at IS NULL
       `,
       [...columnIds, ...studentIds]
     );
@@ -9655,10 +10334,21 @@ async function buildJournalMatrix({
       (rows || []).map((row) => [
         `${Number(row.column_id)}|${Number(row.student_id)}`,
         {
-          score: Number(row.score),
+          score: resolveEffectiveGradeScore(
+            { score: row.score },
+            { status: row.moderation_status, moderated_score: row.moderated_score }
+          ),
+          original_score: Number(row.score),
           teacher_comment: row.teacher_comment || '',
           submission_status: String(row.submission_status || ''),
           graded_at: row.graded_at || null,
+          graded_by: Number.isFinite(Number(row.graded_by)) ? Number(row.graded_by) : null,
+          moderation_status: normalizeJournalModerationStatus(row.moderation_status),
+          moderation_score: Number.isFinite(Number(row.moderated_score)) ? Number(row.moderated_score) : null,
+          moderation_reviewed_at: row.moderation_reviewed_at || null,
+          moderation_reviewed_by: Number.isFinite(Number(row.moderation_reviewed_by))
+            ? Number(row.moderation_reviewed_by)
+            : null,
         },
       ])
     );
@@ -10468,7 +11158,7 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
 
     const grade = await db.get(
       `
-        SELECT score, teacher_comment, submission_status, graded_at
+        SELECT score, teacher_comment, submission_status, graded_at, graded_by
         FROM journal_grades
         WHERE column_id = ? AND student_id = ?
           AND deleted_at IS NULL
@@ -10549,11 +11239,76 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       [columnId, studentId]
     );
     const canManageAppeals = teacherJournalMode && !subjectIsClosed && !isJournalColumnLocked(column);
+    const moderationRow = await db.get(
+      `
+        SELECT
+          jgm.status,
+          jgm.original_score,
+          jgm.moderated_score,
+          jgm.moderation_comment,
+          jgm.created_at,
+          jgm.updated_at,
+          jgm.reviewed_at,
+          jgm.created_by,
+          jgm.reviewed_by,
+          uc.full_name AS created_by_name,
+          ur.full_name AS reviewed_by_name
+        FROM journal_grade_moderations jgm
+        LEFT JOIN users uc ON uc.id = jgm.created_by
+        LEFT JOIN users ur ON ur.id = jgm.reviewed_by
+        WHERE jgm.column_id = ?
+          AND jgm.student_id = ?
+        LIMIT 1
+      `,
+      [columnId, studentId]
+    );
+    const columnNeedsModeration = isJournalModerationRequiredColumn(column);
+    const canManageModeration = (
+      teacherJournalMode
+      && !subjectIsClosed
+      && !isJournalColumnLocked(column)
+      && columnNeedsModeration
+      && Boolean(grade && Number.isFinite(Number(grade.score)))
+      && Number(req.session.user.id) !== Number(grade?.graded_by || 0)
+    );
+    const competencyRows = await db.all(
+      `
+        SELECT
+          ce.id,
+          ce.competency_key,
+          ce.score,
+          ce.note,
+          ce.source_type,
+          ce.created_at,
+          ce.created_by,
+          u.full_name AS created_by_name
+        FROM competency_evaluations ce
+        LEFT JOIN users u ON u.id = ce.created_by
+        WHERE ce.subject_id = ?
+          AND ce.student_id = ?
+          AND (
+            ce.column_id = ?
+            OR ce.column_id IS NULL
+          )
+        ORDER BY ce.created_at DESC, ce.id DESC
+        LIMIT 12
+      `,
+      [Number(column.subject_id), studentId, columnId]
+    );
+    const canAddCompetencySignal = (
+      teacherJournalMode
+      && !subjectIsClosed
+      && !isJournalColumnLocked(column)
+    );
     const canCreateAppeals = (
       !teacherJournalMode
       && !subjectIsClosed
       && Number(req.session.user.id) === studentId
       && Boolean(grade && Number.isFinite(Number(grade.score)))
+    );
+    const effectiveScore = resolveEffectiveGradeScore(
+      grade || null,
+      moderationRow || null
     );
 
     return res.json({
@@ -10574,7 +11329,9 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       },
       grade: grade
         ? {
-            score: Number(grade.score),
+            score: Number.isFinite(Number(effectiveScore)) ? Number(effectiveScore) : Number(grade.score),
+            original_score: Number(grade.score),
+            graded_by: Number.isFinite(Number(grade.graded_by)) ? Number(grade.graded_by) : null,
             teacher_comment: grade.teacher_comment || '',
             submission_status: String(grade.submission_status || submissionStatus),
             graded_at: grade.graded_at || null,
@@ -10597,6 +11354,57 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       can_manage_retakes: canManageRetakes,
       can_create_appeals: canCreateAppeals,
       can_manage_appeals: canManageAppeals,
+      can_manage_moderation: canManageModeration,
+      can_add_competency_signal: canAddCompetencySignal,
+      moderation_meta: {
+        required: columnNeedsModeration,
+        statuses: JOURNAL_MODERATION_STATUSES.map((key) => ({
+          key,
+          label: JOURNAL_MODERATION_STATUS_META[key]?.label || key,
+        })),
+        comment_max_length: JOURNAL_MODERATION_COMMENT_MAX_LENGTH,
+      },
+      moderation: moderationRow
+        ? {
+            status: normalizeJournalModerationStatus(moderationRow.status),
+            status_label: JOURNAL_MODERATION_STATUS_META[normalizeJournalModerationStatus(moderationRow.status)]?.label
+              || normalizeJournalModerationStatus(moderationRow.status),
+            original_score: Number.isFinite(Number(moderationRow.original_score))
+              ? Number(moderationRow.original_score)
+              : null,
+            moderated_score: Number.isFinite(Number(moderationRow.moderated_score))
+              ? Number(moderationRow.moderated_score)
+              : null,
+            moderation_comment: moderationRow.moderation_comment || '',
+            created_at: moderationRow.created_at || null,
+            updated_at: moderationRow.updated_at || null,
+            reviewed_at: moderationRow.reviewed_at || null,
+            created_by_name: moderationRow.created_by_name || '',
+            reviewed_by_name: moderationRow.reviewed_by_name || '',
+          }
+        : null,
+      competency_meta: {
+        definitions: COMPETENCY_DEFINITIONS.map((item) => ({
+          key: item.key,
+          label: item.label,
+        })),
+        score_min: COMPETENCY_SCORE_MIN,
+        score_max: COMPETENCY_SCORE_MAX,
+        note_max_length: COMPETENCY_NOTE_MAX_LENGTH,
+      },
+      competency_signals: (competencyRows || []).map((row) => {
+        const key = normalizeCompetencyKey(row.competency_key);
+        return {
+          id: Number(row.id),
+          competency_key: key || String(row.competency_key || ''),
+          competency_label: getCompetencyLabelByKey(key || String(row.competency_key || '')),
+          score: Number.isFinite(Number(row.score)) ? Number(row.score) : null,
+          note: row.note || '',
+          source_type: String(row.source_type || 'manual'),
+          created_at: row.created_at || null,
+          created_by_name: row.created_by_name || '',
+        };
+      }),
       retake_meta: {
         kinds: JOURNAL_RETAKE_KINDS.map((key) => ({
           key,
@@ -10800,6 +11608,12 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
         submissionStatus,
       ]
     );
+    await upsertJournalModerationPending({
+      column,
+      studentId,
+      score,
+      actorUserId: Number(req.session.user.id),
+    });
 
     logActivity(
       db,
@@ -11009,6 +11823,12 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
           submissionStatus,
         ]
       );
+      await upsertJournalModerationPending({
+        column,
+        studentId: entry.student_id,
+        score,
+        actorUserId: Number(req.session.user.id),
+      });
       updatedCount += 1;
     }
 
@@ -11125,6 +11945,14 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
           AND deleted_at IS NULL
       `,
       [Number(req.session.user.id), columnId, studentId]
+    );
+    await db.run(
+      `
+        DELETE FROM journal_grade_moderations
+        WHERE column_id = ?
+          AND student_id = ?
+      `,
+      [columnId, studentId]
     );
 
     logActivity(
@@ -11554,6 +12382,48 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
           `,
           [columnId, studentId, score, teacherComment || null, Number(req.session.user.id)]
         );
+        if (isJournalModerationRequiredColumn(column)) {
+          await query(
+            `
+              INSERT INTO journal_grade_moderations
+              (
+                subject_id,
+                course_id,
+                semester_id,
+                column_id,
+                student_id,
+                status,
+                original_score,
+                moderated_score,
+                moderation_comment,
+                created_by,
+                created_at,
+                reviewed_by,
+                reviewed_at,
+                updated_at
+              )
+              VALUES (?, ?, ?, ?, ?, 'pending', ?, NULL, NULL, ?, NOW(), NULL, NULL, NOW())
+              ON CONFLICT (column_id, student_id)
+              DO UPDATE SET
+                status = 'pending',
+                original_score = EXCLUDED.original_score,
+                moderated_score = NULL,
+                moderation_comment = NULL,
+                reviewed_by = NULL,
+                reviewed_at = NULL,
+                updated_at = NOW()
+            `,
+            [
+              Number(column.subject_id || 0),
+              Number(column.course_id || 0) || null,
+              column.semester_id ? Number(column.semester_id) : null,
+              columnId,
+              studentId,
+              score,
+              Number(req.session.user.id),
+            ]
+          );
+        }
       }
     });
 
@@ -11896,6 +12766,321 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
     );
     return res.redirect(
       `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Апеляцію оновлено')}`
+    );
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, res) => {
+  const columnId = Number(req.body.column_id);
+  const studentId = Number(req.body.student_id);
+  const status = normalizeJournalModerationStatus(req.body.status);
+  const moderationComment = normalizeJournalModerationComment(req.body.moderation_comment);
+  const moderatedScoreRaw = String(req.body.moderated_score || '').trim();
+  const parsedModeratedScore = moderatedScoreRaw ? Number(moderatedScoreRaw.replace(',', '.')) : NaN;
+  const moderatedScore = moderatedScoreRaw
+    ? (Number.isFinite(parsedModeratedScore) ? Math.round(parsedModeratedScore * 100) / 100 : NaN)
+    : null;
+
+  if (
+    !Number.isFinite(columnId) || columnId < 1
+    || !Number.isFinite(studentId) || studentId < 1
+  ) {
+    return res.redirect('/journal?err=Invalid%20moderation%20target');
+  }
+  if (moderatedScoreRaw && !Number.isFinite(moderatedScore)) {
+    return res.redirect('/journal?err=Invalid%20moderation%20score');
+  }
+  if (status === 'adjusted' && !Number.isFinite(moderatedScore)) {
+    return res.redirect('/journal?err=Для%20статусу%20Скориговано%20потрібно%20вказати%20новий%20бал');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.*,
+          h.group_number AS homework_group_number
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+        LIMIT 1
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.redirect('/journal?err=Column%20not%20found');
+    }
+    if (isJournalColumnLocked(column)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+    }
+    if (!isJournalModerationRequiredColumn(column)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Модерація%20доступна%20лише%20для%20екзаменів%20та%20заліків`);
+    }
+    const maxPoints = parsePositiveDecimal(column.max_points, 10);
+    if (Number.isFinite(moderatedScore) && (moderatedScore < 0 || moderatedScore > maxPoints)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Moderation%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
+    }
+
+    const studentRow = await db.get(
+      `
+        SELECT sg.group_number
+        FROM student_groups sg
+        WHERE sg.subject_id = ? AND sg.student_id = ?
+        LIMIT 1
+      `,
+      [column.subject_id, studentId]
+    );
+    if (!studentRow) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const studentGroup = Number(studentRow.group_number || 0);
+      if (!access.allowAll && !access.groups.has(studentGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    const grade = await db.get(
+      `
+        SELECT score, graded_by
+        FROM journal_grades
+        WHERE column_id = ?
+          AND student_id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [columnId, studentId]
+    );
+    if (!grade || !Number.isFinite(Number(grade.score))) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Немає%20оцінки%20для%20модерації`);
+    }
+    if (Number(req.session.user.id) === Number(grade.graded_by || 0)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Той%20самий%20викладач%20не%20може%20погодити%20власну%20оцінку`);
+    }
+
+    const moderatedScoreToStore = status === 'adjusted' && Number.isFinite(moderatedScore)
+      ? moderatedScore
+      : null;
+    const originalScore = Math.round(Number(grade.score) * 100) / 100;
+    await db.run(
+      `
+        INSERT INTO journal_grade_moderations
+          (
+            subject_id,
+            course_id,
+            semester_id,
+            column_id,
+            student_id,
+            status,
+            original_score,
+            moderated_score,
+            moderation_comment,
+            created_by,
+            created_at,
+            reviewed_by,
+            reviewed_at,
+            updated_at
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW(), NOW())
+        ON CONFLICT (column_id, student_id)
+        DO UPDATE SET
+          status = EXCLUDED.status,
+          original_score = EXCLUDED.original_score,
+          moderated_score = EXCLUDED.moderated_score,
+          moderation_comment = EXCLUDED.moderation_comment,
+          reviewed_by = EXCLUDED.reviewed_by,
+          reviewed_at = EXCLUDED.reviewed_at,
+          updated_at = NOW()
+      `,
+      [
+        Number(column.subject_id || 0),
+        Number(column.course_id || 0) || null,
+        column.semester_id ? Number(column.semester_id) : null,
+        columnId,
+        studentId,
+        status,
+        originalScore,
+        moderatedScoreToStore,
+        moderationComment || null,
+        Number(grade.graded_by || req.session.user.id),
+        Number(req.session.user.id),
+      ]
+    );
+
+    logActivity(
+      db,
+      req,
+      'journal_moderation_update',
+      'journal_grade_moderation',
+      null,
+      {
+        subject_id: Number(column.subject_id),
+        column_id: columnId,
+        student_id: studentId,
+        status,
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(
+      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Модерацію оцінки оновлено')}`
+    );
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/competency/add', requireLogin, writeLimiter, async (req, res) => {
+  const columnId = Number(req.body.column_id);
+  const studentId = Number(req.body.student_id);
+  const competencyKey = normalizeCompetencyKey(req.body.competency_key);
+  const score = parseCompetencyScore(req.body.score);
+  const note = normalizeCompetencyNote(req.body.note);
+
+  if (
+    !Number.isFinite(columnId) || columnId < 1
+    || !Number.isFinite(studentId) || studentId < 1
+  ) {
+    return res.redirect('/journal?err=Invalid%20competency%20target');
+  }
+  if (!competencyKey) {
+    return res.redirect('/journal?err=Invalid%20competency%20key');
+  }
+  if (!Number.isFinite(score)) {
+    return res.redirect(`/journal?err=Competency%20score%20must%20be%20between%20${COMPETENCY_SCORE_MIN}%20and%20${COMPETENCY_SCORE_MAX}`);
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.*,
+          h.group_number AS homework_group_number
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+        LIMIT 1
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.redirect('/journal?err=Column%20not%20found');
+    }
+    if (isJournalColumnLocked(column)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+    }
+
+    const studentRow = await db.get(
+      `
+        SELECT sg.group_number
+        FROM student_groups sg
+        WHERE sg.subject_id = ? AND sg.student_id = ?
+        LIMIT 1
+      `,
+      [column.subject_id, studentId]
+    );
+    if (!studentRow) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const studentGroup = Number(studentRow.group_number || 0);
+      if (!access.allowAll && !access.groups.has(studentGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    await db.run(
+      `
+        INSERT INTO competency_evaluations
+          (
+            course_id,
+            semester_id,
+            subject_id,
+            column_id,
+            student_id,
+            competency_key,
+            score,
+            note,
+            source_type,
+            created_by,
+            created_at,
+            updated_at
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, NOW(), NOW())
+      `,
+      [
+        Number(column.course_id || 0) || null,
+        column.semester_id ? Number(column.semester_id) : null,
+        Number(column.subject_id || 0),
+        columnId,
+        studentId,
+        competencyKey,
+        score,
+        note || null,
+        Number(req.session.user.id),
+      ]
+    );
+
+    logActivity(
+      db,
+      req,
+      'journal_competency_add',
+      'competency_evaluation',
+      null,
+      {
+        subject_id: Number(column.subject_id),
+        column_id: columnId,
+        student_id: studentId,
+        competency_key: competencyKey,
+        score,
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(
+      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Компетентнісний сигнал додано')}`
     );
   } catch (err) {
     return res.redirect('/journal?err=Database%20error');
@@ -15133,6 +16318,25 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     let weeklyTeamwork = weeklyLabels.map(() => 0);
     let weeklyUserRoles = ['student', 'starosta', 'deanery', 'admin'];
     let weeklyUserSeries = weeklyUserRoles.map(() => weeklyLabels.map(() => 0));
+    let coursePulse = {
+      generated_at: new Date().toISOString(),
+      course_id: Number(courseId || 0),
+      semester_id: activeSemester ? Number(activeSemester.id) : null,
+      summary: {
+        students_total: 0,
+        students_at_risk: 0,
+        high_risk_students: 0,
+        risk_students_share: 0,
+        overdue_homework_total: 0,
+        sla_submissions_total: 0,
+        sla_ungraded_total: 0,
+        sla_overdue_ungraded_total: 0,
+        sla_overdue_share: 0,
+        attendance_absent_share: 0,
+        attendance_late_share: 0,
+      },
+      subjects: [],
+    };
     try {
       const weeklyParams = activeSemester
         ? [courseId, weekStart.toISOString(), activeSemester.id]
@@ -18187,6 +19391,15 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
     } catch (weeklyErr) {
       console.error('Database error (admin.dashboard.weekly)', weeklyErr);
     }
+    try {
+      coursePulse = await buildCoursePulseAnalytics({
+        courseId,
+        semesterId: activeSemester ? Number(activeSemester.id) : null,
+        now: new Date(),
+      });
+    } catch (pulseErr) {
+      console.error('Database error (admin.dashboard.coursePulse)', pulseErr);
+    }
 
     return res.render('admin-overview', {
       username: req.session.user.username,
@@ -18199,6 +19412,7 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
       weeklyTeamwork,
       weeklyUserRoles,
       weeklyUserSeries,
+      coursePulse,
       limitedStaffView: !isAdmin,
       allowCourseSelect,
       backLink: isAdmin

@@ -708,6 +708,74 @@
                 </form>
               <% } %>
             </section>
+            <section id="journalModerationSection" class="journal-moderation-section mb-4">
+              <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                  <div class="text-muted small mb-1">Модерація оцінки (2-й рецензент)</div>
+                  <div class="small text-muted">Для екзаменів/заліків: підтвердження або коригування оцінки незалежним рецензентом.</div>
+                </div>
+              </div>
+              <div id="journalModerationCurrent" class="journal-moderation-current">
+                <div class="text-muted small">Модерація недоступна для цього типу колонки.</div>
+              </div>
+              <% if (canEditJournal) { %>
+                <form id="journalModerationForm" method="POST" action="/journal/moderation/update" class="journal-moderation-form mt-3" autocomplete="off">
+                  <input type="hidden" name="column_id" id="journalModerationColumnId" />
+                  <input type="hidden" name="student_id" id="journalModerationStudentId" />
+                  <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label form-label-sm mb-1">Рішення</label>
+                      <select class="form-select form-select-sm" name="status" id="journalModerationStatus"></select>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label form-label-sm mb-1">Скоригований бал</label>
+                      <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="moderated_score" id="journalModerationScore" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <button class="btn btn-sm btn-outline-primary w-100" type="submit" id="journalModerationSubmitBtn">Зберегти модерацію</button>
+                    </div>
+                  </div>
+                  <div class="mt-2">
+                    <label class="form-label form-label-sm mb-1">Коментар модератора (опц.)</label>
+                    <textarea class="form-control form-control-sm" name="moderation_comment" id="journalModerationComment" rows="2" maxlength="2400" placeholder="Коротко поясніть рішення"></textarea>
+                  </div>
+                </form>
+              <% } %>
+            </section>
+            <section id="journalCompetencySection" class="journal-competency-section mb-4">
+              <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                  <div class="text-muted small mb-1">Компетентнісні сигнали</div>
+                  <div class="small text-muted">Оцінка 0-5 для компетенцій по цій роботі з короткою нотаткою.</div>
+                </div>
+              </div>
+              <div id="journalCompetencyList" class="journal-competency-list">
+                <div class="text-muted small">Сигналів поки немає.</div>
+              </div>
+              <% if (canEditJournal) { %>
+                <form id="journalCompetencyCreateForm" method="POST" action="/journal/competency/add" class="journal-competency-create-form mt-3" autocomplete="off">
+                  <input type="hidden" name="column_id" id="journalCompetencyCreateColumnId" />
+                  <input type="hidden" name="student_id" id="journalCompetencyCreateStudentId" />
+                  <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-5">
+                      <label class="form-label form-label-sm mb-1">Компетенція</label>
+                      <select class="form-select form-select-sm" name="competency_key" id="journalCompetencyCreateKey"></select>
+                    </div>
+                    <div class="col-12 col-md-3">
+                      <label class="form-label form-label-sm mb-1">Оцінка (0-5)</label>
+                      <input class="form-control form-control-sm" type="number" step="0.1" min="0" max="5" name="score" id="journalCompetencyCreateScore" required />
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <button class="btn btn-sm btn-outline-info w-100" type="submit" id="journalCompetencyCreateSubmitBtn">Додати сигнал</button>
+                    </div>
+                  </div>
+                  <div class="mt-2">
+                    <label class="form-label form-label-sm mb-1">Нотатка (опц.)</label>
+                    <textarea class="form-control form-control-sm" name="note" id="journalCompetencyCreateNote" rows="2" maxlength="1200" placeholder="Що саме відмічаєте в роботі"></textarea>
+                  </div>
+                </form>
+              <% } %>
+            </section>
             <form id="journalGradeForm" method="POST" action="/journal/grades/save" autocomplete="off">
               <input type="hidden" name="column_id" id="journalGradeColumnId" />
               <input type="hidden" name="student_id" id="journalGradeStudentId" />
@@ -870,6 +938,24 @@
       const appealCreateRequestedScore = document.getElementById('journalAppealCreateRequestedScore');
       const appealCreateReason = document.getElementById('journalAppealCreateReason');
       const appealCreateSubmitBtn = document.getElementById('journalAppealCreateSubmitBtn');
+      const moderationSectionEl = document.getElementById('journalModerationSection');
+      const moderationCurrentEl = document.getElementById('journalModerationCurrent');
+      const moderationForm = document.getElementById('journalModerationForm');
+      const moderationColumnInput = document.getElementById('journalModerationColumnId');
+      const moderationStudentInput = document.getElementById('journalModerationStudentId');
+      const moderationStatusInput = document.getElementById('journalModerationStatus');
+      const moderationScoreInput = document.getElementById('journalModerationScore');
+      const moderationCommentInput = document.getElementById('journalModerationComment');
+      const moderationSubmitBtn = document.getElementById('journalModerationSubmitBtn');
+      const competencySectionEl = document.getElementById('journalCompetencySection');
+      const competencyListEl = document.getElementById('journalCompetencyList');
+      const competencyCreateForm = document.getElementById('journalCompetencyCreateForm');
+      const competencyCreateColumnInput = document.getElementById('journalCompetencyCreateColumnId');
+      const competencyCreateStudentInput = document.getElementById('journalCompetencyCreateStudentId');
+      const competencyCreateKeyInput = document.getElementById('journalCompetencyCreateKey');
+      const competencyCreateScoreInput = document.getElementById('journalCompetencyCreateScore');
+      const competencyCreateNoteInput = document.getElementById('journalCompetencyCreateNote');
+      const competencyCreateSubmitBtn = document.getElementById('journalCompetencyCreateSubmitBtn');
 
       const bulkModalEl = document.getElementById('journalBulkModal');
       const bulkModal = bulkModalEl && window.bootstrap ? new window.bootstrap.Modal(bulkModalEl) : null;
@@ -921,6 +1007,13 @@
         if (key === 'approved') return 'status-chip--success';
         if (key === 'rejected') return 'status-chip--danger';
         if (key === 'in_review') return 'status-chip--info';
+        return 'status-chip--warning';
+      };
+      const getModerationStatusChipClass = (statusKey) => {
+        const key = String(statusKey || '').toLowerCase();
+        if (key === 'approved') return 'status-chip--success';
+        if (key === 'adjusted') return 'status-chip--info';
+        if (key === 'rejected') return 'status-chip--danger';
         return 'status-chip--warning';
       };
 
@@ -1344,6 +1437,168 @@
         appealListEl.innerHTML = html;
       }
 
+      function renderModeration(data) {
+        if (!moderationSectionEl || !moderationCurrentEl) return;
+        const moderationMeta = data && data.moderation_meta ? data.moderation_meta : {};
+        const moderation = data && data.moderation ? data.moderation : null;
+        const required = Boolean(moderationMeta.required);
+        const canManage = Boolean(canEditJournal && data && data.can_manage_moderation);
+        const maxScore = Number(data && data.column ? data.column.max_points : 0);
+        const statuses = Array.isArray(moderationMeta.statuses) && moderationMeta.statuses.length
+          ? moderationMeta.statuses
+          : [
+              { key: 'pending', label: 'Очікує рецензента' },
+              { key: 'approved', label: 'Підтверджено' },
+              { key: 'adjusted', label: 'Скориговано' },
+              { key: 'rejected', label: 'Відхилено' },
+            ];
+        const hasGrade = Boolean(data && data.grade && Number.isFinite(Number(data.grade.original_score)));
+        const effectiveScore = hasGrade ? formatNumber(data.grade.score) : '—';
+        const originalScore = hasGrade ? formatNumber(data.grade.original_score) : '—';
+        const statusKey = moderation && moderation.status ? String(moderation.status) : 'pending';
+        const statusLabel = moderation && moderation.status_label
+          ? String(moderation.status_label)
+          : String((statuses.find((item) => String(item.key) === statusKey) || {}).label || statusKey);
+        const statusClass = getModerationStatusChipClass(statusKey);
+
+        moderationSectionEl.classList.toggle('d-none', !required);
+        if (!required) return;
+
+        if (!hasGrade) {
+          moderationCurrentEl.innerHTML = '<div class="text-muted small">Спочатку потрібно виставити оцінку в цій клітинці.</div>';
+        } else if (!moderation) {
+          moderationCurrentEl.innerHTML = `
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <span class="status-chip status-chip--warning">Очікує рецензента</span>
+              <span class="small text-muted">Поточний бал: ${escapeHtml(originalScore)} / ${escapeHtml(formatNumber(maxScore))}</span>
+            </div>
+          `;
+        } else {
+          const createdAt = moderation.created_at ? formatDateTime(moderation.created_at) : '';
+          const reviewedAt = moderation.reviewed_at ? formatDateTime(moderation.reviewed_at) : '';
+          const reviewedBy = moderation.reviewed_by_name ? String(moderation.reviewed_by_name) : '';
+          const commentText = moderation.moderation_comment ? String(moderation.moderation_comment) : '';
+          const moderatedScoreDisplay = Number.isFinite(Number(moderation.moderated_score))
+            ? formatNumber(moderation.moderated_score)
+            : '—';
+          moderationCurrentEl.innerHTML = `
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <span class="status-chip ${statusClass}">${escapeHtml(statusLabel)}</span>
+              <span class="small text-muted">Оригінал: ${escapeHtml(originalScore)} / ${escapeHtml(formatNumber(maxScore))}</span>
+              <span class="small text-muted">Ефективний: ${escapeHtml(effectiveScore)}</span>
+              ${statusKey === 'adjusted' ? `<span class="small text-muted">Скориговано: ${escapeHtml(moderatedScoreDisplay)}</span>` : ''}
+            </div>
+            <div class="journal-moderation-meta">
+              ${createdAt ? `<span>Створено: ${escapeHtml(createdAt)}</span>` : ''}
+              ${reviewedAt ? `<span>Оновлено: ${escapeHtml(reviewedAt)}${reviewedBy ? ` · ${escapeHtml(reviewedBy)}` : ''}</span>` : ''}
+            </div>
+            ${commentText ? `<div class="journal-moderation-comment small">${escapeHtml(commentText)}</div>` : ''}
+          `;
+        }
+
+        if (!moderationForm) return;
+        moderationForm.classList.toggle('d-none', !canEditJournal);
+        if (moderationColumnInput) moderationColumnInput.value = String(currentCellColumnId || 0);
+        if (moderationStudentInput) moderationStudentInput.value = String(currentCellStudentId || 0);
+        if (moderationStatusInput) {
+          moderationStatusInput.innerHTML = statuses.map((item) => (
+            `<option value="${escapeHtml(String(item && item.key ? item.key : ''))}">${escapeHtml(String(item && item.label ? item.label : item.key || ''))}</option>`
+          )).join('');
+          moderationStatusInput.value = moderation && moderation.status ? String(moderation.status) : 'approved';
+          moderationStatusInput.disabled = !canManage || !hasGrade;
+        }
+        if (moderationScoreInput) {
+          moderationScoreInput.max = formatNumber(maxScore);
+          moderationScoreInput.value = moderation && Number.isFinite(Number(moderation.moderated_score))
+            ? String(moderation.moderated_score)
+            : '';
+        }
+        if (moderationCommentInput) {
+          moderationCommentInput.maxLength = Number(moderationMeta.comment_max_length || 2400);
+          moderationCommentInput.value = moderation && moderation.moderation_comment
+            ? String(moderation.moderation_comment)
+            : '';
+          moderationCommentInput.disabled = !canManage || !hasGrade;
+        }
+        if (moderationSubmitBtn) moderationSubmitBtn.disabled = !canManage || !hasGrade;
+        const syncModerationScoreState = () => {
+          const selectedStatus = moderationStatusInput ? String(moderationStatusInput.value || '') : '';
+          const needsScore = selectedStatus === 'adjusted';
+          if (moderationScoreInput) {
+            moderationScoreInput.required = needsScore;
+            moderationScoreInput.disabled = !canManage || !hasGrade || !needsScore;
+            if (!needsScore) moderationScoreInput.value = '';
+          }
+        };
+        if (moderationStatusInput) {
+          moderationStatusInput.onchange = syncModerationScoreState;
+        }
+        syncModerationScoreState();
+      }
+
+      function renderCompetencies(data) {
+        if (!competencySectionEl || !competencyListEl) return;
+        const competencyMeta = data && data.competency_meta ? data.competency_meta : {};
+        const definitions = Array.isArray(competencyMeta.definitions) ? competencyMeta.definitions : [];
+        const signals = Array.isArray(data && data.competency_signals) ? data.competency_signals : [];
+        const canAdd = Boolean(canEditJournal && data && data.can_add_competency_signal);
+        const scoreMin = Number(competencyMeta.score_min ?? 0);
+        const scoreMax = Number(competencyMeta.score_max ?? 5);
+        const noteMaxLength = Number(competencyMeta.note_max_length || 1200);
+
+        if (!signals.length) {
+          competencyListEl.innerHTML = '<div class="text-muted small">Сигналів поки немає.</div>';
+        } else {
+          competencyListEl.innerHTML = signals.map((item) => {
+            const label = String(item && item.competency_label ? item.competency_label : (item && item.competency_key ? item.competency_key : 'Компетенція'));
+            const score = Number(item && item.score);
+            const scoreDisplay = Number.isFinite(score) ? formatNumber(score) : '—';
+            const createdAt = item && item.created_at ? formatDateTime(item.created_at) : '';
+            const author = item && item.created_by_name ? String(item.created_by_name) : '';
+            const sourceType = String(item && item.source_type ? item.source_type : 'manual');
+            const sourceLabel = sourceType === 'column' ? 'Авто' : 'Ручний';
+            const note = String(item && item.note ? item.note : '');
+            return `
+              <article class="journal-competency-item">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <strong>${escapeHtml(label)}</strong>
+                  <span class="status-chip status-chip--info">${escapeHtml(scoreDisplay)} / ${escapeHtml(formatNumber(scoreMax))}</span>
+                  <span class="status-chip status-chip--neutral">${escapeHtml(sourceLabel)}</span>
+                </div>
+                <div class="journal-competency-meta">
+                  ${createdAt ? `<span>${escapeHtml(createdAt)}</span>` : ''}
+                  ${author ? `<span>${escapeHtml(author)}</span>` : ''}
+                </div>
+                ${note ? `<div class="journal-competency-note small">${escapeHtml(note)}</div>` : ''}
+              </article>
+            `;
+          }).join('');
+        }
+
+        if (!competencyCreateForm) return;
+        competencyCreateForm.classList.toggle('d-none', !canEditJournal);
+        if (competencyCreateColumnInput) competencyCreateColumnInput.value = String(currentCellColumnId || 0);
+        if (competencyCreateStudentInput) competencyCreateStudentInput.value = String(currentCellStudentId || 0);
+        if (competencyCreateKeyInput) {
+          competencyCreateKeyInput.innerHTML = definitions.map((item) => (
+            `<option value="${escapeHtml(String(item && item.key ? item.key : ''))}">${escapeHtml(String(item && item.label ? item.label : item.key || ''))}</option>`
+          )).join('');
+          competencyCreateKeyInput.disabled = !canAdd;
+        }
+        if (competencyCreateScoreInput) {
+          competencyCreateScoreInput.min = String(scoreMin);
+          competencyCreateScoreInput.max = String(scoreMax);
+          competencyCreateScoreInput.disabled = !canAdd;
+          competencyCreateScoreInput.value = '';
+        }
+        if (competencyCreateNoteInput) {
+          competencyCreateNoteInput.maxLength = noteMaxLength;
+          competencyCreateNoteInput.disabled = !canAdd;
+          competencyCreateNoteInput.value = '';
+        }
+        if (competencyCreateSubmitBtn) competencyCreateSubmitBtn.disabled = !canAdd;
+      }
+
       const navigateCell = (columnStep, studentStep) => {
         const currentColumnIndex = findColumnIndex(currentCellColumnId);
         const currentStudentIndex = findStudentIndex(currentCellStudentId);
@@ -1371,6 +1626,8 @@
           currentCellLocked = Boolean(data && data.column && data.column.is_locked);
           renderRetakes(data || null);
           renderAppeals(data || null);
+          renderModeration(data || null);
+          renderCompetencies(data || null);
 
           columnInput.value = String(columnId);
           studentInput.value = String(studentId);
