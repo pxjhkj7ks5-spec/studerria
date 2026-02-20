@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.9.24",
+      "date": "2026-02-20",
+      "items": [
+        "feat(my-day): added staff `Черга перевірки` block with priority buckets (`прострочені`/`нові`/`без коментаря`) and quick counts for teacher workflow",
+        "feat(my-day-data): extended cockpit payload with role-aware review queue assembled from journal/homework submissions, including direct deep-links to target journal cells",
+        "feat(journal): added auto-open support via `open_column_id/open_student_id` and `prefill_comment` query params for one-click review from queue",
+        "ux(journal): added reusable teacher comment template buttons in the grade modal for faster feedback loops"
+      ]
+    },
+    {
       "version": "0.9.23",
       "date": "2026-02-20",
       "items": [

@@ -426,6 +426,15 @@
                 <div class="col-12 col-md-8">
                   <label class="form-label">Коментар (опц.)</label>
                   <textarea class="form-control" name="teacher_comment" id="journalGradeComment" rows="2" maxlength="2000"></textarea>
+                  <% if (canEditJournal) { %>
+                    <div class="journal-feedback-templates mt-2">
+                      <span class="text-muted small">Шаблони:</span>
+                      <button class="btn btn-sm btn-outline-secondary journal-feedback-template-btn" type="button" data-feedback-template="Сильна робота: чітка структура, аргументи і висновок. Так тримати.">Сильна робота</button>
+                      <button class="btn btn-sm btn-outline-secondary journal-feedback-template-btn" type="button" data-feedback-template="Добрий старт, але потрібно посилити аргументацію фактами та прикладами.">Посилити аргументи</button>
+                      <button class="btn btn-sm btn-outline-secondary journal-feedback-template-btn" type="button" data-feedback-template="Потрібно більше конкретики: додай чіткі тези, приклади і короткий висновок.">Більше конкретики</button>
+                      <button class="btn btn-sm btn-outline-secondary journal-feedback-template-btn" type="button" data-feedback-clear="1">Очистити</button>
+                    </div>
+                  <% } %>
                 </div>
               </div>
               <% if (canEditJournal) { %>
@@ -515,6 +524,10 @@
       });
 
       const canEditJournal = <%- canEditJournal ? 'true' : 'false' %>;
+      const queryParams = new URLSearchParams(window.location.search);
+      const autoOpenColumnId = Number(queryParams.get('open_column_id') || 0);
+      const autoOpenStudentId = Number(queryParams.get('open_student_id') || 0);
+      let pendingPrefillComment = String(queryParams.get('prefill_comment') || '').trim().slice(0, 2000);
       const journalColumnsData = <%- JSON.stringify((columns || []).map(function(column) {
         return {
           id: Number(column.id),
@@ -542,6 +555,7 @@
       const columnInput = document.getElementById('journalGradeColumnId');
       const studentInput = document.getElementById('journalGradeStudentId');
       const gradeForm = document.getElementById('journalGradeForm');
+      const feedbackTemplateButtons = Array.from(document.querySelectorAll('.journal-feedback-template-btn'));
       const deleteForm = document.getElementById('journalGradeDeleteForm');
       const deleteColumnInput = document.getElementById('journalGradeDeleteColumnId');
       const deleteStudentInput = document.getElementById('journalGradeDeleteStudentId');
@@ -767,10 +781,15 @@
           scoreEl.value = data && data.grade && Number.isFinite(Number(data.grade.score))
             ? String(data.grade.score)
             : '';
-          commentEl.value = data && data.grade && data.grade.teacher_comment ? data.grade.teacher_comment : '';
+          const existingComment = data && data.grade && data.grade.teacher_comment ? data.grade.teacher_comment : '';
+          commentEl.value = existingComment;
           const canEditCurrent = Boolean(canEditJournal && data && data.can_edit && !currentCellLocked);
           scoreEl.disabled = !canEditCurrent;
           commentEl.disabled = !canEditCurrent;
+          if (!existingComment && pendingPrefillComment && canEditCurrent) {
+            commentEl.value = pendingPrefillComment;
+            pendingPrefillComment = '';
+          }
           if (gradeForm) {
             const submitBtn = gradeForm.querySelector('button[type="submit"]');
             if (submitBtn) {
@@ -970,6 +989,32 @@
             event.preventDefault();
           }
         });
+      }
+      if (feedbackTemplateButtons.length && commentEl) {
+        feedbackTemplateButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            if (commentEl.disabled) return;
+            if (button.dataset.feedbackClear === '1') {
+              commentEl.value = '';
+              commentEl.focus();
+              return;
+            }
+            const template = String(button.dataset.feedbackTemplate || '').trim();
+            if (!template) return;
+            const current = String(commentEl.value || '').trim();
+            if (!current) {
+              commentEl.value = template;
+            } else if (!current.includes(template)) {
+              commentEl.value = `${current}\n${template}`;
+            }
+            commentEl.focus();
+            commentEl.selectionStart = commentEl.value.length;
+            commentEl.selectionEnd = commentEl.value.length;
+          });
+        });
+      }
+      if (autoOpenColumnId > 0 && autoOpenStudentId > 0) {
+        openJournalCell(autoOpenColumnId, autoOpenStudentId);
       }
     </script>
     <script src="/js/design-system.js" defer></script>

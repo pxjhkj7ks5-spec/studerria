@@ -162,6 +162,30 @@ const RBAC_PERMISSION_OPTIONS = [
 
 const JOURNAL_OWN_PERMISSION = 'journal-own';
 const JOURNAL_FULL_PERMISSION = 'journal-full';
+const REVIEW_QUEUE_OVERDUE_HOURS = 48;
+const REVIEW_QUEUE_ITEM_LIMIT = 120;
+const REVIEW_QUEUE_FEEDBACK_TEMPLATES = [
+  {
+    key: 'strong',
+    label: 'Сильна робота',
+    text: 'Сильна робота: чітка структура, аргументи і висновок. Так тримати.',
+  },
+  {
+    key: 'argumentation',
+    label: 'Посилити аргументи',
+    text: 'Добрий старт, але потрібно посилити аргументацію фактами та прикладами.',
+  },
+  {
+    key: 'clarity',
+    label: 'Більше конкретики',
+    text: 'Потрібно більше конкретики: додай чіткі тези, приклади і короткий висновок.',
+  },
+  {
+    key: 'revision',
+    label: 'Потрібне доопрацювання',
+    text: 'Робота потребує доопрацювання за критеріями предмета. Після правок можна перездати.',
+  },
+];
 
 const COURSE_KIND_OPTIONS = [
   { key: 'regular', label: 'Regular courses' },
@@ -3785,7 +3809,237 @@ app.post('/profile/reset-subjects', requireLogin, async (req, res) => {
   }
 });
 
-async function buildMyDayData(user, role = 'student') {
+async function getMyDayReviewSubjects({ userId, courseId, roleKeys = [] }) {
+  const normalizedRoles = normalizeRoleList(roleKeys);
+  const hasFullAccess = normalizedRoles.some((roleKey) => roleKey === 'admin' || roleKey === 'deanery');
+  if (hasFullAccess) {
+    const rows = await db.all(
+      `
+        SELECT s.id AS subject_id, s.name AS subject_name, s.group_count
+        FROM subjects s
+        WHERE s.course_id = ? AND s.visible = 1
+        ORDER BY s.name ASC
+      `,
+      [courseId]
+    );
+    return (rows || []).map((row) => {
+      const groupCount = Math.max(1, Number(row.group_count || 1));
+      return {
+        subject_id: Number(row.subject_id),
+        subject_name: row.subject_name || 'Предмет',
+        has_all_groups: true,
+        group_numbers: Array.from({ length: groupCount }, (_v, index) => index + 1),
+      };
+    });
+  }
+
+  if (!normalizedRoles.includes('teacher')) {
+    return [];
+  }
+
+  const rows = await db.all(
+    `
+      SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count
+      FROM teacher_subjects ts
+      JOIN subjects s ON s.id = ts.subject_id
+      WHERE ts.user_id = ?
+        AND s.course_id = ?
+        AND s.visible = 1
+      ORDER BY s.name ASC
+    `,
+    [userId, courseId]
+  );
+  if (!rows || !rows.length) {
+    return [];
+  }
+  const bySubject = new Map();
+  (rows || []).forEach((row) => {
+    const subjectId = Number(row.subject_id || 0);
+    if (!Number.isFinite(subjectId) || subjectId < 1) return;
+    if (!bySubject.has(subjectId)) {
+      bySubject.set(subjectId, {
+        subject_id: subjectId,
+        subject_name: row.subject_name || 'Предмет',
+        group_count: Math.max(1, Number(row.group_count || 1)),
+        has_all_groups: false,
+        group_numbers_set: new Set(),
+      });
+    }
+    const item = bySubject.get(subjectId);
+    if (row.group_number === null || typeof row.group_number === 'undefined') {
+      item.has_all_groups = true;
+      return;
+    }
+    const groupNumber = Number(row.group_number);
+    if (Number.isInteger(groupNumber) && groupNumber > 0) {
+      item.group_numbers_set.add(groupNumber);
+    }
+  });
+  return Array.from(bySubject.values()).map((item) => {
+    const groupNumbers = item.has_all_groups
+      ? Array.from({ length: item.group_count }, (_v, index) => index + 1)
+      : Array.from(item.group_numbers_set).sort((a, b) => a - b);
+    return {
+      subject_id: item.subject_id,
+      subject_name: item.subject_name,
+      has_all_groups: item.has_all_groups,
+      group_numbers: groupNumbers,
+    };
+  });
+}
+
+async function buildMyDayReviewQueue({
+  userId,
+  courseId,
+  semesterId,
+  roleKeys = [],
+  now = new Date(),
+}) {
+  const subjectOptions = await getMyDayReviewSubjects({ userId, courseId, roleKeys });
+  const emptyResult = {
+    enabled: true,
+    overdue_threshold_hours: REVIEW_QUEUE_OVERDUE_HOURS,
+    counts: { overdue: 0, new: 0, no_comment: 0 },
+    total: 0,
+    items: [],
+    truncated: false,
+    templates: REVIEW_QUEUE_FEEDBACK_TEMPLATES,
+  };
+  if (!subjectOptions.length) {
+    return emptyResult;
+  }
+
+  const priorityByType = {
+    overdue: 0,
+    new: 1,
+    no_comment: 2,
+  };
+  const nowMs = now.getTime();
+  const byCellKey = new Map();
+
+  for (const subject of subjectOptions) {
+    const subjectId = Number(subject.subject_id || 0);
+    if (!Number.isFinite(subjectId) || subjectId < 1) continue;
+    const allowedGroups = Array.isArray(subject.group_numbers)
+      ? subject.group_numbers.filter((value) => Number.isInteger(Number(value)) && Number(value) > 0).map((value) => Number(value))
+      : [];
+    const groupFilterSet = subject.has_all_groups || !allowedGroups.length ? null : new Set(allowedGroups);
+    const matrix = await buildJournalMatrix({
+      subjectId,
+      courseId,
+      semesterId,
+      actorUserId: userId,
+      groupFilterSet,
+    });
+    const columns = Array.isArray(matrix?.columns) ? matrix.columns : [];
+    const rows = Array.isArray(matrix?.rows) ? matrix.rows : [];
+    rows.forEach((row) => {
+      const student = row?.student || {};
+      const studentId = Number(student.id || 0);
+      if (!Number.isFinite(studentId) || studentId < 1) return;
+      const studentName = String(student.full_name || '').trim() || 'Студент';
+      const studentGroup = Number(student.group_number || 0);
+      const cells = Array.isArray(row?.cells) ? row.cells : [];
+      cells.forEach((cell, index) => {
+        const column = columns[index] || null;
+        if (!column) return;
+        const columnId = Number(column.id || 0);
+        if (!Number.isFinite(columnId) || columnId < 1) return;
+        if (Number(column.is_locked || 0) === 1) return;
+        if (!Number(column.source_homework_id || 0)) return;
+        const submission = cell?.submission || null;
+        const submittedAt = submission && submission.submitted_at ? String(submission.submitted_at) : '';
+        if (!submittedAt) return;
+
+        const parsedSubmittedAt = new Date(submittedAt);
+        const submittedAtMs = parsedSubmittedAt.getTime();
+        const hasValidSubmittedAt = Number.isFinite(submittedAtMs);
+        const hasScore = Number.isFinite(Number(cell?.score));
+        const hasComment = Boolean(String(cell?.teacher_comment || '').trim());
+        if (hasScore && hasComment) return;
+
+        let queueType = 'new';
+        if (!hasScore) {
+          const ageHours = hasValidSubmittedAt ? ((nowMs - submittedAtMs) / (60 * 60 * 1000)) : 0;
+          queueType = ageHours >= REVIEW_QUEUE_OVERDUE_HOURS ? 'overdue' : 'new';
+        } else if (!hasComment) {
+          queueType = 'no_comment';
+        }
+
+        const dueDate = toDateOnly(column.custom_due_date || column.class_date);
+        const queueKey = `${columnId}|${studentId}`;
+        const reviewHref = `/journal?subject_id=${encodeURIComponent(String(subjectId))}&open_column_id=${encodeURIComponent(String(columnId))}&open_student_id=${encodeURIComponent(String(studentId))}`;
+        const item = {
+          queue_key: queueKey,
+          queue_type: queueType,
+          subject_id: subjectId,
+          subject_name: subject.subject_name || 'Предмет',
+          student_id: studentId,
+          student_name: studentName,
+          student_group: Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
+          column_id: columnId,
+          column_title: String(column.title || 'Колонка'),
+          max_points: Number(column.max_points || 0),
+          score: hasScore ? Number(cell.score) : null,
+          teacher_comment: String(cell.teacher_comment || ''),
+          submission_status: String(cell.status || 'missing'),
+          submitted_at: submittedAt,
+          submitted_at_ts: hasValidSubmittedAt ? submittedAtMs : Number.MAX_SAFE_INTEGER,
+          due_date: dueDate || null,
+          review_href: reviewHref,
+        };
+        const existing = byCellKey.get(queueKey);
+        if (!existing) {
+          byCellKey.set(queueKey, item);
+          return;
+        }
+        const currentPriority = Number(priorityByType[item.queue_type] ?? 99);
+        const existingPriority = Number(priorityByType[existing.queue_type] ?? 99);
+        if (currentPriority < existingPriority) {
+          byCellKey.set(queueKey, item);
+          return;
+        }
+        if (currentPriority === existingPriority && item.submitted_at_ts < existing.submitted_at_ts) {
+          byCellKey.set(queueKey, item);
+        }
+      });
+    });
+  }
+
+  const allItems = Array.from(byCellKey.values()).sort((a, b) => {
+    const priorityA = Number(priorityByType[a.queue_type] ?? 99);
+    const priorityB = Number(priorityByType[b.queue_type] ?? 99);
+    if (priorityA !== priorityB) return priorityA - priorityB;
+    if (a.submitted_at_ts !== b.submitted_at_ts) return a.submitted_at_ts - b.submitted_at_ts;
+    const subjectCompare = String(a.subject_name || '').localeCompare(String(b.subject_name || ''));
+    if (subjectCompare !== 0) return subjectCompare;
+    return String(a.student_name || '').localeCompare(String(b.student_name || ''));
+  });
+
+  const counts = { overdue: 0, new: 0, no_comment: 0 };
+  allItems.forEach((item) => {
+    if (Object.prototype.hasOwnProperty.call(counts, item.queue_type)) {
+      counts[item.queue_type] += 1;
+    }
+  });
+
+  const limitedItems = allItems.slice(0, REVIEW_QUEUE_ITEM_LIMIT).map((item) => {
+    const normalized = { ...item };
+    delete normalized.submitted_at_ts;
+    return normalized;
+  });
+  return {
+    enabled: true,
+    overdue_threshold_hours: REVIEW_QUEUE_OVERDUE_HOURS,
+    counts,
+    total: allItems.length,
+    items: limitedItems,
+    truncated: allItems.length > REVIEW_QUEUE_ITEM_LIMIT,
+    templates: REVIEW_QUEUE_FEEDBACK_TEMPLATES,
+  };
+}
+
+async function buildMyDayData(user, role = 'student', roleList = []) {
   const courseId = Number(user.course_id || 1);
   const activeSemester = await getActiveSemester(courseId);
   const now = new Date();
@@ -3794,8 +4048,9 @@ async function buildMyDayData(user, role = 'student') {
   const dayName = getDayNameFromDate(todayStr);
   const weekNumber = getAcademicWeekForSemester(now, activeSemester);
   const nowIso = new Date().toISOString();
-  const normalizedRole = String(role || '').toLowerCase();
-  const isStaffRole = normalizedRole === 'teacher' || normalizedRole === 'admin' || normalizedRole === 'deanery';
+  const normalizedRoleList = normalizeRoleList([role, ...(Array.isArray(roleList) ? roleList : [])]);
+  const normalizedRole = normalizedRoleList[0] || String(role || '').toLowerCase() || 'student';
+  const isStaffRole = normalizedRoleList.some((roleKey) => ['teacher', 'admin', 'deanery'].includes(roleKey));
 
   const windowEndShort = formatLocalDate(addDays(now, 7));
   const deadlinesWindowEnd = formatLocalDate(addDays(now, 14));
@@ -4149,6 +4404,25 @@ async function buildMyDayData(user, role = 'student') {
     }));
   }
 
+  let reviewQueue = {
+    enabled: false,
+    overdue_threshold_hours: REVIEW_QUEUE_OVERDUE_HOURS,
+    counts: { overdue: 0, new: 0, no_comment: 0 },
+    total: 0,
+    items: [],
+    truncated: false,
+    templates: REVIEW_QUEUE_FEEDBACK_TEMPLATES,
+  };
+  if (isStaffRole) {
+    reviewQueue = await buildMyDayReviewQueue({
+      userId: Number(user.id),
+      courseId,
+      semesterId: activeSemester ? Number(activeSemester.id) : null,
+      roleKeys: normalizedRoleList,
+      now,
+    });
+  }
+
   const submittedOnTimeCount = homeworkItems.filter((item) => item.submission_status === 'submitted_on_time').length;
   const submittedLateCount = homeworkItems.filter((item) => item.submission_status === 'submitted_late').length;
   const overdueCount = homeworkItems.filter((item) => item.submission_status === 'overdue').length;
@@ -4479,6 +4753,7 @@ async function buildMyDayData(user, role = 'student') {
     competency_fastest_growth: fastestGrowingCompetency,
     what_if_subjects: whatIfSubjects,
     what_if_default_subject_id: defaultWhatIfSubjectId,
+    review_queue: reviewQueue,
     brief,
     scope_count: workloadTargets.length,
     role: normalizedRole,
@@ -4662,7 +4937,7 @@ app.get('/my-day', requireLogin, async (req, res) => {
     return handleDbError(res, err, 'myday.init');
   }
   try {
-    const myDay = await buildMyDayData(req.session.user, req.session.role);
+    const myDay = await buildMyDayData(req.session.user, req.session.role, req.session.roles || []);
     return res.render('my-day', {
       username: req.session.user.username,
       role: req.session.role,
@@ -4678,7 +4953,7 @@ app.get('/my-day', requireLogin, async (req, res) => {
 
 app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
   try {
-    const myDay = await buildMyDayData(req.session.user, req.session.role);
+    const myDay = await buildMyDayData(req.session.user, req.session.role, req.session.roles || []);
     return res.json(myDay);
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });

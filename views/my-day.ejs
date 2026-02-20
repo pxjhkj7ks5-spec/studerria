@@ -24,6 +24,11 @@
       const competencies = Array.isArray(cockpit.competencies) ? cockpit.competencies : [];
       const activity = cockpit.activity_summary || {};
       const reminders = Array.isArray(cockpit.reminders) ? cockpit.reminders : [];
+      const reviewQueue = cockpit.review_queue || {};
+      const reviewQueueItems = Array.isArray(reviewQueue.items) ? reviewQueue.items : [];
+      const reviewQueueTemplates = Array.isArray(reviewQueue.templates) ? reviewQueue.templates : [];
+      const reviewQueueCounts = reviewQueue.counts || {};
+      const hasReviewQueue = Boolean(reviewQueue.enabled);
       const whatIfSubjects = Array.isArray(cockpit.what_if_subjects) ? cockpit.what_if_subjects : [];
       const defaultWhatIfSubjectId = Number(cockpit.what_if_default_subject_id || 0);
       const briefToneClass = `brief-tone-${brief.tone || 'calm'}`;
@@ -40,6 +45,17 @@
         if (Number.isNaN(parsed.getTime())) return value;
         return parsed.toLocaleDateString('uk-UA');
       };
+      const formatDateTime = (value) => {
+        if (!value) return '-';
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return value;
+        return parsed.toLocaleString('uk-UA', {
+          day: '2-digit',
+          month: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      };
       const getDeadlineStatus = (item) => {
         if (item && item.submission_status === 'submitted_on_time') {
           return { label: 'Вчасно', className: 'status-on-time' };
@@ -53,6 +69,23 @@
         return { label: 'Відкрито', className: 'status-open' };
       };
       const getDayContext = (item) => (item && item.day_context === 'tomorrow' ? 'Завтра' : 'Сьогодні');
+      const getReviewQueueTypeMeta = (item) => {
+        const queueType = String(item && item.queue_type ? item.queue_type : 'new');
+        if (queueType === 'overdue') {
+          return { label: 'Прострочені', className: 'status-overdue' };
+        }
+        if (queueType === 'no_comment') {
+          return { label: 'Без коментаря', className: 'status-late' };
+        }
+        return { label: 'Нові', className: 'status-open' };
+      };
+      const getSubmissionStatusMeta = (item) => {
+        const status = String(item && item.submission_status ? item.submission_status : '');
+        if (status === 'late') return { label: 'Здано пізно', className: 'type-chip type-chip-warning' };
+        if (status === 'on_time') return { label: 'Вчасно', className: 'type-chip type-chip-success' };
+        if (status === 'manual') return { label: 'Ручна колонка', className: 'type-chip' };
+        return null;
+      };
     %>
 
     <%- include('partials/topbar', { role, username, t, activePage: 'my-day', pageTitle: 'Studeria Cockpit' }) %>
@@ -176,6 +209,102 @@
             </div>
           <% } %>
         </article>
+
+        <% if (hasReviewQueue) { %>
+          <article class="cockpit-card section-card review-queue-card" id="reviewQueueBlock">
+            <div class="section-head">
+              <h2 class="section-title">Черга перевірки</h2>
+              <span class="section-subtitle">Пріоритет: прострочені, нові, без коментаря</span>
+            </div>
+
+            <div class="summary-grid review-summary-grid">
+              <div class="summary-pill">
+                <span>Всього</span>
+                <strong><%= Number(reviewQueue.total || reviewQueueItems.length || 0) %></strong>
+              </div>
+              <div class="summary-pill">
+                <span>Прострочені</span>
+                <strong><%= Number(reviewQueueCounts.overdue || 0) %></strong>
+              </div>
+              <div class="summary-pill">
+                <span>Нові</span>
+                <strong><%= Number(reviewQueueCounts.new || 0) %></strong>
+              </div>
+              <div class="summary-pill">
+                <span>Без коментаря</span>
+                <strong><%= Number(reviewQueueCounts.no_comment || 0) %></strong>
+              </div>
+            </div>
+
+            <div class="review-queue-toolbar">
+              <div class="review-filter-group" id="reviewQueueFilters">
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn is-active" data-review-filter="all">Всі</button>
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="overdue">Прострочені</button>
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="new">Нові</button>
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="no_comment">Без коментаря</button>
+              </div>
+              <% if (reviewQueueTemplates.length) { %>
+                <div class="review-template-group" id="reviewQueueTemplates">
+                  <span class="review-template-label">Шаблон фідбеку:</span>
+                  <% reviewQueueTemplates.forEach((template, index) => { %>
+                    <button
+                      type="button"
+                      class="btn btn-soft btn-xs review-template-btn <%= index === 0 ? 'is-active' : '' %>"
+                      data-template-text="<%= template.text %>"
+                    >
+                      <%= template.label %>
+                    </button>
+                  <% }) %>
+                  <button type="button" class="btn btn-soft btn-xs review-template-btn" data-template-clear="1">Без шаблону</button>
+                </div>
+              <% } %>
+            </div>
+
+            <% if (!reviewQueueItems.length) { %>
+              <div class="empty-state compact">
+                <div class="empty-state-title">Черга перевірки порожня</div>
+                <div class="empty-state-subtitle">Усі здані роботи з коментарями або без задач на ревʼю.</div>
+              </div>
+            <% } else { %>
+              <div class="item-list review-queue-list">
+                <% reviewQueueItems.forEach((item) => {
+                     const queueMeta = getReviewQueueTypeMeta(item);
+                     const submissionMeta = getSubmissionStatusMeta(item);
+                     const hasScore = Number.isFinite(Number(item.score));
+                %>
+                  <div class="item-row review-row" data-queue-type="<%= item.queue_type || 'new' %>">
+                    <div class="item-main">
+                      <div class="item-title"><%= item.student_name || 'Студент' %></div>
+                      <div class="item-meta">
+                        <span><%= item.subject_name || 'Предмет' %></span>
+                        <% if (item.student_group) { %><span>Група <%= item.student_group %></span><% } %>
+                        <span>Колонка: <%= item.column_title || 'Колонка' %></span>
+                        <span>Здано: <%= formatDateTime(item.submitted_at) %></span>
+                        <% if (item.due_date) { %><span>Дедлайн: <%= formatShortDate(item.due_date) %></span><% } %>
+                        <% if (hasScore) { %><span>Бал: <%= String(item.score).replace(/\.00$/, '') %></span><% } %>
+                      </div>
+                    </div>
+                    <div class="item-side">
+                      <span class="status-chip <%= queueMeta.className %>"><%= queueMeta.label %></span>
+                      <% if (submissionMeta) { %>
+                        <span class="<%= submissionMeta.className %>"><%= submissionMeta.label %></span>
+                      <% } %>
+                      <a class="btn btn-inline-link review-open-link" href="<%= item.review_href %>">Перевірити</a>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            <% } %>
+            <% if (reviewQueue.truncated) { %>
+              <div class="section-footer-link review-footer-note">
+                Показано перші <%= reviewQueueItems.length %> записів. Уточни фільтр або предмет у журналі.
+              </div>
+            <% } %>
+            <div class="section-footer-link">
+              <a href="/journal">Перейти в журнал</a>
+            </div>
+          </article>
+        <% } %>
 
         <article class="cockpit-card section-card" id="inboxBlock">
           <div class="section-head">
@@ -547,7 +676,12 @@
       const whatIfSubject = document.getElementById('whatIfSubject');
       const whatIfResult = document.getElementById('whatIfResult');
       const whatIfTargetButtons = Array.from(document.querySelectorAll('.whatif-target-btn'));
+      const reviewFilterButtons = Array.from(document.querySelectorAll('.review-filter-btn'));
+      const reviewRows = Array.from(document.querySelectorAll('.review-row'));
+      const reviewTemplateButtons = Array.from(document.querySelectorAll('.review-template-btn'));
+      const reviewOpenLinks = Array.from(document.querySelectorAll('.review-open-link'));
       let selectedWhatIfTarget = 75;
+      let selectedReviewTemplateText = '';
 
       if (reminderDate && myDay.today) {
         reminderDate.value = myDay.today;
@@ -604,6 +738,30 @@
         });
         reminderList.querySelectorAll('.reminder-delete').forEach((button) => {
           button.addEventListener('click', deleteReminder);
+        });
+      }
+
+      function applyReviewFilter(filterKey) {
+        const targetFilter = String(filterKey || 'all');
+        reviewRows.forEach((row) => {
+          const rowType = String(row.dataset.queueType || 'new');
+          const shouldShow = targetFilter === 'all' || rowType === targetFilter;
+          row.classList.toggle('d-none', !shouldShow);
+        });
+        reviewFilterButtons.forEach((button) => {
+          button.classList.toggle('is-active', String(button.dataset.reviewFilter || '') === targetFilter);
+        });
+      }
+
+      function setReviewTemplate(text, clearOnly = false) {
+        selectedReviewTemplateText = clearOnly ? '' : String(text || '').trim();
+        reviewTemplateButtons.forEach((button) => {
+          const isClear = button.dataset.templateClear === '1';
+          const buttonText = String(button.dataset.templateText || '').trim();
+          const isActive = clearOnly
+            ? isClear
+            : (!isClear && buttonText && buttonText === selectedReviewTemplateText);
+          button.classList.toggle('is-active', isActive);
         });
       }
 
@@ -760,6 +918,47 @@
       });
 
       renderReminders(reminders);
+      if (reviewFilterButtons.length && reviewRows.length) {
+        reviewFilterButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            applyReviewFilter(button.dataset.reviewFilter || 'all');
+          });
+        });
+        applyReviewFilter('all');
+      }
+      if (reviewTemplateButtons.length) {
+        const firstTemplateButton = reviewTemplateButtons.find((button) => button.dataset.templateText);
+        if (firstTemplateButton) {
+          setReviewTemplate(firstTemplateButton.dataset.templateText || '', false);
+        }
+        reviewTemplateButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            const isClear = button.dataset.templateClear === '1';
+            if (isClear) {
+              setReviewTemplate('', true);
+              return;
+            }
+            setReviewTemplate(button.dataset.templateText || '', false);
+          });
+        });
+      }
+      if (reviewOpenLinks.length) {
+        reviewOpenLinks.forEach((link) => {
+          link.addEventListener('click', (event) => {
+            if (!selectedReviewTemplateText) return;
+            if (event.defaultPrevented) return;
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            const href = link.getAttribute('href');
+            if (!href) return;
+            event.preventDefault();
+            const url = new URL(href, window.location.origin);
+            if (!url.searchParams.get('prefill_comment')) {
+              url.searchParams.set('prefill_comment', selectedReviewTemplateText);
+            }
+            window.location.assign(`${url.pathname}${url.search}`);
+          });
+        });
+      }
       if (whatIfSubject && whatIfResult) {
         whatIfSubject.addEventListener('change', () => {
           loadWhatIf(selectedWhatIfTarget);

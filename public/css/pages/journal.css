@@ -406,6 +406,17 @@ body.theme-dark.page-journal .journal-table thead th {
   white-space: pre-wrap;
 }
 
+.page-journal .journal-feedback-templates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.page-journal .journal-feedback-templates .btn {
+  border-radius: 999px;
+}
+
 .page-journal .journal-bulk-preview {
   max-height: 220px;
   overflow: auto;
