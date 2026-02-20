@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.38",
+      "date": "2026-02-20",
+      "items": [
+        "fix(ci): unblocked GitHub Actions lint step by excluding `eslint.config.js` from lint target set",
+        "chore(release): patch version bump for deploy retrigger"
+      ]
+    },
+    {
       "version": "0.9.37",
       "date": "2026-02-20",
       "items": [

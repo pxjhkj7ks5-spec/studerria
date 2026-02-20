@@ -7,6 +7,7 @@ export default [
       "views/**",
       "locales/**",
       "database.db",
+      "eslint.config.js",
     ],
   },
   {
