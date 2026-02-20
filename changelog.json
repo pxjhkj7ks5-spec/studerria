@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.72",
+      "date": "2026-02-20",
+      "items": [
+        "fix(journal): switched /journal rendering to callback-based safe render so EJS/runtime render failures no longer bubble into uncaught 500 responses",
+        "fix(journal-compat): added plain compatibility fallback response + broader legacy DB error detection for schema/data-shape mismatches"
+      ]
+    },
+    {
       "version": "0.9.71",
       "date": "2026-02-20",
       "items": [

@@ -6450,18 +6450,118 @@ const parseDbIntegerArray = (value) => {
 };
 
 const isDbSchemaCompatibilityError = (err) => {
-  const code = String(err && err.code ? err.code : '').trim();
-  return (
+  const code = String(err && err.code ? err.code : '').trim().toUpperCase();
+  if (
     code === '42P01' // undefined_table
     || code === '42703' // undefined_column
     || code === '42P10' // invalid_column_reference (e.g. ON CONFLICT without matching unique index)
     || code === '42883' // undefined_function/operator (often bool vs int comparisons)
     || code === '42804' // datatype_mismatch
     || code === '22P02' // invalid_text_representation
+  ) {
+    return true;
+  }
+  // Treat SQLSTATE class 42/22 as schema/data-shape compatibility issues for legacy DB variants.
+  if (code.startsWith('42') || code.startsWith('22')) {
+    return true;
+  }
+  const message = String(err && err.message ? err.message : err || '').toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes('does not exist')
+    || message.includes('no such table')
+    || message.includes('no such column')
+    || message.includes('undefined table')
+    || message.includes('undefined column')
+    || message.includes('operator does not exist')
+    || message.includes('cannot cast type')
+    || message.includes('invalid input syntax for type')
   );
 };
 
 const isDataQualityCompatibilityError = (err) => isDbSchemaCompatibilityError(err);
+
+const buildJournalEmptyAttendanceContext = () => ({
+  date: formatLocalDate(new Date()),
+  class_number: 1,
+  class_options: getAttendanceClassOptions(),
+  statuses: ATTENDANCE_STATUS_OPTIONS.map((status) => ATTENDANCE_STATUS_META[status]),
+  rows: [],
+  summary: {
+    present: 0,
+    late: 0,
+    absent: 0,
+    excused: 0,
+    unset: 0,
+    marked_total: 0,
+    students_total: 0,
+  },
+  student_summary: null,
+  reason_max_length: ATTENDANCE_REASON_MAX_LENGTH,
+  quick_current_slot: {
+    available: false,
+    class_date: formatLocalDate(new Date()),
+    class_number: null,
+    day_of_week: null,
+    start: '',
+    end: '',
+    label: '',
+    group_numbers: [],
+    is_selected: false,
+  },
+});
+
+const buildJournalEmptyStateViewModel = ({
+  req,
+  subjects = [],
+  teacherJournalMode = false,
+  canManageAllSubjects = false,
+  compatibilityMessage = '',
+} = {}) => ({
+  username: req.session.user.username,
+  role: req.session.role,
+  subjects,
+  selectedSubject: null,
+  columns: [],
+  journalRows: [],
+  gradingSettings: { ...DEFAULT_SUBJECT_GRADING_SETTINGS },
+  attendanceContext: buildJournalEmptyAttendanceContext(),
+  canEditJournal: false,
+  canEditAttendance: false,
+  teacherJournalMode: Boolean(teacherJournalMode),
+  attendanceQuickAutoOpen: false,
+  canManageAllSubjects: Boolean(canManageAllSubjects),
+  subjectClosure: null,
+  canCloseSubject: false,
+  selectedSemester: null,
+  undoGrade: null,
+  gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
+  compatibilityMessage: String(compatibilityMessage || ''),
+});
+
+const renderViewToResponse = (res, view, payload) => new Promise((resolve, reject) => {
+  res.render(view, payload, (err, html) => {
+    if (err) {
+      err.isViewRenderError = true;
+      err.viewName = view;
+      return reject(err);
+    }
+    if (!res.headersSent) {
+      res.send(html);
+    }
+    return resolve();
+  });
+});
+
+const sendJournalPlainFallback = (res) => {
+  if (res.headersSent) return;
+  return res
+    .status(200)
+    .type('html')
+    .send(
+      '<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Журнал</title></head><body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;padding:24px;line-height:1.45"><h1 style="margin:0 0 8px">Журнал у режимі сумісності</h1><p style="margin:0 0 16px">Сторінка тимчасово спрощена через несумісну структуру БД. Оновіть міграції та перезавантажте сервіс.</p><p style="margin:0"><a href="/journal">Оновити</a></p></body></html>'
+    );
+};
 
 const buildDataQualityCheck = ({
   key,
@@ -12623,54 +12723,17 @@ app.get('/journal', requireLogin, async (req, res) => {
       : null;
 
     if (!selectedSubject) {
-      return res.render('journal', {
-        username: req.session.user.username,
-        role: req.session.role,
-        subjects: [],
-        selectedSubject: null,
-        columns: [],
-        journalRows: [],
-        gradingSettings: { ...DEFAULT_SUBJECT_GRADING_SETTINGS },
-        attendanceContext: {
-          date: formatLocalDate(new Date()),
-          class_number: 1,
-          class_options: getAttendanceClassOptions(),
-          statuses: ATTENDANCE_STATUS_OPTIONS.map((status) => ATTENDANCE_STATUS_META[status]),
-          rows: [],
-          summary: {
-            present: 0,
-            late: 0,
-            absent: 0,
-            excused: 0,
-            unset: 0,
-            marked_total: 0,
-            students_total: 0,
-          },
-          student_summary: null,
-          reason_max_length: ATTENDANCE_REASON_MAX_LENGTH,
-          quick_current_slot: {
-            available: false,
-            class_date: formatLocalDate(new Date()),
-            class_number: null,
-            day_of_week: null,
-            start: '',
-            end: '',
-            label: '',
-            group_numbers: [],
-            is_selected: false,
-          },
-        },
-        canEditJournal: false,
-        canEditAttendance: false,
-        teacherJournalMode,
-        attendanceQuickAutoOpen: false,
-        canManageAllSubjects: Boolean(journalScope.fullAccess),
-        subjectClosure: null,
-        canCloseSubject: false,
-        selectedSemester: null,
-        undoGrade: null,
-        gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
-      });
+      await renderViewToResponse(
+        res,
+        'journal',
+        buildJournalEmptyStateViewModel({
+          req,
+          subjects: [],
+          teacherJournalMode,
+          canManageAllSubjects: Boolean(journalScope.fullAccess),
+        })
+      );
+      return;
     }
 
     const selectedCourseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
@@ -12714,7 +12777,7 @@ app.get('/journal', requireLogin, async (req, res) => {
       hasAllGroups: Boolean(selectedSubject.has_all_groups),
     });
 
-    return res.render('journal', {
+    await renderViewToResponse(res, 'journal', {
       username: req.session.user.username,
       role: req.session.role,
       subjects: subjectOptions,
@@ -12734,62 +12797,39 @@ app.get('/journal', requireLogin, async (req, res) => {
       undoGrade: canEditJournal ? undoGrade : null,
       gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
     });
+    return;
   } catch (err) {
+    if (err && err.isViewRenderError) {
+      console.error('Journal render failed (journal.page.render)', {
+        view: err.viewName || 'journal',
+        message: normalizeRuntimeErrorMessage(err && err.message ? err.message : err),
+      });
+      return sendJournalPlainFallback(res);
+    }
     if (isDbSchemaCompatibilityError(err)) {
+      console.error('Journal compatibility fallback (journal.page.compat)', {
+        code: err && err.code ? String(err.code) : '',
+        message: normalizeRuntimeErrorMessage(err && err.message ? err.message : err),
+      });
       try {
         if (res.locals && res.locals.messages && !res.locals.messages.error) {
           res.locals.messages.error = 'Журнал тимчасово працює в режимі сумісності (оновіть структуру БД).';
         }
-        return res.render('journal', {
-          username: req.session.user.username,
-          role: req.session.role,
-          subjects: [],
-          selectedSubject: null,
-          columns: [],
-          journalRows: [],
-          gradingSettings: { ...DEFAULT_SUBJECT_GRADING_SETTINGS },
-          attendanceContext: {
-            date: formatLocalDate(new Date()),
-            class_number: 1,
-            class_options: getAttendanceClassOptions(),
-            statuses: ATTENDANCE_STATUS_OPTIONS.map((status) => ATTENDANCE_STATUS_META[status]),
-            rows: [],
-            summary: {
-              present: 0,
-              late: 0,
-              absent: 0,
-              excused: 0,
-              unset: 0,
-              marked_total: 0,
-              students_total: 0,
-            },
-            student_summary: null,
-            reason_max_length: ATTENDANCE_REASON_MAX_LENGTH,
-            quick_current_slot: {
-              available: false,
-              class_date: formatLocalDate(new Date()),
-              class_number: null,
-              day_of_week: null,
-              start: '',
-              end: '',
-              label: '',
-              group_numbers: [],
-              is_selected: false,
-            },
-          },
-          canEditJournal: false,
-          canEditAttendance: false,
-          teacherJournalMode: false,
-          attendanceQuickAutoOpen: false,
-          canManageAllSubjects: false,
-          subjectClosure: null,
-          canCloseSubject: false,
-          selectedSemester: null,
-          undoGrade: null,
-          gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
-        });
-      } catch (_renderErr) {
-        return handleDbError(res, err, 'journal.page');
+        await renderViewToResponse(
+          res,
+          'journal',
+          buildJournalEmptyStateViewModel({
+            req,
+            subjects: [],
+            teacherJournalMode: false,
+            canManageAllSubjects: false,
+            compatibilityMessage: 'Журнал тимчасово працює в режимі сумісності (оновіть структуру БД).',
+          })
+        );
+        return;
+      } catch (renderErr) {
+        console.error('Journal compatibility render fallback failed', renderErr);
+        return sendJournalPlainFallback(res);
       }
     }
     return handleDbError(res, err, 'journal.page');
