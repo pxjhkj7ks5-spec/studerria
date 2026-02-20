@@ -21239,10 +21239,10 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
       db.all(
         `
           WITH ip_events AS (
-            SELECT ip, user_id, created_at
+            SELECT ip, user_id, created_at::timestamp AS created_at
             FROM login_history
             WHERE ip IS NOT NULL
-              AND created_at >= NOW() - INTERVAL '14 days'
+              AND created_at::timestamp >= NOW() - INTERVAL '14 days'
               AND (course_id = ? OR course_id IS NULL)
             UNION ALL
             SELECT ip, user_id, created_at
@@ -21285,11 +21285,11 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
             SELECT
               md5(lower(user_agent)) AS device_key,
               user_id,
-              created_at,
+              created_at::timestamp AS created_at,
               LEFT(user_agent, 120) AS sample_label
             FROM login_history
             WHERE user_agent IS NOT NULL
-              AND created_at >= NOW() - INTERVAL '21 days'
+              AND created_at::timestamp >= NOW() - INTERVAL '21 days'
               AND (course_id = ? OR course_id IS NULL)
           )
           SELECT

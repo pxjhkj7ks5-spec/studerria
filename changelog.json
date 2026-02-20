@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.54",
+      "date": "2026-02-20",
+      "items": [
+        "fix(security-dashboard): cast `login_history.created_at` from TEXT to timestamp in security analytics queries to prevent `/admin/security-dashboard.json` failure",
+        "fix(security-dashboard): restored loading of top suspicious IP/device blocks on databases with legacy login_history schema"
+      ]
+    },
+    {
       "version": "0.9.53",
       "date": "2026-02-20",
       "items": [
