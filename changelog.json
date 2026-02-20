@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.9.60",
+      "date": "2026-02-20",
+      "items": [
+        "fix(messages-send): all-course broadcast now creates one global message instead of duplicating one DB row per course",
+        "fix(messages-feed): /messages.json now includes global broadcasts with NULL course/semester scope for all eligible users",
+        "fix(admin-messages): admin/starosta message lists now show global broadcasts alongside course-scoped messages",
+        "fix(admin-message-reads): reads endpoint now resolves global broadcasts (NULL course/semester) in current course context",
+        "ux(admin-messages): clarified target selector labels/hints for current course vs all courses vs specific users"
+      ]
+    },
+    {
       "version": "0.9.59",
       "date": "2026-02-20",
       "items": [

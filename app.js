@@ -17122,37 +17122,33 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
   }
   try {
     if (isAllCourses) {
-      const courses = await db.all('SELECT id FROM courses ORDER BY id');
-      for (const course of courses) {
-        const courseId = Number(course.id);
-        const courseSemester = await getActiveSemester(courseId);
-        const row = await db.get(
-          `
-            INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-          `,
-          [
-            null,
-            null,
-            1,
-            body.trim(),
-            createdBy,
-            createdAt,
-            courseId,
-            courseSemester ? courseSemester.id : null,
-            messageStatus,
-            scheduledAt,
-            publishedAt,
-          ]
-        );
-        if (!row || !row.id) {
-          return res.redirect('/admin?err=Database%20error');
-        }
+      const row = await db.get(
+        `
+          INSERT INTO messages (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+        `,
+        [
+          null,
+          null,
+          1,
+          body.trim(),
+          createdBy,
+          createdAt,
+          null,
+          null,
+          messageStatus,
+          scheduledAt,
+          publishedAt,
+        ]
+      );
+      if (!row || !row.id) {
+        return res.redirect('/admin?err=Database%20error');
       }
       logAction(db, req, 'message_send', {
         target_type: target,
         target_all: true,
         course_scope: 'all',
+        course_id: null,
       });
       return res.redirect('/admin?ok=Message%20sent');
     }
@@ -17331,8 +17327,11 @@ app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
       conditions.push('EXISTS (SELECT 1 FROM message_targets mt WHERE mt.message_id = m.id AND mt.user_id = ?)');
       params.push(userId);
       const baseWhere = conditions.length ? `WHERE ${conditions.map((c) => `(${c})`).join(' OR ')}` : '';
-      const courseFilter = ' AND m.course_id = ?';
-      const semesterFilter = activeSemester ? ' AND m.semester_id = ?' : '';
+      const globalBroadcastScope = '(m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL)';
+      const courseFilter = ` AND (m.course_id = ? OR (${globalBroadcastScope} AND m.course_id IS NULL))`;
+      const semesterFilter = activeSemester
+        ? ` AND (m.semester_id = ? OR (${globalBroadcastScope} AND m.semester_id IS NULL))`
+        : '';
       const statusFilter = " AND COALESCE(m.status, 'published') = 'published' AND (m.scheduled_at IS NULL OR m.scheduled_at <= ?)";
       const subjectFilter = !Number.isNaN(filterSubjectId) ? ' AND m.subject_id = ?' : '';
       const finalParams = [...params, courseId || 1];
@@ -17448,10 +17447,20 @@ app.get('/admin/api/messages/:id/reads', requireMessagesSectionAccess, readLimit
     return res.status(500).json({ error: 'Database error' });
   }
   try {
+    const globalBroadcastScope = 'target_all = 1 AND subject_id IS NULL AND group_number IS NULL';
     const message = await db.get(
-      `SELECT id, subject_id, group_number, target_all
+      `SELECT id, subject_id, group_number, target_all, course_id, semester_id
        FROM messages
-       WHERE id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
+       WHERE id = ?
+         AND (
+           course_id = ?
+           OR (${globalBroadcastScope} AND course_id IS NULL)
+         )${activeSemester
+          ? ` AND (
+              semester_id = ?
+              OR (${globalBroadcastScope} AND semester_id IS NULL)
+            )`
+          : ''}`,
       activeSemester ? [messageId, courseId, activeSemester.id] : [messageId, courseId]
     );
     if (!message) {
@@ -18107,30 +18116,40 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                   WHEN m.target_all = 1 THEN (
                                     SELECT COUNT(*)
                                     FROM users u2
-                                    WHERE u2.course_id = ? AND u2.role = 'student' AND u2.is_active = 1
+                                    WHERE u2.role = 'student' AND u2.is_active = 1
+                                      AND (
+                                        (m.course_id IS NULL AND m.subject_id IS NULL AND m.group_number IS NULL)
+                                        OR u2.course_id = m.course_id
+                                      )
                                   )
                                   WHEN m.subject_id IS NOT NULL THEN (
                                     SELECT COUNT(DISTINCT sg.student_id)
                                     FROM student_groups sg
                                     JOIN users u3 ON u3.id = sg.student_id
                                     WHERE sg.subject_id = m.subject_id AND sg.group_number = m.group_number
-                                      AND u3.course_id = ? AND u3.is_active = 1
+                                      AND u3.course_id = m.course_id AND u3.is_active = 1
                                   )
                                   ELSE (
                                     SELECT COUNT(*)
                                     FROM message_targets mt
                                     JOIN users u4 ON u4.id = mt.user_id
-                                    WHERE mt.message_id = m.id AND u4.course_id = ? AND u4.is_active = 1
+                                    WHERE mt.message_id = m.id AND u4.course_id = m.course_id AND u4.is_active = 1
                                   )
                                 END AS target_count
                               ) targets ON true
-                              WHERE m.course_id = ?${activeSemester ? ' AND m.semester_id = ?' : ''}
+                              WHERE (
+                                m.course_id = ?
+                                OR (m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL AND m.course_id IS NULL)
+                              )${activeSemester
+                                ? ` AND (
+                                    m.semester_id = ?
+                                    OR (m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL AND m.semester_id IS NULL)
+                                  )`
+                                : ''}
                               ORDER BY m.created_at DESC
                               LIMIT 200
                             `,
-                            activeSemester
-                              ? [courseId, courseId, courseId, courseId, activeSemester.id]
-                              : [courseId, courseId, courseId, courseId],
+                            activeSemester ? [courseId, activeSemester.id] : [courseId],
                             (msgErr, messages) => {
                               if (msgErr) {
                                 return handleDbError(res, msgErr, 'admin.messages');
@@ -24189,30 +24208,40 @@ app.get('/starosta', requireStaff, async (req, res) => {
             WHEN m.target_all = 1 THEN (
               SELECT COUNT(*)
               FROM users u2
-              WHERE u2.course_id = ? AND u2.role = 'student' AND u2.is_active = 1
+              WHERE u2.role = 'student' AND u2.is_active = 1
+                AND (
+                  (m.course_id IS NULL AND m.subject_id IS NULL AND m.group_number IS NULL)
+                  OR u2.course_id = m.course_id
+                )
             )
             WHEN m.subject_id IS NOT NULL THEN (
               SELECT COUNT(DISTINCT sg.student_id)
               FROM student_groups sg
               JOIN users u3 ON u3.id = sg.student_id
               WHERE sg.subject_id = m.subject_id AND sg.group_number = m.group_number
-                AND u3.course_id = ? AND u3.is_active = 1
+                AND u3.course_id = m.course_id AND u3.is_active = 1
             )
             ELSE (
               SELECT COUNT(*)
               FROM message_targets mt
               JOIN users u4 ON u4.id = mt.user_id
-              WHERE mt.message_id = m.id AND u4.course_id = ? AND u4.is_active = 1
+              WHERE mt.message_id = m.id AND u4.course_id = m.course_id AND u4.is_active = 1
             )
           END AS target_count
         ) targets ON true
-        WHERE m.course_id = ?${activeSemester ? ' AND m.semester_id = ?' : ''}
+        WHERE (
+          m.course_id = ?
+          OR (m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL AND m.course_id IS NULL)
+        )${activeSemester
+          ? ` AND (
+              m.semester_id = ?
+              OR (m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL AND m.semester_id IS NULL)
+            )`
+          : ''}
         ORDER BY m.created_at DESC
         LIMIT 200
       `,
-      activeSemester
-        ? [courseId, courseId, courseId, courseId, activeSemester.id]
-        : [courseId, courseId, courseId, courseId]
+      activeSemester ? [courseId, activeSemester.id] : [courseId]
     );
   } catch (err) {
     return handleDbError(res, err, 'starosta.messages');

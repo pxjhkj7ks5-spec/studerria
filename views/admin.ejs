@@ -3420,15 +3420,15 @@
                   <div class="col-12 col-md-4">
                     <label class="form-label"><%= t('admin.target') %></label>
                     <select class="form-select" name="target_type" id="messageTargetType">
-                      <option value="all"><%= t('admin.targetAll') %></option>
+                      <option value="all"><%= t('admin.targetAllCurrentCourse') %></option>
                       <% if (canBroadcastAllCourses) { %>
-                        <option value="all_courses">Усі курси</option>
+                        <option value="all_courses"><%= t('admin.targetAllCourses') %></option>
                       <% } %>
-                      <option value="subject"><%= t('admin.targetSubjectGroup') %></option>
-                      <option value="users"><%= t('admin.targetUsers') %></option>
+                      <option value="subject"><%= t('admin.targetSubjectGroupCurrentCourse') %></option>
+                      <option value="users"><%= t('admin.targetUsersSelected') %></option>
                     </select>
                     <div class="form-text text-muted">
-                      <% if (canBroadcastAllCourses) { %>Адмін може надсилати всім курсам, інші ролі — лише своєму.<% } else { %>Доступно лише для вашого курсу.<% } %>
+                      <% if (canBroadcastAllCourses) { %><%= t('admin.messageTargetHintAdmin') %><% } else { %><%= t('admin.messageTargetHintCourseOnly') %><% } %>
                     </div>
                   </div>
                   <div class="col-12 col-md-4">
@@ -3505,11 +3505,11 @@
                         <td><%= m.body %></td>
                         <td>
                           <% if (m.target_all === 1) { %>
-                            All students
+                            <%= m.course_id ? t('admin.targetAllCurrentCourse') : t('admin.targetAllCourses') %>
                           <% } else if (m.subject_name) { %>
                             <%= m.subject_name %> · Group <%= m.group_number %>
                           <% } else { %>
-                            Users
+                            <%= t('admin.targetUsers') %>
                           <% } %>
                         </td>
                         <td><%= m.created_at %></td>
