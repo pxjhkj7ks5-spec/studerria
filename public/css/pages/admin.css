@@ -571,6 +571,10 @@ body.theme-light .admin-metric-card {
   margin-top: 0;
 }
 
+.security-auto-refresh-select {
+  min-width: 130px;
+}
+
 body.theme-light .visit-admin-filter-switch {
   border-color: rgba(15, 23, 42, 0.12);
   background: rgba(255, 255, 255, 0.75);
@@ -607,6 +611,22 @@ body.theme-light .visit-admin-filter-switch {
 .visit-role-value {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.security-risk-row-high > td {
+  background: rgba(239, 68, 68, 0.17) !important;
+}
+
+.security-risk-row-watch > td {
+  background: rgba(245, 158, 11, 0.16) !important;
+}
+
+body.theme-light .security-risk-row-high > td {
+  background: rgba(239, 68, 68, 0.12) !important;
+}
+
+body.theme-light .security-risk-row-watch > td {
+  background: rgba(245, 158, 11, 0.11) !important;
 }
 
 .data-quality-sample {

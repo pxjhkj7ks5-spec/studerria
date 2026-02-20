@@ -277,7 +277,7 @@ const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-overview', label: 'Огляд' },
   { id: 'admin-settings', label: 'Налаштування' },
   { id: 'admin-role-access', label: 'Role Studio' },
-  { id: 'admin-visit-analytics', label: 'Відвідування' },
+  { id: 'admin-visit-analytics', label: 'Security analytics' },
   { id: 'admin-students', label: 'Students' },
   { id: 'admin-schedule', label: 'Розклад' },
   { id: 'admin-import-export', label: 'Імпорт/Експорт' },
@@ -3060,6 +3060,8 @@ const SECURITY_CASE_SCORE_WATCH = 50;
 const SECURITY_CASE_SCORE_HIGH = 90;
 const SECURITY_ALERT_LOOKBACK_HOURS = 72;
 const SECURITY_SESSION_LIST_LIMIT = 120;
+const SECURITY_DASHBOARD_RECOMPUTE_LIMIT_DEFAULT = 220;
+const SECURITY_DASHBOARD_RECOMPUTE_LIMIT_MAX = 500;
 const STEPUP_CODE_ROLE = 'ROLE';
 const STEPUP_CODE_BULK = 'BULK';
 const STEPUP_CODE_FINALIZE = 'FINALIZE';
@@ -21336,6 +21338,121 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.securityDashboard.fetch');
+  }
+});
+
+app.post('/admin/security-dashboard/recompute', requireVisitAnalyticsSectionAccess, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.securityDashboard.recompute.init');
+  }
+  try {
+    const courseId = getAdminCourse(req);
+    const requestedLimit = Number(req.body && req.body.limit ? req.body.limit : SECURITY_DASHBOARD_RECOMPUTE_LIMIT_DEFAULT);
+    const recomputeLimit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(SECURITY_DASHBOARD_RECOMPUTE_LIMIT_MAX, Math.floor(requestedLimit)))
+      : SECURITY_DASHBOARD_RECOMPUTE_LIMIT_DEFAULT;
+    const userRows = await db.all(
+      `
+        SELECT id
+        FROM users
+        WHERE course_id = ?
+          AND is_active = 1
+        ORDER BY id DESC
+        LIMIT ?
+      `,
+      [courseId, recomputeLimit]
+    );
+    const userIds = (userRows || [])
+      .map((row) => Number(row.id || 0))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    const beforeRows = userIds.length
+      ? await db.all(
+          `
+            SELECT user_id, risk_level, risk_score, status
+            FROM user_security_cases
+            WHERE user_id = ANY(?::int[])
+          `,
+          [userIds]
+        )
+      : [];
+    const beforeByUser = new Map();
+    (beforeRows || []).forEach((row) => {
+      const userId = Number(row && row.user_id ? row.user_id : 0);
+      if (!Number.isFinite(userId) || userId < 1) return;
+      const signature = [
+        normalizeSecurityCaseLevel(row.risk_level),
+        Number(row.risk_score || 0),
+        normalizeSecurityCaseStatus(row.status),
+      ].join('|');
+      beforeByUser.set(userId, signature);
+    });
+
+    let processed = 0;
+    let changed = 0;
+    let errors = 0;
+    const summary = {
+      high_risk_total: 0,
+      watch_total: 0,
+      suspicious_total: 0,
+    };
+
+    for (const userId of userIds) {
+      try {
+        const recomputed = await recomputeUserSecurityCase(userId, {
+          courseId,
+          allowAutoQuarantine: false,
+        });
+        processed += 1;
+        if (!recomputed) continue;
+        const level = normalizeSecurityCaseLevel(recomputed.level);
+        const score = Number(recomputed.score || 0);
+        const status = normalizeSecurityCaseStatus(
+          recomputed.case && recomputed.case.status ? recomputed.case.status : 'open'
+        );
+        const nextSignature = [level, score, status].join('|');
+        if (beforeByUser.get(userId) !== nextSignature) {
+          changed += 1;
+        }
+        if (level === 'high-risk') {
+          summary.high_risk_total += 1;
+        } else if (level === 'watch') {
+          summary.watch_total += 1;
+        }
+      } catch (recomputeErr) {
+        errors += 1;
+        pushRuntimeErrorEvent(
+          'security',
+          'dashboard_recompute',
+          recomputeErr && recomputeErr.message ? recomputeErr.message : recomputeErr,
+          { user_id: userId }
+        );
+      }
+    }
+
+    summary.suspicious_total = summary.high_risk_total + summary.watch_total;
+    logAction(db, req, 'security_dashboard_recompute', {
+      course_id: courseId,
+      limit: recomputeLimit,
+      processed,
+      changed,
+      errors,
+      suspicious_total: summary.suspicious_total,
+    });
+
+    return res.json({
+      ok: true,
+      course_id: courseId,
+      limit: recomputeLimit,
+      processed,
+      changed,
+      errors,
+      summary,
+      generated_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.securityDashboard.recompute');
   }
 });
 

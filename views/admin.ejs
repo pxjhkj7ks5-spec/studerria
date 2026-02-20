@@ -813,7 +813,7 @@
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">Activity</div>
             <% if (sectionAllowed('admin-visit-analytics')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-visit-analytics">Visit analytics</button>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-visit-analytics">Security analytics</button>
             <% } %>
             <% if (sectionAllowed('admin-history')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-history">History</button>
@@ -1104,7 +1104,7 @@
                     <div class="settings-section-title">Data retention</div>
                     <div class="row g-3">
                       <div class="col-12 col-md-4">
-                        <label class="form-label">Visit analytics (days)</label>
+                        <label class="form-label">Security analytics (days)</label>
                         <input
                           type="number"
                           min="14"
@@ -2711,13 +2711,13 @@
         <% } %>
 
         <% if (sectionAllowed('admin-visit-analytics')) { %>
-        <div id="admin-visit-analytics" class="admin-panel" data-admin-title="Activity / Visit analytics">
+        <div id="admin-visit-analytics" class="admin-panel" data-admin-title="Security / Analytics">
           <div class="card mb-4">
             <div class="card-body">
               <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                 <div>
-                  <h5 class="card-title mb-1">Аналітика відвідування</h5>
-                  <div class="small text-muted">Живі метрики по візитах, ролях і популярних сторінках.</div>
+                  <h5 class="card-title mb-1">Security analytics</h5>
+                  <div class="small text-muted">Живі метрики безпеки, візитів, ролей і ризикових сигналів.</div>
                 </div>
                 <div class="d-flex gap-2 align-items-center">
                   <select class="form-select form-select-sm" id="visitAnalyticsDays" aria-label="Analytics period">
@@ -2957,9 +2957,17 @@
                   <h6 class="mb-1">Security dashboard</h6>
                   <div class="small text-muted">Ризики акаунтів, алерти, підозрілі IP/девайси та SLA розбору.</div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                   <span class="badge text-bg-secondary" id="securityDashboardStatusBadge">Loading…</span>
+                  <button class="btn btn-outline-warning btn-sm" type="button" id="securityDashboardScan">Скан ризиків</button>
                   <button class="btn btn-outline-secondary btn-sm" type="button" id="securityDashboardRefresh">Оновити security</button>
+                  <select class="form-select form-select-sm security-auto-refresh-select" id="securityAutoRefreshInterval" aria-label="Security auto refresh">
+                    <option value="60">Авто 1 хв</option>
+                    <option value="180" selected>Авто 3 хв</option>
+                    <option value="300">Авто 5 хв</option>
+                    <option value="600">Авто 10 хв</option>
+                  </select>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" id="securityAutoRefreshToggle">Авто: OFF</button>
                 </div>
               </div>
 
@@ -2982,6 +2990,7 @@
                 </div>
               </div>
               <div class="small text-muted mt-2" id="securityDashboardGeneratedAt">—</div>
+              <div class="small text-muted mt-1" id="securityAutoRefreshStatus">Автооновлення вимкнено.</div>
 
               <div class="row g-3 mt-1">
                 <div class="col-12 col-xl-6">
@@ -4416,6 +4425,10 @@
       const dataQualityGeneratedAt = document.getElementById('dataQualityGeneratedAt');
       const dataQualityBody = document.getElementById('dataQualityBody');
       const securityDashboardRefreshBtn = document.getElementById('securityDashboardRefresh');
+      const securityDashboardScanBtn = document.getElementById('securityDashboardScan');
+      const securityAutoRefreshIntervalSelect = document.getElementById('securityAutoRefreshInterval');
+      const securityAutoRefreshToggleBtn = document.getElementById('securityAutoRefreshToggle');
+      const securityAutoRefreshStatus = document.getElementById('securityAutoRefreshStatus');
       const securityDashboardStatusBadge = document.getElementById('securityDashboardStatusBadge');
       const securityDashboardGeneratedAt = document.getElementById('securityDashboardGeneratedAt');
       const securityMetricOpenCases = document.getElementById('securityMetricOpenCases');
@@ -4434,6 +4447,16 @@
       let systemHealthLoading = false;
       let dataQualityLoading = false;
       let securityDashboardLoading = false;
+      let securityScanLoading = false;
+      let securityAutoRefreshTimer = null;
+      const securityAutoRefreshAllowedSeconds = [60, 180, 300, 600];
+      let securityAutoRefreshSeconds = Number(safeStorageGet('admin:security:auto-refresh-seconds', '180'));
+      if (!securityAutoRefreshAllowedSeconds.includes(securityAutoRefreshSeconds)) {
+        securityAutoRefreshSeconds = 180;
+      }
+      let securityAutoRefreshEnabled = safeStorageGet('admin:security:auto-refresh-enabled', '0') === '1';
+      let securityAutoRefreshLastRunAt = null;
+      let securityAutoRefreshSummary = null;
 
       const formatVisitNumber = (value) => {
         const n = Number(value || 0);
@@ -4892,8 +4915,64 @@
       const setSecurityDashboardLoading = (loading) => {
         securityDashboardLoading = !!loading;
         if (securityDashboardRefreshBtn) {
-          securityDashboardRefreshBtn.disabled = securityDashboardLoading;
+          securityDashboardRefreshBtn.disabled = securityDashboardLoading || securityScanLoading;
           securityDashboardRefreshBtn.textContent = securityDashboardLoading ? 'Оновлення…' : 'Оновити security';
+        }
+        if (securityDashboardScanBtn) {
+          securityDashboardScanBtn.disabled = securityDashboardLoading || securityScanLoading;
+        }
+      };
+
+      const setSecurityScanLoading = (loading) => {
+        securityScanLoading = !!loading;
+        if (securityDashboardScanBtn) {
+          securityDashboardScanBtn.disabled = securityDashboardLoading || securityScanLoading;
+          securityDashboardScanBtn.textContent = securityScanLoading ? 'Сканування…' : 'Скан ризиків';
+        }
+        if (securityDashboardRefreshBtn) {
+          securityDashboardRefreshBtn.disabled = securityDashboardLoading || securityScanLoading;
+        }
+      };
+
+      const formatSecurityAutoRefreshLabel = (seconds) => {
+        const safeSeconds = Number(seconds || 0);
+        const minutes = Math.max(1, Math.round(safeSeconds / 60));
+        return `${minutes} хв`;
+      };
+
+      const updateSecurityAutoRefreshUi = () => {
+        if (securityAutoRefreshIntervalSelect) {
+          securityAutoRefreshIntervalSelect.value = String(securityAutoRefreshSeconds);
+        }
+        if (securityAutoRefreshToggleBtn) {
+          securityAutoRefreshToggleBtn.textContent = securityAutoRefreshEnabled ? 'Авто: ON' : 'Авто: OFF';
+          securityAutoRefreshToggleBtn.classList.toggle('btn-outline-success', securityAutoRefreshEnabled);
+          securityAutoRefreshToggleBtn.classList.toggle('btn-outline-secondary', !securityAutoRefreshEnabled);
+        }
+        if (securityAutoRefreshStatus) {
+          const statusParts = [];
+          if (securityAutoRefreshEnabled) {
+            statusParts.push(`Автооновлення кожні ${formatSecurityAutoRefreshLabel(securityAutoRefreshSeconds)}`);
+          } else {
+            statusParts.push('Автооновлення вимкнено');
+          }
+          if (securityAutoRefreshLastRunAt && !Number.isNaN(securityAutoRefreshLastRunAt.getTime())) {
+            statusParts.push(`останній скан ${securityAutoRefreshLastRunAt.toLocaleTimeString('uk-UA')}`);
+          }
+          if (securityAutoRefreshSummary) {
+            const highRisk = Number(securityAutoRefreshSummary.high_risk_total || 0);
+            const watch = Number(securityAutoRefreshSummary.watch_total || 0);
+            const suspicious = Number(securityAutoRefreshSummary.suspicious_total || (highRisk + watch));
+            statusParts.push(`підозрілих ${formatVisitNumber(suspicious)} (high ${formatVisitNumber(highRisk)}, watch ${formatVisitNumber(watch)})`);
+          }
+          securityAutoRefreshStatus.textContent = statusParts.join(' · ');
+        }
+      };
+
+      const clearSecurityAutoRefreshTimer = () => {
+        if (securityAutoRefreshTimer) {
+          window.clearInterval(securityAutoRefreshTimer);
+          securityAutoRefreshTimer = null;
         }
       };
 
@@ -4930,6 +5009,8 @@
           if (securityMetricWatch) securityMetricWatch.textContent = '—';
           if (securityMetricOverdue72h) securityMetricOverdue72h.textContent = '—';
           if (securityDashboardGeneratedAt) securityDashboardGeneratedAt.textContent = 'Оновлено: —';
+          securityAutoRefreshSummary = null;
+          updateSecurityAutoRefreshUi();
           if (securityRiskyBody) securityRiskyBody.innerHTML = '<tr><td colspan="4" class="text-muted">Не вдалось завантажити кейси.</td></tr>';
           if (securityAlertsBody) securityAlertsBody.innerHTML = '<tr><td colspan="4" class="text-muted">Не вдалось завантажити алерти.</td></tr>';
           if (securityIpsBody) securityIpsBody.innerHTML = '<tr><td colspan="3" class="text-muted">Не вдалось завантажити IP.</td></tr>';
@@ -4939,8 +5020,15 @@
 
         const summary = data.summary || {};
         const highRiskTotal = Number(summary.high_risk_total || 0);
+        const watchTotal = Number(summary.watch_total || 0);
         const openCases = Number(summary.open_cases || 0);
         const overdue72h = Number(summary.overdue_72h || 0);
+        securityAutoRefreshSummary = {
+          high_risk_total: highRiskTotal,
+          watch_total: watchTotal,
+          suspicious_total: highRiskTotal + watchTotal,
+        };
+        updateSecurityAutoRefreshUi();
 
         if (securityDashboardStatusBadge) {
           const badgeClass = highRiskTotal > 0
@@ -4954,7 +5042,7 @@
         }
         if (securityMetricOpenCases) securityMetricOpenCases.textContent = formatVisitNumber(openCases);
         if (securityMetricHighRisk) securityMetricHighRisk.textContent = formatVisitNumber(highRiskTotal);
-        if (securityMetricWatch) securityMetricWatch.textContent = formatVisitNumber(summary.watch_total);
+        if (securityMetricWatch) securityMetricWatch.textContent = formatVisitNumber(watchTotal);
         if (securityMetricOverdue72h) securityMetricOverdue72h.textContent = formatVisitNumber(overdue72h);
 
         if (securityDashboardGeneratedAt) {
@@ -4969,14 +5057,20 @@
           if (!rows.length) {
             securityRiskyBody.innerHTML = '<tr><td colspan="4" class="text-muted">Ризикових кейсів за курсом немає.</td></tr>';
           } else {
-            securityRiskyBody.innerHTML = rows.map((row) => `
-              <tr>
+            securityRiskyBody.innerHTML = rows.map((row) => {
+              const level = String(row && row.risk_level ? row.risk_level : '').trim().toLowerCase();
+              const rowClass = level === 'high-risk'
+                ? 'security-risk-row-high'
+                : (level === 'watch' ? 'security-risk-row-watch' : '');
+              return `
+              <tr class="${rowClass}">
                 <td>${escapeHtml(row.full_name || '-')}</td>
                 <td><span class="badge ${getSecurityRiskBadgeClass(row.risk_level)}">${escapeHtml(formatSecurityRiskLabel(row.risk_level))}</span></td>
                 <td><span class="badge ${getSecurityStatusBadgeClass(row.status)}">${escapeHtml(String(row.status || 'open'))}</span></td>
                 <td>${formatVisitNumber(row.risk_score)}</td>
               </tr>
-            `).join('');
+            `;
+            }).join('');
           }
         }
 
@@ -5031,7 +5125,7 @@
         }
       };
 
-      const loadSecurityDashboard = async () => {
+      const loadSecurityDashboard = async ({ silent = false } = {}) => {
         if (!visitAnalyticsPanel || securityDashboardLoading) return;
         setSecurityDashboardLoading(true);
         try {
@@ -5049,10 +5143,62 @@
           renderSecurityDashboard(data);
         } catch (err) {
           renderSecurityDashboard(null);
-          showToast('error', 'Не вдалось завантажити security dashboard.');
+          if (!silent) {
+            showToast('error', 'Не вдалось завантажити security dashboard.');
+          }
         } finally {
           setSecurityDashboardLoading(false);
         }
+      };
+
+      const runSecurityDashboardScan = async ({ silent = false } = {}) => {
+        if (!visitAnalyticsPanel || securityScanLoading) return;
+        setSecurityScanLoading(true);
+        try {
+          const res = await fetch('/admin/security-dashboard/recompute', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ limit: 220 }),
+          });
+          if (!res.ok) {
+            throw new Error(`Security scan ${res.status}`);
+          }
+          const payload = await res.json();
+          if (!payload || !payload.ok) {
+            throw new Error('Security scan payload invalid');
+          }
+          securityAutoRefreshLastRunAt = payload.generated_at ? new Date(payload.generated_at) : new Date();
+          securityAutoRefreshSummary = payload.summary || null;
+          updateSecurityAutoRefreshUi();
+          await loadSecurityDashboard({ silent: true });
+          if (!silent) {
+            const suspiciousTotal = Number(payload.summary && payload.summary.suspicious_total ? payload.summary.suspicious_total : 0);
+            showToast('success', `Скан завершено: підозрілих акаунтів ${formatVisitNumber(suspiciousTotal)}.`);
+          }
+        } catch (err) {
+          if (!silent) {
+            showToast('error', 'Не вдалось виконати скан ризиків.');
+          }
+        } finally {
+          setSecurityScanLoading(false);
+        }
+      };
+
+      const restartSecurityAutoRefresh = () => {
+        clearSecurityAutoRefreshTimer();
+        if (!securityAutoRefreshEnabled) {
+          updateSecurityAutoRefreshUi();
+          return;
+        }
+        securityAutoRefreshTimer = window.setInterval(() => {
+          if (!visitAnalyticsPanel) return;
+          if (!isVisitAnalyticsVisible()) return;
+          runSecurityDashboardScan({ silent: true });
+        }, Math.max(30000, securityAutoRefreshSeconds * 1000));
+        updateSecurityAutoRefreshUi();
       };
 
       const renderVisitChart = (dailyRows) => {
@@ -5182,16 +5328,18 @@
         loadVisitAnalytics();
         loadSystemHealth();
         loadDataQuality();
-        loadSecurityDashboard();
+        loadSecurityDashboard({ silent: true });
+        restartSecurityAutoRefresh();
       };
 
       if (visitAnalyticsPanel) {
+        updateSecurityAutoRefreshUi();
         if (visitRefreshBtn) {
           visitRefreshBtn.addEventListener('click', () => {
             loadVisitAnalytics();
             loadSystemHealth();
             loadDataQuality();
-            loadSecurityDashboard();
+            loadSecurityDashboard({ silent: true });
           });
         }
         if (visitDaysSelect) {
@@ -5207,16 +5355,45 @@
           dataQualityRefreshBtn.addEventListener('click', loadDataQuality);
         }
         if (securityDashboardRefreshBtn) {
-          securityDashboardRefreshBtn.addEventListener('click', loadSecurityDashboard);
+          securityDashboardRefreshBtn.addEventListener('click', () => loadSecurityDashboard({ silent: false }));
+        }
+        if (securityDashboardScanBtn) {
+          securityDashboardScanBtn.addEventListener('click', () => runSecurityDashboardScan({ silent: false }));
+        }
+        if (securityAutoRefreshIntervalSelect) {
+          securityAutoRefreshIntervalSelect.value = String(securityAutoRefreshSeconds);
+          securityAutoRefreshIntervalSelect.addEventListener('change', () => {
+            const nextValue = Number(securityAutoRefreshIntervalSelect.value || securityAutoRefreshSeconds);
+            if (securityAutoRefreshAllowedSeconds.includes(nextValue)) {
+              securityAutoRefreshSeconds = nextValue;
+              safeStorageSet('admin:security:auto-refresh-seconds', String(nextValue));
+            }
+            restartSecurityAutoRefresh();
+          });
+        }
+        if (securityAutoRefreshToggleBtn) {
+          securityAutoRefreshToggleBtn.addEventListener('click', () => {
+            securityAutoRefreshEnabled = !securityAutoRefreshEnabled;
+            safeStorageSet('admin:security:auto-refresh-enabled', securityAutoRefreshEnabled ? '1' : '0');
+            restartSecurityAutoRefresh();
+            if (securityAutoRefreshEnabled && isVisitAnalyticsVisible()) {
+              runSecurityDashboardScan({ silent: true });
+            }
+          });
         }
         window.addEventListener('admin:visit-analytics-opened', refreshVisitAnalyticsOnOpen);
         if (isVisitAnalyticsVisible()) {
           loadVisitAnalytics();
           loadSystemHealth();
           loadDataQuality();
-          loadSecurityDashboard();
+          loadSecurityDashboard({ silent: true });
+          restartSecurityAutoRefresh();
         }
       }
+
+      window.addEventListener('beforeunload', () => {
+        clearSecurityAutoRefreshTimer();
+      });
 
       document.addEventListener('click', async (event) => {
         const trigger = event.target.closest('[data-confirm]');
