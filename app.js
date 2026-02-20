@@ -19050,30 +19050,31 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'admin.settings.init');
   }
-  const sessionDays = Number(req.body.session_duration_days);
-  const maxFileSize = Number(req.body.max_file_size_mb);
-  const minTeamMembers = Number(req.body.min_team_members);
-  const allowHomework = String(req.body.allow_homework_creation).toLowerCase() === 'true';
-  const allowCustomDeadlines = String(req.body.allow_custom_deadlines).toLowerCase() === 'true';
-  const allowMessages = String(req.body.allow_messages).toLowerCase() === 'true';
-  const scheduleRefreshMinutes = Number(req.body.schedule_refresh_minutes);
-  const siteVisitRetentionDays = Number(req.body.site_visit_retention_days);
-  const loginHistoryRetentionDays = Number(req.body.login_history_retention_days);
-  const activityLogRetentionDays = Number(req.body.activity_log_retention_days);
-  const securityAllowlistSource = Object.prototype.hasOwnProperty.call(req.body, 'security_admin_ip_allowlist')
-    ? req.body.security_admin_ip_allowlist
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const sessionDays = Number(body.session_duration_days);
+  const maxFileSize = Number(body.max_file_size_mb);
+  const minTeamMembers = Number(body.min_team_members);
+  const allowHomework = String(body.allow_homework_creation).toLowerCase() === 'true';
+  const allowCustomDeadlines = String(body.allow_custom_deadlines).toLowerCase() === 'true';
+  const allowMessages = String(body.allow_messages).toLowerCase() === 'true';
+  const scheduleRefreshMinutes = Number(body.schedule_refresh_minutes);
+  const siteVisitRetentionDays = Number(body.site_visit_retention_days);
+  const loginHistoryRetentionDays = Number(body.login_history_retention_days);
+  const activityLogRetentionDays = Number(body.activity_log_retention_days);
+  const securityAllowlistSource = Object.prototype.hasOwnProperty.call(body, 'security_admin_ip_allowlist')
+    ? body.security_admin_ip_allowlist
     : settingsCache.security_admin_ip_allowlist;
   const securityAdminIpAllowlist = String(securityAllowlistSource || '');
-  const thresholdRaw = Object.prototype.hasOwnProperty.call(req.body, 'security_registration_alert_threshold')
-    ? req.body.security_registration_alert_threshold
+  const thresholdRaw = Object.prototype.hasOwnProperty.call(body, 'security_registration_alert_threshold')
+    ? body.security_registration_alert_threshold
     : settingsCache.security_registration_alert_threshold;
   const thresholdProvided = thresholdRaw !== undefined && thresholdRaw !== null && String(thresholdRaw).trim() !== '';
   const thresholdParsed = Number(thresholdRaw);
   const securityRegistrationAlertThreshold = thresholdProvided
     ? thresholdParsed
     : Number(settingsCache.security_registration_alert_threshold || DEFAULT_SETTINGS.security_registration_alert_threshold);
-  const windowRaw = Object.prototype.hasOwnProperty.call(req.body, 'security_registration_alert_window_minutes')
-    ? req.body.security_registration_alert_window_minutes
+  const windowRaw = Object.prototype.hasOwnProperty.call(body, 'security_registration_alert_window_minutes')
+    ? body.security_registration_alert_window_minutes
     : settingsCache.security_registration_alert_window_minutes;
   const windowProvided = windowRaw !== undefined && windowRaw !== null && String(windowRaw).trim() !== '';
   const windowParsed = Number(windowRaw);

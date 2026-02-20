@@ -5279,10 +5279,17 @@
           if (saveBtn) saveBtn.disabled = true;
           try {
             const formData = new FormData(settingsForm);
+            const payload = new URLSearchParams();
+            formData.forEach((value, key) => {
+              payload.append(key, String(value));
+            });
             const response = await fetch(settingsForm.action, {
               method: 'POST',
-              headers: { Accept: 'application/json' },
-              body: formData,
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+              },
+              body: payload.toString(),
             });
             const data = await readJsonSafe(response);
             if (!response.ok || !data.ok) {

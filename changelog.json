@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.52",
+      "date": "2026-02-20",
+      "items": [
+        "fix(system-settings): settings save now posts as URL-encoded payload instead of multipart FormData, so backend correctly receives all fields including admin IP allowlist",
+        "fix(system-settings): backend save handler now safely handles missing/invalid req.body object and no longer throws TypeError on malformed requests",
+        "fix(system-settings): admin IP allowlist persistence is restored for async Save flow"
+      ]
+    },
+    {
       "version": "0.9.51",
       "date": "2026-02-20",
       "items": [
