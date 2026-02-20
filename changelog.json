@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.49",
+      "date": "2026-02-20",
+      "items": [
+        "fix(system-settings): settings save is now backward-compatible when security fields are missing (fallbacks to cached values instead of Invalid settings)",
+        "fix(system-settings): security allowlist value is preserved if older/stale form does not send textarea field",
+        "fix(teamwork-settings): min team members input now allows value 1 in System Settings UI"
+      ]
+    },
+    {
       "version": "0.9.48",
       "date": "2026-02-20",
       "items": [

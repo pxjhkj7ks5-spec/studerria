@@ -19031,9 +19031,26 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   const siteVisitRetentionDays = Number(req.body.site_visit_retention_days);
   const loginHistoryRetentionDays = Number(req.body.login_history_retention_days);
   const activityLogRetentionDays = Number(req.body.activity_log_retention_days);
-  const securityAdminIpAllowlist = String(req.body.security_admin_ip_allowlist || '');
-  const securityRegistrationAlertThreshold = Number(req.body.security_registration_alert_threshold);
-  const securityRegistrationAlertWindowMinutes = Number(req.body.security_registration_alert_window_minutes);
+  const securityAllowlistSource = Object.prototype.hasOwnProperty.call(req.body, 'security_admin_ip_allowlist')
+    ? req.body.security_admin_ip_allowlist
+    : settingsCache.security_admin_ip_allowlist;
+  const securityAdminIpAllowlist = String(securityAllowlistSource || '');
+  const thresholdRaw = Object.prototype.hasOwnProperty.call(req.body, 'security_registration_alert_threshold')
+    ? req.body.security_registration_alert_threshold
+    : settingsCache.security_registration_alert_threshold;
+  const thresholdProvided = thresholdRaw !== undefined && thresholdRaw !== null && String(thresholdRaw).trim() !== '';
+  const thresholdParsed = Number(thresholdRaw);
+  const securityRegistrationAlertThreshold = thresholdProvided
+    ? thresholdParsed
+    : Number(settingsCache.security_registration_alert_threshold || DEFAULT_SETTINGS.security_registration_alert_threshold);
+  const windowRaw = Object.prototype.hasOwnProperty.call(req.body, 'security_registration_alert_window_minutes')
+    ? req.body.security_registration_alert_window_minutes
+    : settingsCache.security_registration_alert_window_minutes;
+  const windowProvided = windowRaw !== undefined && windowRaw !== null && String(windowRaw).trim() !== '';
+  const windowParsed = Number(windowRaw);
+  const securityRegistrationAlertWindowMinutes = windowProvided
+    ? windowParsed
+    : Number(settingsCache.security_registration_alert_window_minutes || DEFAULT_SETTINGS.security_registration_alert_window_minutes);
   const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   if (
     Number.isNaN(sessionDays) || sessionDays <= 0 ||
@@ -19043,8 +19060,8 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     Number.isNaN(siteVisitRetentionDays) ||
     Number.isNaN(loginHistoryRetentionDays) ||
     Number.isNaN(activityLogRetentionDays) ||
-    Number.isNaN(securityRegistrationAlertThreshold) ||
-    Number.isNaN(securityRegistrationAlertWindowMinutes)
+    (thresholdProvided && Number.isNaN(securityRegistrationAlertThreshold)) ||
+    (windowProvided && Number.isNaN(securityRegistrationAlertWindowMinutes))
   ) {
     if (wantsJson) {
       return res.status(400).json({ error: 'Invalid settings' });
@@ -19059,10 +19076,14 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     loginHistoryRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
     activityLogRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
     activityLogRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
-    securityRegistrationAlertThreshold < SECURITY_REGISTRATION_ALERT_THRESHOLD_MIN ||
-    securityRegistrationAlertThreshold > SECURITY_REGISTRATION_ALERT_THRESHOLD_MAX ||
-    securityRegistrationAlertWindowMinutes < SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MIN ||
-    securityRegistrationAlertWindowMinutes > SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MAX
+    (thresholdProvided && (
+      securityRegistrationAlertThreshold < SECURITY_REGISTRATION_ALERT_THRESHOLD_MIN ||
+      securityRegistrationAlertThreshold > SECURITY_REGISTRATION_ALERT_THRESHOLD_MAX
+    )) ||
+    (windowProvided && (
+      securityRegistrationAlertWindowMinutes < SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MIN ||
+      securityRegistrationAlertWindowMinutes > SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MAX
+    ))
   ) {
     if (wantsJson) {
       return res.status(400).json({ error: 'Invalid settings' });
