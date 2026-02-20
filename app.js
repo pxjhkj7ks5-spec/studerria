@@ -7451,6 +7451,8 @@ const JOURNAL_SCORING_TYPE_META = {
   custom: { key: 'custom', label: 'Кастом' },
 };
 const JOURNAL_GRADE_UNDO_SECONDS = 30;
+const JOURNAL_SUBJECT_CLOSE_EVENT_TYPE = 'closed';
+const JOURNAL_SUBJECT_CLOSED_ERROR = 'Предмет закрито. Редагування журналу вимкнено.';
 const JOURNAL_RETAKE_KINDS = ['retake', 'makeup'];
 const JOURNAL_RETAKE_KIND_META = {
   retake: { key: 'retake', label: 'Перездача' },
@@ -7545,6 +7547,26 @@ const buildExactSemesterCondition = (alias, semesterId) => {
     clause: `AND ${alias}.semester_id IS NULL`,
     params: [],
   };
+};
+
+const buildJournalClosedRedirectPath = (subjectId, message = JOURNAL_SUBJECT_CLOSED_ERROR) => {
+  const safeSubjectId = Number(subjectId);
+  const base = Number.isFinite(safeSubjectId) && safeSubjectId > 0
+    ? `/journal?subject_id=${safeSubjectId}`
+    : '/journal';
+  const separator = base.includes('?') ? '&' : '?';
+  return `${base}${separator}err=${encodeURIComponent(message)}`;
+};
+
+const resolveStoredUploadAbsolutePath = (storedPath) => {
+  const normalized = String(storedPath || '').trim();
+  if (!normalized) return '';
+  const relative = normalized.replace(/^\/+/, '');
+  if (!relative) return '';
+  const absolutePath = path.resolve(__dirname, relative);
+  const allowedRoot = path.resolve(uploadsDir);
+  if (!absolutePath.startsWith(allowedRoot)) return '';
+  return absolutePath;
 };
 
 const getAttendanceClassOptions = () => (
@@ -7807,7 +7829,14 @@ async function ensureSubjectGradingSettings(subjectId, courseId, semesterId, use
     `,
     [subjectId]
   );
-  if (!row) return { ...DEFAULT_SUBJECT_GRADING_SETTINGS };
+  if (!row) {
+    return {
+      ...DEFAULT_SUBJECT_GRADING_SETTINGS,
+      is_closed: 0,
+      closed_by: null,
+      closed_at: null,
+    };
+  }
   return {
     homework_enabled: parseBinaryFlag(row.homework_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.homework_enabled),
     seminar_enabled: parseBinaryFlag(row.seminar_enabled, DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_enabled),
@@ -7825,6 +7854,187 @@ async function ensureSubjectGradingSettings(subjectId, courseId, semesterId, use
     credit_weight_points: parseNonNegativeDecimal(row.credit_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.credit_weight_points),
     custom_weight_points: parseNonNegativeDecimal(row.custom_weight_points, DEFAULT_SUBJECT_GRADING_SETTINGS.custom_weight_points),
     final_max_points: 100,
+    is_closed: parseBinaryFlag(row.is_closed, 0),
+    closed_by: Number.isFinite(Number(row.closed_by)) ? Number(row.closed_by) : null,
+    closed_at: row.closed_at || null,
+  };
+}
+
+async function getJournalSubjectClosureState(subjectId) {
+  const safeSubjectId = Number(subjectId || 0);
+  if (!Number.isFinite(safeSubjectId) || safeSubjectId < 1) {
+    return {
+      is_closed: false,
+      closed_by: null,
+      closed_at: null,
+      latest_event: null,
+      latest_export_name: '',
+      latest_export_path: '',
+    };
+  }
+
+  let settingsRow = null;
+  let latestEvent = null;
+  try {
+    settingsRow = await db.get(
+      `
+        SELECT is_closed, closed_by, closed_at
+        FROM subject_grading_settings
+        WHERE subject_id = ?
+        LIMIT 1
+      `,
+      [safeSubjectId]
+    );
+  } catch (_err) {
+    settingsRow = null;
+  }
+  try {
+    latestEvent = await db.get(
+      `
+        SELECT
+          id,
+          event_type,
+          export_file_name,
+          export_file_path,
+          export_rows_count,
+          export_columns_count,
+          created_by,
+          created_at,
+          details
+        FROM journal_subject_close_events
+        WHERE subject_id = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      `,
+      [safeSubjectId]
+    );
+  } catch (_err) {
+    latestEvent = null;
+  }
+
+  return {
+    is_closed: Number(settingsRow?.is_closed || 0) === 1,
+    closed_by: Number.isFinite(Number(settingsRow?.closed_by)) ? Number(settingsRow.closed_by) : null,
+    closed_at: settingsRow?.closed_at || null,
+    latest_event: latestEvent
+      ? {
+          id: Number(latestEvent.id),
+          event_type: String(latestEvent.event_type || ''),
+          export_file_name: String(latestEvent.export_file_name || ''),
+          export_file_path: String(latestEvent.export_file_path || ''),
+          export_rows_count: Number(latestEvent.export_rows_count || 0),
+          export_columns_count: Number(latestEvent.export_columns_count || 0),
+          created_by: Number.isFinite(Number(latestEvent.created_by)) ? Number(latestEvent.created_by) : null,
+          created_at: latestEvent.created_at || null,
+          details: latestEvent.details || null,
+        }
+      : null,
+    latest_export_name: String(latestEvent?.export_file_name || ''),
+    latest_export_path: String(latestEvent?.export_file_path || ''),
+  };
+}
+
+const formatJournalClosureCsvNumber = (rawValue) => {
+  const numberValue = Number(rawValue);
+  if (!Number.isFinite(numberValue)) return '';
+  const rounded = Math.round(numberValue * 100) / 100;
+  return rounded
+    .toFixed(2)
+    .replace(/\.00$/, '')
+    .replace(/(\.\d)0$/, '$1');
+};
+
+function buildJournalClosureCsv({
+  subjectName = '',
+  courseName = '',
+  semesterTitle = '',
+  closedAt = new Date(),
+  columns = [],
+  rows = [],
+}) {
+  const safeColumns = Array.isArray(columns) ? columns : [];
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const closedAtIso = closedAt instanceof Date ? closedAt.toISOString() : String(closedAt || new Date().toISOString());
+  const lines = [];
+  lines.push([
+    'Предмет',
+    String(subjectName || '').trim() || 'Предмет',
+  ].map((value) => escapeCsvValue(value)).join(','));
+  lines.push([
+    'Курс',
+    String(courseName || '').trim() || '-',
+  ].map((value) => escapeCsvValue(value)).join(','));
+  lines.push([
+    'Семестр',
+    String(semesterTitle || '').trim() || '-',
+  ].map((value) => escapeCsvValue(value)).join(','));
+  lines.push([
+    'Закрито о',
+    closedAtIso,
+  ].map((value) => escapeCsvValue(value)).join(','));
+  lines.push('');
+
+  const header = [
+    'ПІБ',
+    'Група',
+    ...safeColumns.map((column) => {
+      const title = String(column?.title || '').trim() || 'Колонка';
+      const maxPoints = formatJournalClosureCsvNumber(column?.max_points);
+      return maxPoints ? `${title} (${maxPoints} б.)` : title;
+    }),
+    'Сирі бали',
+    'Сирий максимум',
+    'Підсумок / 100',
+  ];
+  lines.push(header.map((value) => escapeCsvValue(value)).join(','));
+
+  safeRows.forEach((row) => {
+    const student = row?.student || {};
+    const cells = Array.isArray(row?.cells) ? row.cells : [];
+    const cellValues = safeColumns.map((_column, index) => {
+      const score = Number(cells[index]?.score);
+      return Number.isFinite(score) ? formatJournalClosureCsvNumber(score) : '';
+    });
+    const line = [
+      String(student.full_name || '').trim() || 'Студент',
+      Number.isInteger(Number(student.group_number)) && Number(student.group_number) > 0
+        ? Number(student.group_number)
+        : '',
+      ...cellValues,
+      formatJournalClosureCsvNumber(row?.raw_earned),
+      formatJournalClosureCsvNumber(row?.raw_max),
+      formatJournalClosureCsvNumber(row?.final_score),
+    ];
+    lines.push(line.map((value) => escapeCsvValue(value)).join(','));
+  });
+
+  return {
+    csv: lines.join('\n'),
+    exportRowsCount: safeRows.length,
+    exportColumnsCount: safeColumns.length,
+  };
+}
+
+function writeJournalClosureExportFile({
+  subjectId,
+  courseId,
+  semesterId,
+  csvContent,
+}) {
+  const safeSubjectId = Number(subjectId || 0);
+  const safeCourseId = Number(courseId || 0);
+  const safeSemesterId = Number(semesterId || 0);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const directory = path.join(uploadsDir, 'journal-closures', `subject-${safeSubjectId}`);
+  fs.mkdirSync(directory, { recursive: true });
+  const fileName = `journal-subject-${safeSubjectId}-c${safeCourseId}-s${safeSemesterId}-${timestamp}.csv`;
+  const absolutePath = path.join(directory, fileName);
+  fs.writeFileSync(absolutePath, String(csvContent || ''), 'utf8');
+  const relativeToUploads = path.relative(uploadsDir, absolutePath).split(path.sep).join('/');
+  return {
+    fileName,
+    absolutePath,
+    filePath: `/uploads/${relativeToUploads}`,
   };
 }
 
@@ -8588,7 +8798,9 @@ async function buildJournalMatrix({
   studentFilterIds = [],
 }) {
   const gradingSettings = await ensureSubjectGradingSettings(subjectId, courseId, semesterId, actorUserId);
-  await syncJournalColumnsFromHomework(subjectId, courseId, semesterId, gradingSettings, actorUserId);
+  if (Number(gradingSettings?.is_closed || 0) !== 1) {
+    await syncJournalColumnsFromHomework(subjectId, courseId, semesterId, gradingSettings, actorUserId);
+  }
 
   let columns = await getJournalColumns(subjectId, courseId, semesterId);
   const students = await getJournalStudents(subjectId, courseId, groupFilterSet, studentFilterIds);
@@ -8917,8 +9129,11 @@ app.get('/journal', requireLogin, async (req, res) => {
           reason_max_length: ATTENDANCE_REASON_MAX_LENGTH,
         },
         canEditJournal: false,
+        canEditAttendance: false,
         teacherJournalMode,
         canManageAllSubjects: Boolean(journalScope.fullAccess),
+        subjectClosure: null,
+        canCloseSubject: false,
         selectedSemester: null,
         undoGrade: null,
         gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
@@ -8927,6 +9142,13 @@ app.get('/journal', requireLogin, async (req, res) => {
 
     const selectedCourseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
     const selectedSemester = await getActiveSemester(selectedCourseId);
+    const subjectClosure = await getJournalSubjectClosureState(Number(selectedSubject.subject_id));
+    const canEditJournal = teacherJournalMode && !subjectClosure.is_closed;
+    const canCloseSubject = Boolean(
+      teacherJournalMode
+      && !subjectClosure.is_closed
+      && (journalScope.fullAccess || selectedSubject.has_all_groups)
+    );
 
     let groupFilterSet = null;
     let studentFilterIds = [];
@@ -8965,11 +9187,14 @@ app.get('/journal', requireLogin, async (req, res) => {
       journalRows: matrix.rows,
       gradingSettings: matrix.gradingSettings,
       attendanceContext,
-      canEditJournal: teacherJournalMode,
+      canEditJournal,
+      canEditAttendance: teacherJournalMode,
       teacherJournalMode,
       canManageAllSubjects: Boolean(journalScope.fullAccess),
+      subjectClosure,
+      canCloseSubject,
       selectedSemester,
-      undoGrade: teacherJournalMode ? undoGrade : null,
+      undoGrade: canEditJournal ? undoGrade : null,
       gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
     });
   } catch (err) {
@@ -9178,6 +9403,235 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
   }
 });
 
+app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) => {
+  const subjectId = Number(req.body.subject_id);
+  if (!Number.isFinite(subjectId) || subjectId < 1) {
+    return res.redirect('/journal?err=Invalid%20subject');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const subjectOptions = await getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode);
+    const selectedSubject = (subjectOptions || []).find((subject) => Number(subject.subject_id) === subjectId);
+    if (!selectedSubject) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+    if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
+      return res.redirect(
+        `/journal?subject_id=${subjectId}&err=${encodeURIComponent('Для закриття предмета потрібен доступ до всіх груп')}`
+      );
+    }
+
+    const selectedCourseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
+    const selectedSemester = await getActiveSemester(selectedCourseId);
+    const semesterId = selectedSemester ? Number(selectedSemester.id) : null;
+    await ensureSubjectGradingSettings(subjectId, selectedCourseId, semesterId, Number(req.session.user.id));
+    const subjectClosure = await getJournalSubjectClosureState(subjectId);
+    if (subjectClosure.is_closed) {
+      return res.redirect(`/journal?subject_id=${subjectId}&ok=${encodeURIComponent('Предмет уже закрито')}`);
+    }
+
+    const matrix = await buildJournalMatrix({
+      subjectId,
+      courseId: selectedCourseId,
+      semesterId,
+      actorUserId: Number(req.session.user.id),
+      groupFilterSet: null,
+      studentFilterIds: [],
+    });
+    const exportPayload = buildJournalClosureCsv({
+      subjectName: selectedSubject.subject_name,
+      courseName: selectedSubject.course_name,
+      semesterTitle: selectedSemester ? String(selectedSemester.title || '') : '',
+      closedAt: new Date(),
+      columns: matrix.columns,
+      rows: matrix.rows,
+    });
+    const exportFile = writeJournalClosureExportFile({
+      subjectId,
+      courseId: selectedCourseId,
+      semesterId,
+      csvContent: exportPayload.csv,
+    });
+
+    await withTransaction(async (client) => {
+      const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
+      const semesterFilter = buildExactSemesterCondition('jc', semesterId);
+
+      await query(
+        `
+          INSERT INTO subject_grading_settings
+          (
+            subject_id, course_id, semester_id,
+            homework_enabled, seminar_enabled, exam_enabled, credit_enabled, custom_enabled,
+            homework_max_points, seminar_max_points, exam_max_points, credit_max_points, custom_max_points,
+            homework_weight_points, seminar_weight_points, exam_weight_points, credit_weight_points, custom_weight_points,
+            final_max_points,
+            is_closed, closed_by, closed_at,
+            created_by, created_at, updated_by, updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 100, 1, ?, NOW(), ?, NOW(), ?, NOW())
+          ON CONFLICT (subject_id)
+          DO UPDATE SET
+            course_id = EXCLUDED.course_id,
+            semester_id = EXCLUDED.semester_id,
+            is_closed = 1,
+            closed_by = EXCLUDED.closed_by,
+            closed_at = EXCLUDED.closed_at,
+            updated_by = EXCLUDED.updated_by,
+            updated_at = EXCLUDED.updated_at
+        `,
+        [
+          subjectId,
+          selectedCourseId,
+          semesterId,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.homework_enabled,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_enabled,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.exam_enabled,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.credit_enabled,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.custom_enabled,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.homework_weight_points,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_weight_points,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.exam_weight_points,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.credit_weight_points,
+          DEFAULT_SUBJECT_GRADING_SETTINGS.custom_weight_points,
+          Number(req.session.user.id),
+          Number(req.session.user.id),
+          Number(req.session.user.id),
+        ]
+      );
+
+      await query(
+        `
+          UPDATE journal_columns jc
+          SET is_locked = 1,
+              locked_by = ?,
+              locked_at = COALESCE(jc.locked_at, NOW()),
+              updated_at = NOW()
+          WHERE jc.subject_id = ?
+            AND jc.course_id = ?
+            ${semesterFilter.clause}
+            AND COALESCE(jc.is_archived, 0) = 0
+        `,
+        [Number(req.session.user.id), subjectId, selectedCourseId, ...semesterFilter.params]
+      );
+
+      await query(
+        `
+          INSERT INTO journal_subject_close_events
+          (
+            subject_id,
+            course_id,
+            semester_id,
+            event_type,
+            export_file_name,
+            export_file_path,
+            export_rows_count,
+            export_columns_count,
+            created_by,
+            created_at,
+            details
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?::jsonb)
+        `,
+        [
+          subjectId,
+          selectedCourseId,
+          semesterId,
+          JOURNAL_SUBJECT_CLOSE_EVENT_TYPE,
+          exportFile.fileName,
+          exportFile.filePath,
+          exportPayload.exportRowsCount,
+          exportPayload.exportColumnsCount,
+          Number(req.session.user.id),
+          JSON.stringify({
+            subject_name: selectedSubject.subject_name || '',
+            course_name: selectedSubject.course_name || '',
+            semester_title: selectedSemester ? String(selectedSemester.title || '') : '',
+          }),
+        ]
+      );
+    });
+
+    logActivity(
+      db,
+      req,
+      'journal_subject_close',
+      'subject_grading_settings',
+      subjectId,
+      {
+        subject_id: subjectId,
+        export_file_name: exportFile.fileName,
+        export_rows_count: exportPayload.exportRowsCount,
+        export_columns_count: exportPayload.exportColumnsCount,
+      },
+      selectedCourseId,
+      semesterId
+    );
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${exportFile.fileName}"`);
+    return res.send(exportPayload.csv);
+  } catch (err) {
+    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
+  }
+});
+
+app.get('/journal/subject/close-export', requireLogin, readLimiter, async (req, res) => {
+  const subjectId = Number(req.query.subject_id);
+  if (!Number.isFinite(subjectId) || subjectId < 1) {
+    return res.redirect('/journal?err=Invalid%20subject');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const subjectOptions = await getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode);
+    const selectedSubject = (subjectOptions || []).find((subject) => Number(subject.subject_id) === subjectId);
+    if (!selectedSubject) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+    if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const subjectClosure = await getJournalSubjectClosureState(subjectId);
+    if (!subjectClosure.is_closed || !subjectClosure.latest_export_path) {
+      return res.redirect(
+        `/journal?subject_id=${subjectId}&err=${encodeURIComponent('Експорт для закритого предмета не знайдено')}`
+      );
+    }
+    const absolutePath = resolveStoredUploadAbsolutePath(subjectClosure.latest_export_path);
+    if (!absolutePath || !fs.existsSync(absolutePath)) {
+      return res.redirect(
+        `/journal?subject_id=${subjectId}&err=${encodeURIComponent('Файл експорту недоступний')}`
+      );
+    }
+
+    return res.download(
+      absolutePath,
+      subjectClosure.latest_export_name || path.basename(absolutePath)
+    );
+  } catch (err) {
+    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
+  }
+});
+
 app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
   const columnId = Number(req.query.column_id);
   const studentId = Number(req.query.student_id);
@@ -9308,7 +9762,9 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       `,
       [columnId, studentId]
     );
-    const canManageRetakes = teacherJournalMode && !isJournalColumnLocked(column);
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    const subjectIsClosed = subjectClosure.is_closed;
+    const canManageRetakes = teacherJournalMode && !subjectIsClosed && !isJournalColumnLocked(column);
     const appealRows = await db.all(
       `
         SELECT
@@ -9333,9 +9789,10 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       `,
       [columnId, studentId]
     );
-    const canManageAppeals = teacherJournalMode && !isJournalColumnLocked(column);
+    const canManageAppeals = teacherJournalMode && !subjectIsClosed && !isJournalColumnLocked(column);
     const canCreateAppeals = (
       !teacherJournalMode
+      && !subjectIsClosed
       && Number(req.session.user.id) === studentId
       && Boolean(grade && Number.isFinite(Number(grade.score)))
     );
@@ -9375,7 +9832,9 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
           }
         : null,
       submission_status: submissionStatus,
-      can_edit: teacherJournalMode && !isJournalColumnLocked(column),
+      subject_is_closed: subjectIsClosed,
+      subject_closed_at: subjectClosure.closed_at || null,
+      can_edit: teacherJournalMode && !subjectIsClosed && !isJournalColumnLocked(column),
       can_manage_retakes: canManageRetakes,
       can_create_appeals: canCreateAppeals,
       can_manage_appeals: canManageAppeals,
@@ -9501,6 +9960,10 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     const parsedScore = Number(String(scoreRaw || '').replace(',', '.'));
@@ -9670,6 +10133,10 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
 
     if (!journalScope.fullAccess) {
@@ -9843,6 +10310,10 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
     }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+    }
 
     const studentRow = await db.get(
       `
@@ -9951,6 +10422,10 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
 
     const studentRow = await db.get(
@@ -10065,6 +10540,10 @@ app.post('/journal/retakes/create', requireLogin, writeLimiter, async (req, res)
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
 
     const studentRow = await db.get(
@@ -10205,6 +10684,10 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     if (Number.isFinite(score) && (score < 0 || score > maxPoints)) {
@@ -10382,6 +10865,10 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
     if (!column) {
       return res.redirect('/journal?err=Column%20not%20found');
     }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+    }
 
     const studentRow = await db.get(
       `
@@ -10527,6 +11014,10 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
     }
 
     const studentRow = await db.get(
@@ -10689,6 +11180,10 @@ app.post('/journal/columns/final-toggle', requireLogin, writeLimiter, async (req
     if (!column) {
       return res.redirect(`/journal?subject_id=${subjectId}&err=Column%20not%20found`);
     }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+    }
 
     if (!journalScope.fullAccess) {
       const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
@@ -10767,6 +11262,10 @@ app.post('/journal/columns/lock-toggle', requireLogin, writeLimiter, async (req,
     if (!column) {
       return res.redirect(`/journal?subject_id=${subjectId}&err=Column%20not%20found`);
     }
+    const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+    }
 
     if (!journalScope.fullAccess) {
       const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
@@ -10842,6 +11341,10 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
     );
     if (!subject) {
       return res.redirect('/journal?err=Subject%20not%20found');
+    }
+    const subjectClosure = await getJournalSubjectClosureState(subjectId);
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(subjectId));
     }
     if (!journalScope.fullAccess) {
       const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
@@ -10946,6 +11449,10 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
     );
     if (!subject) {
       return res.redirect('/journal?err=Subject%20not%20found');
+    }
+    const subjectClosure = await getJournalSubjectClosureState(subjectId);
+    if (subjectClosure.is_closed) {
+      return res.redirect(buildJournalClosedRedirectPath(subjectId));
     }
     if (!journalScope.fullAccess) {
       const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);

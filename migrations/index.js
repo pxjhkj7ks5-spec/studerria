@@ -23,6 +23,7 @@ const attendanceMvp = require('./022_attendance_mvp');
 const journalRetakeAttempts = require('./023_journal_retake_attempts');
 const journalGradeAppeals = require('./024_journal_grade_appeals');
 const adminChangeAudit = require('./025_admin_change_audit');
+const journalSubjectClosure = require('./026_journal_subject_closure');
 
 module.exports = [
   init,
@@ -50,4 +51,5 @@ module.exports = [
   journalRetakeAttempts,
   journalGradeAppeals,
   adminChangeAudit,
+  journalSubjectClosure,
 ];

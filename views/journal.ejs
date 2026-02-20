@@ -67,6 +67,11 @@
                   <span class="status-chip status-chip--neutral"><%= selectedSemester.title %></span>
                 <% } %>
                 <span class="status-chip status-chip--neutral"><%= selectedSubject.group_label %></span>
+                <% if (subjectClosure && subjectClosure.is_closed) { %>
+                  <span class="status-chip status-chip--danger">Предмет закрито</span>
+                <% } else { %>
+                  <span class="status-chip status-chip--success">Журнал відкрито</span>
+                <% } %>
                 <% if (canManageAllSubjects) { %>
                   <span class="status-chip status-chip--success">Повний доступ</span>
                 <% } %>
@@ -114,10 +119,35 @@
           });
         %>
         <section class="glass liquid-card p-3 mb-3">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+              <div class="fw-semibold">Семестрове закриття предмета</div>
+              <% if (subjectClosure && subjectClosure.is_closed) { %>
+                <div class="text-muted small">
+                  Журнал зафіксовано <%= subjectClosure.closed_at ? new Date(subjectClosure.closed_at).toLocaleString('uk-UA') : '' %>. Редагування оцінок вимкнено.
+                </div>
+              <% } else { %>
+                <div class="text-muted small">Після закриття всі колонки блокуються, а зміни оцінок стають недоступними.</div>
+              <% } %>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              <% if (canCloseSubject) { %>
+                <form method="POST" action="/journal/subject/close" target="_blank" onsubmit="return confirm('Закрити предмет і зафіксувати журнал? Дію не можна скасувати.')">
+                  <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                  <button class="btn btn-outline-danger btn-sm" type="submit">Закрити предмет</button>
+                </form>
+              <% } %>
+              <% if (teacherJournalMode && subjectClosure && subjectClosure.is_closed && (canManageAllSubjects || selectedSubject.has_all_groups)) { %>
+                <a class="btn btn-outline-secondary btn-sm" href="/journal/subject/close-export?subject_id=<%= selectedSubject.subject_id %>">Експорт відомості</a>
+              <% } %>
+            </div>
+          </div>
+        </section>
+        <section class="glass liquid-card p-3 mb-3">
           <details class="journal-attendance-details" open>
             <summary class="journal-attendance-summary">
               <div class="journal-attendance-summary-main">
-                <span class="journal-attendance-summary-title"><%= canEditJournal ? 'Відвідуваність (MVP)' : 'Моя відвідуваність' %></span>
+                <span class="journal-attendance-summary-title"><%= canEditAttendance ? 'Відвідуваність (MVP)' : 'Моя відвідуваність' %></span>
                 <span class="journal-attendance-summary-subtitle">
                   <%= attendance.date || '-' %> · Пара <%= attendance.class_number || '-' %>
                 </span>
@@ -150,7 +180,7 @@
                 </div>
               </form>
 
-              <% if (canEditJournal) { %>
+              <% if (canEditAttendance) { %>
                 <% if (!attendanceRows.length) { %>
                   <div class="text-muted">Немає студентів для відмітки відвідуваності в поточному доступі.</div>
                 <% } else { %>
@@ -644,7 +674,7 @@
               <div id="journalAppealList" class="journal-appeal-list">
                 <div class="text-muted small">Апеляцій поки немає.</div>
               </div>
-              <% if (!canEditJournal) { %>
+              <% if (!teacherJournalMode) { %>
                 <form id="journalAppealCreateForm" method="POST" action="/journal/appeals/create" class="journal-appeal-create-form mt-3" autocomplete="off">
                   <input type="hidden" name="column_id" id="journalAppealCreateColumnId" />
                   <input type="hidden" name="student_id" id="journalAppealCreateStudentId" />

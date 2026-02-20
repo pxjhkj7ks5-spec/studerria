@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.9.33",
+      "date": "2026-02-20",
+      "items": [
+        "feat(journal-closure): added semester subject closure flow via `/journal/subject/close` with grade freeze + statement CSV export",
+        "feat(journal-closure): added `/journal/subject/close-export` and persisted closure audit/export events in `journal_subject_close_events`",
+        "feat(journal): enforced subject-closed guard across grade mutations (save/bulk/delete/restore, retakes, appeals, column toggles, config/column create) and returned read-only flags in `/journal/cell.json`",
+        "feat(journal-ui): added closure status/actions in journal header and split attendance edit mode from grading edit mode (`canEditAttendance`)",
+        "feat(db): added migration `026_journal_subject_closure` and wired it into migration index"
+      ]
+    },
+    {
       "version": "0.9.32",
       "date": "2026-02-20",
       "items": [
