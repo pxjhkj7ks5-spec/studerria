@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.74",
+      "date": "2026-02-20",
+      "items": [
+        "fix(journal-dark): forced dark bootstrap table variables for attendance tables to remove white cell backgrounds in theme-dark",
+        "fix(journal-attendance-ui): restored readable contrast for attendance headers/cells in dark mode"
+      ]
+    },
+    {
       "version": "0.9.73",
       "date": "2026-02-20",
       "items": [

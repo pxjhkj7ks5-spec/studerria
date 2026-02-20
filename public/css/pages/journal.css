@@ -289,7 +289,8 @@ body.theme-dark.page-journal .liquid-card::after {
 }
 
 body.theme-dark.page-journal .journal-config-table,
-body.theme-dark.page-journal .journal-table {
+body.theme-dark.page-journal .journal-table,
+body.theme-dark.page-journal .journal-attendance-table {
   --bs-table-bg: transparent;
   --bs-table-color: var(--ds-text0);
   --bs-table-border-color: color-mix(in srgb, var(--surface-border) 78%, transparent);
@@ -297,13 +298,15 @@ body.theme-dark.page-journal .journal-table {
 }
 
 body.theme-dark.page-journal .journal-config-table > :not(caption) > * > *,
-body.theme-dark.page-journal .journal-table > :not(caption) > * > * {
+body.theme-dark.page-journal .journal-table > :not(caption) > * > *,
+body.theme-dark.page-journal .journal-attendance-table > :not(caption) > * > * {
   background: transparent !important;
   color: var(--ds-text0);
 }
 
 body.theme-dark.page-journal .journal-config-table thead th,
-body.theme-dark.page-journal .journal-table thead th {
+body.theme-dark.page-journal .journal-table thead th,
+body.theme-dark.page-journal .journal-attendance-table thead th {
   color: var(--ds-text2);
 }
 
