@@ -33,6 +33,90 @@ try {
   appChangelog = [];
 }
 const buildStamp = new Date().toISOString();
+const SYSTEM_HEALTH_ERROR_EVENT_LIMIT = 400;
+const SYSTEM_HEALTH_ERROR_WINDOW_HOURS = 24;
+const runtimeErrorEvents = [];
+const schedulerHealthState = {
+  enabled: false,
+  interval_ms: null,
+  running: false,
+  run_count: 0,
+  skipped_count: 0,
+  error_count: 0,
+  last_started_at: null,
+  last_run_at: null,
+  last_duration_ms: null,
+  last_result: null,
+  last_error_at: null,
+  last_error: null,
+};
+
+function normalizeRuntimeErrorMessage(rawError) {
+  const normalized = String(rawError || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (normalized.length <= 220) return normalized;
+  return `${normalized.slice(0, 217)}...`;
+}
+
+function pushRuntimeErrorEvent(kind, label, rawError, extra = {}) {
+  const event = {
+    created_at: new Date().toISOString(),
+    kind: String(kind || 'unknown').trim().toLowerCase() || 'unknown',
+    label: String(label || 'unknown').trim() || 'unknown',
+    message: normalizeRuntimeErrorMessage(rawError),
+    ...extra,
+  };
+  runtimeErrorEvents.push(event);
+  if (runtimeErrorEvents.length > SYSTEM_HEALTH_ERROR_EVENT_LIMIT) {
+    runtimeErrorEvents.splice(0, runtimeErrorEvents.length - SYSTEM_HEALTH_ERROR_EVENT_LIMIT);
+  }
+  return event;
+}
+
+function getRuntimeErrorSummary(now = Date.now()) {
+  const windowMs = SYSTEM_HEALTH_ERROR_WINDOW_HOURS * 60 * 60 * 1000;
+  const cutoff = now - windowMs;
+  const recent = runtimeErrorEvents
+    .filter((event) => {
+      const ts = new Date(event.created_at).getTime();
+      return Number.isFinite(ts) && ts >= cutoff;
+    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const byKind = {
+    db: 0,
+    scheduler: 0,
+    unhandled: 0,
+    session: 0,
+    unknown: 0,
+  };
+  const topLabelMap = new Map();
+  recent.forEach((event) => {
+    const kind = Object.prototype.hasOwnProperty.call(byKind, event.kind) ? event.kind : 'unknown';
+    byKind[kind] += 1;
+    const labelKey = `${kind}::${event.label}`;
+    if (!topLabelMap.has(labelKey)) {
+      topLabelMap.set(labelKey, { kind, label: event.label, count: 0 });
+    }
+    topLabelMap.get(labelKey).count += 1;
+  });
+  const topLabels = Array.from(topLabelMap.values())
+    .sort((a, b) => {
+      if (Number(b.count || 0) !== Number(a.count || 0)) {
+        return Number(b.count || 0) - Number(a.count || 0);
+      }
+      return String(a.label || '').localeCompare(String(b.label || ''));
+    })
+    .slice(0, 8);
+  return {
+    window_hours: SYSTEM_HEALTH_ERROR_WINDOW_HOURS,
+    total: recent.length,
+    by_kind: byKind,
+    top_labels: topLabels,
+    recent: recent.slice(0, 20),
+  };
+}
+
 const localesDir = path.join(__dirname, 'locales');
 const locales = {};
 ['en', 'uk'].forEach((code) => {
@@ -83,10 +167,12 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 process.on('uncaughtException', (err) => {
+  pushRuntimeErrorEvent('unhandled', 'uncaughtException', err && err.message ? err.message : err);
   console.error('Uncaught exception:', err);
 });
 
 process.on('unhandledRejection', (err) => {
+  pushRuntimeErrorEvent('unhandled', 'unhandledRejection', err && err.message ? err.message : err);
   console.error('Unhandled rejection:', err);
 });
 
@@ -384,6 +470,7 @@ const probeSessionStoreHealth = async (reason = 'interval') => {
     sessionHealthState.lastDurationMs = durationMs;
     sessionHealthState.checks += 1;
     sessionHealthState.failures += 1;
+    pushRuntimeErrorEvent('session', `probe:${reason}`, message);
     logSessionHealth('probe_failed', { reason, duration_ms: durationMs, error: message });
   }
 };
@@ -404,6 +491,7 @@ const sessionStore = new PgSession({
     sessionHealthState.lastErrorAt = nowIso;
     sessionHealthState.lastError = message;
     sessionHealthState.failures += 1;
+    pushRuntimeErrorEvent('session', 'store_error', message);
     console.error('SESSION_STORE_ERROR', ...args);
     logSessionHealth('store_error', { error: message });
   },
@@ -2604,6 +2692,7 @@ const {
 } = require('./lib/dateUtils');
 const { generateSchedule, parseWeekSet } = require('./lib/scheduleGenerator');
 const { runMigrations } = require('./lib/migrations');
+const migrationCatalog = require('./migrations');
 
 const authLimiter = createRateLimiter({
   windowMs: 60 * 1000,
@@ -2885,6 +2974,8 @@ const recordSiteVisit = async (payload) => {
 };
 
 function handleDbError(res, err, label) {
+  const message = normalizeRuntimeErrorMessage(err && err.message ? err.message : err);
+  pushRuntimeErrorEvent('db', label, message);
   console.error(`Database error (${label})`, err);
   if (!res.headersSent) {
     if (process.env.DB_DEBUG === 'true') {
@@ -15622,12 +15713,20 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
   }
 });
 
+const schedulerIntervalRaw = Number(process.env.SCHEDULER_INTERVAL_MS || 60000);
+const schedulerIntervalMs = Number.isFinite(schedulerIntervalRaw)
+  ? Math.floor(schedulerIntervalRaw)
+  : 60000;
 let schedulerRunning = false;
 const publishScheduledItems = async () => {
   if (schedulerRunning) {
+    schedulerHealthState.skipped_count += 1;
     return { messages: 0, homework: 0, skipped: true };
   }
+  const startedAt = Date.now();
   schedulerRunning = true;
+  schedulerHealthState.running = true;
+  schedulerHealthState.last_started_at = new Date(startedAt).toISOString();
   try {
     await ensureDbReady();
     const nowIso = new Date().toISOString();
@@ -15653,9 +15752,23 @@ const publishScheduledItems = async () => {
     if (homework) {
       broadcast('homework_updated');
     }
-    return { messages, homework };
+    const result = { messages, homework, skipped: false };
+    schedulerHealthState.run_count += 1;
+    schedulerHealthState.last_run_at = nowIso;
+    schedulerHealthState.last_duration_ms = Math.max(0, Date.now() - startedAt);
+    schedulerHealthState.last_result = result;
+    schedulerHealthState.last_error = null;
+    return result;
+  } catch (err) {
+    const message = normalizeRuntimeErrorMessage(err && err.message ? err.message : err);
+    schedulerHealthState.error_count += 1;
+    schedulerHealthState.last_error_at = new Date().toISOString();
+    schedulerHealthState.last_error = message;
+    pushRuntimeErrorEvent('scheduler', 'publishScheduledItems', message);
+    throw err;
   } finally {
     schedulerRunning = false;
+    schedulerHealthState.running = false;
   }
 };
 
@@ -16243,6 +16356,108 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.visitAnalytics.fetch');
+  }
+});
+
+app.get('/admin/system-health.json', requireVisitAnalyticsSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.systemHealth.init');
+  }
+  try {
+    const nowTs = Date.now();
+    const nowIso = new Date(nowTs).toISOString();
+    const memoryUsage = process.memoryUsage();
+    const dbStatus = initStatus === 'ready' ? 'ok' : (initStatus === 'error' ? 'fail' : 'starting');
+    const sessionStatus = sessionHealthState.ok ? 'ok' : 'fail';
+    const schedulerStatus = !schedulerHealthState.enabled
+      ? 'disabled'
+      : (schedulerHealthState.running
+        ? 'running'
+        : (schedulerHealthState.last_error ? 'degraded' : 'ok'));
+    const errorSummary = getRuntimeErrorSummary(nowTs);
+    const migrationRows = await db.all(
+      `
+        SELECT id, applied_at
+        FROM migrations
+        ORDER BY applied_at DESC, id DESC
+      `
+    );
+    const availableIds = Array.isArray(migrationCatalog)
+      ? migrationCatalog.map((item) => String(item && item.id ? item.id : '')).filter(Boolean)
+      : [];
+    const appliedSet = new Set((migrationRows || []).map((row) => String(row.id || '')).filter(Boolean));
+    const pendingIds = availableIds.filter((id) => !appliedSet.has(id));
+    let status = 'ok';
+    if (dbStatus === 'fail' || sessionStatus === 'fail') {
+      status = 'critical';
+    } else if (dbStatus === 'starting') {
+      status = 'starting';
+    } else if (schedulerStatus === 'degraded' || Number(errorSummary.total || 0) > 0) {
+      status = 'degraded';
+    }
+
+    return res.json({
+      ok: true,
+      generated_at: nowIso,
+      status,
+      runtime: {
+        version: appVersion,
+        build_stamp: buildStamp,
+        node: process.version,
+        uptime_seconds: Math.max(0, Math.floor(process.uptime())),
+        memory_mb: {
+          rss: Math.round((Number(memoryUsage.rss || 0) / (1024 * 1024)) * 10) / 10,
+          heap_used: Math.round((Number(memoryUsage.heapUsed || 0) / (1024 * 1024)) * 10) / 10,
+          heap_total: Math.round((Number(memoryUsage.heapTotal || 0) / (1024 * 1024)) * 10) / 10,
+        },
+      },
+      health: {
+        db_status: dbStatus,
+        session_status: sessionStatus,
+        scheduler_status: schedulerStatus,
+      },
+      db: {
+        init_status: initStatus,
+        init_error: initError ? normalizeRuntimeErrorMessage(initError.message || initError) : null,
+      },
+      session: {
+        table: sessionHealthState.table,
+        checks: Number(sessionHealthState.checks || 0),
+        failures: Number(sessionHealthState.failures || 0),
+        probe_interval_seconds: Number(sessionHealthProbeIntervalSeconds || 0),
+        last_checked_at: sessionHealthState.lastCheckedAt || null,
+        last_ok_at: sessionHealthState.lastOkAt || null,
+        last_error_at: sessionHealthState.lastErrorAt || null,
+        last_error: sessionHealthState.lastError || null,
+        last_duration_ms: Number(sessionHealthState.lastDurationMs || 0),
+      },
+      scheduler: {
+        enabled: Boolean(schedulerHealthState.enabled),
+        interval_ms: Number(schedulerHealthState.interval_ms || 0),
+        running: Boolean(schedulerHealthState.running),
+        run_count: Number(schedulerHealthState.run_count || 0),
+        skipped_count: Number(schedulerHealthState.skipped_count || 0),
+        error_count: Number(schedulerHealthState.error_count || 0),
+        last_started_at: schedulerHealthState.last_started_at || null,
+        last_run_at: schedulerHealthState.last_run_at || null,
+        last_duration_ms: Number(schedulerHealthState.last_duration_ms || 0),
+        last_result: schedulerHealthState.last_result || null,
+        last_error_at: schedulerHealthState.last_error_at || null,
+        last_error: schedulerHealthState.last_error || null,
+      },
+      migrations: {
+        total_available: availableIds.length,
+        applied_count: appliedSet.size,
+        pending_count: pendingIds.length,
+        last_applied_at: migrationRows && migrationRows[0] ? migrationRows[0].applied_at : null,
+        pending_ids: pendingIds.slice(0, 30),
+      },
+      errors: errorSummary,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.systemHealth.fetch');
   }
 });
 
@@ -20257,10 +20472,12 @@ app.post('/logout', (req, res) => {
 });
 
 const startScheduler = () => {
-  const intervalMs = Number(process.env.SCHEDULER_INTERVAL_MS || 60000);
-  if (!Number.isFinite(intervalMs) || intervalMs < 10000) {
+  schedulerHealthState.interval_ms = schedulerIntervalMs;
+  if (!Number.isFinite(schedulerIntervalMs) || schedulerIntervalMs < 10000) {
+    schedulerHealthState.enabled = false;
     return;
   }
+  schedulerHealthState.enabled = true;
   setInterval(() => {
     if (typeof publishScheduledItems !== 'function') {
       return;
@@ -20268,7 +20485,7 @@ const startScheduler = () => {
     publishScheduledItems().catch((err) => {
       console.error('Scheduler error', err);
     });
-  }, intervalMs);
+  }, schedulerIntervalMs);
 };
 
 const startSessionHealthProbes = () => {
@@ -20280,6 +20497,7 @@ const startSessionHealthProbes = () => {
       sessionHealthState.lastError = message;
       sessionHealthState.lastErrorAt = new Date().toISOString();
       sessionHealthState.failures += 1;
+      pushRuntimeErrorEvent('session', `probe_crashed:${reason}`, message);
       logSessionHealth('probe_crashed', { reason, error: message });
     });
 
@@ -20308,6 +20526,7 @@ const startServer = () => {
 };
 
 app.use((err, req, res, next) => {
+  pushRuntimeErrorEvent('unhandled', 'express_middleware', err && err.message ? err.message : err);
   console.error('Unhandled error', err);
   if (process.env.DB_DEBUG === 'true') {
     return res.status(500).send(err && err.stack ? err.stack : String(err));

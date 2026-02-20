@@ -2747,6 +2747,75 @@
             </div>
           </div>
 
+          <div class="card mb-3">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                  <h6 class="mb-1">System health</h6>
+                  <div class="small text-muted">Стан рантайму, міграцій, шедулера та останніх помилок.</div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge text-bg-secondary" id="systemHealthStatusBadge">Loading…</span>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" id="systemHealthRefresh">Оновити health</button>
+                </div>
+              </div>
+
+              <div class="visit-analytics-grid">
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Runtime</div>
+                  <div class="visit-metric-value" id="systemHealthRuntime">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">DB</div>
+                  <div class="visit-metric-value" id="systemHealthDb">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Session</div>
+                  <div class="visit-metric-value" id="systemHealthSession">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Scheduler</div>
+                  <div class="visit-metric-value" id="systemHealthScheduler">—</div>
+                </div>
+              </div>
+              <div class="small text-muted mt-2" id="systemHealthGeneratedAt">—</div>
+
+              <div class="row g-3 mt-1">
+                <div class="col-12 col-xl-6">
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Міграції</th>
+                          <th>Значення</th>
+                        </tr>
+                      </thead>
+                      <tbody id="systemHealthMigrationsBody">
+                        <tr><td colspan="2" class="text-muted">Завантаження…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="col-12 col-xl-6">
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Тип / label</th>
+                          <th>Помилки (24г)</th>
+                        </tr>
+                      </thead>
+                      <tbody id="systemHealthErrorsBody">
+                        <tr><td colspan="2" class="text-muted">Завантаження…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-2 small text-muted" id="systemHealthRecentErrorsList">—</div>
+            </div>
+          </div>
+
           <div class="card">
             <div class="card-body">
               <h6 class="mb-3">Останні візити</h6>
@@ -3953,11 +4022,22 @@
       const visitSlaMetricSubjects = document.getElementById('visitSlaMetricSubjects');
       const visitSlaMetricMaxWait = document.getElementById('visitSlaMetricMaxWait');
       const homeworkSlaBody = document.getElementById('homeworkSlaBody');
+      const systemHealthRefreshBtn = document.getElementById('systemHealthRefresh');
+      const systemHealthStatusBadge = document.getElementById('systemHealthStatusBadge');
+      const systemHealthRuntime = document.getElementById('systemHealthRuntime');
+      const systemHealthDb = document.getElementById('systemHealthDb');
+      const systemHealthSession = document.getElementById('systemHealthSession');
+      const systemHealthScheduler = document.getElementById('systemHealthScheduler');
+      const systemHealthGeneratedAt = document.getElementById('systemHealthGeneratedAt');
+      const systemHealthMigrationsBody = document.getElementById('systemHealthMigrationsBody');
+      const systemHealthErrorsBody = document.getElementById('systemHealthErrorsBody');
+      const systemHealthRecentErrorsList = document.getElementById('systemHealthRecentErrorsList');
       const visitChartCanvas = document.getElementById('visitAnalyticsChart');
       const visitChartCtor =
         typeof window !== 'undefined' && window.Chart ? window.Chart : null;
       let visitChart = null;
       let visitAnalyticsLoading = false;
+      let systemHealthLoading = false;
 
       const formatVisitNumber = (value) => {
         const n = Number(value || 0);
@@ -3973,6 +4053,24 @@
           return `${Math.round(hours / 24)} дн`;
         }
         return `${Math.round(hours)} год`;
+      };
+      const prettyHealthStatus = (value) => {
+        const key = String(value || '').trim().toLowerCase();
+        if (key === 'ok') return 'OK';
+        if (key === 'starting') return 'Starting';
+        if (key === 'running') return 'Running';
+        if (key === 'disabled') return 'Disabled';
+        if (key === 'degraded') return 'Degraded';
+        if (key === 'critical' || key === 'fail') return 'Critical';
+        return key || 'unknown';
+      };
+      const healthBadgeClass = (value) => {
+        const key = String(value || '').trim().toLowerCase();
+        if (key === 'ok' || key === 'running') return 'text-bg-success';
+        if (key === 'starting' || key === 'disabled') return 'text-bg-secondary';
+        if (key === 'degraded') return 'text-bg-warning';
+        if (key === 'critical' || key === 'fail') return 'text-bg-danger';
+        return 'text-bg-secondary';
       };
 
       const prettyVisitPageLabel = (key) => {
@@ -4104,6 +4202,117 @@
         `).join('');
       };
 
+      const setSystemHealthLoading = (loading) => {
+        systemHealthLoading = !!loading;
+        if (systemHealthRefreshBtn) {
+          systemHealthRefreshBtn.disabled = systemHealthLoading;
+          systemHealthRefreshBtn.textContent = systemHealthLoading ? 'Оновлення…' : 'Оновити health';
+        }
+      };
+
+      const renderSystemHealth = (payload) => {
+        const data = payload && typeof payload === 'object' ? payload : null;
+        const status = data ? String(data.status || '') : '';
+        if (systemHealthStatusBadge) {
+          systemHealthStatusBadge.className = `badge ${healthBadgeClass(status)}`;
+          systemHealthStatusBadge.textContent = prettyHealthStatus(status || 'unknown');
+        }
+        if (systemHealthRuntime) {
+          const runtime = data && data.runtime ? data.runtime : {};
+          const version = runtime.version ? `v${runtime.version}` : 'v—';
+          const uptime = Number(runtime.uptime_seconds || 0);
+          const uptimeHours = uptime > 0 ? `${Math.round((uptime / 3600) * 10) / 10}h` : '—';
+          systemHealthRuntime.textContent = `${version} · ${uptimeHours}`;
+        }
+        if (systemHealthDb) {
+          const dbStatus = data && data.health ? String(data.health.db_status || '') : '';
+          systemHealthDb.textContent = prettyHealthStatus(dbStatus || 'unknown');
+        }
+        if (systemHealthSession) {
+          const sessionStatus = data && data.health ? String(data.health.session_status || '') : '';
+          const failures = Number(data && data.session ? data.session.failures : 0);
+          systemHealthSession.textContent = `${prettyHealthStatus(sessionStatus || 'unknown')} · fail ${formatVisitNumber(failures)}`;
+        }
+        if (systemHealthScheduler) {
+          const schedulerStatus = data && data.health ? String(data.health.scheduler_status || '') : '';
+          const scheduler = data && data.scheduler ? data.scheduler : {};
+          const runCount = Number(scheduler.run_count || 0);
+          systemHealthScheduler.textContent = `${prettyHealthStatus(schedulerStatus || 'unknown')} · runs ${formatVisitNumber(runCount)}`;
+        }
+        if (systemHealthGeneratedAt) {
+          const generatedAt = data && data.generated_at ? new Date(data.generated_at) : null;
+          systemHealthGeneratedAt.textContent = generatedAt && !Number.isNaN(generatedAt.getTime())
+            ? `Оновлено: ${generatedAt.toLocaleString('uk-UA')}`
+            : 'Оновлено: —';
+        }
+        if (systemHealthMigrationsBody) {
+          const migrations = data && data.migrations ? data.migrations : {};
+          const pendingIds = Array.isArray(migrations.pending_ids) ? migrations.pending_ids : [];
+          const pendingText = pendingIds.length ? pendingIds.join(', ') : 'Немає';
+          const lastApplied = migrations.last_applied_at ? new Date(migrations.last_applied_at) : null;
+          const lastAppliedText = lastApplied && !Number.isNaN(lastApplied.getTime())
+            ? lastApplied.toLocaleString('uk-UA')
+            : '—';
+          systemHealthMigrationsBody.innerHTML = `
+            <tr><td>Доступно</td><td>${formatVisitNumber(migrations.total_available)}</td></tr>
+            <tr><td>Застосовано</td><td>${formatVisitNumber(migrations.applied_count)}</td></tr>
+            <tr><td>Pending</td><td>${formatVisitNumber(migrations.pending_count)}</td></tr>
+            <tr><td>Остання міграція</td><td>${escapeHtml(lastAppliedText)}</td></tr>
+            <tr><td>Pending IDs</td><td>${escapeHtml(pendingText)}</td></tr>
+          `;
+        }
+        if (systemHealthErrorsBody) {
+          const errors = data && data.errors ? data.errors : {};
+          const top = Array.isArray(errors.top_labels) ? errors.top_labels : [];
+          if (!top.length) {
+            systemHealthErrorsBody.innerHTML = '<tr><td colspan="2" class="text-muted">Помилок за вікно немає.</td></tr>';
+          } else {
+            systemHealthErrorsBody.innerHTML = top.map((row) => `
+              <tr>
+                <td>${escapeHtml(`${row.kind || 'unknown'} / ${row.label || 'unknown'}`)}</td>
+                <td>${formatVisitNumber(row.count)}</td>
+              </tr>
+            `).join('');
+          }
+        }
+        if (systemHealthRecentErrorsList) {
+          const errors = data && data.errors ? data.errors : {};
+          const recent = Array.isArray(errors.recent) ? errors.recent.slice(0, 3) : [];
+          if (!recent.length) {
+            systemHealthRecentErrorsList.textContent = 'Останні помилки: немає';
+          } else {
+            const text = recent.map((row) => {
+              const at = row.created_at ? new Date(row.created_at).toLocaleTimeString('uk-UA') : '--:--';
+              return `${at} ${row.kind || 'unknown'}:${row.label || 'unknown'} — ${row.message || ''}`;
+            }).join(' | ');
+            systemHealthRecentErrorsList.textContent = `Останні помилки: ${text}`;
+          }
+        }
+      };
+
+      const loadSystemHealth = async () => {
+        if (!visitAnalyticsPanel || systemHealthLoading) return;
+        setSystemHealthLoading(true);
+        try {
+          const res = await fetch('/admin/system-health.json', {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+          });
+          if (!res.ok) {
+            throw new Error(`System health ${res.status}`);
+          }
+          const data = await res.json();
+          if (!data || !data.ok) {
+            throw new Error('System health payload invalid');
+          }
+          renderSystemHealth(data);
+        } catch (err) {
+          renderSystemHealth(null);
+        } finally {
+          setSystemHealthLoading(false);
+        }
+      };
+
       const renderVisitChart = (dailyRows) => {
         if (!visitChartCanvas || !visitChartCtor) return;
         const labels = (dailyRows || []).map((row) => row.day || '');
@@ -4216,11 +4425,15 @@
           visitChart.resize();
         }
         loadVisitAnalytics();
+        loadSystemHealth();
       };
 
       if (visitAnalyticsPanel) {
         if (visitRefreshBtn) {
-          visitRefreshBtn.addEventListener('click', loadVisitAnalytics);
+          visitRefreshBtn.addEventListener('click', () => {
+            loadVisitAnalytics();
+            loadSystemHealth();
+          });
         }
         if (visitDaysSelect) {
           visitDaysSelect.addEventListener('change', loadVisitAnalytics);
@@ -4228,9 +4441,13 @@
         if (visitExcludeAdminToggle) {
           visitExcludeAdminToggle.addEventListener('change', loadVisitAnalytics);
         }
+        if (systemHealthRefreshBtn) {
+          systemHealthRefreshBtn.addEventListener('click', loadSystemHealth);
+        }
         window.addEventListener('admin:visit-analytics-opened', refreshVisitAnalyticsOnOpen);
         if (isVisitAnalyticsVisible()) {
           loadVisitAnalytics();
+          loadSystemHealth();
         }
       }
 

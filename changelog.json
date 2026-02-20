@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.31",
+      "date": "2026-02-20",
+      "items": [
+        "feat(admin-health): added System health block in Admin Visit Analytics with runtime, DB/session/scheduler statuses, migration state, and recent error insights",
+        "feat(api): added /admin/system-health.json endpoint with health snapshot (uptime/memory, migrations applied vs pending, scheduler metrics, runtime error summary)",
+        "feat(telemetry): started in-memory runtime error tracking for DB/session/scheduler/unhandled errors to power Health dashboard diagnostics"
+      ]
+    },
+    {
       "version": "0.9.30",
       "date": "2026-02-20",
       "items": [
