@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.73",
+      "date": "2026-02-20",
+      "items": [
+        "fix(journal): fixed /journal SQL bind mismatch in current-slot attendance lookup by passing group params only when group filter is present",
+        "fix(journal): resolved Cloud Run error \"bind message supplies 8 parameters, prepared statement requires 5\" for all-groups journal subjects"
+      ]
+    },
+    {
       "version": "0.9.72",
       "date": "2026-02-20",
       "items": [

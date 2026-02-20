@@ -10543,9 +10543,11 @@ async function resolveJournalCurrentAttendanceSlot({
       .filter((value) => Number.isInteger(value) && value > 0)
     : [];
   const uniqueGroups = Array.from(new Set(normalizedGroups));
-  const groupFilter = (!hasAllGroups && uniqueGroups.length)
+  const applyGroupFilter = !hasAllGroups && uniqueGroups.length > 0;
+  const groupFilter = applyGroupFilter
     ? ` AND se.group_number IN (${uniqueGroups.map(() => '?').join(',')})`
     : '';
+  const groupFilterParams = applyGroupFilter ? uniqueGroups : [];
   const rows = await db.all(
     `
       SELECT se.class_number, se.group_number
@@ -10558,7 +10560,7 @@ async function resolveJournalCurrentAttendanceSlot({
         ${groupFilter}
       ORDER BY se.class_number ASC
     `,
-    [Number(subjectId), Number(courseId), dayName, Number(weekNumber), ...semesterFilter.params, ...uniqueGroups]
+    [Number(subjectId), Number(courseId), dayName, Number(weekNumber), ...semesterFilter.params, ...groupFilterParams]
   );
   if (!rows || !rows.length) return response;
 
