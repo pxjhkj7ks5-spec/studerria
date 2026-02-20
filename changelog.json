@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.22",
+      "date": "2026-02-20",
+      "items": [
+        "fix(my-day): resolved cockpit DB crash by removing non-existent `teamwork_tasks.status` field from the `/my-day` deadlines query"
+      ]
+    },
+    {
       "version": "0.9.21",
       "date": "2026-02-19",
       "items": [

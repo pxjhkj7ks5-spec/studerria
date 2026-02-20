@@ -4047,7 +4047,7 @@ async function buildMyDayData(user, role = 'student') {
       : 'AND t.semester_id IS NULL';
     const rows = await db.all(
       `
-        SELECT t.id, t.title, t.due_date, t.subject_id, s.name AS subject_name, t.status
+        SELECT t.id, t.title, t.due_date, t.subject_id, s.name AS subject_name
         FROM teamwork_tasks t
         JOIN subjects s ON s.id = t.subject_id
         WHERE t.course_id = ?
@@ -4068,7 +4068,6 @@ async function buildMyDayData(user, role = 'student') {
       subject_name: row.subject_name,
       deadline_date: row.due_date,
       submission_status: row.due_date < todayStr ? 'overdue' : 'pending',
-      teamwork_status: row.status || null,
       can_submit: false,
     }));
   }
