@@ -19464,7 +19464,31 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       : '';
     const now = new Date();
 
-    const [summaryRow, dailyRows, topPagesRows, roleRows, recentRows, homeworkSla] = await Promise.all([
+    const recentSqlBase = `
+      SELECT
+        v.created_at,
+        COALESCE(NULLIF(u.full_name, ''), 'Guest') AS user_name,
+        COALESCE(NULLIF(v.role_key, ''), 'guest') AS role_key,
+        v.page_key,
+        v.route_path
+      FROM site_visit_events v
+      LEFT JOIN users u ON u.id = v.user_id
+      WHERE v.course_id = ?
+        AND v.created_at >= ?
+    `;
+    const recentFilteredSql = `
+      ${recentSqlBase}
+      ${excludeAdminClause}
+      ORDER BY v.created_at DESC
+      LIMIT 30
+    `;
+    const recentFallbackSql = `
+      ${recentSqlBase}
+      ORDER BY v.created_at DESC
+      LIMIT 30
+    `;
+
+    const [summaryRow, dailyRows, topPagesRows, roleRows, recentRows, recentFallbackRows, homeworkSla] = await Promise.all([
       db.get(
         `
           SELECT
@@ -19525,23 +19549,12 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
         [courseId, sinceIso]
       ),
       db.all(
-        `
-          SELECT
-            v.created_at,
-            COALESCE(NULLIF(u.full_name, ''), 'Guest') AS user_name,
-            COALESCE(NULLIF(v.role_key, ''), 'guest') AS role_key,
-            v.page_key,
-            v.route_path
-          FROM site_visit_events v
-          LEFT JOIN users u ON u.id = v.user_id
-          WHERE v.course_id = ?
-            AND v.created_at >= ?
-            ${excludeAdminClause}
-          ORDER BY v.created_at DESC
-          LIMIT 30
-        `,
+        recentFilteredSql,
         [courseId, sinceIso]
       ),
+      excludeAdmin
+        ? db.all(recentFallbackSql, [courseId, sinceIso])
+        : Promise.resolve([]),
       buildAdminHomeworkReviewSla({
         userId,
         courseId,
@@ -19569,6 +19582,26 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       };
     });
 
+    const normalizedRecent = (recentRows || []).map((row) => ({
+      created_at: row.created_at,
+      user_name: row.user_name || 'Guest',
+      role_key: row.role_key || 'guest',
+      page_key: row.page_key || 'unknown',
+      route_path: row.route_path || '/',
+    }));
+    const normalizedRecentFallback = (recentFallbackRows || []).map((row) => ({
+      created_at: row.created_at,
+      user_name: row.user_name || 'Guest',
+      role_key: row.role_key || 'guest',
+      page_key: row.page_key || 'unknown',
+      route_path: row.route_path || '/',
+    }));
+    const recentIsFallback = Boolean(
+      excludeAdmin &&
+      normalizedRecent.length === 0 &&
+      normalizedRecentFallback.length > 0
+    );
+
     return res.json({
       ok: true,
       days,
@@ -19590,13 +19623,9 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
         role_key: String(row.role_key || 'guest'),
         visits: Number(row.visits || 0),
       })),
-      recent: (recentRows || []).map((row) => ({
-        created_at: row.created_at,
-        user_name: row.user_name || 'Guest',
-        role_key: row.role_key || 'guest',
-        page_key: row.page_key || 'unknown',
-        route_path: row.route_path || '/',
-      })),
+      recent: normalizedRecent,
+      recent_fallback: normalizedRecentFallback,
+      recent_is_fallback: recentIsFallback,
       homework_sla: homeworkSla,
     });
   } catch (err) {

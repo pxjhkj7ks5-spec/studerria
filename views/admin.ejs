@@ -2961,7 +2961,10 @@
 
           <div class="card">
             <div class="card-body">
-              <h6 class="mb-3">Останні візити</h6>
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <h6 class="mb-0">Останні візити</h6>
+                <div class="small text-muted" id="visitRecentHint"></div>
+              </div>
               <div class="table-responsive">
                 <table class="table table-striped align-middle">
                   <thead>
@@ -4164,6 +4167,7 @@
       const visitRefreshBtn = document.getElementById('visitAnalyticsRefresh');
       const visitTopPagesBody = document.getElementById('visitTopPagesBody');
       const visitRecentBody = document.getElementById('visitRecentBody');
+      const visitRecentHint = document.getElementById('visitRecentHint');
       const visitRolesList = document.getElementById('visitRolesList');
       const visitMetricTotal = document.getElementById('visitMetricTotal');
       const visitMetricUnique = document.getElementById('visitMetricUnique');
@@ -4351,6 +4355,11 @@
             </tr>
           `;
         }).join('');
+      };
+
+      const setVisitRecentHint = (message) => {
+        if (!visitRecentHint) return;
+        visitRecentHint.textContent = String(message || '');
       };
 
       const renderHomeworkSla = (sla) => {
@@ -4737,11 +4746,20 @@
           renderVisitChart(data.daily || []);
           renderVisitTopPages(data.top_pages || []);
           renderVisitRoles(data.roles || []);
-          renderVisitRecent(data.recent || []);
+          const recentFilteredRows = Array.isArray(data.recent) ? data.recent : [];
+          const recentFallbackRows = Array.isArray(data.recent_fallback) ? data.recent_fallback : [];
+          if (!recentFilteredRows.length && data.recent_is_fallback && recentFallbackRows.length) {
+            setVisitRecentHint('Без адмінів порожньо, показано останні візити з адмінами.');
+            renderVisitRecent(recentFallbackRows);
+          } else {
+            setVisitRecentHint('');
+            renderVisitRecent(recentFilteredRows);
+          }
           renderHomeworkSla(data.homework_sla || null);
         } catch (err) {
           renderVisitTopPages([]);
           renderVisitRoles([]);
+          setVisitRecentHint('');
           renderVisitRecent([]);
           renderHomeworkSla(null);
           if (visitMetricTotal) visitMetricTotal.textContent = '—';

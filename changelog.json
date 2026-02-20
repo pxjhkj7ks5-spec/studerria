@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.48",
+      "date": "2026-02-20",
+      "items": [
+        "fix(visit-analytics): recent visits now fallback to unfiltered rows when \"Без адмінів\" yields empty list, so the block is never blank while there are real visits",
+        "ux(visit-analytics): added inline hint in recent visits block to explain when fallback with admin visits is shown",
+        "feat(api): /admin/visit-analytics.json now returns recent_fallback and recent_is_fallback for resilient rendering of recent visits table"
+      ]
+    },
+    {
       "version": "0.9.47",
       "date": "2026-02-20",
       "items": [
