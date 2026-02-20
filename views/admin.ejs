@@ -2871,6 +2871,57 @@
             </div>
           </div>
 
+          <div class="card mb-3">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                  <h6 class="mb-1">Data quality</h6>
+                  <div class="small text-muted">Діагностика дублів, відсутніх зв’язків і проблем конфігурації журналу.</div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge text-bg-secondary" id="dataQualityStatusBadge">Loading…</span>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" id="dataQualityRefresh">Оновити quality</button>
+                </div>
+              </div>
+
+              <div class="visit-analytics-grid">
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Всього проблем</div>
+                  <div class="visit-metric-value" id="dataQualityMetricIssues">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Провалені перевірки</div>
+                  <div class="visit-metric-value" id="dataQualityMetricChecks">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Critical</div>
+                  <div class="visit-metric-value" id="dataQualityMetricCritical">—</div>
+                </div>
+                <div class="visit-metric-card">
+                  <div class="small text-muted">Зачеплено предметів</div>
+                  <div class="visit-metric-value" id="dataQualityMetricSubjects">—</div>
+                </div>
+              </div>
+              <div class="small text-muted mt-2" id="dataQualityGeneratedAt">—</div>
+
+              <div class="table-responsive mt-2">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Severity</th>
+                      <th>Перевірка</th>
+                      <th>Проблем</th>
+                      <th>Приклади</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dataQualityBody">
+                    <tr><td colspan="4" class="text-muted">Завантаження…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <div class="card">
             <div class="card-body">
               <h6 class="mb-3">Останні візити</h6>
@@ -4092,12 +4143,21 @@
       const systemIncidentHigh = document.getElementById('systemIncidentHigh');
       const systemIncidentUnique = document.getElementById('systemIncidentUnique');
       const systemIncidentBody = document.getElementById('systemIncidentBody');
+      const dataQualityRefreshBtn = document.getElementById('dataQualityRefresh');
+      const dataQualityStatusBadge = document.getElementById('dataQualityStatusBadge');
+      const dataQualityMetricIssues = document.getElementById('dataQualityMetricIssues');
+      const dataQualityMetricChecks = document.getElementById('dataQualityMetricChecks');
+      const dataQualityMetricCritical = document.getElementById('dataQualityMetricCritical');
+      const dataQualityMetricSubjects = document.getElementById('dataQualityMetricSubjects');
+      const dataQualityGeneratedAt = document.getElementById('dataQualityGeneratedAt');
+      const dataQualityBody = document.getElementById('dataQualityBody');
       const visitChartCanvas = document.getElementById('visitAnalyticsChart');
       const visitChartCtor =
         typeof window !== 'undefined' && window.Chart ? window.Chart : null;
       let visitChart = null;
       let visitAnalyticsLoading = false;
       let systemHealthLoading = false;
+      let dataQualityLoading = false;
 
       const formatVisitNumber = (value) => {
         const n = Number(value || 0);
@@ -4137,6 +4197,12 @@
         if (key === 'critical') return 'text-bg-danger';
         if (key === 'high') return 'text-bg-warning';
         if (key === 'medium') return 'text-bg-info';
+        return 'text-bg-secondary';
+      };
+      const dataQualitySeverityBadgeClass = (value) => {
+        const key = String(value || '').trim().toLowerCase();
+        if (key === 'critical') return 'text-bg-danger';
+        if (key === 'warning') return 'text-bg-warning';
         return 'text-bg-secondary';
       };
 
@@ -4416,6 +4482,125 @@
         }
       };
 
+      const setDataQualityLoading = (loading) => {
+        dataQualityLoading = !!loading;
+        if (dataQualityRefreshBtn) {
+          dataQualityRefreshBtn.disabled = dataQualityLoading;
+          dataQualityRefreshBtn.textContent = dataQualityLoading ? 'Оновлення…' : 'Оновити quality';
+        }
+      };
+
+      const renderDataQuality = (payload) => {
+        const data = payload && typeof payload === 'object' ? payload : null;
+        if (!data) {
+          if (dataQualityMetricIssues) dataQualityMetricIssues.textContent = '—';
+          if (dataQualityMetricChecks) dataQualityMetricChecks.textContent = '—';
+          if (dataQualityMetricCritical) dataQualityMetricCritical.textContent = '—';
+          if (dataQualityMetricSubjects) dataQualityMetricSubjects.textContent = '—';
+          if (dataQualityStatusBadge) {
+            dataQualityStatusBadge.className = 'badge text-bg-secondary';
+            dataQualityStatusBadge.textContent = 'Unavailable';
+          }
+          if (dataQualityGeneratedAt) {
+            dataQualityGeneratedAt.textContent = 'Оновлено: —';
+          }
+          if (dataQualityBody) {
+            dataQualityBody.innerHTML = '<tr><td colspan="4" class="text-muted">Не вдалось завантажити data quality.</td></tr>';
+          }
+          return;
+        }
+        const summary = data && data.summary ? data.summary : {};
+        const totalIssues = Number(summary.total_issues || 0);
+        const criticalRows = Number(summary && summary.severity_rows ? summary.severity_rows.critical : 0);
+        const checksWithIssues = Number(summary.checks_with_issues || 0);
+        const checksTotal = Number(summary.checks_total || 0);
+
+        if (dataQualityMetricIssues) {
+          dataQualityMetricIssues.textContent = formatVisitNumber(totalIssues);
+        }
+        if (dataQualityMetricChecks) {
+          dataQualityMetricChecks.textContent = `${formatVisitNumber(checksWithIssues)} / ${formatVisitNumber(checksTotal)}`;
+        }
+        if (dataQualityMetricCritical) {
+          dataQualityMetricCritical.textContent = formatVisitNumber(criticalRows);
+        }
+        if (dataQualityMetricSubjects) {
+          dataQualityMetricSubjects.textContent = formatVisitNumber(summary.affected_subjects);
+        }
+
+        if (dataQualityStatusBadge) {
+          const badgeClass = criticalRows > 0
+            ? 'text-bg-danger'
+            : (totalIssues > 0 ? 'text-bg-warning' : 'text-bg-success');
+          const badgeLabel = criticalRows > 0
+            ? 'Critical issues'
+            : (totalIssues > 0 ? 'Warnings' : 'Clean');
+          dataQualityStatusBadge.className = `badge ${badgeClass}`;
+          dataQualityStatusBadge.textContent = badgeLabel;
+        }
+
+        if (dataQualityGeneratedAt) {
+          const generatedAt = data && data.generated_at ? new Date(data.generated_at) : null;
+          dataQualityGeneratedAt.textContent = generatedAt && !Number.isNaN(generatedAt.getTime())
+            ? `Оновлено: ${generatedAt.toLocaleString('uk-UA')}`
+            : 'Оновлено: —';
+        }
+
+        if (!dataQualityBody) return;
+        const rows = Array.isArray(data && data.items ? data.items : []);
+        if (!rows.length) {
+          dataQualityBody.innerHTML = '<tr><td colspan="4" class="text-muted">Перевірки недоступні.</td></tr>';
+          return;
+        }
+        dataQualityBody.innerHTML = rows.map((row) => {
+          const count = Number(row && row.count ? row.count : 0);
+          const statusClass = count > 0 ? dataQualitySeverityBadgeClass(row.severity) : 'text-bg-success';
+          const statusLabel = count > 0
+            ? String(row.severity || 'warning').toUpperCase()
+            : 'OK';
+          const description = row && row.description ? String(row.description) : '';
+          const examples = Array.isArray(row && row.examples ? row.examples : [])
+            .slice(0, 2)
+            .map((item) => `<div class="data-quality-sample">${escapeHtml(String(item || ''))}</div>`)
+            .join('');
+          return `
+            <tr>
+              <td><span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span></td>
+              <td>
+                <div class="fw-semibold">${escapeHtml(row && row.title ? String(row.title) : 'Check')}</div>
+                <div class="small text-muted">${escapeHtml(description || '—')}</div>
+              </td>
+              <td>${formatVisitNumber(count)}</td>
+              <td>${examples || '<span class="text-muted">—</span>'}</td>
+            </tr>
+          `;
+        }).join('');
+      };
+
+      const loadDataQuality = async () => {
+        if (!visitAnalyticsPanel || dataQualityLoading) return;
+        setDataQualityLoading(true);
+        try {
+          const res = await fetch('/admin/data-quality.json', {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+          });
+          if (!res.ok) {
+            throw new Error(`Data quality ${res.status}`);
+          }
+          const data = await res.json();
+          if (!data || !data.ok) {
+            throw new Error('Data quality payload invalid');
+          }
+          renderDataQuality(data);
+        } catch (err) {
+          renderDataQuality(null);
+          showToast('error', 'Не вдалось завантажити data quality.');
+        } finally {
+          setDataQualityLoading(false);
+        }
+      };
+
       const renderVisitChart = (dailyRows) => {
         if (!visitChartCanvas || !visitChartCtor) return;
         const labels = (dailyRows || []).map((row) => row.day || '');
@@ -4529,6 +4714,7 @@
         }
         loadVisitAnalytics();
         loadSystemHealth();
+        loadDataQuality();
       };
 
       if (visitAnalyticsPanel) {
@@ -4536,6 +4722,7 @@
           visitRefreshBtn.addEventListener('click', () => {
             loadVisitAnalytics();
             loadSystemHealth();
+            loadDataQuality();
           });
         }
         if (visitDaysSelect) {
@@ -4547,10 +4734,14 @@
         if (systemHealthRefreshBtn) {
           systemHealthRefreshBtn.addEventListener('click', loadSystemHealth);
         }
+        if (dataQualityRefreshBtn) {
+          dataQualityRefreshBtn.addEventListener('click', loadDataQuality);
+        }
         window.addEventListener('admin:visit-analytics-opened', refreshVisitAnalyticsOnOpen);
         if (isVisitAnalyticsVisible()) {
           loadVisitAnalytics();
           loadSystemHealth();
+          loadDataQuality();
         }
       }
 

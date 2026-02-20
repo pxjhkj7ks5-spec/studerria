@@ -609,6 +609,16 @@ body.theme-light .visit-admin-filter-switch {
   font-variant-numeric: tabular-nums;
 }
 
+.data-quality-sample {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+body.theme-light .data-quality-sample {
+  color: #475569;
+}
+
 .admin-chip {
   background: rgba(148, 163, 184, 0.2);
   color: #e2e8f0;

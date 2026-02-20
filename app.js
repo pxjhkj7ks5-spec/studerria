@@ -4683,6 +4683,536 @@ async function buildAdminHomeworkReviewSla({
   };
 }
 
+const normalizeDataQualitySeverity = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'critical') return 'critical';
+  if (normalized === 'warning') return 'warning';
+  return 'info';
+};
+
+const parseDbIntegerArray = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item) && item > 0);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    const body = trimmed.startsWith('{') && trimmed.endsWith('}')
+      ? trimmed.slice(1, -1)
+      : trimmed;
+    if (!body) return [];
+    return body
+      .split(',')
+      .map((item) => Number(String(item).replace(/^"+|"+$/g, '').trim()))
+      .filter((item) => Number.isInteger(item) && item > 0);
+  }
+  return [];
+};
+
+const buildDataQualityCheck = ({
+  key,
+  title,
+  severity = 'warning',
+  description = '',
+  count = 0,
+  examples = [],
+  subjectIds = [],
+}) => {
+  const normalizedCount = Math.max(0, Number.isFinite(Number(count)) ? Math.round(Number(count)) : 0);
+  const uniqueSubjectIds = Array.from(
+    new Set(
+      (Array.isArray(subjectIds) ? subjectIds : [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    )
+  );
+  return {
+    key: String(key || '').trim() || 'unknown',
+    title: String(title || '').trim() || 'Check',
+    severity: normalizeDataQualitySeverity(severity),
+    description: String(description || '').trim(),
+    count: normalizedCount,
+    status: normalizedCount > 0 ? 'issue' : 'ok',
+    subject_ids: uniqueSubjectIds,
+    examples: (Array.isArray(examples) ? examples : [])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .slice(0, 6),
+  };
+};
+
+async function buildAdminDataQualityDiagnostics({
+  courseId,
+  semesterId = null,
+}) {
+  const normalizedCourseId = Number(courseId || 0);
+  const normalizedSemesterId = Number(semesterId || 0);
+  const hasSemester = Number.isInteger(normalizedSemesterId) && normalizedSemesterId > 0;
+  const result = {
+    generated_at: new Date().toISOString(),
+    course_id: Number.isInteger(normalizedCourseId) && normalizedCourseId > 0 ? normalizedCourseId : null,
+    semester_id: hasSemester ? normalizedSemesterId : null,
+    summary: {
+      checks_total: 0,
+      checks_with_issues: 0,
+      total_issues: 0,
+      affected_subjects: 0,
+      severity_rows: {
+        critical: 0,
+        warning: 0,
+        info: 0,
+      },
+      severity_checks: {
+        critical: 0,
+        warning: 0,
+        info: 0,
+      },
+    },
+    items: [],
+  };
+  if (!Number.isInteger(normalizedCourseId) || normalizedCourseId < 1) {
+    return result;
+  }
+
+  const homeworkSemesterClause = hasSemester
+    ? 'AND (h.semester_id = ? OR h.semester_id IS NULL)'
+    : 'AND h.semester_id IS NULL';
+  const homeworkBaseParams = hasSemester
+    ? [normalizedCourseId, normalizedSemesterId]
+    : [normalizedCourseId];
+
+  const journalSemesterClause = hasSemester
+    ? 'AND (jc.semester_id = ? OR jc.semester_id IS NULL)'
+    : 'AND jc.semester_id IS NULL';
+  const journalBaseParams = hasSemester
+    ? [normalizedCourseId, normalizedSemesterId]
+    : [normalizedCourseId];
+
+  const gradingSemesterClause = hasSemester
+    ? 'AND (sgs.semester_id = ? OR sgs.semester_id IS NULL)'
+    : 'AND sgs.semester_id IS NULL';
+  const gradingBaseParams = hasSemester
+    ? [normalizedCourseId, normalizedSemesterId]
+    : [normalizedCourseId];
+
+  const [
+    missingJournalCountRow,
+    missingJournalRows,
+    duplicateTeacherHomeworkRows,
+    orphanHomeworkColumnCountRow,
+    orphanHomeworkColumnRows,
+    duplicateManualColumnsRows,
+    invalidStudentGroupRows,
+    invalidTeacherGroupRows,
+    gradingWeightMismatchRows,
+  ] = await Promise.all([
+    db.get(
+      `
+        SELECT
+          COUNT(*)::int AS count,
+          COALESCE(
+            ARRAY_AGG(DISTINCT h.subject_id) FILTER (WHERE h.subject_id IS NOT NULL),
+            ARRAY[]::int[]
+          ) AS subject_ids
+        FROM homework h
+        LEFT JOIN journal_columns jc ON jc.source_homework_id = h.id
+        WHERE h.course_id = ?
+          ${homeworkSemesterClause}
+          AND COALESCE(h.is_teacher_homework, 0) = 1
+          AND COALESCE(h.status, 'published') = 'published'
+          AND jc.id IS NULL
+      `,
+      homeworkBaseParams
+    ),
+    db.all(
+      `
+        SELECT
+          h.id AS homework_id,
+          h.subject_id,
+          COALESCE(s.name, 'Предмет') AS subject_name,
+          COALESCE(h.group_number, 0)::int AS group_number,
+          COALESCE(
+            NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
+            NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
+            '—'
+          ) AS due_label,
+          LEFT(TRIM(COALESCE(h.description, '')), 80) AS description_preview
+        FROM homework h
+        LEFT JOIN subjects s ON s.id = h.subject_id
+        LEFT JOIN journal_columns jc ON jc.source_homework_id = h.id
+        WHERE h.course_id = ?
+          ${homeworkSemesterClause}
+          AND COALESCE(h.is_teacher_homework, 0) = 1
+          AND COALESCE(h.status, 'published') = 'published'
+          AND jc.id IS NULL
+        ORDER BY h.created_at DESC
+        LIMIT 8
+      `,
+      homeworkBaseParams
+    ),
+    db.all(
+      `
+        WITH grouped AS (
+          SELECT
+            h.subject_id,
+            COALESCE(s.name, 'Предмет') AS subject_name,
+            COALESCE(h.group_number, 0)::int AS group_number,
+            COALESCE(
+              NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
+              NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
+              '—'
+            ) AS due_label,
+            COALESCE(h.class_number, 0)::int AS class_number,
+            COUNT(*)::int AS duplicates
+          FROM homework h
+          LEFT JOIN subjects s ON s.id = h.subject_id
+          WHERE h.course_id = ?
+            ${homeworkSemesterClause}
+            AND COALESCE(h.is_teacher_homework, 0) = 1
+            AND COALESCE(h.status, 'published') = 'published'
+          GROUP BY
+            h.subject_id,
+            s.name,
+            COALESCE(h.group_number, 0),
+            COALESCE(
+              NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
+              NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
+              '—'
+            ),
+            COALESCE(h.class_number, 0),
+            LOWER(REGEXP_REPLACE(TRIM(COALESCE(h.description, '')), '\\s+', ' ', 'g')),
+            COALESCE(h.is_control, 0),
+            COALESCE(h.is_credit, 0),
+            COALESCE(h.is_custom_deadline, 0)
+          HAVING COUNT(*) > 1
+        )
+        SELECT
+          grouped.*,
+          COUNT(*) OVER()::int AS groups_total,
+          COALESCE(SUM(grouped.duplicates - 1) OVER(), 0)::int AS extra_total
+        FROM grouped
+        ORDER BY grouped.duplicates DESC, grouped.subject_name ASC
+        LIMIT 8
+      `,
+      homeworkBaseParams
+    ),
+    db.get(
+      `
+        SELECT
+          COUNT(*)::int AS count,
+          COALESCE(
+            ARRAY_AGG(DISTINCT jc.subject_id) FILTER (WHERE jc.subject_id IS NOT NULL),
+            ARRAY[]::int[]
+          ) AS subject_ids
+        FROM journal_columns jc
+        WHERE jc.course_id = ?
+          ${journalSemesterClause}
+          AND COALESCE(jc.source_type, 'manual') = 'homework'
+          AND jc.source_homework_id IS NULL
+          AND COALESCE(jc.is_archived, 0) = 0
+      `,
+      journalBaseParams
+    ),
+    db.all(
+      `
+        SELECT
+          jc.id,
+          jc.subject_id,
+          COALESCE(s.name, 'Предмет') AS subject_name,
+          COALESCE(jc.title, 'Колонка') AS title
+        FROM journal_columns jc
+        LEFT JOIN subjects s ON s.id = jc.subject_id
+        WHERE jc.course_id = ?
+          ${journalSemesterClause}
+          AND COALESCE(jc.source_type, 'manual') = 'homework'
+          AND jc.source_homework_id IS NULL
+          AND COALESCE(jc.is_archived, 0) = 0
+        ORDER BY jc.updated_at DESC, jc.id DESC
+        LIMIT 8
+      `,
+      journalBaseParams
+    ),
+    db.all(
+      `
+        WITH grouped AS (
+          SELECT
+            jc.subject_id,
+            COALESCE(s.name, 'Предмет') AS subject_name,
+            LOWER(TRIM(COALESCE(jc.title, ''))) AS title_key,
+            COALESCE(jc.column_type, 'custom') AS column_type,
+            COALESCE(jc.max_points, 0)::numeric(8, 2) AS max_points,
+            COALESCE(jc.include_in_final, 1)::int AS include_in_final,
+            COUNT(*)::int AS duplicates
+          FROM journal_columns jc
+          LEFT JOIN subjects s ON s.id = jc.subject_id
+          WHERE jc.course_id = ?
+            ${journalSemesterClause}
+            AND COALESCE(jc.is_archived, 0) = 0
+            AND COALESCE(jc.source_type, 'manual') = 'manual'
+          GROUP BY
+            jc.subject_id,
+            s.name,
+            LOWER(TRIM(COALESCE(jc.title, ''))),
+            COALESCE(jc.column_type, 'custom'),
+            COALESCE(jc.max_points, 0)::numeric(8, 2),
+            COALESCE(jc.include_in_final, 1)::int,
+            COALESCE(jc.is_credit, 0)
+          HAVING COUNT(*) > 1
+        )
+        SELECT
+          grouped.*,
+          COUNT(*) OVER()::int AS groups_total,
+          COALESCE(SUM(grouped.duplicates - 1) OVER(), 0)::int AS extra_total
+        FROM grouped
+        ORDER BY grouped.duplicates DESC, grouped.subject_name ASC
+        LIMIT 8
+      `,
+      journalBaseParams
+    ),
+    db.all(
+      `
+        SELECT
+          sg.subject_id,
+          COALESCE(s.name, 'Предмет') AS subject_name,
+          COALESCE(s.group_count, 1)::int AS max_group,
+          sg.group_number::int AS group_number,
+          COUNT(*)::int AS rows_count,
+          COUNT(*) OVER()::int AS groups_total,
+          COALESCE(SUM(COUNT(*)) OVER(), 0)::int AS affected_rows_total
+        FROM student_groups sg
+        JOIN subjects s ON s.id = sg.subject_id
+        JOIN users u ON u.id = sg.student_id
+        WHERE s.course_id = ?
+          AND u.course_id = ?
+          AND (sg.group_number < 1 OR sg.group_number > COALESCE(s.group_count, 1))
+        GROUP BY sg.subject_id, s.name, COALESCE(s.group_count, 1), sg.group_number
+        ORDER BY rows_count DESC, subject_name ASC
+        LIMIT 8
+      `,
+      [normalizedCourseId, normalizedCourseId]
+    ),
+    db.all(
+      `
+        SELECT
+          ts.subject_id,
+          COALESCE(s.name, 'Предмет') AS subject_name,
+          COALESCE(s.group_count, 1)::int AS max_group,
+          ts.group_number::int AS group_number,
+          COUNT(*)::int AS rows_count,
+          COUNT(*) OVER()::int AS groups_total,
+          COALESCE(SUM(COUNT(*)) OVER(), 0)::int AS affected_rows_total
+        FROM teacher_subjects ts
+        JOIN subjects s ON s.id = ts.subject_id
+        JOIN users u ON u.id = ts.user_id
+        WHERE s.course_id = ?
+          AND u.course_id = ?
+          AND ts.group_number IS NOT NULL
+          AND (ts.group_number < 1 OR ts.group_number > COALESCE(s.group_count, 1))
+        GROUP BY ts.subject_id, s.name, COALESCE(s.group_count, 1), ts.group_number
+        ORDER BY rows_count DESC, subject_name ASC
+        LIMIT 8
+      `,
+      [normalizedCourseId, normalizedCourseId]
+    ),
+    db.all(
+      `
+        SELECT
+          sgs.subject_id,
+          COALESCE(s.name, 'Предмет') AS subject_name,
+          ROUND((
+            (CASE WHEN COALESCE(sgs.homework_enabled, 1) = 1 THEN COALESCE(sgs.homework_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.seminar_enabled, 1) = 1 THEN COALESCE(sgs.seminar_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.exam_enabled, 1) = 1 THEN COALESCE(sgs.exam_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.credit_enabled, 1) = 1 THEN COALESCE(sgs.credit_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.custom_enabled, 1) = 1 THEN COALESCE(sgs.custom_weight_points, 0) ELSE 0 END)
+          )::numeric, 2) AS active_weight_sum,
+          COUNT(*) OVER()::int AS rows_total
+        FROM subject_grading_settings sgs
+        JOIN subjects s ON s.id = sgs.subject_id
+        WHERE sgs.course_id = ?
+          ${gradingSemesterClause}
+          AND ABS((
+            (CASE WHEN COALESCE(sgs.homework_enabled, 1) = 1 THEN COALESCE(sgs.homework_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.seminar_enabled, 1) = 1 THEN COALESCE(sgs.seminar_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.exam_enabled, 1) = 1 THEN COALESCE(sgs.exam_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.credit_enabled, 1) = 1 THEN COALESCE(sgs.credit_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.custom_enabled, 1) = 1 THEN COALESCE(sgs.custom_weight_points, 0) ELSE 0 END)
+          ) - 100) > 0.01
+        ORDER BY ABS((
+            (CASE WHEN COALESCE(sgs.homework_enabled, 1) = 1 THEN COALESCE(sgs.homework_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.seminar_enabled, 1) = 1 THEN COALESCE(sgs.seminar_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.exam_enabled, 1) = 1 THEN COALESCE(sgs.exam_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.credit_enabled, 1) = 1 THEN COALESCE(sgs.credit_weight_points, 0) ELSE 0 END) +
+            (CASE WHEN COALESCE(sgs.custom_enabled, 1) = 1 THEN COALESCE(sgs.custom_weight_points, 0) ELSE 0 END)
+          ) - 100) DESC,
+          subject_name ASC
+        LIMIT 8
+      `,
+      gradingBaseParams
+    ),
+  ]);
+
+  const items = [];
+  items.push(buildDataQualityCheck({
+    key: 'teacher_homework_without_journal_column',
+    title: 'Викладацьке ДЗ без колонки журналу',
+    severity: 'critical',
+    description: 'ДЗ створене, але автоматична колонка журналу відсутня.',
+    count: Number(missingJournalCountRow?.count || 0),
+    subjectIds: parseDbIntegerArray(missingJournalCountRow?.subject_ids),
+    examples: (missingJournalRows || []).map((row) => {
+      const groupLabel = Number(row.group_number || 0) > 0 ? `група ${row.group_number}` : 'всі групи';
+      const dueLabel = row.due_label ? String(row.due_label) : '—';
+      return `${row.subject_name || 'Предмет'} · ${groupLabel} · ${dueLabel} · #${Number(row.homework_id || 0)}`;
+    }),
+  }));
+
+  items.push(buildDataQualityCheck({
+    key: 'duplicate_teacher_homework',
+    title: 'Дублі викладацьких ДЗ',
+    severity: 'warning',
+    description: 'Підозра на подвійне створення однакових завдань.',
+    count: Number(duplicateTeacherHomeworkRows && duplicateTeacherHomeworkRows[0]
+      ? duplicateTeacherHomeworkRows[0].extra_total
+      : 0),
+    subjectIds: Array.from(
+      new Set(
+        (duplicateTeacherHomeworkRows || [])
+          .map((row) => Number(row.subject_id || 0))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      )
+    ),
+    examples: (duplicateTeacherHomeworkRows || []).map((row) => {
+      const groupLabel = Number(row.group_number || 0) > 0 ? `група ${row.group_number}` : 'всі групи';
+      const classLabel = Number(row.class_number || 0) > 0 ? `пара ${row.class_number}` : 'без пари';
+      return `${row.subject_name || 'Предмет'} · ${groupLabel} · ${row.due_label || '—'} · ${classLabel} · x${Number(row.duplicates || 0)}`;
+    }),
+  }));
+
+  items.push(buildDataQualityCheck({
+    key: 'orphan_homework_journal_columns',
+    title: 'Колонки типу homework без source_homework_id',
+    severity: 'critical',
+    description: 'Колонка журналу не прив’язана до первинного ДЗ.',
+    count: Number(orphanHomeworkColumnCountRow?.count || 0),
+    subjectIds: parseDbIntegerArray(orphanHomeworkColumnCountRow?.subject_ids),
+    examples: (orphanHomeworkColumnRows || []).map((row) => (
+      `${row.subject_name || 'Предмет'} · ${row.title || 'Колонка'} · #${Number(row.id || 0)}`
+    )),
+  }));
+
+  items.push(buildDataQualityCheck({
+    key: 'duplicate_manual_journal_columns',
+    title: 'Дублі ручних колонок журналу',
+    severity: 'warning',
+    description: 'У межах предмета знайдено однакові ручні колонки.',
+    count: Number(duplicateManualColumnsRows && duplicateManualColumnsRows[0]
+      ? duplicateManualColumnsRows[0].extra_total
+      : 0),
+    subjectIds: Array.from(
+      new Set(
+        (duplicateManualColumnsRows || [])
+          .map((row) => Number(row.subject_id || 0))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      )
+    ),
+    examples: (duplicateManualColumnsRows || []).map((row) => {
+      const title = String(row.title_key || '').trim() || 'без назви';
+      return `${row.subject_name || 'Предмет'} · ${title} · ${row.column_type || 'custom'} · x${Number(row.duplicates || 0)}`;
+    }),
+  }));
+
+  items.push(buildDataQualityCheck({
+    key: 'invalid_student_group_numbers',
+    title: 'Некоректні групи студентів',
+    severity: 'warning',
+    description: 'group_number виходить за діапазон предмета.',
+    count: Number(invalidStudentGroupRows && invalidStudentGroupRows[0]
+      ? invalidStudentGroupRows[0].affected_rows_total
+      : 0),
+    subjectIds: Array.from(
+      new Set(
+        (invalidStudentGroupRows || [])
+          .map((row) => Number(row.subject_id || 0))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      )
+    ),
+    examples: (invalidStudentGroupRows || []).map((row) => (
+      `${row.subject_name || 'Предмет'} · group ${Number(row.group_number || 0)} / max ${Number(row.max_group || 1)} · студентів ${Number(row.rows_count || 0)}`
+    )),
+  }));
+
+  items.push(buildDataQualityCheck({
+    key: 'invalid_teacher_subject_groups',
+    title: 'Некоректні групи у зв’язках викладач-предмет',
+    severity: 'warning',
+    description: 'У teacher_subjects записано group_number поза межами предмета.',
+    count: Number(invalidTeacherGroupRows && invalidTeacherGroupRows[0]
+      ? invalidTeacherGroupRows[0].affected_rows_total
+      : 0),
+    subjectIds: Array.from(
+      new Set(
+        (invalidTeacherGroupRows || [])
+          .map((row) => Number(row.subject_id || 0))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      )
+    ),
+    examples: (invalidTeacherGroupRows || []).map((row) => (
+      `${row.subject_name || 'Предмет'} · group ${Number(row.group_number || 0)} / max ${Number(row.max_group || 1)} · зв’язків ${Number(row.rows_count || 0)}`
+    )),
+  }));
+
+  items.push(buildDataQualityCheck({
+    key: 'grading_weights_not_100',
+    title: 'Вага оцінювання не дорівнює 100',
+    severity: 'warning',
+    description: 'Сума активних внесків у фінал має бути рівно 100.',
+    count: Number(gradingWeightMismatchRows && gradingWeightMismatchRows[0]
+      ? gradingWeightMismatchRows[0].rows_total
+      : 0),
+    subjectIds: Array.from(
+      new Set(
+        (gradingWeightMismatchRows || [])
+          .map((row) => Number(row.subject_id || 0))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      )
+    ),
+    examples: (gradingWeightMismatchRows || []).map((row) => (
+      `${row.subject_name || 'Предмет'} · активна сума ${Number(row.active_weight_sum || 0)} / 100`
+    )),
+  }));
+
+  const severityRows = { critical: 0, warning: 0, info: 0 };
+  const severityChecks = { critical: 0, warning: 0, info: 0 };
+  const affectedSubjectSet = new Set();
+  let checksWithIssues = 0;
+  let totalIssues = 0;
+
+  items.forEach((item) => {
+    if (Number(item.count || 0) <= 0) return;
+    checksWithIssues += 1;
+    totalIssues += Number(item.count || 0);
+    severityRows[item.severity] += Number(item.count || 0);
+    severityChecks[item.severity] += 1;
+    (item.subject_ids || []).forEach((subjectId) => {
+      affectedSubjectSet.add(subjectId);
+    });
+  });
+
+  result.items = items;
+  result.summary = {
+    checks_total: items.length,
+    checks_with_issues: checksWithIssues,
+    total_issues: totalIssues,
+    affected_subjects: affectedSubjectSet.size,
+    severity_rows: severityRows,
+    severity_checks: severityChecks,
+  };
+  return result;
+}
+
 async function buildMyDayData(user, role = 'student', roleList = []) {
   const courseId = Number(user.course_id || 1);
   const activeSemester = await getActiveSemester(courseId);
@@ -17360,6 +17890,28 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.visitAnalytics.fetch');
+  }
+});
+
+app.get('/admin/data-quality.json', requireVisitAnalyticsSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.dataQuality.init');
+  }
+  try {
+    const courseId = getAdminCourse(req);
+    const activeSemester = await getActiveSemester(courseId);
+    const diagnostics = await buildAdminDataQualityDiagnostics({
+      courseId,
+      semesterId: activeSemester ? Number(activeSemester.id) : null,
+    });
+    return res.json({
+      ok: true,
+      ...diagnostics,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.dataQuality.fetch');
   }
 });
 

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.36",
+      "date": "2026-02-20",
+      "items": [
+        "feat(admin-data-quality): added Data quality block inside Visit Analytics with live counters, severity status, and issue table with examples",
+        "feat(api): added `/admin/data-quality.json` endpoint with diagnostics for duplicate teacher homework, orphan homework columns, invalid group mappings, and grading weight mismatches",
+        "feat(admin-analytics): wired data-quality refresh into the Visit Analytics panel open/refresh flow and dark-theme-safe sample row styling"
+      ]
+    },
+    {
       "version": "0.9.35",
       "date": "2026-02-20",
       "items": [
