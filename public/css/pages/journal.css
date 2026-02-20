@@ -160,6 +160,82 @@ body.theme-dark.page-journal .dropdown-item:focus {
   padding: 2px 8px 8px;
 }
 
+.page-journal .journal-attendance-details {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 66%, transparent);
+  overflow: hidden;
+}
+
+.page-journal .journal-attendance-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.page-journal .journal-attendance-summary::-webkit-details-marker {
+  display: none;
+}
+
+.page-journal .journal-attendance-summary-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.page-journal .journal-attendance-summary-title {
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--ds-text0);
+}
+
+.page-journal .journal-attendance-summary-subtitle {
+  font-size: 0.76rem;
+  color: var(--ds-text2);
+}
+
+.page-journal .journal-attendance-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.page-journal .journal-attendance-body {
+  padding: 12px 10px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--surface-border) 78%, transparent);
+}
+
+.page-journal .journal-attendance-table-wrap {
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.page-journal .journal-attendance-table {
+  min-width: 620px;
+  margin: 0;
+}
+
+.page-journal .journal-attendance-table th,
+.page-journal .journal-attendance-table td {
+  vertical-align: middle;
+  border-color: color-mix(in srgb, var(--surface-border) 78%, transparent);
+}
+
+.page-journal .journal-student-attendance-card {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 80%, transparent);
+  border-radius: 14px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--surface-soft) 88%, transparent);
+}
+
 .page-journal .journal-config-table--readonly tbody tr.is-disabled td {
   opacity: 0.66;
 }

@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.9.25",
+      "date": "2026-02-20",
+      "items": [
+        "feat(attendance): added Attendance MVP in journal with per-class marking flow (`присутній`, `запізнення`, `відсутній`, `поважна причина`) and optional reason/comment",
+        "feat(journal): added attendance context controls by date and class number, plus student read-only attendance summary and recent records in subject journal",
+        "feat(api): added `/journal/attendance/save` with journal-role access validation, group scope checks, and transactional upsert/delete behavior per student record",
+        "feat(db): added migration `022_attendance_mvp` with new `attendance_records` table, uniqueness guards, and analytical indexes"
+      ]
+    },
+    {
       "version": "0.9.24",
       "date": "2026-02-20",
       "items": [

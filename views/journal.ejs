@@ -39,6 +39,12 @@
 
       <section class="glass liquid-card p-3 mb-3">
         <form method="GET" action="/journal" class="row g-3 align-items-end">
+          <% if (attendanceContext && attendanceContext.date) { %>
+            <input type="hidden" name="attendance_date" value="<%= attendanceContext.date %>" />
+          <% } %>
+          <% if (attendanceContext && attendanceContext.class_number) { %>
+            <input type="hidden" name="attendance_class_number" value="<%= attendanceContext.class_number %>" />
+          <% } %>
           <div class="col-12 col-lg-7">
             <label class="form-label">Предмет</label>
             <select class="form-select" name="subject_id" onchange="this.form.submit()">
@@ -72,6 +78,27 @@
 
       <% if (selectedSubject) { %>
         <%
+          const attendance = attendanceContext || {};
+          const attendanceRows = Array.isArray(attendance.rows) ? attendance.rows : [];
+          const attendanceSummary = attendance.summary || {};
+          const attendanceStatuses = Array.isArray(attendance.statuses) ? attendance.statuses : [];
+          const attendanceStudentSummary = attendance.student_summary || null;
+          const attendanceClassOptions = Array.isArray(attendance.class_options) ? attendance.class_options : [];
+          const attendanceStatusChipClass = {
+            present: 'status-chip--success',
+            late: 'status-chip--warning',
+            absent: 'status-chip--danger',
+            excused: 'status-chip--info',
+          };
+          const attendanceStatusLabelMap = attendanceStatuses.reduce((acc, item) => {
+            if (!item || !item.key) return acc;
+            acc[item.key] = item.label || item.key;
+            return acc;
+          }, {});
+          const attendanceStatusLabel = (key) => attendanceStatusLabelMap[key] || '—';
+          const attendanceMarkedRate = attendanceSummary.students_total
+            ? Math.round((Number(attendanceSummary.marked_total || 0) / Number(attendanceSummary.students_total || 1)) * 100)
+            : 0;
           const gradingTypeRows = [
             { key: 'homework', label: 'ДЗ' },
             { key: 'seminar', label: 'Семінар' },
@@ -86,6 +113,161 @@
             if (enabled && Number.isFinite(weight)) enabledWeightTotal += weight;
           });
         %>
+        <section class="glass liquid-card p-3 mb-3">
+          <details class="journal-attendance-details" open>
+            <summary class="journal-attendance-summary">
+              <div class="journal-attendance-summary-main">
+                <span class="journal-attendance-summary-title"><%= canEditJournal ? 'Відвідуваність (MVP)' : 'Моя відвідуваність' %></span>
+                <span class="journal-attendance-summary-subtitle">
+                  <%= attendance.date || '-' %> · Пара <%= attendance.class_number || '-' %>
+                </span>
+              </div>
+              <div class="journal-attendance-summary-chips">
+                <span class="status-chip status-chip--success">Присутні: <%= Number(attendanceSummary.present || 0) %></span>
+                <span class="status-chip status-chip--warning">Запізнення: <%= Number(attendanceSummary.late || 0) %></span>
+                <span class="status-chip status-chip--danger">Відсутні: <%= Number(attendanceSummary.absent || 0) %></span>
+                <span class="status-chip status-chip--info">Поважні: <%= Number(attendanceSummary.excused || 0) %></span>
+                <span class="status-chip status-chip--neutral">Заповнено: <%= attendanceMarkedRate %>%</span>
+              </div>
+            </summary>
+            <div class="journal-attendance-body">
+              <form method="GET" action="/journal" class="row g-2 align-items-end mb-3">
+                <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                <div class="col-12 col-md-4 col-xl-3">
+                  <label class="form-label">Дата</label>
+                  <input class="form-control form-control-sm" type="date" name="attendance_date" value="<%= attendance.date || '' %>" required />
+                </div>
+                <div class="col-12 col-md-4 col-xl-3">
+                  <label class="form-label">Пара</label>
+                  <select class="form-select form-select-sm" name="attendance_class_number">
+                    <% attendanceClassOptions.forEach((item) => { %>
+                      <option value="<%= item.value %>" <%= Number(attendance.class_number) === Number(item.value) ? 'selected' : '' %>><%= item.label %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-12 col-md-4 col-xl-3">
+                  <button class="btn btn-outline-secondary btn-sm w-100" type="submit">Показати</button>
+                </div>
+              </form>
+
+              <% if (canEditJournal) { %>
+                <% if (!attendanceRows.length) { %>
+                  <div class="text-muted">Немає студентів для відмітки відвідуваності в поточному доступі.</div>
+                <% } else { %>
+                  <form method="POST" action="/journal/attendance/save" id="journalAttendanceForm" autocomplete="off">
+                    <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                    <input type="hidden" name="attendance_date" value="<%= attendance.date || '' %>" />
+                    <input type="hidden" name="attendance_class_number" value="<%= attendance.class_number || '' %>" />
+                    <input type="hidden" name="rows_json" id="journalAttendanceRowsJson" />
+                    <div class="journal-attendance-table-wrap">
+                      <table class="table table-sm align-middle mb-0 journal-attendance-table">
+                        <thead>
+                          <tr>
+                            <th>ПІБ</th>
+                            <th>Статус</th>
+                            <th>Причина / коментар</th>
+                            <th>Оновлено</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <% attendanceRows.forEach((row) => { %>
+                            <tr data-attendance-row data-student-id="<%= row.student_id %>">
+                              <td>
+                                <div class="fw-semibold"><%= row.full_name %></div>
+                                <% if (row.group_number) { %>
+                                  <div class="text-muted small">Група <%= row.group_number %></div>
+                                <% } %>
+                              </td>
+                              <td>
+                                <select class="form-select form-select-sm journal-attendance-status" data-attendance-status>
+                                  <option value="">— Не відмічено —</option>
+                                  <% attendanceStatuses.forEach((status) => { %>
+                                    <option value="<%= status.key %>" <%= row.status === status.key ? 'selected' : '' %>><%= status.label %></option>
+                                  <% }) %>
+                                </select>
+                              </td>
+                              <td>
+                                <input
+                                  class="form-control form-control-sm"
+                                  type="text"
+                                  maxlength="<%= attendance.reason_max_length || 240 %>"
+                                  value="<%= row.reason || '' %>"
+                                  data-attendance-reason
+                                  placeholder="Опц. причина відсутності або короткий коментар"
+                                />
+                              </td>
+                              <td class="text-muted small">
+                                <%= row.marked_at ? new Date(row.marked_at).toLocaleString('uk-UA') : '—' %>
+                              </td>
+                            </tr>
+                          <% }) %>
+                        </tbody>
+                      </table>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+                      <button class="btn btn-primary btn-sm" type="submit">Зберегти відвідуваність</button>
+                      <span class="text-muted small">Порожній статус означає: запис буде прибрано.</span>
+                    </div>
+                  </form>
+                <% } %>
+              <% } else { %>
+                <div class="row g-3">
+                  <div class="col-12 col-lg-5">
+                    <div class="journal-student-attendance-card">
+                      <div class="small text-muted mb-1">Поточний зріз по предмету</div>
+                      <div class="d-flex flex-wrap gap-2">
+                        <span class="status-chip status-chip--success">Присутні: <%= Number(attendanceStudentSummary ? attendanceStudentSummary.present : attendanceSummary.present || 0) %></span>
+                        <span class="status-chip status-chip--warning">Запізнення: <%= Number(attendanceStudentSummary ? attendanceStudentSummary.late : attendanceSummary.late || 0) %></span>
+                        <span class="status-chip status-chip--danger">Відсутні: <%= Number(attendanceStudentSummary ? attendanceStudentSummary.absent : attendanceSummary.absent || 0) %></span>
+                        <span class="status-chip status-chip--info">Поважні: <%= Number(attendanceStudentSummary ? attendanceStudentSummary.excused : attendanceSummary.excused || 0) %></span>
+                        <% if (attendanceStudentSummary && Number.isFinite(Number(attendanceStudentSummary.attendance_rate))) { %>
+                          <span class="status-chip status-chip--neutral">Відвідуваність: <%= attendanceStudentSummary.attendance_rate %>%</span>
+                        <% } %>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-12 col-lg-7">
+                    <div class="journal-attendance-table-wrap">
+                      <table class="table table-sm align-middle mb-0 journal-attendance-table">
+                        <thead>
+                          <tr>
+                            <th>Дата</th>
+                            <th>Пара</th>
+                            <th>Статус</th>
+                            <th>Причина</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <% const studentRecentRecords = attendanceStudentSummary && Array.isArray(attendanceStudentSummary.recent_records)
+                            ? attendanceStudentSummary.recent_records
+                            : []; %>
+                          <% if (!studentRecentRecords.length) { %>
+                            <tr>
+                              <td colspan="4" class="text-muted">Ще немає записів відвідуваності.</td>
+                            </tr>
+                          <% } %>
+                          <% studentRecentRecords.forEach((record) => { %>
+                            <% const statusKey = record.status || ''; %>
+                            <tr>
+                              <td><%= record.class_date || '-' %></td>
+                              <td><%= record.class_number || '-' %></td>
+                              <td>
+                                <span class="status-chip <%= attendanceStatusChipClass[statusKey] || 'status-chip--neutral' %>">
+                                  <%= attendanceStatusLabel(statusKey) %>
+                                </span>
+                              </td>
+                              <td class="small text-muted"><%= record.reason || '—' %></td>
+                            </tr>
+                          <% }) %>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+          </details>
+        </section>
         <section class="glass liquid-card p-3 mb-3">
           <details class="journal-grading-details">
             <summary class="journal-grading-summary">
@@ -575,6 +757,9 @@
       const bulkPreviewMetaEl = document.getElementById('journalBulkPreviewMeta');
       const bulkSubmitBtn = document.getElementById('journalBulkSubmitBtn');
       const bulkLockedAlert = document.getElementById('journalBulkLockedAlert');
+      const attendanceForm = document.getElementById('journalAttendanceForm');
+      const attendanceRowsJsonInput = document.getElementById('journalAttendanceRowsJson');
+      const attendanceRowEls = Array.from(document.querySelectorAll('[data-attendance-row]'));
 
       let currentCellColumnId = 0;
       let currentCellStudentId = 0;
@@ -894,6 +1079,20 @@
         bulkModal.show();
       };
 
+      const serializeAttendanceRows = () => {
+        if (!attendanceRowEls.length) return [];
+        return attendanceRowEls.map((rowEl) => {
+          const studentId = Number(rowEl.dataset.studentId || 0);
+          const statusEl = rowEl.querySelector('[data-attendance-status]');
+          const reasonEl = rowEl.querySelector('[data-attendance-reason]');
+          return {
+            student_id: studentId,
+            status: String(statusEl ? statusEl.value : '').trim(),
+            reason: String(reasonEl ? reasonEl.value : '').trim(),
+          };
+        }).filter((row) => Number.isFinite(row.student_id) && row.student_id > 0);
+      };
+
       const undoBtn = document.getElementById('journalUndoDeleteBtn');
       const undoCountdownEl = document.getElementById('journalUndoCountdown');
       if (undoBtn && undoCountdownEl) {
@@ -988,6 +1187,12 @@
           if (!valid) {
             event.preventDefault();
           }
+        });
+      }
+      if (attendanceForm && attendanceRowsJsonInput) {
+        attendanceForm.addEventListener('submit', () => {
+          const rows = serializeAttendanceRows();
+          attendanceRowsJsonInput.value = JSON.stringify(rows);
         });
       }
       if (feedbackTemplateButtons.length && commentEl) {

@@ -6675,6 +6675,14 @@ const JOURNAL_SCORING_TYPE_META = {
   custom: { key: 'custom', label: 'Кастом' },
 };
 const JOURNAL_GRADE_UNDO_SECONDS = 30;
+const ATTENDANCE_STATUS_OPTIONS = ['present', 'late', 'absent', 'excused'];
+const ATTENDANCE_STATUS_META = {
+  present: { key: 'present', label: 'Присутній' },
+  late: { key: 'late', label: 'Запізнення' },
+  absent: { key: 'absent', label: 'Відсутній' },
+  excused: { key: 'excused', label: 'Поважна причина' },
+};
+const ATTENDANCE_REASON_MAX_LENGTH = 240;
 
 const DEFAULT_SUBJECT_GRADING_SETTINGS = {
   homework_enabled: 1,
@@ -6696,6 +6704,40 @@ const DEFAULT_SUBJECT_GRADING_SETTINGS = {
 };
 
 const toDateOnly = (rawValue) => String(rawValue || '').slice(0, 10);
+const normalizeAttendanceStatus = (rawValue) => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  return ATTENDANCE_STATUS_OPTIONS.includes(normalized) ? normalized : '';
+};
+
+const normalizeAttendanceReason = (rawValue) => {
+  const normalized = String(rawValue || '').trim();
+  if (!normalized) return '';
+  return normalized.slice(0, ATTENDANCE_REASON_MAX_LENGTH);
+};
+
+const buildExactSemesterCondition = (alias, semesterId) => {
+  if (semesterId) {
+    return {
+      clause: `AND ${alias}.semester_id = ?`,
+      params: [semesterId],
+    };
+  }
+  return {
+    clause: `AND ${alias}.semester_id IS NULL`,
+    params: [],
+  };
+};
+
+const getAttendanceClassOptions = () => (
+  Object.entries(bellSchedule)
+    .map(([classNumber, slot]) => ({
+      value: Number(classNumber),
+      start: slot.start || '',
+      end: slot.end || '',
+      label: `Пара ${classNumber}${slot.start && slot.end ? ` (${slot.start}-${slot.end})` : ''}`,
+    }))
+    .sort((a, b) => a.value - b.value)
+);
 
 const normalizeBatchToken = (rawValue) => String(rawValue || '').trim().toLowerCase();
 
@@ -7473,6 +7515,164 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
   }));
 }
 
+async function buildJournalAttendanceContext({
+  subjectId,
+  courseId,
+  semesterId,
+  students = [],
+  requestedDate,
+  requestedClassNumber,
+  studentViewUserId = null,
+}) {
+  const classOptions = getAttendanceClassOptions();
+  const normalizedDate = isValidDateString(String(requestedDate || ''))
+    ? String(requestedDate)
+    : formatLocalDate(new Date());
+  const classNumberRaw = Number(requestedClassNumber);
+  const normalizedClassNumber = (
+    Number.isInteger(classNumberRaw)
+    && classNumberRaw > 0
+    && classOptions.some((option) => option.value === classNumberRaw)
+  )
+    ? classNumberRaw
+    : (classOptions[0] ? Number(classOptions[0].value) : 1);
+
+  const safeStudents = Array.isArray(students)
+    ? students
+      .map((student) => ({
+        id: Number(student?.id || 0),
+        full_name: String(student?.full_name || '').trim() || 'Студент',
+        group_number: Number(student?.group_number || 0),
+      }))
+      .filter((student) => Number.isFinite(student.id) && student.id > 0)
+    : [];
+  const studentIds = safeStudents.map((student) => student.id);
+
+  const semesterFilter = buildExactSemesterCondition('ar', semesterId);
+  let recordsByStudentId = new Map();
+  if (studentIds.length) {
+    const rows = await db.all(
+      `
+        SELECT ar.student_id, ar.status, ar.reason, ar.marked_at
+        FROM attendance_records ar
+        WHERE ar.subject_id = ?
+          AND ar.course_id = ?
+          ${semesterFilter.clause}
+          AND ar.class_date = ?
+          AND ar.class_number = ?
+          AND ar.student_id IN (${studentIds.map(() => '?').join(',')})
+      `,
+      [subjectId, courseId, ...semesterFilter.params, normalizedDate, normalizedClassNumber, ...studentIds]
+    );
+    recordsByStudentId = new Map(
+      (rows || []).map((row) => [
+        Number(row.student_id),
+        {
+          status: normalizeAttendanceStatus(row.status),
+          reason: String(row.reason || ''),
+          marked_at: row.marked_at || null,
+        },
+      ])
+    );
+  }
+
+  const summary = {
+    present: 0,
+    late: 0,
+    absent: 0,
+    excused: 0,
+    unset: 0,
+    marked_total: 0,
+    students_total: safeStudents.length,
+  };
+
+  const rows = safeStudents.map((student) => {
+    const record = recordsByStudentId.get(student.id) || null;
+    const status = record ? normalizeAttendanceStatus(record.status) : '';
+    if (!status) {
+      summary.unset += 1;
+    } else {
+      summary.marked_total += 1;
+      summary[status] = Number(summary[status] || 0) + 1;
+    }
+    return {
+      student_id: student.id,
+      full_name: student.full_name,
+      group_number: Number.isInteger(student.group_number) && student.group_number > 0 ? student.group_number : null,
+      status,
+      reason: record ? String(record.reason || '') : '',
+      marked_at: record ? (record.marked_at || null) : null,
+    };
+  });
+
+  let studentSummary = null;
+  const safeStudentViewId = Number(studentViewUserId || 0);
+  if (Number.isFinite(safeStudentViewId) && safeStudentViewId > 0) {
+    const groupedRows = await db.all(
+      `
+        SELECT ar.status, COUNT(*) AS count
+        FROM attendance_records ar
+        WHERE ar.subject_id = ?
+          AND ar.course_id = ?
+          ${semesterFilter.clause}
+          AND ar.student_id = ?
+        GROUP BY ar.status
+      `,
+      [subjectId, courseId, ...semesterFilter.params, safeStudentViewId]
+    );
+    const recentRows = await db.all(
+      `
+        SELECT ar.class_date, ar.class_number, ar.status, ar.reason, ar.marked_at
+        FROM attendance_records ar
+        WHERE ar.subject_id = ?
+          AND ar.course_id = ?
+          ${semesterFilter.clause}
+          AND ar.student_id = ?
+        ORDER BY ar.class_date DESC, ar.class_number DESC
+        LIMIT 8
+      `,
+      [subjectId, courseId, ...semesterFilter.params, safeStudentViewId]
+    );
+    const grouped = {
+      present: 0,
+      late: 0,
+      absent: 0,
+      excused: 0,
+    };
+    (groupedRows || []).forEach((row) => {
+      const status = normalizeAttendanceStatus(row.status);
+      if (!status) return;
+      grouped[status] = Number(row.count || 0);
+    });
+    const attendedTotal = Number(grouped.present || 0) + Number(grouped.late || 0);
+    const recordsTotal = attendedTotal + Number(grouped.absent || 0) + Number(grouped.excused || 0);
+    studentSummary = {
+      ...grouped,
+      total: recordsTotal,
+      attended_total: attendedTotal,
+      attendance_rate: recordsTotal > 0 ? Math.round((attendedTotal / recordsTotal) * 100) : null,
+      recent_records: (recentRows || []).map((row) => ({
+        class_date: toDateOnly(row.class_date),
+        class_number: Number(row.class_number || 0),
+        status: normalizeAttendanceStatus(row.status),
+        reason: String(row.reason || ''),
+        marked_at: row.marked_at || null,
+      })),
+    };
+  }
+
+  return {
+    date: normalizedDate,
+    class_number: normalizedClassNumber,
+    class_options: classOptions,
+    statuses: ATTENDANCE_STATUS_OPTIONS.map((status) => ATTENDANCE_STATUS_META[status]),
+    rows,
+    summary,
+    student_summary: studentSummary,
+    reason_max_length: ATTENDANCE_REASON_MAX_LENGTH,
+  };
+}
+
 async function resolveJournalColumnHomeworkForStudent(columnRow, studentGroupNumber) {
   const sourceHomeworkId = Number(columnRow?.source_homework_id || 0);
   const fallback = {
@@ -7879,6 +8079,24 @@ app.get('/journal', requireLogin, async (req, res) => {
         columns: [],
         journalRows: [],
         gradingSettings: { ...DEFAULT_SUBJECT_GRADING_SETTINGS },
+        attendanceContext: {
+          date: formatLocalDate(new Date()),
+          class_number: 1,
+          class_options: getAttendanceClassOptions(),
+          statuses: ATTENDANCE_STATUS_OPTIONS.map((status) => ATTENDANCE_STATUS_META[status]),
+          rows: [],
+          summary: {
+            present: 0,
+            late: 0,
+            absent: 0,
+            excused: 0,
+            unset: 0,
+            marked_total: 0,
+            students_total: 0,
+          },
+          student_summary: null,
+          reason_max_length: ATTENDANCE_REASON_MAX_LENGTH,
+        },
         canEditJournal: false,
         teacherJournalMode,
         canManageAllSubjects: Boolean(journalScope.fullAccess),
@@ -7909,6 +8127,15 @@ app.get('/journal', requireLogin, async (req, res) => {
       groupFilterSet,
       studentFilterIds,
     });
+    const attendanceContext = await buildJournalAttendanceContext({
+      subjectId: Number(selectedSubject.subject_id),
+      courseId: selectedCourseId,
+      semesterId: selectedSemester ? Number(selectedSemester.id) : null,
+      students: (matrix.rows || []).map((row) => row.student),
+      requestedDate: req.query.attendance_date,
+      requestedClassNumber: req.query.attendance_class_number,
+      studentViewUserId: teacherJournalMode ? null : Number(req.session.user.id),
+    });
 
     return res.render('journal', {
       username: req.session.user.username,
@@ -7918,6 +8145,7 @@ app.get('/journal', requireLogin, async (req, res) => {
       columns: matrix.columns,
       journalRows: matrix.rows,
       gradingSettings: matrix.gradingSettings,
+      attendanceContext,
       canEditJournal: teacherJournalMode,
       teacherJournalMode,
       canManageAllSubjects: Boolean(journalScope.fullAccess),
@@ -7927,6 +8155,207 @@ app.get('/journal', requireLogin, async (req, res) => {
     });
   } catch (err) {
     return handleDbError(res, err, 'journal.page');
+  }
+});
+
+app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res) => {
+  const subjectId = Number(req.body.subject_id);
+  const attendanceDate = String(req.body.attendance_date || '').trim();
+  const attendanceClassNumber = Number(req.body.attendance_class_number);
+  const rowsRaw = String(req.body.rows_json || '[]').trim() || '[]';
+
+  if (!Number.isFinite(subjectId) || subjectId < 1) {
+    return res.redirect('/journal?err=Invalid%20subject');
+  }
+  if (!isValidDateString(attendanceDate)) {
+    return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20attendance%20date`);
+  }
+  if (!Number.isInteger(attendanceClassNumber) || !bellSchedule[attendanceClassNumber]) {
+    return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20class%20number`);
+  }
+
+  let parsedRows = [];
+  try {
+    const parsed = JSON.parse(rowsRaw);
+    parsedRows = Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20attendance%20payload`);
+  }
+  if (!parsedRows.length) {
+    return res.redirect(`/journal?subject_id=${subjectId}&err=No%20attendance%20rows`);
+  }
+  if (parsedRows.length > 500) {
+    return res.redirect(`/journal?subject_id=${subjectId}&err=Attendance%20payload%20is%20too%20large`);
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const subjectOptions = await getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode);
+    const selectedSubject = (subjectOptions || []).find((subject) => Number(subject.subject_id) === subjectId);
+    if (!selectedSubject) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const selectedCourseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
+    const selectedSemester = await getActiveSemester(selectedCourseId);
+    const semesterId = selectedSemester ? Number(selectedSemester.id) : null;
+    let groupFilterSet = null;
+    if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
+      groupFilterSet = new Set(
+        (selectedSubject.group_numbers || [])
+          .map((value) => Number(value))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      );
+    }
+
+    const allowedStudents = await getJournalStudents(subjectId, selectedCourseId, groupFilterSet);
+    const allowedStudentMap = new Map(
+      (allowedStudents || []).map((student) => [Number(student.id), student])
+    );
+
+    const normalizedMap = new Map();
+    parsedRows.forEach((row) => {
+      const studentId = Number(row?.student_id);
+      if (!Number.isFinite(studentId) || studentId < 1) return;
+      const normalizedStatus = normalizeAttendanceStatus(row?.status);
+      const normalizedReason = normalizeAttendanceReason(row?.reason);
+      normalizedMap.set(studentId, {
+        student_id: studentId,
+        status: normalizedStatus,
+        reason: normalizedReason,
+      });
+    });
+    const normalizedEntries = Array.from(normalizedMap.values());
+    if (!normalizedEntries.length) {
+      return res.redirect(
+        `/journal?subject_id=${subjectId}&attendance_date=${encodeURIComponent(attendanceDate)}&attendance_class_number=${attendanceClassNumber}&err=No%20attendance%20rows`
+      );
+    }
+
+    for (const entry of normalizedEntries) {
+      if (!allowedStudentMap.has(Number(entry.student_id))) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    const semesterMatchClause = semesterId ? 'AND ar.semester_id = ?' : 'AND ar.semester_id IS NULL';
+    const semesterMatchParams = semesterId ? [semesterId] : [];
+    let updatedCount = 0;
+    let deletedCount = 0;
+
+    await withTransaction(async (client) => {
+      const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
+      for (const entry of normalizedEntries) {
+        const studentId = Number(entry.student_id);
+        const studentGroup = Number(allowedStudentMap.get(studentId)?.group_number || 0);
+        if (!entry.status) {
+          const deleteResult = await query(
+            `
+              DELETE FROM attendance_records ar
+              WHERE ar.subject_id = ?
+                AND ar.course_id = ?
+                ${semesterMatchClause}
+                AND ar.class_date = ?
+                AND ar.class_number = ?
+                AND ar.student_id = ?
+            `,
+            [subjectId, selectedCourseId, ...semesterMatchParams, attendanceDate, attendanceClassNumber, studentId]
+          );
+          deletedCount += Number(deleteResult.rowCount || 0);
+          continue;
+        }
+
+        const existing = await query(
+          `
+            SELECT ar.id
+            FROM attendance_records ar
+            WHERE ar.subject_id = ?
+              AND ar.course_id = ?
+              ${semesterMatchClause}
+              AND ar.class_date = ?
+              AND ar.class_number = ?
+              AND ar.student_id = ?
+            ORDER BY ar.id ASC
+            LIMIT 1
+          `,
+          [subjectId, selectedCourseId, ...semesterMatchParams, attendanceDate, attendanceClassNumber, studentId]
+        );
+        const existingId = existing.rows && existing.rows[0] ? Number(existing.rows[0].id) : null;
+        if (Number.isFinite(existingId) && existingId > 0) {
+          await query(
+            `
+              UPDATE attendance_records
+              SET status = ?,
+                  reason = ?,
+                  group_number = ?,
+                  marked_by = ?,
+                  marked_at = NOW(),
+                  updated_at = NOW()
+              WHERE id = ?
+            `,
+            [
+              entry.status,
+              entry.reason || null,
+              Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
+              Number(req.session.user.id),
+              existingId,
+            ]
+          );
+        } else {
+          await query(
+            `
+              INSERT INTO attendance_records
+              (
+                subject_id, course_id, semester_id, student_id, group_number,
+                class_date, class_number, status, reason, marked_by, marked_at, updated_at
+              )
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            `,
+            [
+              subjectId,
+              selectedCourseId,
+              semesterId,
+              studentId,
+              Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
+              attendanceDate,
+              attendanceClassNumber,
+              entry.status,
+              entry.reason || null,
+              Number(req.session.user.id),
+            ]
+          );
+        }
+        updatedCount += 1;
+      }
+    });
+
+    logActivity(
+      db,
+      req,
+      'journal_attendance_save',
+      'attendance_record',
+      null,
+      {
+        subject_id: subjectId,
+        class_date: attendanceDate,
+        class_number: attendanceClassNumber,
+        updated_count: updatedCount,
+        deleted_count: deletedCount,
+      },
+      selectedCourseId,
+      semesterId
+    );
+    return res.redirect(
+      `/journal?subject_id=${subjectId}&attendance_date=${encodeURIComponent(attendanceDate)}&attendance_class_number=${attendanceClassNumber}&ok=Відвідуваність%20збережено`
+    );
+  } catch (err) {
+    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
   }
 });
 
