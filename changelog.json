@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.55",
+      "date": "2026-02-20",
+      "items": [
+        "fix(schedule-list-ui): eliminated repeated chevron tiling in dropdowns by avoiding `background` shorthand resets on themed `.form-select` styles",
+        "fix(schedule-list-ui): normalized select rendering with explicit `-webkit-appearance`/`-moz-appearance`, so each dropdown shows a single arrow and stable background"
+      ]
+    },
+    {
       "version": "0.9.54",
       "date": "2026-02-20",
       "items": [
