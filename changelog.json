@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.32",
+      "date": "2026-02-20",
+      "items": [
+        "feat(admin-incident): added Incident center block in Admin Visit Analytics (open/critical/high/unique counters + incident table)",
+        "feat(api): /admin/system-health.json now returns incidents feed aggregated from runtime telemetry (severity, first/last seen, count)",
+        "feat(ops): added incident aggregation logic with severity mapping and 72-hour incident window for degradation visibility"
+      ]
+    },
+    {
       "version": "0.9.31",
       "date": "2026-02-20",
       "items": [

@@ -35,6 +35,8 @@ try {
 const buildStamp = new Date().toISOString();
 const SYSTEM_HEALTH_ERROR_EVENT_LIMIT = 400;
 const SYSTEM_HEALTH_ERROR_WINDOW_HOURS = 24;
+const SYSTEM_INCIDENT_WINDOW_HOURS = 72;
+const SYSTEM_INCIDENT_ITEM_LIMIT = 25;
 const runtimeErrorEvents = [];
 const schedulerHealthState = {
   enabled: false,
@@ -114,6 +116,89 @@ function getRuntimeErrorSummary(now = Date.now()) {
     by_kind: byKind,
     top_labels: topLabels,
     recent: recent.slice(0, 20),
+  };
+}
+
+function resolveIncidentSeverity(kindRaw) {
+  const kind = String(kindRaw || '').trim().toLowerCase();
+  if (kind === 'unhandled') return 'critical';
+  if (kind === 'session' || kind === 'scheduler') return 'high';
+  if (kind === 'db') return 'medium';
+  return 'low';
+}
+
+function buildIncidentFeed(now = Date.now()) {
+  const windowMs = SYSTEM_INCIDENT_WINDOW_HOURS * 60 * 60 * 1000;
+  const cutoff = now - windowMs;
+  const recent = runtimeErrorEvents
+    .filter((event) => {
+      const ts = new Date(event.created_at).getTime();
+      return Number.isFinite(ts) && ts >= cutoff;
+    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const grouped = new Map();
+  recent.forEach((event) => {
+    const kind = String(event.kind || 'unknown');
+    const label = String(event.label || 'unknown');
+    const message = String(event.message || '');
+    const signature = `${kind}::${label}::${message}`;
+    const severity = resolveIncidentSeverity(kind);
+    if (!grouped.has(signature)) {
+      grouped.set(signature, {
+        signature,
+        kind,
+        label,
+        message,
+        severity,
+        first_seen_at: event.created_at,
+        last_seen_at: event.created_at,
+        count: 0,
+      });
+    }
+    const row = grouped.get(signature);
+    row.count += 1;
+    if (new Date(event.created_at).getTime() < new Date(row.first_seen_at).getTime()) {
+      row.first_seen_at = event.created_at;
+    }
+    if (new Date(event.created_at).getTime() > new Date(row.last_seen_at).getTime()) {
+      row.last_seen_at = event.created_at;
+    }
+  });
+  const severityRank = { critical: 4, high: 3, medium: 2, low: 1 };
+  const items = Array.from(grouped.values())
+    .sort((a, b) => {
+      const aRank = Number(severityRank[a.severity] || 0);
+      const bRank = Number(severityRank[b.severity] || 0);
+      if (aRank !== bRank) return bRank - aRank;
+      const aSeen = new Date(a.last_seen_at).getTime();
+      const bSeen = new Date(b.last_seen_at).getTime();
+      if (aSeen !== bSeen) return bSeen - aSeen;
+      return Number(b.count || 0) - Number(a.count || 0);
+    })
+    .slice(0, SYSTEM_INCIDENT_ITEM_LIMIT);
+  const bySeverity = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+  };
+  items.forEach((item) => {
+    if (!Object.prototype.hasOwnProperty.call(bySeverity, item.severity)) return;
+    bySeverity[item.severity] += 1;
+  });
+  const openCutoff = now - (24 * 60 * 60 * 1000);
+  const openCount = items.filter((item) => {
+    const ts = new Date(item.last_seen_at).getTime();
+    if (!Number.isFinite(ts) || ts < openCutoff) return false;
+    return item.severity === 'critical' || item.severity === 'high';
+  }).length;
+  return {
+    window_hours: SYSTEM_INCIDENT_WINDOW_HOURS,
+    total_events: recent.length,
+    unique_incidents: grouped.size,
+    open_incidents: openCount,
+    by_severity: bySeverity,
+    items,
   };
 }
 
@@ -16377,6 +16462,7 @@ app.get('/admin/system-health.json', requireVisitAnalyticsSectionAccess, async (
         ? 'running'
         : (schedulerHealthState.last_error ? 'degraded' : 'ok'));
     const errorSummary = getRuntimeErrorSummary(nowTs);
+    const incidents = buildIncidentFeed(nowTs);
     const migrationRows = await db.all(
       `
         SELECT id, applied_at
@@ -16455,6 +16541,7 @@ app.get('/admin/system-health.json', requireVisitAnalyticsSectionAccess, async (
         pending_ids: pendingIds.slice(0, 30),
       },
       errors: errorSummary,
+      incidents,
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.systemHealth.fetch');
