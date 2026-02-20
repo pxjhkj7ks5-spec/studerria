@@ -4868,6 +4868,26 @@
           }
           return;
         }
+        if (data.available === false) {
+          if (dataQualityMetricIssues) dataQualityMetricIssues.textContent = '—';
+          if (dataQualityMetricChecks) dataQualityMetricChecks.textContent = '—';
+          if (dataQualityMetricCritical) dataQualityMetricCritical.textContent = '—';
+          if (dataQualityMetricSubjects) dataQualityMetricSubjects.textContent = '—';
+          if (dataQualityStatusBadge) {
+            dataQualityStatusBadge.className = 'badge text-bg-secondary';
+            dataQualityStatusBadge.textContent = 'Unavailable';
+          }
+          if (dataQualityGeneratedAt) {
+            const generatedAt = data && data.generated_at ? new Date(data.generated_at) : null;
+            dataQualityGeneratedAt.textContent = generatedAt && !Number.isNaN(generatedAt.getTime())
+              ? `Оновлено: ${generatedAt.toLocaleString('uk-UA')}`
+              : 'Оновлено: —';
+          }
+          if (dataQualityBody) {
+            dataQualityBody.innerHTML = '<tr><td colspan="4" class="text-muted">Data quality недоступний для поточної схеми БД.</td></tr>';
+          }
+          return;
+        }
         const summary = data && data.summary ? data.summary : {};
         const totalIssues = Number(summary.total_issues || 0);
         const criticalRows = Number(summary && summary.severity_rows ? summary.severity_rows.critical : 0);

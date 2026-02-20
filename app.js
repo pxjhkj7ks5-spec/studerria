@@ -6442,6 +6442,11 @@ const parseDbIntegerArray = (value) => {
   return [];
 };
 
+const isDataQualityCompatibilityError = (err) => {
+  const code = String(err && err.code ? err.code : '').trim();
+  return code === '42P01' || code === '42703';
+};
+
 const buildDataQualityCheck = ({
   key,
   title,
@@ -6485,6 +6490,7 @@ async function buildAdminDataQualityDiagnostics({
     generated_at: new Date().toISOString(),
     course_id: Number.isInteger(normalizedCourseId) && normalizedCourseId > 0 ? normalizedCourseId : null,
     semester_id: hasSemester ? normalizedSemesterId : null,
+    available: true,
     summary: {
       checks_total: 0,
       checks_with_issues: 0,
@@ -6528,6 +6534,263 @@ async function buildAdminDataQualityDiagnostics({
     ? [normalizedCourseId, normalizedSemesterId]
     : [normalizedCourseId];
 
+  let diagnosticsRows = null;
+  try {
+    diagnosticsRows = await Promise.all([
+      db.get(
+        `
+          SELECT
+            COUNT(*)::int AS count,
+            COALESCE(
+              ARRAY_AGG(DISTINCT h.subject_id) FILTER (WHERE h.subject_id IS NOT NULL),
+              ARRAY[]::int[]
+            ) AS subject_ids
+          FROM homework h
+          LEFT JOIN journal_columns jc ON jc.source_homework_id = h.id
+          WHERE h.course_id = ?
+            ${homeworkSemesterClause}
+            AND COALESCE(h.is_teacher_homework, 0) = 1
+            AND COALESCE(h.status, 'published') = 'published'
+            AND jc.id IS NULL
+        `,
+        homeworkBaseParams
+      ),
+      db.all(
+        `
+          SELECT
+            h.id AS homework_id,
+            h.subject_id,
+            COALESCE(s.name, 'Предмет') AS subject_name,
+            COALESCE(h.group_number, 0)::int AS group_number,
+            COALESCE(
+              NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
+              NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
+              '—'
+            ) AS due_label,
+            LEFT(TRIM(COALESCE(h.description, '')), 80) AS description_preview
+          FROM homework h
+          LEFT JOIN subjects s ON s.id = h.subject_id
+          LEFT JOIN journal_columns jc ON jc.source_homework_id = h.id
+          WHERE h.course_id = ?
+            ${homeworkSemesterClause}
+            AND COALESCE(h.is_teacher_homework, 0) = 1
+            AND COALESCE(h.status, 'published') = 'published'
+            AND jc.id IS NULL
+          ORDER BY h.created_at DESC
+          LIMIT 8
+        `,
+        homeworkBaseParams
+      ),
+      db.all(
+        `
+          WITH grouped AS (
+            SELECT
+              h.subject_id,
+              COALESCE(s.name, 'Предмет') AS subject_name,
+              COALESCE(h.group_number, 0)::int AS group_number,
+              COALESCE(
+                NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
+                NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
+                '—'
+              ) AS due_label,
+              COALESCE(h.class_number, 0)::int AS class_number,
+              COUNT(*)::int AS duplicates
+            FROM homework h
+            LEFT JOIN subjects s ON s.id = h.subject_id
+            WHERE h.course_id = ?
+              ${homeworkSemesterClause}
+              AND COALESCE(h.is_teacher_homework, 0) = 1
+              AND COALESCE(h.status, 'published') = 'published'
+            GROUP BY
+              h.subject_id,
+              s.name,
+              COALESCE(h.group_number, 0),
+              COALESCE(
+                NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
+                NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
+                '—'
+              ),
+              COALESCE(h.class_number, 0),
+              LOWER(REGEXP_REPLACE(TRIM(COALESCE(h.description, '')), '\\s+', ' ', 'g')),
+              COALESCE(h.is_control, 0),
+              COALESCE(h.is_credit, 0),
+              COALESCE(h.is_custom_deadline, 0)
+            HAVING COUNT(*) > 1
+          )
+          SELECT
+            grouped.*,
+            COUNT(*) OVER()::int AS groups_total,
+            COALESCE(SUM(grouped.duplicates - 1) OVER(), 0)::int AS extra_total
+          FROM grouped
+          ORDER BY grouped.duplicates DESC, grouped.subject_name ASC
+          LIMIT 8
+        `,
+        homeworkBaseParams
+      ),
+      db.get(
+        `
+          SELECT
+            COUNT(*)::int AS count,
+            COALESCE(
+              ARRAY_AGG(DISTINCT jc.subject_id) FILTER (WHERE jc.subject_id IS NOT NULL),
+              ARRAY[]::int[]
+            ) AS subject_ids
+          FROM journal_columns jc
+          WHERE jc.course_id = ?
+            ${journalSemesterClause}
+            AND COALESCE(jc.source_type, 'manual') = 'homework'
+            AND jc.source_homework_id IS NULL
+            AND COALESCE(jc.is_archived, 0) = 0
+        `,
+        journalBaseParams
+      ),
+      db.all(
+        `
+          SELECT
+            jc.id,
+            jc.subject_id,
+            COALESCE(s.name, 'Предмет') AS subject_name,
+            COALESCE(jc.title, 'Колонка') AS title
+          FROM journal_columns jc
+          LEFT JOIN subjects s ON s.id = jc.subject_id
+          WHERE jc.course_id = ?
+            ${journalSemesterClause}
+            AND COALESCE(jc.source_type, 'manual') = 'homework'
+            AND jc.source_homework_id IS NULL
+            AND COALESCE(jc.is_archived, 0) = 0
+          ORDER BY jc.updated_at DESC, jc.id DESC
+          LIMIT 8
+        `,
+        journalBaseParams
+      ),
+      db.all(
+        `
+          WITH grouped AS (
+            SELECT
+              jc.subject_id,
+              COALESCE(s.name, 'Предмет') AS subject_name,
+              LOWER(TRIM(COALESCE(jc.title, ''))) AS title_key,
+              COALESCE(jc.column_type, 'custom') AS column_type,
+              COALESCE(jc.max_points, 0)::numeric(8, 2) AS max_points,
+              COALESCE(jc.include_in_final, 1)::int AS include_in_final,
+              COUNT(*)::int AS duplicates
+            FROM journal_columns jc
+            LEFT JOIN subjects s ON s.id = jc.subject_id
+            WHERE jc.course_id = ?
+              ${journalSemesterClause}
+              AND COALESCE(jc.is_archived, 0) = 0
+              AND COALESCE(jc.source_type, 'manual') = 'manual'
+            GROUP BY
+              jc.subject_id,
+              s.name,
+              LOWER(TRIM(COALESCE(jc.title, ''))),
+              COALESCE(jc.column_type, 'custom'),
+              COALESCE(jc.max_points, 0)::numeric(8, 2),
+              COALESCE(jc.include_in_final, 1)::int,
+              COALESCE(jc.is_credit, 0)
+            HAVING COUNT(*) > 1
+          )
+          SELECT
+            grouped.*,
+            COUNT(*) OVER()::int AS groups_total,
+            COALESCE(SUM(grouped.duplicates - 1) OVER(), 0)::int AS extra_total
+          FROM grouped
+          ORDER BY grouped.duplicates DESC, grouped.subject_name ASC
+          LIMIT 8
+        `,
+        journalBaseParams
+      ),
+      db.all(
+        `
+          SELECT
+            sg.subject_id,
+            COALESCE(s.name, 'Предмет') AS subject_name,
+            COALESCE(s.group_count, 1)::int AS max_group,
+            sg.group_number::int AS group_number,
+            COUNT(*)::int AS rows_count,
+            COUNT(*) OVER()::int AS groups_total,
+            COALESCE(SUM(COUNT(*)) OVER(), 0)::int AS affected_rows_total
+          FROM student_groups sg
+          JOIN subjects s ON s.id = sg.subject_id
+          JOIN users u ON u.id = sg.student_id
+          WHERE s.course_id = ?
+            AND u.course_id = ?
+            AND (sg.group_number < 1 OR sg.group_number > COALESCE(s.group_count, 1))
+          GROUP BY sg.subject_id, s.name, COALESCE(s.group_count, 1), sg.group_number
+          ORDER BY rows_count DESC, subject_name ASC
+          LIMIT 8
+        `,
+        [normalizedCourseId, normalizedCourseId]
+      ),
+      db.all(
+        `
+          SELECT
+            ts.subject_id,
+            COALESCE(s.name, 'Предмет') AS subject_name,
+            COALESCE(s.group_count, 1)::int AS max_group,
+            ts.group_number::int AS group_number,
+            COUNT(*)::int AS rows_count,
+            COUNT(*) OVER()::int AS groups_total,
+            COALESCE(SUM(COUNT(*)) OVER(), 0)::int AS affected_rows_total
+          FROM teacher_subjects ts
+          JOIN subjects s ON s.id = ts.subject_id
+          JOIN users u ON u.id = ts.user_id
+          WHERE s.course_id = ?
+            AND u.course_id = ?
+            AND ts.group_number IS NOT NULL
+            AND (ts.group_number < 1 OR ts.group_number > COALESCE(s.group_count, 1))
+          GROUP BY ts.subject_id, s.name, COALESCE(s.group_count, 1), ts.group_number
+          ORDER BY rows_count DESC, subject_name ASC
+          LIMIT 8
+        `,
+        [normalizedCourseId, normalizedCourseId]
+      ),
+      db.all(
+        `
+          SELECT
+            sgs.subject_id,
+            COALESCE(s.name, 'Предмет') AS subject_name,
+            ROUND((
+              (CASE WHEN COALESCE(sgs.homework_enabled, 1) = 1 THEN COALESCE(sgs.homework_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.seminar_enabled, 1) = 1 THEN COALESCE(sgs.seminar_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.exam_enabled, 1) = 1 THEN COALESCE(sgs.exam_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.credit_enabled, 1) = 1 THEN COALESCE(sgs.credit_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.custom_enabled, 1) = 1 THEN COALESCE(sgs.custom_weight_points, 0) ELSE 0 END)
+            )::numeric, 2) AS active_weight_sum,
+            COUNT(*) OVER()::int AS rows_total
+          FROM subject_grading_settings sgs
+          JOIN subjects s ON s.id = sgs.subject_id
+          WHERE sgs.course_id = ?
+            ${gradingSemesterClause}
+            AND ABS((
+              (CASE WHEN COALESCE(sgs.homework_enabled, 1) = 1 THEN COALESCE(sgs.homework_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.seminar_enabled, 1) = 1 THEN COALESCE(sgs.seminar_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.exam_enabled, 1) = 1 THEN COALESCE(sgs.exam_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.credit_enabled, 1) = 1 THEN COALESCE(sgs.credit_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.custom_enabled, 1) = 1 THEN COALESCE(sgs.custom_weight_points, 0) ELSE 0 END)
+            ) - 100) > 0.01
+          ORDER BY ABS((
+              (CASE WHEN COALESCE(sgs.homework_enabled, 1) = 1 THEN COALESCE(sgs.homework_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.seminar_enabled, 1) = 1 THEN COALESCE(sgs.seminar_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.exam_enabled, 1) = 1 THEN COALESCE(sgs.exam_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.credit_enabled, 1) = 1 THEN COALESCE(sgs.credit_weight_points, 0) ELSE 0 END) +
+              (CASE WHEN COALESCE(sgs.custom_enabled, 1) = 1 THEN COALESCE(sgs.custom_weight_points, 0) ELSE 0 END)
+            ) - 100) DESC,
+            subject_name ASC
+          LIMIT 8
+        `,
+        gradingBaseParams
+      ),
+    ]);
+  } catch (err) {
+    if (isDataQualityCompatibilityError(err)) {
+      result.available = false;
+      result.generated_at = new Date().toISOString();
+      return result;
+    }
+    throw err;
+  }
+
   const [
     missingJournalCountRow,
     missingJournalRows,
@@ -6538,252 +6801,7 @@ async function buildAdminDataQualityDiagnostics({
     invalidStudentGroupRows,
     invalidTeacherGroupRows,
     gradingWeightMismatchRows,
-  ] = await Promise.all([
-    db.get(
-      `
-        SELECT
-          COUNT(*)::int AS count,
-          COALESCE(
-            ARRAY_AGG(DISTINCT h.subject_id) FILTER (WHERE h.subject_id IS NOT NULL),
-            ARRAY[]::int[]
-          ) AS subject_ids
-        FROM homework h
-        LEFT JOIN journal_columns jc ON jc.source_homework_id = h.id
-        WHERE h.course_id = ?
-          ${homeworkSemesterClause}
-          AND COALESCE(h.is_teacher_homework, 0) = 1
-          AND COALESCE(h.status, 'published') = 'published'
-          AND jc.id IS NULL
-      `,
-      homeworkBaseParams
-    ),
-    db.all(
-      `
-        SELECT
-          h.id AS homework_id,
-          h.subject_id,
-          COALESCE(s.name, 'Предмет') AS subject_name,
-          COALESCE(h.group_number, 0)::int AS group_number,
-          COALESCE(
-            NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
-            NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
-            '—'
-          ) AS due_label,
-          LEFT(TRIM(COALESCE(h.description, '')), 80) AS description_preview
-        FROM homework h
-        LEFT JOIN subjects s ON s.id = h.subject_id
-        LEFT JOIN journal_columns jc ON jc.source_homework_id = h.id
-        WHERE h.course_id = ?
-          ${homeworkSemesterClause}
-          AND COALESCE(h.is_teacher_homework, 0) = 1
-          AND COALESCE(h.status, 'published') = 'published'
-          AND jc.id IS NULL
-        ORDER BY h.created_at DESC
-        LIMIT 8
-      `,
-      homeworkBaseParams
-    ),
-    db.all(
-      `
-        WITH grouped AS (
-          SELECT
-            h.subject_id,
-            COALESCE(s.name, 'Предмет') AS subject_name,
-            COALESCE(h.group_number, 0)::int AS group_number,
-            COALESCE(
-              NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
-              NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
-              '—'
-            ) AS due_label,
-            COALESCE(h.class_number, 0)::int AS class_number,
-            COUNT(*)::int AS duplicates
-          FROM homework h
-          LEFT JOIN subjects s ON s.id = h.subject_id
-          WHERE h.course_id = ?
-            ${homeworkSemesterClause}
-            AND COALESCE(h.is_teacher_homework, 0) = 1
-            AND COALESCE(h.status, 'published') = 'published'
-          GROUP BY
-            h.subject_id,
-            s.name,
-            COALESCE(h.group_number, 0),
-            COALESCE(
-              NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
-              NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
-              '—'
-            ),
-            COALESCE(h.class_number, 0),
-            LOWER(REGEXP_REPLACE(TRIM(COALESCE(h.description, '')), '\\s+', ' ', 'g')),
-            COALESCE(h.is_control, 0),
-            COALESCE(h.is_credit, 0),
-            COALESCE(h.is_custom_deadline, 0)
-          HAVING COUNT(*) > 1
-        )
-        SELECT
-          grouped.*,
-          COUNT(*) OVER()::int AS groups_total,
-          COALESCE(SUM(grouped.duplicates - 1) OVER(), 0)::int AS extra_total
-        FROM grouped
-        ORDER BY grouped.duplicates DESC, grouped.subject_name ASC
-        LIMIT 8
-      `,
-      homeworkBaseParams
-    ),
-    db.get(
-      `
-        SELECT
-          COUNT(*)::int AS count,
-          COALESCE(
-            ARRAY_AGG(DISTINCT jc.subject_id) FILTER (WHERE jc.subject_id IS NOT NULL),
-            ARRAY[]::int[]
-          ) AS subject_ids
-        FROM journal_columns jc
-        WHERE jc.course_id = ?
-          ${journalSemesterClause}
-          AND COALESCE(jc.source_type, 'manual') = 'homework'
-          AND jc.source_homework_id IS NULL
-          AND COALESCE(jc.is_archived, 0) = 0
-      `,
-      journalBaseParams
-    ),
-    db.all(
-      `
-        SELECT
-          jc.id,
-          jc.subject_id,
-          COALESCE(s.name, 'Предмет') AS subject_name,
-          COALESCE(jc.title, 'Колонка') AS title
-        FROM journal_columns jc
-        LEFT JOIN subjects s ON s.id = jc.subject_id
-        WHERE jc.course_id = ?
-          ${journalSemesterClause}
-          AND COALESCE(jc.source_type, 'manual') = 'homework'
-          AND jc.source_homework_id IS NULL
-          AND COALESCE(jc.is_archived, 0) = 0
-        ORDER BY jc.updated_at DESC, jc.id DESC
-        LIMIT 8
-      `,
-      journalBaseParams
-    ),
-    db.all(
-      `
-        WITH grouped AS (
-          SELECT
-            jc.subject_id,
-            COALESCE(s.name, 'Предмет') AS subject_name,
-            LOWER(TRIM(COALESCE(jc.title, ''))) AS title_key,
-            COALESCE(jc.column_type, 'custom') AS column_type,
-            COALESCE(jc.max_points, 0)::numeric(8, 2) AS max_points,
-            COALESCE(jc.include_in_final, 1)::int AS include_in_final,
-            COUNT(*)::int AS duplicates
-          FROM journal_columns jc
-          LEFT JOIN subjects s ON s.id = jc.subject_id
-          WHERE jc.course_id = ?
-            ${journalSemesterClause}
-            AND COALESCE(jc.is_archived, 0) = 0
-            AND COALESCE(jc.source_type, 'manual') = 'manual'
-          GROUP BY
-            jc.subject_id,
-            s.name,
-            LOWER(TRIM(COALESCE(jc.title, ''))),
-            COALESCE(jc.column_type, 'custom'),
-            COALESCE(jc.max_points, 0)::numeric(8, 2),
-            COALESCE(jc.include_in_final, 1)::int,
-            COALESCE(jc.is_credit, 0)
-          HAVING COUNT(*) > 1
-        )
-        SELECT
-          grouped.*,
-          COUNT(*) OVER()::int AS groups_total,
-          COALESCE(SUM(grouped.duplicates - 1) OVER(), 0)::int AS extra_total
-        FROM grouped
-        ORDER BY grouped.duplicates DESC, grouped.subject_name ASC
-        LIMIT 8
-      `,
-      journalBaseParams
-    ),
-    db.all(
-      `
-        SELECT
-          sg.subject_id,
-          COALESCE(s.name, 'Предмет') AS subject_name,
-          COALESCE(s.group_count, 1)::int AS max_group,
-          sg.group_number::int AS group_number,
-          COUNT(*)::int AS rows_count,
-          COUNT(*) OVER()::int AS groups_total,
-          COALESCE(SUM(COUNT(*)) OVER(), 0)::int AS affected_rows_total
-        FROM student_groups sg
-        JOIN subjects s ON s.id = sg.subject_id
-        JOIN users u ON u.id = sg.student_id
-        WHERE s.course_id = ?
-          AND u.course_id = ?
-          AND (sg.group_number < 1 OR sg.group_number > COALESCE(s.group_count, 1))
-        GROUP BY sg.subject_id, s.name, COALESCE(s.group_count, 1), sg.group_number
-        ORDER BY rows_count DESC, subject_name ASC
-        LIMIT 8
-      `,
-      [normalizedCourseId, normalizedCourseId]
-    ),
-    db.all(
-      `
-        SELECT
-          ts.subject_id,
-          COALESCE(s.name, 'Предмет') AS subject_name,
-          COALESCE(s.group_count, 1)::int AS max_group,
-          ts.group_number::int AS group_number,
-          COUNT(*)::int AS rows_count,
-          COUNT(*) OVER()::int AS groups_total,
-          COALESCE(SUM(COUNT(*)) OVER(), 0)::int AS affected_rows_total
-        FROM teacher_subjects ts
-        JOIN subjects s ON s.id = ts.subject_id
-        JOIN users u ON u.id = ts.user_id
-        WHERE s.course_id = ?
-          AND u.course_id = ?
-          AND ts.group_number IS NOT NULL
-          AND (ts.group_number < 1 OR ts.group_number > COALESCE(s.group_count, 1))
-        GROUP BY ts.subject_id, s.name, COALESCE(s.group_count, 1), ts.group_number
-        ORDER BY rows_count DESC, subject_name ASC
-        LIMIT 8
-      `,
-      [normalizedCourseId, normalizedCourseId]
-    ),
-    db.all(
-      `
-        SELECT
-          sgs.subject_id,
-          COALESCE(s.name, 'Предмет') AS subject_name,
-          ROUND((
-            (CASE WHEN COALESCE(sgs.homework_enabled, 1) = 1 THEN COALESCE(sgs.homework_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.seminar_enabled, 1) = 1 THEN COALESCE(sgs.seminar_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.exam_enabled, 1) = 1 THEN COALESCE(sgs.exam_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.credit_enabled, 1) = 1 THEN COALESCE(sgs.credit_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.custom_enabled, 1) = 1 THEN COALESCE(sgs.custom_weight_points, 0) ELSE 0 END)
-          )::numeric, 2) AS active_weight_sum,
-          COUNT(*) OVER()::int AS rows_total
-        FROM subject_grading_settings sgs
-        JOIN subjects s ON s.id = sgs.subject_id
-        WHERE sgs.course_id = ?
-          ${gradingSemesterClause}
-          AND ABS((
-            (CASE WHEN COALESCE(sgs.homework_enabled, 1) = 1 THEN COALESCE(sgs.homework_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.seminar_enabled, 1) = 1 THEN COALESCE(sgs.seminar_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.exam_enabled, 1) = 1 THEN COALESCE(sgs.exam_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.credit_enabled, 1) = 1 THEN COALESCE(sgs.credit_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.custom_enabled, 1) = 1 THEN COALESCE(sgs.custom_weight_points, 0) ELSE 0 END)
-          ) - 100) > 0.01
-        ORDER BY ABS((
-            (CASE WHEN COALESCE(sgs.homework_enabled, 1) = 1 THEN COALESCE(sgs.homework_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.seminar_enabled, 1) = 1 THEN COALESCE(sgs.seminar_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.exam_enabled, 1) = 1 THEN COALESCE(sgs.exam_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.credit_enabled, 1) = 1 THEN COALESCE(sgs.credit_weight_points, 0) ELSE 0 END) +
-            (CASE WHEN COALESCE(sgs.custom_enabled, 1) = 1 THEN COALESCE(sgs.custom_weight_points, 0) ELSE 0 END)
-          ) - 100) DESC,
-          subject_name ASC
-        LIMIT 8
-      `,
-      gradingBaseParams
-    ),
-  ]);
+  ] = diagnosticsRows;
 
   const items = [];
   items.push(buildDataQualityCheck({

@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.67",
+      "date": "2026-02-20",
+      "items": [
+        "fix(admin-data-quality): added legacy-schema fallback for `/admin/data-quality.json` so missing tables/columns no longer break the endpoint",
+        "fix(admin-security-analytics): Data Quality card now renders explicit \"Unavailable\" state without error toast when diagnostics are not supported by current DB schema"
+      ]
+    },
+    {
       "version": "0.9.66",
       "date": "2026-02-20",
       "items": [
