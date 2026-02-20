@@ -186,6 +186,8 @@ const REVIEW_QUEUE_FEEDBACK_TEMPLATES = [
     text: 'Робота потребує доопрацювання за критеріями предмета. Після правок можна перездати.',
   },
 ];
+const STUDENT_RISK_ADMISSION_TARGET = 60;
+const STUDENT_RISK_ON_TIME_WARNING_PERCENT = 65;
 
 const COURSE_KIND_OPTIONS = [
   { key: 'regular', label: 'Regular courses' },
@@ -4477,6 +4479,120 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
     return Number.isFinite(gradedAt) && gradedAt >= feedbackSince;
   }).length;
 
+  let progressDashboard = {
+    enabled: false,
+    admission_target: STUDENT_RISK_ADMISSION_TARGET,
+    subjects_total: 0,
+    at_risk_count: 0,
+    high_risk_count: 0,
+    medium_risk_count: 0,
+    overall_on_time_share: onTimeShare,
+    subjects: [],
+  };
+  if (studentHasOwnSubjects && whatIfSubjects.length) {
+    const admissionTarget = STUDENT_RISK_ADMISSION_TARGET;
+    const forecastRows = await Promise.all(
+      whatIfSubjects.map(async (subject) => {
+        const subjectId = Number(subject.subject_id || 0);
+        if (!Number.isFinite(subjectId) || subjectId < 1) return null;
+        try {
+          const forecast = await buildMyDayWhatIfForecast({
+            userId: Number(user.id),
+            courseId,
+            semesterId: activeSemester ? Number(activeSemester.id) : null,
+            subjectId,
+            targetScores: [admissionTarget, 75, 90],
+          });
+          if (!forecast) return null;
+          return {
+            subject_id: subjectId,
+            subject_name: subject.subject_name || forecast.subject?.name || 'Предмет',
+            forecast,
+          };
+        } catch (err) {
+          return null;
+        }
+      })
+    );
+    const subjectItems = (forecastRows || [])
+      .filter(Boolean)
+      .map((row) => {
+        const subjectId = Number(row.subject_id || 0);
+        const forecast = row.forecast || {};
+        const subjectHomework = (homeworkItems || []).filter((item) => Number(item.subject_id || 0) === subjectId);
+        const submittedOnTime = subjectHomework.filter((item) => item.submission_status === 'submitted_on_time').length;
+        const submittedLate = subjectHomework.filter((item) => item.submission_status === 'submitted_late').length;
+        const submittedTotal = submittedOnTime + submittedLate;
+        const onTimeShareBySubject = submittedTotal ? Math.round((submittedOnTime / submittedTotal) * 100) : null;
+        const overdueBySubject = subjectHomework.filter((item) => item.submission_status === 'overdue').length;
+        const dueSoonBySubject = subjectHomework.filter((item) => (
+          item.submission_status === 'pending'
+          && item.deadline_date
+          && item.deadline_date >= todayStr
+          && item.deadline_date <= tomorrowStr
+        )).length;
+        const currentFinalScore = Math.max(0, Math.min(100, Number(forecast.current_final_score || 0)));
+        const maxReachableFinalScore = Math.max(currentFinalScore, Math.min(100, Number(forecast.max_reachable_final_score || 0)));
+        const remainingColumnsCount = Math.max(0, Number(forecast.remaining_columns_count || 0));
+
+        let riskLevel = 'low';
+        let riskReason = 'Стабільний прогрес по предмету.';
+        if (maxReachableFinalScore < admissionTarget) {
+          riskLevel = 'high';
+          riskReason = `Навіть максимальний сценарій дає < ${admissionTarget}. Потрібен план із викладачем.`;
+        } else if (currentFinalScore < admissionTarget && overdueBySubject > 0) {
+          riskLevel = 'high';
+          riskReason = 'Фінал нижче цілі та є прострочені задачі.';
+        } else if (
+          currentFinalScore < admissionTarget
+          || overdueBySubject > 0
+          || (onTimeShareBySubject !== null && onTimeShareBySubject < STUDENT_RISK_ON_TIME_WARNING_PERCENT)
+        ) {
+          riskLevel = 'medium';
+          riskReason = 'Потрібно стабілізувати темп здач і добрати бали.';
+        }
+
+        const riskScore = riskLevel === 'high' ? 2 : riskLevel === 'medium' ? 1 : 0;
+        const gapToTarget = Math.max(0, Math.round((admissionTarget - currentFinalScore) * 100) / 100);
+        return {
+          subject_id: subjectId,
+          subject_name: row.subject_name,
+          current_final_score: Math.round(currentFinalScore * 100) / 100,
+          max_reachable_final_score: Math.round(maxReachableFinalScore * 100) / 100,
+          remaining_columns_count: remainingColumnsCount,
+          overdue_count: overdueBySubject,
+          due_soon_count: dueSoonBySubject,
+          submitted_total: submittedTotal,
+          on_time_share: onTimeShareBySubject,
+          target_gap: gapToTarget,
+          risk_level: riskLevel,
+          risk_score: riskScore,
+          risk_reason: riskReason,
+          review_href: `/journal?subject_id=${encodeURIComponent(String(subjectId))}`,
+        };
+      })
+      .sort((a, b) => {
+        if (a.risk_score !== b.risk_score) return b.risk_score - a.risk_score;
+        if (a.max_reachable_final_score !== b.max_reachable_final_score) {
+          return a.max_reachable_final_score - b.max_reachable_final_score;
+        }
+        return String(a.subject_name || '').localeCompare(String(b.subject_name || ''));
+      });
+
+    const highRiskCount = subjectItems.filter((item) => item.risk_level === 'high').length;
+    const mediumRiskCount = subjectItems.filter((item) => item.risk_level === 'medium').length;
+    progressDashboard = {
+      enabled: true,
+      admission_target: admissionTarget,
+      subjects_total: subjectItems.length,
+      at_risk_count: highRiskCount + mediumRiskCount,
+      high_risk_count: highRiskCount,
+      medium_risk_count: mediumRiskCount,
+      overall_on_time_share: onTimeShare,
+      subjects: subjectItems,
+    };
+  }
+
   const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
   const avg = (values, fallback = 0.52) => {
     if (!Array.isArray(values) || !values.length) return fallback;
@@ -4751,6 +4867,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
     competency_strongest: strongestCompetency,
     competency_weakest: weakestCompetency,
     competency_fastest_growth: fastestGrowingCompetency,
+    progress_dashboard: progressDashboard,
     what_if_subjects: whatIfSubjects,
     what_if_default_subject_id: defaultWhatIfSubjectId,
     review_queue: reviewQueue,
@@ -4955,6 +5072,23 @@ app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
   try {
     const myDay = await buildMyDayData(req.session.user, req.session.role, req.session.roles || []);
     return res.json(myDay);
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/my-day/progress-risk', requireLogin, readLimiter, async (req, res) => {
+  try {
+    const myDay = await buildMyDayData(req.session.user, req.session.role, req.session.roles || []);
+    return res.json(myDay.progress_dashboard || {
+      enabled: false,
+      subjects: [],
+      at_risk_count: 0,
+      high_risk_count: 0,
+      medium_risk_count: 0,
+      subjects_total: 0,
+      admission_target: STUDENT_RISK_ADMISSION_TARGET,
+    });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
   }

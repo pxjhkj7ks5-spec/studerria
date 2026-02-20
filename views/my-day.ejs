@@ -29,6 +29,9 @@
       const reviewQueueTemplates = Array.isArray(reviewQueue.templates) ? reviewQueue.templates : [];
       const reviewQueueCounts = reviewQueue.counts || {};
       const hasReviewQueue = Boolean(reviewQueue.enabled);
+      const progressDashboard = cockpit.progress_dashboard || {};
+      const progressSubjects = Array.isArray(progressDashboard.subjects) ? progressDashboard.subjects : [];
+      const hasProgressDashboard = Boolean(progressDashboard.enabled);
       const whatIfSubjects = Array.isArray(cockpit.what_if_subjects) ? cockpit.what_if_subjects : [];
       const defaultWhatIfSubjectId = Number(cockpit.what_if_default_subject_id || 0);
       const briefToneClass = `brief-tone-${brief.tone || 'calm'}`;
@@ -85,6 +88,12 @@
         if (status === 'on_time') return { label: 'Вчасно', className: 'type-chip type-chip-success' };
         if (status === 'manual') return { label: 'Ручна колонка', className: 'type-chip' };
         return null;
+      };
+      const getProgressRiskMeta = (item) => {
+        const level = String(item && item.risk_level ? item.risk_level : 'low');
+        if (level === 'high') return { label: 'Високий ризик', className: 'progress-risk-high' };
+        if (level === 'medium') return { label: 'Помірний ризик', className: 'progress-risk-medium' };
+        return { label: 'Стабільно', className: 'progress-risk-low' };
       };
     %>
 
@@ -209,6 +218,74 @@
             </div>
           <% } %>
         </article>
+
+        <% if (hasProgressDashboard) { %>
+          <article class="cockpit-card section-card" id="progressRiskBlock">
+            <div class="section-head">
+              <h2 class="section-title">Прогрес і ризик</h2>
+              <span class="section-subtitle">Прогноз фіналу та ризик недопуску</span>
+            </div>
+
+            <div class="summary-grid progress-summary-grid">
+              <div class="summary-pill">
+                <span>У ризику</span>
+                <strong><%= Number(progressDashboard.at_risk_count || 0) %></strong>
+              </div>
+              <div class="summary-pill">
+                <span>Високий</span>
+                <strong><%= Number(progressDashboard.high_risk_count || 0) %></strong>
+              </div>
+              <div class="summary-pill">
+                <span>Ціль</span>
+                <strong><%= Number(progressDashboard.admission_target || 60) %></strong>
+              </div>
+              <div class="summary-pill">
+                <span>Вчасно</span>
+                <strong><%= progressDashboard.overall_on_time_share === null || typeof progressDashboard.overall_on_time_share === 'undefined' ? '-' : `${progressDashboard.overall_on_time_share}%` %></strong>
+              </div>
+            </div>
+
+            <% if (!progressSubjects.length) { %>
+              <div class="empty-state compact">
+                <div class="empty-state-title">Поки немає даних прогресу</div>
+                <div class="empty-state-subtitle">Потрібні оцінені активності для побудови прогнозу.</div>
+              </div>
+            <% } else { %>
+              <div class="item-list progress-list">
+                <% progressSubjects.slice(0, 8).forEach((item) => {
+                     const riskMeta = getProgressRiskMeta(item);
+                %>
+                  <div class="item-row progress-row">
+                    <div class="item-main">
+                      <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
+                      <div class="item-meta">
+                        <span>Фінал: <strong><%= Number(item.current_final_score || 0) %></strong> / 100</span>
+                        <span>Стеля: <strong><%= Number(item.max_reachable_final_score || 0) %></strong></span>
+                        <span>Прострочок: <%= Number(item.overdue_count || 0) %></span>
+                        <span>Вчасно: <%= item.on_time_share === null || typeof item.on_time_share === 'undefined' ? '-' : `${item.on_time_share}%` %></span>
+                      </div>
+                      <div class="progress-track">
+                        <span style="width: <%= Math.max(0, Math.min(100, Number(item.current_final_score || 0))) %>%"></span>
+                      </div>
+                      <div class="progress-note"><%= item.risk_reason || '' %></div>
+                    </div>
+                    <div class="item-side">
+                      <span class="status-chip <%= riskMeta.className %>"><%= riskMeta.label %></span>
+                      <button
+                        type="button"
+                        class="btn btn-inline-link progress-whatif-btn"
+                        data-progress-subject-id="<%= item.subject_id %>"
+                      >
+                        What-if
+                      </button>
+                      <a class="btn btn-inline-link" href="<%= item.review_href || '/journal' %>">Журнал</a>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            <% } %>
+          </article>
+        <% } %>
 
         <% if (hasReviewQueue) { %>
           <article class="cockpit-card section-card review-queue-card" id="reviewQueueBlock">
@@ -676,6 +753,7 @@
       const whatIfSubject = document.getElementById('whatIfSubject');
       const whatIfResult = document.getElementById('whatIfResult');
       const whatIfTargetButtons = Array.from(document.querySelectorAll('.whatif-target-btn'));
+      const progressWhatIfButtons = Array.from(document.querySelectorAll('.progress-whatif-btn'));
       const reviewFilterButtons = Array.from(document.querySelectorAll('.review-filter-btn'));
       const reviewRows = Array.from(document.querySelectorAll('.review-row'));
       const reviewTemplateButtons = Array.from(document.querySelectorAll('.review-template-btn'));
@@ -918,6 +996,22 @@
       });
 
       renderReminders(reminders);
+      if (progressWhatIfButtons.length && whatIfSubject && whatIfResult) {
+        progressWhatIfButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            const subjectId = String(button.dataset.progressSubjectId || '').trim();
+            if (!subjectId) return;
+            const option = Array.from(whatIfSubject.options || []).find((item) => String(item.value) === subjectId);
+            if (!option) return;
+            whatIfSubject.value = subjectId;
+            loadWhatIf(selectedWhatIfTarget);
+            const whatIfBlock = document.getElementById('whatIfBlock');
+            if (whatIfBlock) {
+              whatIfBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          });
+        });
+      }
       if (reviewFilterButtons.length && reviewRows.length) {
         reviewFilterButtons.forEach((button) => {
           button.addEventListener('click', () => {

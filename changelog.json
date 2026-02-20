@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "0.9.26",
+      "date": "2026-02-20",
+      "items": [
+        "feat(my-day): added `Прогрес і ризик` student dashboard block with per-subject forecast, admission-risk level, and compact progress bars",
+        "feat(my-day-data): extended cockpit payload with `progress_dashboard` based on weighted journal forecast (`current` vs `max reachable`) and per-subject on-time submission share",
+        "feat(my-day): added quick `What-if` jump from risk rows to subject calculator and direct journal link for each subject",
+        "feat(api): added `/api/my-day/progress-risk` endpoint for progress/risk dashboard data"
+      ]
+    },
+    {
       "version": "0.9.25",
       "date": "2026-02-20",
       "items": [
