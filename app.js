@@ -413,6 +413,7 @@ const DEFAULT_SETTINGS = {
   allow_homework_creation: true,
   min_team_members: 2,
   allow_custom_deadlines: true,
+  myday_show_student_homework: true,
   allow_messages: true,
   schedule_refresh_minutes: 5,
   site_visit_retention_days: SITE_VISIT_RETENTION_DAYS_DEFAULT,
@@ -436,6 +437,7 @@ const SYSTEM_SETTINGS_AUDIT_KEYS = [
   'allow_homework_creation',
   'min_team_members',
   'allow_custom_deadlines',
+  'myday_show_student_homework',
   'allow_messages',
   'schedule_refresh_minutes',
   'site_visit_retention_days',
@@ -791,6 +793,8 @@ const refreshSettingsCache = async () => {
       if (!Number.isNaN(n) && n > 0) parsed.min_team_members = n;
     } else if (row.key === 'allow_custom_deadlines') {
       parsed.allow_custom_deadlines = String(row.value).toLowerCase() === 'true';
+    } else if (row.key === 'myday_show_student_homework') {
+      parsed.myday_show_student_homework = String(row.value).toLowerCase() === 'true';
     } else if (row.key === 'allow_messages') {
       parsed.allow_messages = String(row.value).toLowerCase() === 'true';
     } else if (row.key === 'schedule_refresh_minutes') {
@@ -4750,6 +4754,7 @@ function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[k
   if (
     key === 'allow_homework_creation'
     || key === 'allow_custom_deadlines'
+    || key === 'myday_show_student_homework'
     || key === 'allow_messages'
     || key === 'security_auto_quarantine_enabled'
   ) {
@@ -7625,6 +7630,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
     .slice(0, 6);
 
   const canSubmitHomework = studentHasOwnSubjects;
+  const includeStudentHomeworkInMyDay = Boolean(settingsCache.myday_show_student_homework);
   let homeworkItems = [];
   if (workloadTargets.length) {
     const scope = buildScope('h');
@@ -7636,6 +7642,9 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
     const semesterClause = activeSemester
       ? 'AND (h.semester_id = ? OR h.semester_id IS NULL)'
       : 'AND h.semester_id IS NULL';
+    const studentHomeworkVisibilityClause = includeStudentHomeworkInMyDay
+      ? ''
+      : 'AND COALESCE(h.is_teacher_homework, 0) = 1';
     const rows = await db.all(
       `
         SELECT
@@ -7661,6 +7670,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
         LEFT JOIN homework_submissions hs ON hs.homework_id = h.id AND hs.student_id = ?
         WHERE h.course_id = ?
           ${semesterClause}
+          ${studentHomeworkVisibilityClause}
           AND COALESCE(h.status, 'published') = 'published'
           AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
           AND (h.custom_due_date IS NOT NULL OR h.class_date IS NOT NULL)
@@ -21200,6 +21210,10 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   const minTeamMembers = Number(body.min_team_members);
   const allowHomework = String(body.allow_homework_creation).toLowerCase() === 'true';
   const allowCustomDeadlines = String(body.allow_custom_deadlines).toLowerCase() === 'true';
+  const myDayShowStudentHomeworkSource = Object.prototype.hasOwnProperty.call(body, 'myday_show_student_homework')
+    ? body.myday_show_student_homework
+    : settingsCache.myday_show_student_homework;
+  const myDayShowStudentHomework = String(myDayShowStudentHomeworkSource).toLowerCase() === 'true';
   const allowMessages = String(body.allow_messages).toLowerCase() === 'true';
   const scheduleRefreshMinutes = Number(body.schedule_refresh_minutes);
   const siteVisitRetentionDays = Number(body.site_visit_retention_days);
@@ -21291,6 +21305,7 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
       allow_homework_creation: allowHomework,
       min_team_members: minTeamMembers,
       allow_custom_deadlines: allowCustomDeadlines,
+      myday_show_student_homework: myDayShowStudentHomework,
       allow_messages: allowMessages,
       schedule_refresh_minutes: scheduleRefreshMinutes,
       site_visit_retention_days: normalizeRetentionDays(siteVisitRetentionDays, DEFAULT_SETTINGS.site_visit_retention_days),

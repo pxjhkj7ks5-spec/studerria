@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.75",
+      "date": "2026-02-20",
+      "items": [
+        "feat(system-settings): added \"My Day: студентські ДЗ у дедлайнах\" toggle in Admin -> System Settings (Homework block)",
+        "feat(my-day): deadline feed now always includes teacher homework and conditionally includes student-created homework based on the new system toggle"
+      ]
+    },
+    {
       "version": "0.9.74",
       "date": "2026-02-20",
       "items": [

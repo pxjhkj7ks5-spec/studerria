@@ -1062,6 +1062,14 @@
                           <option value="false" <%= (settings && settings.allow_custom_deadlines) ? '' : 'selected' %>><%= t('admin.disabled') %></option>
                         </select>
                       </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">My Day: студентські ДЗ у дедлайнах</label>
+                        <select class="form-select" name="myday_show_student_homework" data-settings-field>
+                          <option value="true" <%= (settings && settings.myday_show_student_homework === false) ? '' : 'selected' %>>Показувати</option>
+                          <option value="false" <%= (settings && settings.myday_show_student_homework === false) ? 'selected' : '' %>>Ховати</option>
+                        </select>
+                        <div class="small text-muted mt-1">Викладацькі ДЗ відображаються завжди.</div>
+                      </div>
                     </div>
                   </div>
                 </div>
