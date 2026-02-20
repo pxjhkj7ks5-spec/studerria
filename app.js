@@ -3401,13 +3401,30 @@ const shouldSkipVisitDuplicate = (req, pageKey, routePath) => {
 };
 
 const resolveVisitCourseId = (req, routePath) => {
-  const queryCourse = Number(req?.query?.course);
-  if (Number.isFinite(queryCourse) && queryCourse > 0 && (
-    routePath.startsWith('/admin')
+  const isStaffRoute = routePath.startsWith('/admin')
     || routePath.startsWith('/deanery')
-    || routePath.startsWith('/starosta')
-  )) {
-    return queryCourse;
+    || routePath.startsWith('/starosta');
+  if (isStaffRoute) {
+    const queryCourse = Number(req?.query?.course);
+    if (Number.isFinite(queryCourse) && queryCourse > 0) {
+      return queryCourse;
+    }
+    const selectedCourse = Number(req?.session?.adminCourse);
+    if (Number.isFinite(selectedCourse) && selectedCourse > 0) {
+      return selectedCourse;
+    }
+    if (hasSessionRole(req, 'admin')) {
+      const adminCourse = Number(getAdminCourse(req));
+      if (Number.isFinite(adminCourse) && adminCourse > 0) {
+        return adminCourse;
+      }
+    }
+    if (hasSessionRole(req, 'deanery') || hasSessionRole(req, 'starosta')) {
+      const staffCourse = Number(getStaffCourse(req));
+      if (Number.isFinite(staffCourse) && staffCourse > 0) {
+        return staffCourse;
+      }
+    }
   }
   const sessionCourse = Number(req?.session?.user?.course_id);
   if (Number.isFinite(sessionCourse) && sessionCourse > 0) return sessionCourse;
@@ -4142,7 +4159,7 @@ app.get('/login', (req, res) => {
 });
 
 app.get('/_health', (req, res) => {
-  const dbStatus = initStatus === 'ready' ? 'ok' : (initStatus === 'error' ? 'fail' : 'starting');
+  const dbStatus = initStatus === 'ok' ? 'ok' : (initStatus === 'error' ? 'fail' : 'starting');
   const sessionStatus = sessionHealthState.ok ? 'ok' : 'fail';
   const status = dbStatus === 'fail' || sessionStatus === 'fail'
     ? 'degraded'
@@ -19686,7 +19703,7 @@ app.get('/admin/system-health.json', requireVisitAnalyticsSectionAccess, async (
     const nowTs = Date.now();
     const nowIso = new Date(nowTs).toISOString();
     const memoryUsage = process.memoryUsage();
-    const dbStatus = initStatus === 'ready' ? 'ok' : (initStatus === 'error' ? 'fail' : 'starting');
+    const dbStatus = initStatus === 'ok' ? 'ok' : (initStatus === 'error' ? 'fail' : 'starting');
     const sessionStatus = sessionHealthState.ok ? 'ok' : 'fail';
     const schedulerStatus = !schedulerHealthState.enabled
       ? 'disabled'

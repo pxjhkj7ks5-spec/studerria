@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.50",
+      "date": "2026-02-20",
+      "items": [
+        "fix(visit-tracking): admin/deanery/starosta visits now always resolve course_id via selected course/session fallback, so \"Останні візити\" is no longer empty because of null course scope",
+        "fix(visit-analytics): staff-route tracking now respects `?course=...` and session adminCourse consistently for event writes",
+        "fix(system-health): normalized DB init status mapping to `ok|fail|starting` (removed stale `ready` check) in `/_health` and `/admin/system-health.json`"
+      ]
+    },
+    {
       "version": "0.9.49",
       "date": "2026-02-20",
       "items": [
