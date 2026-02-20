@@ -532,6 +532,62 @@ body.theme-dark.page-journal .journal-table thead th {
   color: var(--ds-text1);
 }
 
+.page-journal .journal-appeal-section {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 82%, transparent);
+  border-radius: 14px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--surface-soft) 86%, transparent);
+}
+
+.page-journal .journal-appeal-list {
+  display: grid;
+  gap: 10px;
+}
+
+.page-journal .journal-appeal-item {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 78%, transparent);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+}
+
+.page-journal .journal-appeal-item-head {
+  display: grid;
+  gap: 6px;
+}
+
+.page-journal .journal-appeal-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: var(--ds-text2);
+}
+
+.page-journal .journal-appeal-reason {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  color: var(--ds-text1);
+}
+
+.page-journal .journal-appeal-item-form .form-control,
+.page-journal .journal-appeal-item-form .form-select,
+.page-journal .journal-appeal-create-form .form-control,
+.page-journal .journal-appeal-create-form .form-select {
+  border-radius: 10px;
+}
+
+.page-journal .journal-appeal-apply-wrap {
+  min-height: 31px;
+  display: flex;
+  align-items: center;
+}
+
+.page-journal .journal-appeal-readonly {
+  margin-top: 8px;
+  color: var(--ds-text1);
+}
+
 .page-journal .journal-feedback-templates {
   display: flex;
   flex-wrap: wrap;

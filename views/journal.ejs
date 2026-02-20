@@ -634,6 +634,44 @@
                 </form>
               <% } %>
             </section>
+            <section id="journalAppealSection" class="journal-appeal-section mb-4">
+              <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                  <div class="text-muted small mb-1">Апеляції оцінок</div>
+                  <div class="small text-muted">Статус розгляду, SLA відповіді та історія рішення.</div>
+                </div>
+              </div>
+              <div id="journalAppealList" class="journal-appeal-list">
+                <div class="text-muted small">Апеляцій поки немає.</div>
+              </div>
+              <% if (!canEditJournal) { %>
+                <form id="journalAppealCreateForm" method="POST" action="/journal/appeals/create" class="journal-appeal-create-form mt-3" autocomplete="off">
+                  <input type="hidden" name="column_id" id="journalAppealCreateColumnId" />
+                  <input type="hidden" name="student_id" id="journalAppealCreateStudentId" />
+                  <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label form-label-sm mb-1">Бажаний бал (опц.)</label>
+                      <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="requested_score" id="journalAppealCreateRequestedScore" />
+                    </div>
+                    <div class="col-12 col-md-8">
+                      <label class="form-label form-label-sm mb-1">Причина апеляції</label>
+                      <textarea
+                        class="form-control form-control-sm"
+                        name="reason"
+                        id="journalAppealCreateReason"
+                        rows="2"
+                        maxlength="2400"
+                        required
+                        placeholder="Опишіть, чому оцінку варто переглянути"
+                      ></textarea>
+                    </div>
+                  </div>
+                  <div class="d-flex justify-content-end mt-2">
+                    <button class="btn btn-sm btn-outline-warning" type="submit" id="journalAppealCreateSubmitBtn">Подати апеляцію</button>
+                  </div>
+                </form>
+              <% } %>
+            </section>
             <form id="journalGradeForm" method="POST" action="/journal/grades/save" autocomplete="off">
               <input type="hidden" name="column_id" id="journalGradeColumnId" />
               <input type="hidden" name="student_id" id="journalGradeStudentId" />
@@ -788,6 +826,14 @@
       const retakeCreateColumnInput = document.getElementById('journalRetakeCreateColumnId');
       const retakeCreateStudentInput = document.getElementById('journalRetakeCreateStudentId');
       const retakeCreateSubmitBtn = document.getElementById('journalRetakeCreateSubmitBtn');
+      const appealSectionEl = document.getElementById('journalAppealSection');
+      const appealListEl = document.getElementById('journalAppealList');
+      const appealCreateForm = document.getElementById('journalAppealCreateForm');
+      const appealCreateColumnInput = document.getElementById('journalAppealCreateColumnId');
+      const appealCreateStudentInput = document.getElementById('journalAppealCreateStudentId');
+      const appealCreateRequestedScore = document.getElementById('journalAppealCreateRequestedScore');
+      const appealCreateReason = document.getElementById('journalAppealCreateReason');
+      const appealCreateSubmitBtn = document.getElementById('journalAppealCreateSubmitBtn');
 
       const bulkModalEl = document.getElementById('journalBulkModal');
       const bulkModal = bulkModalEl && window.bootstrap ? new window.bootstrap.Modal(bulkModalEl) : null;
@@ -832,6 +878,13 @@
         if (key === 'graded') return 'status-chip--success';
         if (key === 'submitted') return 'status-chip--info';
         if (key === 'cancelled') return 'status-chip--danger';
+        return 'status-chip--warning';
+      };
+      const getAppealStatusChipClass = (statusKey) => {
+        const key = String(statusKey || '').toLowerCase();
+        if (key === 'approved') return 'status-chip--success';
+        if (key === 'rejected') return 'status-chip--danger';
+        if (key === 'in_review') return 'status-chip--info';
         return 'status-chip--warning';
       };
 
@@ -1125,6 +1178,136 @@
         retakeListEl.innerHTML = html;
       }
 
+      function renderAppeals(data) {
+        if (!appealSectionEl || !appealListEl) return;
+        const appeals = Array.isArray(data && data.appeals) ? data.appeals : [];
+        const canCreate = Boolean(data && data.can_create_appeals);
+        const canManage = Boolean(canEditJournal && data && data.can_manage_appeals);
+        const appealMeta = data && data.appeal_meta ? data.appeal_meta : {};
+        const reasonMaxLength = Number(appealMeta.reason_max_length || 2400);
+        const commentMaxLength = Number(appealMeta.comment_max_length || 2400);
+        const maxScore = Number(data && data.column ? data.column.max_points : 0);
+        const statusOptions = Array.isArray(appealMeta.statuses) && appealMeta.statuses.length
+          ? appealMeta.statuses
+          : [
+              { key: 'pending', label: 'Нова' },
+              { key: 'in_review', label: 'На розгляді' },
+              { key: 'approved', label: 'Підтверджено' },
+              { key: 'rejected', label: 'Відхилено' },
+            ];
+
+        if (appealCreateColumnInput) appealCreateColumnInput.value = String(currentCellColumnId || 0);
+        if (appealCreateStudentInput) appealCreateStudentInput.value = String(currentCellStudentId || 0);
+        if (appealCreateRequestedScore) {
+          appealCreateRequestedScore.max = formatNumber(maxScore);
+          appealCreateRequestedScore.disabled = !canCreate;
+          appealCreateRequestedScore.value = '';
+        }
+        if (appealCreateReason) {
+          appealCreateReason.maxLength = reasonMaxLength;
+          appealCreateReason.disabled = !canCreate;
+          appealCreateReason.value = '';
+        }
+        if (appealCreateSubmitBtn) appealCreateSubmitBtn.disabled = !canCreate;
+        if (appealCreateForm) {
+          appealCreateForm.classList.toggle('d-none', canEditJournal);
+        }
+
+        if (!appeals.length) {
+          appealListEl.innerHTML = '<div class="text-muted small">Апеляцій поки немає.</div>';
+          return;
+        }
+
+        const html = appeals.map((appeal) => {
+          const statusKey = String(appeal && appeal.status ? appeal.status : 'pending');
+          const statusClass = getAppealStatusChipClass(statusKey);
+          const requestedScore = Number(appeal && appeal.requested_score);
+          const resolvedScore = Number(appeal && appeal.resolved_score);
+          const requestedScoreDisplay = Number.isFinite(requestedScore) ? formatNumber(requestedScore) : '—';
+          const resolvedScoreDisplay = Number.isFinite(resolvedScore) ? formatNumber(resolvedScore) : '—';
+          const reasonText = String(appeal && appeal.reason ? appeal.reason : '');
+          const decisionText = String(appeal && appeal.decision_comment ? appeal.decision_comment : '');
+          const statusOptionsHtml = statusOptions.map((option) => {
+            const key = String(option && option.key ? option.key : '');
+            const label = String(option && option.label ? option.label : key);
+            return `<option value="${escapeHtml(key)}"${key === statusKey ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+          }).join('');
+          const resolvedScoreInputValue = Number.isFinite(resolvedScore) ? String(resolvedScore) : '';
+          const createdBy = String(appeal && appeal.created_by_name ? appeal.created_by_name : '');
+          const reviewedBy = String(appeal && appeal.reviewed_by_name ? appeal.reviewed_by_name : '');
+          const createdAt = appeal && appeal.created_at ? formatDateTime(appeal.created_at) : '';
+          const reviewedAt = appeal && appeal.reviewed_at ? formatDateTime(appeal.reviewed_at) : '';
+          const slaDueAt = appeal && appeal.sla_due_at ? formatDateTime(appeal.sla_due_at) : '';
+          const isOverdue = Boolean(appeal && appeal.is_overdue);
+
+          const readonlyBlock = `
+            <div class="journal-appeal-readonly small">
+              ${decisionText ? `<div><strong>Коментар:</strong> ${escapeHtml(decisionText)}</div>` : '<div class="text-muted">Рішення ще не додано.</div>'}
+              <div class="mt-1"><strong>Результат:</strong> ${escapeHtml(resolvedScoreDisplay)}</div>
+            </div>
+          `;
+
+          const manageBlock = `
+            <form method="POST" action="/journal/appeals/update" class="journal-appeal-item-form mt-2" autocomplete="off">
+              <input type="hidden" name="appeal_id" value="${Number(appeal && appeal.id ? appeal.id : 0)}" />
+              <input type="hidden" name="column_id" value="${currentCellColumnId}" />
+              <input type="hidden" name="student_id" value="${currentCellStudentId}" />
+              <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
+                  <label class="form-label form-label-sm mb-1">Статус</label>
+                  <select class="form-select form-select-sm" name="status">
+                    ${statusOptionsHtml}
+                  </select>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label form-label-sm mb-1">Новий бал (опц.)</label>
+                  <input class="form-control form-control-sm" type="number" step="0.01" min="0" max="${escapeHtml(formatNumber(maxScore))}" name="resolved_score" value="${escapeHtml(resolvedScoreInputValue)}" />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label form-label-sm mb-1">Застосувати бал</label>
+                  <div class="journal-appeal-apply-wrap">
+                    <input type="hidden" name="apply_resolved_score" value="0" />
+                    <label class="form-check d-inline-flex align-items-center gap-2 m-0">
+                      <input class="form-check-input mt-0" type="checkbox" name="apply_resolved_score" value="1" />
+                      <span class="small">Оновити оцінку</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-2">
+                <label class="form-label form-label-sm mb-1">Коментар до рішення</label>
+                <textarea class="form-control form-control-sm" name="decision_comment" rows="2" maxlength="${commentMaxLength}" placeholder="Результат розгляду">${escapeHtml(decisionText)}</textarea>
+              </div>
+              <div class="d-flex justify-content-end mt-2">
+                <button class="btn btn-sm btn-primary" type="submit">Зберегти рішення</button>
+              </div>
+            </form>
+          `;
+
+          return `
+            <article class="journal-appeal-item">
+              <div class="journal-appeal-item-head">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <strong>Апеляція #${Number(appeal && appeal.id ? appeal.id : 0)}</strong>
+                  <span class="status-chip ${statusClass}">${escapeHtml(String(appeal && appeal.status_label ? appeal.status_label : statusKey))}</span>
+                  ${isOverdue ? '<span class="status-chip status-chip--danger">SLA прострочено</span>' : ''}
+                </div>
+                <div class="journal-appeal-item-meta">
+                  <span>Запитуваний бал: ${escapeHtml(requestedScoreDisplay)}</span>
+                  <span>Поточне рішення: ${escapeHtml(resolvedScoreDisplay)}</span>
+                  ${slaDueAt ? `<span>SLA до: ${escapeHtml(slaDueAt)}</span>` : ''}
+                  ${createdAt ? `<span>Подано: ${escapeHtml(createdAt)}${createdBy ? ` · ${escapeHtml(createdBy)}` : ''}</span>` : ''}
+                  ${reviewedAt ? `<span>Розглянуто: ${escapeHtml(reviewedAt)}${reviewedBy ? ` · ${escapeHtml(reviewedBy)}` : ''}</span>` : ''}
+                </div>
+              </div>
+              <div class="journal-appeal-reason small">${escapeHtml(reasonText)}</div>
+              ${canManage ? manageBlock : readonlyBlock}
+            </article>
+          `;
+        }).join('');
+        appealListEl.innerHTML = html;
+      }
+
       const navigateCell = (columnStep, studentStep) => {
         const currentColumnIndex = findColumnIndex(currentCellColumnId);
         const currentStudentIndex = findStudentIndex(currentCellStudentId);
@@ -1151,6 +1334,7 @@
           currentCellStudentId = Number(studentId);
           currentCellLocked = Boolean(data && data.column && data.column.is_locked);
           renderRetakes(data || null);
+          renderAppeals(data || null);
 
           columnInput.value = String(columnId);
           studentInput.value = String(studentId);

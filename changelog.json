@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.9.28",
+      "date": "2026-02-20",
+      "items": [
+        "feat(journal-appeals): added grade appeal flow in journal cell modal with student submission form, timeline cards, SLA indicator, and decision history",
+        "feat(api): added `/journal/appeals/create` and `/journal/appeals/update` endpoints with role-aware access checks, group scope validation, and locked-column protection",
+        "feat(journal-cell): extended `/journal/cell.json` with appeals payload (`appeals`, `appeal_meta`, `can_create_appeals`, `can_manage_appeals`)",
+        "feat(db): added migration `024_journal_grade_appeals` (`journal_grade_appeals` table, single-open-appeal guard, SLA/status indexes)",
+        "feat(journal): approved appeal can optionally sync resolved score back into `journal_grades` directly from appeal review form"
+      ]
+    },
+    {
       "version": "0.9.27",
       "date": "2026-02-20",
       "items": [

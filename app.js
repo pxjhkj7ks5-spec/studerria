@@ -6823,6 +6823,16 @@ const JOURNAL_RETAKE_STATUS_META = {
 };
 const JOURNAL_RETAKE_NOTE_MAX_LENGTH = 1200;
 const JOURNAL_RETAKE_COMMENT_MAX_LENGTH = 2000;
+const JOURNAL_APPEAL_STATUSES = ['pending', 'in_review', 'approved', 'rejected'];
+const JOURNAL_APPEAL_STATUS_META = {
+  pending: { key: 'pending', label: 'Нова' },
+  in_review: { key: 'in_review', label: 'На розгляді' },
+  approved: { key: 'approved', label: 'Підтверджено' },
+  rejected: { key: 'rejected', label: 'Відхилено' },
+};
+const JOURNAL_APPEAL_REASON_MAX_LENGTH = 2400;
+const JOURNAL_APPEAL_COMMENT_MAX_LENGTH = 2400;
+const JOURNAL_APPEAL_SLA_HOURS = 72;
 const ATTENDANCE_STATUS_OPTIONS = ['present', 'late', 'absent', 'excused'];
 const ATTENDANCE_STATUS_META = {
   present: { key: 'present', label: 'Присутній' },
@@ -6864,6 +6874,12 @@ const normalizeJournalRetakeStatus = (rawValue) => {
 
 const normalizeJournalRetakeNote = (rawValue) => String(rawValue || '').trim().slice(0, JOURNAL_RETAKE_NOTE_MAX_LENGTH);
 const normalizeJournalRetakeComment = (rawValue) => String(rawValue || '').trim().slice(0, JOURNAL_RETAKE_COMMENT_MAX_LENGTH);
+const normalizeJournalAppealStatus = (rawValue) => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  return JOURNAL_APPEAL_STATUSES.includes(normalized) ? normalized : 'pending';
+};
+const normalizeJournalAppealReason = (rawValue) => String(rawValue || '').trim().slice(0, JOURNAL_APPEAL_REASON_MAX_LENGTH);
+const normalizeJournalAppealComment = (rawValue) => String(rawValue || '').trim().slice(0, JOURNAL_APPEAL_COMMENT_MAX_LENGTH);
 
 const normalizeAttendanceStatus = (rawValue) => {
   const normalized = String(rawValue || '').trim().toLowerCase();
@@ -8651,6 +8667,36 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       [columnId, studentId]
     );
     const canManageRetakes = teacherJournalMode && !isJournalColumnLocked(column);
+    const appealRows = await db.all(
+      `
+        SELECT
+          jga.id,
+          jga.requested_score,
+          jga.reason,
+          jga.status,
+          jga.decision_comment,
+          jga.resolved_score,
+          jga.created_at,
+          jga.updated_at,
+          jga.sla_due_at,
+          jga.reviewed_at,
+          uc.full_name AS created_by_name,
+          ur.full_name AS reviewed_by_name
+        FROM journal_grade_appeals jga
+        LEFT JOIN users uc ON uc.id = jga.created_by
+        LEFT JOIN users ur ON ur.id = jga.reviewed_by
+        WHERE jga.column_id = ?
+          AND jga.student_id = ?
+        ORDER BY jga.created_at DESC, jga.id DESC
+      `,
+      [columnId, studentId]
+    );
+    const canManageAppeals = teacherJournalMode && !isJournalColumnLocked(column);
+    const canCreateAppeals = (
+      !teacherJournalMode
+      && Number(req.session.user.id) === studentId
+      && Boolean(grade && Number.isFinite(Number(grade.score)))
+    );
 
     return res.json({
       column: {
@@ -8689,6 +8735,8 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       submission_status: submissionStatus,
       can_edit: teacherJournalMode && !isJournalColumnLocked(column),
       can_manage_retakes: canManageRetakes,
+      can_create_appeals: canCreateAppeals,
+      can_manage_appeals: canManageAppeals,
       retake_meta: {
         kinds: JOURNAL_RETAKE_KINDS.map((key) => ({
           key,
@@ -8719,6 +8767,40 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
           graded_at: row.graded_at || null,
           graded_by_name: row.graded_by_name || '',
           count_in_final: Number(row.count_in_final || 0) === 1,
+        };
+      }),
+      appeal_meta: {
+        statuses: JOURNAL_APPEAL_STATUSES.map((key) => ({
+          key,
+          label: JOURNAL_APPEAL_STATUS_META[key]?.label || key,
+        })),
+        reason_max_length: JOURNAL_APPEAL_REASON_MAX_LENGTH,
+        comment_max_length: JOURNAL_APPEAL_COMMENT_MAX_LENGTH,
+        sla_hours: JOURNAL_APPEAL_SLA_HOURS,
+      },
+      appeals: (appealRows || []).map((row) => {
+        const requestedScore = Number(row.requested_score);
+        const resolvedScore = Number(row.resolved_score);
+        const status = normalizeJournalAppealStatus(row.status);
+        return {
+          id: Number(row.id),
+          requested_score: Number.isFinite(requestedScore) ? requestedScore : null,
+          reason: row.reason || '',
+          status,
+          status_label: JOURNAL_APPEAL_STATUS_META[status]?.label || status,
+          decision_comment: row.decision_comment || '',
+          resolved_score: Number.isFinite(resolvedScore) ? resolvedScore : null,
+          created_at: row.created_at || null,
+          updated_at: row.updated_at || null,
+          sla_due_at: row.sla_due_at || null,
+          reviewed_at: row.reviewed_at || null,
+          created_by_name: row.created_by_name || '',
+          reviewed_by_name: row.reviewed_by_name || '',
+          is_overdue: (
+            ['pending', 'in_review'].includes(status)
+            && row.sla_due_at
+            && new Date(row.sla_due_at).getTime() < Date.now()
+          ),
         };
       }),
     });
@@ -9609,6 +9691,319 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
     );
     return res.redirect(
       `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Спробу оновлено')}`
+    );
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res) => {
+  const columnId = Number(req.body.column_id);
+  const studentId = Number(req.body.student_id);
+  const reason = normalizeJournalAppealReason(req.body.reason);
+  const requestedScoreRaw = String(req.body.requested_score || '').trim();
+  const parsedRequestedScore = requestedScoreRaw ? Number(requestedScoreRaw.replace(',', '.')) : NaN;
+  const requestedScore = requestedScoreRaw
+    ? (Number.isFinite(parsedRequestedScore) ? Math.round(parsedRequestedScore * 100) / 100 : NaN)
+    : null;
+
+  if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
+    return res.redirect('/journal?err=Invalid%20appeal%20target');
+  }
+  if (!reason) {
+    return res.redirect('/journal?err=Вкажіть%20причину%20апеляції');
+  }
+  if (requestedScoreRaw && !Number.isFinite(requestedScore)) {
+    return res.redirect('/journal?err=Invalid%20requested%20score');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+    if (Number(req.session.user.id) !== studentId) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT jc.*
+        FROM journal_columns jc
+        WHERE jc.id = ?
+        LIMIT 1
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.redirect('/journal?err=Column%20not%20found');
+    }
+
+    const studentRow = await db.get(
+      `
+        SELECT sg.group_number
+        FROM student_groups sg
+        WHERE sg.subject_id = ? AND sg.student_id = ?
+        LIMIT 1
+      `,
+      [column.subject_id, studentId]
+    );
+    if (!studentRow) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const maxPoints = parsePositiveDecimal(column.max_points, 10);
+    if (Number.isFinite(requestedScore) && (requestedScore < 0 || requestedScore > maxPoints)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Requested%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
+    }
+
+    const existingGrade = await db.get(
+      `
+        SELECT score
+        FROM journal_grades
+        WHERE column_id = ? AND student_id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [columnId, studentId]
+    );
+    if (!existingGrade || !Number.isFinite(Number(existingGrade.score))) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&err=${encodeURIComponent('Немає оцінки для апеляції')}`);
+    }
+
+    const activeAppeal = await db.get(
+      `
+        SELECT id
+        FROM journal_grade_appeals
+        WHERE column_id = ?
+          AND student_id = ?
+          AND status IN ('pending', 'in_review')
+        LIMIT 1
+      `,
+      [columnId, studentId]
+    );
+    if (activeAppeal) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&err=${encodeURIComponent('Вже є активна апеляція для цієї клітинки')}`);
+    }
+
+    await db.run(
+      `
+        INSERT INTO journal_grade_appeals
+          (
+            subject_id, course_id, semester_id, column_id, student_id,
+            requested_score, reason, status, created_by,
+            created_at, updated_at, sla_due_at
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW(), NOW(), NOW() + (? * INTERVAL '1 hour'))
+      `,
+      [
+        Number(column.subject_id),
+        Number(column.course_id || req.session.user.course_id || 1),
+        column.semester_id ? Number(column.semester_id) : null,
+        columnId,
+        studentId,
+        Number.isFinite(requestedScore) ? requestedScore : null,
+        reason,
+        Number(req.session.user.id),
+        JOURNAL_APPEAL_SLA_HOURS,
+      ]
+    );
+
+    logActivity(
+      db,
+      req,
+      'journal_appeal_create',
+      'journal_grade_appeal',
+      null,
+      {
+        subject_id: Number(column.subject_id),
+        column_id: columnId,
+        student_id: studentId,
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(
+      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Апеляцію подано')}`
+    );
+  } catch (err) {
+    return res.redirect('/journal?err=Database%20error');
+  }
+});
+
+app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res) => {
+  const appealId = Number(req.body.appeal_id);
+  const columnId = Number(req.body.column_id);
+  const studentId = Number(req.body.student_id);
+  const status = normalizeJournalAppealStatus(req.body.status);
+  const decisionComment = normalizeJournalAppealComment(req.body.decision_comment);
+  const resolvedScoreRaw = String(req.body.resolved_score || '').trim();
+  const parsedResolvedScore = resolvedScoreRaw ? Number(resolvedScoreRaw.replace(',', '.')) : NaN;
+  const resolvedScore = resolvedScoreRaw
+    ? (Number.isFinite(parsedResolvedScore) ? Math.round(parsedResolvedScore * 100) / 100 : NaN)
+    : null;
+  const applyResolvedScore = parseBinaryFlag(req.body.apply_resolved_score, 0) === 1;
+
+  if (
+    !Number.isFinite(appealId) || appealId < 1
+    || !Number.isFinite(columnId) || columnId < 1
+    || !Number.isFinite(studentId) || studentId < 1
+  ) {
+    return res.redirect('/journal?err=Invalid%20appeal%20target');
+  }
+  if (resolvedScoreRaw && !Number.isFinite(resolvedScore)) {
+    return res.redirect('/journal?err=Invalid%20resolved%20score');
+  }
+  if (applyResolvedScore && !Number.isFinite(resolvedScore)) {
+    return res.redirect('/journal?err=Щоб%20застосувати%20новий%20бал,%20вкажіть%20коректне%20значення');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const column = await db.get(
+      `
+        SELECT
+          jc.*,
+          h.group_number AS homework_group_number
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.id = ?
+        LIMIT 1
+      `,
+      [columnId]
+    );
+    if (!column) {
+      return res.redirect('/journal?err=Column%20not%20found');
+    }
+    if (isJournalColumnLocked(column)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+    }
+
+    const studentRow = await db.get(
+      `
+        SELECT sg.group_number
+        FROM student_groups sg
+        WHERE sg.subject_id = ? AND sg.student_id = ?
+        LIMIT 1
+      `,
+      [column.subject_id, studentId]
+    );
+    if (!studentRow) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+    }
+
+    if (!journalScope.fullAccess) {
+      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      if (!access.hasRows) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const studentGroup = Number(studentRow.group_number || 0);
+      if (!access.allowAll && !access.groups.has(studentGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+      const homeworkGroup = Number(column.homework_group_number || 0);
+      if (column.source_homework_id && homeworkGroup > 0 && !access.allowAll && !access.groups.has(homeworkGroup)) {
+        return res.status(403).send('Forbidden (journal)');
+      }
+    }
+
+    const appeal = await db.get(
+      `
+        SELECT id
+        FROM journal_grade_appeals
+        WHERE id = ?
+          AND column_id = ?
+          AND student_id = ?
+        LIMIT 1
+      `,
+      [appealId, columnId, studentId]
+    );
+    if (!appeal) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Апеляцію%20не%20знайдено`);
+    }
+
+    const maxPoints = parsePositiveDecimal(column.max_points, 10);
+    if (Number.isFinite(resolvedScore) && (resolvedScore < 0 || resolvedScore > maxPoints)) {
+      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Resolved%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
+    }
+
+    const isFinalStatus = ['approved', 'rejected'].includes(status);
+    await withTransaction(async (client) => {
+      const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
+      await query(
+        `
+          UPDATE journal_grade_appeals
+          SET status = ?,
+              decision_comment = ?,
+              resolved_score = ?,
+              reviewed_by = ?,
+              reviewed_at = ?,
+              updated_at = NOW()
+          WHERE id = ?
+        `,
+        [
+          status,
+          decisionComment || null,
+          Number.isFinite(resolvedScore) ? resolvedScore : null,
+          isFinalStatus ? Number(req.session.user.id) : null,
+          isFinalStatus ? new Date().toISOString() : null,
+          appealId,
+        ]
+      );
+
+      if (status === 'approved' && applyResolvedScore && Number.isFinite(resolvedScore)) {
+        await query(
+          `
+            INSERT INTO journal_grades
+              (column_id, student_id, score, teacher_comment, graded_by, graded_at, submission_status)
+            VALUES (?, ?, ?, ?, ?, NOW(), 'manual')
+            ON CONFLICT (column_id, student_id)
+            DO UPDATE SET
+              score = EXCLUDED.score,
+              teacher_comment = EXCLUDED.teacher_comment,
+              graded_by = EXCLUDED.graded_by,
+              graded_at = EXCLUDED.graded_at,
+              submission_status = EXCLUDED.submission_status,
+              deleted_at = NULL,
+              deleted_by = NULL
+          `,
+          [
+            columnId,
+            studentId,
+            resolvedScore,
+            decisionComment || null,
+            Number(req.session.user.id),
+          ]
+        );
+      }
+    });
+
+    logActivity(
+      db,
+      req,
+      'journal_appeal_update',
+      'journal_grade_appeal',
+      appealId,
+      {
+        subject_id: Number(column.subject_id),
+        column_id: columnId,
+        student_id: studentId,
+        status,
+        apply_resolved_score: applyResolvedScore,
+      },
+      Number(column.course_id || req.session.user.course_id || 1),
+      column.semester_id ? Number(column.semester_id) : null
+    );
+    return res.redirect(
+      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Апеляцію оновлено')}`
     );
   } catch (err) {
     return res.redirect('/journal?err=Database%20error');

@@ -21,6 +21,7 @@ const journalWeightedConfig = require('./020_journal_weighted_config');
 const journalGradeUndoAndLock = require('./021_journal_grade_undo_and_lock');
 const attendanceMvp = require('./022_attendance_mvp');
 const journalRetakeAttempts = require('./023_journal_retake_attempts');
+const journalGradeAppeals = require('./024_journal_grade_appeals');
 
 module.exports = [
   init,
@@ -46,4 +47,5 @@ module.exports = [
   journalGradeUndoAndLock,
   attendanceMvp,
   journalRetakeAttempts,
+  journalGradeAppeals,
 ];
