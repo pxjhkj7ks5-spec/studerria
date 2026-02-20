@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.9.58",
+      "date": "2026-02-20",
+      "items": [
+        "fix(admin-visit-analytics): repaired SLA renderer crash caused by invalid Array.isArray usage, restoring visit chart/top pages/roles/recent blocks",
+        "fix(admin-data-quality): restored checks table rendering (rows now read from payload array instead of boolean result)",
+        "fix(system-health): removed stray scheduler route closures that caused runtime \"schedulerIntervalMs is not defined\" incidents",
+        "improvement(system-health): refined open-incident window to 2 hours so stale one-off errors do not remain marked as open all day",
+        "hardening(admin-visit-analytics): SLA render failures are now isolated and no longer reset all visit analytics widgets"
+      ]
+    },
+    {
       "version": "0.9.57",
       "date": "2026-02-20",
       "items": [

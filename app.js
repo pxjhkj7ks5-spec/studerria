@@ -36,6 +36,7 @@ const buildStamp = new Date().toISOString();
 const SYSTEM_HEALTH_ERROR_EVENT_LIMIT = 400;
 const SYSTEM_HEALTH_ERROR_WINDOW_HOURS = 24;
 const SYSTEM_INCIDENT_WINDOW_HOURS = 72;
+const SYSTEM_INCIDENT_OPEN_HOURS = 2;
 const SYSTEM_INCIDENT_ITEM_LIMIT = 25;
 const runtimeErrorEvents = [];
 const schedulerHealthState = {
@@ -187,7 +188,7 @@ function buildIncidentFeed(now = Date.now()) {
     if (!Object.prototype.hasOwnProperty.call(bySeverity, item.severity)) return;
     bySeverity[item.severity] += 1;
   });
-  const openCutoff = now - (24 * 60 * 60 * 1000);
+  const openCutoff = now - (SYSTEM_INCIDENT_OPEN_HOURS * 60 * 60 * 1000);
   const openCount = items.filter((item) => {
     const ts = new Date(item.last_seen_at).getTime();
     if (!Number.isFinite(ts) || ts < openCutoff) return false;
@@ -20419,11 +20420,6 @@ app.post('/admin/api/scheduler/run', requireScheduleGeneratorSectionAccess, asyn
     return res.status(500).json({ error: 'Database error' });
   }
 });
-      }
-    );
-  });
-});
-});
 
 app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   try {
@@ -20947,7 +20943,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       LIMIT 30
     `;
 
-    const [summaryRow, dailyRows, topPagesRows, roleRows, recentRows, recentFallbackRows, homeworkSla] = await Promise.all([
+    const [summaryRow, dailyRows, topPagesRows, roleRows, recentRows, recentFallbackRows] = await Promise.all([
       db.get(
         `
           SELECT
@@ -21014,14 +21010,19 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       excludeAdmin
         ? db.all(recentFallbackSql, [courseId, sinceIso])
         : Promise.resolve([]),
-      buildAdminHomeworkReviewSla({
+    ]);
+    let homeworkSla = null;
+    try {
+      homeworkSla = await buildAdminHomeworkReviewSla({
         userId,
         courseId,
         semesterId: activeSemester ? Number(activeSemester.id) : null,
         roleKeys,
         now,
-      }),
-    ]);
+      });
+    } catch (err) {
+      homeworkSla = null;
+    }
 
     const dailyMap = new Map();
     (dailyRows || []).forEach((row) => {

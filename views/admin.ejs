@@ -4606,7 +4606,7 @@
           visitSlaMetricMaxWait.textContent = formatSlaWait(data && data.max_wait_hours);
         }
         if (!homeworkSlaBody) return;
-        const rows = Array.isArray(data && data.by_subject ? data.by_subject : [])
+        const rows = (Array.isArray(data && data.by_subject) ? data.by_subject : [])
           .filter((row) => Number(row && row.ungraded_total || 0) > 0 || Number(row && row.overdue_ungraded_total || 0) > 0);
         if (!rows.length) {
           homeworkSlaBody.innerHTML = '<tr><td colspan="5" class="text-muted">Неперевірених робіт понад SLA немає.</td></tr>';
@@ -4835,7 +4835,7 @@
         }
 
         if (!dataQualityBody) return;
-        const rows = Array.isArray(data && data.items ? data.items : []);
+        const rows = Array.isArray(data && data.items) ? data.items : [];
         if (!rows.length) {
           dataQualityBody.innerHTML = '<tr><td colspan="4" class="text-muted">Перевірки недоступні.</td></tr>';
           return;
@@ -5146,7 +5146,11 @@
             setVisitRecentHint('');
             renderVisitRecent(recentFilteredRows);
           }
-          renderHomeworkSla(data.homework_sla || null);
+          try {
+            renderHomeworkSla(data.homework_sla || null);
+          } catch (_err) {
+            renderHomeworkSla(null);
+          }
         } catch (err) {
           renderVisitTopPages([]);
           renderVisitRoles([]);
