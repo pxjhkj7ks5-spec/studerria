@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.64",
+      "date": "2026-02-20",
+      "items": [
+        "fix(my-day-footer): removed page-level footer overrides on My Day so footer now uses unified design-system styling and correct theme contrast",
+        "fix(my-day-footer): restored consistent app-footer spacing/border behavior with other platform pages"
+      ]
+    },
+    {
       "version": "0.9.63",
       "date": "2026-02-20",
       "items": [

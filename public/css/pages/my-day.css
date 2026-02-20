@@ -1299,30 +1299,6 @@ body.theme-light .reminder-input::placeholder {
   color: rgba(51, 65, 85, 0.48);
 }
 
-.app-footer {
-  border-top: 1px solid rgba(148, 163, 184, 0.2);
-  margin-top: 1.1rem;
-  padding-top: 1rem !important;
-}
-
-body.theme-light .app-footer {
-  border-top-color: rgba(15, 23, 42, 0.12);
-}
-
-.footer-meta,
-.footer-link,
-.footer-build,
-.footer-version {
-  color: var(--muted-dark);
-}
-
-body.theme-light .footer-meta,
-body.theme-light .footer-link,
-body.theme-light .footer-build,
-body.theme-light .footer-version {
-  color: var(--muted-light);
-}
-
 @media (max-width: 1200px) {
   .competency-hero {
     grid-template-columns: 1fr;
