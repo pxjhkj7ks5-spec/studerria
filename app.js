@@ -5141,7 +5141,14 @@ async function getActiveSemester(courseId) {
   const cached = cacheGet(referenceCache.activeSemester, courseId);
   if (cached) return cached;
   const row = await db.get(
-    'SELECT id, title, start_date, weeks_count, is_active, is_archived FROM semesters WHERE course_id = ? AND is_active = 1 ORDER BY id DESC LIMIT 1',
+    `
+      SELECT id, title, start_date, weeks_count, is_active, is_archived
+      FROM semesters
+      WHERE course_id = ?
+        AND COALESCE(LOWER(TRIM(CAST(is_active AS TEXT))), '0') IN ('1', 'true', 't')
+      ORDER BY id DESC
+      LIMIT 1
+    `,
     [courseId]
   );
   return cacheSet(referenceCache.activeSemester, courseId, row || null);
@@ -6444,7 +6451,14 @@ const parseDbIntegerArray = (value) => {
 
 const isDbSchemaCompatibilityError = (err) => {
   const code = String(err && err.code ? err.code : '').trim();
-  return code === '42P01' || code === '42703';
+  return (
+    code === '42P01' // undefined_table
+    || code === '42703' // undefined_column
+    || code === '42P10' // invalid_column_reference (e.g. ON CONFLICT without matching unique index)
+    || code === '42883' // undefined_function/operator (often bool vs int comparisons)
+    || code === '42804' // datatype_mismatch
+    || code === '22P02' // invalid_text_representation
+  );
 };
 
 const isDataQualityCompatibilityError = (err) => isDbSchemaCompatibilityError(err);
@@ -11587,7 +11601,8 @@ async function getStudentJournalSubjectOptions(userId) {
       FROM student_groups sg
       JOIN subjects s ON s.id = sg.subject_id
       JOIN courses c ON c.id = s.course_id
-      WHERE sg.student_id = ? AND s.visible = 1
+      WHERE sg.student_id = ?
+        AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
       ORDER BY c.id ASC, s.name ASC
     `,
     [userId]
@@ -11612,7 +11627,7 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
         SELECT s.id AS subject_id, s.name AS subject_name, s.group_count, s.course_id, c.name AS course_name
         FROM subjects s
         JOIN courses c ON c.id = s.course_id
-        WHERE s.visible = 1
+        WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
         ORDER BY c.id ASC, s.name ASC
       `
     );
@@ -11635,7 +11650,8 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
         FROM teacher_subjects ts
         JOIN subjects s ON s.id = ts.subject_id
         JOIN courses c ON c.id = s.course_id
-        WHERE ts.user_id = ? AND s.visible = 1
+        WHERE ts.user_id = ?
+          AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
         ORDER BY c.id ASC, s.name ASC
       `,
       [userId]
@@ -11874,7 +11890,9 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
 }
 
 async function getJournalStudents(subjectId, courseId, groupFilterSet = null, userFilterIds = []) {
-  const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
+  const activeUserFilter = usersHasIsActive
+    ? " AND COALESCE(LOWER(TRIM(CAST(u.is_active AS TEXT))), '1') IN ('1', 'true', 't')"
+    : '';
   const params = [subjectId, courseId];
   let sql = `
     SELECT DISTINCT u.id, u.full_name, sg.group_number
@@ -11908,7 +11926,9 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
 }
 
 async function getJournalStudentGroup(subjectId, studentId) {
-  const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
+  const activeUserFilter = usersHasIsActive
+    ? " AND COALESCE(LOWER(TRIM(CAST(u.is_active AS TEXT))), '1') IN ('1', 'true', 't')"
+    : '';
   return db.get(
     `
       SELECT sg.group_number
@@ -12715,6 +12735,63 @@ app.get('/journal', requireLogin, async (req, res) => {
       gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
     });
   } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      try {
+        if (res.locals && res.locals.messages && !res.locals.messages.error) {
+          res.locals.messages.error = 'Журнал тимчасово працює в режимі сумісності (оновіть структуру БД).';
+        }
+        return res.render('journal', {
+          username: req.session.user.username,
+          role: req.session.role,
+          subjects: [],
+          selectedSubject: null,
+          columns: [],
+          journalRows: [],
+          gradingSettings: { ...DEFAULT_SUBJECT_GRADING_SETTINGS },
+          attendanceContext: {
+            date: formatLocalDate(new Date()),
+            class_number: 1,
+            class_options: getAttendanceClassOptions(),
+            statuses: ATTENDANCE_STATUS_OPTIONS.map((status) => ATTENDANCE_STATUS_META[status]),
+            rows: [],
+            summary: {
+              present: 0,
+              late: 0,
+              absent: 0,
+              excused: 0,
+              unset: 0,
+              marked_total: 0,
+              students_total: 0,
+            },
+            student_summary: null,
+            reason_max_length: ATTENDANCE_REASON_MAX_LENGTH,
+            quick_current_slot: {
+              available: false,
+              class_date: formatLocalDate(new Date()),
+              class_number: null,
+              day_of_week: null,
+              start: '',
+              end: '',
+              label: '',
+              group_numbers: [],
+              is_selected: false,
+            },
+          },
+          canEditJournal: false,
+          canEditAttendance: false,
+          teacherJournalMode: false,
+          attendanceQuickAutoOpen: false,
+          canManageAllSubjects: false,
+          subjectClosure: null,
+          canCloseSubject: false,
+          selectedSemester: null,
+          undoGrade: null,
+          gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
+        });
+      } catch (_renderErr) {
+        return handleDbError(res, err, 'journal.page');
+      }
+    }
     return handleDbError(res, err, 'journal.page');
   }
 });

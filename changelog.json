@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.71",
+      "date": "2026-02-20",
+      "items": [
+        "fix(journal-compat): expanded legacy DB compatibility detector for journal queries (includes type/constraint mismatch codes like 42P10, 42883, 42804)",
+        "fix(journal): added last-resort compatibility render path for `/journal` so requests do not return 500 when DB schema is partially outdated"
+      ]
+    },
+    {
       "version": "0.9.70",
       "date": "2026-02-20",
       "items": [
