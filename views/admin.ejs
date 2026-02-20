@@ -1114,6 +1114,16 @@
                   <div class="small text-muted">Manual save · changes are applied after clicking “Save”.</div>
                 </div>
               </form>
+              <div class="mt-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                  <div class="fw-semibold">Audit + rollback</div>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-settings-audit-refresh>Refresh</button>
+                </div>
+                <div class="small text-muted mb-2">Останні зміни System Settings. Можна швидко відкотити попередній стан.</div>
+                <div id="settingsAuditList" class="table-responsive">
+                  <div class="small text-muted py-2">Loading…</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1136,6 +1146,16 @@
                 </div>
               </div>
               <div class="small text-muted mb-3">Застосуй шаблон, потім натисни “Зберегти роль” у потрібних ролях. Драфти зберігаються локально автоматично.</div>
+              <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                  <div class="fw-semibold">Audit + rollback</div>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-role-audit-refresh>Refresh</button>
+                </div>
+                <div class="small text-muted mb-2">Історія змін Role Studio (ролі, права, доступи курсів) з можливістю відкату.</div>
+                <div id="roleStudioAuditList" class="table-responsive">
+                  <div class="small text-muted py-2">Loading…</div>
+                </div>
+              </div>
               <form method="POST" action="/admin/rbac/roles/create" class="row g-2 align-items-end mb-4">
                 <div class="col-12 col-md-3">
                   <label class="form-label">Key</label>
@@ -4594,6 +4614,123 @@
 
         setDirtyState();
       }
+
+      const escapeAuditText = (value) =>
+        String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      const formatAuditDate = (value) => {
+        if (!value) return '—';
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return escapeAuditText(value);
+        return parsed.toLocaleString('uk-UA');
+      };
+      const renderAuditTable = (containerEl, entries, rollbackAction, confirmMessage) => {
+        if (!containerEl) return;
+        if (!Array.isArray(entries) || !entries.length) {
+          containerEl.innerHTML = '<div class="small text-muted py-2">Ще немає змін.</div>';
+          return;
+        }
+        const rowsHtml = entries.map((entry) => {
+          const summary = escapeAuditText(entry.summary || 'Оновлення');
+          const actor = escapeAuditText(entry.created_by_name || '—');
+          const createdAt = formatAuditDate(entry.created_at);
+          const target = [entry.target_type, entry.target_key].filter(Boolean).join(': ');
+          const targetText = target ? escapeAuditText(target) : '—';
+          const rolledBack = entry.is_rolled_back;
+          const rolledMeta = rolledBack
+            ? `${formatAuditDate(entry.rolled_back_at)}${entry.rolled_back_by_name ? ` · ${escapeAuditText(entry.rolled_back_by_name)}` : ''}`
+            : '';
+          const canRollback = !rolledBack && entry.can_rollback;
+          const rollbackButton = canRollback
+            ? `
+              <form method="POST" action="${rollbackAction}" class="d-inline">
+                <input type="hidden" name="audit_id" value="${Number(entry.id)}" />
+                <button
+                  class="btn btn-sm btn-outline-warning"
+                  type="submit"
+                  data-confirm="${escapeAuditText(confirmMessage)}"
+                  data-confirm-level="warning"
+                >
+                  Rollback
+                </button>
+              </form>
+            `
+            : `<span class="badge text-bg-${rolledBack ? 'secondary' : 'light'}">${rolledBack ? 'Rolled back' : 'No rollback'}</span>`;
+          return `
+            <tr>
+              <td>#${Number(entry.id)}</td>
+              <td>${summary}</td>
+              <td>${targetText}</td>
+              <td>${actor}</td>
+              <td>${createdAt}</td>
+              <td>${rolledBack ? rolledMeta : '—'}</td>
+              <td>${rollbackButton}</td>
+            </tr>
+          `;
+        }).join('');
+        containerEl.innerHTML = `
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Подія</th>
+                <th>Target</th>
+                <th>Хто</th>
+                <th>Коли</th>
+                <th>Rollback</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        `;
+      };
+      const loadSettingsAudit = async () => {
+        const container = document.getElementById('settingsAuditList');
+        if (!container) return;
+        container.innerHTML = '<div class="small text-muted py-2">Loading…</div>';
+        try {
+          const response = await fetch('/admin/audit/settings.json', {
+            headers: { Accept: 'application/json' },
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data && data.error ? data.error : 'Failed to load settings audit');
+          }
+          renderAuditTable(container, data.entries || [], '/admin/settings/rollback', 'Rollback this settings change?');
+        } catch (err) {
+          container.innerHTML = `<div class="small text-danger py-2">${escapeAuditText(err.message || 'Failed to load settings audit')}</div>`;
+        }
+      };
+      const loadRoleStudioAudit = async () => {
+        const container = document.getElementById('roleStudioAuditList');
+        if (!container) return;
+        container.innerHTML = '<div class="small text-muted py-2">Loading…</div>';
+        try {
+          const response = await fetch('/admin/audit/role-studio.json', {
+            headers: { Accept: 'application/json' },
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data && data.error ? data.error : 'Failed to load Role Studio audit');
+          }
+          renderAuditTable(container, data.entries || [], '/admin/role-studio/rollback', 'Rollback this Role Studio change?');
+        } catch (err) {
+          container.innerHTML = `<div class="small text-danger py-2">${escapeAuditText(err.message || 'Failed to load Role Studio audit')}</div>`;
+        }
+      };
+      document.querySelectorAll('[data-settings-audit-refresh]').forEach((btn) => {
+        btn.addEventListener('click', () => loadSettingsAudit());
+      });
+      document.querySelectorAll('[data-role-audit-refresh]').forEach((btn) => {
+        btn.addEventListener('click', () => loadRoleStudioAudit());
+      });
+      loadSettingsAudit();
+      loadRoleStudioAudit();
 
       const rbacRoleForms = Array.from(document.querySelectorAll('[data-rbac-role-form]'));
       const rbacTemplateButtons = Array.from(document.querySelectorAll('[data-rbac-template]'));

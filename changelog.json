@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "0.9.29",
+      "date": "2026-02-20",
+      "items": [
+        "feat(admin-audit): added audit trail storage for System Settings and Role Studio changes with snapshots before/after",
+        "feat(admin-audit-api): added /admin/audit/settings.json and /admin/audit/role-studio.json endpoints for latest change history",
+        "feat(admin-rollback): added rollback actions for settings, legacy role permissions, and RBAC roles (create/update/delete)",
+        "feat(db): added migration 025_admin_change_audit with indexed admin_change_audit table and rollback metadata",
+        "ux(admin): added Audit + rollback panels in Admin Settings and Role Studio with one-click rollback controls"
+      ]
+    },
+    {
       "version": "0.9.28",
       "date": "2026-02-20",
       "items": [

@@ -234,6 +234,20 @@ const DEFAULT_SETTINGS = {
 };
 let settingsCache = { ...DEFAULT_SETTINGS };
 const SESSION_DAY_MS = 24 * 60 * 60 * 1000;
+const ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS = 'system_settings';
+const ADMIN_AUDIT_SCOPE_ROLE_STUDIO = 'role_studio';
+const SYSTEM_SETTINGS_AUDIT_KEYS = [
+  'session_duration_days',
+  'max_file_size_mb',
+  'allow_homework_creation',
+  'min_team_members',
+  'allow_custom_deadlines',
+  'allow_messages',
+  'schedule_refresh_minutes',
+  'site_visit_retention_days',
+  'login_history_retention_days',
+  'activity_log_retention_days',
+];
 
 function resolveSessionTtlDays(rawDays) {
   const parsedDays = Number(rawDays);
@@ -2918,6 +2932,327 @@ function getStaffPanelBase(req, courseId) {
     return `/deanery?course=${courseId}`;
   }
   return `/admin?course=${courseId}`;
+}
+
+function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[key]) {
+  if (key === 'allow_homework_creation' || key === 'allow_custom_deadlines' || key === 'allow_messages') {
+    const normalized = String(rawValue).trim().toLowerCase();
+    if (['1', 'true', 'on', 'yes'].includes(normalized)) return true;
+    if (['0', 'false', 'off', 'no'].includes(normalized)) return false;
+    return Boolean(fallback);
+  }
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return Number(fallback || 0);
+  }
+  if (key === 'site_visit_retention_days') {
+    return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.site_visit_retention_days);
+  }
+  if (key === 'login_history_retention_days') {
+    return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.login_history_retention_days);
+  }
+  if (key === 'activity_log_retention_days') {
+    return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.activity_log_retention_days);
+  }
+  return Math.round(parsed);
+}
+
+function buildSystemSettingsAuditState(source = settingsCache) {
+  const snapshot = {};
+  SYSTEM_SETTINGS_AUDIT_KEYS.forEach((key) => {
+    snapshot[key] = normalizeAdminSettingValue(key, source ? source[key] : undefined, DEFAULT_SETTINGS[key]);
+  });
+  return snapshot;
+}
+
+async function persistSystemSettingsState(nextState) {
+  const stmt = db.prepare(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value'
+  );
+  const normalized = buildSystemSettingsAuditState(nextState || {});
+  SYSTEM_SETTINGS_AUDIT_KEYS.forEach((key) => {
+    const value = normalized[key];
+    if (typeof value === 'boolean') {
+      stmt.run(key, value ? 'true' : 'false');
+      return;
+    }
+    stmt.run(key, String(value));
+  });
+  await refreshSettingsCache();
+  return buildSystemSettingsAuditState(settingsCache);
+}
+
+function sanitizeLegacyRolePermissions(rawPermissions = {}) {
+  const allowedIds = new Set(ADMIN_SECTION_OPTIONS.map((item) => item.id));
+  const nextPermissions = {};
+  Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach((role) => {
+    const raw = rawPermissions[role];
+    const list = Array.isArray(raw)
+      ? raw
+      : typeof raw === 'string'
+        ? [raw]
+        : [];
+    nextPermissions[role] = list
+      .map((id) => String(id))
+      .filter((id) => allowedIds.has(id));
+  });
+  const restrictedForStaff = new Set([
+    'admin-settings',
+    'admin-role-access',
+    'admin-users',
+    'admin-students',
+    'admin-import-export',
+    'admin-schedule-generator',
+  ]);
+  ['teacher', 'student'].forEach((role) => {
+    if (!nextPermissions[role]) return;
+    nextPermissions[role] = nextPermissions[role].filter((id) => !restrictedForStaff.has(id));
+  });
+  return nextPermissions;
+}
+
+async function persistLegacyRolePermissions(nextPermissionsRaw) {
+  const normalized = sanitizeLegacyRolePermissions(nextPermissionsRaw || {});
+  await db.run(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
+    ['role_permissions', JSON.stringify(normalized)]
+  );
+  await refreshSettingsCache();
+  return sanitizeLegacyRolePermissions(settingsCache.role_permissions || normalized);
+}
+
+async function getRbacRoleStateByKey(roleKeyRaw) {
+  const roleKey = String(roleKeyRaw || '').trim().toLowerCase();
+  if (!roleKey) return null;
+  const roleRow = await db.get(
+    `
+      SELECT id, key, label, description, is_system, is_active
+      FROM access_roles
+      WHERE key = ?
+      LIMIT 1
+    `,
+    [roleKey]
+  );
+  if (!roleRow) return null;
+  const [permissionRows, courseRows] = await Promise.all([
+    db.all(
+      `
+        SELECT p.key
+        FROM access_role_permissions rp
+        JOIN access_permissions p ON p.id = rp.permission_id
+        WHERE rp.role_id = ? AND rp.allowed = true
+        ORDER BY p.key ASC
+      `,
+      [roleRow.id]
+    ),
+    db.all(
+      `
+        SELECT course_kind
+        FROM access_role_course_access
+        WHERE role_id = ? AND allowed = true
+        ORDER BY course_kind ASC
+      `,
+      [roleRow.id]
+    ),
+  ]);
+  return {
+    key: String(roleRow.key),
+    label: String(roleRow.label || ''),
+    description: String(roleRow.description || ''),
+    is_system: Number(roleRow.is_system) === 1 || roleRow.is_system === true,
+    is_active: Number(roleRow.is_active) === 1 || roleRow.is_active === true,
+    permission_keys: (permissionRows || []).map((row) => String(row.key)),
+    course_kinds: (courseRows || []).map((row) => String(row.course_kind)),
+  };
+}
+
+async function upsertRbacRoleState(client, state) {
+  const key = String(state && state.key ? state.key : '').trim().toLowerCase();
+  if (!key) {
+    throw new Error('Invalid role key in snapshot');
+  }
+  const normalizedCourseKinds = Array.from(new Set(
+    (Array.isArray(state.course_kinds) ? state.course_kinds : [])
+      .map((kind) => String(kind))
+      .filter((kind) => kind === 'regular' || kind === 'teacher')
+  ));
+  const roleCourseKinds = normalizedCourseKinds.length
+    ? normalizedCourseKinds
+    : (key === 'admin' ? ['regular', 'teacher'] : ['regular']);
+  const requestedPermissions = Array.from(new Set(
+    (Array.isArray(state.permission_keys) ? state.permission_keys : [])
+      .map((permissionKey) => String(permissionKey || '').trim())
+      .filter(Boolean)
+  ));
+  const validPermissionRows = await client.query(
+    `
+      SELECT key
+      FROM access_permissions
+      WHERE category IN ('admin_section', 'feature')
+    `
+  );
+  const validPermissionKeys = new Set((validPermissionRows.rows || []).map((row) => String(row.key)));
+  const rolePermissionKeys = requestedPermissions.filter((permissionKey) => validPermissionKeys.has(permissionKey));
+
+  const existingRow = await client.query(
+    `
+      SELECT id
+      FROM access_roles
+      WHERE key = $1
+      LIMIT 1
+    `,
+    [key]
+  );
+  let roleId = existingRow.rows && existingRow.rows[0] ? Number(existingRow.rows[0].id) : null;
+  const isSystem = Boolean(state && (state.is_system === true || Number(state.is_system) === 1));
+  const isActive = key === 'admin'
+    ? true
+    : Boolean(state && (state.is_active === true || Number(state.is_active) === 1));
+  const label = String(state && state.label ? state.label : key).trim() || key;
+  const description = String(state && state.description ? state.description : '').trim();
+
+  if (Number.isFinite(roleId) && roleId > 0) {
+    await client.query(
+      `
+        UPDATE access_roles
+        SET label = $1,
+            description = $2,
+            is_system = $3,
+            is_active = $4,
+            updated_at = NOW()
+        WHERE id = $5
+      `,
+      [label, description, isSystem, isActive, roleId]
+    );
+  } else {
+    const inserted = await client.query(
+      `
+        INSERT INTO access_roles (key, label, description, is_system, is_active, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+        RETURNING id
+      `,
+      [key, label, description, isSystem, isActive]
+    );
+    roleId = Number(inserted.rows[0].id);
+  }
+
+  await client.query('DELETE FROM access_role_permissions WHERE role_id = $1', [roleId]);
+  if (rolePermissionKeys.length) {
+    await client.query(
+      `
+        INSERT INTO access_role_permissions (role_id, permission_id, allowed, created_at, updated_at)
+        SELECT $1, p.id, true, NOW(), NOW()
+        FROM access_permissions p
+        WHERE p.key = ANY($2::text[])
+        ON CONFLICT (role_id, permission_id) DO NOTHING
+      `,
+      [roleId, rolePermissionKeys]
+    );
+  }
+
+  await client.query('DELETE FROM access_role_course_access WHERE role_id = $1', [roleId]);
+  await client.query(
+    `
+      INSERT INTO access_role_course_access (role_id, course_kind, allowed, created_at, updated_at)
+      SELECT $1, kind.kind, true, NOW(), NOW()
+      FROM (SELECT UNNEST($2::text[]) AS kind) kind
+      ON CONFLICT (role_id, course_kind) DO NOTHING
+    `,
+    [roleId, roleCourseKinds]
+  );
+}
+
+async function deleteRbacRoleByKey(client, roleKeyRaw) {
+  const roleKey = String(roleKeyRaw || '').trim().toLowerCase();
+  if (!roleKey) {
+    throw new Error('Invalid role key');
+  }
+  const roleRow = await client.query(
+    `
+      SELECT id, is_system
+      FROM access_roles
+      WHERE key = $1
+      LIMIT 1
+    `,
+    [roleKey]
+  );
+  const role = roleRow.rows && roleRow.rows[0] ? roleRow.rows[0] : null;
+  if (!role) return;
+  if (role.is_system === true || Number(role.is_system) === 1) {
+    throw new Error('Cannot delete system role');
+  }
+  const usageRow = await client.query(
+    `
+      SELECT COUNT(*)::int AS count
+      FROM user_roles
+      WHERE role_id = $1
+    `,
+    [role.id]
+  );
+  if (Number(usageRow.rows[0]?.count || 0) > 0) {
+    throw new Error('Role is assigned to users');
+  }
+  await client.query('DELETE FROM access_roles WHERE id = $1', [role.id]);
+}
+
+async function createAdminAuditEntry(req, {
+  scopeKey,
+  targetType,
+  targetKey = null,
+  summary = '',
+  beforeState = null,
+  afterState = null,
+  operationId = null,
+  courseId = null,
+}) {
+  const actorId = req && req.session && req.session.user ? Number(req.session.user.id) : null;
+  const actorName = req && req.session && req.session.user ? String(req.session.user.username || '') : '';
+  const row = await db.get(
+    `
+      INSERT INTO admin_change_audit
+      (
+        scope_key,
+        target_type,
+        target_key,
+        summary,
+        before_state,
+        after_state,
+        operation_id,
+        created_by,
+        created_by_name,
+        created_at,
+        course_id
+      )
+      VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?, NOW(), ?)
+      RETURNING id
+    `,
+    [
+      scopeKey,
+      targetType,
+      targetKey || null,
+      String(summary || '').trim() || null,
+      beforeState == null ? null : JSON.stringify(beforeState),
+      afterState == null ? null : JSON.stringify(afterState),
+      operationId || null,
+      Number.isFinite(actorId) ? actorId : null,
+      actorName || null,
+      Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+    ]
+  );
+  return row && row.id ? Number(row.id) : null;
+}
+
+async function markAdminAuditEntryRolledBack(auditId, req) {
+  await db.run(
+    `
+      UPDATE admin_change_audit
+      SET is_rolled_back = true,
+          rolled_back_by = ?,
+          rolled_back_at = NOW()
+      WHERE id = ?
+    `,
+    [Number(req?.session?.user?.id || 0) || null, Number(auditId)]
+  );
 }
 
 app.use((req, _res, next) => {
@@ -15255,6 +15590,8 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     return res.redirect('/admin?err=Invalid%20settings');
   }
   try {
+    const courseId = getAdminCourse(req);
+    const beforeState = buildSystemSettingsAuditState(settingsCache);
     const nextSettings = {
       session_duration_days: sessionDays,
       max_file_size_mb: maxFileSize,
@@ -15273,21 +15610,17 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
       }
       return acc;
     }, []);
-    const stmt = db.prepare(
-      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value'
-    );
-    stmt.run('session_duration_days', String(sessionDays));
-    stmt.run('max_file_size_mb', String(maxFileSize));
-    stmt.run('allow_homework_creation', allowHomework ? 'true' : 'false');
-    stmt.run('min_team_members', String(minTeamMembers));
-    stmt.run('allow_custom_deadlines', allowCustomDeadlines ? 'true' : 'false');
-    stmt.run('allow_messages', allowMessages ? 'true' : 'false');
-    stmt.run('schedule_refresh_minutes', String(scheduleRefreshMinutes));
-    stmt.run('site_visit_retention_days', String(nextSettings.site_visit_retention_days));
-    stmt.run('login_history_retention_days', String(nextSettings.login_history_retention_days));
-    stmt.run('activity_log_retention_days', String(nextSettings.activity_log_retention_days));
-    await refreshSettingsCache();
     const operationId = randomUUID();
+    const afterState = await persistSystemSettingsState(nextSettings);
+    await createAdminAuditEntry(req, {
+      scopeKey: ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS,
+      targetType: 'system_settings',
+      summary: 'System settings updated',
+      beforeState,
+      afterState,
+      operationId,
+      courseId,
+    });
     logAction(db, req, 'system_settings_update', {
       operation_id: operationId,
       changes,
@@ -15314,34 +15647,12 @@ app.post('/admin/role-access', requireRoleAccessSectionAccess, async (req, res) 
     return handleDbError(res, err, 'admin.roleAccess.init');
   }
   try {
-    const allowedIds = new Set(ADMIN_SECTION_OPTIONS.map((item) => item.id));
+    const courseId = getAdminCourse(req);
     const rolePermissions = req.body.role_permissions || {};
-    const nextPermissions = {};
-    Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach((role) => {
-      const raw = rolePermissions[role];
-      const list = Array.isArray(raw)
-        ? raw
-        : typeof raw === 'string'
-          ? [raw]
-          : [];
-      nextPermissions[role] = list
-        .map((id) => String(id))
-        .filter((id) => allowedIds.has(id));
-    });
-    const restrictedForStaff = new Set([
-      'admin-settings',
-      'admin-role-access',
-      'admin-users',
-      'admin-students',
-      'admin-import-export',
-      'admin-schedule-generator',
-    ]);
-    ['teacher', 'student'].forEach((role) => {
-      if (!nextPermissions[role]) return;
-      nextPermissions[role] = nextPermissions[role].filter((id) => !restrictedForStaff.has(id));
-    });
+    const beforeState = sanitizeLegacyRolePermissions(settingsCache.role_permissions || {});
+    const nextPermissions = sanitizeLegacyRolePermissions(rolePermissions);
 
-    const previous = settingsCache.role_permissions || {};
+    const previous = beforeState;
     const changes = [];
     Object.keys(nextPermissions).forEach((role) => {
       const prevList = new Set(previous[role] || []);
@@ -15353,11 +15664,17 @@ app.post('/admin/role-access', requireRoleAccessSectionAccess, async (req, res) 
       }
     });
     const operationId = randomUUID();
-    await db.run(
-      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
-      ['role_permissions', JSON.stringify(nextPermissions)]
-    );
-    await refreshSettingsCache();
+    const afterState = await persistLegacyRolePermissions(nextPermissions);
+    await createAdminAuditEntry(req, {
+      scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+      targetType: 'role_permissions',
+      targetKey: 'legacy',
+      summary: 'Role permissions updated',
+      beforeState,
+      afterState,
+      operationId,
+      courseId,
+    });
     logAction(db, req, 'role_access_update', {
       operation_id: operationId,
       changes,
@@ -15365,6 +15682,273 @@ app.post('/admin/role-access', requireRoleAccessSectionAccess, async (req, res) 
     return res.redirect(`/admin?ok=Role%20access%20saved&op=${operationId}`);
   } catch (err) {
     return handleDbError(res, err, 'admin.roleAccess.save');
+  }
+});
+
+const parseAuditState = (rawState) => {
+  if (rawState == null) return null;
+  if (typeof rawState === 'object') return rawState;
+  if (typeof rawState !== 'string') return null;
+  try {
+    return JSON.parse(rawState);
+  } catch (err) {
+    return null;
+  }
+};
+
+app.get('/admin/audit/settings.json', requireSettingsSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.audit.settings.init');
+  }
+  try {
+    const courseId = getAdminCourse(req);
+    const rows = await db.all(
+      `
+        SELECT
+          a.id,
+          a.target_type,
+          a.target_key,
+          a.summary,
+          a.operation_id,
+          a.created_by_name,
+          a.created_at,
+          a.is_rolled_back,
+          a.rolled_back_at,
+          ur.full_name AS rolled_back_by_name,
+          (a.before_state IS NOT NULL) AS can_rollback
+        FROM admin_change_audit a
+        LEFT JOIN users ur ON ur.id = a.rolled_back_by
+        WHERE a.scope_key = ?
+          AND (a.course_id = ? OR a.course_id IS NULL)
+        ORDER BY a.created_at DESC, a.id DESC
+        LIMIT 20
+      `,
+      [ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS, courseId]
+    );
+    const entries = (rows || []).map((row) => ({
+      id: Number(row.id),
+      target_type: String(row.target_type || ''),
+      target_key: row.target_key ? String(row.target_key) : '',
+      summary: String(row.summary || 'System settings update'),
+      operation_id: row.operation_id ? String(row.operation_id) : '',
+      created_by_name: row.created_by_name ? String(row.created_by_name) : '',
+      created_at: row.created_at || null,
+      is_rolled_back: row.is_rolled_back === true || Number(row.is_rolled_back) === 1,
+      rolled_back_at: row.rolled_back_at || null,
+      rolled_back_by_name: row.rolled_back_by_name ? String(row.rolled_back_by_name) : '',
+      can_rollback: row.can_rollback === true || Number(row.can_rollback) === 1,
+    }));
+    return res.json({ entries });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/admin/audit/role-studio.json', requireRoleAccessSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.audit.roleStudio.init');
+  }
+  try {
+    const courseId = getAdminCourse(req);
+    const rows = await db.all(
+      `
+        SELECT
+          a.id,
+          a.target_type,
+          a.target_key,
+          a.summary,
+          a.operation_id,
+          a.created_by_name,
+          a.created_at,
+          a.is_rolled_back,
+          a.rolled_back_at,
+          ur.full_name AS rolled_back_by_name,
+          (a.before_state IS NOT NULL) AS can_rollback
+        FROM admin_change_audit a
+        LEFT JOIN users ur ON ur.id = a.rolled_back_by
+        WHERE a.scope_key = ?
+          AND (a.course_id = ? OR a.course_id IS NULL)
+        ORDER BY a.created_at DESC, a.id DESC
+        LIMIT 30
+      `,
+      [ADMIN_AUDIT_SCOPE_ROLE_STUDIO, courseId]
+    );
+    const entries = (rows || []).map((row) => ({
+      id: Number(row.id),
+      target_type: String(row.target_type || ''),
+      target_key: row.target_key ? String(row.target_key) : '',
+      summary: String(row.summary || 'Role Studio update'),
+      operation_id: row.operation_id ? String(row.operation_id) : '',
+      created_by_name: row.created_by_name ? String(row.created_by_name) : '',
+      created_at: row.created_at || null,
+      is_rolled_back: row.is_rolled_back === true || Number(row.is_rolled_back) === 1,
+      rolled_back_at: row.rolled_back_at || null,
+      rolled_back_by_name: row.rolled_back_by_name ? String(row.rolled_back_by_name) : '',
+      can_rollback: row.can_rollback === true || Number(row.can_rollback) === 1,
+    }));
+    return res.json({ entries });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/admin/settings/rollback', requireSettingsSectionAccess, async (req, res) => {
+  const auditId = Number(req.body.audit_id);
+  if (!Number.isFinite(auditId) || auditId < 1) {
+    return res.redirect('/admin?tab=admin-settings&err=Invalid%20audit%20entry');
+  }
+  try {
+    await ensureDbReady();
+    const courseId = getAdminCourse(req);
+    const auditRow = await db.get(
+      `
+        SELECT id, target_type, before_state, after_state
+        FROM admin_change_audit
+        WHERE id = ?
+          AND scope_key = ?
+          AND (course_id = ? OR course_id IS NULL)
+        LIMIT 1
+      `,
+      [auditId, ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS, courseId]
+    );
+    if (!auditRow) {
+      return res.redirect('/admin?tab=admin-settings&err=Audit%20entry%20not%20found');
+    }
+    if (String(auditRow.target_type || '') !== 'system_settings') {
+      return res.redirect('/admin?tab=admin-settings&err=Unsupported%20audit%20target');
+    }
+    const rollbackStateRaw = parseAuditState(auditRow.before_state);
+    if (!rollbackStateRaw || typeof rollbackStateRaw !== 'object') {
+      return res.redirect('/admin?tab=admin-settings&err=Rollback%20snapshot%20is%20invalid');
+    }
+
+    const beforeRollbackState = buildSystemSettingsAuditState(settingsCache);
+    const rollbackState = buildSystemSettingsAuditState(rollbackStateRaw);
+    const operationId = randomUUID();
+    const afterRollbackState = await persistSystemSettingsState(rollbackState);
+    await markAdminAuditEntryRolledBack(auditId, req);
+    await createAdminAuditEntry(req, {
+      scopeKey: ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS,
+      targetType: 'system_settings',
+      summary: `Rollback from audit #${auditId}`,
+      beforeState: beforeRollbackState,
+      afterState: afterRollbackState,
+      operationId,
+      courseId,
+    });
+    logAction(db, req, 'system_settings_rollback', {
+      operation_id: operationId,
+      audit_id: auditId,
+    });
+    return res.redirect(`/admin?tab=admin-settings&ok=Settings%20rollback%20applied&op=${operationId}`);
+  } catch (err) {
+    return res.redirect('/admin?tab=admin-settings&err=Database%20error');
+  }
+});
+
+app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (req, res) => {
+  const auditId = Number(req.body.audit_id);
+  if (!Number.isFinite(auditId) || auditId < 1) {
+    return res.redirect('/admin?tab=admin-role-studio&err=Invalid%20audit%20entry');
+  }
+  try {
+    await ensureDbReady();
+    const courseId = getAdminCourse(req);
+    const auditRow = await db.get(
+      `
+        SELECT id, target_type, target_key, before_state, after_state
+        FROM admin_change_audit
+        WHERE id = ?
+          AND scope_key = ?
+          AND (course_id = ? OR course_id IS NULL)
+        LIMIT 1
+      `,
+      [auditId, ADMIN_AUDIT_SCOPE_ROLE_STUDIO, courseId]
+    );
+    if (!auditRow) {
+      return res.redirect('/admin?tab=admin-role-studio&err=Audit%20entry%20not%20found');
+    }
+    const targetType = String(auditRow.target_type || '');
+    const targetKey = String(auditRow.target_key || '').trim().toLowerCase();
+    const rollbackState = parseAuditState(auditRow.before_state);
+    const afterState = parseAuditState(auditRow.after_state);
+    const operationId = randomUUID();
+
+    if (targetType === 'role_permissions') {
+      if (!rollbackState || typeof rollbackState !== 'object') {
+        return res.redirect('/admin?tab=admin-role-studio&err=Rollback%20snapshot%20is%20invalid');
+      }
+      const beforeRollbackState = sanitizeLegacyRolePermissions(settingsCache.role_permissions || {});
+      const appliedState = await persistLegacyRolePermissions(rollbackState);
+      await markAdminAuditEntryRolledBack(auditId, req);
+      await createAdminAuditEntry(req, {
+        scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+        targetType: 'role_permissions',
+        targetKey: 'legacy',
+        summary: `Rollback from audit #${auditId}`,
+        beforeState: beforeRollbackState,
+        afterState: appliedState,
+        operationId,
+        courseId,
+      });
+      logAction(db, req, 'role_permissions_rollback', {
+        operation_id: operationId,
+        audit_id: auditId,
+      });
+      broadcast('users_updated');
+      return res.redirect(`/admin?tab=admin-role-studio&ok=Role%20Studio%20rollback%20applied&op=${operationId}`);
+    }
+
+    if (targetType === 'rbac_role') {
+      if (!targetKey) {
+        return res.redirect('/admin?tab=admin-role-studio&err=Invalid%20audit%20target%20key');
+      }
+      const beforeRollbackState = await getRbacRoleStateByKey(targetKey);
+      if (!rollbackState && !afterState) {
+        return res.redirect('/admin?tab=admin-role-studio&err=Rollback%20snapshot%20is%20empty');
+      }
+      await withTransaction(async (client) => {
+        if (!rollbackState && afterState) {
+          await deleteRbacRoleByKey(client, targetKey);
+          return;
+        }
+        await upsertRbacRoleState(client, rollbackState);
+      });
+      const appliedState = await getRbacRoleStateByKey(targetKey);
+      await markAdminAuditEntryRolledBack(auditId, req);
+      await createAdminAuditEntry(req, {
+        scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+        targetType: 'rbac_role',
+        targetKey,
+        summary: `Rollback from audit #${auditId}`,
+        beforeState: beforeRollbackState,
+        afterState: appliedState,
+        operationId,
+        courseId,
+      });
+      logAction(db, req, 'rbac_role_rollback', {
+        operation_id: operationId,
+        audit_id: auditId,
+        role_key: targetKey,
+      });
+      broadcast('users_updated');
+      return res.redirect(`/admin?tab=admin-role-studio&ok=Role%20Studio%20rollback%20applied&op=${operationId}`);
+    }
+
+    return res.redirect('/admin?tab=admin-role-studio&err=Unsupported%20rollback%20target');
+  } catch (err) {
+    const message = String(err && err.message ? err.message : '');
+    if (message.includes('Role is assigned to users')) {
+      return res.redirect('/admin?tab=admin-role-studio&err=Cannot%20rollback:%20role%20is%20assigned%20to%20users');
+    }
+    if (message.includes('Cannot delete system role')) {
+      return res.redirect('/admin?tab=admin-role-studio&err=Cannot%20rollback:%20system%20role%20delete%20blocked');
+    }
+    return res.redirect('/admin?tab=admin-role-studio&err=Database%20error');
   }
 });
 
@@ -19019,6 +19603,7 @@ app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, async (req,
   }
   try {
     await ensureDbReady();
+    const courseId = getAdminCourse(req);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -19065,11 +19650,27 @@ app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, async (req,
         );
       }
       await client.query('COMMIT');
+      const afterState = await getRbacRoleStateByKey(key);
+      const operationId = randomUUID();
+      await createAdminAuditEntry(req, {
+        scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+        targetType: 'rbac_role',
+        targetKey: key,
+        summary: `Role created: ${key}`,
+        beforeState: null,
+        afterState,
+        operationId,
+        courseId,
+      });
       logAction(db, req, 'rbac_role_create', { key, label, clone_from: cloneFrom || null });
       broadcast('users_updated');
-      return res.redirect('/admin?ok=Role%20created');
+      return res.redirect(`/admin?tab=admin-role-studio&ok=Role%20created&op=${operationId}`);
     } catch (err) {
-      await client.query('ROLLBACK');
+      try {
+        await client.query('ROLLBACK');
+      } catch (_) {
+        // ignore rollback error when transaction is already committed
+      }
       if (err && err.code === '23505') {
         return res.redirect('/admin?err=Role%20key%20already%20exists');
       }
@@ -19106,6 +19707,8 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
   }
   try {
     await ensureDbReady();
+    const courseId = getAdminCourse(req);
+    const beforeState = await getRbacRoleStateByKey(roleKey);
     const roleRow = await db.get('SELECT id, key, is_system FROM access_roles WHERE key = ?', [roleKey]);
     if (!roleRow) {
       return res.redirect('/admin?err=Role%20not%20found');
@@ -19159,6 +19762,18 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
         [roleRow.id, courseKinds]
       );
       await client.query('COMMIT');
+      const afterState = await getRbacRoleStateByKey(roleRow.key);
+      const operationId = randomUUID();
+      await createAdminAuditEntry(req, {
+        scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+        targetType: 'rbac_role',
+        targetKey: roleRow.key,
+        summary: `Role updated: ${roleRow.key}`,
+        beforeState,
+        afterState,
+        operationId,
+        courseId,
+      });
       logAction(db, req, 'rbac_role_update', {
         key: roleRow.key,
         label,
@@ -19167,9 +19782,13 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
         course_kinds: courseKinds,
       });
       broadcast('users_updated');
-      return res.redirect('/admin?ok=Role%20updated');
+      return res.redirect(`/admin?tab=admin-role-studio&ok=Role%20updated&op=${operationId}`);
     } catch (err) {
-      await client.query('ROLLBACK');
+      try {
+        await client.query('ROLLBACK');
+      } catch (_) {
+        // ignore rollback error when transaction is already committed
+      }
       return res.redirect('/admin?err=Database%20error');
     } finally {
       client.release();
@@ -19186,6 +19805,8 @@ app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async 
   }
   try {
     await ensureDbReady();
+    const courseId = getAdminCourse(req);
+    const beforeState = await getRbacRoleStateByKey(roleKey);
     const roleRow = await db.get('SELECT id, key, is_system FROM access_roles WHERE key = ?', [roleKey]);
     if (!roleRow) {
       return res.redirect('/admin?err=Role%20not%20found');
@@ -19198,9 +19819,20 @@ app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async 
       return res.redirect('/admin?err=Role%20is%20assigned%20to%20users');
     }
     await db.run('DELETE FROM access_roles WHERE id = ?', [roleRow.id]);
+    const operationId = randomUUID();
+    await createAdminAuditEntry(req, {
+      scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+      targetType: 'rbac_role',
+      targetKey: roleRow.key,
+      summary: `Role deleted: ${roleRow.key}`,
+      beforeState,
+      afterState: null,
+      operationId,
+      courseId,
+    });
     logAction(db, req, 'rbac_role_delete', { key: roleRow.key });
     broadcast('users_updated');
-    return res.redirect('/admin?ok=Role%20deleted');
+    return res.redirect(`/admin?tab=admin-role-studio&ok=Role%20deleted&op=${operationId}`);
   } catch (err) {
     return res.redirect('/admin?err=Database%20error');
   }
