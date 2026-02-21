@@ -13192,11 +13192,26 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
     let closeCompatibilityMode = false;
     await withTransaction(async (client) => {
       const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
+      let savepointCounter = 0;
       const runCompatibilityQuery = async (sql, params = []) => {
+        savepointCounter += 1;
+        const savepointName = `journal_close_sp_${savepointCounter}`;
+        await client.query(`SAVEPOINT ${savepointName}`);
         try {
           await query(sql, params);
+          await client.query(`RELEASE SAVEPOINT ${savepointName}`);
           return true;
         } catch (err) {
+          try {
+            await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          } catch (_rollbackErr) {
+            // Ignore savepoint rollback failures and rely on outer transaction rollback if needed.
+          }
+          try {
+            await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+          } catch (_releaseErr) {
+            // Ignore release failures after rollback.
+          }
           if (!isDbSchemaCompatibilityError(err)) {
             throw err;
           }
@@ -13205,7 +13220,7 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
         }
       };
 
-      await runCompatibilityQuery(
+      const buildSubjectCloseUpsertSql = (closedLiteral) => (
         `
           INSERT INTO subject_grading_settings
           (
@@ -13217,41 +13232,56 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
             is_closed, closed_by, closed_at,
             created_by, created_at, updated_by, updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 100, 1, ?, NOW(), ?, NOW(), ?, NOW())
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 100, ${closedLiteral}, ?, NOW(), ?, NOW(), ?, NOW())
           ON CONFLICT (subject_id)
           DO UPDATE SET
             course_id = EXCLUDED.course_id,
             semester_id = EXCLUDED.semester_id,
-            is_closed = 1,
+            is_closed = ${closedLiteral},
             closed_by = EXCLUDED.closed_by,
             closed_at = EXCLUDED.closed_at,
             updated_by = EXCLUDED.updated_by,
             updated_at = EXCLUDED.updated_at
-        `,
-        [
-          subjectId,
-          selectedCourseId,
-          semesterId,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.homework_enabled,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_enabled,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.exam_enabled,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.credit_enabled,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.custom_enabled,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.homework_weight_points,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_weight_points,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.exam_weight_points,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.credit_weight_points,
-          DEFAULT_SUBJECT_GRADING_SETTINGS.custom_weight_points,
-          actorUserId,
-          actorUserId,
-          actorUserId,
-        ]
+        `
       );
+
+      const closeUpsertParams = [
+        subjectId,
+        selectedCourseId,
+        semesterId,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.homework_enabled,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_enabled,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.exam_enabled,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.credit_enabled,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.custom_enabled,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.homework_max_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_max_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.exam_max_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.credit_max_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.custom_max_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.homework_weight_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.seminar_weight_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.exam_weight_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.credit_weight_points,
+        DEFAULT_SUBJECT_GRADING_SETTINGS.custom_weight_points,
+        actorUserId,
+        actorUserId,
+        actorUserId,
+      ];
+
+      let closeUpsertApplied = await runCompatibilityQuery(
+        buildSubjectCloseUpsertSql('TRUE'),
+        closeUpsertParams
+      );
+      if (!closeUpsertApplied) {
+        closeUpsertApplied = await runCompatibilityQuery(
+          buildSubjectCloseUpsertSql('1'),
+          closeUpsertParams
+        );
+      }
+      if (!closeUpsertApplied) {
+        closeCompatibilityMode = true;
+      }
 
       const buildLockWhereClause = ({ withSemester = true, withArchived = true } = {}) => {
         const conditions = [

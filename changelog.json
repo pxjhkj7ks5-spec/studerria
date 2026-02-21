@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.81",
+      "date": "2026-02-21",
+      "items": [
+        "fix(journal-close): close subject transaction now uses SAVEPOINT-based compatibility steps so fallback SQL no longer aborts the whole transaction",
+        "fix(journal-close): subject_grading_settings close upsert now tries boolean is_closed first (TRUE) with integer fallback for legacy schemas",
+        "fix(journal-close): prevented Cloud SQL error \"column is_closed is of type boolean but expression is of type integer\" during close action"
+      ]
+    },
+    {
       "version": "0.9.80",
       "date": "2026-02-21",
       "items": [
