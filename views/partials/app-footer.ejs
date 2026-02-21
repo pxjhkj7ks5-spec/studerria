@@ -1,5 +1,11 @@
+<%
+  const footerMetaClassList = ['footer-meta'];
+  if (typeof footerMetaClass === 'string' && footerMetaClass.trim()) {
+    footerMetaClassList.push(footerMetaClass.trim());
+  }
+%>
 <footer class="app-footer text-center py-4">
-  <small class="footer-meta">
+  <small class="<%= footerMetaClassList.join(' ') %>">
     <span class="footer-version">v<%= appVersion %></span>
     <button
       type="button"

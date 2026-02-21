@@ -189,15 +189,6 @@
           border-radius: 16px;
         }
       }
-      .app-footer {
-        font-size: 0.8rem;
-      }
-      body.theme-dark .app-footer {
-        color: rgba(255, 255, 255, 0.6);
-      }
-      body.theme-light .app-footer {
-        color: rgba(15, 23, 42, 0.6);
-      }
       :root {
         --radius-lg: 20px;
         --radius-md: 14px;
@@ -393,7 +384,7 @@
               </form>
             </div>
           </div>
-          <%- include('partials/app-footer') %>
+          <%- include('partials/app-footer', { footerMetaClass: 'glass-dock' }) %>
         </div>
       </div>
     </div>

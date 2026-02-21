@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.79",
+      "date": "2026-02-21",
+      "items": [
+        "fix(my-day-changelog): loaded shared design-system styles on My Day so changelog modal uses correct contrast and liquid sheet styling",
+        "fix(footer-partial): app footer now supports optional extra class for consistent dock style on specific pages",
+        "fix(login-footer): applied shared glass-dock footer meta style on login page and removed local footer overrides"
+      ]
+    },
+    {
       "version": "0.9.78",
       "date": "2026-02-21",
       "items": [
