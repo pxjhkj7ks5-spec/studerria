@@ -12102,9 +12102,9 @@ async function buildJournalAttendanceContext({
             ${semesterFilter.clause}
             AND ar.class_date = ?
             AND ar.class_number = ?
-            AND ar.student_id IN (${studentIds.map(() => '?').join(',')})
+            AND ar.student_id = ANY(?::int[])
         `,
-        [subjectId, courseId, ...semesterFilter.params, normalizedDate, normalizedClassNumber, ...studentIds]
+        [subjectId, courseId, ...semesterFilter.params, normalizedDate, normalizedClassNumber, studentIds]
       );
       recordsByStudentId = new Map(
         (rows || []).map((row) => [
@@ -12472,11 +12472,11 @@ async function buildJournalMatrix({
           LEFT JOIN journal_grade_moderations jgm
             ON jgm.column_id = jg.column_id
            AND jgm.student_id = jg.student_id
-          WHERE jg.column_id IN (${columnIds.map(() => '?').join(',')})
-            AND jg.student_id IN (${studentIds.map(() => '?').join(',')})
+          WHERE jg.column_id = ANY(?::int[])
+            AND jg.student_id = ANY(?::int[])
             AND jg.deleted_at IS NULL
         `,
-        [...columnIds, ...studentIds]
+        [columnIds, studentIds]
       );
     } catch (err) {
       if (!isDbSchemaCompatibilityError(err)) {
@@ -12494,10 +12494,10 @@ async function buildJournalMatrix({
               jg.graded_at,
               jg.graded_by
             FROM journal_grades jg
-            WHERE jg.column_id IN (${columnIds.map(() => '?').join(',')})
-              AND jg.student_id IN (${studentIds.map(() => '?').join(',')})
+            WHERE jg.column_id = ANY(?::int[])
+              AND jg.student_id = ANY(?::int[])
           `,
-          [...columnIds, ...studentIds]
+          [columnIds, studentIds]
         );
       } catch (legacyErr) {
         if (!isDbSchemaCompatibilityError(legacyErr)) {
@@ -12579,10 +12579,10 @@ async function buildJournalMatrix({
         `
           SELECT homework_id, student_id, submission_text, link_url, file_path, file_name, submitted_at, updated_at
           FROM homework_submissions
-          WHERE homework_id IN (${homeworkIds.map(() => '?').join(',')})
-            AND student_id IN (${studentIds.map(() => '?').join(',')})
+          WHERE homework_id = ANY(?::int[])
+            AND student_id = ANY(?::int[])
         `,
-        [...homeworkIds, ...studentIds]
+        [homeworkIds, studentIds]
       );
     } catch (err) {
       if (!isDbSchemaCompatibilityError(err)) {
@@ -21009,6 +21009,22 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
     return handleDbError(res, err, 'admin.scheduleGenerator.publish');
   }
   const runId = Number(req.params.runId);
+  const buildPreviewRedirect = (message) => {
+    const params = new URLSearchParams();
+    const courseId = Number(req.body.course_id);
+    const week = Number(req.body.week);
+    if (Number.isFinite(courseId) && courseId > 0) {
+      params.set('course', String(courseId));
+    }
+    if (Number.isFinite(week) && week > 0) {
+      params.set('week', String(week));
+    }
+    if (message) {
+      params.set('err', String(message));
+    }
+    const query = params.toString();
+    return `/admin/schedule-generator/${runId}/preview${query ? `?${query}` : ''}`;
+  };
   if (!Number.isFinite(runId) || runId <= 0) {
     return res.redirect('/admin/schedule-generator?err=Invalid%20run');
   }
@@ -21020,7 +21036,7 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
     const lastOperationId = config && config.last_stats ? config.last_stats.operation_id : null;
     const requestedOperationId = String(req.body.operation_id || '').trim();
     if (lastOperationId && requestedOperationId && lastOperationId !== requestedOperationId) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Preview%20outdated`);
+      return res.redirect(buildPreviewRedirect('Preview outdated'));
     }
     const operationId = requestedOperationId || lastOperationId || randomUUID();
     const entries = await db.all(
@@ -21032,18 +21048,18 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
       [runId]
     );
     if (!entries.length) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20entries`);
+      return res.redirect(buildPreviewRedirect('No entries'));
     }
     const diffResult = await buildScheduleDiff(entries);
     const overwriteCount = diffResult.diff.overwrite;
     const confirmOverwrite = String(req.body.confirm_overwrite || '') === '1' || String(req.body.confirm_overwrite || '') === 'on';
     if (!confirmOverwrite) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Confirm%20overwrite`);
+      return res.redirect(buildPreviewRedirect('Confirm overwrite'));
     }
     const requiresTyped = overwriteCount > IMPORT_CONFIRM_THRESHOLD;
     const confirmPhrase = String(req.body.confirm_phrase || '').trim().toUpperCase();
     if (requiresTyped && confirmPhrase !== 'PUBLISH') {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Type%20PUBLISH%20to%20confirm`);
+      return res.redirect(buildPreviewRedirect('Type PUBLISH to confirm'));
     }
 
     let backupInfo = null;

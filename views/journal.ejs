@@ -840,28 +840,6 @@
                     <button class="btn btn-sm btn-outline-info" type="submit" id="journalCompetencyChecklistSubmitBtn">Зберегти +1/+0</button>
                   </div>
                 </form>
-                <form id="journalCompetencyCreateForm" method="POST" action="/journal/competency/add" class="journal-competency-create-form mt-3" autocomplete="off">
-                  <input type="hidden" name="column_id" id="journalCompetencyCreateColumnId" />
-                  <input type="hidden" name="student_id" id="journalCompetencyCreateStudentId" />
-                  <div class="small text-muted mb-2">Додатковий ручний сигнал (0-5), якщо потрібно точніше оцінити конкретну компетентність.</div>
-                  <div class="row g-2 align-items-end">
-                    <div class="col-12 col-md-5">
-                      <label class="form-label form-label-sm mb-1">Компетенція</label>
-                      <select class="form-select form-select-sm" name="competency_key" id="journalCompetencyCreateKey"></select>
-                    </div>
-                    <div class="col-12 col-md-3">
-                      <label class="form-label form-label-sm mb-1">Оцінка (0-5)</label>
-                      <input class="form-control form-control-sm" type="number" step="0.1" min="0" max="5" name="score" id="journalCompetencyCreateScore" required />
-                    </div>
-                    <div class="col-12 col-md-4">
-                      <button class="btn btn-sm btn-outline-info w-100" type="submit" id="journalCompetencyCreateSubmitBtn">Додати сигнал</button>
-                    </div>
-                  </div>
-                  <div class="mt-2">
-                    <label class="form-label form-label-sm mb-1">Нотатка (опц.)</label>
-                    <textarea class="form-control form-control-sm" name="note" id="journalCompetencyCreateNote" rows="2" maxlength="1200" placeholder="Що саме відмічаєте в роботі"></textarea>
-                  </div>
-                </form>
               <% } %>
             </section>
             <form id="journalGradeForm" method="POST" action="/journal/grades/save" autocomplete="off">
@@ -1093,13 +1071,6 @@
       const competencyChecklistStudentInput = document.getElementById('journalCompetencyChecklistStudentId');
       const competencyChecklistGridEl = document.getElementById('journalCompetencyChecklistGrid');
       const competencyChecklistSubmitBtn = document.getElementById('journalCompetencyChecklistSubmitBtn');
-      const competencyCreateForm = document.getElementById('journalCompetencyCreateForm');
-      const competencyCreateColumnInput = document.getElementById('journalCompetencyCreateColumnId');
-      const competencyCreateStudentInput = document.getElementById('journalCompetencyCreateStudentId');
-      const competencyCreateKeyInput = document.getElementById('journalCompetencyCreateKey');
-      const competencyCreateScoreInput = document.getElementById('journalCompetencyCreateScore');
-      const competencyCreateNoteInput = document.getElementById('journalCompetencyCreateNote');
-      const competencyCreateSubmitBtn = document.getElementById('journalCompetencyCreateSubmitBtn');
 
       const bulkModalEl = document.getElementById('journalBulkModal');
       const bulkModal = bulkModalEl && window.bootstrap ? new window.bootstrap.Modal(bulkModalEl) : null;
@@ -1158,6 +1129,49 @@
         const parsed = new Date(value);
         if (Number.isNaN(parsed.getTime())) return String(value);
         return parsed.toLocaleString('uk-UA');
+      };
+      const getMessageFromUrl = (urlValue, key) => {
+        if (!urlValue) return '';
+        try {
+          const parsed = new URL(urlValue, window.location.origin);
+          const value = parsed.searchParams.get(key);
+          return value ? String(value) : '';
+        } catch (_err) {
+          return '';
+        }
+      };
+      const submitAndRefreshCell = async (formEl, pendingLabel) => {
+        if (!formEl || !currentCellColumnId || !currentCellStudentId) return;
+        const submitBtn = formEl.querySelector('button[type="submit"]');
+        const previousLabel = submitBtn ? submitBtn.textContent : '';
+        const wasDisabled = submitBtn ? submitBtn.disabled : false;
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          if (pendingLabel) submitBtn.textContent = pendingLabel;
+        }
+        try {
+          const response = await fetch(formEl.action, {
+            method: String(formEl.method || 'POST').toUpperCase(),
+            body: new FormData(formEl),
+            credentials: 'same-origin',
+          });
+          if (!response.ok) {
+            throw new Error('Помилка збереження');
+          }
+          const errMessage = getMessageFromUrl(response.url, 'err');
+          if (errMessage) {
+            throw new Error(errMessage);
+          }
+          await openJournalCell(currentCellColumnId, currentCellStudentId);
+        } catch (err) {
+          const message = String(err && err.message ? err.message : 'Помилка збереження');
+          window.alert(message);
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = wasDisabled;
+            submitBtn.textContent = previousLabel || submitBtn.textContent;
+          }
+        }
       };
       const getRetakeStatusChipClass = (statusKey) => {
         const key = String(statusKey || '').toLowerCase();
@@ -1706,9 +1720,6 @@
         const definitions = Array.isArray(competencyMeta.definitions) ? competencyMeta.definitions : [];
         const signals = Array.isArray(data && data.competency_signals) ? data.competency_signals : [];
         const canAdd = Boolean(canEditJournal && data && data.can_add_competency_signal);
-        const scoreMin = Number(competencyMeta.score_min ?? 0);
-        const scoreMax = Number(competencyMeta.score_max ?? 5);
-        const noteMaxLength = Number(competencyMeta.note_max_length || 1200);
         const quickValuesRaw = (data && data.competency_quick_values && typeof data.competency_quick_values === 'object')
           ? data.competency_quick_values
           : {};
@@ -1728,7 +1739,7 @@
               : sourceType === 'checklist'
                 ? '+1/+0'
                 : 'Ручний';
-            const scoreScaleMax = sourceType === 'checklist' ? 1 : scoreMax;
+            const scoreScaleMax = sourceType === 'checklist' ? 1 : Number(competencyMeta.score_max ?? 5);
             const note = String(item && item.note ? item.note : '');
             return `
               <article class="journal-competency-item">
@@ -1788,29 +1799,6 @@
           }
           if (competencyChecklistSubmitBtn) competencyChecklistSubmitBtn.disabled = !canAdd;
         }
-
-        if (!competencyCreateForm) return;
-        competencyCreateForm.classList.toggle('d-none', !canEditJournal);
-        if (competencyCreateColumnInput) competencyCreateColumnInput.value = String(currentCellColumnId || 0);
-        if (competencyCreateStudentInput) competencyCreateStudentInput.value = String(currentCellStudentId || 0);
-        if (competencyCreateKeyInput) {
-          competencyCreateKeyInput.innerHTML = definitions.map((item) => (
-            `<option value="${escapeHtml(String(item && item.key ? item.key : ''))}">${escapeHtml(String(item && item.label ? item.label : item.key || ''))}</option>`
-          )).join('');
-          competencyCreateKeyInput.disabled = !canAdd;
-        }
-        if (competencyCreateScoreInput) {
-          competencyCreateScoreInput.min = String(scoreMin);
-          competencyCreateScoreInput.max = String(scoreMax);
-          competencyCreateScoreInput.disabled = !canAdd;
-          competencyCreateScoreInput.value = '';
-        }
-        if (competencyCreateNoteInput) {
-          competencyCreateNoteInput.maxLength = noteMaxLength;
-          competencyCreateNoteInput.disabled = !canAdd;
-          competencyCreateNoteInput.value = '';
-        }
-        if (competencyCreateSubmitBtn) competencyCreateSubmitBtn.disabled = !canAdd;
       }
 
       const navigateCell = (columnStep, studentStep) => {
@@ -2285,6 +2273,26 @@
         attendanceForm.addEventListener('submit', () => {
           const rows = serializeAttendanceRows();
           attendanceRowsJsonInput.value = JSON.stringify(rows);
+        });
+      }
+      if (retakeCreateForm) {
+        retakeCreateForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          await submitAndRefreshCell(retakeCreateForm, 'Додаємо...');
+        });
+      }
+      if (retakeListEl) {
+        retakeListEl.addEventListener('submit', async (event) => {
+          const form = event.target.closest('form[action="/journal/retakes/update"]');
+          if (!form) return;
+          event.preventDefault();
+          await submitAndRefreshCell(form, 'Зберігаємо...');
+        });
+      }
+      if (competencyChecklistForm) {
+        competencyChecklistForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          await submitAndRefreshCell(competencyChecklistForm, 'Зберігаємо...');
         });
       }
       if (feedbackTemplateButtons.length && commentEl) {

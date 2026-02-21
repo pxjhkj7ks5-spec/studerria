@@ -1870,6 +1870,9 @@
                           <% } %>
                         <% } %>
                         <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+                        <% if (item.created_by) { %>
+                          <div class="deadline-meta">Додав: <%= item.created_by %></div>
+                        <% } %>
                         <div class="d-flex flex-wrap gap-1 mt-1">
                           <% if (Number(item.is_credit || 0) === 1) { %>
                             <span class="priority-chip priority-control">Залік</span>
@@ -1927,6 +1930,9 @@
                           <% } %>
                         <% } %>
                         <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+                        <% if (item.created_by) { %>
+                          <div class="deadline-meta">Додав: <%= item.created_by %></div>
+                        <% } %>
                         <div class="d-flex flex-wrap gap-1 mt-1">
                           <% if (Number(item.is_credit || 0) === 1) { %>
                             <span class="priority-chip priority-control">Залік</span>

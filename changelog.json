@@ -1,6 +1,20 @@
 {
   "items": [
     {
+      "version": "0.9.76",
+      "date": "2026-02-21",
+      "items": [
+        "fix(my-day): deadlines now show who added homework and keep the submit action available for repeat submissions",
+        "fix(schedule-weird-deadlines): added \"Додав\" metadata for custom deadline cards in weekly and weekend blocks",
+        "fix(journal-competencies): removed manual 0-5 competency form, leaving only +1/+0 checklist mode",
+        "fix(journal-competencies): checklist save now runs via fetch and instantly refreshes the opened journal cell data",
+        "fix(journal-retakes): retake create/update forms now submit via fetch and refresh the current journal cell without full page reload",
+        "fix(journal-db): switched key journal matrix/attendance queries from dynamic IN placeholders to ANY(int[]) to prevent bind-parameter mismatches",
+        "fix(journal-dark): restyled journal cell modal container for theme-dark (content/background/borders/close icon)",
+        "fix(schedule-generator-publish): publish validation errors now redirect back to preview (with message) so Type PUBLISH input is visible"
+      ]
+    },
+    {
       "version": "0.9.75",
       "date": "2026-02-20",
       "items": [

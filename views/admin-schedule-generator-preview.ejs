@@ -43,6 +43,12 @@
     </nav>
 
     <main class="container py-4 schedule-content">
+      <% if (messages && messages.error) { %>
+        <div class="alert alert-danger"><%= messages.error %></div>
+      <% } %>
+      <% if (messages && messages.success) { %>
+        <div class="alert alert-success"><%= messages.success %></div>
+      <% } %>
       <% if (publishSummary) { %>
         <div class="alert alert-success">
           <div class="fw-semibold">Розклад опубліковано</div>
