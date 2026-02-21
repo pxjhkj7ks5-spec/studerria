@@ -6668,9 +6668,26 @@ async function buildAdminDataQualityDiagnostics({
     : [normalizedCourseId];
 
   let diagnosticsRows = null;
-  try {
-    diagnosticsRows = await Promise.all([
-      db.get(
+  let compatibilityFallbacks = 0;
+  const fallbackMessages = [];
+  const withCompatibilityFallback = async (queryPromise, fallbackValue) => {
+    try {
+      return await queryPromise;
+    } catch (err) {
+      compatibilityFallbacks += 1;
+      const rawMessage = String(err && err.message ? err.message : err || '').trim();
+      if (rawMessage) {
+        fallbackMessages.push(rawMessage.slice(0, 180));
+      } else if (isDataQualityCompatibilityError(err)) {
+        fallbackMessages.push('schema compatibility');
+      } else {
+        fallbackMessages.push('query failed');
+      }
+      return fallbackValue;
+    }
+  };
+  diagnosticsRows = await Promise.all([
+      withCompatibilityFallback(db.get(
         `
           SELECT
             COUNT(*)::int AS count,
@@ -6687,8 +6704,8 @@ async function buildAdminDataQualityDiagnostics({
             AND jc.id IS NULL
         `,
         homeworkBaseParams
-      ),
-      db.all(
+      ), { count: 0, subject_ids: [] }),
+      withCompatibilityFallback(db.all(
         `
           SELECT
             h.id AS homework_id,
@@ -6713,8 +6730,8 @@ async function buildAdminDataQualityDiagnostics({
           LIMIT 8
         `,
         homeworkBaseParams
-      ),
-      db.all(
+      ), []),
+      withCompatibilityFallback(db.all(
         `
           WITH grouped AS (
             SELECT
@@ -6759,8 +6776,8 @@ async function buildAdminDataQualityDiagnostics({
           LIMIT 8
         `,
         homeworkBaseParams
-      ),
-      db.get(
+      ), []),
+      withCompatibilityFallback(db.get(
         `
           SELECT
             COUNT(*)::int AS count,
@@ -6776,8 +6793,8 @@ async function buildAdminDataQualityDiagnostics({
             AND COALESCE(jc.is_archived, 0) = 0
         `,
         journalBaseParams
-      ),
-      db.all(
+      ), { count: 0, subject_ids: [] }),
+      withCompatibilityFallback(db.all(
         `
           SELECT
             jc.id,
@@ -6795,8 +6812,8 @@ async function buildAdminDataQualityDiagnostics({
           LIMIT 8
         `,
         journalBaseParams
-      ),
-      db.all(
+      ), []),
+      withCompatibilityFallback(db.all(
         `
           WITH grouped AS (
             SELECT
@@ -6832,8 +6849,8 @@ async function buildAdminDataQualityDiagnostics({
           LIMIT 8
         `,
         journalBaseParams
-      ),
-      db.all(
+      ), []),
+      withCompatibilityFallback(db.all(
         `
           SELECT
             sg.subject_id,
@@ -6854,8 +6871,8 @@ async function buildAdminDataQualityDiagnostics({
           LIMIT 8
         `,
         [normalizedCourseId, normalizedCourseId]
-      ),
-      db.all(
+      ), []),
+      withCompatibilityFallback(db.all(
         `
           SELECT
             ts.subject_id,
@@ -6877,8 +6894,8 @@ async function buildAdminDataQualityDiagnostics({
           LIMIT 8
         `,
         [normalizedCourseId, normalizedCourseId]
-      ),
-      db.all(
+      ), []),
+      withCompatibilityFallback(db.all(
         `
           SELECT
             sgs.subject_id,
@@ -6913,16 +6930,8 @@ async function buildAdminDataQualityDiagnostics({
           LIMIT 8
         `,
         gradingBaseParams
-      ),
+      ), []),
     ]);
-  } catch (err) {
-    if (isDataQualityCompatibilityError(err)) {
-      result.available = false;
-      result.generated_at = new Date().toISOString();
-      return result;
-    }
-    throw err;
-  }
 
   const [
     missingJournalCountRow,
@@ -7065,6 +7074,23 @@ async function buildAdminDataQualityDiagnostics({
       `${row.subject_name || 'Предмет'} · активна сума ${Number(row.active_weight_sum || 0)} / 100`
     )),
   }));
+
+  if (compatibilityFallbacks > 0) {
+    const fallbackExamples = Array.from(
+      new Set([
+        `Пропущено перевірок: ${compatibilityFallbacks}`,
+        ...fallbackMessages.slice(0, 3),
+      ].filter(Boolean))
+    );
+    items.push(buildDataQualityCheck({
+      key: 'partial_schema_compatibility',
+      title: 'Частина перевірок недоступна',
+      severity: 'info',
+      description: 'Деякі діагностичні запити пропущено, показано частковий результат.',
+      count: 0,
+      examples: fallbackExamples,
+    }));
+  }
 
   const severityRows = { critical: 0, warning: 0, info: 0 };
   const severityChecks = { critical: 0, warning: 0, info: 0 };
@@ -11145,10 +11171,32 @@ async function getJournalSubjectClosureState(subjectId) {
     latestEvent = null;
   }
 
+  let inferredClosedFromLocks = false;
+  if (!settingsRow) {
+    try {
+      const lockState = await db.get(
+        `
+          SELECT
+            COUNT(*)::int AS total_columns,
+            COUNT(*) FILTER (WHERE COALESCE(is_locked, 0) = 1)::int AS locked_columns
+          FROM journal_columns
+          WHERE subject_id = ?
+            AND COALESCE(is_archived, 0) = 0
+        `,
+        [safeSubjectId]
+      );
+      const totalColumns = Number(lockState?.total_columns || 0);
+      const lockedColumns = Number(lockState?.locked_columns || 0);
+      inferredClosedFromLocks = totalColumns > 0 && lockedColumns >= totalColumns;
+    } catch (_err) {
+      inferredClosedFromLocks = false;
+    }
+  }
+
   return {
-    is_closed: Number(settingsRow?.is_closed || 0) === 1,
+    is_closed: Number(settingsRow?.is_closed || 0) === 1 || inferredClosedFromLocks,
     closed_by: Number.isFinite(Number(settingsRow?.closed_by)) ? Number(settingsRow.closed_by) : null,
-    closed_at: settingsRow?.closed_at || null,
+    closed_at: settingsRow?.closed_at || latestEvent?.created_at || null,
     latest_event: latestEvent
       ? {
           id: Number(latestEvent.id),
@@ -13140,11 +13188,24 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
       csvContent: exportPayload.csv,
     });
 
+    const actorUserId = Number(req.session.user.id);
+    let closeCompatibilityMode = false;
     await withTransaction(async (client) => {
       const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
-      const semesterFilter = buildExactSemesterCondition('jc', semesterId);
+      const runCompatibilityQuery = async (sql, params = []) => {
+        try {
+          await query(sql, params);
+          return true;
+        } catch (err) {
+          if (!isDbSchemaCompatibilityError(err)) {
+            throw err;
+          }
+          closeCompatibilityMode = true;
+          return false;
+        }
+      };
 
-      await query(
+      await runCompatibilityQuery(
         `
           INSERT INTO subject_grading_settings
           (
@@ -13186,28 +13247,102 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
           DEFAULT_SUBJECT_GRADING_SETTINGS.exam_weight_points,
           DEFAULT_SUBJECT_GRADING_SETTINGS.credit_weight_points,
           DEFAULT_SUBJECT_GRADING_SETTINGS.custom_weight_points,
-          Number(req.session.user.id),
-          Number(req.session.user.id),
-          Number(req.session.user.id),
+          actorUserId,
+          actorUserId,
+          actorUserId,
         ]
       );
 
-      await query(
-        `
-          UPDATE journal_columns jc
-          SET is_locked = 1,
-              locked_by = ?,
-              locked_at = COALESCE(jc.locked_at, NOW()),
-              updated_at = NOW()
-          WHERE jc.subject_id = ?
-            AND jc.course_id = ?
-            ${semesterFilter.clause}
-            AND COALESCE(jc.is_archived, 0) = 0
-        `,
-        [Number(req.session.user.id), subjectId, selectedCourseId, ...semesterFilter.params]
-      );
+      const buildLockWhereClause = ({ withSemester = true, withArchived = true } = {}) => {
+        const conditions = [
+          'jc.subject_id = ?',
+          'jc.course_id = ?',
+        ];
+        const params = [subjectId, selectedCourseId];
+        if (withSemester) {
+          const semesterFilter = buildExactSemesterCondition('jc', semesterId);
+          const semesterClause = String(semesterFilter?.clause || '')
+            .replace(/^\s*AND\s+/i, '')
+            .trim();
+          if (semesterClause) {
+            conditions.push(semesterClause);
+            params.push(...(Array.isArray(semesterFilter?.params) ? semesterFilter.params : []));
+          }
+        }
+        if (withArchived) {
+          conditions.push('COALESCE(jc.is_archived, 0) = 0');
+        }
+        return {
+          whereSql: conditions.join('\n              AND '),
+          whereParams: params,
+        };
+      };
 
-      await query(
+      const lockVariants = [
+        {
+          setSql: `
+            SET is_locked = 1,
+                locked_by = ?,
+                locked_at = COALESCE(jc.locked_at, NOW()),
+                updated_at = NOW()
+          `,
+          setParams: [actorUserId],
+          withSemester: true,
+          withArchived: true,
+        },
+        {
+          setSql: `
+            SET is_locked = 1,
+                updated_at = NOW()
+          `,
+          setParams: [],
+          withSemester: true,
+          withArchived: true,
+        },
+        {
+          setSql: 'SET is_locked = 1',
+          setParams: [],
+          withSemester: true,
+          withArchived: true,
+        },
+        {
+          setSql: 'SET is_locked = 1',
+          setParams: [],
+          withSemester: false,
+          withArchived: true,
+        },
+        {
+          setSql: 'SET is_locked = 1',
+          setParams: [],
+          withSemester: false,
+          withArchived: false,
+        },
+      ];
+
+      let lockApplied = false;
+      for (const variant of lockVariants) {
+        const where = buildLockWhereClause({
+          withSemester: variant.withSemester,
+          withArchived: variant.withArchived,
+        });
+        const ok = await runCompatibilityQuery(
+          `
+            UPDATE journal_columns jc
+            ${variant.setSql}
+            WHERE ${where.whereSql}
+          `,
+          [...variant.setParams, ...where.whereParams]
+        );
+        if (ok) {
+          lockApplied = true;
+          break;
+        }
+      }
+      if (!lockApplied) {
+        closeCompatibilityMode = true;
+      }
+
+      await runCompatibilityQuery(
         `
           INSERT INTO journal_subject_close_events
           (
@@ -13234,7 +13369,7 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
           exportFile.filePath,
           exportPayload.exportRowsCount,
           exportPayload.exportColumnsCount,
-          Number(req.session.user.id),
+          actorUserId,
           JSON.stringify({
             subject_name: selectedSubject.subject_name || '',
             course_name: selectedSubject.course_name || '',
@@ -13255,6 +13390,7 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
         export_file_name: exportFile.fileName,
         export_rows_count: exportPayload.exportRowsCount,
         export_columns_count: exportPayload.exportColumnsCount,
+        compatibility_mode: closeCompatibilityMode ? 'fallback' : 'full',
       },
       selectedCourseId,
       semesterId
@@ -21957,7 +22093,15 @@ app.get('/admin/data-quality.json', requireVisitAnalyticsSectionAccess, async (r
   }
   try {
     const courseId = getAdminCourse(req);
-    const activeSemester = await getActiveSemester(courseId);
+    let activeSemester = null;
+    try {
+      activeSemester = await getActiveSemester(courseId);
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        console.error('Database error (admin.dataQuality.activeSemester)', err);
+      }
+      activeSemester = null;
+    }
     const diagnostics = await buildAdminDataQualityDiagnostics({
       courseId,
       semesterId: activeSemester ? Number(activeSemester.id) : null,

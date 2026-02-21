@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.80",
+      "date": "2026-02-21",
+      "items": [
+        "fix(admin-data-quality): diagnostics now degrade per-check with partial fallback payloads instead of collapsing to full Unavailable state",
+        "fix(admin-data-quality): endpoint now tolerates active-semester lookup incompatibilities and still returns best-effort diagnostics",
+        "fix(journal-close): subject close now uses multi-step legacy SQL fallback when locking journal columns (semester/archive/lock metadata compatibility) to avoid Database error on close action"
+      ]
+    },
+    {
       "version": "0.9.79",
       "date": "2026-02-21",
       "items": [

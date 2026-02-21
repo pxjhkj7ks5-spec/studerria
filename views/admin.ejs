@@ -4970,6 +4970,29 @@
         }).join('');
       };
 
+      const buildUnavailableDataQualityPayload = () => ({
+        ok: true,
+        generated_at: new Date().toISOString(),
+        available: false,
+        summary: {
+          checks_total: 0,
+          checks_with_issues: 0,
+          total_issues: 0,
+          affected_subjects: 0,
+          severity_rows: {
+            critical: 0,
+            warning: 0,
+            info: 0,
+          },
+          severity_checks: {
+            critical: 0,
+            warning: 0,
+            info: 0,
+          },
+        },
+        items: [],
+      });
+
       const loadDataQuality = async () => {
         if (!visitAnalyticsPanel || dataQualityLoading) return;
         setDataQualityLoading(true);
@@ -4978,16 +5001,24 @@
             headers: { Accept: 'application/json' },
             cache: 'no-store',
           });
-          if (!res.ok) {
-            throw new Error(`Data quality ${res.status}`);
+          let data = null;
+          const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+          if (contentType.includes('application/json')) {
+            data = await res.json();
+          } else {
+            const raw = await res.text();
+            try {
+              data = JSON.parse(raw);
+            } catch (_err) {
+              data = null;
+            }
           }
-          const data = await res.json();
-          if (!data || !data.ok) {
-            throw new Error('Data quality payload invalid');
+          if (!res.ok || !data || typeof data !== 'object' || data.ok !== true) {
+            data = buildUnavailableDataQualityPayload();
           }
           renderDataQuality(data);
         } catch (err) {
-          renderDataQuality(null);
+          renderDataQuality(buildUnavailableDataQualityPayload());
         } finally {
           setDataQualityLoading(false);
         }
