@@ -1150,9 +1150,17 @@
           if (pendingLabel) submitBtn.textContent = pendingLabel;
         }
         try {
+          const formData = new window.FormData(formEl);
+          const bodyParams = new URLSearchParams();
+          formData.forEach((value, key) => {
+            bodyParams.append(key, String(value == null ? '' : value));
+          });
           const response = await fetch(formEl.action, {
             method: String(formEl.method || 'POST').toUpperCase(),
-            body: new FormData(formEl),
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            },
+            body: bodyParams.toString(),
             credentials: 'same-origin',
           });
           if (!response.ok) {
@@ -2281,9 +2289,23 @@
           await submitAndRefreshCell(retakeCreateForm, 'Додаємо...');
         });
       }
+      if (appealCreateForm) {
+        appealCreateForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          await submitAndRefreshCell(appealCreateForm, 'Надсилаємо...');
+        });
+      }
       if (retakeListEl) {
         retakeListEl.addEventListener('submit', async (event) => {
           const form = event.target.closest('form[action="/journal/retakes/update"]');
+          if (!form) return;
+          event.preventDefault();
+          await submitAndRefreshCell(form, 'Зберігаємо...');
+        });
+      }
+      if (appealListEl) {
+        appealListEl.addEventListener('submit', async (event) => {
+          const form = event.target.closest('form[action="/journal/appeals/update"]');
           if (!form) return;
           event.preventDefault();
           await submitAndRefreshCell(form, 'Зберігаємо...');

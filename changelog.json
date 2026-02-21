@@ -1,6 +1,18 @@
 {
   "items": [
     {
+      "version": "0.9.77",
+      "date": "2026-02-21",
+      "items": [
+        "fix(journal-cell): switched modal async form submit to URL-encoded payloads so /journal handlers receive req.body and no longer crash on column_id",
+        "fix(journal-appeals): wired create/update appeal forms to async save + immediate cell refresh for teacher and student flows",
+        "fix(schedule-generator-publish): preview always shows confirm_phrase input; button enforces typed PUBLISH only when backend marks overwrite confirmation as required",
+        "fix(security-analytics): cast legacy text created_at values to timestamptz in security recompute/dashboard queries to prevent operator mismatch errors",
+        "fix(admin-data-quality): /admin/data-quality.json now returns a safe unavailable payload for compatibility errors instead of HTTP 500",
+        "fix(forms): parseBinaryFlag now supports repeated form fields (array values) from hidden+checkbox inputs"
+      ]
+    },
+    {
       "version": "0.9.76",
       "date": "2026-02-21",
       "items": [

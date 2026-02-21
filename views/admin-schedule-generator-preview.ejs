@@ -105,6 +105,7 @@
             class="d-flex flex-column gap-2 mt-2"
             id="publishForm"
             data-has-preview="<%= previewDiff ? '1' : '0' %>"
+            data-requires-typed="<%= publishRequiresTyped ? '1' : '0' %>"
           >
             <input type="hidden" name="operation_id" value="<%= previewStats ? (previewStats.operation_id || '') : '' %>" />
             <input type="hidden" name="course_id" value="<%= selectedCourseId %>" />
@@ -113,10 +114,8 @@
               <input class="form-check-input" type="checkbox" name="confirm_overwrite" value="1" data-publish-confirm />
               Я розумію, що це перезапише <%= overwriteCount %> слотів
             </label>
-            <% if (publishRequiresTyped) { %>
-              <div class="small text-muted">Type PUBLISH to continue</div>
-              <input class="form-control form-control-sm" name="confirm_phrase" data-publish-phrase />
-            <% } %>
+            <div class="small text-muted">Type PUBLISH to continue</div>
+            <input class="form-control form-control-sm" name="confirm_phrase" data-publish-phrase autocomplete="off" />
             <label class="form-check small">
               <input class="form-check-input" type="checkbox" name="replace" value="1" checked />
               Замінити існуючий розклад для семестрів у превʼю
@@ -271,6 +270,7 @@
         const confirmCheck = publishForm.querySelector('[data-publish-confirm]');
         const confirmPhrase = publishForm.querySelector('[data-publish-phrase]');
         const hasPreview = publishForm.dataset.hasPreview === '1';
+        const requiresTyped = publishForm.dataset.requiresTyped === '1';
         const updatePublishState = () => {
           if (!publishBtn) return;
           if (!hasPreview) {
@@ -278,7 +278,7 @@
             return;
           }
           const confirmOk = confirmCheck ? confirmCheck.checked : true;
-          const typedOk = !confirmPhrase || confirmPhrase.value.trim().toUpperCase() === 'PUBLISH';
+          const typedOk = !requiresTyped || (confirmPhrase && confirmPhrase.value.trim().toUpperCase() === 'PUBLISH');
           publishBtn.disabled = !(confirmOk && typedOk);
         };
         if (confirmCheck) {

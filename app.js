@@ -3341,7 +3341,7 @@ async function evaluateRegistrationSecuritySignals({
         ARRAY_AGG(DISTINCT user_id ORDER BY user_id DESC) FILTER (WHERE user_id IS NOT NULL) AS sample_user_ids
       FROM user_registration_events
       WHERE ${column} = ?
-        AND created_at >= NOW() - (?::int * INTERVAL '1 minute')
+        AND created_at::timestamptz >= NOW() - (?::int * INTERVAL '1 minute')
     `;
     if (Number.isFinite(numericCourseId)) {
       sql += ' AND (course_id IS NULL OR course_id = ?) ';
@@ -3787,7 +3787,7 @@ async function recordAuthFailureEvent({
         SELECT COUNT(*)::int AS count, COUNT(DISTINCT COALESCE(user_id, -id))::int AS actors_count
         FROM auth_failure_events
         WHERE ip = ?
-          AND created_at >= NOW() - INTERVAL '10 minutes'
+          AND created_at::timestamptz >= NOW() - INTERVAL '10 minutes'
       `,
       [normalizedIp]
     );
@@ -3813,8 +3813,8 @@ async function recordAuthFailureEvent({
     const userFailureRow = await db.get(
       `
         SELECT
-          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS failed_24h,
-          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS failed_7d
+          COUNT(*) FILTER (WHERE created_at::timestamptz >= NOW() - INTERVAL '24 hours')::int AS failed_24h,
+          COUNT(*) FILTER (WHERE created_at::timestamptz >= NOW() - INTERVAL '7 days')::int AS failed_7d
         FROM auth_failure_events
         WHERE user_id = ?
       `,
@@ -3976,8 +3976,8 @@ async function recomputeUserSecurityCase(userId, options = {}) {
     db.get(
       `
         SELECT
-          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS failed_24h,
-          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS failed_7d
+          COUNT(*) FILTER (WHERE created_at::timestamptz >= NOW() - INTERVAL '24 hours')::int AS failed_24h,
+          COUNT(*) FILTER (WHERE created_at::timestamptz >= NOW() - INTERVAL '7 days')::int AS failed_7d
         FROM auth_failure_events
         WHERE user_id = ?
       `,
@@ -3986,9 +3986,9 @@ async function recomputeUserSecurityCase(userId, options = {}) {
     db.get(
       `
         SELECT
-          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS changes_30d,
+          COUNT(*) FILTER (WHERE created_at::timestamptz >= NOW() - INTERVAL '30 days')::int AS changes_30d,
           COUNT(*) FILTER (
-            WHERE created_at >= NOW() - INTERVAL '30 days'
+            WHERE created_at::timestamptz >= NOW() - INTERVAL '30 days'
               AND EXISTS (
                 SELECT 1
                 FROM jsonb_array_elements_text(after_roles) AS role_key
@@ -4004,7 +4004,7 @@ async function recomputeUserSecurityCase(userId, options = {}) {
       `
         SELECT COUNT(*) FILTER (
           WHERE resolved_at IS NULL
-            AND created_at >= NOW() - (?::int * INTERVAL '1 hour')
+            AND created_at::timestamptz >= NOW() - (?::int * INTERVAL '1 hour')
         )::int AS open_alerts
         FROM security_alert_events
         WHERE user_id = ?
@@ -4059,9 +4059,9 @@ async function recomputeUserSecurityCase(userId, options = {}) {
       ? db.get(
           `
             SELECT
-              COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS total_30d,
+              COUNT(*) FILTER (WHERE created_at::timestamptz >= NOW() - INTERVAL '30 days')::int AS total_30d,
               COUNT(*) FILTER (
-                WHERE created_at >= NOW() - INTERVAL '30 days'
+                WHERE created_at::timestamptz >= NOW() - INTERVAL '30 days'
                   AND ip = ?
               )::int AS ip_hits_30d
             FROM login_history
@@ -4082,8 +4082,8 @@ async function recomputeUserSecurityCase(userId, options = {}) {
           SELECT COUNT(DISTINCT user_id)::int AS users_count
           FROM user_registration_events
           WHERE ip = ?
-            AND created_at BETWEEN (?::timestamptz - INTERVAL '10 minutes')
-                              AND (?::timestamptz + INTERVAL '10 minutes')
+            AND created_at::timestamptz BETWEEN (?::timestamptz - INTERVAL '10 minutes')
+                                           AND (?::timestamptz + INTERVAL '10 minutes')
         `,
         [registrationEvent.ip, createdAtIso, createdAtIso]
       );
@@ -4095,8 +4095,8 @@ async function recomputeUserSecurityCase(userId, options = {}) {
           SELECT COUNT(DISTINCT user_id)::int AS users_count
           FROM user_registration_events
           WHERE device_fingerprint = ?
-            AND created_at BETWEEN (?::timestamptz - INTERVAL '10 minutes')
-                              AND (?::timestamptz + INTERVAL '10 minutes')
+            AND created_at::timestamptz BETWEEN (?::timestamptz - INTERVAL '10 minutes')
+                                           AND (?::timestamptz + INTERVAL '10 minutes')
         `,
         [registrationEvent.device_fingerprint, createdAtIso, createdAtIso]
       );
@@ -10745,10 +10745,13 @@ const parseNonNegativeDecimal = (rawValue, fallbackValue) => {
 };
 
 const parseBinaryFlag = (rawValue, fallbackValue = 0) => {
-  if (rawValue === null || typeof rawValue === 'undefined' || rawValue === '') {
+  const candidateValue = Array.isArray(rawValue)
+    ? rawValue[rawValue.length - 1]
+    : rawValue;
+  if (candidateValue === null || typeof candidateValue === 'undefined' || candidateValue === '') {
     return Number(fallbackValue) === 1 ? 1 : 0;
   }
-  const normalized = String(rawValue).trim().toLowerCase();
+  const normalized = String(candidateValue).trim().toLowerCase();
   if (['1', 'true', 'on', 'yes'].includes(normalized)) return 1;
   if (['0', 'false', 'off', 'no'].includes(normalized)) return 0;
   return Number(fallbackValue) === 1 ? 1 : 0;
@@ -21909,6 +21912,30 @@ app.get('/admin/data-quality.json', requireVisitAnalyticsSectionAccess, async (r
       ...diagnostics,
     });
   } catch (err) {
+    if (isDataQualityCompatibilityError(err)) {
+      return res.json({
+        ok: true,
+        generated_at: new Date().toISOString(),
+        available: false,
+        summary: {
+          checks_total: 0,
+          checks_with_issues: 0,
+          total_issues: 0,
+          affected_subjects: 0,
+          severity_rows: {
+            critical: 0,
+            warning: 0,
+            info: 0,
+          },
+          severity_checks: {
+            critical: 0,
+            warning: 0,
+            info: 0,
+          },
+        },
+        items: [],
+      });
+    }
     return handleDbError(res, err, 'admin.dataQuality.fetch');
   }
 });
@@ -21988,8 +22015,8 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
           LEFT JOIN users u ON u.id = sae.user_id
           WHERE (sae.course_id = ? OR sae.course_id IS NULL)
             AND sae.resolved_at IS NULL
-            AND sae.created_at >= NOW() - INTERVAL '14 days'
-          ORDER BY sae.created_at DESC
+            AND sae.created_at::timestamptz >= NOW() - INTERVAL '14 days'
+          ORDER BY sae.created_at::timestamptz DESC
           LIMIT 24
         `,
         [courseId]
@@ -22003,16 +22030,16 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
               AND created_at::timestamp >= NOW() - INTERVAL '14 days'
               AND (course_id = ? OR course_id IS NULL)
             UNION ALL
-            SELECT ip, user_id, created_at
+            SELECT ip, user_id, created_at::timestamp AS created_at
             FROM user_registration_events
             WHERE ip IS NOT NULL
-              AND created_at >= NOW() - INTERVAL '14 days'
+              AND created_at::timestamptz >= NOW() - INTERVAL '14 days'
               AND (course_id = ? OR course_id IS NULL)
             UNION ALL
-            SELECT ip, user_id, created_at
+            SELECT ip, user_id, created_at::timestamp AS created_at
             FROM auth_failure_events
             WHERE ip IS NOT NULL
-              AND created_at >= NOW() - INTERVAL '14 days'
+              AND created_at::timestamptz >= NOW() - INTERVAL '14 days'
               AND (course_id = ? OR course_id IS NULL)
           )
           SELECT
@@ -22033,11 +22060,11 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
             SELECT
               device_fingerprint AS device_key,
               user_id,
-              created_at,
+              created_at::timestamp AS created_at,
               device_fingerprint AS sample_label
             FROM user_registration_events
             WHERE device_fingerprint IS NOT NULL
-              AND created_at >= NOW() - INTERVAL '21 days'
+              AND created_at::timestamptz >= NOW() - INTERVAL '21 days'
               AND (course_id = ? OR course_id IS NULL)
             UNION ALL
             SELECT
