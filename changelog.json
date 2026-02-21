@@ -1,6 +1,18 @@
 {
   "items": [
     {
+      "version": "0.9.78",
+      "date": "2026-02-21",
+      "items": [
+        "fix(admin-data-quality): endpoint now always returns safe unavailable payload instead of surfacing fetch errors in Security Analytics",
+        "fix(admin-data-quality-ui): removed error toast spam when data-quality cannot be loaded and kept inline unavailable state only",
+        "fix(incident-center): hardened scheduler startup interval resolution and auto-cleared stale schedulerIntervalMs runtime incidents",
+        "chore(schedule-ui): archived Day/Week/Month mode switch from schedule page and pinned view to week mode",
+        "feat(my-day-competency): switched competency details to mark counts (not percent), with zeroed detail rows when no marks exist",
+        "feat(my-day-competency): competency orb now recalculates segment sizes from live mark distribution and uses equal neutral split when empty"
+      ]
+    },
+    {
       "version": "0.9.77",
       "date": "2026-02-21",
       "items": [

@@ -1668,15 +1668,6 @@
           </div>
         </div>
 
-        <section class="glass-tabs-wrap mb-4" id="scheduleModeTabsWrap" aria-label="Schedule views">
-          <div class="glass-tabs" id="scheduleModeTabs" role="tablist" aria-label="Schedule mode">
-            <span class="glass-tabs-indicator" id="scheduleModeIndicator" aria-hidden="true"></span>
-            <button type="button" class="glass-tab" data-mode="day" role="tab" aria-selected="false">Day</button>
-            <button type="button" class="glass-tab is-active" data-mode="week" role="tab" aria-selected="true">Week</button>
-            <button type="button" class="glass-tab" data-mode="month" role="tab" aria-selected="false">Month</button>
-          </div>
-        </section>
-
         <section class="status-stack mb-4" id="densityBlock">
           <details class="density-summary" id="densitySummary">
             <summary>
@@ -3209,15 +3200,13 @@
       }
 
       const weekGrid = document.getElementById('scheduleWeekGrid');
-      const scheduleModes = ['day', 'week', 'month'];
+      const scheduleModes = ['week'];
       const scheduleModeTabs = document.getElementById('scheduleModeTabs');
       const scheduleModeIndicator = document.getElementById('scheduleModeIndicator');
       const scheduleModeButtons = scheduleModeTabs ? Array.from(scheduleModeTabs.querySelectorAll('.glass-tab[data-mode]')) : [];
       const monthSummary = document.getElementById('scheduleMonthSummary');
       const densityBlock = document.getElementById('densityBlock');
-      let currentScheduleMode = scheduleModes.includes(localStorage.getItem('schedule-view-mode'))
-        ? localStorage.getItem('schedule-view-mode')
-        : 'week';
+      let currentScheduleMode = 'week';
 
       function getPreferredDayCard(dayCards) {
         const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
@@ -3312,7 +3301,7 @@
         }
 
         if (persist) {
-          localStorage.setItem('schedule-view-mode', mode);
+          localStorage.setItem('schedule-view-mode', 'week');
         }
       }
 

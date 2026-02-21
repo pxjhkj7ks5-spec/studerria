@@ -77,6 +77,18 @@ function pushRuntimeErrorEvent(kind, label, rawError, extra = {}) {
   return event;
 }
 
+function clearRuntimeErrorEvents(predicate) {
+  if (typeof predicate !== 'function') return 0;
+  let removed = 0;
+  for (let idx = runtimeErrorEvents.length - 1; idx >= 0; idx -= 1) {
+    const item = runtimeErrorEvents[idx];
+    if (!predicate(item)) continue;
+    runtimeErrorEvents.splice(idx, 1);
+    removed += 1;
+  }
+  return removed;
+}
+
 function getRuntimeErrorSummary(now = Date.now()) {
   const windowMs = SYSTEM_HEALTH_ERROR_WINDOW_HOURS * 60 * 60 * 1000;
   const cutoff = now - windowMs;
@@ -8181,14 +8193,11 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       populated_count: hasGradeSignals ? competencies.length : 0,
     };
   };
-  let competencyProfile = buildHeuristicProfile();
-  if (Array.isArray(competencySignalRows) && competencySignalRows.length) {
-    competencyProfile = buildCompetencyProfileFromSignalRows({
-      signalRows: competencySignalRows,
-      includeEmpty: true,
-      now,
-    });
-  }
+  const competencyProfile = buildCompetencyProfileFromSignalRows({
+    signalRows: competencySignalRows,
+    includeEmpty: true,
+    now,
+  });
   const competencies = Array.isArray(competencyProfile.competencies)
     ? competencyProfile.competencies
     : [];
@@ -8197,6 +8206,9 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
   const fastestGrowingCompetency = competencyProfile.fastest_growth || null;
   const competencyAverage = Number.isFinite(Number(competencyProfile.average))
     ? Number(competencyProfile.average)
+    : 0;
+  const competencyTotalMarks = Number.isFinite(Number(competencyProfile.total_marks))
+    ? Number(competencyProfile.total_marks)
     : 0;
 
   const activitySummary = {
@@ -8315,7 +8327,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
         `Вчасні здачі: ${onTimeShare === null ? '-' : `${onTimeShare}%`}`,
       ],
     };
-  } else if (fastestGrowingCompetency && fastestGrowingCompetency.delta >= 3) {
+  } else if (fastestGrowingCompetency && fastestGrowingCompetency.delta >= 1) {
     brief = {
       tone: 'growth',
       title: 'Помітний прогрес за останній період',
@@ -8324,7 +8336,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       action_href: '/my-day#competencyBlock',
       reasons: [
         `Сильна сторона: ${strongestCompetency ? strongestCompetency.label : 'н/д'}`,
-        `Середній профіль: ${competencyAverage}/100`,
+        `Відміток компетентностей: ${competencyTotalMarks}`,
       ],
     };
   } else if (nextClass) {
@@ -8341,7 +8353,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
     };
   }
 
-  if (strongestCompetency && strongestCompetency.score >= 65 && brief.tone !== 'risk') {
+  if (strongestCompetency && Number(strongestCompetency.count || 0) > 0 && brief.tone !== 'risk') {
     brief.message = `${brief.message} Додатково: ${strongestCompetency.label} зараз серед найсильніших напрямів.`;
   }
 
@@ -8370,6 +8382,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
     inbox_items: inboxItems,
     competencies,
     competency_average: competencyAverage,
+    competency_total_marks: competencyTotalMarks,
     competency_strongest: strongestCompetency,
     competency_weakest: weakestCompetency,
     competency_fastest_growth: fastestGrowingCompetency,
@@ -10865,72 +10878,88 @@ const buildCompetencyProfileFromSignalRows = ({
   const recentSince = nowMs - (30 * 24 * 60 * 60 * 1000);
   const previousSince = nowMs - (60 * 24 * 60 * 60 * 1000);
 
-  const scoreByKey = new Map();
+  const marksByKey = new Map();
   COMPETENCY_DEFINITIONS.forEach((item) => {
-    scoreByKey.set(item.key, {
-      all: [],
-      recent: [],
-      previous: [],
+    marksByKey.set(item.key, {
+      total: 0,
+      recent: 0,
+      previous: 0,
     });
   });
 
   safeRows.forEach((row) => {
     const key = normalizeCompetencyKey(row?.competency_key);
-    if (!key || !scoreByKey.has(key)) return;
+    if (!key || !marksByKey.has(key)) return;
     const score = Number(row?.score);
     if (!Number.isFinite(score)) return;
-    const clippedScore = Math.max(COMPETENCY_SCORE_MIN, Math.min(COMPETENCY_SCORE_MAX, score));
+    const mark = score > 0 ? 1 : 0;
+    if (mark < 1) return;
     const createdAtMs = row?.created_at ? new Date(row.created_at).getTime() : Number.NaN;
-    const bucket = scoreByKey.get(key);
-    bucket.all.push(clippedScore);
+    const bucket = marksByKey.get(key);
+    bucket.total += 1;
     if (Number.isFinite(createdAtMs) && createdAtMs >= recentSince) {
-      bucket.recent.push(clippedScore);
+      bucket.recent += 1;
     } else if (Number.isFinite(createdAtMs) && createdAtMs >= previousSince && createdAtMs < recentSince) {
-      bucket.previous.push(clippedScore);
+      bucket.previous += 1;
     }
   });
 
-  const toPercent = (value) => Math.round((Math.max(COMPETENCY_SCORE_MIN, Math.min(COMPETENCY_SCORE_MAX, value)) / COMPETENCY_SCORE_MAX) * 100);
-  const avg = (values) => {
-    if (!Array.isArray(values) || !values.length) return null;
-    const sum = values.reduce((acc, item) => acc + Number(item || 0), 0);
-    return sum / values.length;
-  };
-
   const competencies = COMPETENCY_DEFINITIONS.map((definition) => {
-    const bucket = scoreByKey.get(definition.key) || { all: [], recent: [], previous: [] };
-    const allAvg = avg(bucket.all);
-    const recentAvg = avg(bucket.recent);
-    const previousAvg = avg(bucket.previous);
-    const score = allAvg === null ? null : toPercent(allAvg);
-    const delta = (recentAvg === null || previousAvg === null)
-      ? 0
-      : (toPercent(recentAvg) - toPercent(previousAvg));
+    const bucket = marksByKey.get(definition.key) || { total: 0, recent: 0, previous: 0 };
+    const count = Number(bucket.total || 0);
+    const delta = Number(bucket.recent || 0) - Number(bucket.previous || 0);
     return {
       key: definition.key,
       label: definition.label,
-      score: score === null ? 0 : score,
+      count,
+      score: count,
+      share_percent: 0,
+      bar_percent: 0,
       delta: Math.round(delta),
-      trend: delta >= 3 ? 'up' : (delta <= -3 ? 'down' : 'steady'),
-      has_data: allAvg !== null,
+      trend: delta >= 1 ? 'up' : (delta <= -1 ? 'down' : 'steady'),
+      has_data: count > 0,
     };
   }).filter((item) => includeEmpty || item.has_data);
 
+  const totalMarks = competencies.reduce((sum, item) => sum + Number(item.count || 0), 0);
+  const equalShare = competencies.length ? (100 / competencies.length) : 0;
+  competencies.forEach((item) => {
+    const share = totalMarks > 0
+      ? (Number(item.count || 0) / totalMarks) * 100
+      : equalShare;
+    item.share_percent = Math.round(share * 100) / 100;
+    item.bar_percent = totalMarks > 0 ? item.share_percent : 0;
+  });
+
   const withData = competencies.filter((item) => item.has_data);
-  const sortedByScore = [...withData].sort((a, b) => b.score - a.score);
+  const sortedByScore = [...competencies].sort((a, b) => {
+    if (Number(b.count || 0) !== Number(a.count || 0)) return Number(b.count || 0) - Number(a.count || 0);
+    if (Number(b.delta || 0) !== Number(a.delta || 0)) return Number(b.delta || 0) - Number(a.delta || 0);
+    return String(a.label || '').localeCompare(String(b.label || ''));
+  });
+  const sortedByWeakest = [...competencies].sort((a, b) => {
+    if (Number(a.count || 0) !== Number(b.count || 0)) return Number(a.count || 0) - Number(b.count || 0);
+    if (Number(a.delta || 0) !== Number(b.delta || 0)) return Number(a.delta || 0) - Number(b.delta || 0);
+    return String(a.label || '').localeCompare(String(b.label || ''));
+  });
   const sortedByDelta = [...withData].sort((a, b) => b.delta - a.delta);
-  const strongest = sortedByScore[0] || null;
-  const weakest = sortedByScore.length ? sortedByScore[sortedByScore.length - 1] : null;
-  const fastestGrowth = sortedByDelta[0] || null;
-  const average = withData.length
-    ? Math.round(withData.reduce((sum, item) => sum + Number(item.score || 0), 0) / withData.length)
+  const strongest = totalMarks > 0 ? (sortedByScore[0] || null) : null;
+  const weakest = totalMarks > 0 ? (sortedByWeakest[0] || null) : null;
+  const fastestGrowth = sortedByDelta.length && Number(sortedByDelta[0].delta || 0) > 0
+    ? sortedByDelta[0]
+    : null;
+  const average = competencies.length
+    ? Math.round(totalMarks / competencies.length)
     : 0;
 
   return {
     competencies: competencies.map((item) => ({
       key: item.key,
       label: item.label,
-      score: Math.max(0, Math.min(100, Number(item.score || 0))),
+      count: Math.max(0, Math.floor(Number(item.count || 0))),
+      score: Math.max(0, Math.floor(Number(item.score || 0))),
+      share_percent: Math.max(0, Math.min(100, Number(item.share_percent || 0))),
+      bar_percent: Math.max(0, Math.min(100, Number(item.bar_percent || 0))),
       delta: Number(item.delta || 0),
       trend: item.trend || 'steady',
       has_data: Boolean(item.has_data),
@@ -10939,6 +10968,8 @@ const buildCompetencyProfileFromSignalRows = ({
     weakest,
     fastest_growth: fastestGrowth,
     average,
+    total_marks: Math.max(0, Math.floor(totalMarks)),
+    has_marks: totalMarks > 0,
     populated_count: withData.length,
   };
 };
@@ -21142,10 +21173,12 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
   }
 });
 
-const schedulerIntervalRaw = Number(process.env.SCHEDULER_INTERVAL_MS || 60000);
-const schedulerIntervalMs = Number.isFinite(schedulerIntervalRaw)
-  ? Math.floor(schedulerIntervalRaw)
-  : 60000;
+const resolveSchedulerIntervalMs = () => {
+  const raw = Number(process.env.SCHEDULER_INTERVAL_MS || 60000);
+  if (!Number.isFinite(raw)) return 60000;
+  return Math.floor(raw);
+};
+const schedulerIntervalMs = resolveSchedulerIntervalMs();
 let schedulerRunning = false;
 const publishScheduledItems = async () => {
   if (schedulerRunning) {
@@ -21895,10 +21928,32 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
 });
 
 app.get('/admin/data-quality.json', requireVisitAnalyticsSectionAccess, async (req, res) => {
+  const unavailablePayload = {
+    ok: true,
+    generated_at: new Date().toISOString(),
+    available: false,
+    summary: {
+      checks_total: 0,
+      checks_with_issues: 0,
+      total_issues: 0,
+      affected_subjects: 0,
+      severity_rows: {
+        critical: 0,
+        warning: 0,
+        info: 0,
+      },
+      severity_checks: {
+        critical: 0,
+        warning: 0,
+        info: 0,
+      },
+    },
+    items: [],
+  };
   try {
     await ensureDbReady();
   } catch (err) {
-    return handleDbError(res, err, 'admin.dataQuality.init');
+    return res.json(unavailablePayload);
   }
   try {
     const courseId = getAdminCourse(req);
@@ -21912,31 +21967,7 @@ app.get('/admin/data-quality.json', requireVisitAnalyticsSectionAccess, async (r
       ...diagnostics,
     });
   } catch (err) {
-    if (isDataQualityCompatibilityError(err)) {
-      return res.json({
-        ok: true,
-        generated_at: new Date().toISOString(),
-        available: false,
-        summary: {
-          checks_total: 0,
-          checks_with_issues: 0,
-          total_issues: 0,
-          affected_subjects: 0,
-          severity_rows: {
-            critical: 0,
-            warning: 0,
-            info: 0,
-          },
-          severity_checks: {
-            critical: 0,
-            warning: 0,
-            info: 0,
-          },
-        },
-        items: [],
-      });
-    }
-    return handleDbError(res, err, 'admin.dataQuality.fetch');
+    return res.json(unavailablePayload);
   }
 });
 
@@ -27587,12 +27618,18 @@ app.post('/logout', (req, res) => {
 });
 
 const startScheduler = () => {
-  schedulerHealthState.interval_ms = schedulerIntervalMs;
-  if (!Number.isFinite(schedulerIntervalMs) || schedulerIntervalMs < 10000) {
+  const intervalMs = (typeof schedulerIntervalMs === 'number' && Number.isFinite(schedulerIntervalMs))
+    ? schedulerIntervalMs
+    : resolveSchedulerIntervalMs();
+  schedulerHealthState.interval_ms = intervalMs;
+  if (!Number.isFinite(intervalMs) || intervalMs < 10000) {
     schedulerHealthState.enabled = false;
     return;
   }
   schedulerHealthState.enabled = true;
+  clearRuntimeErrorEvents((event) => (
+    String(event && event.message ? event.message : '').toLowerCase().includes('schedulerintervalms is not defined')
+  ));
   setInterval(() => {
     if (typeof publishScheduledItems !== 'function') {
       return;
@@ -27600,7 +27637,7 @@ const startScheduler = () => {
     publishScheduledItems().catch((err) => {
       console.error('Scheduler error', err);
     });
-  }, schedulerIntervalMs);
+  }, intervalMs);
 };
 
 const startSessionHealthProbes = () => {
