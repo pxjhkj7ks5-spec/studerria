@@ -99,6 +99,43 @@
     %>
 
     <%- include('partials/topbar', { role, username, t, activePage: 'my-day', pageTitle: 'Studeria Cockpit' }) %>
+    <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
+      <div class="drawer-head">
+        <div class="drawer-title">Меню</div>
+        <button class="drawer-close" type="button" id="scheduleDrawerClose" aria-label="Close menu">✕</button>
+      </div>
+      <div class="drawer-actions">
+        <% if (role === 'admin') { %>
+          <form method="POST" action="/admin/switch-to-admin" class="drawer-action-wrap">
+            <button class="drawer-action" type="submit"><%= t('schedule.backToAdmin') %></button>
+          </form>
+        <% } else if (hasCustomAdminPanelAccess) { %>
+          <a class="drawer-action" href="<%= customAdminPanelHref || '/admin' %>"><%= t('schedule.backToAdmin') %></a>
+        <% } %>
+        <% if (role === 'starosta') { %>
+          <a class="drawer-action" href="/starosta"><%= t('menu.starosta') %></a>
+        <% } %>
+        <% if (role === 'deanery') { %>
+          <a class="drawer-action" href="/deanery"><%= t('menu.deanery') %></a>
+        <% } %>
+        <a class="drawer-action" href="/schedule">Повернутись до розкладу</a>
+        <a class="drawer-action" href="/subjects">Предмети</a>
+        <a class="drawer-action" href="/journal">Журнал</a>
+        <a class="drawer-action" href="/teamwork"><%= t('menu.teamwork') %></a>
+        <a class="drawer-action" href="/profile"><%= t('schedule.profile') %></a>
+        <button
+          class="drawer-action theme-toggle"
+          type="button"
+          data-light-label="☀️"
+          data-dark-label="🌙"
+        >
+          🌙
+        </button>
+        <form method="POST" action="/logout" class="drawer-action-wrap">
+          <button class="drawer-action" type="submit"><%= t('schedule.logout') %></button>
+        </form>
+      </div>
+    </aside>
 
     <main class="container cockpit-page py-4">
       <% if (okMessage) { %>
@@ -606,6 +643,9 @@
     <script>
       const myDay = <%- JSON.stringify(myDay || {}) %>;
       const themeToggles = document.querySelectorAll('.theme-toggle');
+      const scheduleDrawer = document.getElementById('scheduleActionDrawer');
+      const scheduleDrawerToggle = document.getElementById('scheduleDrawerToggle');
+      const scheduleDrawerClose = document.getElementById('scheduleDrawerClose');
       const storedTheme = localStorage.getItem('ui-theme') || 'theme-dark';
       document.body.classList.remove('theme-dark', 'theme-light');
       document.body.classList.add(storedTheme);
@@ -621,6 +661,48 @@
             toggle.textContent = next === 'theme-dark' ? toggle.dataset.lightLabel : toggle.dataset.darkLabel;
           });
         });
+      });
+
+      function setDrawerOpen(open) {
+        if (!scheduleDrawer) return;
+        const isOpen = Boolean(open) && window.innerWidth > 991;
+        document.body.classList.toggle('schedule-drawer-open', isOpen);
+        scheduleDrawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+        if (scheduleDrawerToggle) {
+          scheduleDrawerToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        }
+      }
+
+      if (scheduleDrawerToggle && scheduleDrawer) {
+        scheduleDrawerToggle.addEventListener('click', () => {
+          const isOpen = document.body.classList.contains('schedule-drawer-open');
+          setDrawerOpen(!isOpen);
+        });
+      }
+
+      if (scheduleDrawerClose && scheduleDrawer) {
+        scheduleDrawerClose.addEventListener('click', () => setDrawerOpen(false));
+      }
+
+      document.addEventListener('click', (event) => {
+        if (!scheduleDrawer || !document.body.classList.contains('schedule-drawer-open')) return;
+        const insideDrawer = scheduleDrawer.contains(event.target);
+        const onToggle = scheduleDrawerToggle && scheduleDrawerToggle.contains(event.target);
+        if (!insideDrawer && !onToggle) {
+          setDrawerOpen(false);
+        }
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && document.body.classList.contains('schedule-drawer-open')) {
+          setDrawerOpen(false);
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        if (window.innerWidth <= 991) {
+          setDrawerOpen(false);
+        }
       });
 
       const briefWhyToggle = document.getElementById('briefWhyToggle');

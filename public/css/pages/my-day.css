@@ -196,6 +196,110 @@ body.theme-light .theme-toggle-min:hover {
   background: rgba(255, 255, 255, 0.9);
 }
 
+.drawer-menu-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+body.theme-light .drawer-menu-btn {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(148, 163, 184, 0.48);
+  color: rgba(15, 23, 42, 0.88);
+}
+
+.schedule-drawer {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  width: min(320px, 86vw);
+  padding: 22px 18px;
+  z-index: 1080;
+  transform: translateX(-104%);
+  transition: transform 220ms ease-out;
+  border-right: 1px solid rgba(148, 163, 184, 0.24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+body.theme-dark .schedule-drawer {
+  background: rgba(8, 14, 24, 0.94);
+}
+
+body.theme-light .schedule-drawer {
+  background: rgba(246, 249, 255, 0.98);
+  border-right-color: rgba(148, 163, 184, 0.42);
+}
+
+body.schedule-drawer-open .schedule-drawer {
+  transform: translateX(0);
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.drawer-title {
+  font-size: var(--t-meta);
+  letter-spacing: var(--trk-chip);
+  text-transform: none;
+  font-weight: var(--w-medium);
+  opacity: 0.72;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.drawer-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  background: transparent;
+  color: inherit;
+}
+
+.drawer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.drawer-action-wrap {
+  margin: 0;
+}
+
+.drawer-action {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(148, 163, 184, 0.1);
+  color: inherit;
+  text-decoration: none;
+  padding: 9px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.drawer-action:hover {
+  transform: translateY(-1px);
+  color: inherit;
+}
+
+body.theme-light .drawer-action {
+  background: rgba(255, 255, 255, 0.85);
+}
+
 button.mobile-menu-btn {
   border-radius: 999px;
   width: 38px;
@@ -253,6 +357,11 @@ body.theme-light .mobile-menu-action:hover {
 .cockpit-page {
   position: relative;
   z-index: 1;
+  transition: transform 220ms ease-out;
+}
+
+body.schedule-drawer-open .cockpit-page {
+  transform: translateX(12px);
 }
 
 .cockpit-alert {
@@ -1373,6 +1482,14 @@ body.theme-light .app-footer .footer-meta {
 }
 
 @media (max-width: 991px) {
+  .schedule-drawer {
+    display: none;
+  }
+
+  body.schedule-drawer-open .cockpit-page {
+    transform: none;
+  }
+
   .topbar-actions .desktop-only {
     display: none !important;
   }

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.83",
+      "date": "2026-02-21",
+      "items": [
+        "fix(my-day-menu): desktop ☰ button now opens a left drawer menu like Schedule instead of the mobile modal",
+        "ux(my-day-menu): added schedule-style drawer panel with close button and actions for desktop widths while keeping mobile modal behavior on small screens",
+        "fix(my-day-topbar): split My Day menu trigger into desktop drawer button and mobile modal button to match responsive behavior from Schedule"
+      ]
+    },
+    {
       "version": "0.9.82",
       "date": "2026-02-21",
       "items": [

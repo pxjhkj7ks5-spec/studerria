@@ -47,7 +47,7 @@
           <span class="msg-badge d-none" id="mobileMenuBadge">0</span>
         </button>
       <% } else if (isMyDay) { %>
-        <span class="me-2 muted text-nowrap">
+        <span class="me-2 muted desktop-only text-nowrap">
           <% if (role === 'admin') { %>
             <%= t('role.admin') %>: <%= username %>
           <% } else if (role === 'starosta') { %>
@@ -61,7 +61,17 @@
           <% } %>
         </span>
         <button
-          class="theme-toggle-min"
+          class="theme-toggle-min drawer-menu-btn desktop-only"
+          type="button"
+          id="scheduleDrawerToggle"
+          aria-label="Open menu"
+          aria-controls="scheduleActionDrawer"
+          aria-expanded="false"
+        >
+          ☰
+        </button>
+        <button
+          class="theme-toggle-min mobile-menu-btn"
           type="button"
           data-bs-toggle="modal"
           data-bs-target="#mobileMenuModal"
