@@ -9,7 +9,8 @@
         "fix(menu-hover): normalized blue hover/focus highlight styles for drawer actions so all menu items highlight consistently",
         "fix(home-welcome): moved the post-registration welcome modal to /home and refreshed its onboarding text for the new Home dashboard",
         "ux(home-role-layouts): admin Home now uses the same student-style block composition, while teacher Home is simplified to three blocks (classes+reminders, competency compass, review queue)",
-        "ux(home-teacher-competency): teacher competency compass now supports selecting a taught subject directly on /home"
+        "ux(home-teacher-competency): teacher competency compass now supports selecting a taught subject directly on /home",
+        "copy(home-welcome): refined the Home welcome modal text to emphasize Studerria as a student-built platform for students"
       ]
     },
     {
