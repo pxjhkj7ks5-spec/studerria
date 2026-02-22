@@ -143,7 +143,12 @@ textarea {
   text-rendering: optimizeLegibility;
 }
 
+html {
+  background-color: var(--bg-0);
+}
+
 body {
+  background-color: var(--bg-0);
   color: var(--ds-text0);
   font-size: var(--t-body);
   font-weight: var(--w-regular);

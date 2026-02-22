@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.85",
+      "date": "2026-02-21",
+      "items": [
+        "fix(theme-overscroll): set root html/body background color from theme tokens so overscroll swipe area no longer shows white outside page bounds",
+        "ux(theme): page edge bounce now keeps dark/light app background continuity across screens using design-system base styles"
+      ]
+    },
+    {
       "version": "0.9.84",
       "date": "2026-02-21",
       "items": [
