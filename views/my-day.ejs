@@ -718,6 +718,25 @@
       </section>
     </main>
 
+    <div class="modal fade" id="welcomeModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-welcome-modal">
+          <div class="modal-body text-center">
+            <div class="welcome-title mb-2">👋 Вітаємо у Studerria!</div>
+            <div class="welcome-subtitle mb-3">
+              Це твоя <strong>Головна</strong> сторінка: тут зібрані дедлайни, найближчі пари, компетентності та нагадування.
+            </div>
+            <div class="small mb-4">
+              🎯 Почни з блоку найближчих дедлайнів і пар, щоб швидко побачити пріоритети.
+              <br />
+              🧭 Далі переглянь компас компетентностей та пульс/інбокс для щоденного фокусу.
+            </div>
+            <button type="button" class="btn btn-primary glass" data-bs-dismiss="modal">Почати роботу</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="homeworkSubmitModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-modal">
@@ -762,6 +781,7 @@
     ></script>
     <script>
       const myDay = <%- JSON.stringify(myDay || {}) %>;
+      const currentUserId = <%- JSON.stringify(userId || null) %>;
       const themeToggles = document.querySelectorAll('.theme-toggle');
       if (window.bootstrap && window.bootstrap.Tooltip) {
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
@@ -787,6 +807,33 @@
           });
         });
       });
+
+      const welcomeModalEl = document.getElementById('welcomeModal');
+      if (welcomeModalEl && window.bootstrap && window.bootstrap.Modal) {
+        const params = new URLSearchParams(window.location.search);
+        const shouldWelcome = params.get('welcome') === '1';
+        const welcomeKey = `studerria:welcome:registered:${currentUserId || 'guest'}`;
+        if (shouldWelcome && !localStorage.getItem(welcomeKey)) {
+          const welcomeModal = new window.bootstrap.Modal(welcomeModalEl, { backdrop: true });
+          welcomeModal.show();
+          localStorage.setItem(welcomeKey, '1');
+          document.body.classList.add('welcome-open');
+          if (window.history && window.history.replaceState) {
+            params.delete('welcome');
+            const query = params.toString();
+            const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
+            window.history.replaceState({}, document.title, nextUrl);
+          }
+          welcomeModalEl.addEventListener('hidden.bs.modal', () => {
+            document.body.classList.remove('welcome-open');
+          }, { once: true });
+        } else if (shouldWelcome && window.history && window.history.replaceState) {
+          params.delete('welcome');
+          const query = params.toString();
+          const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
+          window.history.replaceState({}, document.title, nextUrl);
+        }
+      }
 
       function setDrawerOpen(open) {
         if (!scheduleDrawer) return;

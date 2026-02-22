@@ -8634,6 +8634,7 @@ const renderMyDayPage = async (req, res) => {
     const myDay = await buildMyDayData(req.session.user, req.session.role, req.session.roles || []);
     return res.render('my-day', {
       username: req.session.user.username,
+      userId: req.session.user.id,
       role: req.session.role,
       viewAs: req.session.viewAs || null,
       myDay,

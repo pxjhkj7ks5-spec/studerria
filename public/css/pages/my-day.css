@@ -1544,6 +1544,42 @@ body.theme-light .glass-modal .form-label {
   color: var(--muted-light);
 }
 
+.glass-welcome-modal {
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  box-shadow: 0 14px 38px rgba(2, 6, 23, 0.36);
+  backdrop-filter: blur(16px);
+  padding: 1.2rem;
+}
+
+body.theme-light .glass-welcome-modal {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.88);
+  color: #0f172a;
+}
+
+.welcome-title {
+  font-size: 1.45rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.welcome-subtitle {
+  color: rgba(248, 250, 252, 0.78);
+}
+
+body.theme-light .welcome-subtitle {
+  color: rgba(15, 23, 42, 0.7);
+}
+
+body.welcome-open .cockpit-page,
+body.welcome-open .topbar,
+body.welcome-open .app-footer {
+  filter: blur(2px);
+}
+
 .submit-target {
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.3);
