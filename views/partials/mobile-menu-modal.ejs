@@ -14,17 +14,6 @@
       </div>
       <div class="modal-body">
         <div class="d-grid gap-2">
-          <% if (isSubjects) { %>
-            <a class="btn w-100 glass mobile-menu-action" href="/schedule">📅 Повернутись до розкладу</a>
-            <button
-              class="btn w-100 glass mobile-menu-action theme-toggle"
-              type="button"
-              data-light-label="☀️ Зміна теми"
-              data-dark-label="🌙 Зміна теми"
-            >
-              🌙 Зміна теми
-            </button>
-          <% } else { %>
           <% if (role === 'admin') { %>
             <form method="POST" action="/admin/switch-to-admin">
               <button class="btn w-100 glass mobile-menu-action" type="submit">🛠️ <%= t('schedule.backToAdmin') %></button>
@@ -88,7 +77,6 @@
           <form method="POST" action="/logout">
             <button class="btn w-100 glass mobile-menu-action" type="submit">🚪 <%= t('schedule.logout') %></button>
           </form>
-          <% } %>
         </div>
       </div>
     </div>

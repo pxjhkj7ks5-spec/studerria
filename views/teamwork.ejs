@@ -621,6 +621,7 @@
   </head>
   <body class="theme-dark page-teamwork">
     <%- include('partials/topbar', { role, username, t, activePage: 'teamwork', pageTitle: t('menu.teamwork') }) %>
+    <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'teamwork' }) %>
 
     <main class="container py-4">
       <% if (messages && messages.error) { %>
@@ -1208,6 +1209,7 @@
         });
       });
     </script>
+    <%- include('partials/desktop-menu-drawer-script') %>
       <script src="/js/design-system.js" defer></script>
   </body>
 </html>

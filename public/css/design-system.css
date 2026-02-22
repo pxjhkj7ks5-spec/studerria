@@ -435,6 +435,25 @@ button.btn-link:hover {
     border-color: rgba(120, 167, 255, 0.38);
     box-shadow: 0 8px 18px rgba(2, 6, 23, 0.16);
   }
+
+  .schedule-drawer .drawer-action:hover,
+  .schedule-drawer .drawer-close:hover {
+    border-color: color-mix(in srgb, var(--accent) 36%, var(--surface-border));
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface-soft));
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 14%, rgba(2, 6, 23, 0.2));
+  }
+
+  .schedule-drawer .drawer-action:hover {
+    transform: translateY(-1px);
+    color: var(--ds-text0);
+    text-decoration: none;
+  }
+}
+
+.schedule-drawer .drawer-action:focus-visible,
+.schedule-drawer .drawer-close:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--surface-border));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-soft));
 }
 
 .btn:active,
@@ -534,6 +553,118 @@ button.btn:active,
   color: var(--ds-text2) !important;
   font-size: var(--t-meta);
   font-weight: var(--w-medium);
+}
+
+body.page-journal .schedule-drawer,
+body.page-subjects .schedule-drawer,
+body.page-teamwork .schedule-drawer,
+body.page-profile .schedule-drawer {
+  position: fixed;
+  top: 72px;
+  left: 12px;
+  width: min(360px, calc(100vw - 24px));
+  max-height: calc(100vh - 84px);
+  overflow: auto;
+  border: 1px solid var(--glass-border);
+  border-radius: 22px;
+  padding: 12px;
+  box-shadow: 0 22px 44px rgba(2, 6, 23, 0.24);
+  z-index: 1045;
+  transform: translate3d(calc(-100% - 18px), 0, 0);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform var(--dur-med) var(--ease-apple),
+    opacity var(--dur-fast) ease-out;
+}
+
+body.page-journal.schedule-drawer-open .schedule-drawer,
+body.page-subjects.schedule-drawer-open .schedule-drawer,
+body.page-teamwork.schedule-drawer-open .schedule-drawer,
+body.page-profile.schedule-drawer-open .schedule-drawer {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.page-journal .drawer-head,
+body.page-subjects .drawer-head,
+body.page-teamwork .drawer-head,
+body.page-profile .drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+body.page-journal .drawer-title,
+body.page-subjects .drawer-title,
+body.page-teamwork .drawer-title,
+body.page-profile .drawer-title {
+  font-size: var(--t-h2);
+  font-weight: var(--w-semibold);
+  color: var(--ds-text0);
+}
+
+body.page-journal .drawer-close,
+body.page-subjects .drawer-close,
+body.page-teamwork .drawer-close,
+body.page-profile .drawer-close {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-soft);
+  color: var(--ds-text0);
+}
+
+body.page-journal .drawer-actions,
+body.page-subjects .drawer-actions,
+body.page-teamwork .drawer-actions,
+body.page-profile .drawer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+body.page-journal .drawer-action-wrap,
+body.page-subjects .drawer-action-wrap,
+body.page-teamwork .drawer-action-wrap,
+body.page-profile .drawer-action-wrap {
+  margin: 0;
+}
+
+body.page-journal .drawer-action,
+body.page-subjects .drawer-action,
+body.page-teamwork .drawer-action,
+body.page-profile .drawer-action {
+  width: 100%;
+  min-height: 46px;
+  border-radius: 14px;
+  border: 1px solid var(--surface-border);
+  background: color-mix(in srgb, var(--surface-soft) 94%, transparent);
+  color: var(--ds-text0);
+  text-decoration: none;
+  padding: 11px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  transition:
+    background-color var(--dur-med) var(--ease-apple),
+    border-color var(--dur-med) var(--ease-apple),
+    box-shadow var(--dur-med) var(--ease-apple),
+    transform var(--dur-fast) ease-out;
+}
+
+@media (max-width: 991px) {
+  body.page-journal .schedule-drawer,
+  body.page-subjects .schedule-drawer,
+  body.page-teamwork .schedule-drawer,
+  body.page-profile .schedule-drawer {
+    display: none;
+  }
 }
 
 .app-footer {

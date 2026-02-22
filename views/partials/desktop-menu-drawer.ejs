@@ -1,0 +1,69 @@
+<%
+  const drawerIsSchedule = activePage === 'schedule';
+  const drawerIsMyDay = activePage === 'my-day';
+  const drawerFirstHref = drawerIsMyDay ? '/schedule' : '/home';
+  const drawerFirstLabel = drawerIsMyDay ? '📅 Розклад' : '🏠 Головна';
+  const canShowCustomDeadlines = (role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student')
+    && settings
+    && settings.allow_custom_deadlines;
+  const canShowMessages = settings && settings.allow_messages;
+%>
+<aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div class="drawer-title">Меню</div>
+    <button class="drawer-close" type="button" id="scheduleDrawerClose" aria-label="Close menu">✕</button>
+  </div>
+  <div class="drawer-actions">
+    <% if (role === 'admin') { %>
+      <form method="POST" action="/admin/switch-to-admin" class="drawer-action-wrap">
+        <button class="drawer-action" type="submit">🛠️ <%= t('schedule.backToAdmin') %></button>
+      </form>
+    <% } else if (hasCustomAdminPanelAccess) { %>
+      <a class="drawer-action" href="<%= customAdminPanelHref || '/admin' %>">🛠️ <%= t('schedule.backToAdmin') %></a>
+    <% } %>
+    <% if (role === 'starosta') { %>
+      <a class="drawer-action" href="/starosta">🧑‍🏫 <%= t('menu.starosta') %></a>
+    <% } %>
+    <% if (role === 'deanery') { %>
+      <a class="drawer-action" href="/deanery">🏛️ <%= t('menu.deanery') %></a>
+    <% } %>
+
+    <a class="drawer-action" href="<%= drawerFirstHref %>"><%= drawerFirstLabel %></a>
+    <a class="drawer-action" href="/journal">📘 Журнал</a>
+    <a class="drawer-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
+    <a class="drawer-action" href="/subjects">📚 Предмети</a>
+
+    <% if (canShowCustomDeadlines) { %>
+      <% if (drawerIsSchedule) { %>
+        <button class="drawer-action" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
+          🌀 Дивні дедлайни
+        </button>
+      <% } else { %>
+        <a class="drawer-action" href="/schedule">🌀 Дивні дедлайни</a>
+      <% } %>
+    <% } %>
+
+    <% if (canShowMessages) { %>
+      <% if (drawerIsSchedule) { %>
+        <button class="drawer-action" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">💬 Повідомлення</button>
+      <% } else { %>
+        <a class="drawer-action" href="/schedule">💬 Повідомлення</a>
+      <% } %>
+    <% } %>
+
+    <a class="drawer-action" href="/profile">👤 <%= t('schedule.profile') %></a>
+
+    <button
+      class="drawer-action theme-toggle"
+      type="button"
+      data-light-label="☀️ Зміна теми"
+      data-dark-label="🌙 Зміна теми"
+    >
+      🌙 Зміна теми
+    </button>
+
+    <form method="POST" action="/logout" class="drawer-action-wrap">
+      <button class="drawer-action" type="submit">🚪 <%= t('schedule.logout') %></button>
+    </form>
+  </div>
+</aside>

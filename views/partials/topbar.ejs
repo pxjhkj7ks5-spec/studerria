@@ -79,18 +79,40 @@
         >
           ☰
         </button>
-      <% } else if (isSubjects || isJournal || isTeamwork) { %>
+      <% } else if (isSubjects || isJournal || isTeamwork || isProfile) { %>
+        <span class="me-2 muted desktop-only text-nowrap">
+          <% if (role === 'admin') { %>
+            <%= t('role.admin') %>: <%= username %>
+          <% } else if (role === 'starosta') { %>
+            <%= t('role.starosta') %>: <%= username %>
+          <% } else if (role === 'deanery') { %>
+            <%= t('role.deanery') %>: <%= username %>
+          <% } else if (role === 'teacher') { %>
+            <%= t('role.teacher') %>: <%= username %>
+          <% } else { %>
+            <%= t('role.student') %>: <%= username %>
+          <% } %>
+        </span>
         <button
-          class="theme-toggle theme-toggle-min"
+          class="theme-toggle-min drawer-menu-btn desktop-only"
           type="button"
-          id="themeToggle"
-          aria-label="Toggle theme"
-          data-light-label="☀️"
-          data-dark-label="🌙"
+          id="scheduleDrawerToggle"
+          aria-label="Open menu"
+          aria-controls="scheduleActionDrawer"
+          aria-expanded="false"
         >
-          🌙
+          ☰
         </button>
-        <a class="btn btn-glass" href="/schedule">Повернутись до розкладу</a>
+        <button
+          class="theme-toggle-min mobile-menu-btn"
+          type="button"
+          data-bs-toggle="modal"
+          data-bs-target="#mobileMenuModal"
+          aria-label="Menu"
+        >
+          ☰
+          <span class="msg-badge d-none" id="mobileMenuBadge">0</span>
+        </button>
       <% } else { %>
         <% if (!isMyDay) { %>
           <span class="me-2 muted desktop-only text-nowrap">

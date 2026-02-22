@@ -18,6 +18,7 @@
   </head>
   <body class="theme-dark page-journal">
     <%- include('partials/topbar', { role, username, t, activePage: 'journal', pageTitle: 'Журнал' }) %>
+    <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'journal' }) %>
 
     <main class="container py-4">
       <% if (messages && messages.error) { %>
@@ -2347,6 +2348,7 @@
         openAttendanceQuickModal();
       }
     </script>
+    <%- include('partials/desktop-menu-drawer-script') %>
     <script src="/js/design-system.js" defer></script>
   </body>
 </html>

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.99",
+      "date": "2026-02-22",
+      "items": [
+        "ux(menu-desktop): added the same drawer menu to Journal, Teamwork, Subjects, and Profile pages with a shared reusable partial",
+        "ux(menu-mobile-subjects): unified Subjects mobile menu with the full navigation menu used on other pages",
+        "fix(menu-hover): normalized blue hover/focus highlight styles for drawer actions so all menu items highlight consistently"
+      ]
+    },
+    {
       "version": "0.9.98",
       "date": "2026-02-22",
       "items": [
