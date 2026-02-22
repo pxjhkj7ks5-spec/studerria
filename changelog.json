@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.82",
+      "date": "2026-02-21",
+      "items": [
+        "ux(my-day-topbar): replaced separate theme/back buttons with a single menu (☰) trigger in My Day header",
+        "ux(my-day-topbar): restored compact role+username label next to the menu button to match other pages and target menu layout"
+      ]
+    },
+    {
       "version": "0.9.81",
       "date": "2026-02-21",
       "items": [
