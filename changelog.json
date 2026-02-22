@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.93",
+      "date": "2026-02-22",
+      "items": [
+        "ux(my-day): styled Leadership Brief week label as a colored oval chip to match the Schedule week badge look"
+      ]
+    },
+    {
       "version": "0.9.92",
       "date": "2026-02-22",
       "items": [

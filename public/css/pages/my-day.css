@@ -439,13 +439,26 @@ body.theme-light .brief-kicker {
 }
 
 .brief-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  padding: 0.34rem 0.78rem;
+  border-radius: 999px;
   font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--muted-dark);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: #16213b;
+  background: linear-gradient(135deg, rgba(191, 219, 254, 0.9), rgba(196, 181, 253, 0.82));
+  border: 1px solid rgba(147, 197, 253, 0.62);
+  box-shadow: 0 8px 18px rgba(100, 116, 139, 0.12);
+  flex-shrink: 0;
 }
 
 body.theme-light .brief-meta {
-  color: var(--muted-light);
+  color: #16213b;
+  background: linear-gradient(135deg, rgba(191, 219, 254, 0.88), rgba(196, 181, 253, 0.8));
+  border-color: rgba(147, 197, 253, 0.58);
 }
 
 .brief-title {
