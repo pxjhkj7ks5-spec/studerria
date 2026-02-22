@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.90",
+      "date": "2026-02-22",
+      "items": [
+        "ux(home-url): switched My Day page links to canonical /home route (\"Головна\") while keeping /my-day as backward-compatible redirect",
+        "ux(auth): login success, student registration completion, and authenticated root/login entry now open /home as the first landing page"
+      ]
+    },
+    {
       "version": "0.9.89",
       "date": "2026-02-22",
       "items": [

@@ -4476,7 +4476,7 @@ const resolveVisitPageKey = (pathname) => {
   if (normalized === '/' || normalized === '/login') return 'login';
   if (normalized.startsWith('/register')) return 'register';
   if (normalized.startsWith('/schedule')) return 'schedule';
-  if (normalized.startsWith('/my-day')) return 'my-day';
+  if (normalized.startsWith('/my-day') || normalized.startsWith('/home')) return 'my-day';
   if (normalized.startsWith('/teamwork')) return 'teamwork';
   if (normalized.startsWith('/profile')) return 'profile';
   if (normalized.startsWith('/admin')) return 'admin';
@@ -5381,10 +5381,16 @@ function sortHomework(homework, sortKey) {
 }
 
 app.get('/', (req, res) => {
+  if (req.session && req.session.user) {
+    return res.redirect('/home');
+  }
   res.render('login', { error: req.query.error === '1' });
 });
 
 app.get('/login', (req, res) => {
+  if (req.session && req.session.user) {
+    return res.redirect('/home');
+  }
   res.render('login', { error: req.query.error === '1' });
 });
 
@@ -5506,12 +5512,7 @@ app.post('/login', authLimiter, async (req, res) => {
         req.session.last_seen_ip = loginIp;
         req.session.last_seen_user_agent = loginUserAgent;
 
-        req.session.save(() => {
-          if (role === 'admin') {
-            return res.redirect('/admin');
-          }
-          return res.redirect('/schedule');
-        });
+        req.session.save(() => res.redirect('/home'));
       }
     );
   });
@@ -5789,7 +5790,7 @@ app.post('/register/subjects', registerLimiter, (req, res) => {
           req.session.rememberMe = null;
           logAction(db, req, 'register_subjects', { user_id: user.id });
           broadcast('users_updated');
-          return req.session.save(() => res.redirect('/schedule?welcome=1'));
+          return req.session.save(() => res.redirect('/home?welcome=1'));
         });
       });
     });
@@ -8255,7 +8256,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       kind: 'risk',
       title: `Прострочено: ${overdueCount}`,
       meta: 'Закрий прострочки, щоб не втратити темп',
-      action_href: '/my-day#deadlinesBlock',
+      action_href: '/home#deadlinesBlock',
       action_label: 'До дедлайнів',
     });
   }
@@ -8264,7 +8265,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       kind: 'focus',
       title: `На 48 год: ${dueSoonCount}`,
       meta: 'Найближчі завдання потребують уваги',
-      action_href: '/my-day#deadlinesBlock',
+      action_href: '/home#deadlinesBlock',
       action_label: 'Відкрити',
     });
   }
@@ -8291,7 +8292,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       kind: 'reminder',
       title: `Активні нагадування: ${openReminders}`,
       meta: 'Не забудь перевірити особистий список',
-      action_href: '/my-day#inboxBlock',
+      action_href: '/home#inboxBlock',
       action_label: 'Перевірити',
     });
   }
@@ -8335,7 +8336,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       title: 'Є ризик по дедлайнах',
       message: `Маєш ${overdueCount} прострочених завдань. ${subjectHint}`,
       action_label: 'Закрити дедлайни',
-      action_href: '/my-day#deadlinesBlock',
+      action_href: '/home#deadlinesBlock',
       reasons: [
         `Прострочені задачі: ${overdueCount}`,
         `Предметів у ризику: ${riskySubjectCount}`,
@@ -8347,7 +8348,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       title: 'Фокус на найближчі 48 год',
       message: `Попереду ${dueSoonCount} задач до завтра. Закрий їх зараз, щоб зберегти темп.`,
       action_label: 'Перейти до здачі',
-      action_href: '/my-day#deadlinesBlock',
+      action_href: '/home#deadlinesBlock',
       reasons: [
         `Задачі до завтра: ${dueSoonCount}`,
         `Вчасні здачі: ${onTimeShare === null ? '-' : `${onTimeShare}%`}`,
@@ -8359,7 +8360,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       title: 'Помітний прогрес за останній період',
       message: `Прокачується ${fastestGrowingCompetency.label} (+${fastestGrowingCompetency.delta}). Тримай цей фокус.`,
       action_label: 'Переглянути прогрес',
-      action_href: '/my-day#competencyBlock',
+      action_href: '/home#competencyBlock',
       reasons: [
         `Сильна сторона: ${strongestCompetency ? strongestCompetency.label : 'н/д'}`,
         `Відміток компетентностей: ${competencyTotalMarks}`,
@@ -8600,7 +8601,7 @@ async function buildMyDayWhatIfForecast({
   };
 }
 
-app.get('/my-day', requireLogin, async (req, res) => {
+const renderMyDayPage = async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -8619,7 +8620,15 @@ app.get('/my-day', requireLogin, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'myday');
   }
+};
+
+app.get('/my-day', requireLogin, (req, res) => {
+  const queryIndex = String(req.originalUrl || '').indexOf('?');
+  const query = queryIndex >= 0 ? String(req.originalUrl).slice(queryIndex) : '';
+  return res.redirect(`/home${query}`);
 });
+
+app.get('/home', requireLogin, renderMyDayPage);
 
 app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
   try {
@@ -8922,7 +8931,9 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
 app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('submission_attachment'), async (req, res) => {
   const homeworkId = Number(req.params.id);
   const requestedRedirect = typeof req.body.redirect_to === 'string' ? String(req.body.redirect_to).trim() : '';
-  const redirectBase = requestedRedirect.startsWith('/my-day') ? '/my-day' : '/schedule';
+  const redirectBase = (requestedRedirect.startsWith('/my-day') || requestedRedirect.startsWith('/home'))
+    ? '/home'
+    : '/schedule';
   const redirectWith = (kind, message) => `${redirectBase}?${kind}=${encodeURIComponent(String(message || ''))}`;
   if (!Number.isFinite(homeworkId) || homeworkId < 1) {
     if (req.file) fs.unlink(req.file.path, () => {});
