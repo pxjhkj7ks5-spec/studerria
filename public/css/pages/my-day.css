@@ -1664,6 +1664,22 @@ body.theme-light .reminder-input::placeholder {
   color: rgba(51, 65, 85, 0.48);
 }
 
+body.theme-dark select.reminder-input,
+body.theme-dark select.reminder-input:focus {
+  color-scheme: dark;
+}
+
+body.theme-dark select.reminder-input option,
+body.theme-dark select.reminder-input optgroup {
+  background: #0b1426;
+  color: #e5edf8;
+}
+
+body.theme-dark select.reminder-input option:checked {
+  background: #1d4ed8;
+  color: #f8fafc;
+}
+
 .app-footer {
   margin-top: 1.1rem;
   padding-top: 1rem !important;
