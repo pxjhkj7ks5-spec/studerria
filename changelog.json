@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.96",
+      "date": "2026-02-22",
+      "items": [
+        "fix(my-day-layout): reminders card now renders as the last student block on Home (replaced invalid order-6 utility with valid order-last)"
+      ]
+    },
+    {
       "version": "0.9.95",
       "date": "2026-02-22",
       "items": [

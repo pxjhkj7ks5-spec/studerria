@@ -443,7 +443,7 @@
         <% } %>
 
         <% if (hasReviewQueue) { %>
-          <article class="cockpit-card section-card review-queue-card<%= isStudentMyDayView ? ' order-6' : '' %>" id="reviewQueueBlock">
+          <article class="cockpit-card section-card review-queue-card<%= isStudentMyDayView ? ' order-last' : '' %>" id="reviewQueueBlock">
             <div class="section-head">
               <h2 class="section-title">Черга перевірки</h2>
               <span class="section-subtitle">Пріоритет: прострочені, нові, без коментаря</span>
@@ -607,7 +607,7 @@
           </div>
         </article>
 
-        <article class="cockpit-card section-card reminder-card<%= isStudentMyDayView ? ' order-6' : '' %>" id="remindersBlock">
+        <article class="cockpit-card section-card reminder-card<%= isStudentMyDayView ? ' order-last' : '' %>" id="remindersBlock">
           <div class="section-head">
             <h2 class="section-title">Нагадування</h2>
             <span class="section-subtitle">Особисті задачі та короткі нотатки</span>
