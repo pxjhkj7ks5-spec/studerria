@@ -7493,6 +7493,16 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
   const tomorrowStr = formatLocalDate(addDays(now, 1));
   const dayName = getDayNameFromDate(todayStr);
   const weekNumber = getAcademicWeekForSemester(now, activeSemester);
+  const currentDayIndex = fullWeekDays.indexOf(dayName);
+  const clampAcademicWeek = (value) => {
+    let nextValue = Number.isFinite(Number(value)) ? Math.floor(Number(value)) : 1;
+    if (nextValue < 1) nextValue = 1;
+    const totalWeeks = Number(activeSemester && activeSemester.weeks_count);
+    if (Number.isFinite(totalWeeks) && totalWeeks > 0 && nextValue > totalWeeks) {
+      nextValue = totalWeeks;
+    }
+    return nextValue;
+  };
   const nowIso = new Date().toISOString();
   const normalizedRoleList = normalizeRoleList([role, ...(Array.isArray(roleList) ? roleList : [])]);
   const normalizedRole = normalizedRoleList[0] || String(role || '').toLowerCase() || 'student';
@@ -7595,7 +7605,20 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       return [];
     }
     const dateAsDate = new Date(`${dateValue}T12:00:00`);
-    const weekForDate = getAcademicWeekForSemester(dateAsDate, activeSemester);
+    let weekForDate = getAcademicWeekForSemester(dateAsDate, activeSemester);
+    const targetDayIndex = fullWeekDays.indexOf(targetDayName);
+    const isFutureDate = typeof dateValue === 'string' && dateValue > todayStr;
+    // If calendar day wraps (e.g. Sunday -> Monday) but semester-start-based week math keeps the same week,
+    // My Day should still show the next academic week Monday classes.
+    if (
+      isFutureDate
+      && currentDayIndex >= 0
+      && targetDayIndex >= 0
+      && targetDayIndex < currentDayIndex
+      && Number(weekForDate) <= Number(weekNumber)
+    ) {
+      weekForDate = clampAcademicWeek(Number(weekNumber) + 1);
+    }
     const scope = buildScope('se');
     const params = [weekForDate, courseId, targetDayName];
     if (activeSemester) {

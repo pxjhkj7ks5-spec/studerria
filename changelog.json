@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.94",
+      "date": "2026-02-22",
+      "items": [
+        "fix(my-day-next-classes): on Sunday, nearest classes now correctly resolve Monday from the next academic week instead of the past Monday of the current week"
+      ]
+    },
+    {
       "version": "0.9.93",
       "date": "2026-02-22",
       "items": [
