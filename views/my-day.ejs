@@ -763,6 +763,11 @@
     <script>
       const myDay = <%- JSON.stringify(myDay || {}) %>;
       const themeToggles = document.querySelectorAll('.theme-toggle');
+      if (window.bootstrap && window.bootstrap.Tooltip) {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+          window.bootstrap.Tooltip.getOrCreateInstance(el);
+        });
+      }
       const scheduleDrawer = document.getElementById('scheduleActionDrawer');
       const scheduleDrawerToggle = document.getElementById('scheduleDrawerToggle');
       const scheduleDrawerClose = document.getElementById('scheduleDrawerClose');

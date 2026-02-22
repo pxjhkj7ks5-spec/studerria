@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.97",
+      "date": "2026-02-22",
+      "items": [
+        "fix(home-footer): initialized Bootstrap tooltips on Home page so the footer build hover info appears",
+        "ux(home-light-theme): tweaked Changelog modal background and header/footer surfaces in light theme for cleaner contrast"
+      ]
+    },
+    {
       "version": "0.9.96",
       "date": "2026-02-22",
       "items": [

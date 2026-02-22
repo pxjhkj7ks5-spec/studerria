@@ -1644,6 +1644,17 @@ body.theme-light .app-footer .footer-meta {
   box-shadow: 0 12px 20px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
+body.theme-light .changelog-liquid-modal .modal-content {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(245, 249, 255, 0.93));
+  border-color: rgba(148, 163, 184, 0.26);
+  box-shadow: 0 28px 64px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+body.theme-light .changelog-liquid-modal .modal-header,
+body.theme-light .changelog-liquid-modal .modal-footer {
+  background: rgba(248, 251, 255, 0.82);
+}
+
 @media (max-width: 1200px) {
   .dual-focus-grid {
     grid-template-columns: 1fr;
