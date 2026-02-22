@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.86",
+      "date": "2026-02-21",
+      "items": [
+        "ux(my-day-menu): replaced self-link \"Мій день\" with \"Розклад\" in My Day desktop drawer menu"
+      ]
+    },
+    {
       "version": "0.9.85",
       "date": "2026-02-21",
       "items": [
