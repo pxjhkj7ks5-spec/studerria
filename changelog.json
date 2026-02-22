@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.95",
+      "date": "2026-02-22",
+      "items": [
+        "ux(menu-home-schedule): reordered student menu items on Home and Schedule drawers to a consistent navigation order (home/schedule, journal, teamwork, subjects, weird deadlines, messages, profile, theme, logout)",
+        "ux(menu): added emoji icons to drawer and mobile menu actions, including themed label text for the theme toggle"
+      ]
+    },
+    {
       "version": "0.9.94",
       "date": "2026-02-22",
       "items": [

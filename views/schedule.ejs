@@ -1580,40 +1580,40 @@
       <div class="drawer-actions">
         <% if (role === 'admin') { %>
           <form method="POST" action="/admin/switch-to-admin" class="drawer-action-wrap">
-            <button class="drawer-action" type="submit"><%= t('schedule.backToAdmin') %></button>
+            <button class="drawer-action" type="submit">🛠️ <%= t('schedule.backToAdmin') %></button>
           </form>
         <% } else if (hasCustomAdminPanelAccess) { %>
-          <a class="drawer-action" href="<%= customAdminPanelHref || '/admin' %>"><%= t('schedule.backToAdmin') %></a>
+          <a class="drawer-action" href="<%= customAdminPanelHref || '/admin' %>">🛠️ <%= t('schedule.backToAdmin') %></a>
         <% } %>
         <% if (role === 'starosta') { %>
-          <a class="drawer-action" href="/starosta"><%= t('menu.starosta') %></a>
+          <a class="drawer-action" href="/starosta">🧑‍🏫 <%= t('menu.starosta') %></a>
         <% } %>
         <% if (role === 'deanery') { %>
-          <a class="drawer-action" href="/deanery"><%= t('menu.deanery') %></a>
+          <a class="drawer-action" href="/deanery">🏛️ <%= t('menu.deanery') %></a>
+        <% } %>
+        <a class="drawer-action" href="/home">🏠 Головна</a>
+        <a class="drawer-action" href="/journal">📘 Журнал</a>
+        <a class="drawer-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
+        <a class="drawer-action" href="/subjects">📚 Предмети</a>
+        <% if ((role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') && settings && settings.allow_custom_deadlines) { %>
+          <button class="drawer-action" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
+            🌀 Дивні дедлайни
+          </button>
         <% } %>
         <% if (settings && settings.allow_messages) { %>
           <button class="drawer-action" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">💬 Повідомлення</button>
         <% } %>
-        <% if ((role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') && settings && settings.allow_custom_deadlines) { %>
-          <button class="drawer-action" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
-            Дивні дедлайни
-          </button>
-        <% } %>
-        <a class="drawer-action" href="/subjects">Предмети</a>
-        <a class="drawer-action" href="/journal">Журнал</a>
-        <a class="drawer-action" href="/teamwork"><%= t('menu.teamwork') %></a>
-        <a class="drawer-action" href="/home">Головна</a>
-        <a class="drawer-action" href="/profile"><%= t('schedule.profile') %></a>
+        <a class="drawer-action" href="/profile">👤 <%= t('schedule.profile') %></a>
         <button
           class="drawer-action theme-toggle"
           type="button"
-          data-light-label="☀️"
-          data-dark-label="🌙"
+          data-light-label="☀️ Зміна теми"
+          data-dark-label="🌙 Зміна теми"
         >
-          🌙
+          🌙 Зміна теми
         </button>
         <form method="POST" action="/logout" class="drawer-action-wrap">
-          <button class="drawer-action" type="submit"><%= t('schedule.logout') %></button>
+          <button class="drawer-action" type="submit">🚪 <%= t('schedule.logout') %></button>
         </form>
       </div>
     </aside>
