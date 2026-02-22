@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "0.9.88",
+      "date": "2026-02-21",
+      "items": [
+        "ux(my-day): renamed page title from \"Studeria Cockpit\" to \"Головна\" in topbar and browser title to \"Studerria\"",
+        "ux(menu): increased drawer menu item spacing/padding in Schedule and My Day for roomier navigation",
+        "ux(menu): renamed \"Мій день\" menu entry to \"Головна\" in Schedule drawer and shared mobile menu"
+      ]
+    },
+    {
       "version": "0.9.87",
       "date": "2026-02-21",
       "items": [
