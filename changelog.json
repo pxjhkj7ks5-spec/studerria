@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.9.98",
+      "date": "2026-02-22",
+      "items": [
+        "ux(home-student-layout): reordered student Home blocks to deadlines/classes -> competency compass -> pulse/inbox -> reminders"
+      ]
+    },
+    {
       "version": "0.9.97",
       "date": "2026-02-22",
       "items": [
