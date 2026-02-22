@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.91",
+      "date": "2026-02-22",
+      "items": [
+        "ux(my-day-student): made competency compass more compact with smaller orb, tighter insight cards, and denser spacing",
+        "ux(my-day-student): switched competency rows to a two-column desktop layout with mobile/tablet fallback to a single column"
+      ]
+    },
+    {
       "version": "0.9.90",
       "date": "2026-02-22",
       "items": [

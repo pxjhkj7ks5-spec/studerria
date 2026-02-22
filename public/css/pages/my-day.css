@@ -1352,6 +1352,92 @@ body.theme-light .competency-bar {
   font-weight: 700;
 }
 
+.competency-card-compact .section-head {
+  margin-bottom: 0.62rem;
+}
+
+.competency-card-compact .competency-hero {
+  grid-template-columns: 156px 1fr;
+  gap: 0.62rem;
+  margin-bottom: 0.64rem;
+  align-items: start;
+}
+
+.competency-card-compact .competency-orb {
+  width: 146px;
+  height: 146px;
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.34);
+}
+
+body.theme-light .competency-card-compact .competency-orb {
+  box-shadow: 0 10px 22px rgba(30, 64, 175, 0.1);
+}
+
+.competency-card-compact .competency-orb-core {
+  width: 92px;
+  height: 92px;
+}
+
+.competency-card-compact .competency-orb-core strong {
+  font-size: 1.32rem;
+}
+
+.competency-card-compact .competency-orb-core span {
+  font-size: 0.72rem;
+}
+
+.competency-card-compact .competency-insights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.38rem;
+}
+
+.competency-card-compact .competency-insight {
+  min-width: 0;
+  padding: 0.42rem 0.5rem;
+  gap: 0.12rem;
+  min-height: 58px;
+}
+
+.competency-card-compact .competency-insight span {
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+}
+
+.competency-card-compact .competency-insight strong {
+  font-size: 0.84rem;
+  line-height: 1.14;
+  word-break: break-word;
+}
+
+.competency-card-compact .competency-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.38rem;
+}
+
+.competency-card-compact .competency-list > .empty-state {
+  grid-column: 1 / -1;
+}
+
+.competency-card-compact .competency-item {
+  padding: 0.42rem 0.5rem;
+  gap: 0.28rem 0.44rem;
+}
+
+.competency-card-compact .competency-name,
+.competency-card-compact .competency-score {
+  font-size: 0.8rem;
+}
+
+.competency-card-compact .competency-bar {
+  height: 6px;
+}
+
+.competency-card-compact .competency-delta {
+  font-size: 0.7rem;
+}
+
 .trend-up {
   color: #34d399;
 }
@@ -1555,6 +1641,14 @@ body.theme-light .app-footer .footer-meta {
 
   .competency-insights {
     width: 100%;
+  }
+
+  .competency-card-compact .competency-insights {
+    grid-template-columns: 1fr;
+  }
+
+  .competency-card-compact .competency-list {
+    grid-template-columns: 1fr;
   }
 }
 
