@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.84",
+      "date": "2026-02-21",
+      "items": [
+        "ux(my-day-menu): matched desktop drawer menu item set/order with Schedule (added messages, weird deadlines, self-link; removed separate back-to-schedule row)",
+        "ux(my-day-menu): My Day drawer now mirrors Schedule menu structure for consistent navigation between pages"
+      ]
+    },
+    {
       "version": "0.9.83",
       "date": "2026-02-21",
       "items": [

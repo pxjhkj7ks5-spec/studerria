@@ -118,10 +118,16 @@
         <% if (role === 'deanery') { %>
           <a class="drawer-action" href="/deanery"><%= t('menu.deanery') %></a>
         <% } %>
-        <a class="drawer-action" href="/schedule">Повернутись до розкладу</a>
+        <% if (settings && settings.allow_messages) { %>
+          <a class="drawer-action" href="/schedule">💬 Повідомлення</a>
+        <% } %>
+        <% if ((role === 'student' || role === 'starosta' || role === 'teacher') && settings && settings.allow_custom_deadlines) { %>
+          <a class="drawer-action" href="/schedule">Дивні дедлайни</a>
+        <% } %>
         <a class="drawer-action" href="/subjects">Предмети</a>
         <a class="drawer-action" href="/journal">Журнал</a>
         <a class="drawer-action" href="/teamwork"><%= t('menu.teamwork') %></a>
+        <a class="drawer-action" href="/my-day">Мій день</a>
         <a class="drawer-action" href="/profile"><%= t('schedule.profile') %></a>
         <button
           class="drawer-action theme-toggle"
