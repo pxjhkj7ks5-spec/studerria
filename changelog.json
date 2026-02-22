@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.92",
+      "date": "2026-02-22",
+      "items": [
+        "ux(my-day): moved reminders into a separate dashboard card instead of nesting them inside \"Пульс та інбокс\"",
+        "ux(my-day): added standalone reminder block styling so reminders keep the same controls without extra nested separator spacing"
+      ]
+    },
+    {
       "version": "0.9.91",
       "date": "2026-02-22",
       "items": [

@@ -605,10 +605,17 @@
               </div>
             <% } %>
           </div>
+        </article>
 
-          <div class="reminder-block">
+        <article class="cockpit-card section-card reminder-card<%= isStudentMyDayView ? ' order-6' : '' %>" id="remindersBlock">
+          <div class="section-head">
+            <h2 class="section-title">Нагадування</h2>
+            <span class="section-subtitle">Особисті задачі та короткі нотатки</span>
+          </div>
+
+          <div class="reminder-block reminder-block-standalone">
             <div class="reminder-header">
-              <h3>Нагадування</h3>
+              <h3>Список нагадувань</h3>
               <button type="button" class="btn btn-soft btn-sm" id="toggleReminderForm">Додати</button>
             </div>
             <form id="reminderForm" class="reminder-form d-none">
