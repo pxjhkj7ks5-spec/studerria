@@ -529,6 +529,75 @@ body.theme-light .section-subtitle {
   color: var(--muted-light);
 }
 
+.dual-focus-card .section-head {
+  margin-bottom: 0.72rem;
+}
+
+.dual-focus-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 0.78rem;
+}
+
+.dual-focus-pane {
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  background: rgba(15, 23, 42, 0.12);
+  padding: 0.78rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+body.theme-light .dual-focus-pane {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.dual-focus-pane-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin-bottom: 0.66rem;
+}
+
+.dual-focus-pane-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 690;
+  letter-spacing: 0.003em;
+}
+
+.dual-focus-pane-subtitle {
+  color: var(--muted-dark);
+  font-size: 0.72rem;
+  font-weight: 560;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+body.theme-light .dual-focus-pane-subtitle {
+  color: var(--muted-light);
+}
+
+.dual-focus-pane .item-list {
+  gap: 0.56rem;
+}
+
+.dual-focus-pane .item-row {
+  padding: 0.62rem 0.7rem;
+}
+
+.dual-focus-pane .empty-state {
+  margin: 0;
+}
+
+.dual-focus-footer {
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
 .item-list {
   display: flex;
   flex-direction: column;
@@ -1471,6 +1540,14 @@ body.theme-light .app-footer .footer-meta {
 }
 
 @media (max-width: 1200px) {
+  .dual-focus-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dual-focus-pane-subtitle {
+    text-align: left;
+  }
+
   .competency-hero {
     grid-template-columns: 1fr;
     justify-items: center;

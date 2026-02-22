@@ -175,6 +175,111 @@
       </section>
 
       <section class="cockpit-grid">
+        <% if (isStudentMyDayView) { %>
+          <article class="cockpit-card section-card order-1 dual-focus-card" id="deadlinesClassesBlock">
+            <div class="section-head">
+              <h2 class="section-title">Найближчі дедлайни та пари</h2>
+              <span class="section-subtitle">Ключові задачі та найближчі заняття</span>
+            </div>
+
+            <div class="dual-focus-grid">
+              <section class="dual-focus-pane" aria-labelledby="deadlinesPaneTitle">
+                <div class="dual-focus-pane-head">
+                  <h3 class="dual-focus-pane-title" id="deadlinesPaneTitle">Найближчі дедлайни</h3>
+                  <span class="dual-focus-pane-subtitle">2-3 задачі з пріоритетом</span>
+                </div>
+                <% if (!deadlineItems.length) { %>
+                  <div class="empty-state compact">
+                    <div class="empty-state-title">Критичних дедлайнів не знайдено</div>
+                    <div class="empty-state-subtitle">Система не бачить відкритих ризиків на найближчий період.</div>
+                  </div>
+                <% } else { %>
+                  <div class="item-list">
+                    <% deadlineItems.forEach((item) => {
+                         const status = getDeadlineStatus(item);
+                         const isHomework = item && item.type === 'homework';
+                         const canSubmitNow = Boolean(isHomework && item.can_submit);
+                         const hasSubmission = Boolean(isHomework && item.submission_id);
+                         const creatorName = String(item && item.created_by ? item.created_by : '').trim();
+                    %>
+                      <div class="item-row deadline-row">
+                        <div class="item-main">
+                          <div class="item-title"><%= item.description || 'Завдання' %></div>
+                          <div class="item-meta">
+                            <span><%= item.subject_name || 'Предмет' %></span>
+                            <span>до <%= formatShortDate(item.deadline_date) %></span>
+                            <% if (creatorName) { %><span>додав: <%= creatorName %></span><% } %>
+                            <% if (item.is_control) { %><span class="type-chip">Контроль</span><% } %>
+                            <% if (item.is_credit) { %><span class="type-chip">Залік</span><% } %>
+                          </div>
+                        </div>
+                        <div class="item-side">
+                          <span class="status-chip <%= status.className %>"><%= status.label %></span>
+                          <% if (canSubmitNow) { %>
+                            <button
+                              type="button"
+                              class="btn btn-submit-now"
+                              data-submit-homework-id="<%= item.id %>"
+                              data-submit-title="<%= item.description || 'Завдання' %>"
+                              data-submit-mode="<%= hasSubmission ? 'update' : 'create' %>"
+                            >
+                              <%= hasSubmission ? 'Оновити здачу' : 'Здати' %>
+                            </button>
+                          <% } else if (isHomework && hasSubmission && item.submission_status === 'submitted_on_time') { %>
+                            <span class="item-note">Здано <%= item.submitted_date || '' %></span>
+                          <% } else if (isHomework && hasSubmission && item.submission_status === 'submitted_late') { %>
+                            <span class="item-note">Здано із запізненням</span>
+                          <% } else if (item.type === 'teamwork') { %>
+                            <a href="/teamwork" class="btn btn-inline-link">Відкрити</a>
+                          <% } else { %>
+                            <a href="/schedule" class="btn btn-inline-link">Відкрити</a>
+                          <% } %>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                <% } %>
+                <div class="section-footer-link dual-focus-footer">
+                  <a href="/schedule">Відкрити повний список у розкладі</a>
+                </div>
+              </section>
+
+              <section class="dual-focus-pane" aria-labelledby="nextClassesPaneTitle">
+                <div class="dual-focus-pane-head">
+                  <h3 class="dual-focus-pane-title" id="nextClassesPaneTitle">Пари найближчим часом</h3>
+                  <span class="dual-focus-pane-subtitle">Сьогодні та завтра</span>
+                </div>
+                <% if (!classItems.length) { %>
+                  <div class="empty-state compact">
+                    <div class="empty-state-title">Найближчих пар немає</div>
+                    <div class="empty-state-subtitle">Перевір розклад, якщо очікуєш зміни.</div>
+                  </div>
+                <% } else { %>
+                  <div class="item-list">
+                    <% classItems.forEach((item) => { %>
+                      <div class="item-row class-row">
+                        <div class="item-main">
+                          <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
+                          <div class="item-meta">
+                            <span class="type-chip"><%= getDayContext(item) %></span>
+                            <span>Пара <%= item.class_number || '-' %></span>
+                            <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
+                            <% if (item.group_number) { %><span>Група <%= item.group_number %></span><% } %>
+                          </div>
+                        </div>
+                        <div class="item-side">
+                          <a href="/schedule" class="btn btn-inline-link">До розкладу</a>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                <% } %>
+              </section>
+            </div>
+          </article>
+        <% } %>
+
+        <% if (!isStudentMyDayView) { %>
         <article class="cockpit-card section-card<%= isStudentMyDayView ? ' order-1' : '' %>" id="deadlinesBlock">
           <div class="section-head">
             <h2 class="section-title">Найближчі дедлайни</h2>
@@ -267,6 +372,7 @@
             </div>
           <% } %>
         </article>
+        <% } %>
 
         <% if (hasProgressDashboard && !isStudentMyDayView) { %>
           <article class="cockpit-card section-card" id="progressRiskBlock">

@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.89",
+      "date": "2026-02-22",
+      "items": [
+        "ux(my-day-student): merged \"Найближчі дедлайни\" and \"Пари найближчим часом\" into one combined dashboard card with two panes",
+        "ux(my-day-student): added adaptive dual-pane layout (desktop side-by-side, tablet/mobile stacked) for deadlines/classes block"
+      ]
+    },
+    {
       "version": "0.9.88",
       "date": "2026-02-21",
       "items": [
