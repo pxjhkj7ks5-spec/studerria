@@ -33,6 +33,7 @@
       const progressDashboard = cockpit.progress_dashboard || {};
       const progressSubjects = Array.isArray(progressDashboard.subjects) ? progressDashboard.subjects : [];
       const hasProgressDashboard = Boolean(progressDashboard.enabled);
+      const isStudentMyDayView = role === 'student';
       const whatIfSubjects = Array.isArray(cockpit.what_if_subjects) ? cockpit.what_if_subjects : [];
       const defaultWhatIfSubjectId = Number(cockpit.what_if_default_subject_id || 0);
       const briefToneClass = `brief-tone-${brief.tone || 'calm'}`;
@@ -174,7 +175,7 @@
       </section>
 
       <section class="cockpit-grid">
-        <article class="cockpit-card section-card" id="deadlinesBlock">
+        <article class="cockpit-card section-card<%= isStudentMyDayView ? ' order-1' : '' %>" id="deadlinesBlock">
           <div class="section-head">
             <h2 class="section-title">Найближчі дедлайни</h2>
             <span class="section-subtitle">2-3 задачі з найвищим пріоритетом</span>
@@ -235,7 +236,7 @@
           </div>
         </article>
 
-        <article class="cockpit-card section-card">
+        <article class="cockpit-card section-card<%= isStudentMyDayView ? ' order-4' : '' %>" id="nextClassesBlock">
           <div class="section-head">
             <h2 class="section-title">Пари найближчим часом</h2>
             <span class="section-subtitle">Сьогодні та завтра</span>
@@ -267,7 +268,7 @@
           <% } %>
         </article>
 
-        <% if (hasProgressDashboard) { %>
+        <% if (hasProgressDashboard && !isStudentMyDayView) { %>
           <article class="cockpit-card section-card" id="progressRiskBlock">
             <div class="section-head">
               <h2 class="section-title">Прогрес і ризик</h2>
@@ -336,7 +337,7 @@
         <% } %>
 
         <% if (hasReviewQueue) { %>
-          <article class="cockpit-card section-card review-queue-card" id="reviewQueueBlock">
+          <article class="cockpit-card section-card review-queue-card<%= isStudentMyDayView ? ' order-6' : '' %>" id="reviewQueueBlock">
             <div class="section-head">
               <h2 class="section-title">Черга перевірки</h2>
               <span class="section-subtitle">Пріоритет: прострочені, нові, без коментаря</span>
@@ -431,7 +432,7 @@
           </article>
         <% } %>
 
-        <article class="cockpit-card section-card" id="inboxBlock">
+        <article class="cockpit-card section-card<%= isStudentMyDayView ? ' order-5' : '' %>" id="inboxBlock">
           <div class="section-head">
             <h2 class="section-title">Пульс та інбокс</h2>
             <span class="section-subtitle">Швидкий зріз прогресу і сигналів</span>
@@ -541,7 +542,7 @@
           </div>
         </article>
 
-        <article class="cockpit-card section-card" id="competencyBlock">
+        <article class="cockpit-card section-card<%= isStudentMyDayView ? ' order-3' : '' %>" id="competencyBlock">
           <div class="section-head">
             <h2 class="section-title">Компас компетентностей</h2>
             <span class="section-subtitle">Портфоліо сильних сторін і точок росту</span>

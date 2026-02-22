@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "0.9.87",
+      "date": "2026-02-21",
+      "items": [
+        "ux(my-day-student): reordered student dashboard blocks to deadlines -> competency compass -> upcoming classes -> pulse/inbox",
+        "ux(my-day-student): temporarily hid \"Прогрес і ризик\" block for student view while keeping Leadership Brief position unchanged"
+      ]
+    },
+    {
       "version": "0.9.86",
       "date": "2026-02-21",
       "items": [
