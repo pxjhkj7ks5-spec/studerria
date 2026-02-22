@@ -7485,7 +7485,7 @@ async function buildCoursePulseAnalytics({
   };
 }
 
-async function buildMyDayData(user, role = 'student', roleList = []) {
+async function buildMyDayData(user, role = 'student', roleList = [], options = {}) {
   const courseId = Number(user.course_id || 1);
   const activeSemester = await getActiveSemester(courseId);
   const now = new Date();
@@ -7507,6 +7507,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
   const normalizedRoleList = normalizeRoleList([role, ...(Array.isArray(roleList) ? roleList : [])]);
   const normalizedRole = normalizedRoleList[0] || String(role || '').toLowerCase() || 'student';
   const isStaffRole = normalizedRoleList.some((roleKey) => ['teacher', 'admin', 'deanery'].includes(roleKey));
+  const requestedCompetencySubjectId = Number(options && options.competencySubjectId ? options.competencySubjectId : 0);
 
   const windowEndShort = formatLocalDate(addDays(now, 7));
   const deadlinesWindowEnd = formatLocalDate(addDays(now, 14));
@@ -7574,6 +7575,22 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
     }
   });
   const whatIfSubjects = Array.from(whatIfSubjectMap.values()).sort((a, b) => (
+    String(a.subject_name || '').localeCompare(String(b.subject_name || ''))
+  ));
+  const teacherCompetencySubjectMap = new Map();
+  if (normalizedRole === 'teacher') {
+    workloadTargets.forEach((target) => {
+      const subjectId = Number(target.subject_id || 0);
+      if (!Number.isFinite(subjectId) || subjectId < 1) return;
+      if (!teacherCompetencySubjectMap.has(subjectId)) {
+        teacherCompetencySubjectMap.set(subjectId, {
+          subject_id: subjectId,
+          subject_name: target.subject_name || 'Предмет',
+        });
+      }
+    });
+  }
+  const teacherCompetencySubjects = Array.from(teacherCompetencySubjectMap.values()).sort((a, b) => (
     String(a.subject_name || '').localeCompare(String(b.subject_name || ''))
   ));
 
@@ -7967,7 +7984,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       : 'AND ce.semester_id IS NULL';
     competencySignalRows = await db.all(
       `
-        SELECT ce.competency_key, ce.score, ce.created_at
+        SELECT ce.subject_id, ce.competency_key, ce.score, ce.created_at
         FROM competency_evaluations ce
         WHERE ce.student_id = ?
           AND (ce.course_id = ? OR ce.course_id IS NULL)
@@ -8005,7 +8022,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
         : 'AND ce.semester_id IS NULL';
       competencySignalRows = await db.all(
         `
-          SELECT ce.competency_key, ce.score, ce.created_at
+          SELECT ce.subject_id, ce.competency_key, ce.score, ce.created_at
           FROM competency_evaluations ce
           JOIN student_groups sg
             ON sg.student_id = ce.student_id
@@ -8243,11 +8260,40 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
       populated_count: hasGradeSignals ? competencies.length : 0,
     };
   };
-  const competencyProfile = buildCompetencyProfileFromSignalRows({
+  let competencyProfile = buildCompetencyProfileFromSignalRows({
     signalRows: competencySignalRows,
     includeEmpty: true,
     now,
   });
+  let teacherCompetencyPicker = {
+    enabled: false,
+    subjects: [],
+    selected_subject_id: null,
+    selected_subject_name: null,
+  };
+  if (normalizedRole === 'teacher' && teacherCompetencySubjects.length) {
+    const teacherSubjectIds = new Set(teacherCompetencySubjects.map((item) => Number(item.subject_id || 0)).filter(Boolean));
+    let selectedTeacherCompetencySubjectId = teacherSubjectIds.has(requestedCompetencySubjectId)
+      ? requestedCompetencySubjectId
+      : Number(teacherCompetencySubjects[0].subject_id || 0);
+    if (!teacherSubjectIds.has(selectedTeacherCompetencySubjectId)) {
+      selectedTeacherCompetencySubjectId = Number(teacherCompetencySubjects[0]?.subject_id || 0);
+    }
+    if (selectedTeacherCompetencySubjectId > 0) {
+      competencyProfile = buildCompetencyProfileFromSignalRows({
+        signalRows: (competencySignalRows || []).filter((row) => Number(row && row.subject_id ? row.subject_id : 0) === selectedTeacherCompetencySubjectId),
+        includeEmpty: true,
+        now,
+      });
+      const selectedTeacherSubject = teacherCompetencySubjects.find((item) => Number(item.subject_id || 0) === selectedTeacherCompetencySubjectId) || null;
+      teacherCompetencyPicker = {
+        enabled: true,
+        subjects: teacherCompetencySubjects,
+        selected_subject_id: selectedTeacherCompetencySubjectId,
+        selected_subject_name: selectedTeacherSubject ? (selectedTeacherSubject.subject_name || 'Предмет') : null,
+      };
+    }
+  }
   const competencies = Array.isArray(competencyProfile.competencies)
     ? competencyProfile.competencies
     : [];
@@ -8436,6 +8482,7 @@ async function buildMyDayData(user, role = 'student', roleList = []) {
     competency_strongest: strongestCompetency,
     competency_weakest: weakestCompetency,
     competency_fastest_growth: fastestGrowingCompetency,
+    teacher_competency_picker: teacherCompetencyPicker,
     progress_dashboard: progressDashboard,
     what_if_subjects: whatIfSubjects,
     what_if_default_subject_id: defaultWhatIfSubjectId,
@@ -8631,7 +8678,13 @@ const renderMyDayPage = async (req, res) => {
     return handleDbError(res, err, 'myday.init');
   }
   try {
-    const myDay = await buildMyDayData(req.session.user, req.session.role, req.session.roles || []);
+    const competencySubjectId = Number(req.query.competency_subject_id || 0);
+    const myDay = await buildMyDayData(
+      req.session.user,
+      req.session.role,
+      req.session.roles || [],
+      { competencySubjectId }
+    );
     return res.render('my-day', {
       username: req.session.user.username,
       userId: req.session.user.id,
@@ -8656,7 +8709,13 @@ app.get('/home', requireLogin, renderMyDayPage);
 
 app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
   try {
-    const myDay = await buildMyDayData(req.session.user, req.session.role, req.session.roles || []);
+    const competencySubjectId = Number(req.query.competency_subject_id || 0);
+    const myDay = await buildMyDayData(
+      req.session.user,
+      req.session.role,
+      req.session.roles || [],
+      { competencySubjectId }
+    );
     return res.json(myDay);
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });

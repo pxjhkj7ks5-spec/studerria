@@ -33,7 +33,12 @@
       const progressDashboard = cockpit.progress_dashboard || {};
       const progressSubjects = Array.isArray(progressDashboard.subjects) ? progressDashboard.subjects : [];
       const hasProgressDashboard = Boolean(progressDashboard.enabled);
-      const isStudentMyDayView = role === 'student';
+      const teacherCompetencyPicker = cockpit.teacher_competency_picker || {};
+      const teacherCompetencySubjects = Array.isArray(teacherCompetencyPicker.subjects) ? teacherCompetencyPicker.subjects : [];
+      const teacherSelectedCompetencySubjectId = Number(teacherCompetencyPicker.selected_subject_id || 0);
+      const isStudentLikeMyDayView = role === 'student' || role === 'admin';
+      const isTeacherMyDayView = role === 'teacher';
+      const isDefaultStaffMyDayView = !isStudentLikeMyDayView && !isTeacherMyDayView;
       const whatIfSubjects = Array.isArray(cockpit.what_if_subjects) ? cockpit.what_if_subjects : [];
       const defaultWhatIfSubjectId = Number(cockpit.what_if_default_subject_id || 0);
       const briefToneClass = `brief-tone-${brief.tone || 'calm'}`;
@@ -175,7 +180,7 @@
       </section>
 
       <section class="cockpit-grid">
-        <% if (isStudentMyDayView) { %>
+        <% if (isStudentLikeMyDayView) { %>
           <article class="cockpit-card section-card order-1 dual-focus-card" id="deadlinesClassesBlock">
             <div class="section-head">
               <h2 class="section-title">Найближчі дедлайни та пари</h2>
@@ -279,8 +284,92 @@
           </article>
         <% } %>
 
-        <% if (!isStudentMyDayView) { %>
-        <article class="cockpit-card section-card<%= isStudentMyDayView ? ' order-1' : '' %>" id="deadlinesBlock">
+        <% if (isTeacherMyDayView) { %>
+          <article class="cockpit-card section-card order-1 dual-focus-card teacher-focus-card" id="teacherClassesRemindersBlock">
+            <div class="section-head">
+              <h2 class="section-title">Пари найближчим часом</h2>
+              <span class="section-subtitle">Сьогодні та завтра + особисті нагадування</span>
+            </div>
+
+            <div class="dual-focus-grid dual-focus-grid-single">
+              <section class="dual-focus-pane" aria-labelledby="teacherNextClassesPaneTitle">
+                <div class="dual-focus-pane-head">
+                  <h3 class="dual-focus-pane-title" id="teacherNextClassesPaneTitle">Пари найближчим часом</h3>
+                  <span class="dual-focus-pane-subtitle">Сьогодні та завтра</span>
+                </div>
+                <% if (!classItems.length) { %>
+                  <div class="empty-state compact">
+                    <div class="empty-state-title">Найближчих пар немає</div>
+                    <div class="empty-state-subtitle">Перевір розклад, якщо очікуєш зміни.</div>
+                  </div>
+                <% } else { %>
+                  <div class="item-list">
+                    <% classItems.forEach((item) => { %>
+                      <div class="item-row class-row">
+                        <div class="item-main">
+                          <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
+                          <div class="item-meta">
+                            <span class="type-chip"><%= getDayContext(item) %></span>
+                            <span>Пара <%= item.class_number || '-' %></span>
+                            <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
+                            <% if (item.group_number) { %><span>Група <%= item.group_number %></span><% } %>
+                          </div>
+                        </div>
+                        <div class="item-side">
+                          <a href="/schedule" class="btn btn-inline-link">До розкладу</a>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                <% } %>
+              </section>
+            </div>
+
+            <div class="reminder-block teacher-inline-reminders">
+              <div class="reminder-header">
+                <h3>Нагадування</h3>
+                <button type="button" class="btn btn-soft btn-sm" id="toggleReminderForm">Додати</button>
+              </div>
+              <form id="reminderForm" class="reminder-form d-none">
+                <input type="hidden" id="reminderEditId" value="" />
+                <div class="reminder-row">
+                  <input type="text" id="reminderTitle" class="form-control reminder-input" maxlength="160" placeholder="Назва нагадування" required />
+                </div>
+                <div class="reminder-row">
+                  <textarea id="reminderNote" class="form-control reminder-input" rows="2" maxlength="500" placeholder="Нотатка (опційно)"></textarea>
+                </div>
+                <div class="reminder-row reminder-row-split">
+                  <input type="date" id="reminderDate" class="form-control reminder-input" required />
+                  <input type="time" id="reminderTime" class="form-control reminder-input" />
+                </div>
+                <div class="reminder-actions">
+                  <button type="submit" class="btn btn-glass btn-sm" id="reminderSubmit">Додати</button>
+                  <button type="button" class="btn btn-soft btn-sm" id="reminderCancel">Скасувати</button>
+                </div>
+              </form>
+              <div id="reminderList" class="reminder-list">
+                <% if (!reminders.length) { %>
+                  <div class="empty-state compact">
+                    <div class="empty-state-title">Нагадувань немає</div>
+                    <div class="empty-state-subtitle">Додай перше на найближчий тиждень.</div>
+                  </div>
+                <% } else { %>
+                  <% reminders.forEach((reminder) => { %>
+                    <div class="reminder-item">
+                      <div class="reminder-main">
+                        <div class="reminder-title <%= reminder.is_done ? 'done' : '' %>"><%= reminder.title %></div>
+                        <div class="reminder-meta"><%= formatReminderDate(reminder.remind_date) %><%= reminder.remind_time ? ` · ${reminder.remind_time}` : '' %></div>
+                      </div>
+                    </div>
+                  <% }) %>
+                <% } %>
+              </div>
+            </div>
+          </article>
+        <% } %>
+
+        <% if (isDefaultStaffMyDayView) { %>
+        <article class="cockpit-card section-card<%= isStudentLikeMyDayView ? ' order-1' : '' %>" id="deadlinesBlock">
           <div class="section-head">
             <h2 class="section-title">Найближчі дедлайни</h2>
             <span class="section-subtitle">2-3 задачі з найвищим пріоритетом</span>
@@ -341,7 +430,7 @@
           </div>
         </article>
 
-        <article class="cockpit-card section-card<%= isStudentMyDayView ? ' order-4' : '' %>" id="nextClassesBlock">
+        <article class="cockpit-card section-card<%= isStudentLikeMyDayView ? ' order-4' : '' %>" id="nextClassesBlock">
           <div class="section-head">
             <h2 class="section-title">Пари найближчим часом</h2>
             <span class="section-subtitle">Сьогодні та завтра</span>
@@ -374,7 +463,7 @@
         </article>
         <% } %>
 
-        <% if (hasProgressDashboard && !isStudentMyDayView) { %>
+        <% if (hasProgressDashboard && isDefaultStaffMyDayView) { %>
           <article class="cockpit-card section-card" id="progressRiskBlock">
             <div class="section-head">
               <h2 class="section-title">Прогрес і ризик</h2>
@@ -442,8 +531,8 @@
           </article>
         <% } %>
 
-        <% if (hasReviewQueue) { %>
-          <article class="cockpit-card section-card review-queue-card<%= isStudentMyDayView ? ' order-last' : '' %>" id="reviewQueueBlock">
+        <% if (hasReviewQueue && !isStudentLikeMyDayView) { %>
+          <article class="cockpit-card section-card review-queue-card<%= isStudentLikeMyDayView ? ' order-last' : (isTeacherMyDayView ? ' order-3 teacher-review-queue-card' : '') %>" id="reviewQueueBlock">
             <div class="section-head">
               <h2 class="section-title">Черга перевірки</h2>
               <span class="section-subtitle">Пріоритет: прострочені, нові, без коментаря</span>
@@ -538,7 +627,8 @@
           </article>
         <% } %>
 
-        <article class="cockpit-card section-card<%= isStudentMyDayView ? ' order-3' : '' %>" id="inboxBlock">
+        <% if (!isTeacherMyDayView) { %>
+        <article class="cockpit-card section-card<%= isStudentLikeMyDayView ? ' order-3' : '' %>" id="inboxBlock">
           <div class="section-head">
             <h2 class="section-title">Пульс та інбокс</h2>
             <span class="section-subtitle">Швидкий зріз прогресу і сигналів</span>
@@ -606,8 +696,10 @@
             <% } %>
           </div>
         </article>
+        <% } %>
 
-        <article class="cockpit-card section-card reminder-card<%= isStudentMyDayView ? ' order-4' : '' %>" id="remindersBlock">
+        <% if (!isTeacherMyDayView) { %>
+        <article class="cockpit-card section-card reminder-card<%= isStudentLikeMyDayView ? ' order-4' : '' %>" id="remindersBlock">
           <div class="section-head">
             <h2 class="section-title">Нагадування</h2>
             <span class="section-subtitle">Особисті задачі та короткі нотатки</span>
@@ -654,12 +746,33 @@
             </div>
           </div>
         </article>
+        <% } %>
 
-        <article class="cockpit-card section-card<%= isStudentMyDayView ? ' order-2 competency-card-compact' : '' %>" id="competencyBlock">
+        <article class="cockpit-card section-card<%= isStudentLikeMyDayView || isTeacherMyDayView ? ' order-2 competency-card-compact' : '' %><%= isTeacherMyDayView ? ' teacher-competency-card' : '' %>" id="competencyBlock">
           <div class="section-head">
             <h2 class="section-title">Компас компетентностей</h2>
-            <span class="section-subtitle">Портфоліо сильних сторін і точок росту</span>
+            <% if (isTeacherMyDayView && teacherCompetencyPicker.enabled && teacherCompetencySubjects.length) { %>
+              <form method="GET" action="/home" class="teacher-competency-picker" id="teacherCompetencyPickerForm">
+                <select
+                  name="competency_subject_id"
+                  id="teacherCompetencySubjectSelect"
+                  class="form-select reminder-input teacher-competency-select"
+                  aria-label="Обрати предмет для компаса компетентностей"
+                >
+                  <% teacherCompetencySubjects.forEach((subject) => { %>
+                    <option value="<%= subject.subject_id %>" <%= Number(subject.subject_id) === teacherSelectedCompetencySubjectId ? 'selected' : '' %>>
+                      <%= subject.subject_name || 'Предмет' %>
+                    </option>
+                  <% }) %>
+                </select>
+              </form>
+            <% } else { %>
+              <span class="section-subtitle">Портфоліо сильних сторін і точок росту</span>
+            <% } %>
           </div>
+          <% if (isTeacherMyDayView && teacherCompetencyPicker.enabled && teacherCompetencyPicker.selected_subject_name) { %>
+            <div class="teacher-competency-subtitle">Предмет: <%= teacherCompetencyPicker.selected_subject_name %></div>
+          <% } %>
 
           <div class="competency-hero">
             <div class="competency-orb" id="competencyOrb">
@@ -882,6 +995,13 @@
       if (briefWhyToggle && briefWhyPanel) {
         briefWhyToggle.addEventListener('click', () => {
           briefWhyPanel.classList.toggle('d-none');
+        });
+      }
+      const teacherCompetencyPickerForm = document.getElementById('teacherCompetencyPickerForm');
+      const teacherCompetencySubjectSelect = document.getElementById('teacherCompetencySubjectSelect');
+      if (teacherCompetencyPickerForm && teacherCompetencySubjectSelect) {
+        teacherCompetencySubjectSelect.addEventListener('change', () => {
+          teacherCompetencyPickerForm.submit();
         });
       }
 

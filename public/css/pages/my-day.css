@@ -552,6 +552,10 @@ body.theme-light .section-subtitle {
   gap: 0.78rem;
 }
 
+.dual-focus-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .dual-focus-pane {
   border-radius: 14px;
   border: 1px solid rgba(148, 163, 184, 0.26);
@@ -609,6 +613,22 @@ body.theme-light .dual-focus-pane-subtitle {
 .dual-focus-footer {
   margin-top: auto;
   padding-top: 0.5rem;
+}
+
+.teacher-focus-card .teacher-inline-reminders {
+  margin-top: 0.8rem;
+}
+
+.teacher-focus-card .teacher-inline-reminders .reminder-header h3 {
+  font-size: 0.9rem;
+}
+
+@media (min-width: 992px) {
+  .teacher-focus-card,
+  .teacher-competency-card,
+  .teacher-review-queue-card {
+    grid-column: 1 / -1;
+  }
 }
 
 .item-list {
@@ -1373,6 +1393,32 @@ body.theme-light .competency-bar {
 
 .competency-card-compact .section-head {
   margin-bottom: 0.62rem;
+  flex-wrap: wrap;
+}
+
+.teacher-competency-picker {
+  margin: 0;
+  min-width: min(340px, 100%);
+  max-width: 52%;
+  flex: 1 1 320px;
+}
+
+.teacher-competency-select {
+  min-height: 36px;
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
+  font-size: 0.82rem;
+}
+
+.teacher-competency-subtitle {
+  margin-top: -0.35rem;
+  margin-bottom: 0.7rem;
+  color: var(--muted-dark);
+  font-size: 0.78rem;
+}
+
+body.theme-light .teacher-competency-subtitle {
+  color: var(--muted-light);
 }
 
 .competency-card-compact .competency-hero {
@@ -1746,6 +1792,12 @@ body.theme-light .changelog-liquid-modal .modal-footer {
   .section-subtitle {
     max-width: none;
     text-align: left;
+  }
+
+  .teacher-competency-picker {
+    min-width: 100%;
+    max-width: 100%;
+    flex-basis: 100%;
   }
 }
 

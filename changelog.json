@@ -7,7 +7,9 @@
         "ux(menu-desktop): added the same drawer menu to Journal, Teamwork, Subjects, and Profile pages with a shared reusable partial",
         "ux(menu-mobile-subjects): unified Subjects mobile menu with the full navigation menu used on other pages",
         "fix(menu-hover): normalized blue hover/focus highlight styles for drawer actions so all menu items highlight consistently",
-        "fix(home-welcome): moved the post-registration welcome modal to /home and refreshed its onboarding text for the new Home dashboard"
+        "fix(home-welcome): moved the post-registration welcome modal to /home and refreshed its onboarding text for the new Home dashboard",
+        "ux(home-role-layouts): admin Home now uses the same student-style block composition, while teacher Home is simplified to three blocks (classes+reminders, competency compass, review queue)",
+        "ux(home-teacher-competency): teacher competency compass now supports selecting a taught subject directly on /home"
       ]
     },
     {
