@@ -23,6 +23,8 @@
       const classItems = Array.isArray(cockpit.next_classes) ? cockpit.next_classes : [];
       const inboxItems = Array.isArray(cockpit.inbox_items) ? cockpit.inbox_items : [];
       const competencies = Array.isArray(cockpit.competencies) ? cockpit.competencies : [];
+      const competencyManualTotalMarks = Number(cockpit.competency_manual_total_marks || 0);
+      const competencyAutoTotalMarks = Number(cockpit.competency_auto_total_marks || 0);
       const activity = cockpit.activity_summary || {};
       const reminders = Array.isArray(cockpit.reminders) ? cockpit.reminders : [];
       const reviewQueue = cockpit.review_queue || {};
@@ -773,6 +775,10 @@
           <% if (isTeacherMyDayView && teacherCompetencyPicker.enabled && teacherCompetencyPicker.selected_subject_name) { %>
             <div class="teacher-competency-subtitle">Предмет: <%= teacherCompetencyPicker.selected_subject_name %></div>
           <% } %>
+          <div class="competency-source-summary">
+            <span>Ручні: <strong><%= competencyManualTotalMarks %></strong></span>
+            <span>Авто: <strong><%= competencyAutoTotalMarks %></strong></span>
+          </div>
 
           <div class="competency-hero">
             <div class="competency-orb" id="competencyOrb">
@@ -816,6 +822,10 @@
                   <div class="competency-head">
                     <span class="competency-name"><%= item.label %></span>
                     <span class="competency-score"><%= item.count %></span>
+                  </div>
+                  <div class="competency-source-meta">
+                    <span>ручні <%= Number(item.manual_count || 0) %></span>
+                    <span>авто <%= Number(item.auto_count || 0) %></span>
                   </div>
                   <div class="competency-bar">
                     <span style="width: <%= Math.max(0, Math.min(100, Number(item.bar_percent || 0))) %>%"></span>

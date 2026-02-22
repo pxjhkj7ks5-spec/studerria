@@ -7984,7 +7984,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       : 'AND ce.semester_id IS NULL';
     competencySignalRows = await db.all(
       `
-        SELECT ce.subject_id, ce.competency_key, ce.score, ce.created_at
+        SELECT ce.subject_id, ce.competency_key, ce.score, ce.source_type, ce.created_at
         FROM competency_evaluations ce
         WHERE ce.student_id = ?
           AND (ce.course_id = ? OR ce.course_id IS NULL)
@@ -8022,7 +8022,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
         : 'AND ce.semester_id IS NULL';
       competencySignalRows = await db.all(
         `
-          SELECT ce.subject_id, ce.competency_key, ce.score, ce.created_at
+          SELECT ce.subject_id, ce.competency_key, ce.score, ce.source_type, ce.created_at
           FROM competency_evaluations ce
           JOIN student_groups sg
             ON sg.student_id = ce.student_id
@@ -8158,108 +8158,6 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     };
   }
 
-  const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
-  const hasGradeSignals = Array.isArray(gradeRows) && gradeRows.length > 0;
-  const heuristicFallback = hasGradeSignals ? 0.52 : 0;
-  const avg = (values, fallback = 0.52) => {
-    if (!Array.isArray(values) || !values.length) return fallback;
-    return values.reduce((acc, item) => acc + item, 0) / values.length;
-  };
-  const pickTypeBuckets = (rows, predicate = () => true) => {
-    const buckets = { homework: [], seminar: [], exam: [], credit: [], custom: [] };
-    (rows || []).forEach((row) => {
-      if (!predicate(row)) return;
-      const type = String(row.column_type || 'custom');
-      if (!Object.prototype.hasOwnProperty.call(buckets, type)) return;
-      const score = Number(row.score);
-      const maxPoints = Number(row.max_points);
-      if (!Number.isFinite(score) || !Number.isFinite(maxPoints) || maxPoints <= 0) return;
-      buckets[type].push(clamp01(score / maxPoints));
-    });
-    return buckets;
-  };
-
-  const recentSince = addDays(now, -21).getTime();
-  const previousSince = addDays(now, -42).getTime();
-  const baseBuckets = pickTypeBuckets(gradeRows);
-  const recentBuckets = pickTypeBuckets(gradeRows, (row) => {
-    const gradedAt = row.graded_at ? new Date(row.graded_at).getTime() : Number.NaN;
-    return Number.isFinite(gradedAt) && gradedAt >= recentSince;
-  });
-  const previousBuckets = pickTypeBuckets(gradeRows, (row) => {
-    const gradedAt = row.graded_at ? new Date(row.graded_at).getTime() : Number.NaN;
-    return Number.isFinite(gradedAt) && gradedAt >= previousSince && gradedAt < recentSince;
-  });
-
-  const weightVector = (buckets) => ({
-    homework: avg(buckets.homework, heuristicFallback),
-    seminar: avg(buckets.seminar, heuristicFallback),
-    exam: avg(buckets.exam, heuristicFallback),
-    credit: avg(buckets.credit, heuristicFallback),
-    custom: avg(buckets.custom, heuristicFallback),
-  });
-
-  const baseVector = weightVector(baseBuckets);
-  const recentVector = weightVector(recentBuckets);
-  const previousVector = weightVector(previousBuckets);
-  const selfOrgSignal = onTimeShare === null ? heuristicFallback : clamp01(onTimeShare / 100);
-  const competencyHeuristic = {
-    leadership: (vector) => (vector.custom * 0.45) + (vector.seminar * 0.35) + (vector.exam * 0.2),
-    negotiation: (vector) => (vector.seminar * 0.45) + (vector.custom * 0.35) + (vector.exam * 0.2),
-    communication: (vector) => (vector.seminar * 0.55) + (vector.custom * 0.25) + (vector.homework * 0.2),
-    analysis: (vector) => (vector.exam * 0.55) + (vector.homework * 0.3) + (vector.custom * 0.15),
-    teamwork: (vector) => (vector.seminar * 0.45) + (vector.credit * 0.3) + (vector.custom * 0.25),
-    self_organization: (vector) => (vector.homework * 0.45) + (vector.credit * 0.25) + (selfOrgSignal * 0.3),
-    critical_thinking: (vector) => (vector.exam * 0.45) + (vector.analysis * 0.35) + (vector.seminar * 0.2),
-    resilience: (vector) => (selfOrgSignal * 0.45) + (vector.credit * 0.25) + (vector.homework * 0.3),
-  };
-  const baseWithDerived = {
-    ...baseVector,
-    analysis: (baseVector.exam * 0.55) + (baseVector.homework * 0.3) + (baseVector.custom * 0.15),
-  };
-  const recentWithDerived = {
-    ...recentVector,
-    analysis: (recentVector.exam * 0.55) + (recentVector.homework * 0.3) + (recentVector.custom * 0.15),
-  };
-  const previousWithDerived = {
-    ...previousVector,
-    analysis: (previousVector.exam * 0.55) + (previousVector.homework * 0.3) + (previousVector.custom * 0.15),
-  };
-  const buildHeuristicProfile = () => {
-    const competencies = COMPETENCY_DEFINITIONS.map((definition) => {
-      const compute = competencyHeuristic[definition.key] || ((vector) => (
-        (vector.homework + vector.seminar + vector.exam + vector.credit + vector.custom) / 5
-      ));
-      const scoreRaw = clamp01(compute(baseWithDerived));
-      const recentRaw = clamp01(compute(recentWithDerived));
-      const previousRaw = clamp01(compute(previousWithDerived));
-      const delta = Math.round((recentRaw - previousRaw) * 100);
-      return {
-        key: definition.key,
-        label: definition.label,
-        score: Math.round(scoreRaw * 100),
-        delta,
-        trend: delta >= 3 ? 'up' : (delta <= -3 ? 'down' : 'steady'),
-        has_data: hasGradeSignals,
-      };
-    });
-    const sortedByScore = [...competencies].sort((a, b) => b.score - a.score);
-    const sortedByDelta = [...competencies].sort((a, b) => b.delta - a.delta);
-    const strongest = sortedByScore[0] || null;
-    const weakest = sortedByScore[sortedByScore.length - 1] || null;
-    const fastestGrowth = sortedByDelta[0] || null;
-    const average = competencies.length
-      ? Math.round(competencies.reduce((sum, item) => sum + item.score, 0) / competencies.length)
-      : 0;
-    return {
-      competencies,
-      strongest,
-      weakest,
-      fastest_growth: fastestGrowth,
-      average,
-      populated_count: hasGradeSignals ? competencies.length : 0,
-    };
-  };
   let competencyProfile = buildCompetencyProfileFromSignalRows({
     signalRows: competencySignalRows,
     includeEmpty: true,
@@ -8305,6 +8203,12 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     : 0;
   const competencyTotalMarks = Number.isFinite(Number(competencyProfile.total_marks))
     ? Number(competencyProfile.total_marks)
+    : 0;
+  const competencyManualTotalMarks = Number.isFinite(Number(competencyProfile.manual_total_marks))
+    ? Number(competencyProfile.manual_total_marks)
+    : 0;
+  const competencyAutoTotalMarks = Number.isFinite(Number(competencyProfile.auto_total_marks))
+    ? Number(competencyProfile.auto_total_marks)
     : 0;
 
   const activitySummary = {
@@ -8479,6 +8383,8 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     competencies,
     competency_average: competencyAverage,
     competency_total_marks: competencyTotalMarks,
+    competency_manual_total_marks: competencyManualTotalMarks,
+    competency_auto_total_marks: competencyAutoTotalMarks,
     competency_strongest: strongestCompetency,
     competency_weakest: weakestCompetency,
     competency_fastest_growth: fastestGrowingCompetency,
@@ -9049,7 +8955,7 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
   try {
     const homework = await db.get(
       `
-        SELECT id, subject_id, group_number, course_id, semester_id
+        SELECT id, subject_id, group_number, course_id, semester_id, custom_due_date, class_date
         FROM homework
         WHERE id = ?
           AND course_id = ?
@@ -9088,6 +8994,7 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
       `,
       [homeworkId, userId]
     );
+    const wasFirstSubmission = !existing;
     if (existing) {
       await db.run(
         `
@@ -9144,6 +9051,44 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
       `,
       [userId, homeworkId, nowIso]
     );
+
+    if (wasFirstSubmission) {
+      const deadlineDate = String(homework.custom_due_date || homework.class_date || '').trim() || null;
+      const submittedDateOnly = formatLocalDate(new Date(nowIso));
+      const autoScore = (deadlineDate && submittedDateOnly > deadlineDate) ? 0 : 1;
+      const autoSourceRef = `homework:${homeworkId}:student:${userId}`;
+      await db.run(
+        `
+          INSERT INTO competency_evaluations
+            (
+              course_id,
+              semester_id,
+              subject_id,
+              column_id,
+              student_id,
+              competency_key,
+              score,
+              note,
+              source_type,
+              source_ref,
+              created_by,
+              created_at,
+              updated_at
+            )
+          VALUES (?, ?, ?, NULL, ?, ?, ?, NULL, 'auto_homework_on_time', ?, NULL, NOW(), NOW())
+          ON CONFLICT DO NOTHING
+        `,
+        [
+          Number(homework.course_id || courseId) || null,
+          homework.semester_id ? Number(homework.semester_id) : null,
+          Number(homework.subject_id || 0),
+          userId,
+          'self_organization',
+          autoScore,
+          autoSourceRef,
+        ]
+      );
+    }
 
     logActivity(
       db,
@@ -11004,6 +10949,8 @@ const buildCompetencyProfileFromSignalRows = ({
       total: 0,
       recent: 0,
       previous: 0,
+      manual_total: 0,
+      auto_total: 0,
     });
   });
 
@@ -11014,9 +10961,16 @@ const buildCompetencyProfileFromSignalRows = ({
     if (!Number.isFinite(score)) return;
     const mark = score > 0 ? 1 : 0;
     if (mark < 1) return;
+    const sourceType = String(row?.source_type || 'manual').trim().toLowerCase() || 'manual';
+    const isAutoSource = sourceType.startsWith('auto_');
     const createdAtMs = row?.created_at ? new Date(row.created_at).getTime() : Number.NaN;
     const bucket = marksByKey.get(key);
     bucket.total += 1;
+    if (isAutoSource) {
+      bucket.auto_total += 1;
+    } else {
+      bucket.manual_total += 1;
+    }
     if (Number.isFinite(createdAtMs) && createdAtMs >= recentSince) {
       bucket.recent += 1;
     } else if (Number.isFinite(createdAtMs) && createdAtMs >= previousSince && createdAtMs < recentSince) {
@@ -11028,10 +10982,14 @@ const buildCompetencyProfileFromSignalRows = ({
     const bucket = marksByKey.get(definition.key) || { total: 0, recent: 0, previous: 0 };
     const count = Number(bucket.total || 0);
     const delta = Number(bucket.recent || 0) - Number(bucket.previous || 0);
+    const manualCount = Number(bucket.manual_total || 0);
+    const autoCount = Number(bucket.auto_total || 0);
     return {
       key: definition.key,
       label: definition.label,
       count,
+      manual_count: manualCount,
+      auto_count: autoCount,
       score: count,
       share_percent: 0,
       bar_percent: 0,
@@ -11042,6 +11000,8 @@ const buildCompetencyProfileFromSignalRows = ({
   }).filter((item) => includeEmpty || item.has_data);
 
   const totalMarks = competencies.reduce((sum, item) => sum + Number(item.count || 0), 0);
+  const manualTotalMarks = competencies.reduce((sum, item) => sum + Number(item.manual_count || 0), 0);
+  const autoTotalMarks = competencies.reduce((sum, item) => sum + Number(item.auto_count || 0), 0);
   const equalShare = competencies.length ? (100 / competencies.length) : 0;
   competencies.forEach((item) => {
     const share = totalMarks > 0
@@ -11077,6 +11037,8 @@ const buildCompetencyProfileFromSignalRows = ({
       key: item.key,
       label: item.label,
       count: Math.max(0, Math.floor(Number(item.count || 0))),
+      manual_count: Math.max(0, Math.floor(Number(item.manual_count || 0))),
+      auto_count: Math.max(0, Math.floor(Number(item.auto_count || 0))),
       score: Math.max(0, Math.floor(Number(item.score || 0))),
       share_percent: Math.max(0, Math.min(100, Number(item.share_percent || 0))),
       bar_percent: Math.max(0, Math.min(100, Number(item.bar_percent || 0))),
@@ -11089,6 +11051,8 @@ const buildCompetencyProfileFromSignalRows = ({
     fastest_growth: fastestGrowth,
     average,
     total_marks: Math.max(0, Math.floor(totalMarks)),
+    manual_total_marks: Math.max(0, Math.floor(manualTotalMarks)),
+    auto_total_marks: Math.max(0, Math.floor(autoTotalMarks)),
     has_marks: totalMarks > 0,
     populated_count: withData.length,
   };

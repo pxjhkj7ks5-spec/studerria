@@ -27,6 +27,7 @@ const journalSubjectClosure = require('./026_journal_subject_closure');
 const journalModerationCompetencies = require('./027_journal_moderation_competencies');
 const userRegistrationEvents = require('./028_user_registration_events');
 const securityRiskAudit = require('./029_security_risk_audit');
+const competencyAutoSources = require('./030_competency_auto_sources');
 
 module.exports = [
   init,
@@ -58,4 +59,5 @@ module.exports = [
   journalModerationCompetencies,
   userRegistrationEvents,
   securityRiskAudit,
+  competencyAutoSources,
 ];

@@ -12,7 +12,10 @@
         "ux(home-teacher-competency): teacher competency compass now supports selecting a taught subject directly on /home",
         "copy(home-welcome): refined the Home welcome modal text to emphasize Studerria as a student-built platform for students",
         "fix(admin-dark-dropdowns): normalized dark-theme dropdown menu/button colors in Users actions so labels and hover states stay readable",
-        "fix(home-dark-select): forced dark native dropdown styling for Home select controls (What-if / subject pickers) to prevent bright popups in dark theme"
+        "fix(home-dark-select): forced dark native dropdown styling for Home select controls (What-if / subject pickers) to prevent bright popups in dark theme",
+        "feat(competencies-hybrid): added auto competency source support with source_ref idempotency for first-time homework submissions (+1/+0 for self_organization based on on-time status)",
+        "ux(home-competency-compass): competency compass now shows manual vs auto signal counts in the UI",
+        "refactor(my-day): removed unused heuristic competency profile code path that was not applied to the compass output"
       ]
     },
     {
