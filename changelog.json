@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.07",
+      "date": "2026-02-23",
+      "items": [
+        "fix(topbar): enforce exactly one menu button per breakpoint across all topbar pages (desktop drawer vs mobile modal)",
+        "ux(menu-drawer): unify desktop drawer visuals and open animation across Journal, Subjects, Teamwork, Profile, Schedule and My Day"
+      ]
+    },
+    {
       "version": "1.0.06",
       "date": "2026-02-23",
       "items": [

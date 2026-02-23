@@ -548,6 +548,18 @@ button.btn:active,
   gap: var(--space-8) !important;
 }
 
+.topbar .drawer-menu-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.topbar .mobile-menu-btn {
+  display: none !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
 .topbar .muted,
 .admin-nav .muted {
   color: var(--ds-text2) !important;
@@ -558,7 +570,9 @@ button.btn:active,
 body.page-journal .schedule-drawer,
 body.page-subjects .schedule-drawer,
 body.page-teamwork .schedule-drawer,
-body.page-profile .schedule-drawer {
+body.page-profile .schedule-drawer,
+body.page-schedule .schedule-drawer,
+body.page-my-day .schedule-drawer {
   position: fixed;
   top: 72px;
   left: 12px;
@@ -578,10 +592,29 @@ body.page-profile .schedule-drawer {
     opacity var(--dur-fast) ease-out;
 }
 
+body.page-journal .schedule-drawer::before,
+body.page-subjects .schedule-drawer::before,
+body.page-teamwork .schedule-drawer::before,
+body.page-profile .schedule-drawer::before,
+body.page-schedule .schedule-drawer::before,
+body.page-my-day .schedule-drawer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(180px 120px at 24% 8%, rgba(96, 165, 250, 0.1), transparent 72%),
+    radial-gradient(220px 140px at 72% 12%, rgba(167, 139, 250, 0.06), transparent 76%);
+  opacity: 0.9;
+}
+
 body.page-journal.schedule-drawer-open .schedule-drawer,
 body.page-subjects.schedule-drawer-open .schedule-drawer,
 body.page-teamwork.schedule-drawer-open .schedule-drawer,
-body.page-profile.schedule-drawer-open .schedule-drawer {
+body.page-profile.schedule-drawer-open .schedule-drawer,
+body.page-schedule.schedule-drawer-open .schedule-drawer,
+body.page-my-day.schedule-drawer-open .schedule-drawer {
   transform: translate3d(0, 0, 0);
   opacity: 1;
   pointer-events: auto;
@@ -590,7 +623,9 @@ body.page-profile.schedule-drawer-open .schedule-drawer {
 body.page-journal .drawer-head,
 body.page-subjects .drawer-head,
 body.page-teamwork .drawer-head,
-body.page-profile .drawer-head {
+body.page-profile .drawer-head,
+body.page-schedule .drawer-head,
+body.page-my-day .drawer-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -601,7 +636,9 @@ body.page-profile .drawer-head {
 body.page-journal .drawer-title,
 body.page-subjects .drawer-title,
 body.page-teamwork .drawer-title,
-body.page-profile .drawer-title {
+body.page-profile .drawer-title,
+body.page-schedule .drawer-title,
+body.page-my-day .drawer-title {
   font-size: var(--t-h2);
   font-weight: var(--w-semibold);
   color: var(--ds-text0);
@@ -610,7 +647,9 @@ body.page-profile .drawer-title {
 body.page-journal .drawer-close,
 body.page-subjects .drawer-close,
 body.page-teamwork .drawer-close,
-body.page-profile .drawer-close {
+body.page-profile .drawer-close,
+body.page-schedule .drawer-close,
+body.page-my-day .drawer-close {
   width: 38px;
   height: 38px;
   min-width: 38px;
@@ -623,7 +662,9 @@ body.page-profile .drawer-close {
 body.page-journal .drawer-actions,
 body.page-subjects .drawer-actions,
 body.page-teamwork .drawer-actions,
-body.page-profile .drawer-actions {
+body.page-profile .drawer-actions,
+body.page-schedule .drawer-actions,
+body.page-my-day .drawer-actions {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -632,14 +673,18 @@ body.page-profile .drawer-actions {
 body.page-journal .drawer-action-wrap,
 body.page-subjects .drawer-action-wrap,
 body.page-teamwork .drawer-action-wrap,
-body.page-profile .drawer-action-wrap {
+body.page-profile .drawer-action-wrap,
+body.page-schedule .drawer-action-wrap,
+body.page-my-day .drawer-action-wrap {
   margin: 0;
 }
 
 body.page-journal .drawer-action,
 body.page-subjects .drawer-action,
 body.page-teamwork .drawer-action,
-body.page-profile .drawer-action {
+body.page-profile .drawer-action,
+body.page-schedule .drawer-action,
+body.page-my-day .drawer-action {
   width: 100%;
   min-height: 46px;
   border-radius: 14px;
@@ -658,11 +703,96 @@ body.page-profile .drawer-action {
     transform var(--dur-fast) ease-out;
 }
 
+body.page-journal .drawer-action,
+body.page-subjects .drawer-action,
+body.page-teamwork .drawer-action,
+body.page-profile .drawer-action,
+body.page-schedule .drawer-action,
+body.page-my-day .drawer-action {
+  position: relative;
+  overflow: clip;
+}
+
+body.page-journal .drawer-action::before,
+body.page-subjects .drawer-action::before,
+body.page-teamwork .drawer-action::before,
+body.page-profile .drawer-action::before,
+body.page-schedule .drawer-action::before,
+body.page-my-day .drawer-action::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120px 48px at 20% 50%, rgba(255, 255, 255, 0.08), transparent 72%),
+    radial-gradient(120px 48px at 72% 50%, rgba(148, 163, 184, 0.08), transparent 72%);
+  opacity: 0.8;
+}
+
+body.page-journal.schedule-drawer-open .drawer-action,
+body.page-subjects.schedule-drawer-open .drawer-action,
+body.page-teamwork.schedule-drawer-open .drawer-action,
+body.page-profile.schedule-drawer-open .drawer-action,
+body.page-schedule.schedule-drawer-open .drawer-action,
+body.page-my-day.schedule-drawer-open .drawer-action {
+  animation: drawer-item-rise 280ms var(--ease-apple) both;
+}
+
+body.page-journal.schedule-drawer-open .drawer-action:nth-child(1),
+body.page-subjects.schedule-drawer-open .drawer-action:nth-child(1),
+body.page-teamwork.schedule-drawer-open .drawer-action:nth-child(1),
+body.page-profile.schedule-drawer-open .drawer-action:nth-child(1),
+body.page-schedule.schedule-drawer-open .drawer-action:nth-child(1),
+body.page-my-day.schedule-drawer-open .drawer-action:nth-child(1) { animation-delay: 20ms; }
+
+body.page-journal.schedule-drawer-open .drawer-action:nth-child(2),
+body.page-subjects.schedule-drawer-open .drawer-action:nth-child(2),
+body.page-teamwork.schedule-drawer-open .drawer-action:nth-child(2),
+body.page-profile.schedule-drawer-open .drawer-action:nth-child(2),
+body.page-schedule.schedule-drawer-open .drawer-action:nth-child(2),
+body.page-my-day.schedule-drawer-open .drawer-action:nth-child(2) { animation-delay: 40ms; }
+
+body.page-journal.schedule-drawer-open .drawer-action:nth-child(3),
+body.page-subjects.schedule-drawer-open .drawer-action:nth-child(3),
+body.page-teamwork.schedule-drawer-open .drawer-action:nth-child(3),
+body.page-profile.schedule-drawer-open .drawer-action:nth-child(3),
+body.page-schedule.schedule-drawer-open .drawer-action:nth-child(3),
+body.page-my-day.schedule-drawer-open .drawer-action:nth-child(3) { animation-delay: 60ms; }
+
+body.page-journal.schedule-drawer-open .drawer-action:nth-child(n+4),
+body.page-subjects.schedule-drawer-open .drawer-action:nth-child(n+4),
+body.page-teamwork.schedule-drawer-open .drawer-action:nth-child(n+4),
+body.page-profile.schedule-drawer-open .drawer-action:nth-child(n+4),
+body.page-schedule.schedule-drawer-open .drawer-action:nth-child(n+4),
+body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-delay: 80ms; }
+
+@keyframes drawer-item-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (max-width: 991px) {
+  .topbar .drawer-menu-btn,
+  .topbar .drawer-menu-btn.desktop-only {
+    display: none !important;
+  }
+
+  .topbar .mobile-menu-btn {
+    display: inline-flex !important;
+  }
+
   body.page-journal .schedule-drawer,
   body.page-subjects .schedule-drawer,
   body.page-teamwork .schedule-drawer,
-  body.page-profile .schedule-drawer {
+  body.page-profile .schedule-drawer,
+  body.page-schedule .schedule-drawer,
+  body.page-my-day .schedule-drawer {
     display: none;
   }
 }
