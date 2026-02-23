@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.14",
+      "date": "2026-02-23",
+      "items": [
+        "ux(menu-drawer): increase desktop drawer shell height to about 95% viewport across shared and page parity styles"
+      ]
+    },
+    {
       "version": "1.0.13",
       "date": "2026-02-23",
       "items": [
