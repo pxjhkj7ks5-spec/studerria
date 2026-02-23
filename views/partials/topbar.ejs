@@ -6,12 +6,10 @@
   const isSubjects = activePage === 'subjects';
   const isJournal = activePage === 'journal';
   const brandTitle = isSchedule ? 'Studerria' : (pageTitle || 'Studerria');
-  const topbarClassName = `navbar navbar-expand-lg topbar topbar--spotlight`;
 %>
-<nav class="<%= topbarClassName %>" data-active-page="<%= activePage || '' %>">
-  <span class="topbar-ambient-bloom" aria-hidden="true"></span>
+<nav class="navbar navbar-expand-lg topbar">
   <div class="container">
-    <span class="navbar-brand text-white me-auto is-active-page"><%= brandTitle %></span>
+    <span class="navbar-brand text-white me-auto"><%= brandTitle %></span>
     <div class="d-flex align-items-center gap-2 topbar-actions flex-wrap justify-content-end">
       <% if (isSchedule) { %>
         <span class="me-2 muted desktop-only text-nowrap">

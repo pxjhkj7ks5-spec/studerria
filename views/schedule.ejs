@@ -1570,7 +1570,7 @@
     <link rel="stylesheet" href="/css/pages/schedule.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
   </head>
-  <body class="theme-dark page-schedule schedule-role-<%= role || 'student' %>">
+  <body class="theme-dark">
     <%- include('partials/topbar', { role, username, t, activePage: 'schedule' }) %>
     <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
       <div class="drawer-head">
@@ -1630,75 +1630,21 @@
           </div>
         </div>
 
-        <div class="glass-tabs-wrap mb-4">
-          <div class="glass-tabs glass-tabs--2 segmented" id="scheduleModeTabs" role="tablist" aria-label="Режим перегляду розкладу">
-            <span class="glass-tabs-indicator" id="scheduleModeIndicator" aria-hidden="true"></span>
-            <button class="glass-tab is-active" type="button" role="tab" aria-selected="true" data-mode="day">День</button>
-            <button class="glass-tab" type="button" role="tab" aria-selected="false" data-mode="week">Тиждень</button>
-          </div>
-        </div>
-
         <% const hasCourseFilters = role === 'teacher' && teacherCourses && teacherCourses.length > 1; %>
-        <% const canUseCourseSegments = hasCourseFilters && teacherCourses.length <= 4; %>
-        <%
-          const visibleGroupNumbers = [];
-          const visibleGroupSet = new Set();
-          (daysOfWeek || []).forEach(function(dayName) {
-            const entries = (scheduleByDay && scheduleByDay[dayName]) || [];
-            entries.forEach(function(entry) {
-              const groupNum = Number(entry.group_number || 0);
-              if (!groupNum || visibleGroupSet.has(groupNum)) return;
-              visibleGroupSet.add(groupNum);
-              visibleGroupNumbers.push(groupNum);
-            });
-          });
-          visibleGroupNumbers.sort(function(a, b) { return a - b; });
-          const canUseGroupSegments = visibleGroupNumbers.length > 1 && visibleGroupNumbers.length <= 6;
-        %>
         <div class="glass schedule-panel liquid-card mb-4 <%= hasCourseFilters ? '' : 'single-panel' %>">
           <% if (hasCourseFilters) { %>
             <div class="panel-section">
-              <div class="panel-title">Курс</div>
+              <div class="panel-title">Фільтри</div>
               <div class="panel-body">
-                <% if (canUseCourseSegments) { %>
-                  <div class="mini-segmented segmented" role="group" aria-label="Фільтр за курсом">
-                    <form method="GET" action="/schedule" class="d-inline">
-                      <input type="hidden" name="week" value="<%= currentWeek %>" />
-                      <button class="mini-segmented__item <%= !selectedCourseId ? 'is-active' : '' %>" type="submit">Усі</button>
-                    </form>
+                <form method="GET" action="/schedule" class="d-inline">
+                  <input type="hidden" name="week" value="<%= currentWeek %>" />
+                  <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
+                    <option value="">Усі курси</option>
                     <% teacherCourses.forEach(function(c) { %>
-                      <form method="GET" action="/schedule" class="d-inline">
-                        <input type="hidden" name="week" value="<%= currentWeek %>" />
-                        <input type="hidden" name="course" value="<%= c.id %>" />
-                        <button class="mini-segmented__item <%= selectedCourseId === c.id ? 'is-active' : '' %>" type="submit"><%= c.name %></button>
-                      </form>
+                      <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
                     <% }); %>
-                  </div>
-                <% } else { %>
-                  <form method="GET" action="/schedule" class="d-inline">
-                    <input type="hidden" name="week" value="<%= currentWeek %>" />
-                    <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
-                      <option value="">Усі курси</option>
-                      <% teacherCourses.forEach(function(c) { %>
-                        <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
-                      <% }); %>
-                    </select>
-                  </form>
-                <% } %>
-              </div>
-            </div>
-            <div class="panel-divider"></div>
-          <% } %>
-          <% if (canUseGroupSegments) { %>
-            <div class="panel-section">
-              <div class="panel-title">Група</div>
-              <div class="panel-body">
-                <div class="mini-segmented segmented" id="scheduleGroupSegments" role="group" aria-label="Фільтр за групою">
-                  <button class="mini-segmented__item is-active" type="button" data-group-filter="all" aria-pressed="true">Усі</button>
-                  <% visibleGroupNumbers.forEach(function(groupNum) { %>
-                    <button class="mini-segmented__item" type="button" data-group-filter="<%= groupNum %>" aria-pressed="false">Група <%= groupNum %></button>
-                  <% }); %>
-                </div>
+                  </select>
+                </form>
               </div>
             </div>
             <div class="panel-divider"></div>
@@ -2010,8 +1956,6 @@
         </div>
         <button class="week-nav-btn week-nav-btn--next" type="button" id="weekNext" aria-label="Next week">›</button>
       </div>
-
-      <%- include('partials/schedule-action-capsule', { role, settings }) %>
 
       <%- include('partials/app-footer') %>
     </div>
@@ -3013,9 +2957,6 @@
       const scheduleDrawer = document.getElementById('scheduleActionDrawer');
       const scheduleDrawerToggle = document.getElementById('scheduleDrawerToggle');
       const scheduleDrawerClose = document.getElementById('scheduleDrawerClose');
-      const schedulePanel = document.querySelector('.schedule-panel');
-      const scheduleGroupSegments = document.getElementById('scheduleGroupSegments');
-      const scheduleActionCapsule = document.getElementById('scheduleActionCapsule');
       const focusWeekToggle = document.getElementById('focusWeekToggle');
       const densityChipBalance = document.getElementById('densityChipBalance');
       const densityChipEvening = document.getElementById('densityChipEvening');
@@ -3258,79 +3199,18 @@
         });
       }
 
-      function applyGroupFilter(groupValue) {
-        const weekGridNode = document.getElementById('scheduleWeekGrid');
-        if (!weekGridNode) return;
-        const normalized = String(groupValue || 'all');
-        const isAll = normalized === 'all';
-        document.body.classList.toggle('group-filter-active', !isAll);
-        weekGridNode.querySelectorAll('.schedule-card[data-groupnum]').forEach((card) => {
-          const matches = isAll || String(card.dataset.groupnum || '') === normalized;
-          card.classList.toggle('is-group-hidden', !matches);
-        });
-        weekGridNode.querySelectorAll('.day-card').forEach((dayCard) => {
-          const visibleScheduleCards = dayCard.querySelectorAll('.schedule-card:not(.is-group-hidden)').length;
-          const hasDeadlineBlock = Boolean(dayCard.querySelector('.deadline-block'));
-          dayCard.classList.toggle('is-group-empty', !visibleScheduleCards && !hasDeadlineBlock);
-        });
-        if (typeof currentScheduleMode === 'string' && currentScheduleMode === 'day') {
-          applyScheduleMode(currentScheduleMode, { persist: false, bounce: false });
-        }
-      }
-
-      if (scheduleGroupSegments) {
-        scheduleGroupSegments.querySelectorAll('[data-group-filter]').forEach((button) => {
-          button.addEventListener('click', () => {
-            const nextGroup = button.dataset.groupFilter || 'all';
-            scheduleGroupSegments.querySelectorAll('[data-group-filter]').forEach((item) => {
-              const active = item === button;
-              item.classList.toggle('is-active', active);
-              item.setAttribute('aria-pressed', active ? 'true' : 'false');
-            });
-            applyGroupFilter(nextGroup);
-          });
-        });
-        applyGroupFilter('all');
-      }
-
-      if (scheduleActionCapsule) {
-        scheduleActionCapsule.addEventListener('click', (event) => {
-          const trigger = event.target.closest('[data-action-capsule]');
-          if (!trigger) return;
-          const action = trigger.dataset.actionCapsule;
-          if (action === 'filter' && schedulePanel) {
-            schedulePanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            return;
-          }
-          if (action === 'export') {
-            window.print();
-          }
-        });
-      }
-
       const weekGrid = document.getElementById('scheduleWeekGrid');
-      const scheduleModes = ['day', 'week'];
+      const scheduleModes = ['week'];
       const scheduleModeTabs = document.getElementById('scheduleModeTabs');
       const scheduleModeIndicator = document.getElementById('scheduleModeIndicator');
       const scheduleModeButtons = scheduleModeTabs ? Array.from(scheduleModeTabs.querySelectorAll('.glass-tab[data-mode]')) : [];
       const monthSummary = document.getElementById('scheduleMonthSummary');
       const densityBlock = document.getElementById('densityBlock');
-      const storedScheduleMode = (() => {
-        try {
-          return localStorage.getItem('schedule-view-mode');
-        } catch (err) {
-          return null;
-        }
-      })();
-      let currentScheduleMode = scheduleModes.includes(storedScheduleMode) ? storedScheduleMode : 'day';
+      let currentScheduleMode = 'week';
 
       function getPreferredDayCard(dayCards) {
         const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
-        const hasVisibleCards = (card) => card.querySelector('.schedule-card:not(.is-group-hidden)');
-        return dayCards.find((card) => card.dataset.dayDate === today && hasVisibleCards(card))
-          || dayCards.find((card) => hasVisibleCards(card))
-          || dayCards[0]
-          || null;
+        return dayCards.find((card) => card.dataset.dayDate === today) || dayCards.find((card) => card.querySelector('.schedule-card')) || dayCards[0] || null;
       }
 
       function buildMonthSummary() {
@@ -3421,7 +3301,7 @@
         }
 
         if (persist) {
-          localStorage.setItem('schedule-view-mode', mode);
+          localStorage.setItem('schedule-view-mode', 'week');
         }
       }
 
@@ -3700,7 +3580,6 @@
       }
 
       function bindScheduleCardInteractions(root = document) {
-        const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         root.querySelectorAll('.schedule-card[role="button"]').forEach((card) => {
           if (card.dataset.keyboardBound === '1') return;
           card.dataset.keyboardBound = '1';
@@ -3708,25 +3587,6 @@
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
             card.click();
-          });
-          if (reduceMotion || card.dataset.depthBound === '1') return;
-          card.dataset.depthBound = '1';
-          card.addEventListener('pointermove', (event) => {
-            if (event.pointerType === 'touch') return;
-            const rect = card.getBoundingClientRect();
-            if (!rect.width || !rect.height) return;
-            const x = (event.clientX - rect.left) / rect.width;
-            const y = (event.clientY - rect.top) / rect.height;
-            const tiltY = ((x - 0.5) * 4).toFixed(2);
-            const tiltX = ((0.5 - y) * 3).toFixed(2);
-            card.style.setProperty('--card-tilt-y', `${tiltY}deg`);
-            card.style.setProperty('--card-tilt-x', `${tiltX}deg`);
-            card.style.setProperty('--card-glow-opacity', '1');
-          });
-          card.addEventListener('pointerleave', () => {
-            card.style.setProperty('--card-tilt-y', '0deg');
-            card.style.setProperty('--card-tilt-x', '0deg');
-            card.style.setProperty('--card-glow-opacity', '0');
           });
         });
       }
@@ -3851,10 +3711,6 @@
             updateSmartHighlights();
             applySubjectTones(weekGrid);
             updateDensitySummary(weekGrid);
-            if (scheduleGroupSegments) {
-              const activeGroupBtn = scheduleGroupSegments.querySelector('.is-active[data-group-filter]');
-              applyGroupFilter(activeGroupBtn ? activeGroupBtn.dataset.groupFilter : 'all');
-            }
             applyScheduleMode(currentScheduleMode, { persist: false, bounce: false });
             initTooltips(weekGrid);
             writeScheduleCache(weekGrid.innerHTML);

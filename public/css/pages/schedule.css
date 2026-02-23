@@ -76,52 +76,6 @@ body {
   font-weight: var(--w-regular);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  position: relative;
-}
-
-body.page-schedule::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(520px 280px at 14% 8%, rgba(125, 211, 252, 0.14), transparent 72%),
-    radial-gradient(640px 320px at 88% 14%, rgba(196, 181, 253, 0.1), transparent 76%);
-  transition: opacity 220ms ease, filter 220ms ease;
-  opacity: 1;
-}
-
-body.page-schedule > .topbar,
-body.page-schedule > .schedule-drawer,
-body.page-schedule > .schedule-shell {
-  position: relative;
-  z-index: 1;
-}
-
-body.schedule-role-student.page-schedule::before {
-  background:
-    radial-gradient(560px 300px at 14% 8%, rgba(125, 211, 252, 0.16), transparent 72%),
-    radial-gradient(680px 320px at 86% 14%, rgba(167, 139, 250, 0.12), transparent 76%);
-}
-
-body.schedule-role-teacher.page-schedule::before {
-  background:
-    radial-gradient(540px 300px at 14% 8%, rgba(74, 222, 128, 0.14), transparent 72%),
-    radial-gradient(700px 340px at 86% 14%, rgba(59, 130, 246, 0.12), transparent 76%);
-}
-
-body.schedule-role-admin.page-schedule::before,
-body.schedule-role-deanery.page-schedule::before {
-  background:
-    radial-gradient(540px 300px at 14% 8%, rgba(251, 191, 36, 0.14), transparent 72%),
-    radial-gradient(700px 340px at 86% 14%, rgba(244, 114, 182, 0.1), transparent 76%);
-}
-
-body.schedule-role-starosta.page-schedule::before {
-  background:
-    radial-gradient(540px 300px at 14% 8%, rgba(96, 165, 250, 0.16), transparent 72%),
-    radial-gradient(700px 340px at 86% 14%, rgba(34, 197, 94, 0.1), transparent 76%);
 }
 
 .topbar .navbar-brand {
@@ -330,10 +284,6 @@ body.theme-dark .week-hero .hero-sub {
   box-shadow: 0 10px 24px rgba(2, 6, 23, 0.12);
   backdrop-filter: blur(14px) saturate(1.1);
   overflow: hidden;
-}
-
-.glass-tabs--2 {
-  grid-template-columns: repeat(2, minmax(86px, 1fr));
 }
 
 body.theme-light .glass-tabs {
@@ -580,62 +530,6 @@ body.theme-light .schedule-panel {
   align-items: center;
   gap: var(--space-1);
   flex-wrap: wrap;
-}
-
-.mini-segmented {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  background: rgba(148, 163, 184, 0.1);
-  backdrop-filter: blur(12px) saturate(1.05);
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-body.theme-light .mini-segmented {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(148, 163, 184, 0.36);
-}
-
-.mini-segmented form {
-  margin: 0;
-}
-
-.mini-segmented__item {
-  appearance: none;
-  -webkit-appearance: none;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  border-radius: 999px;
-  padding: 7px 10px;
-  min-height: 34px;
-  font-size: 12px;
-  font-weight: var(--w-medium);
-  line-height: 1;
-  white-space: nowrap;
-  transition: background var(--motion-fast), box-shadow var(--motion-fast), color var(--motion-fast);
-}
-
-.mini-segmented__item.is-active {
-  background: linear-gradient(160deg, rgba(191, 219, 254, 0.42), rgba(125, 211, 252, 0.24));
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.26);
-}
-
-body.theme-dark .mini-segmented__item.is-active {
-  color: rgba(241, 245, 249, 0.94);
-}
-
-body.theme-light .mini-segmented__item.is-active {
-  color: rgba(15, 23, 42, 0.92);
-}
-
-.mini-segmented__item:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.28);
 }
 
 .panel-focus-inline {
@@ -947,10 +841,6 @@ body.theme-dark .day-chip--primary {
   --subject-shift: 0;
   --subject-light-dark: calc(14% + (var(--subject-shift) * 0.22%));
   --subject-light-light: calc(95% + (var(--subject-shift) * 0.25%));
-  --card-tilt-x: 0deg;
-  --card-tilt-y: 0deg;
-  --card-lift-y: 0px;
-  --card-glow-opacity: 0;
   border-radius: var(--radius-md);
   border: 1px solid rgba(148, 163, 184, 0.24);
   padding: 18px;
@@ -963,7 +853,7 @@ body.theme-dark .day-chip--primary {
   transition: transform var(--motion-card), box-shadow var(--motion-card), border-color var(--motion-card), background var(--motion-card);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
   outline: none;
-  transform: perspective(900px) rotateX(var(--card-tilt-x)) rotateY(var(--card-tilt-y)) translate3d(0, var(--card-lift-y), 0);
+  transform: translate3d(0, 0, 0);
   will-change: transform;
   contain: paint;
   backface-visibility: hidden;
@@ -974,21 +864,7 @@ body.theme-dark .day-chip--primary {
 }
 
 .schedule-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, calc(0.07 + (var(--card-glow-opacity) * 0.12))),
-    inset 0 0 0 1px rgba(125, 211, 252, calc(var(--card-glow-opacity) * 0.16)),
-    0 0 0 1px rgba(125, 211, 252, calc(var(--card-glow-opacity) * 0.08));
-  opacity: 1 !important;
-}
-
-.schedule-card.liquid-card::after {
-  display: block !important;
+  display: none !important;
 }
 
 body.theme-dark .schedule-card {
@@ -1174,8 +1050,7 @@ body.theme-light .schedule-card.is-next .chip-next {
 
 @media (hover: hover) {
   .schedule-card:hover {
-    --card-lift-y: -2px;
-    --card-glow-opacity: 1;
+    transform: translate3d(0, -2px, 0);
     box-shadow: 0 10px 26px rgba(2, 6, 23, 0.08), 0 14px 24px rgba(15, 23, 42, 0.06);
   }
 }
@@ -1186,8 +1061,7 @@ body.theme-dark .schedule-card:hover {
 }
 
 .schedule-card:active {
-  --card-lift-y: 0px;
-  transform: perspective(900px) scale(0.99);
+  transform: translate3d(0, 0, 0) scale(0.99);
   box-shadow: 0 6px 14px rgba(2, 6, 23, 0.08);
 }
 
@@ -1771,71 +1645,6 @@ body.is-scrolling .week-pager {
   backdrop-filter: none !important;
 }
 
-body.group-filter-active .schedule-card.is-group-hidden {
-  display: none !important;
-}
-
-body.group-filter-active .day-card.is-group-empty {
-  opacity: 0.58;
-}
-
-.schedule-action-capsule {
-  position: fixed;
-  right: max(14px, env(safe-area-inset-right));
-  bottom: calc(84px + env(safe-area-inset-bottom));
-  z-index: 1045;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(16px) saturate(1.08);
-  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.18);
-}
-
-body.theme-light .schedule-action-capsule {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(148, 163, 184, 0.38);
-}
-
-.schedule-action-capsule__btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(255, 255, 255, 0.08);
-  color: inherit;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  transition: transform var(--motion-fast), background var(--motion-fast), border-color var(--motion-fast);
-}
-
-body.theme-light .schedule-action-capsule__btn {
-  background: rgba(15, 23, 42, 0.04);
-}
-
-.schedule-action-capsule__btn:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(148, 163, 184, 0.38);
-}
-
-body.theme-light .schedule-action-capsule__btn:hover {
-  background: rgba(15, 23, 42, 0.08);
-}
-
-.schedule-action-capsule__btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.3);
-}
-
 .app-footer {
   padding-bottom: calc(104px + env(safe-area-inset-bottom));
 }
@@ -1938,10 +1747,5 @@ body.theme-light .footer-link {
     padding: 12px 4px;
     bottom: 12px;
     transform: translateX(calc(-50% + 4px));
-  }
-
-  .schedule-action-capsule {
-    right: 10px;
-    bottom: calc(72px + env(safe-area-inset-bottom));
   }
 }
