@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.16",
+      "date": "2026-02-23",
+      "items": [
+        "ux(menu-drawer): extend desktop drawer shell height further (near edge-to-edge viewport) across shared and page parity styles"
+      ]
+    },
+    {
       "version": "1.0.15",
       "date": "2026-02-23",
       "items": [
