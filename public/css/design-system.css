@@ -574,10 +574,10 @@ body.page-profile .schedule-drawer,
 body.page-schedule .schedule-drawer,
 body.page-my-day .schedule-drawer {
   position: fixed;
-  top: 72px;
+  top: 58px;
   left: 12px;
   width: min(360px, calc(100vw - 24px));
-  max-height: calc(100vh - 84px);
+  max-height: calc(100vh - 70px);
   overflow: auto;
   border: 1px solid var(--glass-border);
   border-radius: 22px;

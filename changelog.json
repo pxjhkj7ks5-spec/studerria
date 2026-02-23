@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.12",
+      "date": "2026-02-23",
+      "items": [
+        "ux(menu-drawer): raise desktop drawer shell closer to topbar across pages",
+        "ux(topbar): make title underline stripe thinner and softer"
+      ]
+    },
+    {
       "version": "1.0.11",
       "date": "2026-02-23",
       "items": [

@@ -1898,10 +1898,10 @@ body.theme-light .changelog-liquid-modal .modal-footer {
 
 /* Journal-style desktop drawer parity for My Day (page CSS loads after design-system). */
 body.page-my-day .schedule-drawer {
-  top: 72px !important;
+  top: 58px !important;
   left: 12px !important;
   width: min(360px, calc(100vw - 24px)) !important;
-  max-height: calc(100vh - 84px) !important;
+  max-height: calc(100vh - 70px) !important;
   height: auto !important;
   overflow: auto !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
