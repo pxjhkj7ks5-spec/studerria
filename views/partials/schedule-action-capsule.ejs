@@ -1,0 +1,36 @@
+<%
+  const canOpenCustomDeadline = Boolean(settings && settings.allow_custom_deadlines && (role === 'student' || role === 'starosta' || role === 'teacher' || role === 'admin'));
+%>
+<div class="schedule-action-capsule" id="scheduleActionCapsule" aria-label="Швидкі дії">
+  <% if (canOpenCustomDeadline) { %>
+    <button
+      class="schedule-action-capsule__btn"
+      type="button"
+      data-action-capsule="add"
+      data-bs-toggle="modal"
+      data-bs-target="#customDeadlineModal"
+      aria-label="Додати дедлайн"
+      title="Додати"
+    >
+      +
+    </button>
+  <% } %>
+  <button
+    class="schedule-action-capsule__btn"
+    type="button"
+    data-action-capsule="export"
+    aria-label="Експорт або друк"
+    title="Експорт"
+  >
+    P
+  </button>
+  <button
+    class="schedule-action-capsule__btn"
+    type="button"
+    data-action-capsule="filter"
+    aria-label="Перейти до фільтрів"
+    title="Фільтри"
+  >
+    F
+  </button>
+</div>
