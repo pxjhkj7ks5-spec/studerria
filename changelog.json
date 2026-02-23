@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.09",
+      "date": "2026-02-23",
+      "items": [
+        "ux(schedule-menu): match Schedule desktop drawer visual and animation to Journal/My Day and keep overlay behavior (no content shift)"
+      ]
+    },
+    {
       "version": "1.0.08",
       "date": "2026-02-23",
       "items": [
