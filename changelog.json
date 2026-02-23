@@ -1,21 +1,29 @@
 {
   "items": [
     {
-      "version": "0.10.02",
+      "version": "1.0.03",
+      "date": "2026-02-23",
+      "items": [
+        "ux(topbar): straighten title spotlight underline and reduce curved glow artifacts",
+        "chore(versioning): normalize recent topbar release versions from 0.10.xx to 1.0.xx"
+      ]
+    },
+    {
+      "version": "1.0.02",
       "date": "2026-02-23",
       "items": [
         "fix(topbar): hide mobile menu button on desktop to prevent duplicate menu icons in Journal and Subjects"
       ]
     },
     {
-      "version": "0.10.01",
+      "version": "1.0.01",
       "date": "2026-02-23",
       "items": [
         "ux(topbar): add subtle gradient background tint behind the title spotlight underline"
       ]
     },
     {
-      "version": "0.10.00",
+      "version": "1.0.00",
       "date": "2026-02-23",
       "items": [
         "ux(topbar): keep only a subtle liquid-glass spotlight underline under the page title"
