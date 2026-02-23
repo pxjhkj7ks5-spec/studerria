@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.13",
+      "date": "2026-02-23",
+      "items": [
+        "ux(menu-drawer): stretch desktop drawer height to near full viewport across shared, Home and Schedule parity styles"
+      ]
+    },
+    {
       "version": "1.0.12",
       "date": "2026-02-23",
       "items": [
