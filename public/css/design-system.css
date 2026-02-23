@@ -620,6 +620,14 @@ body.page-my-day.schedule-drawer-open .schedule-drawer {
   pointer-events: auto;
 }
 
+body.page-schedule.schedule-drawer-open .schedule-shell {
+  transform: none !important;
+}
+
+body.page-my-day.schedule-drawer-open .cockpit-page {
+  transform: none !important;
+}
+
 body.page-journal .drawer-head,
 body.page-subjects .drawer-head,
 body.page-teamwork .drawer-head,

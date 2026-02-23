@@ -1896,6 +1896,91 @@ body.theme-light .changelog-liquid-modal .modal-footer {
   }
 }
 
+/* Journal-style desktop drawer parity for My Day (page CSS loads after design-system). */
+body.page-my-day .schedule-drawer {
+  top: 72px !important;
+  left: 12px !important;
+  width: min(360px, calc(100vw - 24px)) !important;
+  max-height: calc(100vh - 84px) !important;
+  height: auto !important;
+  overflow: auto !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 22px !important;
+  padding: 12px !important;
+  box-shadow: 0 22px 44px rgba(2, 6, 23, 0.24) !important;
+  z-index: 1045 !important;
+  transform: translate3d(calc(-100% - 18px), 0, 0) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease-out !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+  backdrop-filter: blur(16px) saturate(1.08) !important;
+}
+
+body.page-my-day.theme-light .schedule-drawer {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border-color: rgba(148, 163, 184, 0.34) !important;
+}
+
+body.page-my-day.schedule-drawer-open .schedule-drawer {
+  transform: translate3d(0, 0, 0) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+body.page-my-day .drawer-head {
+  margin-bottom: 12px !important;
+}
+
+body.page-my-day .drawer-title {
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+  opacity: 1 !important;
+  color: inherit !important;
+  letter-spacing: 0 !important;
+}
+
+body.page-my-day .drawer-close {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  background: rgba(148, 163, 184, 0.12) !important;
+}
+
+body.page-my-day .drawer-action {
+  position: relative;
+  overflow: clip;
+  border-radius: 14px !important;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  background: rgba(148, 163, 184, 0.08) !important;
+  transition: background 200ms ease, border-color 200ms ease, box-shadow 200ms ease, transform 180ms ease !important;
+}
+
+body.page-my-day.theme-light .drawer-action {
+  background: rgba(255, 255, 255, 0.72) !important;
+}
+
+body.page-my-day .drawer-action::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120px 48px at 20% 50%, rgba(255, 255, 255, 0.08), transparent 72%),
+    radial-gradient(120px 48px at 72% 50%, rgba(148, 163, 184, 0.08), transparent 72%);
+  opacity: 0.8;
+}
+
+body.page-my-day.schedule-drawer-open .drawer-action {
+  animation: drawer-item-rise 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (max-width: 991px) {
+  body.page-my-day .schedule-drawer {
+    display: none !important;
+  }
+}
+
 @media (max-width: 460px) {
   .topbar .navbar-brand {
     font-size: 1rem;

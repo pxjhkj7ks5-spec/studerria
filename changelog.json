@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.08",
+      "date": "2026-02-23",
+      "items": [
+        "ux(menu-drawer): make Schedule and My Day desktop drawer match Journal visual style and open animation",
+        "ux(schedule,my-day): disable content shift while desktop drawer is open for Journal-like overlay behavior"
+      ]
+    },
+    {
       "version": "1.0.07",
       "date": "2026-02-23",
       "items": [
