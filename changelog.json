@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.11",
+      "date": "2026-02-23",
+      "items": [
+        "fix(schedule-menu): restore `page-schedule` body class so Schedule drawer parity overrides apply",
+        "ux(topbar): replace curved title underline with centered capsule highlight and soft pulse animation"
+      ]
+    },
+    {
       "version": "1.0.10",
       "date": "2026-02-23",
       "items": [

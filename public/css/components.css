@@ -619,45 +619,83 @@ body.theme-light .topbar--title-spotlight::before {
 .topbar-title-spotlight::before {
   content: "";
   position: absolute;
-  left: 6px;
-  bottom: -1px;
-  width: min(118px, 54%);
-  height: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: -2px;
+  width: 92px;
+  height: 12px;
   border-radius: 999px;
-  background: radial-gradient(70% 100% at 50% 50%, rgba(191, 219, 254, 0.34), rgba(191, 219, 254, 0) 100%);
-  filter: blur(6px);
-  opacity: 0.75;
+  background: radial-gradient(70% 100% at 50% 50%, rgba(191, 219, 254, 0.32), rgba(191, 219, 254, 0) 100%);
+  filter: blur(7px);
+  opacity: 0.72;
   pointer-events: none;
+  animation: topbar-title-glow 3.2s ease-in-out infinite;
 }
 
 .topbar-title-spotlight::after {
   content: "";
   position: absolute;
-  left: 6px;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 1px;
-  width: min(118px, 54%);
+  width: 76px;
   height: 4px;
   border-radius: 999px;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0%, rgba(226, 232, 240, 0.38) 20%, rgba(241, 245, 249, 0.95) 50%, rgba(191, 219, 254, 0.62) 78%, rgba(255, 255, 255, 0.06) 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(226, 232, 240, 0.28) 16%,
+    rgba(248, 250, 252, 0.95) 50%,
+    rgba(191, 219, 254, 0.42) 84%,
+    rgba(255, 255, 255, 0) 100%
+  );
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 1px 6px rgba(148, 163, 184, 0.12);
-  opacity: 0.98;
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 10px rgba(148, 163, 184, 0.14);
+  opacity: 0.97;
   pointer-events: none;
+  animation: topbar-title-line 3.2s ease-in-out infinite;
 }
 
 body.theme-light .topbar-title-spotlight::before {
-  background: radial-gradient(70% 100% at 50% 50%, rgba(96, 165, 250, 0.2), rgba(96, 165, 250, 0) 100%);
-  opacity: 0.6;
+  background: radial-gradient(70% 100% at 50% 50%, rgba(96, 165, 250, 0.16), rgba(96, 165, 250, 0) 100%);
+  opacity: 0.52;
 }
 
 body.theme-light .topbar-title-spotlight::after {
-  background:
-    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 0%, rgba(203, 213, 225, 0.26) 20%, rgba(241, 245, 249, 0.9) 50%, rgba(96, 165, 250, 0.36) 78%, rgba(148, 163, 184, 0.06) 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0) 0%,
+    rgba(203, 213, 225, 0.2) 16%,
+    rgba(255, 255, 255, 0.96) 50%,
+    rgba(96, 165, 250, 0.3) 84%,
+    rgba(148, 163, 184, 0) 100%
+  );
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 1px 5px rgba(59, 130, 246, 0.06);
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 0 8px rgba(59, 130, 246, 0.05);
+}
+
+@keyframes topbar-title-glow {
+  0%, 100% {
+    opacity: 0.62;
+    transform: translateX(-50%) scaleX(0.96);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateX(-50%) scaleX(1.03);
+  }
+}
+
+@keyframes topbar-title-line {
+  0%, 100% {
+    opacity: 0.92;
+    transform: translateX(-50%) scaleX(0.985);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scaleX(1.015);
+  }
 }
 
 @media (max-width: 768px) {
@@ -666,16 +704,15 @@ body.theme-light .topbar-title-spotlight::after {
   }
 
   .topbar-title-spotlight::after {
-    left: 4px;
-    width: min(98px, 48%);
+    width: 62px;
     height: 3px;
   }
 
   .topbar-title-spotlight::before {
-    left: 4px;
+    left: 50%;
     bottom: -1px;
-    width: min(98px, 48%);
-    height: 8px;
+    width: 74px;
+    height: 9px;
     filter: blur(5px);
   }
 
@@ -684,6 +721,13 @@ body.theme-light .topbar-title-spotlight::after {
       radial-gradient(220px 84px at 28% 0%, rgba(96, 165, 250, 0.12), transparent 72%),
       radial-gradient(260px 96px at 76% 0%, rgba(167, 139, 250, 0.07), transparent 76%),
       linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar-title-spotlight::before,
+  .topbar-title-spotlight::after {
+    animation: none !important;
   }
 }
 
