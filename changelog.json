@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.05",
+      "date": "2026-02-23",
+      "items": [
+        "ux(topbar): refine title spotlight into cleaner capsule highlight with softer glow"
+      ]
+    },
+    {
       "version": "1.0.04",
       "date": "2026-02-23",
       "items": [
