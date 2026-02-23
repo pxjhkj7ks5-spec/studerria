@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.10.02",
+      "date": "2026-02-23",
+      "items": [
+        "fix(topbar): hide mobile menu button on desktop to prevent duplicate menu icons in Journal and Subjects"
+      ]
+    },
+    {
       "version": "0.10.01",
       "date": "2026-02-23",
       "items": [

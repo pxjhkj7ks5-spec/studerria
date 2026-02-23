@@ -442,6 +442,23 @@ body.theme-light .table-striped > tbody > tr:nth-of-type(odd) > * {
 
 .mobile-menu-btn {
   position: relative;
+  display: none;
+}
+
+.desktop-only {
+  display: inline-flex;
+}
+
+@media (max-width: 991px) {
+  .desktop-only {
+    display: none !important;
+  }
+
+  .topbar .mobile-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 body.theme-dark .topbar .btn-glass,
