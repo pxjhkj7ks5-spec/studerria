@@ -16,7 +16,8 @@
         "feat(competencies-hybrid): added auto competency source support with source_ref idempotency for first-time homework submissions (+1/+0 for self_organization based on on-time status)",
         "ux(home-competency-compass): competency compass now shows manual vs auto signal counts in the UI",
         "refactor(my-day): removed unused heuristic competency profile code path that was not applied to the compass output",
-        "fix(academic-week-timezone): academic week rollover now uses Europe/Kyiv calendar date so week changes at 00:00 Kyiv time instead of UTC"
+        "fix(academic-week-timezone): academic week rollover now uses Europe/Kyiv calendar date so week changes at 00:00 Kyiv time instead of UTC",
+        "fix(security-analytics-scheduler): hardened scheduler interval resolver against init-order issues and clear legacy runtime incident signature before scheduler startup"
       ]
     },
     {

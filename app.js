@@ -21397,11 +21397,11 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
   }
 });
 
-const resolveSchedulerIntervalMs = () => {
+function resolveSchedulerIntervalMs() {
   const raw = Number(process.env.SCHEDULER_INTERVAL_MS || 60000);
   if (!Number.isFinite(raw)) return 60000;
   return Math.floor(raw);
-};
+}
 const schedulerIntervalMs = resolveSchedulerIntervalMs();
 let schedulerRunning = false;
 const publishScheduledItems = async () => {
@@ -27850,6 +27850,9 @@ app.post('/logout', (req, res) => {
 });
 
 const startScheduler = () => {
+  clearRuntimeErrorEvents((event) => (
+    String(event && event.message ? event.message : '').toLowerCase().includes('schedulerintervalms is not defined')
+  ));
   const intervalMs = (typeof schedulerIntervalMs === 'number' && Number.isFinite(schedulerIntervalMs))
     ? schedulerIntervalMs
     : resolveSchedulerIntervalMs();
@@ -27859,9 +27862,6 @@ const startScheduler = () => {
     return;
   }
   schedulerHealthState.enabled = true;
-  clearRuntimeErrorEvents((event) => (
-    String(event && event.message ? event.message : '').toLowerCase().includes('schedulerintervalms is not defined')
-  ));
   setInterval(() => {
     if (typeof publishScheduledItems !== 'function') {
       return;
