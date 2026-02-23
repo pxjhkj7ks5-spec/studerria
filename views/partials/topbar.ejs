@@ -7,9 +7,9 @@
   const isJournal = activePage === 'journal';
   const brandTitle = isSchedule ? 'Studerria' : (pageTitle || 'Studerria');
 %>
-<nav class="navbar navbar-expand-lg topbar">
+<nav class="navbar navbar-expand-lg topbar topbar--title-spotlight">
   <div class="container">
-    <span class="navbar-brand text-white me-auto"><%= brandTitle %></span>
+    <span class="navbar-brand text-white me-auto topbar-title-spotlight"><%= brandTitle %></span>
     <div class="d-flex align-items-center gap-2 topbar-actions flex-wrap justify-content-end">
       <% if (isSchedule) { %>
         <span class="me-2 muted desktop-only text-nowrap">

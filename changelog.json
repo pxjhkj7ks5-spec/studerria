@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.10.00",
+      "date": "2026-02-23",
+      "items": [
+        "ux(topbar): keep only a subtle liquid-glass spotlight underline under the page title"
+      ]
+    },
+    {
       "version": "0.9.99",
       "date": "2026-02-22",
       "items": [
