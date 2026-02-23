@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.04",
+      "date": "2026-02-23",
+      "items": [
+        "ux(topbar): unify shared menu/topbar visuals across pages to match Journal styling"
+      ]
+    },
+    {
       "version": "1.0.03",
       "date": "2026-02-23",
       "items": [

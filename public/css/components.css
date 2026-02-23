@@ -440,6 +440,45 @@ body.theme-light .table-striped > tbody > tr:nth-of-type(odd) > * {
   background: rgba(12, 16, 28, 0.6);
 }
 
+.topbar.topbar--title-spotlight {
+  padding: 0.6rem 0 !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(1.08);
+  backdrop-filter: blur(12px) saturate(1.08);
+}
+
+.topbar.topbar--title-spotlight .container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-height: 44px !important;
+}
+
+.topbar.topbar--title-spotlight .navbar-brand {
+  margin-right: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  height: 36px !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+  font-weight: 700 !important;
+  font-size: 1.18rem !important;
+  letter-spacing: 0.01em !important;
+}
+
+.topbar.topbar--title-spotlight .topbar-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  min-height: 36px !important;
+}
+
+.topbar.topbar--title-spotlight .topbar-actions form {
+  display: contents !important;
+}
+
 .mobile-menu-btn {
   position: relative;
   display: none;
@@ -499,6 +538,30 @@ body.theme-light .topbar .msg-btn:hover,
 body.theme-light .topbar .mobile-menu-btn:hover {
   background: rgba(15, 23, 42, 0.12);
   border-color: rgba(15, 23, 42, 0.22);
+}
+
+.topbar.topbar--title-spotlight .drawer-menu-btn,
+.topbar.topbar--title-spotlight .mobile-menu-btn {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.theme-dark .topbar.topbar--title-spotlight {
+  background: rgba(12, 16, 28, 0.6) !important;
+}
+
+body.theme-light .topbar.topbar--title-spotlight {
+  background: rgba(255, 255, 255, 0.8) !important;
+}
+
+@media (max-width: 991px) {
+  .topbar.topbar--title-spotlight .topbar-actions {
+    gap: 0.3rem !important;
+  }
 }
 
 .topbar--title-spotlight {
