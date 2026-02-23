@@ -488,8 +488,22 @@ body.theme-light .table-striped > tbody > tr:nth-of-type(odd) > * {
   display: inline-flex;
 }
 
+.topbar .mobile-menu-btn {
+  display: none !important;
+}
+
+.topbar .drawer-menu-btn.desktop-only,
+.topbar .desktop-only {
+  display: inline-flex !important;
+}
+
 @media (max-width: 991px) {
   .desktop-only {
+    display: none !important;
+  }
+
+  .topbar .drawer-menu-btn.desktop-only,
+  .topbar .desktop-only {
     display: none !important;
   }
 
@@ -497,6 +511,7 @@ body.theme-light .table-striped > tbody > tr:nth-of-type(odd) > * {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    display: inline-flex !important;
   }
 }
 

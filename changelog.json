@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.06",
+      "date": "2026-02-23",
+      "items": [
+        "fix(topbar): enforce one menu button per breakpoint in Journal and Subjects (desktop drawer vs mobile menu)"
+      ]
+    },
+    {
       "version": "1.0.05",
       "date": "2026-02-23",
       "items": [
