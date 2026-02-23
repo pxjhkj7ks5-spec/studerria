@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.10",
+      "date": "2026-02-23",
+      "items": [
+        "ux(schedule-menu): force full drawer parity with Home/Journal by duplicating final drawer shell and item styles in schedule page CSS"
+      ]
+    },
+    {
       "version": "1.0.09",
       "date": "2026-02-23",
       "items": [

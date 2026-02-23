@@ -1769,11 +1769,26 @@ body.page-schedule .schedule-drawer {
   transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease-out !important;
   background: rgba(15, 23, 42, 0.72) !important;
   backdrop-filter: blur(16px) saturate(1.08) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
 }
 
 body.page-schedule.theme-light .schedule-drawer {
   background: rgba(255, 255, 255, 0.82) !important;
   border-color: rgba(148, 163, 184, 0.34) !important;
+}
+
+body.page-schedule .schedule-drawer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(180px 120px at 24% 8%, rgba(96, 165, 250, 0.1), transparent 72%),
+    radial-gradient(220px 140px at 72% 12%, rgba(167, 139, 250, 0.06), transparent 76%);
+  opacity: 0.9;
 }
 
 body.page-schedule.schedule-drawer-open .schedule-drawer {
@@ -1787,6 +1802,10 @@ body.page-schedule.schedule-drawer-open .schedule-shell {
 }
 
 body.page-schedule .drawer-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
   margin-bottom: 12px !important;
 }
 
@@ -1801,16 +1820,35 @@ body.page-schedule .drawer-title {
 body.page-schedule .drawer-close {
   width: 38px !important;
   height: 38px !important;
+  min-width: 38px !important;
   border-radius: 999px !important;
   background: rgba(148, 163, 184, 0.12) !important;
+}
+
+body.page-schedule .drawer-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+body.page-schedule .drawer-action-wrap {
+  margin: 0 !important;
 }
 
 body.page-schedule .drawer-action {
   position: relative;
   overflow: clip;
+  width: 100% !important;
+  min-height: 46px !important;
   border-radius: 14px !important;
   border: 1px solid rgba(148, 163, 184, 0.28) !important;
   background: rgba(148, 163, 184, 0.08) !important;
+  color: inherit !important;
+  text-decoration: none !important;
+  padding: 11px 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
   transition: background 200ms ease, border-color 200ms ease, box-shadow 200ms ease, transform 180ms ease !important;
 }
 
