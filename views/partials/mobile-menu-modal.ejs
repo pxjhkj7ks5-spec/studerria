@@ -4,6 +4,13 @@
   const isTeamwork = activePage === 'teamwork';
   const isSubjects = activePage === 'subjects';
   const isJournal = activePage === 'journal';
+  const mobileSettings = (typeof settings !== 'undefined') ? settings : null;
+  const mobileHasCustomAdminPanelAccess = (typeof hasCustomAdminPanelAccess !== 'undefined')
+    ? Boolean(hasCustomAdminPanelAccess)
+    : false;
+  const mobileCustomAdminPanelHref = (typeof customAdminPanelHref !== 'undefined')
+    ? customAdminPanelHref
+    : '/admin';
 %>
 <div class="modal fade" id="mobileMenuModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -18,8 +25,8 @@
             <form method="POST" action="/admin/switch-to-admin">
               <button class="btn w-100 glass mobile-menu-action" type="submit">🛠️ <%= t('schedule.backToAdmin') %></button>
             </form>
-          <% } else if (hasCustomAdminPanelAccess) { %>
-            <a class="btn w-100 glass mobile-menu-action" href="<%= customAdminPanelHref || '/admin' %>">🛠️ <%= t('schedule.backToAdmin') %></a>
+          <% } else if (mobileHasCustomAdminPanelAccess) { %>
+            <a class="btn w-100 glass mobile-menu-action" href="<%= mobileCustomAdminPanelHref || '/admin' %>">🛠️ <%= t('schedule.backToAdmin') %></a>
           <% } %>
           <% if (role === 'starosta') { %>
             <a class="btn w-100 glass mobile-menu-action" href="/starosta">🧑‍🏫 <%= t('menu.starosta') %></a>
@@ -43,7 +50,7 @@
           <% if (!isSubjects) { %>
             <a class="btn w-100 glass mobile-menu-action" href="/subjects">📚 Предмети</a>
           <% } %>
-          <% if ((activePage === 'schedule' || isMyDay) && settings && settings.allow_custom_deadlines) { %>
+          <% if ((activePage === 'schedule' || isMyDay) && mobileSettings && mobileSettings.allow_custom_deadlines) { %>
             <% if (activePage === 'schedule') { %>
               <button class="btn w-100 glass mobile-menu-action" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
                 🌀 Дивні дедлайни
@@ -52,7 +59,7 @@
               <a class="btn w-100 glass mobile-menu-action" href="/schedule">🌀 Дивні дедлайни</a>
             <% } %>
           <% } %>
-          <% if ((activePage === 'schedule' || isMyDay) && settings && settings.allow_messages) { %>
+          <% if ((activePage === 'schedule' || isMyDay) && mobileSettings && mobileSettings.allow_messages) { %>
             <% if (activePage === 'schedule') { %>
               <button class="btn w-100 glass mobile-menu-action" type="button" id="messagesBtnMobile" aria-label="<%= t('messages.aria') %>">
                 💬 Повідомлення

@@ -3,10 +3,18 @@
   const drawerIsMyDay = activePage === 'my-day';
   const drawerFirstHref = drawerIsMyDay ? '/schedule' : '/home';
   const drawerFirstLabel = drawerIsMyDay ? '📅 Розклад' : '🏠 Головна';
-  const canShowCustomDeadlines = (role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student')
-    && settings
-    && settings.allow_custom_deadlines;
-  const canShowMessages = settings && settings.allow_messages;
+  const drawerViewAs = (typeof viewAs !== 'undefined') ? viewAs : null;
+  const drawerSettings = (typeof settings !== 'undefined') ? settings : null;
+  const drawerHasCustomAdminPanelAccess = (typeof hasCustomAdminPanelAccess !== 'undefined')
+    ? Boolean(hasCustomAdminPanelAccess)
+    : false;
+  const drawerCustomAdminPanelHref = (typeof customAdminPanelHref !== 'undefined')
+    ? customAdminPanelHref
+    : '/admin';
+  const canShowCustomDeadlines = (role === 'student' || role === 'starosta' || role === 'teacher' || drawerViewAs === 'student')
+    && drawerSettings
+    && drawerSettings.allow_custom_deadlines;
+  const canShowMessages = drawerSettings && drawerSettings.allow_messages;
 %>
 <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
   <div class="drawer-head">
@@ -18,8 +26,8 @@
       <form method="POST" action="/admin/switch-to-admin" class="drawer-action-wrap">
         <button class="drawer-action" type="submit">🛠️ <%= t('schedule.backToAdmin') %></button>
       </form>
-    <% } else if (hasCustomAdminPanelAccess) { %>
-      <a class="drawer-action" href="<%= customAdminPanelHref || '/admin' %>">🛠️ <%= t('schedule.backToAdmin') %></a>
+    <% } else if (drawerHasCustomAdminPanelAccess) { %>
+      <a class="drawer-action" href="<%= drawerCustomAdminPanelHref || '/admin' %>">🛠️ <%= t('schedule.backToAdmin') %></a>
     <% } %>
     <% if (role === 'starosta') { %>
       <a class="drawer-action" href="/starosta">🧑‍🏫 <%= t('menu.starosta') %></a>
