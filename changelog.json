@@ -17,7 +17,8 @@
         "ux(home-competency-compass): competency compass now shows manual vs auto signal counts in the UI",
         "refactor(my-day): removed unused heuristic competency profile code path that was not applied to the compass output",
         "fix(academic-week-timezone): academic week rollover now uses Europe/Kyiv calendar date so week changes at 00:00 Kyiv time instead of UTC",
-        "fix(security-analytics-scheduler): hardened scheduler interval resolver against init-order issues and clear legacy runtime incident signature before scheduler startup"
+        "fix(security-analytics-scheduler): hardened scheduler interval resolver against init-order issues and clear legacy runtime incident signature before scheduler startup",
+        "fix(security-analytics-incidents): suppress legacy resolveSchedulerIntervalMs runtime signature from incident feed/system-health summaries and remove direct resolver symbol dependency"
       ]
     },
     {

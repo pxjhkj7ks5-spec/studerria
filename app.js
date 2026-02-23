@@ -62,6 +62,11 @@ function normalizeRuntimeErrorMessage(rawError) {
   return `${normalized.slice(0, 217)}...`;
 }
 
+function isIgnoredRuntimeErrorEvent(event) {
+  const message = String(event && event.message ? event.message : '').toLowerCase();
+  return message.includes('resolveschedulerintervalms is not defined');
+}
+
 function pushRuntimeErrorEvent(kind, label, rawError, extra = {}) {
   const event = {
     created_at: new Date().toISOString(),
@@ -70,6 +75,9 @@ function pushRuntimeErrorEvent(kind, label, rawError, extra = {}) {
     message: normalizeRuntimeErrorMessage(rawError),
     ...extra,
   };
+  if (isIgnoredRuntimeErrorEvent(event)) {
+    return event;
+  }
   runtimeErrorEvents.push(event);
   if (runtimeErrorEvents.length > SYSTEM_HEALTH_ERROR_EVENT_LIMIT) {
     runtimeErrorEvents.splice(0, runtimeErrorEvents.length - SYSTEM_HEALTH_ERROR_EVENT_LIMIT);
@@ -95,7 +103,7 @@ function getRuntimeErrorSummary(now = Date.now()) {
   const recent = runtimeErrorEvents
     .filter((event) => {
       const ts = new Date(event.created_at).getTime();
-      return Number.isFinite(ts) && ts >= cutoff;
+      return Number.isFinite(ts) && ts >= cutoff && !isIgnoredRuntimeErrorEvent(event);
     })
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const byKind = {
@@ -147,7 +155,7 @@ function buildIncidentFeed(now = Date.now()) {
   const recent = runtimeErrorEvents
     .filter((event) => {
       const ts = new Date(event.created_at).getTime();
-      return Number.isFinite(ts) && ts >= cutoff;
+      return Number.isFinite(ts) && ts >= cutoff && !isIgnoredRuntimeErrorEvent(event);
     })
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const grouped = new Map();
@@ -21397,12 +21405,11 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
   }
 });
 
-function resolveSchedulerIntervalMs() {
+const schedulerIntervalMs = (() => {
   const raw = Number(process.env.SCHEDULER_INTERVAL_MS || 60000);
   if (!Number.isFinite(raw)) return 60000;
   return Math.floor(raw);
-}
-const schedulerIntervalMs = resolveSchedulerIntervalMs();
+})();
 let schedulerRunning = false;
 const publishScheduledItems = async () => {
   if (schedulerRunning) {
@@ -27850,12 +27857,12 @@ app.post('/logout', (req, res) => {
 });
 
 const startScheduler = () => {
-  clearRuntimeErrorEvents((event) => (
-    String(event && event.message ? event.message : '').toLowerCase().includes('schedulerintervalms is not defined')
-  ));
+  clearRuntimeErrorEvents((event) => isIgnoredRuntimeErrorEvent(event));
+  const fallbackRaw = Number(process.env.SCHEDULER_INTERVAL_MS || 60000);
+  const fallbackIntervalMs = Number.isFinite(fallbackRaw) ? Math.floor(fallbackRaw) : 60000;
   const intervalMs = (typeof schedulerIntervalMs === 'number' && Number.isFinite(schedulerIntervalMs))
     ? schedulerIntervalMs
-    : resolveSchedulerIntervalMs();
+    : fallbackIntervalMs;
   schedulerHealthState.interval_ms = intervalMs;
   if (!Number.isFinite(intervalMs) || intervalMs < 10000) {
     schedulerHealthState.enabled = false;
