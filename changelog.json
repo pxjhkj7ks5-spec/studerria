@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "0.10.01",
+      "date": "2026-02-23",
+      "items": [
+        "ux(topbar): add subtle gradient background tint behind the title spotlight underline"
+      ]
+    },
+    {
       "version": "0.10.00",
       "date": "2026-02-23",
       "items": [
