@@ -574,8 +574,8 @@ body.page-profile .schedule-drawer,
 body.page-schedule .schedule-drawer,
 body.page-my-day .schedule-drawer {
   position: fixed;
-  top: 32px;
-  bottom: 8px;
+  top: 20px;
+  bottom: 4px;
   left: 12px;
   width: min(360px, calc(100vw - 24px));
   max-height: none;

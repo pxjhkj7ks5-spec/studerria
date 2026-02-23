@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.15",
+      "date": "2026-02-23",
+      "items": [
+        "ux(menu-drawer): push desktop drawer shell even closer to full-height viewport (~98%) across shared and page parity styles"
+      ]
+    },
+    {
       "version": "1.0.14",
       "date": "2026-02-23",
       "items": [
