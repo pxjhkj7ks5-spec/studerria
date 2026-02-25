@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Генератор сесії</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/pages/admin.css" />
+    <link rel="stylesheet" href="/css/pages/admin-schedule-generator.css" />
+    <link rel="stylesheet" href="/css/design-system.css" />
+    <style>
+      .session-generator-page {
+        background:
+          radial-gradient(1300px 700px at 8% -5%, rgba(74, 160, 255, 0.2), transparent 60%),
+          radial-gradient(900px 500px at 95% 0%, rgba(73, 220, 202, 0.14), transparent 64%),
+          radial-gradient(800px 500px at 50% 120%, rgba(255, 180, 120, 0.12), transparent 62%),
+          var(--app-bg, #0f1320);
+        min-height: 100vh;
+      }
+      .session-shell {
+        position: relative;
+      }
+      .session-shell::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
+        background-size: 18px 18px;
+        pointer-events: none;
+        opacity: 0.45;
+      }
+      .session-shell > * {
+        position: relative;
+        z-index: 1;
+      }
+      .session-hero {
+        position: relative;
+        overflow: hidden;
+        border-radius: 24px;
+        padding: 1.1rem;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05));
+        box-shadow:
+          0 18px 46px rgba(0, 0, 0, 0.24),
+          inset 0 1px 0 rgba(255,255,255,0.18);
+        backdrop-filter: blur(22px) saturate(140%);
+      }
+      .session-hero::after {
+        content: '';
+        position: absolute;
+        inset: auto -12% 55% -12%;
+        height: 120px;
+        background: radial-gradient(circle at 50% 100%, rgba(255,255,255,0.18), rgba(255,255,255,0));
+        pointer-events: none;
+      }
+      .session-lead {
+        color: rgba(255,255,255,0.78);
+        max-width: 64ch;
+      }
+      body.theme-light .session-lead {
+        color: rgba(20,28,38,0.68);
+      }
+      .session-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      .session-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        border-radius: 999px;
+        padding: 0.35rem 0.7rem;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(255,255,255,0.06);
+        font-size: 0.82rem;
+        color: rgba(255,255,255,0.92);
+      }
+      body.theme-light .session-chip {
+        border-color: rgba(24,36,60,0.12);
+        background: rgba(255,255,255,0.7);
+        color: rgba(20,28,38,0.86);
+      }
+      .session-chip strong {
+        font-size: 0.9rem;
+      }
+      .liquid-panel {
+        border-radius: 22px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+        box-shadow:
+          0 12px 34px rgba(0,0,0,0.20),
+          inset 0 1px 0 rgba(255,255,255,0.14);
+        backdrop-filter: blur(20px) saturate(135%);
+      }
+      body.theme-light .liquid-panel {
+        border-color: rgba(24,36,60,0.10);
+        background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(248,252,255,0.72));
+      }
+      .liquid-panel .card-body {
+        padding: 1rem;
+      }
+      .panel-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .panel-title-row h5 {
+        margin: 0;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+      }
+      .location-toggle-group {
+        display: inline-flex;
+        gap: 0.35rem;
+        padding: 0.25rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.06);
+      }
+      body.theme-light .location-toggle-group {
+        border-color: rgba(24,36,60,0.1);
+        background: rgba(255,255,255,0.75);
+      }
+      .location-toggle-group .btn {
+        border-radius: 999px;
+        padding-inline: 0.8rem;
+      }
+      .soft-divider {
+        height: 1px;
+        background: linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+        margin: 0.8rem 0;
+      }
+      body.theme-light .soft-divider {
+        background: linear-gradient(90deg, rgba(20,28,38,0.12), rgba(20,28,38,0.03));
+      }
+      .session-subtle {
+        color: rgba(255,255,255,0.7);
+        font-size: 0.9rem;
+      }
+      body.theme-light .session-subtle {
+        color: rgba(20,28,38,0.65);
+      }
+      .session-stat-grid {
+        display: grid;
+        gap: 0.6rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .session-stat {
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.04);
+        padding: 0.65rem 0.75rem;
+      }
+      body.theme-light .session-stat {
+        border-color: rgba(20,28,38,0.08);
+        background: rgba(255,255,255,0.64);
+      }
+      .session-stat-label {
+        font-size: 0.75rem;
+        color: rgba(255,255,255,0.64);
+      }
+      body.theme-light .session-stat-label {
+        color: rgba(20,28,38,0.56);
+      }
+      .session-stat-value {
+        font-weight: 700;
+        font-size: 1rem;
+      }
+      .mark-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2.2rem;
+        padding: 0.18rem 0.45rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.05);
+        color: rgba(255,255,255,0.92);
+      }
+      .mark-pill + .mark-pill {
+        margin-left: 0.22rem;
+      }
+      body.theme-light .mark-pill {
+        border-color: rgba(20,28,38,0.1);
+        background: rgba(255,255,255,0.72);
+        color: rgba(20,28,38,0.86);
+      }
+      .mark-pill.exam { background: rgba(255, 95, 95, 0.16); border-color: rgba(255, 125, 125, 0.3); }
+      .mark-pill.credit { background: rgba(87, 197, 255, 0.14); border-color: rgba(114, 210, 255, 0.28); }
+      .mark-pill.accent { background: rgba(255, 196, 74, 0.14); border-color: rgba(255, 210, 110, 0.28); }
+      .mark-pill.warn { background: rgba(255, 173, 85, 0.14); border-color: rgba(255, 193, 125, 0.28); }
+      .mark-pill.danger { background: rgba(255, 113, 140, 0.16); border-color: rgba(255, 138, 160, 0.28); }
+      .mark-pill.info { background: rgba(92, 163, 255, 0.14); border-color: rgba(126, 183, 255, 0.28); }
+      .mark-pill.muted { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); }
+      body.theme-light .mark-pill.muted { background: rgba(20,28,38,0.04); border-color: rgba(20,28,38,0.08); }
+      .legend-grid {
+        display: grid;
+        gap: 0.55rem;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        border-radius: 14px;
+        padding: 0.45rem 0.5rem;
+        background: rgba(255,255,255,0.03);
+      }
+      body.theme-light .legend-item { background: rgba(20,28,38,0.03); }
+      .timeline-day {
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.04);
+        overflow: hidden;
+      }
+      body.theme-light .timeline-day {
+        border-color: rgba(20,28,38,0.08);
+        background: rgba(255,255,255,0.68);
+      }
+      .timeline-day-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.7rem 0.85rem;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+      }
+      body.theme-light .timeline-day-header {
+        border-bottom-color: rgba(20,28,38,0.07);
+        background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(248,252,255,0.65));
+      }
+      .timeline-day-header.is-weekend {
+        box-shadow: inset 0 0 0 9999px rgba(255, 171, 54, 0.06);
+      }
+      .timeline-day-header.is-reserve {
+        box-shadow: inset 0 0 0 9999px rgba(255, 205, 84, 0.08);
+      }
+      .timeline-day-title {
+        font-weight: 700;
+        line-height: 1.15;
+      }
+      .timeline-day-subtitle {
+        font-size: 0.78rem;
+        color: rgba(255,255,255,0.66);
+      }
+      body.theme-light .timeline-day-subtitle { color: rgba(20,28,38,0.56); }
+      .timeline-list {
+        padding: 0.55rem;
+        display: grid;
+        gap: 0.45rem;
+      }
+      .timeline-empty {
+        padding: 0.8rem;
+        text-align: center;
+        color: rgba(255,255,255,0.55);
+        font-size: 0.86rem;
+      }
+      body.theme-light .timeline-empty { color: rgba(20,28,38,0.52); }
+      .timeline-item {
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.09);
+        background: rgba(255,255,255,0.03);
+        padding: 0.6rem 0.65rem;
+      }
+      body.theme-light .timeline-item {
+        border-color: rgba(20,28,38,0.07);
+        background: rgba(255,255,255,0.62);
+      }
+      .timeline-item.kind-assessment.exam {
+        box-shadow: inset 3px 0 0 rgba(255, 113, 140, 0.75);
+      }
+      .timeline-item.kind-assessment.credit {
+        box-shadow: inset 3px 0 0 rgba(93, 186, 255, 0.78);
+      }
+      .timeline-item.kind-consultation {
+        box-shadow: inset 3px 0 0 rgba(255, 219, 119, 0.6);
+      }
+      .timeline-item.kind-reserve,
+      .timeline-item.kind-retake {
+        box-shadow: inset 3px 0 0 rgba(255, 168, 84, 0.66);
+      }
+      .timeline-item-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.6rem;
+      }
+      .timeline-item-title {
+        font-weight: 650;
+        font-size: 0.93rem;
+        line-height: 1.15;
+      }
+      .timeline-item-subject {
+        margin-top: 0.15rem;
+        font-size: 0.84rem;
+        color: rgba(255,255,255,0.78);
+      }
+      body.theme-light .timeline-item-subject { color: rgba(20,28,38,0.68); }
+      .timeline-item-meta {
+        margin-top: 0.25rem;
+        font-size: 0.76rem;
+        color: rgba(255,255,255,0.62);
+      }
+      body.theme-light .timeline-item-meta { color: rgba(20,28,38,0.56); }
+      .timeline-note {
+        margin-top: 0.3rem;
+        font-size: 0.76rem;
+        color: rgba(255,255,255,0.72);
+      }
+      body.theme-light .timeline-note { color: rgba(20,28,38,0.6); }
+      .subject-table-wrap {
+        overflow: auto;
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.1);
+      }
+      body.theme-light .subject-table-wrap { border-color: rgba(20,28,38,0.08); }
+      .subject-table {
+        margin: 0;
+        min-width: 720px;
+        --bs-table-bg: transparent;
+        --bs-table-striped-bg: rgba(255,255,255,0.03);
+        --bs-table-color: inherit;
+        --bs-table-border-color: rgba(255,255,255,0.08);
+      }
+      body.theme-light .subject-table {
+        --bs-table-striped-bg: rgba(20,28,38,0.02);
+        --bs-table-border-color: rgba(20,28,38,0.07);
+      }
+      .subject-table td,
+      .subject-table th {
+        vertical-align: middle;
+      }
+      .subject-type-chip {
+        border-radius: 999px;
+        padding: 0.22rem 0.55rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+      }
+      .subject-type-chip.exam {
+        background: rgba(255,113,140,0.14);
+        color: #ffd3dc;
+        border: 1px solid rgba(255,113,140,0.22);
+      }
+      .subject-type-chip.credit {
+        background: rgba(93,186,255,0.14);
+        color: #d4efff;
+        border: 1px solid rgba(93,186,255,0.22);
+      }
+      body.theme-light .subject-type-chip.exam {
+        color: #8a3146;
+      }
+      body.theme-light .subject-type-chip.credit {
+        color: #1f5272;
+      }
+      .liquid-alert {
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.06);
+        padding: 0.65rem 0.85rem;
+        font-size: 0.88rem;
+      }
+      body.theme-light .liquid-alert {
+        border-color: rgba(20,28,38,0.08);
+        background: rgba(255,255,255,0.7);
+      }
+      .liquid-alert.warn {
+        box-shadow: inset 3px 0 0 rgba(255, 176, 79, 0.72);
+      }
+      .liquid-alert.info {
+        box-shadow: inset 3px 0 0 rgba(88, 174, 255, 0.7);
+      }
+      .liquid-alert.danger {
+        box-shadow: inset 3px 0 0 rgba(255, 113, 140, 0.78);
+      }
+      .tiny-dot {
+        width: 0.45rem;
+        height: 0.45rem;
+        border-radius: 50%;
+        background: currentColor;
+        opacity: 0.7;
+        display: inline-block;
+      }
+      @media (max-width: 991px) {
+        .session-stat-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 767px) {
+        .session-hero {
+          padding: 0.9rem;
+          border-radius: 18px;
+        }
+        .session-stat-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .timeline-day-header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .panel-title-row {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .location-toggle-group {
+          width: 100%;
+          justify-content: stretch;
+        }
+        .location-toggle-group .btn {
+          flex: 1 1 auto;
+        }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .session-hero,
+        .liquid-panel,
+        .timeline-day {
+          animation: sessionFadeIn 280ms ease both;
+        }
+        .timeline-day { animation-duration: 360ms; }
+        @keyframes sessionFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      }
+    </style>
+  </head>
+  <body class="theme-light schedule-generator-page session-generator-page">
+    <nav class="navbar navbar-expand-lg admin-nav">
+      <div class="container">
+        <span class="navbar-brand">Генератор сесії</span>
+        <div class="d-flex align-items-center flex-wrap gap-2 justify-content-end">
+          <span class="text-muted small"><%= t('role.admin') %>: <%= username %></span>
+          <button
+            class="theme-toggle theme-toggle-min"
+            type="button"
+            id="themeToggle"
+            aria-label="Toggle theme"
+            data-light-label="☀️"
+            data-dark-label="🌙"
+          >
+            🌙
+          </button>
+          <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-generator">Семестровий генератор</a>
+          <a class="btn btn-outline-primary btn-sm" href="/admin">Назад в адмінку</a>
+          <form method="POST" action="/logout" class="m-0">
+            <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
+          </form>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-4 session-shell">
+      <% if (messages && messages.error) { %>
+        <div class="alert alert-danger"><%= messages.error %></div>
+      <% } %>
+      <% if (messages && messages.success) { %>
+        <div class="alert alert-success"><%= messages.success %></div>
+      <% } %>
+
+      <div class="session-hero mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+          <div>
+            <h1 class="h3 mb-2">Чернетка генератора екзаменаційної сесії</h1>
+            <div class="session-lead">
+              Окрема сторінка для швидкого накидання таймлайна сесії: розкладає екзамени/заліки по днях,
+              додає консультації, резервні позначки та вікно перескладань. Логіка евристична, щоб було з чого стартувати.
+            </div>
+          </div>
+          <div class="session-chip-row">
+            <span class="session-chip"><span class="tiny-dot"></span> <strong><%= activeLocation === 'munich' ? 'Munich' : 'Kyiv' %></strong></span>
+            <% if (selectedCourse) { %>
+              <span class="session-chip">Курс: <strong><%= selectedCourse.name %></strong></span>
+            <% } %>
+            <% if (activeSemester) { %>
+              <span class="session-chip">Семестр: <strong><%= activeSemester.title || ('#' + activeSemester.id) %></strong></span>
+            <% } %>
+            <span class="session-chip">Джерело типів: <strong><%= gradingSource === 'subject_grading_settings' ? 'grading settings' : 'fallback' %></strong></span>
+          </div>
+        </div>
+        <div class="soft-divider"></div>
+        <div class="session-stat-grid">
+          <div class="session-stat"><div class="session-stat-label">Предметів</div><div class="session-stat-value"><%= preview && preview.stats ? preview.stats.subjects_count : 0 %></div></div>
+          <div class="session-stat"><div class="session-stat-label">Оцінювань</div><div class="session-stat-value"><%= preview && preview.stats ? preview.stats.assessments_total : 0 %></div></div>
+          <div class="session-stat"><div class="session-stat-label">Екзамени</div><div class="session-stat-value"><%= preview && preview.stats ? preview.stats.exams_total : 0 %></div></div>
+          <div class="session-stat"><div class="session-stat-label">Заліки</div><div class="session-stat-value"><%= preview && preview.stats ? preview.stats.credits_total : 0 %></div></div>
+          <div class="session-stat"><div class="session-stat-label">Консультації</div><div class="session-stat-value"><%= preview && preview.stats ? preview.stats.consultations_total : 0 %></div></div>
+          <div class="session-stat"><div class="session-stat-label">Резерв / перескладання</div><div class="session-stat-value"><%= preview && preview.stats ? ((preview.stats.reserve_days_total || 0) + (preview.stats.retake_windows_total || 0)) : 0 %></div></div>
+        </div>
+      </div>
+
+      <% if (uiHints && uiHints.length) { %>
+        <div class="d-grid gap-2 mb-3">
+          <% uiHints.forEach(function(hint) { %>
+            <div class="liquid-alert info"><%= hint %></div>
+          <% }); %>
+        </div>
+      <% } %>
+
+      <div class="row g-4">
+        <div class="col-12 col-xl-4">
+          <div class="card liquid-panel mb-4">
+            <div class="card-body">
+              <div class="panel-title-row">
+                <h5>Параметри генерації</h5>
+                <div class="location-toggle-group" role="tablist" aria-label="Campus">
+                  <button class="btn btn-sm <%= activeLocation === 'kyiv' ? 'btn-primary' : 'btn-outline-secondary' %>" type="button" data-location="kyiv">Kyiv</button>
+                  <button class="btn btn-sm <%= activeLocation === 'munich' ? 'btn-primary' : 'btn-outline-secondary' %>" type="button" data-location="munich">Munich</button>
+                </div>
+              </div>
+              <form method="GET" action="/admin/session-generator" id="sessionGeneratorForm" class="row g-3">
+                <input type="hidden" name="location" id="sessionLocationInput" value="<%= activeLocation %>" />
+                <div class="col-12">
+                  <label class="form-label">Курс</label>
+                  <select class="form-select" name="course_id" onchange="this.form.submit()">
+                    <% const locationCourses = (coursesByLocation && coursesByLocation[activeLocation]) || []; %>
+                    <% if (!locationCourses.length) { %>
+                      <option value="">Немає курсів</option>
+                    <% } %>
+                    <% locationCourses.forEach(function(course) { %>
+                      <option value="<%= course.id %>" <%= Number(course.id) === Number(form && form.course_id) ? 'selected' : '' %>><%= course.name %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Семестр</label>
+                  <select class="form-select" name="semester_id" onchange="this.form.submit()" <%= (semesters && semesters.length) ? '' : 'disabled' %>>
+                    <% if (!(semesters && semesters.length)) { %>
+                      <option value="">Немає семестрів</option>
+                    <% } %>
+                    <% (semesters || []).forEach(function(sem) { %>
+                      <option value="<%= sem.id %>" <%= Number(sem.id) === Number(selectedSemesterId) ? 'selected' : '' %>>
+                        <%= sem.title || ('Semester #' + sem.id) %> · <%= sem.weeks_count || '—' %> тиж.
+                      </option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6">
+                  <label class="form-label">Старт сесії</label>
+                  <input class="form-control" type="date" name="start_date" value="<%= (form && form.start_date) || '' %>" required />
+                </div>
+                <div class="col-6 col-sm-3">
+                  <label class="form-label">Днів</label>
+                  <input class="form-control" type="number" min="3" max="60" name="session_days" value="<%= form && form.session_days %>" />
+                </div>
+                <div class="col-6 col-sm-3">
+                  <label class="form-label">Max/день</label>
+                  <input class="form-control" type="number" min="1" max="6" name="max_events_per_day" value="<%= form && form.max_events_per_day %>" />
+                </div>
+                <div class="col-12 col-sm-6">
+                  <label class="form-label">Стратегія</label>
+                  <select class="form-select" name="strategy">
+                    <% (strategyOptions || []).forEach(function(opt) { %>
+                      <option value="<%= opt.value %>" <%= form && form.strategy === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-6 col-sm-3">
+                  <label class="form-label">Gap EX</label>
+                  <input class="form-control" type="number" min="0" max="5" name="exam_gap_days" value="<%= form && form.exam_gap_days %>" />
+                </div>
+                <div class="col-6 col-sm-3">
+                  <label class="form-label">Резерв кожні</label>
+                  <input class="form-control" type="number" min="0" max="20" name="reserve_every" value="<%= form && form.reserve_every %>" />
+                </div>
+                <div class="col-6 col-sm-4">
+                  <label class="form-label">Пересклад. через</label>
+                  <input class="form-control" type="number" min="1" max="14" name="retake_gap_days" value="<%= form && form.retake_gap_days %>" />
+                </div>
+                <div class="col-6 col-sm-4">
+                  <label class="form-label">Вікно перескл.</label>
+                  <input class="form-control" type="number" min="1" max="14" name="retake_window_days" value="<%= form && form.retake_window_days %>" />
+                </div>
+                <div class="col-12 col-sm-4">
+                  <label class="form-label">Активні дні курсу</label>
+                  <div class="form-control d-flex align-items-center flex-wrap gap-1" style="min-height: 38px;">
+                    <% if (activeStudyDayNames && activeStudyDayNames.length) { %>
+                      <% activeStudyDayNames.forEach(function(day) { %>
+                        <span class="mark-pill info"><%= day.slice(0,2) %></span>
+                      <% }); %>
+                    <% } else { %>
+                      <span class="text-muted small">Немає налаштувань</span>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="col-12 d-grid gap-2">
+                  <label class="form-check">
+                    <input class="form-check-input" type="checkbox" name="include_consultations" value="1" <%= form && form.include_consultations ? 'checked' : '' %> />
+                    <span class="form-check-label">Додавати консультації перед екзаменами</span>
+                  </label>
+                  <label class="form-check">
+                    <input class="form-check-input" type="checkbox" name="include_weekends" value="1" <%= form && form.include_weekends ? 'checked' : '' %> />
+                    <span class="form-check-label">Дозволити суботу/неділю у сесії</span>
+                  </label>
+                  <label class="form-check">
+                    <input class="form-check-input" type="checkbox" name="respect_study_days" value="1" <%= form && form.respect_study_days ? 'checked' : '' %> />
+                    <span class="form-check-label">Планувати тільки в активні навчальні дні курсу</span>
+                  </label>
+                </div>
+                <div class="col-12 d-grid">
+                  <button class="btn btn-primary" type="submit" <%= form && form.course_id ? '' : 'disabled' %>>Згенерувати превʼю сесії</button>
+                </div>
+                <div class="col-12 session-subtle">
+                  Підказка: це прототип. Можемо далі додати ручне перетягування слотів, export CSV/PDF та publish в окрему таблицю сесії.
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card liquid-panel mb-4">
+            <div class="card-body">
+              <div class="panel-title-row">
+                <h5>Спецпозначки</h5>
+                <span class="session-subtle">Легенда</span>
+              </div>
+              <div class="legend-grid">
+                <% (sessionMarkLegend || []).forEach(function(mark) { %>
+                  <div class="legend-item">
+                    <span class="mark-pill <%= mark.tone || 'muted' %>"><%= mark.code %></span>
+                    <span class="small"><%= mark.label %></span>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          </div>
+
+          <div class="card liquid-panel">
+            <div class="card-body">
+              <div class="panel-title-row">
+                <h5>Що ще уточнити</h5>
+                <span class="session-subtle">next</span>
+              </div>
+              <div class="d-grid gap-2">
+                <div class="liquid-alert warn">Чи є окремі правила для екзаменів vs заліків по конкретних предметах (перелік вручну)?</div>
+                <div class="liquid-alert warn">Чи можна ставити 2 екзамени в один день і для яких груп/курсів це заборонено?</div>
+                <div class="liquid-alert warn">Чи потрібні окремі позначки для усного/письмового/онлайн/аудиторного формату?</div>
+                <div class="liquid-alert warn">Чи має бути publish в БД і де зберігати (нова таблиця session_entries / export only)?</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-8">
+          <% if (preview && preview.warnings && preview.warnings.length) { %>
+            <div class="d-grid gap-2 mb-3">
+              <% preview.warnings.forEach(function(w) { %>
+                <div class="liquid-alert danger"><%= w %></div>
+              <% }); %>
+            </div>
+          <% } %>
+
+          <% if (preview && preview.notes && preview.notes.length) { %>
+            <div class="d-grid gap-2 mb-3">
+              <% preview.notes.forEach(function(n) { %>
+                <div class="liquid-alert info"><%= n %></div>
+              <% }); %>
+            </div>
+          <% } %>
+
+          <div class="card liquid-panel mb-4">
+            <div class="card-body">
+              <div class="panel-title-row">
+                <h5>Таймлайн сесії</h5>
+                <span class="session-subtle">
+                  Слоти: <%= preview && preview.stats ? preview.stats.used_slots : 0 %> / <%= preview && preview.stats ? preview.stats.capacity_total : 0 %>
+                  · вільно <%= preview && preview.stats ? preview.stats.free_slots : 0 %>
+                </span>
+              </div>
+              <% if (!(preview && preview.dayBuckets && preview.dayBuckets.length)) { %>
+                <div class="timeline-empty">Виберіть курс і параметри, щоб побачити превʼю.</div>
+              <% } else { %>
+                <div class="d-grid gap-2">
+                  <% preview.dayBuckets.forEach(function(day) { %>
+                    <div class="timeline-day">
+                      <div class="timeline-day-header <%= day.is_weekend ? 'is-weekend' : '' %> <%= day.is_reserved ? 'is-reserve' : '' %>">
+                        <div>
+                          <div class="timeline-day-title"><%= day.date %></div>
+                          <div class="timeline-day-subtitle"><%= day.day_label %></div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                          <% if (day.is_extra_tail) { %>
+                            <span class="mark-pill danger">TAIL</span>
+                          <% } %>
+                          <% if (day.is_weekend) { %>
+                            <span class="mark-pill warn">WEEKEND</span>
+                          <% } %>
+                          <% if (day.is_reserved) { %>
+                            <span class="mark-pill accent">BUFFER</span>
+                          <% } %>
+                          <span class="session-chip" style="padding:0.25rem 0.55rem; font-size:0.76rem;">
+                            оцінювань <strong><%= day.assessment_count || 0 %>/<%= day.capacity || 0 %></strong>
+                          </span>
+                        </div>
+                      </div>
+                      <% if (!day.items || !day.items.length) { %>
+                        <div class="timeline-empty">Вільний день</div>
+                      <% } else { %>
+                        <div class="timeline-list">
+                          <% day.items.forEach(function(item) { %>
+                            <div class="timeline-item kind-<%= item.kind %> <%= item.kind === 'assessment' ? item.type : '' %>">
+                              <div class="timeline-item-top">
+                                <div>
+                                  <div class="timeline-item-title"><%= item.title || '' %></div>
+                                  <% if (item.subject_name) { %>
+                                    <div class="timeline-item-subject"><%= item.subject_name %></div>
+                                  <% } %>
+                                  <% if (item.group_label) { %>
+                                    <div class="timeline-item-meta"><%= item.group_label %></div>
+                                  <% } %>
+                                </div>
+                                <div class="text-end">
+                                  <% (item.marks || []).forEach(function(mark) { %>
+                                    <% const tone = mark === 'EX' ? 'exam' : (mark === 'CR' ? 'credit' : (mark === 'DIF' ? 'accent' : (mark === 'RET' ? 'danger' : (mark === 'RES' || mark === 'CAP' ? 'warn' : (mark === 'CONS' ? 'muted' : (String(mark).startsWith('G') ? 'info' : 'muted')))))); %>
+                                    <span class="mark-pill <%= tone %>"><%= mark %></span>
+                                  <% }); %>
+                                </div>
+                              </div>
+                              <% if (item.note) { %>
+                                <div class="timeline-note"><%= item.note %></div>
+                              <% } %>
+                            </div>
+                          <% }); %>
+                        </div>
+                      <% } %>
+                    </div>
+                  <% }); %>
+                </div>
+              <% } %>
+            </div>
+          </div>
+
+          <div class="card liquid-panel mb-4">
+            <div class="card-body">
+              <div class="panel-title-row">
+                <h5>Класифікація предметів (евристика)</h5>
+                <span class="session-subtle">Щоб швидко перевірити, що generator вгадав неправильно</span>
+              </div>
+              <% if (!(preview && preview.sourceRows && preview.sourceRows.length)) { %>
+                <div class="timeline-empty">Немає предметів для превʼю.</div>
+              <% } else { %>
+                <div class="subject-table-wrap">
+                  <table class="table table-sm table-striped align-middle subject-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Предмет</th>
+                        <th>Тип</th>
+                        <th>Scope</th>
+                        <th>Подій</th>
+                        <th>Позначки</th>
+                        <th>Причина</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% preview.sourceRows.forEach(function(row, idx) { %>
+                        <tr>
+                          <td class="text-muted"><%= idx + 1 %></td>
+                          <td>
+                            <div class="fw-semibold"><%= row.subject_name %></div>
+                            <div class="small text-muted">group_count: <%= row.group_count %></div>
+                          </td>
+                          <td>
+                            <span class="subject-type-chip <%= row.assessment_type === 'exam' ? 'exam' : 'credit' %>"><%= row.assessment_label %></span>
+                          </td>
+                          <td><%= row.scope_label %></td>
+                          <td><%= row.events_count %></td>
+                          <td>
+                            <% (row.marks || []).forEach(function(mark) { %>
+                              <% const tone = mark === 'EX' ? 'exam' : (mark === 'CR' ? 'credit' : (mark === 'DIF' ? 'accent' : 'muted')); %>
+                              <span class="mark-pill <%= tone %>"><%= mark %></span>
+                            <% }); %>
+                          </td>
+                          <td class="small"><%= row.reason_text %></td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
+                </div>
+              <% } %>
+            </div>
+          </div>
+
+          <div class="card liquid-panel">
+            <div class="card-body">
+              <div class="panel-title-row">
+                <h5>Припущення прототипу</h5>
+                <span class="session-subtle">Щоб було видно межі рішення</span>
+              </div>
+              <div class="d-grid gap-2">
+                <% ((preview && preview.assumptions) || []).forEach(function(item) { %>
+                  <div class="liquid-alert"><%= item %></div>
+                <% }); %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <%- include('partials/app-footer') %>
+    <%- include('partials/changelog-modal') %>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script>
+      (function() {
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+          const applyTheme = (theme) => {
+            document.body.classList.toggle('theme-light', theme === 'light');
+            document.body.classList.toggle('theme-dark', theme === 'dark');
+            themeToggle.textContent = theme === 'light' ? (themeToggle.dataset.darkLabel || '🌙') : (themeToggle.dataset.lightLabel || '☀️');
+          };
+          const stored = localStorage.getItem('theme') || 'light';
+          applyTheme(stored);
+          themeToggle.addEventListener('click', () => {
+            const next = document.body.classList.contains('theme-dark') ? 'light' : 'dark';
+            localStorage.setItem('theme', next);
+            applyTheme(next);
+          });
+        }
+
+        const locationInput = document.getElementById('sessionLocationInput');
+        const form = document.getElementById('sessionGeneratorForm');
+        document.querySelectorAll('[data-location]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            if (!locationInput || !form) return;
+            locationInput.value = btn.dataset.location || 'kyiv';
+            form.submit();
+          });
+        });
+
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+          if (window.bootstrap && window.bootstrap.Tooltip) {
+            window.bootstrap.Tooltip.getOrCreateInstance(el);
+          }
+        });
+      })();
+    </script>
+    <script src="/js/design-system.js" defer></script>
+  </body>
+</html>

@@ -19877,6 +19877,791 @@ app.get('/admin/schedule-summary', requireScheduleSectionAccess, async (req, res
   }
 });
 
+const SESSION_GENERATOR_MARK_LEGEND = [
+  { code: 'EX', label: 'Екзамен', tone: 'exam' },
+  { code: 'CR', label: 'Залік', tone: 'credit' },
+  { code: 'DIF', label: 'Диференційований залік', tone: 'accent' },
+  { code: 'CONS', label: 'Консультація', tone: 'muted' },
+  { code: 'RES', label: 'Резервний день / перенос', tone: 'warn' },
+  { code: 'RET', label: 'Вікно перескладань', tone: 'danger' },
+  { code: 'OPT', label: 'Необовʼязковий предмет', tone: 'muted' },
+  { code: 'CAP', label: 'Високе навантаження дня', tone: 'warn' },
+  { code: 'G1..Gn', label: 'Окремо по групах', tone: 'info' },
+];
+
+const SESSION_GENERATOR_DEFAULTS = {
+  session_days: 14,
+  max_events_per_day: 2,
+  reserve_every: 4,
+  exam_gap_days: 1,
+  retake_gap_days: 3,
+  retake_window_days: 3,
+  include_weekends: false,
+  include_consultations: true,
+  respect_study_days: false,
+  strategy: 'exams_first',
+};
+
+const normalizeSessionGeneratorStrategy = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'credits_first') return 'credits_first';
+  if (raw === 'balanced') return 'balanced';
+  return 'exams_first';
+};
+
+const parseSessionGeneratorFlag = (value, fallback = false) => {
+  if (value === undefined || value === null || value === '') return !!fallback;
+  const raw = String(value).trim().toLowerCase();
+  if (['1', 'true', 't', 'yes', 'on'].includes(raw)) return true;
+  if (['0', 'false', 'f', 'no', 'off'].includes(raw)) return false;
+  return !!fallback;
+};
+
+const parseSessionGeneratorInt = (value, fallback, min, max) => {
+  if (value === undefined || value === null || String(value).trim() === '') return fallback;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  const rounded = Math.round(num);
+  if (Number.isFinite(min) && rounded < min) return min;
+  if (Number.isFinite(max) && rounded > max) return max;
+  return rounded;
+};
+
+const toIsoDateOnly = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+    .toISOString()
+    .slice(0, 10);
+};
+
+const addDaysIso = (isoDate, days) => {
+  if (!isoDate || !isValidDateString(isoDate)) return null;
+  const next = addDays(new Date(`${isoDate}T00:00:00Z`), Number(days) || 0);
+  return toIsoDateOnly(next);
+};
+
+const diffDaysIso = (a, b) => {
+  if (!a || !b || !isValidDateString(a) || !isValidDateString(b)) return null;
+  const aUtc = parseDateUTC(a);
+  const bUtc = parseDateUTC(b);
+  if (aUtc === null || bUtc === null) return null;
+  return Math.round((aUtc - bUtc) / (24 * 60 * 60 * 1000));
+};
+
+const getStudyDayShortLabel = (dayName) => {
+  const idx = fullWeekDays.indexOf(dayName);
+  return idx >= 0 ? (studyDayLabels[idx] || dayName) : dayName;
+};
+
+const buildSessionGeneratorDefaultStartDate = (semester) => {
+  if (semester && semester.start_date && isValidDateString(semester.start_date)) {
+    const weeks = Math.max(1, Number(semester.weeks_count || 15));
+    return addDaysIso(semester.start_date, weeks * 7);
+  }
+  return toIsoDateOnly(new Date());
+};
+
+const safeArrayChunk = (list, size) => {
+  const normalizedSize = Math.max(1, Number(size) || 1);
+  const result = [];
+  for (let i = 0; i < list.length; i += normalizedSize) {
+    result.push(list.slice(i, i + normalizedSize));
+  }
+  return result;
+};
+
+const shuffleArrayDeterministic = (items, seed = 1) => {
+  const list = [...items];
+  let x = Number(seed) || 1;
+  for (let i = list.length - 1; i > 0; i -= 1) {
+    x = (x * 1664525 + 1013904223) % 4294967296;
+    const j = x % (i + 1);
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+};
+
+const buildSessionAssessmentPlan = ({ subjects = [], gradingBySubject = {} }) => {
+  const sourceRows = [];
+  const queue = [];
+  const groupUpperCap = 6;
+  (subjects || []).forEach((subject) => {
+    const subjectId = Number(subject.id);
+    const grading = gradingBySubject[subjectId] || {};
+    const examEnabled = Number(grading.exam_enabled ?? 1) === 1;
+    const creditEnabled = Number(grading.credit_enabled ?? 1) === 1;
+    const examWeight = Number(grading.exam_weight_points ?? 0) || 0;
+    const creditWeight = Number(grading.credit_weight_points ?? 0) || 0;
+    const isRequired = !(subject.is_required === false || Number(subject.is_required) === 0);
+    const isGeneral = subject.is_general === true || Number(subject.is_general) === 1;
+    const groupCountRaw = Math.max(1, Number(subject.group_count || 1));
+    const groupCount = Math.min(groupUpperCap, groupCountRaw);
+    const lowered = String(subject.name || '').toLowerCase();
+    const looksLikePractice = /(семінар|семинар|practice|практик|lab|лаборатор)/i.test(lowered);
+    let assessmentType = 'exam';
+    let typeReason = 'fallback_required_subject';
+    if (examEnabled && !creditEnabled) {
+      assessmentType = 'exam';
+      typeReason = 'grading_exam_enabled_only';
+    } else if (!examEnabled && creditEnabled) {
+      assessmentType = 'credit';
+      typeReason = 'grading_credit_enabled_only';
+    } else if (examEnabled && creditEnabled) {
+      if (examWeight > creditWeight) {
+        assessmentType = 'exam';
+        typeReason = 'grading_weights_exam_gt_credit';
+      } else if (creditWeight > examWeight) {
+        assessmentType = 'credit';
+        typeReason = 'grading_weights_credit_gt_exam';
+      } else if (!isRequired || looksLikePractice) {
+        assessmentType = 'credit';
+        typeReason = !isRequired ? 'optional_subject_bias_credit' : 'practice_subject_bias_credit';
+      } else {
+        assessmentType = 'exam';
+        typeReason = 'required_subject_bias_exam';
+      }
+    } else if (!isRequired || looksLikePractice) {
+      assessmentType = 'credit';
+      typeReason = !isRequired ? 'optional_subject_fallback_credit' : 'practice_subject_fallback_credit';
+    }
+
+    const isDifferentiatedCredit = assessmentType === 'credit' && creditWeight > 0;
+    const splitByGroups = !isGeneral && groupCount > 1;
+    const groupNumbers = splitByGroups ? Array.from({ length: groupCount }, (_, idx) => idx + 1) : [null];
+    const baseMarks = [];
+    if (assessmentType === 'exam') baseMarks.push('EX');
+    if (assessmentType === 'credit') baseMarks.push('CR');
+    if (isDifferentiatedCredit) baseMarks.push('DIF');
+    if (!isRequired) baseMarks.push('OPT');
+
+    const complexityBase = assessmentType === 'exam' ? 3 : (isDifferentiatedCredit ? 2 : 1);
+    const complexity = complexityBase + (splitByGroups ? 1 : 0) + (groupCountRaw >= 3 ? 1 : 0);
+    const perGroupQueue = groupNumbers.map((groupNumber) => {
+      const marks = [...baseMarks];
+      if (groupNumber) marks.push(`G${groupNumber}`);
+      return {
+        subject_id: subjectId,
+        subject_name: subject.name,
+        group_number: groupNumber,
+        group_label: groupNumber ? `Група ${groupNumber}` : (groupCountRaw > 1 ? `Всі групи (${groupCountRaw})` : 'Всі'),
+        type: assessmentType,
+        complexity,
+        marks,
+        is_required: isRequired,
+        is_general: isGeneral,
+        group_count: groupCountRaw,
+        classification_reason: typeReason,
+      };
+    });
+
+    sourceRows.push({
+      subject_id: subjectId,
+      subject_name: subject.name,
+      group_count: groupCountRaw,
+      scope_label: splitByGroups ? `Окремо по групах (${groupCountRaw})` : (groupCountRaw > 1 ? `Спільно (${groupCountRaw} групи)` : 'Одна група'),
+      assessment_type: assessmentType,
+      assessment_label: assessmentType === 'exam' ? 'Екзамен' : (isDifferentiatedCredit ? 'Диф. залік' : 'Залік'),
+      marks: baseMarks,
+      events_count: perGroupQueue.length,
+      complexity,
+      reason_key: typeReason,
+      reason_text:
+        typeReason === 'grading_exam_enabled_only' ? 'Grading: увімкнено лише exam' :
+        typeReason === 'grading_credit_enabled_only' ? 'Grading: увімкнено лише credit' :
+        typeReason === 'grading_weights_exam_gt_credit' ? 'Grading: вага exam > credit' :
+        typeReason === 'grading_weights_credit_gt_exam' ? 'Grading: вага credit > exam' :
+        typeReason === 'optional_subject_bias_credit' ? 'Евристика: необовʼязковий предмет → залік' :
+        typeReason === 'practice_subject_bias_credit' ? 'Евристика: практичний/семінарний предмет → залік' :
+        typeReason === 'required_subject_bias_exam' ? 'Евристика: обовʼязковий предмет → екзамен' :
+        typeReason === 'optional_subject_fallback_credit' ? 'Fallback: необовʼязковий предмет → залік' :
+        typeReason === 'practice_subject_fallback_credit' ? 'Fallback: практичний предмет → залік' :
+        'Fallback: обовʼязковий предмет → екзамен',
+    });
+    queue.push(...perGroupQueue);
+  });
+  return { sourceRows, queue };
+};
+
+const buildSessionQueueWithStrategy = (queue, strategy, seed = 1) => {
+  const sorted = [...(queue || [])];
+  sorted.sort((a, b) => {
+    if (a.type !== b.type) {
+      if (strategy === 'credits_first') return a.type === 'credit' ? -1 : 1;
+      if (strategy === 'exams_first') return a.type === 'exam' ? -1 : 1;
+      if (a.complexity !== b.complexity) return b.complexity - a.complexity;
+      return String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
+    }
+    if (a.complexity !== b.complexity) return b.complexity - a.complexity;
+    const subjectCompare = String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
+    if (subjectCompare !== 0) return subjectCompare;
+    return Number(a.group_number || 0) - Number(b.group_number || 0);
+  });
+  if (strategy !== 'balanced') return sorted;
+
+  const exams = sorted.filter((row) => row.type === 'exam');
+  const credits = sorted.filter((row) => row.type === 'credit');
+  const randomizedExams = shuffleArrayDeterministic(exams, seed + 11);
+  const randomizedCredits = shuffleArrayDeterministic(credits, seed + 29);
+  const examChunks = safeArrayChunk(randomizedExams, 2);
+  const creditChunks = safeArrayChunk(randomizedCredits, 2);
+  const merged = [];
+  const maxLen = Math.max(examChunks.length, creditChunks.length);
+  for (let i = 0; i < maxLen; i += 1) {
+    if (examChunks[i]) merged.push(...examChunks[i]);
+    if (creditChunks[i]) merged.push(...creditChunks[i]);
+  }
+  return merged;
+};
+
+const buildSessionDayBuckets = ({
+  startDate,
+  sessionDays,
+  maxEventsPerDay,
+  includeWeekends,
+  respectStudyDays,
+  activeStudyDayNames = [],
+}) => {
+  const buckets = [];
+  const normalizedMax = Math.max(1, Number(maxEventsPerDay || 1));
+  const activeStudyDaySet = new Set((activeStudyDayNames || []).map((day) => String(day)));
+  let cursor = isValidDateString(startDate) ? startDate : toIsoDateOnly(new Date());
+  let attempts = 0;
+  while (buckets.length < sessionDays && attempts < sessionDays * 10) {
+    attempts += 1;
+    const dayName = getDayNameFromDate(cursor);
+    const isWeekend = dayName === 'Saturday' || dayName === 'Sunday';
+    if (!includeWeekends && isWeekend) {
+      cursor = addDaysIso(cursor, 1);
+      continue;
+    }
+    if (respectStudyDays && activeStudyDaySet.size && !activeStudyDaySet.has(dayName)) {
+      cursor = addDaysIso(cursor, 1);
+      continue;
+    }
+    buckets.push({
+      date: cursor,
+      day_name: dayName,
+      day_short: getStudyDayShortLabel(dayName),
+      items: [],
+      capacity: normalizedMax,
+      is_weekend: isWeekend,
+      is_reserved: false,
+      capacity_note: null,
+    });
+    cursor = addDaysIso(cursor, 1);
+  }
+  return buckets;
+};
+
+const sessionEventTitleLabel = (event) => {
+  if (!event) return '';
+  if (event.kind === 'consultation') return 'Консультація';
+  if (event.kind === 'reserve') return 'Резерв / перенос';
+  if (event.kind === 'retake') return 'Вікно перескладань';
+  return event.type === 'exam' ? 'Екзамен' : 'Залік';
+};
+
+const buildSessionGeneratorPreview = ({
+  subjects = [],
+  gradingBySubject = {},
+  startDate,
+  sessionDays,
+  maxEventsPerDay,
+  reserveEvery,
+  examGapDays,
+  retakeGapDays,
+  retakeWindowDays,
+  includeConsultations,
+  includeWeekends,
+  respectStudyDays,
+  activeStudyDayNames = [],
+  strategy,
+  seed,
+}) => {
+  const warnings = [];
+  const notes = [];
+  const assumptions = [
+    'Це чернетка-евристика: тип контролю визначається за grading settings (якщо є) + fallback правилами.',
+    'Publish у журнал/розклад не виконується — сторінка лише формує превʼю для планування сесії.',
+  ];
+  if (!subjects.length) {
+    return {
+      dayBuckets: [],
+      timelineItems: [],
+      sourceRows: [],
+      warnings: ['Немає видимих предметів для вибраного курсу.'],
+      notes,
+      assumptions,
+      stats: {
+        subjects_count: 0,
+        assessments_total: 0,
+        exams_total: 0,
+        credits_total: 0,
+        consultations_total: 0,
+        reserve_days_total: 0,
+        retake_windows_total: 0,
+        used_slots: 0,
+        capacity_total: 0,
+        free_slots: 0,
+        free_days: 0,
+        overloaded_days: 0,
+      },
+    };
+  }
+
+  const { sourceRows, queue } = buildSessionAssessmentPlan({ subjects, gradingBySubject });
+  const sortedQueue = buildSessionQueueWithStrategy(queue, strategy, seed);
+  const dayBuckets = buildSessionDayBuckets({
+    startDate,
+    sessionDays,
+    maxEventsPerDay,
+    includeWeekends,
+    respectStudyDays,
+    activeStudyDayNames,
+  });
+
+  if (!dayBuckets.length) {
+    warnings.push('Не вдалося побудувати календарні дні для сесії (перевірте дату старту та фільтр днів).');
+  }
+
+  const lastExamByScope = {};
+  const addEventToBucket = (bucket, event) => {
+    if (!bucket) return false;
+    bucket.items.push(event);
+    return true;
+  };
+
+  const chooseBucketForAssessment = (assessment) => {
+    const scopeKey = assessment.group_number ? `G${assessment.group_number}` : 'ALL';
+    const candidateBuckets = dayBuckets.filter((bucket) => bucket.items.length < bucket.capacity);
+    let fallbackBucket = candidateBuckets[0] || null;
+    for (const bucket of candidateBuckets) {
+      if (assessment.type !== 'exam') return bucket;
+      const lastDate = lastExamByScope[scopeKey] || (scopeKey !== 'ALL' ? lastExamByScope.ALL : null) || null;
+      if (!lastDate) return bucket;
+      const diff = diffDaysIso(bucket.date, lastDate);
+      if (diff === null) return bucket;
+      if (diff > Math.max(0, examGapDays)) {
+        return bucket;
+      }
+      fallbackBucket = fallbackBucket || bucket;
+    }
+    return fallbackBucket;
+  };
+
+  let scheduledAssessments = 0;
+  let examCount = 0;
+  let creditCount = 0;
+  let consultCount = 0;
+  let reserveCount = 0;
+  let overflowCount = 0;
+  const pendingConsultations = [];
+
+  sortedQueue.forEach((assessment) => {
+    const bucket = chooseBucketForAssessment(assessment);
+    if (!bucket) {
+      overflowCount += 1;
+      warnings.push(`Не вистачило слотів для "${assessment.subject_name}" (${assessment.group_label}).`);
+      return;
+    }
+    const isHeavy = assessment.type === 'exam' && assessment.complexity >= 4;
+    const marks = [...assessment.marks];
+    if (isHeavy) marks.push('CAP');
+    const event = {
+      kind: 'assessment',
+      type: assessment.type,
+      subject_id: assessment.subject_id,
+      subject_name: assessment.subject_name,
+      group_label: assessment.group_label,
+      group_number: assessment.group_number,
+      marks,
+      complexity: assessment.complexity,
+      title: sessionEventTitleLabel(assessment),
+      note: assessment.is_required ? '' : 'Необовʼязковий предмет',
+    };
+    addEventToBucket(bucket, event);
+    scheduledAssessments += 1;
+    if (assessment.type === 'exam') {
+      examCount += 1;
+      const scopeKey = assessment.group_number ? `G${assessment.group_number}` : 'ALL';
+      lastExamByScope[scopeKey] = bucket.date;
+      if (!assessment.group_number) lastExamByScope.ALL = bucket.date;
+      if (includeConsultations) {
+        pendingConsultations.push({
+          subject_name: assessment.subject_name,
+          group_label: assessment.group_label,
+          target_date: bucket.date,
+        });
+      }
+    } else {
+      creditCount += 1;
+    }
+  });
+
+  if (includeConsultations && pendingConsultations.length) {
+    pendingConsultations.forEach((consult) => {
+      const targetIndex = dayBuckets.findIndex((bucket) => bucket.date === consult.target_date);
+      if (targetIndex <= 0) return;
+      for (let idx = targetIndex - 1; idx >= 0; idx -= 1) {
+        const bucket = dayBuckets[idx];
+        if (bucket.items.length >= bucket.capacity) continue;
+        const hasSameSubject = bucket.items.some((item) => item.subject_name === consult.subject_name);
+        if (hasSameSubject) continue;
+        addEventToBucket(bucket, {
+          kind: 'consultation',
+          type: 'consultation',
+          subject_name: consult.subject_name,
+          group_label: consult.group_label,
+          marks: ['CONS'],
+          title: 'Консультація',
+          note: `Перед "${consult.subject_name}"`,
+          complexity: 0,
+        });
+        consultCount += 1;
+        break;
+      }
+    });
+  }
+
+  if (Number(reserveEvery) > 0) {
+    let assessmentsSeen = 0;
+    dayBuckets.forEach((bucket) => {
+      const assessmentsOnDay = bucket.items.filter((item) => item.kind === 'assessment').length;
+      if (!assessmentsOnDay) return;
+      assessmentsSeen += assessmentsOnDay;
+      if (assessmentsSeen > 0 && assessmentsSeen % reserveEvery === 0) {
+        bucket.is_reserved = true;
+        bucket.capacity_note = 'Після цього дня бажано мати резерв/перенос';
+        bucket.items.push({
+          kind: 'reserve',
+          type: 'reserve',
+          marks: ['RES'],
+          title: 'Резерв / перенос',
+          note: 'Рекомендується закласти буфер після блоку контрольних',
+          complexity: 0,
+        });
+        reserveCount += 1;
+      }
+    });
+  }
+
+  const lastAssessmentDate = [...dayBuckets]
+    .reverse()
+    .find((bucket) => bucket.items.some((item) => item.kind === 'assessment'))?.date || null;
+  if (lastAssessmentDate) {
+    const retakeStart = addDaysIso(lastAssessmentDate, Math.max(1, Number(retakeGapDays || 1)));
+    const retakeEnd = addDaysIso(retakeStart, Math.max(0, Number(retakeWindowDays || 1) - 1));
+    if (retakeStart) {
+      const existing = dayBuckets.find((bucket) => bucket.date === retakeStart);
+      const retakeEvent = {
+        kind: 'retake',
+        type: 'retake',
+        marks: ['RET'],
+        title: 'Вікно перескладань',
+        note: retakeEnd && retakeEnd !== retakeStart ? `${retakeStart} → ${retakeEnd}` : retakeStart,
+        complexity: 0,
+      };
+      if (existing) {
+        existing.items.push(retakeEvent);
+      } else {
+        dayBuckets.push({
+          date: retakeStart,
+          day_name: getDayNameFromDate(retakeStart),
+          day_short: getStudyDayShortLabel(getDayNameFromDate(retakeStart)),
+          items: [retakeEvent],
+          capacity: maxEventsPerDay,
+          is_weekend: ['Saturday', 'Sunday'].includes(getDayNameFromDate(retakeStart)),
+          is_reserved: false,
+          capacity_note: null,
+          is_extra_tail: true,
+        });
+      }
+    }
+  }
+
+  dayBuckets.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  dayBuckets.forEach((bucket) => {
+    bucket.items.sort((a, b) => {
+      const priority = { reserve: 9, retake: 8, consultation: 2, assessment: 1 };
+      const pa = priority[a.kind] || 5;
+      const pb = priority[b.kind] || 5;
+      if (pa !== pb) return pa - pb;
+      const typeOrder = { exam: 1, credit: 2 };
+      const ta = typeOrder[a.type] || 9;
+      const tb = typeOrder[b.type] || 9;
+      if (ta !== tb) return ta - tb;
+      return String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
+    });
+  });
+
+  const capacityTotal = dayBuckets
+    .filter((bucket) => !bucket.is_extra_tail)
+    .reduce((sum, bucket) => sum + Number(bucket.capacity || 0), 0);
+  const usedAssessmentSlots = dayBuckets
+    .reduce((sum, bucket) => sum + bucket.items.filter((item) => item.kind === 'assessment').length, 0);
+  const freeSlots = Math.max(0, capacityTotal - usedAssessmentSlots);
+  const freeDays = dayBuckets.filter((bucket) => bucket.items.length === 0).length;
+  const overloadedDays = dayBuckets.filter((bucket) =>
+    bucket.items.filter((item) => item.kind === 'assessment').length >= Math.max(1, Number(bucket.capacity || 1))
+  ).length;
+  if (usedAssessmentSlots > capacityTotal) {
+    warnings.push(`Потрібно більше слотів: оцінювань ${usedAssessmentSlots}, місткість ${capacityTotal}.`);
+  }
+  if (overloadedDays && usedAssessmentSlots) {
+    notes.push(`Днів з повним навантаженням: ${overloadedDays}. Можна збільшити тривалість сесії або зменшити max подій/день.`);
+  }
+  if (overflowCount > 0) {
+    warnings.push(`Частина подій не потрапила в календар (${overflowCount}).`);
+  }
+  if (respectStudyDays && !activeStudyDayNames.length) {
+    notes.push('Увімкнено "лише навчальні дні", але активні дні курсу не знайдені — використано звичайний календарний фільтр.');
+  }
+
+  const timelineItems = [];
+  dayBuckets.forEach((bucket) => {
+    bucket.date_label = bucket.date;
+    bucket.day_label = bucket.day_name ? `${bucket.day_short} · ${bucket.day_name}` : bucket.day_short;
+    bucket.assessment_count = bucket.items.filter((item) => item.kind === 'assessment').length;
+    timelineItems.push(...bucket.items.map((item) => ({
+      ...item,
+      date: bucket.date,
+      day_name: bucket.day_name,
+      day_short: bucket.day_short,
+      date_label: bucket.date,
+    })));
+  });
+
+  return {
+    dayBuckets,
+    timelineItems,
+    sourceRows: sourceRows.sort((a, b) => {
+      if (a.complexity !== b.complexity) return b.complexity - a.complexity;
+      return String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
+    }),
+    warnings: Array.from(new Set(warnings)).slice(0, 8),
+    notes,
+    assumptions,
+    stats: {
+      subjects_count: sourceRows.length,
+      assessments_total: scheduledAssessments,
+      exams_total: examCount,
+      credits_total: creditCount,
+      consultations_total: consultCount,
+      reserve_days_total: reserveCount,
+      retake_windows_total: lastAssessmentDate ? 1 : 0,
+      used_slots: usedAssessmentSlots,
+      capacity_total: capacityTotal,
+      free_slots: freeSlots,
+      free_days: freeDays,
+      overloaded_days: overloadedDays,
+    },
+  };
+};
+
+app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.sessionGenerator.init');
+  }
+  try {
+    const activeLocation = normalizeGeneratorLocation(req.query.location || 'kyiv');
+    const coursesByLocation = {
+      kyiv: await getCoursesByLocation('kyiv'),
+      munich: await getCoursesByLocation('munich'),
+    };
+    const preferredCourseId = parseSessionGeneratorInt(req.query.course_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const locationCourseIds = new Set((coursesByLocation[activeLocation] || []).map((c) => Number(c.id)));
+    let selectedCourseId = preferredCourseId && locationCourseIds.has(preferredCourseId)
+      ? preferredCourseId
+      : ((coursesByLocation[activeLocation] || [])[0] ? Number(coursesByLocation[activeLocation][0].id) : null);
+    if (!selectedCourseId && preferredCourseId) {
+      const crossLocationCourse = [...(coursesByLocation.kyiv || []), ...(coursesByLocation.munich || [])]
+        .find((course) => Number(course.id) === Number(preferredCourseId));
+      if (crossLocationCourse) {
+        selectedCourseId = Number(crossLocationCourse.id);
+      }
+    }
+
+    const semesters = selectedCourseId ? await getSemestersCached(selectedCourseId) : [];
+    const requestedSemesterId = parseSessionGeneratorInt(req.query.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
+    let activeSemester = null;
+    if (selectedCourseId && requestedSemesterId) {
+      activeSemester = (semesters || []).find((s) => Number(s.id) === requestedSemesterId) || null;
+    }
+    if (selectedCourseId && !activeSemester) {
+      activeSemester = await getActiveSemester(selectedCourseId);
+    }
+    if (selectedCourseId && !activeSemester && semesters && semesters.length) {
+      activeSemester = semesters[0];
+    }
+    const selectedSemesterId = activeSemester ? Number(activeSemester.id) : null;
+
+    const defaultStartDate = buildSessionGeneratorDefaultStartDate(activeSemester);
+    const form = {
+      location: activeLocation,
+      course_id: selectedCourseId,
+      semester_id: selectedSemesterId,
+      start_date: isValidDateString(req.query.start_date) ? String(req.query.start_date) : defaultStartDate,
+      session_days: parseSessionGeneratorInt(
+        req.query.session_days,
+        SESSION_GENERATOR_DEFAULTS.session_days,
+        3,
+        60
+      ),
+      max_events_per_day: parseSessionGeneratorInt(
+        req.query.max_events_per_day,
+        SESSION_GENERATOR_DEFAULTS.max_events_per_day,
+        1,
+        6
+      ),
+      reserve_every: parseSessionGeneratorInt(
+        req.query.reserve_every,
+        SESSION_GENERATOR_DEFAULTS.reserve_every,
+        0,
+        20
+      ),
+      exam_gap_days: parseSessionGeneratorInt(
+        req.query.exam_gap_days,
+        SESSION_GENERATOR_DEFAULTS.exam_gap_days,
+        0,
+        5
+      ),
+      retake_gap_days: parseSessionGeneratorInt(
+        req.query.retake_gap_days,
+        SESSION_GENERATOR_DEFAULTS.retake_gap_days,
+        1,
+        14
+      ),
+      retake_window_days: parseSessionGeneratorInt(
+        req.query.retake_window_days,
+        SESSION_GENERATOR_DEFAULTS.retake_window_days,
+        1,
+        14
+      ),
+      include_weekends: parseSessionGeneratorFlag(
+        req.query.include_weekends,
+        SESSION_GENERATOR_DEFAULTS.include_weekends
+      ),
+      include_consultations: parseSessionGeneratorFlag(
+        req.query.include_consultations,
+        SESSION_GENERATOR_DEFAULTS.include_consultations
+      ),
+      respect_study_days: parseSessionGeneratorFlag(
+        req.query.respect_study_days,
+        SESSION_GENERATOR_DEFAULTS.respect_study_days
+      ),
+      strategy: normalizeSessionGeneratorStrategy(req.query.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
+    };
+
+    let subjects = [];
+    let courseStudyDays = [];
+    if (selectedCourseId) {
+      subjects = await getSubjectsCached(selectedCourseId, { visibleOnly: true });
+      try {
+        courseStudyDays = await getCourseStudyDays(selectedCourseId);
+      } catch (err) {
+        courseStudyDays = [];
+      }
+    }
+    const activeStudyDayNames = (courseStudyDays || [])
+      .filter((row) => row.is_active)
+      .map((row) => row.day_name)
+      .filter(Boolean);
+
+    let gradingRows = [];
+    let gradingSource = 'none';
+    if (selectedCourseId && selectedSemesterId) {
+      try {
+        gradingRows = await db.all(
+          `
+            SELECT subject_id,
+                   COALESCE(exam_enabled, 1) AS exam_enabled,
+                   COALESCE(credit_enabled, 1) AS credit_enabled,
+                   COALESCE(exam_weight_points, 0) AS exam_weight_points,
+                   COALESCE(credit_weight_points, 0) AS credit_weight_points
+            FROM subject_grading_settings
+            WHERE course_id = ? AND semester_id = ?
+          `,
+          [selectedCourseId, selectedSemesterId]
+        );
+        gradingSource = 'subject_grading_settings';
+      } catch (err) {
+        gradingRows = [];
+        gradingSource = 'fallback';
+      }
+    }
+    const gradingBySubject = {};
+    (gradingRows || []).forEach((row) => {
+      gradingBySubject[Number(row.subject_id)] = {
+        exam_enabled: Number(row.exam_enabled ?? 1) === 1 ? 1 : 0,
+        credit_enabled: Number(row.credit_enabled ?? 1) === 1 ? 1 : 0,
+        exam_weight_points: Number(row.exam_weight_points ?? 0) || 0,
+        credit_weight_points: Number(row.credit_weight_points ?? 0) || 0,
+      };
+    });
+
+    const previewSeed = Number(selectedCourseId || 0) * 17 + Number(selectedSemesterId || 0) * 31
+      + Number(parseDateUTC(form.start_date) || 0) % 97;
+    const preview = buildSessionGeneratorPreview({
+      subjects,
+      gradingBySubject,
+      startDate: form.start_date,
+      sessionDays: form.session_days,
+      maxEventsPerDay: form.max_events_per_day,
+      reserveEvery: form.reserve_every,
+      examGapDays: form.exam_gap_days,
+      retakeGapDays: form.retake_gap_days,
+      retakeWindowDays: form.retake_window_days,
+      includeConsultations: form.include_consultations,
+      includeWeekends: form.include_weekends,
+      respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
+      activeStudyDayNames,
+      strategy: form.strategy,
+      seed: previewSeed,
+    });
+
+    const selectedCourse = selectedCourseId ? await getCourseById(selectedCourseId) : null;
+    const uiHints = [];
+    if (gradingSource === 'fallback') {
+      uiHints.push('Налаштування grading для семестру не прочитались — типи контролю визначено евристично.');
+    }
+    if (!selectedSemesterId) {
+      uiHints.push('Активний семестр не знайдено. Використано загальні fallback-налаштування для превʼю.');
+    }
+    if (form.respect_study_days && !activeStudyDayNames.length) {
+      uiHints.push('Активні навчальні дні курсу не задані — фільтр по навчальних днях не застосовано.');
+    }
+
+    return res.render('admin-session-generator', {
+      username: req.session.user.username,
+      role: req.session.role,
+      activeLocation,
+      coursesByLocation,
+      selectedCourse,
+      selectedCourseId,
+      semesters,
+      activeSemester,
+      selectedSemesterId,
+      form,
+      preview,
+      uiHints,
+      gradingSource,
+      courseStudyDays,
+      activeStudyDayNames,
+      sessionMarkLegend: SESSION_GENERATOR_MARK_LEGEND,
+      strategyOptions: [
+        { value: 'exams_first', label: 'Екзамени спочатку' },
+        { value: 'balanced', label: 'Змішано' },
+        { value: 'credits_first', label: 'Заліки спочатку' },
+      ],
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.sessionGenerator.render');
+  }
+});
+
 app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
