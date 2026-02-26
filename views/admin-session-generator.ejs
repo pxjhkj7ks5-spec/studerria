@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Генератор сесії</title>
+    <title>Генератор сесій</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -443,7 +443,7 @@
   <body class="theme-light schedule-generator-page session-generator-page">
     <nav class="navbar navbar-expand-lg admin-nav">
       <div class="container">
-        <span class="navbar-brand">Генератор сесії</span>
+        <span class="navbar-brand">Генератор сесій</span>
         <div class="d-flex align-items-center flex-wrap gap-2 justify-content-end">
           <span class="text-muted small"><%= t('role.admin') %>: <%= username %></span>
           <button
@@ -456,7 +456,7 @@
           >
             🌙
           </button>
-          <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-generator">Семестровий генератор</a>
+          <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-generator">Генератор розкладу</a>
           <a class="btn btn-outline-primary btn-sm" href="/admin">Назад в адмінку</a>
           <form method="POST" action="/logout" class="m-0">
             <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
@@ -476,7 +476,7 @@
       <div class="session-hero mb-4">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
           <div>
-            <h1 class="h3 mb-2">Чернетка генератора екзаменаційної сесії</h1>
+            <h1 class="h3 mb-2">Генератор екзаменаційної сесії</h1>
             <div class="session-lead">
               Окрема сторінка для швидкого накидання таймлайна сесії: розкладає екзамени/заліки по днях,
               додає консультації, резервні позначки та вікно перескладань. Логіка евристична, щоб було з чого стартувати.
@@ -484,6 +484,9 @@
           </div>
           <div class="session-chip-row">
             <span class="session-chip"><span class="tiny-dot"></span> <strong><%= activeLocation === 'munich' ? 'Munich' : 'Kyiv' %></strong></span>
+            <% if (draftMeta && draftMeta.id) { %>
+              <span class="session-chip">Драфт: <strong>#<%= draftMeta.id %></strong> · <%= draftMeta.total || 1 %></span>
+            <% } %>
             <% if (selectedCourse) { %>
               <span class="session-chip">Курс: <strong><%= selectedCourse.name %></strong></span>
             <% } %>
@@ -523,8 +526,37 @@
                   <button class="btn btn-sm <%= activeLocation === 'munich' ? 'btn-primary' : 'btn-outline-secondary' %>" type="button" data-location="munich">Munich</button>
                 </div>
               </div>
+              <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                <a
+                  class="btn btn-outline-secondary btn-sm"
+                  href="/admin/session-generator?draft_action=new&location=<%= activeLocation %><%= form && form.course_id ? ('&course_id=' + form.course_id) : '' %><%= selectedSemesterId ? ('&semester_id=' + selectedSemesterId) : '' %>"
+                >
+                  Новий драфт
+                </a>
+                <% if (draftMeta && draftMeta.id) { %>
+                  <a
+                    class="btn btn-outline-secondary btn-sm"
+                    href="/admin/session-generator?draft_id=<%= draftMeta.id %>&draft_action=clear&location=<%= activeLocation %><%= form && form.course_id ? ('&course_id=' + form.course_id) : '' %><%= selectedSemesterId ? ('&semester_id=' + selectedSemesterId) : '' %>"
+                  >
+                    Очистити драфт
+                  </a>
+                <% } %>
+                <% if (draftMeta && draftMeta.list && draftMeta.list.length > 1) { %>
+                  <div class="d-flex align-items-center gap-2 ms-auto">
+                    <label class="small text-muted m-0" for="draftSwitcherSelect">Драфти</label>
+                    <select class="form-select form-select-sm" id="draftSwitcherSelect" style="width: auto;" data-draft-switch>
+                      <% draftMeta.list.forEach(function(d) { %>
+                        <option value="/admin/session-generator?draft_id=<%= d.id %>" <%= Number(d.id) === Number(draftMeta.id) ? 'selected' : '' %>>
+                          #<%= d.id %>
+                        </option>
+                      <% }); %>
+                    </select>
+                  </div>
+                <% } %>
+              </div>
               <form method="GET" action="/admin/session-generator" id="sessionGeneratorForm" class="row g-3">
                 <input type="hidden" name="location" id="sessionLocationInput" value="<%= activeLocation %>" />
+                <input type="hidden" name="draft_id" id="sessionDraftIdInput" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
                 <div class="col-12">
                   <label class="form-label">Курс</label>
                   <select class="form-select" name="course_id" onchange="this.form.submit()">
@@ -613,7 +645,7 @@
                   </label>
                 </div>
                 <div class="col-12 d-grid">
-                  <button class="btn btn-primary" type="submit" <%= form && form.course_id ? '' : 'disabled' %>>Згенерувати превʼю сесії</button>
+                  <button class="btn btn-primary" type="submit" <%= form && form.course_id ? '' : 'disabled' %>>Згенерувати сесію</button>
                 </div>
                 <div class="col-12 session-subtle">
                   Підказка: це прототип. Можемо далі додати ручне перетягування слотів, export CSV/PDF та publish в окрему таблицю сесії.
@@ -682,7 +714,7 @@
                 </span>
               </div>
               <% if (!(preview && preview.dayBuckets && preview.dayBuckets.length)) { %>
-                <div class="timeline-empty">Виберіть курс і параметри, щоб побачити превʼю.</div>
+                <div class="timeline-empty"><%= previewCleared ? 'Драфт очищено. Налаштуйте параметри та згенеруйте сесію.' : 'Виберіть курс і параметри, щоб побачити превʼю.' %></div>
               <% } else { %>
                 <div class="d-grid gap-2">
                   <% preview.dayBuckets.forEach(function(day) { %>
@@ -835,6 +867,7 @@
         }
 
         const locationInput = document.getElementById('sessionLocationInput');
+        const draftSwitcher = document.querySelector('[data-draft-switch]');
         const form = document.getElementById('sessionGeneratorForm');
         document.querySelectorAll('[data-location]').forEach((btn) => {
           btn.addEventListener('click', () => {
@@ -843,6 +876,14 @@
             form.submit();
           });
         });
+
+        if (draftSwitcher) {
+          draftSwitcher.addEventListener('change', () => {
+            const url = String(draftSwitcher.value || '').trim();
+            if (!url) return;
+            window.location.href = url;
+          });
+        }
 
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
           if (window.bootstrap && window.bootstrap.Tooltip) {

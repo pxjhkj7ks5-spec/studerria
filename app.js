@@ -301,7 +301,7 @@ const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-students', label: 'Students' },
   { id: 'admin-schedule', label: 'Розклад' },
   { id: 'admin-import-export', label: 'Імпорт/Експорт' },
-  { id: 'admin-schedule-generator', label: 'Генератор' },
+  { id: 'admin-schedule-generator', label: 'Генератори' },
   { id: 'admin-homework', label: 'Домашні' },
   { id: 'admin-users', label: 'Користувачі' },
   { id: 'admin-teachers', label: 'Заявки викладачів' },
@@ -19902,6 +19902,111 @@ const SESSION_GENERATOR_DEFAULTS = {
   strategy: 'exams_first',
 };
 
+const SESSION_GENERATOR_DRAFTS_LIMIT = 12;
+const SESSION_GENERATOR_DRAFTS_SESSION_KEY = 'session_generator_drafts';
+const SESSION_GENERATOR_FORM_QUERY_KEYS = new Set([
+  'start_date',
+  'session_days',
+  'max_events_per_day',
+  'reserve_every',
+  'exam_gap_days',
+  'retake_gap_days',
+  'retake_window_days',
+  'include_weekends',
+  'include_consultations',
+  'respect_study_days',
+  'strategy',
+]);
+
+const hasOwnQueryKey = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
+
+const getSessionGeneratorDraftStore = (req) => {
+  if (!req.session) {
+    return { next_id: 1, current_id: null, items: {} };
+  }
+  if (!req.session[SESSION_GENERATOR_DRAFTS_SESSION_KEY] || typeof req.session[SESSION_GENERATOR_DRAFTS_SESSION_KEY] !== 'object') {
+    req.session[SESSION_GENERATOR_DRAFTS_SESSION_KEY] = { next_id: 1, current_id: null, items: {} };
+  }
+  const store = req.session[SESSION_GENERATOR_DRAFTS_SESSION_KEY];
+  if (!store.items || typeof store.items !== 'object') store.items = {};
+  const nextId = Number(store.next_id);
+  store.next_id = Number.isFinite(nextId) && nextId > 0 ? Math.floor(nextId) : 1;
+  const currentId = Number(store.current_id);
+  store.current_id = Number.isFinite(currentId) && currentId > 0 ? Math.floor(currentId) : null;
+  if (store.current_id && !store.items[store.current_id]) {
+    store.current_id = null;
+  }
+  return store;
+};
+
+const getSessionGeneratorDraftRecord = (store, draftId) => {
+  const id = Number(draftId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  if (!store || !store.items || !store.items[id]) return null;
+  return store.items[id];
+};
+
+const pruneSessionGeneratorDraftStore = (store) => {
+  if (!store || !store.items) return;
+  const entries = Object.values(store.items).sort((a, b) =>
+    String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
+  );
+  entries.slice(SESSION_GENERATOR_DRAFTS_LIMIT).forEach((entry) => {
+    if (!entry || !entry.id) return;
+    delete store.items[entry.id];
+  });
+  if (store.current_id && !store.items[store.current_id]) {
+    store.current_id = entries[0] && store.items[entries[0].id] ? entries[0].id : null;
+  }
+};
+
+const createSessionGeneratorDraftRecord = (store, seedForm = {}) => {
+  const id = Math.max(1, Number(store.next_id || 1));
+  const now = new Date().toISOString();
+  const record = {
+    id,
+    created_at: now,
+    updated_at: now,
+    form: { ...(seedForm || {}) },
+  };
+  store.items[id] = record;
+  store.next_id = id + 1;
+  store.current_id = id;
+  pruneSessionGeneratorDraftStore(store);
+  return store.items[id] || record;
+};
+
+const saveSessionGeneratorDraftRecord = (store, draftRecord, form) => {
+  if (!store || !draftRecord || !draftRecord.id) return null;
+  const id = Number(draftRecord.id);
+  if (!store.items[id]) return null;
+  const nextRecord = store.items[id];
+  nextRecord.form = { ...(form || {}) };
+  nextRecord.updated_at = new Date().toISOString();
+  store.current_id = id;
+  return nextRecord;
+};
+
+const buildSessionGeneratorFormDefaults = ({ activeLocation, selectedCourseId, selectedSemesterId, defaultStartDate }) => ({
+  location: normalizeGeneratorLocation(activeLocation),
+  course_id: Number.isFinite(Number(selectedCourseId)) && Number(selectedCourseId) > 0 ? Number(selectedCourseId) : null,
+  semester_id: Number.isFinite(Number(selectedSemesterId)) && Number(selectedSemesterId) > 0 ? Number(selectedSemesterId) : null,
+  start_date: defaultStartDate,
+  session_days: SESSION_GENERATOR_DEFAULTS.session_days,
+  max_events_per_day: SESSION_GENERATOR_DEFAULTS.max_events_per_day,
+  reserve_every: SESSION_GENERATOR_DEFAULTS.reserve_every,
+  exam_gap_days: SESSION_GENERATOR_DEFAULTS.exam_gap_days,
+  retake_gap_days: SESSION_GENERATOR_DEFAULTS.retake_gap_days,
+  retake_window_days: SESSION_GENERATOR_DEFAULTS.retake_window_days,
+  include_weekends: SESSION_GENERATOR_DEFAULTS.include_weekends,
+  include_consultations: SESSION_GENERATOR_DEFAULTS.include_consultations,
+  respect_study_days: SESSION_GENERATOR_DEFAULTS.respect_study_days,
+  strategy: SESSION_GENERATOR_DEFAULTS.strategy,
+});
+
+const hasSessionGeneratorFormPayload = (query) =>
+  Object.keys(query || {}).some((key) => SESSION_GENERATOR_FORM_QUERY_KEYS.has(String(key)));
+
 const normalizeSessionGeneratorStrategy = (value) => {
   const raw = String(value || '').trim().toLowerCase();
   if (raw === 'credits_first') return 'credits_first';
@@ -20466,13 +20571,30 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     return handleDbError(res, err, 'admin.sessionGenerator.init');
   }
   try {
-    const activeLocation = normalizeGeneratorLocation(req.query.location || 'kyiv');
+    const query = req.query || {};
+    const draftStore = getSessionGeneratorDraftStore(req);
+    const requestedDraftId = parseSessionGeneratorInt(query.draft_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const draftActionRaw = String(query.draft_action || query.action || '').trim().toLowerCase();
+    const draftAction = draftActionRaw === 'new' ? 'new' : draftActionRaw === 'clear' ? 'clear' : '';
+    let draftRecord = getSessionGeneratorDraftRecord(draftStore, requestedDraftId)
+      || getSessionGeneratorDraftRecord(draftStore, draftStore.current_id);
+
+    const seedLocation = normalizeGeneratorLocation(
+      hasOwnQueryKey(query, 'location')
+        ? query.location
+        : (draftRecord && draftRecord.form ? draftRecord.form.location : 'kyiv')
+    );
+
     const coursesByLocation = {
       kyiv: await getCoursesByLocation('kyiv'),
       munich: await getCoursesByLocation('munich'),
     };
-    const preferredCourseId = parseSessionGeneratorInt(req.query.course_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const activeLocation = seedLocation;
     const locationCourseIds = new Set((coursesByLocation[activeLocation] || []).map((c) => Number(c.id)));
+    const preferredCourseIdRaw = hasOwnQueryKey(query, 'course_id')
+      ? query.course_id
+      : (draftRecord && draftRecord.form ? draftRecord.form.course_id : null);
+    const preferredCourseId = parseSessionGeneratorInt(preferredCourseIdRaw, null, 1, Number.MAX_SAFE_INTEGER);
     let selectedCourseId = preferredCourseId && locationCourseIds.has(preferredCourseId)
       ? preferredCourseId
       : ((coursesByLocation[activeLocation] || [])[0] ? Number(coursesByLocation[activeLocation][0].id) : null);
@@ -20485,7 +20607,15 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     }
 
     const semesters = selectedCourseId ? await getSemestersCached(selectedCourseId) : [];
-    const requestedSemesterId = parseSessionGeneratorInt(req.query.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const requestedSemesterIdRaw = hasOwnQueryKey(query, 'semester_id')
+      ? query.semester_id
+      : (draftRecord && draftRecord.form ? draftRecord.form.semester_id : null);
+    const requestedSemesterId = parseSessionGeneratorInt(
+      requestedSemesterIdRaw,
+      null,
+      1,
+      Number.MAX_SAFE_INTEGER
+    );
     let activeSemester = null;
     if (selectedCourseId && requestedSemesterId) {
       activeSemester = (semesters || []).find((s) => Number(s.id) === requestedSemesterId) || null;
@@ -20497,63 +20627,96 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       activeSemester = semesters[0];
     }
     const selectedSemesterId = activeSemester ? Number(activeSemester.id) : null;
-
     const defaultStartDate = buildSessionGeneratorDefaultStartDate(activeSemester);
-    const form = {
+    const defaultForm = buildSessionGeneratorFormDefaults({
+      activeLocation,
+      selectedCourseId,
+      selectedSemesterId,
+      defaultStartDate,
+    });
+
+    if (draftAction === 'new' || !draftRecord) {
+      draftRecord = createSessionGeneratorDraftRecord(draftStore, defaultForm);
+    }
+
+    const baseForm = {
+      ...defaultForm,
+      ...((draftRecord && draftRecord.form) || {}),
       location: activeLocation,
       course_id: selectedCourseId,
       semester_id: selectedSemesterId,
-      start_date: isValidDateString(req.query.start_date) ? String(req.query.start_date) : defaultStartDate,
-      session_days: parseSessionGeneratorInt(
-        req.query.session_days,
-        SESSION_GENERATOR_DEFAULTS.session_days,
-        3,
-        60
-      ),
-      max_events_per_day: parseSessionGeneratorInt(
-        req.query.max_events_per_day,
-        SESSION_GENERATOR_DEFAULTS.max_events_per_day,
-        1,
-        6
-      ),
-      reserve_every: parseSessionGeneratorInt(
-        req.query.reserve_every,
-        SESSION_GENERATOR_DEFAULTS.reserve_every,
-        0,
-        20
-      ),
-      exam_gap_days: parseSessionGeneratorInt(
-        req.query.exam_gap_days,
-        SESSION_GENERATOR_DEFAULTS.exam_gap_days,
-        0,
-        5
-      ),
-      retake_gap_days: parseSessionGeneratorInt(
-        req.query.retake_gap_days,
-        SESSION_GENERATOR_DEFAULTS.retake_gap_days,
-        1,
-        14
-      ),
-      retake_window_days: parseSessionGeneratorInt(
-        req.query.retake_window_days,
-        SESSION_GENERATOR_DEFAULTS.retake_window_days,
-        1,
-        14
-      ),
-      include_weekends: parseSessionGeneratorFlag(
-        req.query.include_weekends,
-        SESSION_GENERATOR_DEFAULTS.include_weekends
-      ),
-      include_consultations: parseSessionGeneratorFlag(
-        req.query.include_consultations,
-        SESSION_GENERATOR_DEFAULTS.include_consultations
-      ),
-      respect_study_days: parseSessionGeneratorFlag(
-        req.query.respect_study_days,
-        SESSION_GENERATOR_DEFAULTS.respect_study_days
-      ),
-      strategy: normalizeSessionGeneratorStrategy(req.query.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
     };
+    if (!baseForm.start_date || !isValidDateString(baseForm.start_date)) {
+      baseForm.start_date = defaultStartDate;
+    }
+
+    const hasFormPayload = hasSessionGeneratorFormPayload(query);
+    let form = { ...baseForm };
+    if (draftAction === 'clear') {
+      form = { ...defaultForm };
+    } else if (hasFormPayload) {
+      form = {
+        ...baseForm,
+        location: normalizeGeneratorLocation(query.location || baseForm.location || activeLocation),
+        course_id: parseSessionGeneratorInt(query.course_id, baseForm.course_id, 1, Number.MAX_SAFE_INTEGER),
+        semester_id: parseSessionGeneratorInt(query.semester_id, baseForm.semester_id, 1, Number.MAX_SAFE_INTEGER),
+        start_date: isValidDateString(query.start_date) ? String(query.start_date) : (baseForm.start_date || defaultStartDate),
+        session_days: parseSessionGeneratorInt(
+          query.session_days,
+          baseForm.session_days,
+          3,
+          60
+        ),
+        max_events_per_day: parseSessionGeneratorInt(
+          query.max_events_per_day,
+          baseForm.max_events_per_day,
+          1,
+          6
+        ),
+        reserve_every: parseSessionGeneratorInt(
+          query.reserve_every,
+          baseForm.reserve_every,
+          0,
+          20
+        ),
+        exam_gap_days: parseSessionGeneratorInt(
+          query.exam_gap_days,
+          baseForm.exam_gap_days,
+          0,
+          5
+        ),
+        retake_gap_days: parseSessionGeneratorInt(
+          query.retake_gap_days,
+          baseForm.retake_gap_days,
+          1,
+          14
+        ),
+        retake_window_days: parseSessionGeneratorInt(
+          query.retake_window_days,
+          baseForm.retake_window_days,
+          1,
+          14
+        ),
+        include_weekends: hasOwnQueryKey(query, 'include_weekends')
+          ? parseSessionGeneratorFlag(query.include_weekends, false)
+          : false,
+        include_consultations: hasOwnQueryKey(query, 'include_consultations')
+          ? parseSessionGeneratorFlag(query.include_consultations, false)
+          : false,
+        respect_study_days: hasOwnQueryKey(query, 'respect_study_days')
+          ? parseSessionGeneratorFlag(query.respect_study_days, false)
+          : false,
+        strategy: normalizeSessionGeneratorStrategy(query.strategy || baseForm.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
+      };
+    }
+
+    form.location = activeLocation;
+    form.course_id = selectedCourseId;
+    form.semester_id = selectedSemesterId;
+    if (!form.start_date || !isValidDateString(form.start_date)) {
+      form.start_date = defaultStartDate;
+    }
+    draftRecord = saveSessionGeneratorDraftRecord(draftStore, draftRecord, form) || draftRecord;
 
     let subjects = [];
     let courseStudyDays = [];
@@ -20602,28 +20765,39 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       };
     });
 
-    const previewSeed = Number(selectedCourseId || 0) * 17 + Number(selectedSemesterId || 0) * 31
-      + Number(parseDateUTC(form.start_date) || 0) % 97;
-    const preview = buildSessionGeneratorPreview({
-      subjects,
-      gradingBySubject,
-      startDate: form.start_date,
-      sessionDays: form.session_days,
-      maxEventsPerDay: form.max_events_per_day,
-      reserveEvery: form.reserve_every,
-      examGapDays: form.exam_gap_days,
-      retakeGapDays: form.retake_gap_days,
-      retakeWindowDays: form.retake_window_days,
-      includeConsultations: form.include_consultations,
-      includeWeekends: form.include_weekends,
-      respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
-      activeStudyDayNames,
-      strategy: form.strategy,
-      seed: previewSeed,
-    });
+    const previewCleared = draftAction === 'clear';
+    let preview = null;
+    if (!previewCleared) {
+      const previewSeed = Number(selectedCourseId || 0) * 17 + Number(selectedSemesterId || 0) * 31
+        + Number(parseDateUTC(form.start_date) || 0) % 97
+        + Number(draftRecord && draftRecord.id ? draftRecord.id : 0) * 13;
+      preview = buildSessionGeneratorPreview({
+        subjects,
+        gradingBySubject,
+        startDate: form.start_date,
+        sessionDays: form.session_days,
+        maxEventsPerDay: form.max_events_per_day,
+        reserveEvery: form.reserve_every,
+        examGapDays: form.exam_gap_days,
+        retakeGapDays: form.retake_gap_days,
+        retakeWindowDays: form.retake_window_days,
+        includeConsultations: form.include_consultations,
+        includeWeekends: form.include_weekends,
+        respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
+        activeStudyDayNames,
+        strategy: form.strategy,
+        seed: previewSeed,
+      });
+    }
 
     const selectedCourse = selectedCourseId ? await getCourseById(selectedCourseId) : null;
     const uiHints = [];
+    if (draftAction === 'new') {
+      uiHints.push(`Створено новий драфт генератора сесій #${draftRecord ? draftRecord.id : '—'}.`);
+    }
+    if (previewCleared) {
+      uiHints.push(`Драфт #${draftRecord ? draftRecord.id : '—'} очищено до базових параметрів.`);
+    }
     if (gradingSource === 'fallback') {
       uiHints.push('Налаштування grading для семестру не прочитались — типи контролю визначено евристично.');
     }
@@ -20633,6 +20807,22 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     if (form.respect_study_days && !activeStudyDayNames.length) {
       uiHints.push('Активні навчальні дні курсу не задані — фільтр по навчальних днях не застосовано.');
     }
+
+    const draftEntries = Object.values(draftStore.items || {}).sort((a, b) =>
+      String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
+    );
+    const draftMeta = draftRecord
+      ? {
+          id: Number(draftRecord.id),
+          created_at: draftRecord.created_at || null,
+          updated_at: draftRecord.updated_at || null,
+          total: draftEntries.length,
+          list: draftEntries.map((item) => ({
+            id: Number(item.id),
+            updated_at: item.updated_at || null,
+          })),
+        }
+      : null;
 
     return res.render('admin-session-generator', {
       username: req.session.user.username,
@@ -20646,10 +20836,12 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       selectedSemesterId,
       form,
       preview,
+      previewCleared,
       uiHints,
       gradingSource,
       courseStudyDays,
       activeStudyDayNames,
+      draftMeta,
       sessionMarkLegend: SESSION_GENERATOR_MARK_LEGEND,
       strategyOptions: [
         { value: 'exams_first', label: 'Екзамени спочатку' },

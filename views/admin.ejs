@@ -821,7 +821,7 @@
               <button class="admin-nav-link" type="button" data-admin-nav="admin-import-export">Import/Export (CSV)</button>
             <% } %>
             <% if (sectionAllowed('admin-schedule-generator')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-schedule-generator">Semester Generator</button>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-schedule-generator">Генератори</button>
             <% } %>
           </div>
           <div class="admin-sidebar-section">
@@ -932,7 +932,8 @@
                     <div class="small text-muted">Швидкий стан по курсу та найближчих діях.</div>
                   </div>
                   <div class="d-flex gap-2 flex-wrap">
-                    <a class="btn btn-outline-primary btn-sm" href="/admin/schedule-generator">Semester Generator</a>
+                    <a class="btn btn-outline-primary btn-sm" href="/admin/schedule-generator">Генератор розкладу</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="/admin/session-generator">Генератор сесій</a>
                     <button class="btn btn-outline-secondary btn-sm" type="button" data-admin-nav="admin-import-export">Import/Export</button>
                     <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-list">Schedule list</a>
                     <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-summary">Semester summary</a>
@@ -1672,17 +1673,17 @@
         <% } %>
 
         <% if (sectionAllowed('admin-schedule-generator')) { %>
-        <div id="admin-schedule-generator" class="admin-panel" data-admin-title="Schedule / Semester Generator">
+        <div id="admin-schedule-generator" class="admin-panel" data-admin-title="Schedule / Generators">
           <div class="card mb-4">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                 <div>
-                  <h5 class="card-title mb-1">Semester Generator</h5>
-                  <div class="small text-muted">Preview або Publish з контрольованим scope.</div>
+                  <h5 class="card-title mb-1">Генератори</h5>
+                  <div class="small text-muted">Генератор розкладу + генератор сесій (превʼю/планування).</div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
-                  <a class="btn btn-outline-primary btn-sm" href="/admin/schedule-generator">Open generator</a>
-                  <a class="btn btn-outline-secondary btn-sm" href="/admin/session-generator">Session generator (draft)</a>
+                  <a class="btn btn-outline-primary btn-sm" href="/admin/schedule-generator">Генератор розкладу</a>
+                  <a class="btn btn-outline-secondary btn-sm" href="/admin/session-generator">Генератор сесій</a>
                   <a class="btn btn-outline-secondary btn-sm" href="/admin/export/schedule.csv">Export current schedule CSV</a>
                 </div>
               </div>

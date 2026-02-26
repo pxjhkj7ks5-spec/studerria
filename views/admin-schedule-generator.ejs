@@ -34,7 +34,7 @@
             🌙
           </button>
           <a class="btn btn-outline-primary btn-sm me-2" href="/admin">Назад в адмінку</a>
-          <a class="btn btn-outline-secondary btn-sm me-2" href="/admin/session-generator">Генератор сесії</a>
+          <a class="btn btn-outline-secondary btn-sm me-2" href="/admin/session-generator">Генератор сесій</a>
           <form method="POST" action="/admin/schedule-generator/new" class="me-2">
             <button class="btn btn-outline-secondary btn-sm" type="submit">Новий драфт</button>
           </form>
@@ -59,7 +59,7 @@
       <div class="generator-hero glass mb-4">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
           <div>
-            <h1 class="h3 mb-2">Семестровий генератор</h1>
+            <h1 class="h3 mb-2">Генератор розкладу</h1>
             <div class="text-muted">
               Формуємо повний розклад по вибраній локації: фіксовані слоти, дзеркальні тижні, обмеження викладачів.
             </div>
@@ -91,7 +91,7 @@
           <% if (firstCourseId) { %>
             <a class="btn btn-outline-primary" href="/admin/schedule-generator/<%= run.id %>/preview?course=<%= firstCourseId %>&week=1">Відкрити превʼю</a>
           <% } %>
-          <a class="btn btn-outline-secondary" href="/admin/session-generator?location=<%= activeLocation %>">Чернетка сесії</a>
+          <a class="btn btn-outline-secondary" href="/admin/session-generator?location=<%= activeLocation %>">Генератор сесій</a>
         </div>
         <div class="generator-actions mt-2">
           <% ['kyiv', 'munich'].forEach(function(location) { %>
