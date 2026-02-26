@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.18",
+      "date": "2026-02-26",
+      "items": [
+        "feat(session-generator): added session-scoped draft controls in Session Generator (new draft, clear draft, draft switcher) with persisted form settings in admin session",
+        "ux(session-generator): removed draft wording from generator navigation labels and aligned naming to \"Генератор сесій\" / \"Генератор розкладу\"",
+        "ux(admin-generators): renamed admin generator section to \"Генератори\" and updated quick links/buttons for both schedule and session generators"
+      ]
+    },
+    {
       "version": "1.0.17",
       "date": "2026-02-25",
       "items": [
