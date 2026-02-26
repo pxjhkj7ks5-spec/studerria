@@ -19890,7 +19890,10 @@ const SESSION_GENERATOR_MARK_LEGEND = [
 ];
 
 const SESSION_GENERATOR_DEFAULTS = {
+  window_mode: 'days',
   session_days: 14,
+  session_weeks_count: 2,
+  session_weeks_set: '',
   max_events_per_day: 2,
   reserve_every: 4,
   exam_gap_days: 1,
@@ -19899,14 +19902,20 @@ const SESSION_GENERATOR_DEFAULTS = {
   include_weekends: false,
   include_consultations: true,
   respect_study_days: false,
+  day_grouping_mode: 'none',
+  exam_sequence: 'consult_exam',
+  credit_sequence: 'credit_only',
   strategy: 'exams_first',
 };
 
 const SESSION_GENERATOR_DRAFTS_LIMIT = 12;
 const SESSION_GENERATOR_DRAFTS_SESSION_KEY = 'session_generator_drafts';
 const SESSION_GENERATOR_FORM_QUERY_KEYS = new Set([
+  'window_mode',
   'start_date',
   'session_days',
+  'session_weeks_count',
+  'session_weeks_set',
   'max_events_per_day',
   'reserve_every',
   'exam_gap_days',
@@ -19915,6 +19924,9 @@ const SESSION_GENERATOR_FORM_QUERY_KEYS = new Set([
   'include_weekends',
   'include_consultations',
   'respect_study_days',
+  'day_grouping_mode',
+  'exam_sequence',
+  'credit_sequence',
   'strategy',
 ]);
 
@@ -19991,8 +20003,11 @@ const buildSessionGeneratorFormDefaults = ({ activeLocation, selectedCourseId, s
   location: normalizeGeneratorLocation(activeLocation),
   course_id: Number.isFinite(Number(selectedCourseId)) && Number(selectedCourseId) > 0 ? Number(selectedCourseId) : null,
   semester_id: Number.isFinite(Number(selectedSemesterId)) && Number(selectedSemesterId) > 0 ? Number(selectedSemesterId) : null,
+  window_mode: SESSION_GENERATOR_DEFAULTS.window_mode,
   start_date: defaultStartDate,
   session_days: SESSION_GENERATOR_DEFAULTS.session_days,
+  session_weeks_count: SESSION_GENERATOR_DEFAULTS.session_weeks_count,
+  session_weeks_set: SESSION_GENERATOR_DEFAULTS.session_weeks_set,
   max_events_per_day: SESSION_GENERATOR_DEFAULTS.max_events_per_day,
   reserve_every: SESSION_GENERATOR_DEFAULTS.reserve_every,
   exam_gap_days: SESSION_GENERATOR_DEFAULTS.exam_gap_days,
@@ -20001,11 +20016,39 @@ const buildSessionGeneratorFormDefaults = ({ activeLocation, selectedCourseId, s
   include_weekends: SESSION_GENERATOR_DEFAULTS.include_weekends,
   include_consultations: SESSION_GENERATOR_DEFAULTS.include_consultations,
   respect_study_days: SESSION_GENERATOR_DEFAULTS.respect_study_days,
+  day_grouping_mode: SESSION_GENERATOR_DEFAULTS.day_grouping_mode,
+  exam_sequence: SESSION_GENERATOR_DEFAULTS.exam_sequence,
+  credit_sequence: SESSION_GENERATOR_DEFAULTS.credit_sequence,
   strategy: SESSION_GENERATOR_DEFAULTS.strategy,
 });
 
 const hasSessionGeneratorFormPayload = (query) =>
   Object.keys(query || {}).some((key) => SESSION_GENERATOR_FORM_QUERY_KEYS.has(String(key)));
+
+const normalizeSessionWindowMode = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  return raw === 'weeks' ? 'weeks' : 'days';
+};
+
+const normalizeSessionDayGroupingMode = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'subject_per_day') return 'subject_per_day';
+  if (raw === 'activity_per_day') return 'activity_per_day';
+  return 'none';
+};
+
+const normalizeSessionExamSequence = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'exam_only') return 'exam_only';
+  if (raw === 'consult_exam_credit') return 'consult_exam_credit';
+  return 'consult_exam';
+};
+
+const normalizeSessionCreditSequence = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'consult_credit') return 'consult_credit';
+  return 'credit_only';
+};
 
 const normalizeSessionGeneratorStrategy = (value) => {
   const raw = String(value || '').trim().toLowerCase();
@@ -20226,10 +20269,34 @@ const buildSessionDayBuckets = ({
   includeWeekends,
   respectStudyDays,
   activeStudyDayNames = [],
+  explicitDates = [],
 }) => {
   const buckets = [];
   const normalizedMax = Math.max(1, Number(maxEventsPerDay || 1));
   const activeStudyDaySet = new Set((activeStudyDayNames || []).map((day) => String(day)));
+  const normalizedExplicitDates = Array.from(new Set((explicitDates || [])
+    .map((date) => (isValidDateString(date) ? String(date) : null))
+    .filter(Boolean)))
+    .sort();
+  if (normalizedExplicitDates.length) {
+    normalizedExplicitDates.forEach((cursor) => {
+      const dayName = getDayNameFromDate(cursor);
+      const isWeekend = dayName === 'Saturday' || dayName === 'Sunday';
+      if (!includeWeekends && isWeekend) return;
+      if (respectStudyDays && activeStudyDaySet.size && !activeStudyDaySet.has(dayName)) return;
+      buckets.push({
+        date: cursor,
+        day_name: dayName,
+        day_short: getStudyDayShortLabel(dayName),
+        items: [],
+        capacity: normalizedMax,
+        is_weekend: isWeekend,
+        is_reserved: false,
+        capacity_note: null,
+      });
+    });
+    return buckets;
+  }
   let cursor = isValidDateString(startDate) ? startDate : toIsoDateOnly(new Date());
   let attempts = 0;
   while (buckets.length < sessionDays && attempts < sessionDays * 10) {
@@ -20259,6 +20326,81 @@ const buildSessionDayBuckets = ({
   return buckets;
 };
 
+const buildSessionDatesFromWeekNumbers = ({
+  semester,
+  weekNumbers = [],
+  includeWeekends,
+  respectStudyDays,
+  activeStudyDayNames = [],
+}) => {
+  if (!semester || !semester.start_date || !isValidDateString(semester.start_date)) return [];
+  const activeStudyDaySet = new Set((activeStudyDayNames || []).map((day) => String(day)));
+  const dayOrder = includeWeekends ? fullWeekDays : daysOfWeek;
+  const dates = [];
+  (weekNumbers || []).forEach((weekNumber) => {
+    (dayOrder || []).forEach((dayName) => {
+      if (respectStudyDays && activeStudyDaySet.size && !activeStudyDaySet.has(dayName)) return;
+      const date = getDateForWeekDay(weekNumber, dayName, semester.start_date);
+      if (date && isValidDateString(date)) {
+        dates.push(date);
+      }
+    });
+  });
+  return Array.from(new Set(dates)).sort();
+};
+
+const getSemesterWeekNumberForDate = (dateStr, semester) => {
+  if (!dateStr || !semester || !semester.start_date) return null;
+  const info = getWeekDayForDate(dateStr, semester.start_date);
+  return info && Number.isFinite(Number(info.weekNumber)) ? Number(info.weekNumber) : null;
+};
+
+const buildSessionSlotBoard = ({
+  dayBuckets = [],
+  semester,
+  scheduleRows = [],
+}) => {
+  const busyMap = new Map();
+  (scheduleRows || []).forEach((row) => {
+    const week = Number(row.week_number);
+    const classNum = Number(row.class_number);
+    const dayName = String(row.day_of_week || '');
+    if (!week || !classNum || !dayName) return;
+    const key = `${week}|${dayName}|${classNum}`;
+    if (!busyMap.has(key)) busyMap.set(key, []);
+    busyMap.get(key).push({
+      subject_name: row.subject_name || 'Пара',
+      lesson_type: row.lesson_type || '',
+      group_number: row.group_number,
+    });
+  });
+
+  return (dayBuckets || []).map((bucket) => {
+    const weekNumber = getSemesterWeekNumberForDate(bucket.date, semester);
+    const slotRows = [1, 2, 3, 4, 5, 6, 7].map((classNum) => {
+      const key = `${weekNumber || 0}|${bucket.day_name || ''}|${classNum}`;
+      const busy = weekNumber ? (busyMap.get(key) || []) : [];
+      const slot = bellSchedule[classNum] || null;
+      return {
+        class_number: classNum,
+        time_label: slot ? `${slot.start}-${slot.end}` : `#${classNum}`,
+        is_busy: !!busy.length,
+        is_free: !busy.length,
+        busy,
+      };
+    });
+    return {
+      date: bucket.date,
+      day_name: bucket.day_name,
+      day_short: bucket.day_short,
+      week_number: weekNumber,
+      slots: slotRows,
+      free_count: slotRows.filter((s) => s.is_free).length,
+      busy_count: slotRows.filter((s) => s.is_busy).length,
+    };
+  });
+};
+
 const sessionEventTitleLabel = (event) => {
   if (!event) return '';
   if (event.kind === 'consultation') return 'Консультація';
@@ -20272,6 +20414,7 @@ const buildSessionGeneratorPreview = ({
   gradingBySubject = {},
   startDate,
   sessionDays,
+  explicitDates = [],
   maxEventsPerDay,
   reserveEvery,
   examGapDays,
@@ -20281,14 +20424,17 @@ const buildSessionGeneratorPreview = ({
   includeWeekends,
   respectStudyDays,
   activeStudyDayNames = [],
+  dayGroupingMode = 'none',
+  examSequence = 'consult_exam',
+  creditSequence = 'credit_only',
   strategy,
   seed,
 }) => {
   const warnings = [];
   const notes = [];
   const assumptions = [
-    'Це чернетка-евристика: тип контролю визначається за grading settings (якщо є) + fallback правилами.',
-    'Publish у журнал/розклад не виконується — сторінка лише формує превʼю для планування сесії.',
+    'Тип контролю визначається за grading settings (якщо є) + fallback правилами класифікації.',
+    'Publish у журнал/розклад поки не виконується — сторінка формує планування сесії та розміщення по слотах.',
   ];
   if (!subjects.length) {
     return {
@@ -20324,6 +20470,7 @@ const buildSessionGeneratorPreview = ({
     includeWeekends,
     respectStudyDays,
     activeStudyDayNames,
+    explicitDates,
   });
 
   if (!dayBuckets.length) {
@@ -20331,17 +20478,55 @@ const buildSessionGeneratorPreview = ({
   }
 
   const lastExamByScope = {};
+  const daySubjectSetByDate = new Map();
+  const dayActivityTypeSetByDate = new Map();
+  const getDaySet = (map, date) => {
+    if (!map.has(date)) map.set(date, new Set());
+    return map.get(date);
+  };
+  const eventActivityKey = (event) => {
+    if (!event) return '';
+    if (event.kind === 'consultation') return 'consultation';
+    if (event.kind === 'reserve') return 'reserve';
+    if (event.kind === 'retake') return 'retake';
+    if (event.kind === 'assessment') return String(event.type || 'assessment');
+    return String(event.kind || event.type || '');
+  };
+  const canUseBucketByGrouping = (bucket, eventLike) => {
+    if (!bucket) return false;
+    if (dayGroupingMode === 'subject_per_day' && eventLike && eventLike.subject_name) {
+      const subjectSet = getDaySet(daySubjectSetByDate, bucket.date);
+      if (subjectSet.size && !subjectSet.has(String(eventLike.subject_name))) return false;
+    }
+    if (dayGroupingMode === 'activity_per_day') {
+      const activitySet = getDaySet(dayActivityTypeSetByDate, bucket.date);
+      const key = eventActivityKey(eventLike);
+      if (activitySet.size && key && !activitySet.has(key)) return false;
+    }
+    return true;
+  };
   const addEventToBucket = (bucket, event) => {
     if (!bucket) return false;
     bucket.items.push(event);
+    if (event && event.subject_name) {
+      getDaySet(daySubjectSetByDate, bucket.date).add(String(event.subject_name));
+    }
+    const activityKey = eventActivityKey(event);
+    if (activityKey) {
+      getDaySet(dayActivityTypeSetByDate, bucket.date).add(activityKey);
+    }
     return true;
   };
 
   const chooseBucketForAssessment = (assessment) => {
     const scopeKey = assessment.group_number ? `G${assessment.group_number}` : 'ALL';
-    const candidateBuckets = dayBuckets.filter((bucket) => bucket.items.length < bucket.capacity);
-    let fallbackBucket = candidateBuckets[0] || null;
-    for (const bucket of candidateBuckets) {
+    const candidateBuckets = dayBuckets.filter((bucket) =>
+      bucket.items.length < bucket.capacity && canUseBucketByGrouping(bucket, { kind: 'assessment', type: assessment.type, subject_name: assessment.subject_name })
+    );
+    const relaxedBuckets = dayBuckets.filter((bucket) => bucket.items.length < bucket.capacity);
+    const effectiveBuckets = candidateBuckets.length ? candidateBuckets : relaxedBuckets;
+    let fallbackBucket = effectiveBuckets[0] || null;
+    for (const bucket of effectiveBuckets) {
       if (assessment.type !== 'exam') return bucket;
       const lastDate = lastExamByScope[scopeKey] || (scopeKey !== 'ALL' ? lastExamByScope.ALL : null) || null;
       if (!lastDate) return bucket;
@@ -20361,7 +20546,29 @@ const buildSessionGeneratorPreview = ({
   let consultCount = 0;
   let reserveCount = 0;
   let overflowCount = 0;
-  const pendingConsultations = [];
+  const placeRelativeEvent = ({
+    sourceDate,
+    direction,
+    event,
+    preferSameSubjectGap = true,
+  }) => {
+    const targetIndex = dayBuckets.findIndex((bucket) => bucket.date === sourceDate);
+    if (targetIndex < 0) return false;
+    const start = direction < 0 ? targetIndex - 1 : targetIndex + 1;
+    const end = direction < 0 ? -1 : dayBuckets.length;
+    for (let idx = start; direction < 0 ? idx > end : idx < end; idx += direction) {
+      const bucket = dayBuckets[idx];
+      if (!bucket || bucket.items.length >= bucket.capacity) continue;
+      if (!canUseBucketByGrouping(bucket, event)) continue;
+      if (preferSameSubjectGap && event && event.subject_name) {
+        const hasSameSubject = bucket.items.some((item) => item.subject_name && item.subject_name === event.subject_name);
+        if (hasSameSubject) continue;
+      }
+      addEventToBucket(bucket, event);
+      return true;
+    }
+    return false;
+  };
 
   sortedQueue.forEach((assessment) => {
     const bucket = chooseBucketForAssessment(assessment);
@@ -20392,42 +20599,78 @@ const buildSessionGeneratorPreview = ({
       const scopeKey = assessment.group_number ? `G${assessment.group_number}` : 'ALL';
       lastExamByScope[scopeKey] = bucket.date;
       if (!assessment.group_number) lastExamByScope.ALL = bucket.date;
-      if (includeConsultations) {
-        pendingConsultations.push({
-          subject_name: assessment.subject_name,
-          group_label: assessment.group_label,
-          target_date: bucket.date,
+      const needsConsult =
+        examSequence === 'consult_exam' || examSequence === 'consult_exam_credit' || (includeConsultations && examSequence === 'exam_only');
+      if (needsConsult) {
+        const placedConsult = placeRelativeEvent({
+          sourceDate: bucket.date,
+          direction: -1,
+          event: {
+            kind: 'consultation',
+            type: 'consultation',
+            subject_name: assessment.subject_name,
+            group_label: assessment.group_label,
+            marks: ['CONS'],
+            title: 'Консультація',
+            note: `Перед "${assessment.subject_name}"`,
+            complexity: 0,
+          },
         });
+        if (placedConsult) {
+          consultCount += 1;
+        } else {
+          notes.push(`Не вдалося вставити консультацію перед "${assessment.subject_name}" (немає вільного дня/слота).`);
+        }
+      }
+      if (examSequence === 'consult_exam_credit') {
+        const placedCreditAfterExam = placeRelativeEvent({
+          sourceDate: bucket.date,
+          direction: 1,
+          event: {
+            kind: 'assessment',
+            type: 'credit',
+            subject_id: assessment.subject_id,
+            subject_name: assessment.subject_name,
+            group_label: assessment.group_label,
+            group_number: assessment.group_number,
+            marks: Array.from(new Set([...(assessment.marks || []).filter((m) => m !== 'EX'), 'CR'])),
+            complexity: Math.max(0, Number(assessment.complexity || 0) - 1),
+            title: 'Залік',
+            note: 'Після екзамену',
+          },
+        });
+        if (placedCreditAfterExam) {
+          scheduledAssessments += 1;
+          creditCount += 1;
+        } else {
+          notes.push(`Не вдалося вставити залік після екзамену для "${assessment.subject_name}".`);
+        }
       }
     } else {
       creditCount += 1;
+      if (creditSequence === 'consult_credit' || (includeConsultations && creditSequence === 'credit_only')) {
+        const placedConsult = placeRelativeEvent({
+          sourceDate: bucket.date,
+          direction: -1,
+          event: {
+            kind: 'consultation',
+            type: 'consultation',
+            subject_name: assessment.subject_name,
+            group_label: assessment.group_label,
+            marks: ['CONS'],
+            title: 'Консультація',
+            note: `Перед заліком "${assessment.subject_name}"`,
+            complexity: 0,
+          },
+        });
+        if (placedConsult) {
+          consultCount += 1;
+        } else {
+          notes.push(`Не вдалося вставити консультацію перед заліком "${assessment.subject_name}".`);
+        }
+      }
     }
   });
-
-  if (includeConsultations && pendingConsultations.length) {
-    pendingConsultations.forEach((consult) => {
-      const targetIndex = dayBuckets.findIndex((bucket) => bucket.date === consult.target_date);
-      if (targetIndex <= 0) return;
-      for (let idx = targetIndex - 1; idx >= 0; idx -= 1) {
-        const bucket = dayBuckets[idx];
-        if (bucket.items.length >= bucket.capacity) continue;
-        const hasSameSubject = bucket.items.some((item) => item.subject_name === consult.subject_name);
-        if (hasSameSubject) continue;
-        addEventToBucket(bucket, {
-          kind: 'consultation',
-          type: 'consultation',
-          subject_name: consult.subject_name,
-          group_label: consult.group_label,
-          marks: ['CONS'],
-          title: 'Консультація',
-          note: `Перед "${consult.subject_name}"`,
-          complexity: 0,
-        });
-        consultCount += 1;
-        break;
-      }
-    });
-  }
 
   if (Number(reserveEvery) > 0) {
     let assessmentsSeen = 0;
@@ -20660,6 +20903,7 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
         location: normalizeGeneratorLocation(query.location || baseForm.location || activeLocation),
         course_id: parseSessionGeneratorInt(query.course_id, baseForm.course_id, 1, Number.MAX_SAFE_INTEGER),
         semester_id: parseSessionGeneratorInt(query.semester_id, baseForm.semester_id, 1, Number.MAX_SAFE_INTEGER),
+        window_mode: normalizeSessionWindowMode(query.window_mode || baseForm.window_mode || SESSION_GENERATOR_DEFAULTS.window_mode),
         start_date: isValidDateString(query.start_date) ? String(query.start_date) : (baseForm.start_date || defaultStartDate),
         session_days: parseSessionGeneratorInt(
           query.session_days,
@@ -20667,6 +20911,13 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
           3,
           60
         ),
+        session_weeks_count: parseSessionGeneratorInt(
+          query.session_weeks_count,
+          baseForm.session_weeks_count,
+          1,
+          12
+        ),
+        session_weeks_set: String(query.session_weeks_set ?? baseForm.session_weeks_set ?? '').trim(),
         max_events_per_day: parseSessionGeneratorInt(
           query.max_events_per_day,
           baseForm.max_events_per_day,
@@ -20706,6 +20957,15 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
         respect_study_days: hasOwnQueryKey(query, 'respect_study_days')
           ? parseSessionGeneratorFlag(query.respect_study_days, false)
           : false,
+        day_grouping_mode: normalizeSessionDayGroupingMode(
+          query.day_grouping_mode || baseForm.day_grouping_mode || SESSION_GENERATOR_DEFAULTS.day_grouping_mode
+        ),
+        exam_sequence: normalizeSessionExamSequence(
+          query.exam_sequence || baseForm.exam_sequence || SESSION_GENERATOR_DEFAULTS.exam_sequence
+        ),
+        credit_sequence: normalizeSessionCreditSequence(
+          query.credit_sequence || baseForm.credit_sequence || SESSION_GENERATOR_DEFAULTS.credit_sequence
+        ),
         strategy: normalizeSessionGeneratorStrategy(query.strategy || baseForm.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
       };
     }
@@ -20713,6 +20973,17 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     form.location = activeLocation;
     form.course_id = selectedCourseId;
     form.semester_id = selectedSemesterId;
+    form.window_mode = normalizeSessionWindowMode(form.window_mode || SESSION_GENERATOR_DEFAULTS.window_mode);
+    form.session_weeks_count = parseSessionGeneratorInt(
+      form.session_weeks_count,
+      SESSION_GENERATOR_DEFAULTS.session_weeks_count,
+      1,
+      12
+    );
+    form.session_weeks_set = String(form.session_weeks_set || '').trim();
+    form.day_grouping_mode = normalizeSessionDayGroupingMode(form.day_grouping_mode || SESSION_GENERATOR_DEFAULTS.day_grouping_mode);
+    form.exam_sequence = normalizeSessionExamSequence(form.exam_sequence || SESSION_GENERATOR_DEFAULTS.exam_sequence);
+    form.credit_sequence = normalizeSessionCreditSequence(form.credit_sequence || SESSION_GENERATOR_DEFAULTS.credit_sequence);
     if (!form.start_date || !isValidDateString(form.start_date)) {
       form.start_date = defaultStartDate;
     }
@@ -20765,6 +21036,29 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       };
     });
 
+    let sessionWeekNumbers = [];
+    if (form.window_mode === 'weeks' && activeSemester && Number(activeSemester.weeks_count || 0) > 0) {
+      const semesterWeeksCount = Number(activeSemester.weeks_count || 0);
+      const parsedWeeks = parseWeekSet(form.session_weeks_set, semesterWeeksCount);
+      if (parsedWeeks.length) {
+        sessionWeekNumbers = parsedWeeks;
+      } else {
+        const count = Math.min(Math.max(Number(form.session_weeks_count || 1), 1), semesterWeeksCount);
+        const startWeek = Math.max(1, semesterWeeksCount - count + 1);
+        sessionWeekNumbers = Array.from({ length: count }, (_, idx) => startWeek + idx);
+      }
+      form.session_weeks_set = sessionWeekNumbers.join(',');
+    }
+    const explicitSessionDates = form.window_mode === 'weeks'
+      ? buildSessionDatesFromWeekNumbers({
+          semester: activeSemester,
+          weekNumbers: sessionWeekNumbers,
+          includeWeekends: form.include_weekends,
+          respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
+          activeStudyDayNames,
+        })
+      : [];
+
     const previewCleared = draftAction === 'clear';
     let preview = null;
     if (!previewCleared) {
@@ -20776,6 +21070,7 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
         gradingBySubject,
         startDate: form.start_date,
         sessionDays: form.session_days,
+        explicitDates: explicitSessionDates,
         maxEventsPerDay: form.max_events_per_day,
         reserveEvery: form.reserve_every,
         examGapDays: form.exam_gap_days,
@@ -20785,10 +21080,71 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
         includeWeekends: form.include_weekends,
         respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
         activeStudyDayNames,
+        dayGroupingMode: form.day_grouping_mode,
+        examSequence: form.exam_sequence,
+        creditSequence: form.credit_sequence,
         strategy: form.strategy,
         seed: previewSeed,
       });
     }
+
+    const slotCalendarBuckets = preview && Array.isArray(preview.dayBuckets) && preview.dayBuckets.length
+      ? preview.dayBuckets
+      : buildSessionDayBuckets({
+          startDate: form.start_date,
+          sessionDays: form.session_days,
+          explicitDates: explicitSessionDates,
+          maxEventsPerDay: form.max_events_per_day,
+          includeWeekends: form.include_weekends,
+          respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
+          activeStudyDayNames,
+        });
+
+    const slotWeekNumbers = Array.from(new Set((slotCalendarBuckets || [])
+      .map((bucket) => getSemesterWeekNumberForDate(bucket.date, activeSemester))
+      .filter((week) => Number.isFinite(Number(week)) && Number(week) > 0)))
+      .sort((a, b) => a - b);
+    let slotScheduleRows = [];
+    if (selectedCourseId && selectedSemesterId && slotWeekNumbers.length) {
+      try {
+        const placeholders = slotWeekNumbers.map(() => '?').join(', ');
+        slotScheduleRows = await db.all(
+          `
+            SELECT se.week_number,
+                   se.day_of_week,
+                   se.class_number,
+                   se.group_number,
+                   COALESCE(se.lesson_type, '') AS lesson_type,
+                   s.name AS subject_name
+            FROM schedule_entries se
+            JOIN subjects s ON s.id = se.subject_id
+            WHERE se.course_id = ?
+              AND se.semester_id = ?
+              AND se.week_number IN (${placeholders})
+            ORDER BY se.week_number, se.day_of_week, se.class_number
+          `,
+          [selectedCourseId, selectedSemesterId, ...slotWeekNumbers]
+        );
+      } catch (err) {
+        slotScheduleRows = [];
+      }
+    }
+    const slotBoard = buildSessionSlotBoard({
+      dayBuckets: slotCalendarBuckets,
+      semester: activeSemester,
+      scheduleRows: slotScheduleRows,
+    });
+    const plannerItems = ((preview && preview.timelineItems) || [])
+      .filter((item) => item.kind !== 'reserve')
+      .map((item, idx) => ({
+        uid: `evt-${idx + 1}`,
+        label: `${item.title || ''}${item.subject_name ? ` · ${item.subject_name}` : ''}`.trim(),
+        kind: item.kind,
+        type: item.type || '',
+        subject_name: item.subject_name || '',
+        group_label: item.group_label || '',
+        marks: item.marks || [],
+      }));
 
     const selectedCourse = selectedCourseId ? await getCourseById(selectedCourseId) : null;
     const uiHints = [];
@@ -20806,6 +21162,9 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     }
     if (form.respect_study_days && !activeStudyDayNames.length) {
       uiHints.push('Активні навчальні дні курсу не задані — фільтр по навчальних днях не застосовано.');
+    }
+    if (form.window_mode === 'weeks' && !activeSemester) {
+      uiHints.push('Режим "сесійні тижні" потребує активного семестру з датою старту. Зараз використано звичайний режим за днями.');
     }
 
     const draftEntries = Object.values(draftStore.items || {}).sort((a, b) =>
@@ -20841,12 +21200,33 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       gradingSource,
       courseStudyDays,
       activeStudyDayNames,
+      sessionWeekNumbers,
+      slotBoard,
+      plannerItems,
       draftMeta,
       sessionMarkLegend: SESSION_GENERATOR_MARK_LEGEND,
       strategyOptions: [
         { value: 'exams_first', label: 'Екзамени спочатку' },
         { value: 'balanced', label: 'Змішано' },
         { value: 'credits_first', label: 'Заліки спочатку' },
+      ],
+      sessionWindowOptions: [
+        { value: 'days', label: 'Дні (від дати старту)' },
+        { value: 'weeks', label: 'Сесійні тижні семестру' },
+      ],
+      sessionGroupingOptions: [
+        { value: 'none', label: 'Без обмеження по днях' },
+        { value: 'subject_per_day', label: 'Один предмет на день' },
+        { value: 'activity_per_day', label: 'Один тип активності на день' },
+      ],
+      examSequenceOptions: [
+        { value: 'exam_only', label: 'Лише екзамен' },
+        { value: 'consult_exam', label: 'Консультація + екзамен' },
+        { value: 'consult_exam_credit', label: 'Консультація + екзамен + залік' },
+      ],
+      creditSequenceOptions: [
+        { value: 'credit_only', label: 'Лише залік (мінімум)' },
+        { value: 'consult_credit', label: 'Консультація + залік' },
       ],
     });
   } catch (err) {

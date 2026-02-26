@@ -389,6 +389,129 @@
       .liquid-alert.danger {
         box-shadow: inset 3px 0 0 rgba(255, 113, 140, 0.78);
       }
+      .planner-queue {
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.04);
+        padding: 0.7rem;
+      }
+      body.theme-light .planner-queue {
+        border-color: rgba(20,28,38,0.08);
+        background: rgba(255,255,255,0.68);
+      }
+      .planner-event-btn {
+        width: 100%;
+        text-align: left;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.03);
+        color: inherit;
+        padding: 0.6rem 0.65rem;
+        display: grid;
+        gap: 0.2rem;
+        transition: border-color 140ms ease, transform 140ms ease, background-color 140ms ease;
+      }
+      body.theme-light .planner-event-btn {
+        border-color: rgba(20,28,38,0.08);
+        background: rgba(255,255,255,0.7);
+      }
+      .planner-event-btn:hover {
+        border-color: rgba(110, 185, 255, 0.38);
+      }
+      .planner-event-btn.is-selected {
+        border-color: rgba(82, 170, 255, 0.55);
+        background: rgba(82, 170, 255, 0.10);
+        box-shadow: inset 0 0 0 1px rgba(82, 170, 255, 0.22);
+      }
+      .planner-event-btn.is-assigned {
+        opacity: 0.58;
+      }
+      .planner-event-main {
+        font-weight: 650;
+        line-height: 1.15;
+      }
+      .planner-event-sub {
+        font-size: 0.76rem;
+        color: rgba(255,255,255,0.64);
+      }
+      body.theme-light .planner-event-sub { color: rgba(20,28,38,0.54); }
+      .planner-event-marks {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.2rem;
+      }
+      .slot-day-card {
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.04);
+        padding: 0.65rem;
+      }
+      body.theme-light .slot-day-card {
+        border-color: rgba(20,28,38,0.08);
+        background: rgba(255,255,255,0.7);
+      }
+      .slot-day-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.6rem;
+        margin-bottom: 0.55rem;
+      }
+      .slot-row-grid {
+        display: grid;
+        gap: 0.45rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .slot-cell {
+        position: relative;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.03);
+        color: inherit;
+        text-align: left;
+        padding: 0.48rem 0.52rem;
+        min-height: 74px;
+        display: grid;
+        align-content: start;
+        gap: 0.1rem;
+      }
+      body.theme-light .slot-cell {
+        border-color: rgba(20,28,38,0.08);
+        background: rgba(255,255,255,0.78);
+      }
+      .slot-cell.is-free:hover {
+        border-color: rgba(88, 174, 255, 0.42);
+      }
+      .slot-cell.is-busy {
+        opacity: 0.72;
+        background: rgba(255, 163, 92, 0.08);
+      }
+      .slot-cell.is-assigned {
+        border-color: rgba(82, 170, 255, 0.5);
+        background: rgba(82, 170, 255, 0.10);
+        box-shadow: inset 0 0 0 1px rgba(82, 170, 255, 0.18);
+      }
+      .slot-cell-top {
+        font-weight: 700;
+        font-size: 0.78rem;
+      }
+      .slot-cell-time {
+        font-size: 0.68rem;
+        color: rgba(255,255,255,0.62);
+      }
+      body.theme-light .slot-cell-time { color: rgba(20,28,38,0.54); }
+      .slot-cell-content {
+        font-size: 0.78rem;
+        line-height: 1.15;
+      }
+      .slot-cell-assignment {
+        margin-top: 0.15rem;
+        font-size: 0.72rem;
+        line-height: 1.15;
+        color: rgba(255,255,255,0.88);
+        word-break: break-word;
+      }
+      body.theme-light .slot-cell-assignment { color: rgba(20,28,38,0.78); }
       .tiny-dot {
         width: 0.45rem;
         height: 0.45rem;
@@ -413,6 +536,9 @@
         .timeline-day-header {
           flex-direction: column;
           align-items: flex-start;
+        }
+        .slot-row-grid {
+          grid-template-columns: 1fr;
         }
         .panel-title-row {
           align-items: flex-start;
@@ -582,6 +708,14 @@
                     <% }); %>
                   </select>
                 </div>
+                <div class="col-12">
+                  <label class="form-label">Вікно сесії</label>
+                  <select class="form-select" name="window_mode" id="sessionWindowModeSelect">
+                    <% (sessionWindowOptions || []).forEach(function(opt) { %>
+                      <option value="<%= opt.value %>" <%= form && form.window_mode === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+                    <% }); %>
+                  </select>
+                </div>
                 <div class="col-12 col-sm-6">
                   <label class="form-label">Старт сесії</label>
                   <input class="form-control" type="date" name="start_date" value="<%= (form && form.start_date) || '' %>" required />
@@ -594,11 +728,50 @@
                   <label class="form-label">Max/день</label>
                   <input class="form-control" type="number" min="1" max="6" name="max_events_per_day" value="<%= form && form.max_events_per_day %>" />
                 </div>
+                <div class="col-6 col-sm-4">
+                  <label class="form-label">Тижнів сесії</label>
+                  <input class="form-control" type="number" min="1" max="12" name="session_weeks_count" value="<%= form && form.session_weeks_count %>" />
+                </div>
+                <div class="col-12 col-sm-8">
+                  <label class="form-label">Які тижні (опц.)</label>
+                  <input class="form-control" type="text" name="session_weeks_set" value="<%= (form && form.session_weeks_set) || '' %>" placeholder="Напр. 14-15 або 15,16" />
+                  <div class="small text-muted mt-1">
+                    <% if (sessionWeekNumbers && sessionWeekNumbers.length) { %>
+                      Сесійні тижні: <%= sessionWeekNumbers.join(', ') %>
+                    <% } else { %>
+                      Якщо порожньо, візьмемо останні N тижнів семестру.
+                    <% } %>
+                  </div>
+                </div>
                 <div class="col-12 col-sm-6">
                   <label class="form-label">Стратегія</label>
                   <select class="form-select" name="strategy">
                     <% (strategyOptions || []).forEach(function(opt) { %>
                       <option value="<%= opt.value %>" <%= form && form.strategy === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6">
+                  <label class="form-label">Групування по днях</label>
+                  <select class="form-select" name="day_grouping_mode">
+                    <% (sessionGroupingOptions || []).forEach(function(opt) { %>
+                      <option value="<%= opt.value %>" <%= form && form.day_grouping_mode === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6">
+                  <label class="form-label">Сценарій екзамену</label>
+                  <select class="form-select" name="exam_sequence">
+                    <% (examSequenceOptions || []).forEach(function(opt) { %>
+                      <option value="<%= opt.value %>" <%= form && form.exam_sequence === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6">
+                  <label class="form-label">Сценарій заліку</label>
+                  <select class="form-select" name="credit_sequence">
+                    <% (creditSequenceOptions || []).forEach(function(opt) { %>
+                      <option value="<%= opt.value %>" <%= form && form.credit_sequence === opt.value ? 'selected' : '' %>><%= opt.label %></option>
                     <% }); %>
                   </select>
                 </div>
@@ -633,7 +806,7 @@
                 <div class="col-12 d-grid gap-2">
                   <label class="form-check">
                     <input class="form-check-input" type="checkbox" name="include_consultations" value="1" <%= form && form.include_consultations ? 'checked' : '' %> />
-                    <span class="form-check-label">Додавати консультації перед екзаменами</span>
+                    <span class="form-check-label">Авто-консультації (fallback, якщо сценарій без консультації)</span>
                   </label>
                   <label class="form-check">
                     <input class="form-check-input" type="checkbox" name="include_weekends" value="1" <%= form && form.include_weekends ? 'checked' : '' %> />
@@ -648,7 +821,7 @@
                   <button class="btn btn-primary" type="submit" <%= form && form.course_id ? '' : 'disabled' %>>Згенерувати сесію</button>
                 </div>
                 <div class="col-12 session-subtle">
-                  Підказка: це прототип. Можемо далі додати ручне перетягування слотів, export CSV/PDF та publish в окрему таблицю сесії.
+                  Тепер можна задавати сценарії екзамену/заліку окремо (мінімум: лише залік, максимум: консультація + екзамен + залік).
                 </div>
               </form>
             </div>
@@ -674,14 +847,14 @@
           <div class="card liquid-panel">
             <div class="card-body">
               <div class="panel-title-row">
-                <h5>Що ще уточнити</h5>
-                <span class="session-subtle">next</span>
+                <h5>Сценарії сесії</h5>
+                <span class="session-subtle">концепція</span>
               </div>
               <div class="d-grid gap-2">
-                <div class="liquid-alert warn">Чи є окремі правила для екзаменів vs заліків по конкретних предметах (перелік вручну)?</div>
-                <div class="liquid-alert warn">Чи можна ставити 2 екзамени в один день і для яких груп/курсів це заборонено?</div>
-                <div class="liquid-alert warn">Чи потрібні окремі позначки для усного/письмового/онлайн/аудиторного формату?</div>
-                <div class="liquid-alert warn">Чи має бути publish в БД і де зберігати (нова таблиця session_entries / export only)?</div>
+                <div class="liquid-alert info">Мінімальна сесія для предмета: <strong>Лише залік</strong> (одна подія в один день).</div>
+                <div class="liquid-alert info">Середня: <strong>Консультація + екзамен</strong>.</div>
+                <div class="liquid-alert info">Максимальна: <strong>Консультація + екзамен + залік</strong> (наприклад, англійська).</div>
+                <div class="liquid-alert info">Обмеження дня: можна перемкнути режим <em>один предмет на день</em> або <em>один тип активності на день</em>.</div>
               </div>
             </div>
           </div>
@@ -703,6 +876,92 @@
               <% }); %>
             </div>
           <% } %>
+
+          <div class="card liquid-panel mb-4">
+            <div class="card-body">
+              <div class="panel-title-row">
+                <h5>Планувальник слотів</h5>
+                <span class="session-subtle">вільні слоти + вибір подій</span>
+              </div>
+              <% if (!(slotBoard && slotBoard.length)) { %>
+                <div class="timeline-empty">Немає сесійного вікна для побудови слотів.</div>
+              <% } else { %>
+                <div class="row g-3">
+                  <div class="col-12 col-lg-4">
+                    <div class="planner-queue" id="plannerQueue">
+                      <div class="small text-muted mb-2">Події сесії (клікни подію, потім вільний слот)</div>
+                      <% if (!(plannerItems && plannerItems.length)) { %>
+                        <div class="timeline-empty">Спочатку згенеруй сесію, щоб побачити перелік подій.</div>
+                      <% } else { %>
+                        <div class="d-grid gap-2">
+                          <% plannerItems.forEach(function(item) { %>
+                            <button
+                              type="button"
+                              class="planner-event-btn"
+                              data-planner-event-id="<%= item.uid %>"
+                              data-planner-event-label="<%= item.label %>"
+                              data-planner-event-kind="<%= item.kind %>"
+                            >
+                              <span class="planner-event-main"><%= item.label %></span>
+                              <% if (item.group_label) { %>
+                                <span class="planner-event-sub"><%= item.group_label %></span>
+                              <% } %>
+                              <% if (item.marks && item.marks.length) { %>
+                                <span class="planner-event-marks">
+                                  <% item.marks.forEach(function(mark) { %>
+                                    <span class="mark-pill <%= mark === 'EX' ? 'exam' : (mark === 'CR' ? 'credit' : (mark === 'DIF' ? 'accent' : (mark === 'CONS' ? 'muted' : (mark === 'RET' ? 'danger' : (mark === 'RES' || mark === 'CAP' ? 'warn' : 'info'))))) %>"><%= mark %></span>
+                                  <% }); %>
+                                </span>
+                              <% } %>
+                            </button>
+                          <% }); %>
+                        </div>
+                      <% } %>
+                    </div>
+                  </div>
+                  <div class="col-12 col-lg-8">
+                    <div class="slot-board d-grid gap-2" id="slotBoard">
+                      <% slotBoard.forEach(function(day) { %>
+                        <div class="slot-day-card">
+                          <div class="slot-day-head">
+                            <div>
+                              <div class="fw-semibold"><%= day.date %></div>
+                              <div class="small text-muted">
+                                <%= day.day_short %> · <%= day.day_name || '—' %>
+                                <% if (day.week_number) { %> · Тиждень <%= day.week_number %><% } %>
+                              </div>
+                            </div>
+                            <div class="small text-muted">вільно <%= day.free_count %>/7</div>
+                          </div>
+                          <div class="slot-row-grid">
+                            <% day.slots.forEach(function(slot) { %>
+                              <% const busyTitle = slot.is_busy && slot.busy && slot.busy.length ? slot.busy.map(function(b) { return (b.subject_name || 'Пара') + (b.lesson_type ? (' · ' + b.lesson_type) : '') + (b.group_number ? (' · гр.' + b.group_number) : ''); }).join(' | ') : ''; %>
+                              <button
+                                type="button"
+                                class="slot-cell <%= slot.is_busy ? 'is-busy' : 'is-free' %>"
+                                data-slot-cell
+                                data-slot-key="<%= day.date %>|<%= slot.class_number %>"
+                                data-slot-label="Пара <%= slot.class_number %> · <%= slot.time_label %>"
+                                <%= slot.is_busy ? 'disabled' : '' %>
+                                title="<%= slot.is_busy ? busyTitle : ('Вільний слот · ' + slot.time_label) %>"
+                              >
+                                <span class="slot-cell-top">#<%= slot.class_number %></span>
+                                <span class="slot-cell-time"><%= slot.time_label %></span>
+                                <span class="slot-cell-content"><%= slot.is_busy ? 'Зайнято' : 'Вільно' %></span>
+                              </button>
+                            <% }); %>
+                          </div>
+                        </div>
+                      <% }); %>
+                    </div>
+                    <div class="small text-muted mt-2">
+                      Клік по події -> клік по вільному слоту. Призначення поки локальне (в межах сторінки), без publish у БД.
+                    </div>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+          </div>
 
           <div class="card liquid-panel mb-4">
             <div class="card-body">
@@ -830,8 +1089,8 @@
           <div class="card liquid-panel">
             <div class="card-body">
               <div class="panel-title-row">
-                <h5>Припущення прототипу</h5>
-                <span class="session-subtle">Щоб було видно межі рішення</span>
+                <h5>Правила генерації</h5>
+                <span class="session-subtle">поточна логіка</span>
               </div>
               <div class="d-grid gap-2">
                 <% ((preview && preview.assumptions) || []).forEach(function(item) { %>
@@ -884,6 +1143,83 @@
             window.location.href = url;
           });
         }
+
+        const plannerEventButtons = Array.from(document.querySelectorAll('[data-planner-event-id]'));
+        const slotCells = Array.from(document.querySelectorAll('[data-slot-cell]'));
+        let selectedPlannerEventId = null;
+        const assignmentsBySlot = new Map();
+        const assignmentsByEvent = new Map();
+
+        const renderPlannerState = () => {
+          plannerEventButtons.forEach((btn) => {
+            const eventId = btn.dataset.plannerEventId;
+            btn.classList.toggle('is-selected', !!eventId && eventId === selectedPlannerEventId);
+            btn.classList.toggle('is-assigned', !!eventId && assignmentsByEvent.has(eventId));
+          });
+          slotCells.forEach((cell) => {
+            const slotKey = cell.dataset.slotKey;
+            const slotContent = cell.querySelector('.slot-cell-content');
+            let assignmentNode = cell.querySelector('.slot-cell-assignment');
+            const assigned = slotKey ? assignmentsBySlot.get(slotKey) : null;
+            cell.classList.toggle('is-assigned', !!assigned);
+            if (slotContent) {
+              slotContent.textContent = cell.disabled ? 'Зайнято' : (assigned ? 'Призначено' : 'Вільно');
+            }
+            if (assigned) {
+              if (!assignmentNode) {
+                assignmentNode = document.createElement('div');
+                assignmentNode.className = 'slot-cell-assignment';
+                cell.appendChild(assignmentNode);
+              }
+              assignmentNode.textContent = assigned.label || '';
+            } else if (assignmentNode) {
+              assignmentNode.remove();
+            }
+          });
+        };
+
+        plannerEventButtons.forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const eventId = btn.dataset.plannerEventId;
+            selectedPlannerEventId = selectedPlannerEventId === eventId ? null : eventId;
+            renderPlannerState();
+          });
+        });
+
+        slotCells.forEach((cell) => {
+          cell.addEventListener('click', () => {
+            if (cell.disabled) return;
+            const slotKey = cell.dataset.slotKey;
+            if (!slotKey) return;
+            const existing = assignmentsBySlot.get(slotKey);
+            if (!selectedPlannerEventId) {
+              if (existing) {
+                assignmentsBySlot.delete(slotKey);
+                assignmentsByEvent.delete(existing.eventId);
+                renderPlannerState();
+              }
+              return;
+            }
+            const selectedBtn = plannerEventButtons.find((btn) => btn.dataset.plannerEventId === selectedPlannerEventId);
+            if (!selectedBtn) return;
+            const prevSlotForEvent = assignmentsByEvent.get(selectedPlannerEventId);
+            if (prevSlotForEvent && prevSlotForEvent !== slotKey) {
+              assignmentsBySlot.delete(prevSlotForEvent);
+            }
+            if (existing && existing.eventId && existing.eventId !== selectedPlannerEventId) {
+              assignmentsByEvent.delete(existing.eventId);
+            }
+            const payload = {
+              eventId: selectedPlannerEventId,
+              label: selectedBtn.dataset.plannerEventLabel || selectedBtn.textContent.trim(),
+            };
+            assignmentsBySlot.set(slotKey, payload);
+            assignmentsByEvent.set(selectedPlannerEventId, slotKey);
+            selectedPlannerEventId = null;
+            renderPlannerState();
+          });
+        });
+        renderPlannerState();
 
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
           if (window.bootstrap && window.bootstrap.Tooltip) {
