@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.20",
+      "date": "2026-02-27",
+      "items": [
+        "feat(journal): added reopen-subject flow after closure with full journal unlock (subject state + locked columns) and activity log event",
+        "ux(journal): added \"Відкрити предмет\" action for closed subjects and updated closure confirmation copy to reflect reversible flow",
+        "feat(deanery): added deanery monitoring snapshot for courses/subjects (closure status, locked columns, homework and student coverage) on /deanery",
+        "ux(generators): removed visible draft wording in session/schedule generator controls (renamed to plan labels)"
+      ]
+    },
+    {
       "version": "1.0.19",
       "date": "2026-02-26",
       "items": [
