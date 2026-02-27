@@ -610,9 +610,6 @@
           </div>
           <div class="session-chip-row">
             <span class="session-chip"><span class="tiny-dot"></span> <strong><%= activeLocation === 'munich' ? 'Munich' : 'Kyiv' %></strong></span>
-            <% if (draftMeta && draftMeta.id) { %>
-              <span class="session-chip">Драфт: <strong>#<%= draftMeta.id %></strong> · <%= draftMeta.total || 1 %></span>
-            <% } %>
             <% if (selectedCourse) { %>
               <span class="session-chip">Курс: <strong><%= selectedCourse.name %></strong></span>
             <% } %>
@@ -657,19 +654,19 @@
                   class="btn btn-outline-secondary btn-sm"
                   href="/admin/session-generator?draft_action=new&location=<%= activeLocation %><%= form && form.course_id ? ('&course_id=' + form.course_id) : '' %><%= selectedSemesterId ? ('&semester_id=' + selectedSemesterId) : '' %>"
                 >
-                  Новий драфт
+                  Новий план
                 </a>
                 <% if (draftMeta && draftMeta.id) { %>
                   <a
                     class="btn btn-outline-secondary btn-sm"
                     href="/admin/session-generator?draft_id=<%= draftMeta.id %>&draft_action=clear&location=<%= activeLocation %><%= form && form.course_id ? ('&course_id=' + form.course_id) : '' %><%= selectedSemesterId ? ('&semester_id=' + selectedSemesterId) : '' %>"
                   >
-                    Очистити драфт
+                    Очистити план
                   </a>
                 <% } %>
                 <% if (draftMeta && draftMeta.list && draftMeta.list.length > 1) { %>
                   <div class="d-flex align-items-center gap-2 ms-auto">
-                    <label class="small text-muted m-0" for="draftSwitcherSelect">Драфти</label>
+                    <label class="small text-muted m-0" for="draftSwitcherSelect">Плани</label>
                     <select class="form-select form-select-sm" id="draftSwitcherSelect" style="width: auto;" data-draft-switch>
                       <% draftMeta.list.forEach(function(d) { %>
                         <option value="/admin/session-generator?draft_id=<%= d.id %>" <%= Number(d.id) === Number(draftMeta.id) ? 'selected' : '' %>>
@@ -973,7 +970,7 @@
                 </span>
               </div>
               <% if (!(preview && preview.dayBuckets && preview.dayBuckets.length)) { %>
-                <div class="timeline-empty"><%= previewCleared ? 'Драфт очищено. Налаштуйте параметри та згенеруйте сесію.' : 'Виберіть курс і параметри, щоб побачити превʼю.' %></div>
+                <div class="timeline-empty"><%= previewCleared ? 'План очищено. Налаштуйте параметри та згенеруйте сесію.' : 'Виберіть курс і параметри, щоб побачити превʼю.' %></div>
               <% } else { %>
                 <div class="d-grid gap-2">
                   <% preview.dayBuckets.forEach(function(day) { %>

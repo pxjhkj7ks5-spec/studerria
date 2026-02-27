@@ -134,9 +134,15 @@
             </div>
             <div class="d-flex flex-wrap gap-2">
               <% if (canCloseSubject) { %>
-                <form method="POST" action="/journal/subject/close" target="_blank" onsubmit="return confirm('Закрити предмет і зафіксувати журнал? Дію не можна скасувати.')">
+                <form method="POST" action="/journal/subject/close" target="_blank" onsubmit="return confirm('Закрити предмет і зафіксувати журнал? Повернути доступ можна через кнопку «Відкрити предмет».')">
                   <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
                   <button class="btn btn-outline-danger btn-sm" type="submit">Закрити предмет</button>
+                </form>
+              <% } %>
+              <% if (canReopenSubject) { %>
+                <form method="POST" action="/journal/subject/reopen" onsubmit="return confirm('Відкрити предмет і розблокувати журнал?')">
+                  <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                  <button class="btn btn-outline-success btn-sm" type="submit">Відкрити предмет</button>
                 </form>
               <% } %>
               <% if (teacherJournalMode && subjectClosure && subjectClosure.is_closed && (canManageAllSubjects || selectedSubject.has_all_groups)) { %>

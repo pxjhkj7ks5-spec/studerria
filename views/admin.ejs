@@ -793,6 +793,7 @@
       </div>
     </nav>
 
+    <% const deaneryMonitoringData = typeof deaneryMonitoring !== 'undefined' && deaneryMonitoring ? deaneryMonitoring : null; %>
     <main class="admin-layout">
       <aside class="admin-sidebar">
         <div class="admin-sidebar-inner">
@@ -800,6 +801,9 @@
             <div class="admin-sidebar-title">Overview</div>
             <% if (sectionAllowed('admin-overview')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-overview">Overview</button>
+            <% } %>
+            <% if (deaneryMonitoringData) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-deanery-monitoring">Deanery Monitor</button>
             <% } %>
           </div>
           <div class="admin-sidebar-section">
@@ -956,6 +960,137 @@
                     <div class="small text-muted">Teamwork tasks</div>
                     <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.teamworkTasks : '—' %></div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% } %>
+        <% if (deaneryMonitoringData) { %>
+          <% const monitorSummary = deaneryMonitoringData.summary || {}; %>
+          <% const monitorSelectedCourse = deaneryMonitoringData.selected_course || null; %>
+          <% const monitorCourseRows = Array.isArray(deaneryMonitoringData.courses) ? deaneryMonitoringData.courses : []; %>
+          <% const monitorSubjectRows = Array.isArray(deaneryMonitoringData.subjects) ? deaneryMonitoringData.subjects : []; %>
+          <% const monitorBasePath = role === 'deanery' ? '/deanery' : '/admin'; %>
+          <div id="admin-deanery-monitoring" class="admin-panel" data-admin-title="Overview / Deanery Monitor">
+            <div class="card mb-4">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                  <div>
+                    <h5 class="card-title mb-1">Моніторинг деканату</h5>
+                    <div class="small text-muted">Статус курсів і предметів: закриття журналів, блокування колонок, покриття ДЗ.</div>
+                  </div>
+                  <% if (deaneryMonitoringData.generated_at) { %>
+                    <div class="small text-muted">Оновлено: <%= new Date(deaneryMonitoringData.generated_at).toLocaleString('uk-UA') %></div>
+                  <% } %>
+                </div>
+                <div class="admin-overview-grid mb-3">
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Предметів (курс)</div>
+                    <div class="admin-metric-value"><%= Number(monitorSummary.subjects_total || 0) %></div>
+                  </div>
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Закрито предметів</div>
+                    <div class="admin-metric-value"><%= Number(monitorSummary.subjects_closed || 0) %></div>
+                  </div>
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Заблоковані колонки</div>
+                    <div class="admin-metric-value"><%= Number(monitorSummary.columns_locked || 0) %> / <%= Number(monitorSummary.columns_total || 0) %></div>
+                  </div>
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Записів студентів</div>
+                    <div class="admin-metric-value"><%= Number(monitorSummary.students_assignments_total || 0) %></div>
+                  </div>
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Домашніх робіт</div>
+                    <div class="admin-metric-value"><%= Number(monitorSummary.homework_total || 0) %></div>
+                  </div>
+                </div>
+                <% if (monitorCourseRows.length > 1) { %>
+                  <div class="table-responsive mb-3">
+                    <table class="table table-sm align-middle">
+                      <thead>
+                        <tr>
+                          <th>Курс</th>
+                          <th>Семестр</th>
+                          <th>Предмети</th>
+                          <th>Закрито</th>
+                          <th>Колонки</th>
+                          <th>Розклад</th>
+                          <th>ДЗ</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% monitorCourseRows.forEach(function(row) { %>
+                          <tr class="<%= monitorSelectedCourse && Number(monitorSelectedCourse.course_id) === Number(row.course_id) ? 'table-active' : '' %>">
+                            <td><%= row.course_name %></td>
+                            <td><%= row.active_semester_title || '—' %></td>
+                            <td><%= Number(row.subjects_total || 0) %></td>
+                            <td><%= Number(row.subjects_closed || 0) %> (<%= Number(row.subjects_closed_share || 0) %>%)</td>
+                            <td><%= Number(row.columns_locked || 0) %> / <%= Number(row.columns_total || 0) %></td>
+                            <td><%= Number(row.schedule_total || 0) %></td>
+                            <td><%= Number(row.homework_total || 0) %></td>
+                            <td class="text-end">
+                              <a class="btn btn-outline-secondary btn-sm" href="<%= monitorBasePath %>?course=<%= row.course_id %>#admin-deanery-monitoring">Відкрити</a>
+                            </td>
+                          </tr>
+                        <% }); %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% } %>
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                  <div class="fw-semibold">
+                    Предмети <%= monitorSelectedCourse && monitorSelectedCourse.course_name ? `— ${monitorSelectedCourse.course_name}` : '' %>
+                  </div>
+                  <% if (monitorSelectedCourse && monitorSelectedCourse.active_semester_title) { %>
+                    <span class="badge text-bg-secondary">Семестр: <%= monitorSelectedCourse.active_semester_title %></span>
+                  <% } %>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-striped align-middle">
+                    <thead>
+                      <tr>
+                        <th>Предмет</th>
+                        <th>Груп</th>
+                        <th>Студентів</th>
+                        <th>ДЗ</th>
+                        <th>Колонки</th>
+                        <th>Статус</th>
+                        <th>Закрив(ла)</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% if (!monitorSubjectRows.length) { %>
+                        <tr>
+                          <td colspan="8" class="text-muted">Немає даних для моніторингу предметів.</td>
+                        </tr>
+                      <% } %>
+                      <% monitorSubjectRows.forEach(function(row) { %>
+                        <tr>
+                          <td><%= row.subject_name %></td>
+                          <td><%= Number(row.group_count || 1) %></td>
+                          <td><%= Number(row.students_total || 0) %></td>
+                          <td><%= Number(row.homework_total || 0) %></td>
+                          <td><%= Number(row.columns_locked || 0) %> / <%= Number(row.columns_total || 0) %></td>
+                          <td>
+                            <span class="badge <%= row.is_closed ? 'text-bg-success' : 'text-bg-warning text-dark' %>"><%= row.status_label || (row.is_closed ? 'Закрито' : 'Відкрито') %></span>
+                          </td>
+                          <td class="small text-muted">
+                            <% if (row.is_closed) { %>
+                              <%= row.closed_by_name || '—' %><%= row.closed_at ? (' · ' + new Date(row.closed_at).toLocaleString('uk-UA')) : '' %>
+                            <% } else { %>
+                              —
+                            <% } %>
+                          </td>
+                          <td class="text-end">
+                            <a class="btn btn-outline-secondary btn-sm" href="/journal?subject_id=<%= row.subject_id %>">Журнал</a>
+                          </td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

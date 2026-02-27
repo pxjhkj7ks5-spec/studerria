@@ -6559,6 +6559,7 @@ const buildJournalEmptyStateViewModel = ({
   canManageAllSubjects: Boolean(canManageAllSubjects),
   subjectClosure: null,
   canCloseSubject: false,
+  canReopenSubject: false,
   selectedSemester: null,
   undoGrade: null,
   gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
@@ -10410,6 +10411,7 @@ const JOURNAL_SCORING_TYPE_META = {
 };
 const JOURNAL_GRADE_UNDO_SECONDS = 30;
 const JOURNAL_SUBJECT_CLOSE_EVENT_TYPE = 'closed';
+const JOURNAL_SUBJECT_REOPEN_EVENT_TYPE = 'reopened';
 const JOURNAL_SUBJECT_CLOSED_ERROR = 'Предмет закрито. Редагування журналу вимкнено.';
 const SEMESTER_ARCHIVE_UPLOADS_DIR = 'semester-archives';
 const JOURNAL_RETAKE_KINDS = ['retake', 'makeup'];
@@ -12905,6 +12907,11 @@ app.get('/journal', requireLogin, async (req, res) => {
       && !subjectClosure.is_closed
       && (journalScope.fullAccess || selectedSubject.has_all_groups)
     );
+    const canReopenSubject = Boolean(
+      teacherJournalMode
+      && subjectClosure.is_closed
+      && (journalScope.fullAccess || selectedSubject.has_all_groups)
+    );
 
     let groupFilterSet = null;
     let studentFilterIds = [];
@@ -12953,6 +12960,7 @@ app.get('/journal', requireLogin, async (req, res) => {
       canManageAllSubjects: Boolean(journalScope.fullAccess),
       subjectClosure,
       canCloseSubject,
+      canReopenSubject,
       selectedSemester,
       undoGrade: canEditJournal ? undoGrade : null,
       gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
@@ -13494,6 +13502,214 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${exportFile.fileName}"`);
     return res.send(exportPayload.csv);
+  } catch (err) {
+    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
+  }
+});
+
+app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res) => {
+  const subjectId = Number(req.body.subject_id);
+  if (!Number.isFinite(subjectId) || subjectId < 1) {
+    return res.redirect('/journal?err=Invalid%20subject');
+  }
+
+  try {
+    await ensureDbReady();
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const subjectOptions = await getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode);
+    const selectedSubject = (subjectOptions || []).find((subject) => Number(subject.subject_id) === subjectId);
+    if (!selectedSubject) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+    if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
+      return res.redirect(
+        `/journal?subject_id=${subjectId}&err=${encodeURIComponent('Для повторного відкриття предмета потрібен доступ до всіх груп')}`
+      );
+    }
+
+    const selectedCourseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
+    const selectedSemester = await getActiveSemester(selectedCourseId);
+    const semesterId = selectedSemester ? Number(selectedSemester.id) : null;
+    await ensureSubjectGradingSettings(subjectId, selectedCourseId, semesterId, Number(req.session.user.id));
+    const subjectClosure = await getJournalSubjectClosureState(subjectId);
+    if (!subjectClosure.is_closed) {
+      return res.redirect(`/journal?subject_id=${subjectId}&ok=${encodeURIComponent('Предмет уже відкрито')}`);
+    }
+
+    const actorUserId = Number(req.session.user.id);
+    let reopenCompatibilityMode = false;
+    await withTransaction(async (client) => {
+      const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
+      let savepointCounter = 0;
+      const runCompatibilityQuery = async (sql, params = []) => {
+        savepointCounter += 1;
+        const savepointName = `journal_reopen_sp_${savepointCounter}`;
+        await client.query(`SAVEPOINT ${savepointName}`);
+        try {
+          await query(sql, params);
+          await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+          return true;
+        } catch (err) {
+          try {
+            await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          } catch (_rollbackErr) {
+            // Ignore savepoint rollback failures and rely on outer transaction rollback if needed.
+          }
+          try {
+            await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+          } catch (_releaseErr) {
+            // Ignore release failures after rollback.
+          }
+          if (!isDbSchemaCompatibilityError(err)) {
+            throw err;
+          }
+          reopenCompatibilityMode = true;
+          return false;
+        }
+      };
+
+      let settingsUpdated = await runCompatibilityQuery(
+        `
+          UPDATE subject_grading_settings
+          SET is_closed = FALSE,
+              closed_by = NULL,
+              closed_at = NULL,
+              updated_by = ?,
+              updated_at = NOW()
+          WHERE subject_id = ?
+        `,
+        [actorUserId, subjectId]
+      );
+      if (!settingsUpdated) {
+        settingsUpdated = await runCompatibilityQuery(
+          `
+            UPDATE subject_grading_settings
+            SET is_closed = 0,
+                closed_by = NULL,
+                closed_at = NULL,
+                updated_by = ?,
+                updated_at = NOW()
+            WHERE subject_id = ?
+          `,
+          [actorUserId, subjectId]
+        );
+      }
+      if (!settingsUpdated) {
+        reopenCompatibilityMode = true;
+      }
+
+      const buildUnlockWhereClause = ({ withSemester = true, withArchived = true } = {}) => {
+        const conditions = [
+          'jc.subject_id = ?',
+          'jc.course_id = ?',
+        ];
+        const params = [subjectId, selectedCourseId];
+        if (withSemester) {
+          const semesterFilter = buildExactSemesterCondition('jc', semesterId);
+          const semesterClause = String(semesterFilter?.clause || '')
+            .replace(/^\s*AND\s+/i, '')
+            .trim();
+          if (semesterClause) {
+            conditions.push(semesterClause);
+            params.push(...(Array.isArray(semesterFilter?.params) ? semesterFilter.params : []));
+          }
+        }
+        if (withArchived) {
+          conditions.push('COALESCE(jc.is_archived, 0) = 0');
+        }
+        return {
+          whereSql: conditions.join('\n              AND '),
+          whereParams: params,
+        };
+      };
+
+      const unlockVariants = [
+        {
+          setSql: `
+            SET is_locked = 0,
+                locked_by = NULL,
+                locked_at = NULL,
+                updated_at = NOW()
+          `,
+          setParams: [],
+          withSemester: true,
+          withArchived: true,
+        },
+        {
+          setSql: `
+            SET is_locked = 0,
+                updated_at = NOW()
+          `,
+          setParams: [],
+          withSemester: true,
+          withArchived: true,
+        },
+        {
+          setSql: 'SET is_locked = 0',
+          setParams: [],
+          withSemester: true,
+          withArchived: true,
+        },
+        {
+          setSql: 'SET is_locked = 0',
+          setParams: [],
+          withSemester: false,
+          withArchived: true,
+        },
+        {
+          setSql: 'SET is_locked = 0',
+          setParams: [],
+          withSemester: false,
+          withArchived: false,
+        },
+      ];
+
+      let unlockApplied = false;
+      for (const variant of unlockVariants) {
+        const where = buildUnlockWhereClause({
+          withSemester: variant.withSemester,
+          withArchived: variant.withArchived,
+        });
+        const ok = await runCompatibilityQuery(
+          `
+            UPDATE journal_columns jc
+            ${variant.setSql}
+            WHERE ${where.whereSql}
+          `,
+          [...variant.setParams, ...where.whereParams]
+        );
+        if (ok) {
+          unlockApplied = true;
+          break;
+        }
+      }
+      if (!unlockApplied) {
+        reopenCompatibilityMode = true;
+      }
+    });
+
+    logActivity(
+      db,
+      req,
+      'journal_subject_reopen',
+      'subject_grading_settings',
+      subjectId,
+      {
+        subject_id: subjectId,
+        event_type: JOURNAL_SUBJECT_REOPEN_EVENT_TYPE,
+        compatibility_mode: reopenCompatibilityMode ? 'fallback' : 'full',
+      },
+      selectedCourseId,
+      semesterId
+    );
+    return res.redirect(
+      `/journal?subject_id=${subjectId}&ok=${encodeURIComponent('Предмет повторно відкрито. Журнал розблоковано')}`
+    );
   } catch (err) {
     return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
   }
@@ -21149,10 +21365,10 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     const selectedCourse = selectedCourseId ? await getCourseById(selectedCourseId) : null;
     const uiHints = [];
     if (draftAction === 'new') {
-      uiHints.push(`Створено новий драфт генератора сесій #${draftRecord ? draftRecord.id : '—'}.`);
+      uiHints.push(`Створено новий план генератора сесій #${draftRecord ? draftRecord.id : '—'}.`);
     }
     if (previewCleared) {
-      uiHints.push(`Драфт #${draftRecord ? draftRecord.id : '—'} очищено до базових параметрів.`);
+      uiHints.push(`План #${draftRecord ? draftRecord.id : '—'} очищено до базових параметрів.`);
     }
     if (gradingSource === 'fallback') {
       uiHints.push('Налаштування grading для семестру не прочитались — типи контролю визначено евристично.');
@@ -26732,138 +26948,377 @@ app.get('/starosta', requireStaff, async (req, res) => {
   }
 });
 
-app.get('/deanery', requireDeanery, (req, res) => {
-  (async () => {
+async function buildDeaneryCourseMonitoringRow(course) {
+  const courseId = Number(course && course.id ? course.id : 0);
+  if (!Number.isFinite(courseId) || courseId < 1) return null;
+  const activeSemester = await getActiveSemester(courseId);
+  const semesterId = activeSemester ? Number(activeSemester.id) : null;
+  const scopeParams = semesterId ? [courseId, semesterId] : [courseId];
+  const safeGet = async (sql, params = [], fallback = {}) => {
     try {
-      await ensureDbReady();
+      return await db.get(sql, params);
     } catch (err) {
-      return handleDbError(res, err, 'deanery.init');
-    }
-    const baseCourseId = Number(req.session.user.course_id || 1);
-    let allCourses = [];
-    try {
-      allCourses = await getCoursesCached();
-    } catch (err) {
-      return handleDbError(res, err, 'deanery.courses');
-    }
-    const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, allCourses, getSessionRoleList(req));
-    if (!allowedCourses.length) {
-      return res.status(403).send('Forbidden (course access)');
-    }
-    const requestedCourse = Number(req.query.course);
-    let courseId = allowedCourseIds.has(requestedCourse) ? requestedCourse : baseCourseId;
-    if (allowedCourses.length && !allowedCourses.some((course) => Number(course.id) === Number(courseId))) {
-      courseId = Number(allowedCourses[0].id);
-    }
-    req.session.adminCourse = courseId;
-    const allowCourseSelect = allowedCourses.length > 1;
-    let allowedSections = null;
-    try {
-      allowedSections = await getRoleAllowedSectionsForRoleKeys(getSessionRoleList(req), 'deanery');
-    } catch (err) {
-      allowedSections = getRoleAllowedSections('deanery');
-    }
-    const { group_number, day, subject, sort_schedule, schedule_date } = req.query;
-    let activeSemester = null;
-    try {
-      activeSemester = await getActiveSemester(courseId);
-    } catch (err) {
-      return handleDbError(res, err, 'deanery.activeSemester');
-    }
-    const scheduleFilters = [];
-    const scheduleParams = [];
-    scheduleFilters.push('se.course_id = ?');
-    scheduleParams.push(courseId);
-    if (activeSemester) {
-      scheduleFilters.push('se.semester_id = ?');
-      scheduleParams.push(activeSemester.id);
-    }
-    if (group_number) {
-      scheduleFilters.push('se.group_number = ?');
-      scheduleParams.push(group_number);
-    }
-    if (day) {
-      scheduleFilters.push('se.day_of_week = ?');
-      scheduleParams.push(day);
-    }
-    if (subject) {
-      scheduleFilters.push('s.name LIKE ?');
-      scheduleParams.push(`%${subject}%`);
-    }
-    if (schedule_date && activeSemester && activeSemester.start_date) {
-      const mapped = getWeekDayForDate(schedule_date, activeSemester.start_date);
-      if (mapped) {
-        scheduleFilters.push('se.week_number = ?');
-        scheduleParams.push(mapped.weekNumber);
-        scheduleFilters.push('se.day_of_week = ?');
-        scheduleParams.push(mapped.dayName);
+      if (isDbSchemaCompatibilityError(err)) {
+        return fallback;
       }
+      throw err;
     }
-    const scheduleWhere = scheduleFilters.length ? `WHERE ${scheduleFilters.join(' AND ')}` : '';
-    const scheduleSql = `
-      SELECT se.*, s.name AS subject_name
-      FROM schedule_entries se
-      JOIN subjects s ON s.id = se.subject_id
-      ${scheduleWhere}
-      ORDER BY se.week_number, se.day_of_week, se.class_number
-    `;
-    const courses = allowedCourses;
-    db.all(
-      'SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC',
+  };
+
+  const [subjectStatsRow, scheduleStatsRow, homeworkStatsRow, columnStatsRow] = await Promise.all([
+    safeGet(
+      `
+        SELECT
+          COUNT(*) AS subjects_total,
+          COUNT(*) FILTER (WHERE COALESCE(sgs.is_closed, 0) = 1) AS subjects_closed
+        FROM subjects s
+        LEFT JOIN subject_grading_settings sgs ON sgs.subject_id = s.id
+        WHERE s.course_id = ?
+      `,
       [courseId],
-      (semErr, semesters) => {
-        if (semErr) {
-          return handleDbError(res, semErr, 'deanery.semesters');
-        }
-        db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId], (subjectErr, subjects) => {
-          if (subjectErr) {
-            return handleDbError(res, subjectErr, 'deanery.subjects');
-          }
-          db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
-            if (scheduleErr) {
-              return handleDbError(res, scheduleErr, 'deanery.schedule');
-            }
-            const schedule = sortSchedule(scheduleRows, sort_schedule);
-            try {
-              return res.render('admin', {
-                username: req.session.user.username,
-                userId: req.session.user.id,
-                role: 'deanery',
-                schedule,
-                homework: [],
-                users: [],
-                subjects,
-                studentGroups: [],
-                logs: [],
-                teamworkTasks: [],
-                adminMessages: [],
-                courses,
-                semesters,
-                activeSemester,
-                selectedCourseId: courseId,
-                limitedStaffView: true,
-                allowedSections,
-                allowCourseSelect,
-                filters: {
-                  group_number: group_number || '',
-                  day: day || '',
-                  subject: subject || '',
-                  schedule_date: schedule_date || '',
-                },
-                usersStatus: 'active',
-                sorts: {
-                  schedule: sort_schedule || '',
-                  homework: '',
-                },
-              });
-            } catch (renderErr) {
-              return handleDbError(res, renderErr, 'deanery.render');
-            }
-          });
-        });
-      }
+      { subjects_total: 0, subjects_closed: 0 }
+    ),
+    safeGet(
+      `
+        SELECT COUNT(*) AS schedule_total
+        FROM schedule_entries
+        WHERE course_id = ?${semesterId ? ' AND semester_id = ?' : ''}
+      `,
+      scopeParams,
+      { schedule_total: 0 }
+    ),
+    safeGet(
+      `
+        SELECT COUNT(*) AS homework_total
+        FROM homework
+        WHERE course_id = ?${semesterId ? ' AND semester_id = ?' : ''}
+      `,
+      scopeParams,
+      { homework_total: 0 }
+    ),
+    safeGet(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE COALESCE(is_archived, 0) = 0) AS columns_total,
+          COUNT(*) FILTER (WHERE COALESCE(is_archived, 0) = 0 AND COALESCE(is_locked, 0) = 1) AS columns_locked
+        FROM journal_columns
+        WHERE course_id = ?${semesterId ? ' AND semester_id = ?' : ''}
+      `,
+      scopeParams,
+      { columns_total: 0, columns_locked: 0 }
+    ),
+  ]);
+
+  const subjectsTotal = Number(subjectStatsRow && subjectStatsRow.subjects_total ? subjectStatsRow.subjects_total : 0);
+  const subjectsClosed = Number(subjectStatsRow && subjectStatsRow.subjects_closed ? subjectStatsRow.subjects_closed : 0);
+  const columnsTotal = Number(columnStatsRow && columnStatsRow.columns_total ? columnStatsRow.columns_total : 0);
+  const columnsLocked = Number(columnStatsRow && columnStatsRow.columns_locked ? columnStatsRow.columns_locked : 0);
+  return {
+    course_id: courseId,
+    course_name: String(course && course.name ? course.name : `Course ${courseId}`),
+    active_semester_id: semesterId,
+    active_semester_title: activeSemester ? String(activeSemester.title || '') : '',
+    active_semester_weeks: activeSemester ? Number(activeSemester.weeks_count || 0) : 0,
+    subjects_total: subjectsTotal,
+    subjects_closed: subjectsClosed,
+    subjects_open: Math.max(0, subjectsTotal - subjectsClosed),
+    subjects_closed_share: subjectsTotal ? Math.round((subjectsClosed / subjectsTotal) * 100) : 0,
+    schedule_total: Number(scheduleStatsRow && scheduleStatsRow.schedule_total ? scheduleStatsRow.schedule_total : 0),
+    homework_total: Number(homeworkStatsRow && homeworkStatsRow.homework_total ? homeworkStatsRow.homework_total : 0),
+    columns_total: columnsTotal,
+    columns_locked: columnsLocked,
+    columns_locked_share: columnsTotal ? Math.round((columnsLocked / columnsTotal) * 100) : 0,
+  };
+}
+
+async function buildDeanerySubjectMonitoringRows(courseId, semesterId) {
+  const safeCourseId = Number(courseId || 0);
+  if (!Number.isFinite(safeCourseId) || safeCourseId < 1) return [];
+  const safeSemesterId = Number.isFinite(Number(semesterId)) ? Number(semesterId) : null;
+  const homeworkSemesterClause = safeSemesterId ? 'AND h.semester_id = ?' : '';
+  const columnSemesterClause = safeSemesterId ? 'AND jc.semester_id = ?' : '';
+  const params = [
+    safeCourseId,
+    ...(safeSemesterId ? [safeSemesterId] : []),
+    safeCourseId,
+    ...(safeSemesterId ? [safeSemesterId] : []),
+    safeCourseId,
+  ];
+  let rows = [];
+  try {
+    rows = await db.all(
+      `
+        SELECT
+          s.id AS subject_id,
+          s.name AS subject_name,
+          COALESCE(s.group_count, 1) AS group_count,
+          COALESCE(sgs.is_closed, 0) AS is_closed,
+          sgs.closed_at,
+          u.full_name AS closed_by_name,
+          COALESCE(st.students_total, 0) AS students_total,
+          COALESCE(hw.homework_total, 0) AS homework_total,
+          COALESCE(cols.columns_total, 0) AS columns_total,
+          COALESCE(cols.columns_locked, 0) AS columns_locked
+        FROM subjects s
+        LEFT JOIN subject_grading_settings sgs ON sgs.subject_id = s.id
+        LEFT JOIN users u ON u.id = sgs.closed_by
+        LEFT JOIN (
+          SELECT sg.subject_id, COUNT(DISTINCT sg.student_id) AS students_total
+          FROM student_groups sg
+          GROUP BY sg.subject_id
+        ) st ON st.subject_id = s.id
+        LEFT JOIN (
+          SELECT h.subject_id, COUNT(*) AS homework_total
+          FROM homework h
+          WHERE h.course_id = ? ${homeworkSemesterClause}
+          GROUP BY h.subject_id
+        ) hw ON hw.subject_id = s.id
+        LEFT JOIN (
+          SELECT
+            jc.subject_id,
+            COUNT(*) FILTER (WHERE COALESCE(jc.is_archived, 0) = 0) AS columns_total,
+            COUNT(*) FILTER (WHERE COALESCE(jc.is_archived, 0) = 0 AND COALESCE(jc.is_locked, 0) = 1) AS columns_locked
+          FROM journal_columns jc
+          WHERE jc.course_id = ? ${columnSemesterClause}
+          GROUP BY jc.subject_id
+        ) cols ON cols.subject_id = s.id
+        WHERE s.course_id = ?
+        ORDER BY COALESCE(sgs.is_closed, 0) DESC, s.name ASC
+      `,
+      params
     );
-  })();
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    rows = await db.all(
+      `
+        SELECT
+          s.id AS subject_id,
+          s.name AS subject_name,
+          COALESCE(s.group_count, 1) AS group_count
+        FROM subjects s
+        WHERE s.course_id = ?
+        ORDER BY s.name ASC
+      `,
+      [safeCourseId]
+    );
+  }
+  return (rows || []).map((row) => {
+    const columnsTotal = Number(row.columns_total || 0);
+    const columnsLocked = Number(row.columns_locked || 0);
+    const closedFlag = Number(row.is_closed || 0) === 1;
+    return {
+      subject_id: Number(row.subject_id || 0),
+      subject_name: String(row.subject_name || 'Предмет'),
+      group_count: Number(row.group_count || 1),
+      is_closed: closedFlag,
+      status_label: closedFlag ? 'Закрито' : 'Відкрито',
+      closed_at: row.closed_at || null,
+      closed_by_name: row.closed_by_name || '',
+      students_total: Number(row.students_total || 0),
+      homework_total: Number(row.homework_total || 0),
+      columns_total: columnsTotal,
+      columns_locked: columnsLocked,
+      columns_locked_share: columnsTotal ? Math.round((columnsLocked / columnsTotal) * 100) : 0,
+    };
+  });
+}
+
+async function buildDeaneryMonitoringSnapshot(allowedCourses = [], selectedCourseId = null) {
+  const normalizedCourses = Array.isArray(allowedCourses) ? allowedCourses : [];
+  const base = {
+    generated_at: new Date().toISOString(),
+    selected_course_id: null,
+    selected_course: null,
+    courses: [],
+    subjects: [],
+    summary: {
+      subjects_total: 0,
+      subjects_closed: 0,
+      subjects_open: 0,
+      columns_total: 0,
+      columns_locked: 0,
+      students_assignments_total: 0,
+      homework_total: 0,
+    },
+  };
+  if (!normalizedCourses.length) {
+    return base;
+  }
+
+  const courseRows = (await Promise.all(normalizedCourses.map((course) => buildDeaneryCourseMonitoringRow(course))))
+    .filter(Boolean);
+  if (!courseRows.length) {
+    return base;
+  }
+
+  const requestedCourseId = Number(selectedCourseId);
+  const selectedCourse = courseRows.find((row) => Number(row.course_id) === requestedCourseId) || courseRows[0];
+  const subjects = await buildDeanerySubjectMonitoringRows(
+    selectedCourse.course_id,
+    selectedCourse.active_semester_id
+  );
+  const summary = subjects.reduce((acc, row) => {
+    acc.subjects_total += 1;
+    if (row.is_closed) {
+      acc.subjects_closed += 1;
+    } else {
+      acc.subjects_open += 1;
+    }
+    acc.columns_total += Number(row.columns_total || 0);
+    acc.columns_locked += Number(row.columns_locked || 0);
+    acc.students_assignments_total += Number(row.students_total || 0);
+    acc.homework_total += Number(row.homework_total || 0);
+    return acc;
+  }, {
+    subjects_total: 0,
+    subjects_closed: 0,
+    subjects_open: 0,
+    columns_total: 0,
+    columns_locked: 0,
+    students_assignments_total: 0,
+    homework_total: 0,
+  });
+
+  return {
+    generated_at: new Date().toISOString(),
+    selected_course_id: Number(selectedCourse.course_id),
+    selected_course: selectedCourse,
+    courses: courseRows.sort((a, b) => String(a.course_name).localeCompare(String(b.course_name))),
+    subjects,
+    summary,
+  };
+}
+
+app.get('/deanery', requireDeanery, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'deanery.init');
+  }
+
+  const baseCourseId = Number(req.session.user.course_id || 1);
+  let allCourses = [];
+  try {
+    allCourses = await getCoursesCached();
+  } catch (err) {
+    return handleDbError(res, err, 'deanery.courses');
+  }
+
+  const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, allCourses, getSessionRoleList(req));
+  if (!allowedCourses.length) {
+    return res.status(403).send('Forbidden (course access)');
+  }
+
+  const requestedCourse = Number(req.query.course);
+  let courseId = allowedCourseIds.has(requestedCourse) ? requestedCourse : baseCourseId;
+  if (allowedCourses.length && !allowedCourses.some((course) => Number(course.id) === Number(courseId))) {
+    courseId = Number(allowedCourses[0].id);
+  }
+  req.session.adminCourse = courseId;
+  const allowCourseSelect = allowedCourses.length > 1;
+
+  let allowedSections = null;
+  try {
+    allowedSections = await getRoleAllowedSectionsForRoleKeys(getSessionRoleList(req), 'deanery');
+  } catch (err) {
+    allowedSections = getRoleAllowedSections('deanery');
+  }
+
+  const { group_number, day, subject, sort_schedule, schedule_date } = req.query;
+  let activeSemester = null;
+  try {
+    activeSemester = await getActiveSemester(courseId);
+  } catch (err) {
+    return handleDbError(res, err, 'deanery.activeSemester');
+  }
+
+  const scheduleFilters = [];
+  const scheduleParams = [];
+  scheduleFilters.push('se.course_id = ?');
+  scheduleParams.push(courseId);
+  if (activeSemester) {
+    scheduleFilters.push('se.semester_id = ?');
+    scheduleParams.push(activeSemester.id);
+  }
+  if (group_number) {
+    scheduleFilters.push('se.group_number = ?');
+    scheduleParams.push(group_number);
+  }
+  if (day) {
+    scheduleFilters.push('se.day_of_week = ?');
+    scheduleParams.push(day);
+  }
+  if (subject) {
+    scheduleFilters.push('s.name LIKE ?');
+    scheduleParams.push(`%${subject}%`);
+  }
+  if (schedule_date && activeSemester && activeSemester.start_date) {
+    const mapped = getWeekDayForDate(schedule_date, activeSemester.start_date);
+    if (mapped) {
+      scheduleFilters.push('se.week_number = ?');
+      scheduleParams.push(mapped.weekNumber);
+      scheduleFilters.push('se.day_of_week = ?');
+      scheduleParams.push(mapped.dayName);
+    }
+  }
+  const scheduleWhere = scheduleFilters.length ? `WHERE ${scheduleFilters.join(' AND ')}` : '';
+  const scheduleSql = `
+    SELECT se.*, s.name AS subject_name
+    FROM schedule_entries se
+    JOIN subjects s ON s.id = se.subject_id
+    ${scheduleWhere}
+    ORDER BY se.week_number, se.day_of_week, se.class_number
+  `;
+
+  try {
+    const [semesters, subjects, scheduleRows, deaneryMonitoring] = await Promise.all([
+      db.all('SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC', [courseId]),
+      db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId]),
+      db.all(scheduleSql, scheduleParams),
+      buildDeaneryMonitoringSnapshot(allowedCourses, courseId),
+    ]);
+    const schedule = sortSchedule(scheduleRows, sort_schedule);
+    return res.render('admin', {
+      username: req.session.user.username,
+      userId: req.session.user.id,
+      role: 'deanery',
+      schedule,
+      homework: [],
+      users: [],
+      subjects,
+      studentGroups: [],
+      logs: [],
+      teamworkTasks: [],
+      adminMessages: [],
+      courses: allowedCourses,
+      semesters,
+      activeSemester,
+      selectedCourseId: courseId,
+      limitedStaffView: true,
+      allowedSections,
+      allowCourseSelect,
+      deaneryMonitoring,
+      filters: {
+        group_number: group_number || '',
+        day: day || '',
+        subject: subject || '',
+        schedule_date: schedule_date || '',
+      },
+      usersStatus: 'active',
+      sorts: {
+        schedule: sort_schedule || '',
+        homework: '',
+      },
+      messages: {
+        error: req.query.err || '',
+        success: req.query.ok || '',
+      },
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'deanery.render');
+  }
 });
 
 app.post('/subgroup/join', requireLogin, (req, res) => {
