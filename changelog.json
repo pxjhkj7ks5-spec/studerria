@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.21",
+      "date": "2026-02-28",
+      "items": [
+        "fix(schedule-list): switched dropdowns to native select rendering to remove repeated chevron tiling artifacts",
+        "feat(schedule-list): added footer Changelog trigger and release modal to the schedule list page"
+      ]
+    },
+    {
       "version": "1.0.20",
       "date": "2026-02-27",
       "items": [
