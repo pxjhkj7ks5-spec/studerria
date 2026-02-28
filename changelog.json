@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.27",
+      "date": "2026-02-28",
+      "items": [
+        "fix(analytics-chart): added automatic fallback to include-admin analytics data when \"Без адмінів\" filter returns an empty dataset",
+        "ux(analytics): visit chart/cards/top pages/roles now show fallback stats with a clear hint instead of rendering a flat zero chart"
+      ]
+    },
+    {
       "version": "1.0.26",
       "date": "2026-02-28",
       "items": [

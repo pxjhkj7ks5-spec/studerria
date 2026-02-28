@@ -24045,6 +24045,110 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
         ? db.all(recentFallbackSql, [courseId, sinceIso])
         : Promise.resolve([]),
     ]);
+    const normalizeSummary = (row) => ({
+      total_visits: Number(row?.total_visits || 0),
+      unique_visitors: Number(row?.unique_visitors || 0),
+      signed_users: Number(row?.signed_users || 0),
+      active_days: Number(row?.active_days || 0),
+    });
+    const mapDailyByLabels = (rows) => {
+      const map = new Map();
+      (rows || []).forEach((row) => {
+        const key = row && row.day ? String(row.day).slice(0, 10) : '';
+        if (!key) return;
+        map.set(key, {
+          visits: Number(row.visits || 0),
+          unique_visitors: Number(row.unique_visitors || 0),
+        });
+      });
+      return labels.map((day) => {
+        const value = map.get(day) || { visits: 0, unique_visitors: 0 };
+        return {
+          day,
+          visits: value.visits,
+          unique_visitors: value.unique_visitors,
+        };
+      });
+    };
+    const normalizeTopPages = (rows) => (rows || []).map((row) => ({
+      page_key: String(row.page_key || 'unknown'),
+      visits: Number(row.visits || 0),
+      unique_visitors: Number(row.unique_visitors || 0),
+    }));
+    const normalizeRoles = (rows) => (rows || []).map((row) => ({
+      role_key: String(row.role_key || 'guest'),
+      visits: Number(row.visits || 0),
+    }));
+    const summary = normalizeSummary(summaryRow);
+    let summaryFallback = null;
+    let dailyFallback = [];
+    let topPagesFallback = [];
+    let rolesFallback = [];
+    let analyticsUsedFallback = false;
+    if (excludeAdmin && summary.total_visits === 0) {
+      const [summaryFallbackRow, dailyFallbackRows, topPagesFallbackRows, roleFallbackRows] = await Promise.all([
+        db.get(
+          `
+            SELECT
+              COUNT(*)::int AS total_visits,
+              COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors,
+              COUNT(DISTINCT v.user_id)::int AS signed_users,
+              COUNT(DISTINCT DATE(v.created_at))::int AS active_days
+            FROM site_visit_events v
+            WHERE v.course_id = ?
+              AND v.created_at >= ?
+          `,
+          [courseId, sinceIso]
+        ),
+        db.all(
+          `
+            SELECT
+              DATE(v.created_at) AS day,
+              COUNT(*)::int AS visits,
+              COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
+            FROM site_visit_events v
+            WHERE v.course_id = ?
+              AND v.created_at >= ?
+            GROUP BY DATE(v.created_at)
+            ORDER BY day ASC
+          `,
+          [courseId, sinceIso]
+        ),
+        db.all(
+          `
+            SELECT
+              v.page_key,
+              COUNT(*)::int AS visits,
+              COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
+            FROM site_visit_events v
+            WHERE v.course_id = ?
+              AND v.created_at >= ?
+            GROUP BY v.page_key
+            ORDER BY visits DESC, v.page_key ASC
+            LIMIT 8
+          `,
+          [courseId, sinceIso]
+        ),
+        db.all(
+          `
+            SELECT
+              COALESCE(NULLIF(v.role_key, ''), 'guest') AS role_key,
+              COUNT(*)::int AS visits
+            FROM site_visit_events v
+            WHERE v.course_id = ?
+              AND v.created_at >= ?
+            GROUP BY COALESCE(NULLIF(v.role_key, ''), 'guest')
+            ORDER BY visits DESC, role_key ASC
+          `,
+          [courseId, sinceIso]
+        ),
+      ]);
+      summaryFallback = normalizeSummary(summaryFallbackRow);
+      dailyFallback = mapDailyByLabels(dailyFallbackRows);
+      topPagesFallback = normalizeTopPages(topPagesFallbackRows);
+      rolesFallback = normalizeRoles(roleFallbackRows);
+      analyticsUsedFallback = Number(summaryFallback.total_visits || 0) > 0;
+    }
     let homeworkSla = null;
     try {
       homeworkSla = await buildAdminHomeworkReviewSla({
@@ -24058,23 +24162,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       homeworkSla = null;
     }
 
-    const dailyMap = new Map();
-    (dailyRows || []).forEach((row) => {
-      const key = row && row.day ? String(row.day).slice(0, 10) : '';
-      if (!key) return;
-      dailyMap.set(key, {
-        visits: Number(row.visits || 0),
-        unique_visitors: Number(row.unique_visitors || 0),
-      });
-    });
-    const daily = labels.map((day) => {
-      const value = dailyMap.get(day) || { visits: 0, unique_visitors: 0 };
-      return {
-        day,
-        visits: value.visits,
-        unique_visitors: value.unique_visitors,
-      };
-    });
+    const daily = mapDailyByLabels(dailyRows);
 
     const normalizedRecent = (recentRows || []).map((row) => ({
       created_at: row.created_at,
@@ -24101,22 +24189,15 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       days,
       course_id: courseId,
       exclude_admin: excludeAdmin,
-      summary: {
-        total_visits: Number(summaryRow?.total_visits || 0),
-        unique_visitors: Number(summaryRow?.unique_visitors || 0),
-        signed_users: Number(summaryRow?.signed_users || 0),
-        active_days: Number(summaryRow?.active_days || 0),
-      },
+      summary,
+      summary_fallback: summaryFallback,
+      analytics_used_fallback: analyticsUsedFallback,
       daily,
-      top_pages: (topPagesRows || []).map((row) => ({
-        page_key: String(row.page_key || 'unknown'),
-        visits: Number(row.visits || 0),
-        unique_visitors: Number(row.unique_visitors || 0),
-      })),
-      roles: (roleRows || []).map((row) => ({
-        role_key: String(row.role_key || 'guest'),
-        visits: Number(row.visits || 0),
-      })),
+      daily_fallback: dailyFallback,
+      top_pages: normalizeTopPages(topPagesRows),
+      top_pages_fallback: topPagesFallback,
+      roles: normalizeRoles(roleRows),
+      roles_fallback: rolesFallback,
       recent: normalizedRecent,
       recent_fallback: normalizedRecentFallback,
       recent_is_fallback: recentIsFallback,

@@ -5644,16 +5644,30 @@
           if (!data || !data.ok) {
             throw new Error('Analytics payload invalid');
           }
-          if (visitMetricTotal) visitMetricTotal.textContent = formatVisitNumber(data.summary && data.summary.total_visits);
-          if (visitMetricUnique) visitMetricUnique.textContent = formatVisitNumber(data.summary && data.summary.unique_visitors);
-          if (visitMetricSigned) visitMetricSigned.textContent = formatVisitNumber(data.summary && data.summary.signed_users);
-          if (visitMetricDays) visitMetricDays.textContent = formatVisitNumber(data.summary && data.summary.active_days);
-          renderVisitChart(data.daily || []);
-          renderVisitTopPages(data.top_pages || []);
-          renderVisitRoles(data.roles || []);
+          const useAnalyticsFallback = Boolean(
+            data.exclude_admin
+            && data.analytics_used_fallback
+            && data.summary_fallback
+            && Number(data.summary_fallback.total_visits || 0) > 0
+          );
+          const summarySource = useAnalyticsFallback ? (data.summary_fallback || {}) : (data.summary || {});
+          const dailySource = useAnalyticsFallback ? (data.daily_fallback || []) : (data.daily || []);
+          const topPagesSource = useAnalyticsFallback ? (data.top_pages_fallback || []) : (data.top_pages || []);
+          const rolesSource = useAnalyticsFallback ? (data.roles_fallback || []) : (data.roles || []);
+
+          if (visitMetricTotal) visitMetricTotal.textContent = formatVisitNumber(summarySource.total_visits);
+          if (visitMetricUnique) visitMetricUnique.textContent = formatVisitNumber(summarySource.unique_visitors);
+          if (visitMetricSigned) visitMetricSigned.textContent = formatVisitNumber(summarySource.signed_users);
+          if (visitMetricDays) visitMetricDays.textContent = formatVisitNumber(summarySource.active_days);
+          renderVisitChart(dailySource);
+          renderVisitTopPages(topPagesSource);
+          renderVisitRoles(rolesSource);
           const recentFilteredRows = Array.isArray(data.recent) ? data.recent : [];
           const recentFallbackRows = Array.isArray(data.recent_fallback) ? data.recent_fallback : [];
-          if (!recentFilteredRows.length && data.recent_is_fallback && recentFallbackRows.length) {
+          if (useAnalyticsFallback && recentFallbackRows.length) {
+            setVisitRecentHint('Без адмінів порожньо, показано статистику і останні візити з адмінами.');
+            renderVisitRecent(recentFallbackRows);
+          } else if (!recentFilteredRows.length && data.recent_is_fallback && recentFallbackRows.length) {
             setVisitRecentHint('Без адмінів порожньо, показано останні візити з адмінами.');
             renderVisitRecent(recentFallbackRows);
           } else {
