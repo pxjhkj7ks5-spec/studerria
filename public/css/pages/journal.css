@@ -329,11 +329,40 @@ body.theme-dark.page-journal .journal-attendance-table thead th {
   color: var(--ds-text2);
 }
 
+body.theme-light.page-journal .journal-config-table,
+body.theme-light.page-journal .journal-table,
+body.theme-light.page-journal .journal-attendance-table {
+  --bs-table-bg: rgba(255, 255, 255, 0.88);
+  --bs-table-color: #0f172a;
+  --bs-table-border-color: rgba(148, 163, 184, 0.44);
+  --bs-table-striped-bg: rgba(15, 23, 42, 0.045);
+}
+
+body.theme-light.page-journal .journal-config-table > :not(caption) > * > *,
+body.theme-light.page-journal .journal-table > :not(caption) > * > *,
+body.theme-light.page-journal .journal-attendance-table > :not(caption) > * > * {
+  background: transparent !important;
+  color: #0f172a;
+}
+
+body.theme-light.page-journal .journal-config-table thead th,
+body.theme-light.page-journal .journal-table thead th,
+body.theme-light.page-journal .journal-attendance-table thead th {
+  color: rgba(51, 65, 85, 0.92);
+}
+
 .page-journal .journal-table-wrap {
   overflow: auto;
   border-radius: 16px;
   border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
   background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+body.theme-light.page-journal .journal-table-wrap,
+body.theme-light.page-journal .journal-config-table-wrap,
+body.theme-light.page-journal .journal-attendance-table-wrap {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(148, 163, 184, 0.42);
 }
 
 .page-journal .journal-table {
@@ -370,6 +399,10 @@ body.theme-dark.page-journal .journal-attendance-table thead th {
   color: var(--ds-text2);
 }
 
+body.theme-light.page-journal .journal-col-meta {
+  color: rgba(51, 65, 85, 0.9);
+}
+
 .page-journal .journal-col-meta .status-chip {
   min-height: 1.2rem;
   padding: 0.14rem 0.48rem;
@@ -392,6 +425,24 @@ body.theme-dark.page-journal .journal-attendance-table thead th {
   background: rgba(239, 68, 68, 0.14);
   border-color: rgba(239, 68, 68, 0.42);
   color: #ffc0c0;
+}
+
+body.theme-light.page-journal .status-chip--success {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(22, 163, 74, 0.42);
+  color: #166534;
+}
+
+body.theme-light.page-journal .status-chip--warning {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(217, 119, 6, 0.45);
+  color: #92400e;
+}
+
+body.theme-light.page-journal .status-chip--danger {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(220, 38, 38, 0.44);
+  color: #991b1b;
 }
 
 .page-journal .journal-col-actions {
@@ -445,6 +496,15 @@ body.theme-dark.page-journal .journal-attendance-table thead th {
   font-size: 0.78rem;
 }
 
+body.theme-light.page-journal .journal-student-meta,
+body.theme-light.page-journal .journal-final-meta,
+body.theme-light.page-journal .journal-retake-item-meta,
+body.theme-light.page-journal .journal-appeal-item-meta,
+body.theme-light.page-journal .journal-moderation-meta,
+body.theme-light.page-journal .journal-competency-meta {
+  color: rgba(51, 65, 85, 0.9);
+}
+
 .page-journal .journal-cell {
   min-width: 110px;
 }
@@ -458,6 +518,12 @@ body.theme-dark.page-journal .journal-attendance-table thead th {
   background: color-mix(in srgb, var(--surface-soft) 86%, transparent);
   color: var(--ds-text0);
   transition: transform var(--dur-fast) var(--ease-apple), box-shadow var(--dur-fast) var(--ease-apple), border-color var(--dur-fast) var(--ease-apple);
+}
+
+body.theme-light.page-journal .journal-cell-btn {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(148, 163, 184, 0.38);
+  color: #0f172a;
 }
 
 .page-journal .journal-cell-btn:hover {
@@ -489,6 +555,11 @@ body.theme-dark.page-journal .journal-attendance-table thead th {
   background: color-mix(in srgb, var(--surface-soft) 92%, transparent);
 }
 
+body.theme-light.page-journal .journal-cell-btn.is-missing {
+  border-color: rgba(148, 163, 184, 0.46);
+  background: rgba(241, 245, 249, 0.94);
+}
+
 .page-journal .journal-cell-btn.is-locked {
   opacity: 0.78;
   border-style: dashed;
@@ -501,6 +572,10 @@ body.theme-dark.page-journal .journal-attendance-table thead th {
   z-index: 3;
   background: color-mix(in srgb, var(--surface-bg) 88%, transparent);
   min-width: 135px;
+}
+
+body.theme-light.page-journal .final-col {
+  background: rgba(248, 250, 252, 0.96);
 }
 
 .page-journal .journal-final-cell {
@@ -755,6 +830,19 @@ body.theme-dark.page-journal .journal-attendance-table thead th {
 
 .page-journal .journal-feedback-templates .btn {
   border-radius: 999px;
+}
+
+body.theme-light.page-journal .text-muted,
+body.theme-light.page-journal .small,
+body.theme-light.page-journal .form-text,
+body.theme-light.page-journal small {
+  color: rgba(51, 65, 85, 0.9) !important;
+}
+
+body.theme-light.page-journal .alert-success {
+  border-color: rgba(22, 163, 74, 0.36);
+  background: rgba(34, 197, 94, 0.14);
+  color: #166534;
 }
 
 .page-journal .journal-bulk-preview {

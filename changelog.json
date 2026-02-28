@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.30",
+      "date": "2026-02-28",
+      "items": [
+        "ux(journal-light-theme): increased contrast for text, chips, table headers, and grade cells in light theme",
+        "fix(journal-light-theme): status chips (success/warning/danger) now use readable dark text and stronger borders",
+        "ux(journal): improved light-theme card/table surfaces and success alert readability"
+      ]
+    },
+    {
       "version": "1.0.29",
       "date": "2026-02-28",
       "items": [
