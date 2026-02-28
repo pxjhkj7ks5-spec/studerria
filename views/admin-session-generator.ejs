@@ -858,6 +858,16 @@
         </div>
 
         <div class="col-12 col-xl-8">
+          <% const assessmentItems = ((preview && preview.timelineItems) || [])
+            .filter(function(item) {
+              return item && item.kind === 'assessment' && (item.type === 'exam' || item.type === 'credit');
+            })
+            .sort(function(a, b) {
+              const byDate = String(a.date || '').localeCompare(String(b.date || ''));
+              if (byDate !== 0) return byDate;
+              if (a.type !== b.type) return a.type === 'exam' ? -1 : 1;
+              return String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
+            }); %>
           <% if (preview && preview.warnings && preview.warnings.length) { %>
             <div class="d-grid gap-2 mb-3">
               <% preview.warnings.forEach(function(w) { %>
@@ -877,222 +887,110 @@
           <div class="card liquid-panel mb-4">
             <div class="card-body">
               <div class="panel-title-row">
-                <h5>Планувальник слотів</h5>
-                <span class="session-subtle">вільні слоти + вибір подій</span>
+                <h5>Що буде опубліковано</h5>
+                <span class="session-subtle">Екзамени та заліки з цього превʼю</span>
               </div>
-              <% if (!(slotBoard && slotBoard.length)) { %>
-                <div class="timeline-empty">Немає сесійного вікна для побудови слотів.</div>
-              <% } else { %>
-                <div class="row g-3">
-                  <div class="col-12 col-lg-4">
-                    <div class="planner-queue" id="plannerQueue">
-                      <div class="small text-muted mb-2">Події сесії (клікни подію, потім вільний слот)</div>
-                      <% if (!(plannerItems && plannerItems.length)) { %>
-                        <div class="timeline-empty">Спочатку згенеруй сесію, щоб побачити перелік подій.</div>
-                      <% } else { %>
-                        <div class="d-grid gap-2">
-                          <% plannerItems.forEach(function(item) { %>
-                            <button
-                              type="button"
-                              class="planner-event-btn"
-                              data-planner-event-id="<%= item.uid %>"
-                              data-planner-event-label="<%= item.label %>"
-                              data-planner-event-kind="<%= item.kind %>"
-                            >
-                              <span class="planner-event-main"><%= item.label %></span>
-                              <% if (item.group_label) { %>
-                                <span class="planner-event-sub"><%= item.group_label %></span>
-                              <% } %>
-                              <% if (item.marks && item.marks.length) { %>
-                                <span class="planner-event-marks">
-                                  <% item.marks.forEach(function(mark) { %>
-                                    <span class="mark-pill <%= mark === 'EX' ? 'exam' : (mark === 'CR' ? 'credit' : (mark === 'DIF' ? 'accent' : (mark === 'CONS' ? 'muted' : (mark === 'RET' ? 'danger' : (mark === 'RES' || mark === 'CAP' ? 'warn' : 'info'))))) %>"><%= mark %></span>
-                                  <% }); %>
-                                </span>
-                              <% } %>
-                            </button>
-                          <% }); %>
-                        </div>
-                      <% } %>
-                    </div>
-                  </div>
-                  <div class="col-12 col-lg-8">
-                    <div class="slot-board d-grid gap-2" id="slotBoard">
-                      <% slotBoard.forEach(function(day) { %>
-                        <div class="slot-day-card">
-                          <div class="slot-day-head">
-                            <div>
-                              <div class="fw-semibold"><%= day.date %></div>
-                              <div class="small text-muted">
-                                <%= day.day_short %> · <%= day.day_name || '—' %>
-                                <% if (day.week_number) { %> · Тиждень <%= day.week_number %><% } %>
-                              </div>
-                            </div>
-                            <div class="small text-muted">вільно <%= day.free_count %>/7</div>
-                          </div>
-                          <div class="slot-row-grid">
-                            <% day.slots.forEach(function(slot) { %>
-                              <% const busyTitle = slot.is_busy && slot.busy && slot.busy.length ? slot.busy.map(function(b) { return (b.subject_name || 'Пара') + (b.lesson_type ? (' · ' + b.lesson_type) : '') + (b.group_number ? (' · гр.' + b.group_number) : ''); }).join(' | ') : ''; %>
-                              <button
-                                type="button"
-                                class="slot-cell <%= slot.is_busy ? 'is-busy' : 'is-free' %>"
-                                data-slot-cell
-                                data-slot-key="<%= day.date %>|<%= slot.class_number %>"
-                                data-slot-label="Пара <%= slot.class_number %> · <%= slot.time_label %>"
-                                <%= slot.is_busy ? 'disabled' : '' %>
-                                title="<%= slot.is_busy ? busyTitle : ('Вільний слот · ' + slot.time_label) %>"
-                              >
-                                <span class="slot-cell-top">#<%= slot.class_number %></span>
-                                <span class="slot-cell-time"><%= slot.time_label %></span>
-                                <span class="slot-cell-content"><%= slot.is_busy ? 'Зайнято' : 'Вільно' %></span>
-                              </button>
-                            <% }); %>
-                          </div>
-                        </div>
-                      <% }); %>
-                    </div>
-                    <div class="small text-muted mt-2">
-                      Клік по події -> клік по вільному слоту. Призначення поки локальне (в межах сторінки), без publish у БД.
-                    </div>
-                  </div>
-                </div>
-              <% } %>
-            </div>
-          </div>
-
-          <div class="card liquid-panel mb-4">
-            <div class="card-body">
-              <div class="panel-title-row">
-                <h5>Таймлайн сесії</h5>
-                <span class="session-subtle">
-                  Слоти: <%= preview && preview.stats ? preview.stats.used_slots : 0 %> / <%= preview && preview.stats ? preview.stats.capacity_total : 0 %>
-                  · вільно <%= preview && preview.stats ? preview.stats.free_slots : 0 %>
-                </span>
-              </div>
-              <% if (!(preview && preview.dayBuckets && preview.dayBuckets.length)) { %>
-                <div class="timeline-empty"><%= previewCleared ? 'План очищено. Налаштуйте параметри та згенеруйте сесію.' : 'Виберіть курс і параметри, щоб побачити превʼю.' %></div>
-              <% } else { %>
-                <div class="d-grid gap-2">
-                  <% preview.dayBuckets.forEach(function(day) { %>
-                    <div class="timeline-day">
-                      <div class="timeline-day-header <%= day.is_weekend ? 'is-weekend' : '' %> <%= day.is_reserved ? 'is-reserve' : '' %>">
-                        <div>
-                          <div class="timeline-day-title"><%= day.date %></div>
-                          <div class="timeline-day-subtitle"><%= day.day_label %></div>
-                        </div>
-                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                          <% if (day.is_extra_tail) { %>
-                            <span class="mark-pill danger">TAIL</span>
-                          <% } %>
-                          <% if (day.is_weekend) { %>
-                            <span class="mark-pill warn">WEEKEND</span>
-                          <% } %>
-                          <% if (day.is_reserved) { %>
-                            <span class="mark-pill accent">BUFFER</span>
-                          <% } %>
-                          <span class="session-chip" style="padding:0.25rem 0.55rem; font-size:0.76rem;">
-                            оцінювань <strong><%= day.assessment_count || 0 %>/<%= day.capacity || 0 %></strong>
-                          </span>
-                        </div>
-                      </div>
-                      <% if (!day.items || !day.items.length) { %>
-                        <div class="timeline-empty">Вільний день</div>
-                      <% } else { %>
-                        <div class="timeline-list">
-                          <% day.items.forEach(function(item) { %>
-                            <div class="timeline-item kind-<%= item.kind %> <%= item.kind === 'assessment' ? item.type : '' %>">
-                              <div class="timeline-item-top">
-                                <div>
-                                  <div class="timeline-item-title"><%= item.title || '' %></div>
-                                  <% if (item.subject_name) { %>
-                                    <div class="timeline-item-subject"><%= item.subject_name %></div>
-                                  <% } %>
-                                  <% if (item.group_label) { %>
-                                    <div class="timeline-item-meta"><%= item.group_label %></div>
-                                  <% } %>
-                                </div>
-                                <div class="text-end">
-                                  <% (item.marks || []).forEach(function(mark) { %>
-                                    <% const tone = mark === 'EX' ? 'exam' : (mark === 'CR' ? 'credit' : (mark === 'DIF' ? 'accent' : (mark === 'RET' ? 'danger' : (mark === 'RES' || mark === 'CAP' ? 'warn' : (mark === 'CONS' ? 'muted' : (String(mark).startsWith('G') ? 'info' : 'muted')))))); %>
-                                    <span class="mark-pill <%= tone %>"><%= mark %></span>
-                                  <% }); %>
-                                </div>
-                              </div>
-                              <% if (item.note) { %>
-                                <div class="timeline-note"><%= item.note %></div>
-                              <% } %>
-                            </div>
-                          <% }); %>
-                        </div>
-                      <% } %>
-                    </div>
-                  <% }); %>
-                </div>
-              <% } %>
-            </div>
-          </div>
-
-          <div class="card liquid-panel mb-4">
-            <div class="card-body">
-              <div class="panel-title-row">
-                <h5>Класифікація предметів (евристика)</h5>
-                <span class="session-subtle">Щоб швидко перевірити, що generator вгадав неправильно</span>
-              </div>
-              <% if (!(preview && preview.sourceRows && preview.sourceRows.length)) { %>
-                <div class="timeline-empty">Немає предметів для превʼю.</div>
+              <% if (!assessmentItems.length) { %>
+                <div class="timeline-empty"><%= previewCleared ? 'План очищено. Спочатку згенеруйте сесію.' : 'Немає подій для публікації.' %></div>
               <% } else { %>
                 <div class="subject-table-wrap">
-                  <table class="table table-sm table-striped align-middle subject-table">
+                  <table class="table table-sm align-middle subject-table">
                     <thead>
                       <tr>
-                        <th>#</th>
+                        <th>Дата</th>
                         <th>Предмет</th>
                         <th>Тип</th>
-                        <th>Scope</th>
-                        <th>Подій</th>
-                        <th>Позначки</th>
-                        <th>Причина</th>
+                        <th>Група</th>
+                        <th>Нотатка</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <% preview.sourceRows.forEach(function(row, idx) { %>
+                      <% assessmentItems.forEach(function(item) { %>
                         <tr>
-                          <td class="text-muted"><%= idx + 1 %></td>
-                          <td>
-                            <div class="fw-semibold"><%= row.subject_name %></div>
-                            <div class="small text-muted">group_count: <%= row.group_count %></div>
+                          <td class="small">
+                            <div class="fw-semibold"><%= item.date || '—' %></div>
+                            <div class="text-muted"><%= item.day_label || item.day_name || '' %></div>
                           </td>
                           <td>
-                            <span class="subject-type-chip <%= row.assessment_type === 'exam' ? 'exam' : 'credit' %>"><%= row.assessment_label %></span>
+                            <div class="fw-semibold"><%= item.subject_name || '—' %></div>
                           </td>
-                          <td><%= row.scope_label %></td>
-                          <td><%= row.events_count %></td>
                           <td>
-                            <% (row.marks || []).forEach(function(mark) { %>
-                              <% const tone = mark === 'EX' ? 'exam' : (mark === 'CR' ? 'credit' : (mark === 'DIF' ? 'accent' : 'muted')); %>
-                              <span class="mark-pill <%= tone %>"><%= mark %></span>
-                            <% }); %>
+                            <span class="mark-pill <%= item.type === 'credit' ? 'danger' : 'info' %>">
+                              <%= item.type === 'credit' ? 'Залік' : 'Екзамен' %>
+                            </span>
                           </td>
-                          <td class="small"><%= row.reason_text %></td>
+                          <td class="small"><%= item.group_label || 'Усі групи предмета' %></td>
+                          <td class="small"><%= item.note || '—' %></td>
                         </tr>
                       <% }); %>
                     </tbody>
                   </table>
                 </div>
               <% } %>
+
+              <div class="d-grid gap-2 mt-3">
+                <div class="liquid-alert warn">
+                  Після публікації кожен <strong>залік</strong> автоматично створює порожню колонку в журналі відповідного предмета.
+                </div>
+                <div class="liquid-alert info">
+                  У звичайному розкладі залік буде підсвічений окремим кольором, щоб одразу бачити сесійні події.
+                </div>
+              </div>
+
+              <form method="POST" action="/admin/session-generator/publish" class="mt-3 d-grid gap-2">
+                <input type="hidden" name="location" value="<%= activeLocation %>" />
+                <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
+                <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
+                <input type="hidden" name="draft_id" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
+                <input type="hidden" name="window_mode" value="<%= form && form.window_mode ? form.window_mode : 'days' %>" />
+                <input type="hidden" name="start_date" value="<%= form && form.start_date ? form.start_date : '' %>" />
+                <input type="hidden" name="session_days" value="<%= form && form.session_days ? form.session_days : '' %>" />
+                <input type="hidden" name="session_weeks_count" value="<%= form && form.session_weeks_count ? form.session_weeks_count : '' %>" />
+                <input type="hidden" name="session_weeks_set" value="<%= form && form.session_weeks_set ? form.session_weeks_set : '' %>" />
+                <input type="hidden" name="max_events_per_day" value="<%= form && form.max_events_per_day ? form.max_events_per_day : '' %>" />
+                <input type="hidden" name="reserve_every" value="<%= form && form.reserve_every ? form.reserve_every : '' %>" />
+                <input type="hidden" name="exam_gap_days" value="<%= form && form.exam_gap_days ? form.exam_gap_days : '' %>" />
+                <input type="hidden" name="retake_gap_days" value="<%= form && form.retake_gap_days ? form.retake_gap_days : '' %>" />
+                <input type="hidden" name="retake_window_days" value="<%= form && form.retake_window_days ? form.retake_window_days : '' %>" />
+                <input type="hidden" name="include_weekends" value="<%= form && form.include_weekends ? 1 : 0 %>" />
+                <input type="hidden" name="include_consultations" value="<%= form && form.include_consultations ? 1 : 0 %>" />
+                <input type="hidden" name="respect_study_days" value="<%= form && form.respect_study_days ? 1 : 0 %>" />
+                <input type="hidden" name="day_grouping_mode" value="<%= form && form.day_grouping_mode ? form.day_grouping_mode : 'none' %>" />
+                <input type="hidden" name="exam_sequence" value="<%= form && form.exam_sequence ? form.exam_sequence : 'exam_only' %>" />
+                <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
+                <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
+                <button class="btn btn-danger" type="submit" <%= assessmentItems.length ? '' : 'disabled' %>>
+                  Опублікувати в розклад і журнал
+                </button>
+                <div class="session-subtle">
+                  Публікація створює події у розкладі як контрольні викладацькі записи (без перезапису наявних дублікатів).
+                </div>
+              </form>
             </div>
           </div>
 
           <div class="card liquid-panel">
             <div class="card-body">
               <div class="panel-title-row">
-                <h5>Правила генерації</h5>
-                <span class="session-subtle">поточна логіка</span>
+                <h5>Коротко про логіку</h5>
+                <span class="session-subtle">лише головне</span>
               </div>
               <div class="d-grid gap-2">
-                <% ((preview && preview.assumptions) || []).forEach(function(item) { %>
+                <div class="liquid-alert info">Генератор розкладає екзамени/заліки по датах за обраними параметрами.</div>
+                <div class="liquid-alert info">Якщо предмет має групи, події публікуються по відповідних групах автоматично.</div>
+                <% ((preview && preview.assumptions) || []).slice(0, 2).forEach(function(item) { %>
                   <div class="liquid-alert"><%= item %></div>
                 <% }); %>
+                <% if (preview && preview.assumptions && preview.assumptions.length > 2) { %>
+                  <details>
+                    <summary class="session-subtle">Ще <%= preview.assumptions.length - 2 %> технічних правил</summary>
+                    <div class="d-grid gap-2 mt-2">
+                      <% preview.assumptions.slice(2).forEach(function(item) { %>
+                        <div class="liquid-alert"><%= item %></div>
+                      <% }); %>
+                    </div>
+                  </details>
+                <% } %>
               </div>
             </div>
           </div>
@@ -1140,83 +1038,6 @@
             window.location.href = url;
           });
         }
-
-        const plannerEventButtons = Array.from(document.querySelectorAll('[data-planner-event-id]'));
-        const slotCells = Array.from(document.querySelectorAll('[data-slot-cell]'));
-        let selectedPlannerEventId = null;
-        const assignmentsBySlot = new Map();
-        const assignmentsByEvent = new Map();
-
-        const renderPlannerState = () => {
-          plannerEventButtons.forEach((btn) => {
-            const eventId = btn.dataset.plannerEventId;
-            btn.classList.toggle('is-selected', !!eventId && eventId === selectedPlannerEventId);
-            btn.classList.toggle('is-assigned', !!eventId && assignmentsByEvent.has(eventId));
-          });
-          slotCells.forEach((cell) => {
-            const slotKey = cell.dataset.slotKey;
-            const slotContent = cell.querySelector('.slot-cell-content');
-            let assignmentNode = cell.querySelector('.slot-cell-assignment');
-            const assigned = slotKey ? assignmentsBySlot.get(slotKey) : null;
-            cell.classList.toggle('is-assigned', !!assigned);
-            if (slotContent) {
-              slotContent.textContent = cell.disabled ? 'Зайнято' : (assigned ? 'Призначено' : 'Вільно');
-            }
-            if (assigned) {
-              if (!assignmentNode) {
-                assignmentNode = document.createElement('div');
-                assignmentNode.className = 'slot-cell-assignment';
-                cell.appendChild(assignmentNode);
-              }
-              assignmentNode.textContent = assigned.label || '';
-            } else if (assignmentNode) {
-              assignmentNode.remove();
-            }
-          });
-        };
-
-        plannerEventButtons.forEach((btn) => {
-          btn.addEventListener('click', () => {
-            const eventId = btn.dataset.plannerEventId;
-            selectedPlannerEventId = selectedPlannerEventId === eventId ? null : eventId;
-            renderPlannerState();
-          });
-        });
-
-        slotCells.forEach((cell) => {
-          cell.addEventListener('click', () => {
-            if (cell.disabled) return;
-            const slotKey = cell.dataset.slotKey;
-            if (!slotKey) return;
-            const existing = assignmentsBySlot.get(slotKey);
-            if (!selectedPlannerEventId) {
-              if (existing) {
-                assignmentsBySlot.delete(slotKey);
-                assignmentsByEvent.delete(existing.eventId);
-                renderPlannerState();
-              }
-              return;
-            }
-            const selectedBtn = plannerEventButtons.find((btn) => btn.dataset.plannerEventId === selectedPlannerEventId);
-            if (!selectedBtn) return;
-            const prevSlotForEvent = assignmentsByEvent.get(selectedPlannerEventId);
-            if (prevSlotForEvent && prevSlotForEvent !== slotKey) {
-              assignmentsBySlot.delete(prevSlotForEvent);
-            }
-            if (existing && existing.eventId && existing.eventId !== selectedPlannerEventId) {
-              assignmentsByEvent.delete(existing.eventId);
-            }
-            const payload = {
-              eventId: selectedPlannerEventId,
-              label: selectedBtn.dataset.plannerEventLabel || selectedBtn.textContent.trim(),
-            };
-            assignmentsBySlot.set(slotKey, payload);
-            assignmentsByEvent.set(selectedPlannerEventId, slotKey);
-            selectedPlannerEventId = null;
-            renderPlannerState();
-          });
-        });
-        renderPlannerState();
 
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
           if (window.bootstrap && window.bootstrap.Tooltip) {

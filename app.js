@@ -9710,6 +9710,35 @@ app.get('/schedule', requireLogin, async (req, res) => {
 
   const loadStudentGroups = (cb) => {
     if (!isAdminViewAs) {
+      if (hasSessionRole(req, 'admin')) {
+        return db.all(
+          `
+            SELECT id AS subject_id, name AS subject_name, group_count
+            FROM subjects
+            WHERE course_id = ? AND visible = 1
+            ORDER BY name
+          `,
+          [scheduleCourseId],
+          (err, subjects) => {
+            if (err) {
+              return cb(err);
+            }
+            const groups = [];
+            (subjects || []).forEach((subject) => {
+              const subjectId = Number(subject.subject_id);
+              const groupCount = Math.max(1, Number(subject.group_count || 1));
+              for (let groupNumber = 1; groupNumber <= groupCount; groupNumber += 1) {
+                groups.push({
+                  subject_id: subjectId,
+                  group_number: groupNumber,
+                  subject_name: subject.subject_name,
+                });
+              }
+            });
+            return cb(null, groups);
+          }
+        );
+      }
       return db.all(
         `
           SELECT sg.subject_id, sg.group_number, s.name AS subject_name
@@ -21447,6 +21476,361 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.sessionGenerator.render');
+  }
+});
+
+app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.sessionGenerator.publish.init');
+  }
+  try {
+    const body = req.body || {};
+    const activeLocation = normalizeGeneratorLocation(body.location || 'kyiv');
+    const selectedCourseId = parseSessionGeneratorInt(body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const selectedSemesterRaw = parseSessionGeneratorInt(body.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const draftId = parseSessionGeneratorInt(body.draft_id, null, 1, Number.MAX_SAFE_INTEGER);
+    let form = {
+      location: activeLocation,
+      course_id: selectedCourseId,
+      semester_id: selectedSemesterRaw,
+      window_mode: normalizeSessionWindowMode(body.window_mode || SESSION_GENERATOR_DEFAULTS.window_mode),
+      start_date: isValidDateString(body.start_date)
+        ? String(body.start_date)
+        : buildSessionGeneratorDefaultStartDate(null),
+      session_days: parseSessionGeneratorInt(body.session_days, SESSION_GENERATOR_DEFAULTS.session_days, 3, 60),
+      session_weeks_count: parseSessionGeneratorInt(
+        body.session_weeks_count,
+        SESSION_GENERATOR_DEFAULTS.session_weeks_count,
+        1,
+        12
+      ),
+      session_weeks_set: String(body.session_weeks_set || '').trim(),
+      max_events_per_day: parseSessionGeneratorInt(
+        body.max_events_per_day,
+        SESSION_GENERATOR_DEFAULTS.max_events_per_day,
+        1,
+        6
+      ),
+      reserve_every: parseSessionGeneratorInt(body.reserve_every, SESSION_GENERATOR_DEFAULTS.reserve_every, 0, 20),
+      exam_gap_days: parseSessionGeneratorInt(body.exam_gap_days, SESSION_GENERATOR_DEFAULTS.exam_gap_days, 0, 5),
+      retake_gap_days: parseSessionGeneratorInt(body.retake_gap_days, SESSION_GENERATOR_DEFAULTS.retake_gap_days, 1, 14),
+      retake_window_days: parseSessionGeneratorInt(
+        body.retake_window_days,
+        SESSION_GENERATOR_DEFAULTS.retake_window_days,
+        1,
+        14
+      ),
+      include_weekends: parseSessionGeneratorFlag(body.include_weekends, SESSION_GENERATOR_DEFAULTS.include_weekends),
+      include_consultations: parseSessionGeneratorFlag(body.include_consultations, SESSION_GENERATOR_DEFAULTS.include_consultations),
+      respect_study_days: parseSessionGeneratorFlag(body.respect_study_days, SESSION_GENERATOR_DEFAULTS.respect_study_days),
+      day_grouping_mode: normalizeSessionDayGroupingMode(body.day_grouping_mode || SESSION_GENERATOR_DEFAULTS.day_grouping_mode),
+      exam_sequence: normalizeSessionExamSequence(body.exam_sequence || SESSION_GENERATOR_DEFAULTS.exam_sequence),
+      credit_sequence: normalizeSessionCreditSequence(body.credit_sequence || SESSION_GENERATOR_DEFAULTS.credit_sequence),
+      strategy: normalizeSessionGeneratorStrategy(body.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
+    };
+    const redirectToGenerator = (messageKind, messageText) => {
+      const params = new URLSearchParams();
+      const safeSet = (key, value) => {
+        if (value === undefined || value === null || value === '') return;
+        params.set(key, String(value));
+      };
+      safeSet('location', activeLocation);
+      safeSet('course_id', selectedCourseId);
+      safeSet('semester_id', form.semester_id || selectedSemesterRaw);
+      safeSet('draft_id', draftId);
+      safeSet('window_mode', form.window_mode);
+      safeSet('start_date', form.start_date);
+      safeSet('session_days', form.session_days);
+      safeSet('session_weeks_count', form.session_weeks_count);
+      safeSet('session_weeks_set', form.session_weeks_set);
+      safeSet('max_events_per_day', form.max_events_per_day);
+      safeSet('reserve_every', form.reserve_every);
+      safeSet('exam_gap_days', form.exam_gap_days);
+      safeSet('retake_gap_days', form.retake_gap_days);
+      safeSet('retake_window_days', form.retake_window_days);
+      safeSet('day_grouping_mode', form.day_grouping_mode);
+      safeSet('exam_sequence', form.exam_sequence);
+      safeSet('credit_sequence', form.credit_sequence);
+      safeSet('strategy', form.strategy);
+      params.set('include_weekends', form.include_weekends ? '1' : '0');
+      params.set('include_consultations', form.include_consultations ? '1' : '0');
+      params.set('respect_study_days', form.respect_study_days ? '1' : '0');
+      if (messageText) {
+        params.set(messageKind, String(messageText));
+      }
+      return res.redirect(`/admin/session-generator?${params.toString()}`);
+    };
+
+    if (!selectedCourseId) {
+      return redirectToGenerator('err', 'Оберіть курс для публікації сесії.');
+    }
+
+    const semesters = await getSemestersCached(selectedCourseId);
+    let activeSemester = null;
+    if (selectedSemesterRaw) {
+      activeSemester = (semesters || []).find((row) => Number(row.id) === Number(selectedSemesterRaw)) || null;
+    }
+    if (!activeSemester) {
+      activeSemester = await getActiveSemester(selectedCourseId);
+    }
+    if (!activeSemester && semesters && semesters.length) {
+      activeSemester = semesters[0];
+    }
+    if (!activeSemester) {
+      return redirectToGenerator('err', 'Активний семестр не знайдено.');
+    }
+
+    const selectedSemesterId = Number(activeSemester.id);
+    form.semester_id = selectedSemesterId;
+    if (!isValidDateString(body.start_date)) {
+      form.start_date = buildSessionGeneratorDefaultStartDate(activeSemester);
+    }
+
+    const subjects = await getSubjectsCached(selectedCourseId, { visibleOnly: true });
+    if (!subjects || !subjects.length) {
+      return redirectToGenerator('err', 'Немає предметів для генерації сесії.');
+    }
+    let courseStudyDays = [];
+    try {
+      courseStudyDays = await getCourseStudyDays(selectedCourseId);
+    } catch (err) {
+      courseStudyDays = [];
+    }
+    const activeStudyDayNames = (courseStudyDays || [])
+      .filter((row) => row.is_active)
+      .map((row) => row.day_name)
+      .filter(Boolean);
+    let gradingRows = [];
+    try {
+      gradingRows = await db.all(
+        `
+          SELECT subject_id,
+                 COALESCE(exam_enabled, 1) AS exam_enabled,
+                 COALESCE(credit_enabled, 1) AS credit_enabled,
+                 COALESCE(exam_weight_points, 0) AS exam_weight_points,
+                 COALESCE(credit_weight_points, 0) AS credit_weight_points
+          FROM subject_grading_settings
+          WHERE course_id = ? AND semester_id = ?
+        `,
+        [selectedCourseId, selectedSemesterId]
+      );
+    } catch (err) {
+      gradingRows = [];
+    }
+    const gradingBySubject = {};
+    (gradingRows || []).forEach((row) => {
+      gradingBySubject[Number(row.subject_id)] = {
+        exam_enabled: Number(row.exam_enabled ?? 1) === 1 ? 1 : 0,
+        credit_enabled: Number(row.credit_enabled ?? 1) === 1 ? 1 : 0,
+        exam_weight_points: Number(row.exam_weight_points ?? 0) || 0,
+        credit_weight_points: Number(row.credit_weight_points ?? 0) || 0,
+      };
+    });
+
+    let sessionWeekNumbers = [];
+    if (form.window_mode === 'weeks' && Number(activeSemester.weeks_count || 0) > 0) {
+      const semesterWeeksCount = Number(activeSemester.weeks_count || 0);
+      const parsedWeeks = parseWeekSet(form.session_weeks_set, semesterWeeksCount);
+      if (parsedWeeks.length) {
+        sessionWeekNumbers = parsedWeeks;
+      } else {
+        const count = Math.min(Math.max(Number(form.session_weeks_count || 1), 1), semesterWeeksCount);
+        const startWeek = Math.max(1, semesterWeeksCount - count + 1);
+        sessionWeekNumbers = Array.from({ length: count }, (_value, index) => startWeek + index);
+      }
+      form.session_weeks_set = sessionWeekNumbers.join(',');
+    }
+    const explicitSessionDates = form.window_mode === 'weeks'
+      ? buildSessionDatesFromWeekNumbers({
+          semester: activeSemester,
+          weekNumbers: sessionWeekNumbers,
+          includeWeekends: form.include_weekends,
+          respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
+          activeStudyDayNames,
+        })
+      : [];
+
+    const previewSeed = Number(selectedCourseId || 0) * 17 + Number(selectedSemesterId || 0) * 31
+      + Number(parseDateUTC(form.start_date) || 0) % 97
+      + Number(draftId || 0) * 13;
+    const preview = buildSessionGeneratorPreview({
+      subjects,
+      gradingBySubject,
+      startDate: form.start_date,
+      sessionDays: form.session_days,
+      explicitDates: explicitSessionDates,
+      maxEventsPerDay: form.max_events_per_day,
+      reserveEvery: form.reserve_every,
+      examGapDays: form.exam_gap_days,
+      retakeGapDays: form.retake_gap_days,
+      retakeWindowDays: form.retake_window_days,
+      includeConsultations: form.include_consultations,
+      includeWeekends: form.include_weekends,
+      respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
+      activeStudyDayNames,
+      dayGroupingMode: form.day_grouping_mode,
+      examSequence: form.exam_sequence,
+      creditSequence: form.credit_sequence,
+      strategy: form.strategy,
+      seed: previewSeed,
+    });
+    const assessments = ((preview && preview.timelineItems) || [])
+      .filter((item) => (
+        item
+        && item.kind === 'assessment'
+        && (item.type === 'exam' || item.type === 'credit')
+        && Number.isFinite(Number(item.subject_id))
+        && Number(item.subject_id) > 0
+        && isValidDateString(item.date)
+      ))
+      .sort((a, b) => {
+        const byDate = String(a.date || '').localeCompare(String(b.date || ''));
+        if (byDate !== 0) return byDate;
+        if (a.type !== b.type) return a.type === 'exam' ? -1 : 1;
+        const bySubject = String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
+        if (bySubject !== 0) return bySubject;
+        return Number(a.group_number || 0) - Number(b.group_number || 0);
+      });
+    if (!assessments.length) {
+      return redirectToGenerator('err', 'Немає подій для публікації. Спочатку згенеруйте сесію.');
+    }
+
+    const subjectById = new Map((subjects || []).map((subject) => [Number(subject.id), subject]));
+    const daySlotCursor = new Map();
+    const username = String(req.session.user?.username || '');
+    const authorId = Number(req.session.user?.id || 0);
+    const createdAt = new Date().toISOString();
+    let createdCount = 0;
+    let skippedCount = 0;
+    let overflowSlotCount = 0;
+    const touchedSubjectIds = new Set();
+
+    for (const assessment of assessments) {
+      const subjectId = Number(assessment.subject_id);
+      const subject = subjectById.get(subjectId);
+      if (!subject) continue;
+      touchedSubjectIds.add(subjectId);
+      const groupCount = Math.max(1, Number(subject.group_count || 1));
+      const singleGroupNumber = Number(assessment.group_number || 0);
+      const targetGroups = Number.isFinite(singleGroupNumber) && singleGroupNumber > 0
+        ? [singleGroupNumber]
+        : Array.from({ length: groupCount }, (_value, index) => index + 1);
+      const dayName = String(assessment.day_name || getDayNameFromDate(assessment.date) || '').trim();
+      if (!dayName) continue;
+      const dayCursor = Number(daySlotCursor.get(assessment.date) || 1);
+      const classNumber = Math.max(1, Math.min(7, dayCursor));
+      daySlotCursor.set(assessment.date, dayCursor + 1);
+      if (dayCursor > 7) {
+        overflowSlotCount += 1;
+      }
+      const slot = bellSchedule[classNumber] || null;
+      const timeLabel = slot ? `${slot.start}-${slot.end}` : `Пара ${classNumber}`;
+      const isCredit = assessment.type === 'credit' ? 1 : 0;
+      const typeLabel = isCredit ? 'Залік' : 'Екзамен';
+      const description = `[Сесія] ${typeLabel} · ${subject.name || assessment.subject_name || ''}`.trim();
+
+      for (const groupNumber of targetGroups) {
+        let existingSql = `
+          SELECT id
+          FROM homework
+          WHERE subject_id = ?
+            AND group_number = ?
+            AND course_id = ?
+            AND class_date = ?
+            AND class_number = ?
+            AND COALESCE(is_teacher_homework, 0) = 1
+            AND COALESCE(is_control, 0) = 1
+            AND COALESCE(is_credit, 0) = ?
+            AND COALESCE(is_custom_deadline, 0) = 0
+            AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
+        `;
+        const existingParams = [subjectId, groupNumber, selectedCourseId, assessment.date, classNumber, isCredit];
+        if (selectedSemesterId) {
+          existingSql += ' AND (semester_id = ? OR semester_id IS NULL)';
+          existingParams.push(selectedSemesterId);
+        } else {
+          existingSql += ' AND semester_id IS NULL';
+        }
+        existingSql += ' LIMIT 1';
+        const existing = await db.get(existingSql, existingParams);
+        if (existing && Number(existing.id) > 0) {
+          skippedCount += 1;
+          continue;
+        }
+        await db.run(
+          `
+            INSERT INTO homework
+              (
+                group_name, subject, day, time, class_number, subject_id, group_number, day_of_week,
+                created_by_id, description, class_date, meeting_url, link_url, file_path, file_name,
+                created_by, created_at, course_id, semester_id, status, scheduled_at, published_at,
+                is_control, is_teacher_homework, is_credit
+              )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', NULL, ?, 1, 1, ?)
+          `,
+          [
+            `Група ${groupNumber}`,
+            subject.name || assessment.subject_name || '',
+            dayName,
+            timeLabel,
+            classNumber,
+            subjectId,
+            groupNumber,
+            dayName,
+            authorId || null,
+            description,
+            assessment.date,
+            null,
+            null,
+            null,
+            null,
+            username || null,
+            createdAt,
+            selectedCourseId,
+            selectedSemesterId || null,
+            createdAt,
+            isCredit,
+          ]
+        );
+        createdCount += 1;
+      }
+    }
+
+    let syncedSubjects = 0;
+    for (const subjectId of touchedSubjectIds) {
+      try {
+        const gradingSettings = await ensureSubjectGradingSettings(
+          Number(subjectId),
+          selectedCourseId,
+          selectedSemesterId,
+          authorId || null
+        );
+        await syncJournalColumnsFromHomework(
+          Number(subjectId),
+          selectedCourseId,
+          selectedSemesterId,
+          gradingSettings,
+          authorId || null
+        );
+        syncedSubjects += 1;
+      } catch (err) {
+        if (!isDbSchemaCompatibilityError(err)) {
+          throw err;
+        }
+      }
+    }
+
+    const suffix = overflowSlotCount > 0
+      ? ` Частина подій (${overflowSlotCount}) вийшла за межі 7 пар/день і була привʼязана до 7-ї пари.`
+      : '';
+    const message = createdCount > 0
+      ? `Опубліковано ${createdCount} подій сесії. Пропущено дублікатів: ${skippedCount}. Синхронізовано предметів у журналі: ${syncedSubjects}.${suffix}`
+      : `Нових подій не створено (дублікатів: ${skippedCount}).${suffix}`;
+    return redirectToGenerator('ok', message.trim());
+  } catch (err) {
+    return handleDbError(res, err, 'admin.sessionGenerator.publish');
   }
 });
 

@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "1.0.22",
+      "date": "2026-02-28",
+      "items": [
+        "feat(session-generator): added one-click publish flow that creates session exams/credits in homework schedule slots and skips duplicates safely",
+        "feat(journal): publishing session credits now auto-syncs and creates empty subject journal columns for credit control points",
+        "ux(session-generator): simplified generator page by removing local slot planner/heuristic debug blocks and replacing them with a clear publish preview table",
+        "fix(schedule-admin): admins now see teacher homework in regular schedule view by loading all course subject-group targets when not in view-as mode",
+        "ux(schedule): added red credit highlight for schedule cards with published credit events"
+      ]
+    },
+    {
       "version": "1.0.21",
       "date": "2026-02-28",
       "items": [

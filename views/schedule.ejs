@@ -1254,6 +1254,25 @@
       .schedule-card.is-next::after {
         border-left-color: rgba(59, 130, 246, 0.6);
       }
+      .schedule-card.has-credit {
+        border-color: rgba(248, 113, 113, 0.6);
+        box-shadow: 0 10px 24px rgba(239, 68, 68, 0.18);
+      }
+      .schedule-card.has-credit::after {
+        border-left-color: rgba(239, 68, 68, 0.9);
+      }
+      body.theme-dark .schedule-card.has-credit {
+        background: linear-gradient(135deg, hsla(var(--subject-h), 30%, 20%, 0.68), rgba(127, 29, 29, 0.26));
+        border-color: rgba(248, 113, 113, 0.52);
+      }
+      body.theme-light .schedule-card.has-credit {
+        background: linear-gradient(135deg, hsla(var(--subject-h), 60%, 90%, 0.96), rgba(254, 226, 226, 0.98));
+        border-color: rgba(220, 38, 38, 0.45);
+      }
+      .schedule-card.has-credit:hover {
+        border-color: rgba(239, 68, 68, 0.7);
+        box-shadow: 0 14px 30px rgba(185, 28, 28, 0.2);
+      }
       .schedule-card.chain-prev {
         margin-top: -8px;
         border-top-left-radius: 10px;
@@ -1771,7 +1790,7 @@
                   <% if (cls.course_name) { tooltipParts.push(cls.course_name); } %>
                   <% if (hwMeta && hwMeta.preview && hwMeta.preview.length) { tooltipParts.push(...hwMeta.preview); } %>
                   <div
-                    class="list-group-item schedule-card liquid-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %>"
+                    class="list-group-item schedule-card liquid-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %> <%= hwMeta && hwMeta.credit ? 'has-credit' : '' %>"
                     role="button"
                     tabindex="0"
                     data-bs-toggle="modal"
