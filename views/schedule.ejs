@@ -1963,12 +1963,10 @@
         <section class="month-summary glass liquid-card d-none" id="scheduleMonthSummary" aria-live="polite"></section>
       </main>
 
-      <% const weekTotal = totalWeeks || 15; %>
       <div class="week-rail week-pager" id="weekPager">
         <button class="week-nav-btn week-nav-btn--prev" type="button" id="weekPrev" aria-label="Previous week">‹</button>
         <div class="week-pill" id="weekPill" aria-label="Current week">
           <span class="week-pill-title"><%= t('schedule.week') %> <span id="weekPillCurrent"><%= currentWeek %></span></span>
-          <span class="week-pill-meta"><span id="weekPillCurrentMeta"><%= currentWeek %></span> / <span id="weekPillTotal"><%= weekTotal %></span></span>
           <span class="week-pill-progress" aria-hidden="true">
             <span class="week-pill-progress-fill" id="weekPillProgress"></span>
           </span>
@@ -2962,8 +2960,6 @@
       const weekPager = document.getElementById('weekPager');
       const weekPill = document.getElementById('weekPill');
       const weekPillCurrent = document.getElementById('weekPillCurrent');
-      const weekPillCurrentMeta = document.getElementById('weekPillCurrentMeta');
-      const weekPillTotal = document.getElementById('weekPillTotal');
       const weekPillProgress = document.getElementById('weekPillProgress');
       const messagesBtn = document.getElementById('messagesBtn');
       const messagesBtnMobile = document.getElementById('messagesBtnMobile');
@@ -3059,15 +3055,13 @@
         const safe = clampWeek(week);
         currentWeek = safe;
         if (weekPillCurrent) weekPillCurrent.textContent = String(safe);
-        if (weekPillCurrentMeta) weekPillCurrentMeta.textContent = String(safe);
-        if (weekPillTotal) weekPillTotal.textContent = String(totalWeeks);
         if (weekPillProgress) {
           const ratio = totalWeeks > 0 ? safe / totalWeeks : 1;
           weekPillProgress.style.transform = `scaleX(${ratio})`;
         }
         if (weekPrev) weekPrev.disabled = safe <= 1;
         if (weekNext) weekNext.disabled = safe >= totalWeeks;
-        if (weekPill) weekPill.setAttribute('aria-label', `<%= t('schedule.week') %> ${safe} / ${totalWeeks}`);
+        if (weekPill) weekPill.setAttribute('aria-label', `<%= t('schedule.week') %> ${safe}`);
       }
 
       function goToWeek(targetWeek) {

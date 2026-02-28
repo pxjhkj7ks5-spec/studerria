@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.24",
+      "date": "2026-02-28",
+      "items": [
+        "ux(schedule): removed numeric fraction from week carousel pill and kept only the current week label"
+      ]
+    },
+    {
       "version": "1.0.23",
       "date": "2026-02-28",
       "items": [
