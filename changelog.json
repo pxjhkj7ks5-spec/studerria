@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.26",
+      "date": "2026-02-28",
+      "items": [
+        "fix(admin-topbar): forced theme toggle button to keep strict 1:1 circle geometry (min/max size + fixed flex-basis) so it no longer appears squashed"
+      ]
+    },
+    {
       "version": "1.0.25",
       "date": "2026-02-28",
       "items": [
