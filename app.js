@@ -21479,6 +21479,18 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
   }
 });
 
+app.get('/admin/session-generator/', requireScheduleGeneratorSectionAccess, (req, res) => {
+  const params = new URLSearchParams(req.query || {});
+  const query = params.toString();
+  return res.redirect(`/admin/session-generator${query ? `?${query}` : ''}`);
+});
+
+app.get('/admin/session-generator/index', requireScheduleGeneratorSectionAccess, (req, res) => {
+  const params = new URLSearchParams(req.query || {});
+  const query = params.toString();
+  return res.redirect(`/admin/session-generator${query ? `?${query}` : ''}`);
+});
+
 app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();

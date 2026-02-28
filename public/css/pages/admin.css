@@ -881,6 +881,23 @@ body.theme-light .role-access-summary {
   color: #fee2e2;
 }
 
+body.theme-light .admin-toast {
+  border-color: rgba(15, 23, 42, 0.14);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+body.theme-light .admin-toast.is-success {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(22, 163, 74, 0.34);
+  color: #14532d;
+}
+
+body.theme-light .admin-toast.is-error {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(220, 38, 38, 0.3);
+  color: #7f1d1d;
+}
+
 .admin-toast-close {
   position: absolute;
   top: 6px;

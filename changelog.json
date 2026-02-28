@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.25",
+      "date": "2026-02-28",
+      "items": [
+        "ux(admin-light-theme): increased light theme contrast for muted text and health/security cards on admin dashboard",
+        "fix(admin-toasts): improved success/error toast readability in light theme (stronger text and border contrast)",
+        "fix(session-generator-route): added compatibility redirects for /admin/session-generator/ and /admin/session-generator/index to canonical /admin/session-generator"
+      ]
+    },
+    {
       "version": "1.0.24",
       "date": "2026-02-28",
       "items": [
