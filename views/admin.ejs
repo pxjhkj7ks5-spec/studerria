@@ -147,6 +147,27 @@
         border-color: rgba(15, 23, 42, 0.12);
         box-shadow: 0 0 24px rgba(15, 23, 42, 0.18);
       }
+      #confirmActionModal .modal-dialog {
+        transition: transform 140ms ease, opacity 140ms ease;
+        will-change: transform, opacity;
+      }
+      #confirmActionModal .modal-content {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+      }
+      body.theme-dark #confirmActionModal .modal-content {
+        background: rgba(18, 24, 38, 0.94);
+      }
+      body.theme-light #confirmActionModal .modal-content {
+        background: rgba(255, 255, 255, 0.96);
+      }
+      #confirmTypedInput {
+        text-transform: uppercase;
+      }
+      body.confirm-modal-open .modal-backdrop.show {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
       button.glass {
         background: rgba(255, 255, 255, 0.08);
         backdrop-filter: blur(8px);
@@ -4125,7 +4146,15 @@
             <div id="confirmActionMessage" class="mb-3"></div>
             <div class="confirm-typed" id="confirmTypedWrapper" style="display: none;">
               <label class="form-label">Type to confirm</label>
-              <input class="form-control" id="confirmTypedInput" />
+              <input
+                class="form-control"
+                id="confirmTypedInput"
+                autocomplete="off"
+                autocapitalize="characters"
+                autocorrect="off"
+                spellcheck="false"
+                enterkeyhint="done"
+              />
               <div class="small text-muted mt-1">Повторіть фразу для підтвердження.</div>
             </div>
           </div>
@@ -4492,6 +4521,25 @@
       const confirmTypedWrapper = document.getElementById('confirmTypedWrapper');
       const confirmTypedInput = document.getElementById('confirmTypedInput');
       let confirmResolve = null;
+      const normalizeConfirmTypedValue = (value) => String(value || '').trim().toUpperCase();
+      const getRequiredConfirmPhrase = () => {
+        if (!confirmTypedInput) return '';
+        return normalizeConfirmTypedValue(confirmTypedInput.dataset.typedValue || '');
+      };
+      const syncConfirmActionState = () => {
+        if (!confirmActionButton) return;
+        const required = getRequiredConfirmPhrase();
+        if (!required || !confirmTypedInput) {
+          confirmActionButton.disabled = false;
+          return;
+        }
+        const current = normalizeConfirmTypedValue(confirmTypedInput.value);
+        const matches = current === required;
+        confirmActionButton.disabled = !matches;
+        if (matches || !current) {
+          confirmTypedInput.classList.remove('is-invalid');
+        }
+      };
 
       const openConfirmModal = ({ message, title = 'Confirm action', level = 'danger', typed = '' } = {}) =>
         new Promise((resolve) => {
@@ -4508,24 +4556,28 @@
             confirmActionButton.textContent = level === 'warning' ? 'Confirm' : 'Delete';
           }
           if (confirmTypedWrapper && confirmTypedInput) {
-            if (typed) {
+            const typedValue = normalizeConfirmTypedValue(typed);
+            if (typedValue) {
               confirmTypedWrapper.style.display = 'block';
               confirmTypedInput.value = '';
-              confirmTypedInput.dataset.typedValue = typed;
+              confirmTypedInput.dataset.typedValue = typedValue;
             } else {
               confirmTypedWrapper.style.display = 'none';
               confirmTypedInput.value = '';
               confirmTypedInput.dataset.typedValue = '';
             }
           }
+          syncConfirmActionState();
           confirmModal.show();
         });
 
       if (confirmActionButton && confirmModalEl) {
         confirmActionButton.addEventListener('click', () => {
-          const required = confirmTypedInput && confirmTypedInput.dataset.typedValue;
-          if (required && confirmTypedInput.value.trim() !== required) {
+          const required = getRequiredConfirmPhrase();
+          const typedValue = confirmTypedInput ? normalizeConfirmTypedValue(confirmTypedInput.value) : '';
+          if (required && typedValue !== required && confirmTypedInput) {
             confirmTypedInput.classList.add('is-invalid');
+            confirmTypedInput.focus({ preventScroll: true });
             return;
           }
           if (confirmTypedInput) confirmTypedInput.classList.remove('is-invalid');
@@ -4533,7 +4585,30 @@
           if (confirmResolve) confirmResolve(true);
           confirmResolve = null;
         });
+        if (confirmTypedInput) {
+          confirmTypedInput.addEventListener('input', syncConfirmActionState);
+          confirmTypedInput.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            if (confirmActionButton.disabled) return;
+            event.preventDefault();
+            confirmActionButton.click();
+          });
+        }
+        confirmModalEl.addEventListener('shown.bs.modal', () => {
+          document.body.classList.add('confirm-modal-open');
+          if (!confirmTypedInput || !getRequiredConfirmPhrase()) return;
+          window.requestAnimationFrame(() => {
+            confirmTypedInput.focus({ preventScroll: true });
+          });
+        });
         confirmModalEl.addEventListener('hidden.bs.modal', () => {
+          document.body.classList.remove('confirm-modal-open');
+          if (confirmTypedInput) {
+            confirmTypedInput.value = '';
+            confirmTypedInput.dataset.typedValue = '';
+            confirmTypedInput.classList.remove('is-invalid');
+          }
+          syncConfirmActionState();
           if (confirmResolve) confirmResolve(false);
           confirmResolve = null;
         });

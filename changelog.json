@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.23",
+      "date": "2026-02-28",
+      "items": [
+        "perf(admin-roles): optimized role-change confirm modal typing by disabling heavy backdrop blur while the modal is open",
+        "ux(admin-roles): improved confirmation input responsiveness with uppercase normalization, immediate button state sync, and Enter-to-confirm support"
+      ]
+    },
+    {
       "version": "1.0.22",
       "date": "2026-02-28",
       "items": [
