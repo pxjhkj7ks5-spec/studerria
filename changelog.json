@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.29",
+      "date": "2026-02-28",
+      "items": [
+        "feat(session-generator): credit events now try to use real schedule slots of the same subject/group on that weekday",
+        "fix(session-generator): if no same-day slot exists for a credit, publish now falls back to the class time of the latest known pair for that subject/group",
+        "fix(session-generator): credit class_date is normalized to date-only during publish to avoid duplicate/match inconsistencies"
+      ]
+    },
+    {
       "version": "1.0.28",
       "date": "2026-02-28",
       "items": [

@@ -21731,6 +21731,110 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
 
     const subjectById = new Map((subjects || []).map((subject) => [Number(subject.id), subject]));
     const daySlotCursor = new Map();
+    const creditSlotCursor = new Map();
+    const creditScheduleSlotsByDay = new Map();
+    const creditLastSlotByGroup = new Map();
+    const assessmentSubjectIds = Array.from(new Set(
+      assessments
+        .map((item) => Number(item.subject_id))
+        .filter((value) => Number.isFinite(value) && value > 0)
+    ));
+    if (assessmentSubjectIds.length) {
+      const placeholders = assessmentSubjectIds.map(() => '?').join(', ');
+      let scheduleSql = `
+        SELECT subject_id, group_number, day_of_week, class_number, week_number
+        FROM schedule_entries
+        WHERE course_id = ?
+          AND subject_id IN (${placeholders})
+          AND class_number BETWEEN 1 AND 7
+      `;
+      const scheduleParams = [selectedCourseId, ...assessmentSubjectIds];
+      if (selectedSemesterId) {
+        scheduleSql += ' AND semester_id = ?';
+        scheduleParams.push(selectedSemesterId);
+      } else {
+        scheduleSql += ' AND semester_id IS NULL';
+      }
+      const scheduleRows = await db.all(scheduleSql, scheduleParams);
+      const dayRankMap = new Map(fullWeekDays.map((dayName, index) => [dayName, index + 1]));
+      const slotSetByDay = new Map();
+      (scheduleRows || []).forEach((row) => {
+        const subjectId = Number(row.subject_id);
+        const groupNumber = Number(row.group_number);
+        const classNumber = Number(row.class_number);
+        const dayName = normalizeWeekdayName(row.day_of_week);
+        if (
+          !Number.isFinite(subjectId)
+          || subjectId < 1
+          || !Number.isFinite(groupNumber)
+          || groupNumber < 1
+          || !Number.isFinite(classNumber)
+          || classNumber < 1
+          || classNumber > 7
+          || !dayName
+        ) {
+          return;
+        }
+        const dayKey = `${subjectId}|${groupNumber}|${dayName}`;
+        if (!slotSetByDay.has(dayKey)) {
+          slotSetByDay.set(dayKey, new Set());
+        }
+        slotSetByDay.get(dayKey).add(classNumber);
+        const lastKey = `${subjectId}|${groupNumber}`;
+        const candidate = {
+          class_number: classNumber,
+          week_number: Number(row.week_number || 0),
+          day_rank: Number(dayRankMap.get(dayName) || 0),
+        };
+        const current = creditLastSlotByGroup.get(lastKey);
+        if (
+          !current
+          || candidate.week_number > current.week_number
+          || (candidate.week_number === current.week_number && candidate.day_rank > current.day_rank)
+          || (
+            candidate.week_number === current.week_number
+            && candidate.day_rank === current.day_rank
+            && candidate.class_number > current.class_number
+          )
+        ) {
+          creditLastSlotByGroup.set(lastKey, candidate);
+        }
+      });
+      slotSetByDay.forEach((slotSet, key) => {
+        creditScheduleSlotsByDay.set(
+          key,
+          Array.from(slotSet).sort((a, b) => Number(a) - Number(b))
+        );
+      });
+    }
+    const getNextDefaultClassNumber = (dateValue) => {
+      const safeDate = toDateOnly(dateValue);
+      const dayCursor = Number(daySlotCursor.get(safeDate) || 1);
+      const classNumber = Math.max(1, Math.min(7, dayCursor));
+      daySlotCursor.set(safeDate, dayCursor + 1);
+      if (dayCursor > 7) {
+        overflowSlotCount += 1;
+      }
+      return classNumber;
+    };
+    const resolveCreditClassNumber = (subjectId, groupNumber, dayName) => {
+      const normalizedDay = normalizeWeekdayName(dayName);
+      const dayKey = `${subjectId}|${groupNumber}|${normalizedDay}`;
+      const slots = normalizedDay ? (creditScheduleSlotsByDay.get(dayKey) || []) : [];
+      if (slots.length) {
+        const cursor = Number(creditSlotCursor.get(dayKey) || 0);
+        creditSlotCursor.set(dayKey, cursor + 1);
+        return Number(slots[cursor % slots.length]);
+      }
+      const lastSlot = creditLastSlotByGroup.get(`${subjectId}|${groupNumber}`);
+      if (lastSlot && Number.isFinite(Number(lastSlot.class_number))) {
+        const safeClass = Number(lastSlot.class_number);
+        if (safeClass >= 1 && safeClass <= 7) {
+          return safeClass;
+        }
+      }
+      return null;
+    };
     const username = String(req.session.user?.username || '');
     const authorId = Number(req.session.user?.id || 0);
     const createdAt = new Date().toISOString();
@@ -21749,21 +21853,29 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       const targetGroups = Number.isFinite(singleGroupNumber) && singleGroupNumber > 0
         ? [singleGroupNumber]
         : Array.from({ length: groupCount }, (_value, index) => index + 1);
-      const dayName = String(assessment.day_name || getDayNameFromDate(assessment.date) || '').trim();
+      const assessmentDate = toDateOnly(assessment.date);
+      const dayName = normalizeWeekdayName(
+        String(assessment.day_name || getDayNameFromDate(assessmentDate) || '').trim()
+      );
       if (!dayName) continue;
-      const dayCursor = Number(daySlotCursor.get(assessment.date) || 1);
-      const classNumber = Math.max(1, Math.min(7, dayCursor));
-      daySlotCursor.set(assessment.date, dayCursor + 1);
-      if (dayCursor > 7) {
-        overflowSlotCount += 1;
-      }
-      const slot = bellSchedule[classNumber] || null;
-      const timeLabel = slot ? `${slot.start}-${slot.end}` : `Пара ${classNumber}`;
       const isCredit = assessment.type === 'credit' ? 1 : 0;
       const typeLabel = isCredit ? 'Залік' : 'Екзамен';
       const description = `[Сесія] ${typeLabel} · ${subject.name || assessment.subject_name || ''}`.trim();
+      const defaultClassNumber = isCredit ? null : getNextDefaultClassNumber(assessmentDate);
 
       for (const groupNumber of targetGroups) {
+        let classNumber = Number(defaultClassNumber || 0);
+        if (isCredit) {
+          classNumber = Number(resolveCreditClassNumber(subjectId, groupNumber, dayName) || 0);
+          if (!Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) {
+            classNumber = getNextDefaultClassNumber(assessmentDate);
+          }
+        }
+        if (!Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) {
+          classNumber = 1;
+        }
+        const slot = bellSchedule[classNumber] || null;
+        const timeLabel = slot ? `${slot.start}-${slot.end}` : `Пара ${classNumber}`;
         let existingSql = `
           SELECT id
           FROM homework
@@ -21778,7 +21890,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
             AND COALESCE(is_custom_deadline, 0) = 0
             AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
         `;
-        const existingParams = [subjectId, groupNumber, selectedCourseId, assessment.date, classNumber, isCredit];
+        const existingParams = [subjectId, groupNumber, selectedCourseId, assessmentDate, classNumber, isCredit];
         if (selectedSemesterId) {
           existingSql += ' AND (semester_id = ? OR semester_id IS NULL)';
           existingParams.push(selectedSemesterId);
@@ -21813,7 +21925,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
             dayName,
             authorId || null,
             description,
-            assessment.date,
+            assessmentDate,
             null,
             null,
             null,
