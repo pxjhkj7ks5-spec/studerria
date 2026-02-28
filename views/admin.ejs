@@ -1874,9 +1874,12 @@
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="card-title mb-0"><%= t('admin.searchHomework') %></h5>
-                <form method="POST" action="/admin/homework/migrate">
-                  <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.migrateLegacyHomework') %></button>
-                </form>
+                <div class="d-flex align-items-center gap-2">
+                  <a class="btn btn-outline-primary btn-sm" href="/schedule">Перейти до ДЗ</a>
+                  <form method="POST" action="/admin/homework/migrate">
+                    <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.migrateLegacyHomework') %></button>
+                  </form>
+                </div>
               </div>
               <form method="GET" action="/admin">
                 <div class="row g-2">

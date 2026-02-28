@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.28",
+      "date": "2026-02-28",
+      "items": [
+        "fix(schedule-admin): in admin view-as=self mode with empty student_groups, schedule now falls back to all subject groups for the course so class-level homework is visible",
+        "fix(schedule-homework): normalized day/date matching and added legacy key fallback so homework marker chips and modal items resolve reliably",
+        "ux(admin-homework): added \"Перейти до ДЗ\" quick action button in the admin Homework section"
+      ]
+    },
+    {
       "version": "1.0.27",
       "date": "2026-02-28",
       "items": [

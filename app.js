@@ -9365,10 +9365,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
               group_number: row.group_number,
               subject_id: row.subject_id,
               subject: row.subject_name,
-              day: row.day_of_week,
+              day: normalizeWeekdayName(row.day_of_week) || String(row.day_of_week || ''),
               class_number: row.class_number,
               description: row.description,
-              class_date: row.class_date,
+              class_date: toDateOnly(row.class_date),
               meeting_url: row.meeting_url,
               link_url: row.link_url,
               file_path: row.file_path,
@@ -9403,8 +9403,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
           }))
         );
         homework.forEach((hw) => {
-          const legacyKey = `${hw.subject_id}|${hw.group_number}|${hw.day}|${hw.class_number}`;
-          const key = hw.class_date ? `${legacyKey}|${hw.class_date}` : legacyKey;
+          const hwDay = normalizeWeekdayName(hw.day) || String(hw.day || '');
+          const hwDate = toDateOnly(hw.class_date);
+          const legacyKey = `${hw.subject_id}|${hw.group_number}|${hwDay}|${hw.class_number}`;
+          const key = hwDate ? `${legacyKey}|${hwDate}` : legacyKey;
           if (!homeworkMeta[key]) {
             homeworkMeta[key] = {
               count: 0,
@@ -9435,9 +9437,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
           if (hw.description && homeworkMeta[key].preview.length < 2) {
             homeworkMeta[key].preview.push(hw.description);
           }
-          const allKey = hw.class_date
-            ? `${hw.subject_id}|${hw.day}|${hw.class_number}|${hw.class_date}`
-            : `${hw.subject_id}|${hw.day}|${hw.class_number}`;
+          const allKey = hwDate
+            ? `${hw.subject_id}|${hwDay}|${hw.class_number}|${hwDate}`
+            : `${hw.subject_id}|${hwDay}|${hw.class_number}`;
           if (!homeworkMetaAll[allKey]) {
             homeworkMetaAll[allKey] = {
               count: 0,
@@ -9708,36 +9710,44 @@ app.get('/schedule', requireLogin, async (req, res) => {
   const weekEndDate = weekDates[6];
   const nowIso = new Date().toISOString();
 
+  const expandSubjectGroupsForCourse = (subjects = []) => {
+    const groups = [];
+    (subjects || []).forEach((subject) => {
+      const subjectId = Number(subject.subject_id);
+      const groupCount = Math.max(1, Number(subject.group_count || 1));
+      for (let groupNumber = 1; groupNumber <= groupCount; groupNumber += 1) {
+        groups.push({
+          subject_id: subjectId,
+          group_number: groupNumber,
+          subject_name: subject.subject_name,
+        });
+      }
+    });
+    return groups;
+  };
+
+  const loadAllCourseSubjectGroups = (cb) => {
+    db.all(
+      `
+        SELECT id AS subject_id, name AS subject_name, group_count
+        FROM subjects
+        WHERE course_id = ? AND visible = 1
+        ORDER BY name
+      `,
+      [scheduleCourseId],
+      (err, subjects) => {
+        if (err) {
+          return cb(err);
+        }
+        return cb(null, expandSubjectGroupsForCourse(subjects || []));
+      }
+    );
+  };
+
   const loadStudentGroups = (cb) => {
     if (!isAdminViewAs) {
       if (hasSessionRole(req, 'admin')) {
-        return db.all(
-          `
-            SELECT id AS subject_id, name AS subject_name, group_count
-            FROM subjects
-            WHERE course_id = ? AND visible = 1
-            ORDER BY name
-          `,
-          [scheduleCourseId],
-          (err, subjects) => {
-            if (err) {
-              return cb(err);
-            }
-            const groups = [];
-            (subjects || []).forEach((subject) => {
-              const subjectId = Number(subject.subject_id);
-              const groupCount = Math.max(1, Number(subject.group_count || 1));
-              for (let groupNumber = 1; groupNumber <= groupCount; groupNumber += 1) {
-                groups.push({
-                  subject_id: subjectId,
-                  group_number: groupNumber,
-                  subject_name: subject.subject_name,
-                });
-              }
-            });
-            return cb(null, groups);
-          }
-        );
+        return loadAllCourseSubjectGroups(cb);
       }
       return db.all(
         `
@@ -9759,7 +9769,15 @@ app.get('/schedule', requireLogin, async (req, res) => {
           WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
         `,
         [userId, scheduleCourseId],
-        cb
+        (err, rows) => {
+          if (err) {
+            return cb(err);
+          }
+          if (Array.isArray(rows) && rows.length) {
+            return cb(null, rows);
+          }
+          return loadAllCourseSubjectGroups(cb);
+        }
       );
     }
     db.all(
@@ -10027,10 +10045,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
                   group_number: row.group_number,
                   subject_id: row.subject_id,
                   subject: row.subject_name,
-                  day: row.day_of_week,
+                  day: normalizeWeekdayName(row.day_of_week) || String(row.day_of_week || ''),
                   class_number: row.class_number,
                   description: row.description,
-                  class_date: row.class_date,
+                  class_date: toDateOnly(row.class_date),
                   meeting_url: row.meeting_url,
                   link_url: row.link_url,
                   file_path: row.file_path,
@@ -10066,8 +10084,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
             }));
             const homeworkMeta = {};
             homework.forEach((hw) => {
-              const legacyKey = `${hw.subject_id}|${hw.group_number}|${hw.day}|${hw.class_number}`;
-              const key = hw.class_date ? `${legacyKey}|${hw.class_date}` : legacyKey;
+              const hwDay = normalizeWeekdayName(hw.day) || String(hw.day || '');
+              const hwDate = toDateOnly(hw.class_date);
+              const legacyKey = `${hw.subject_id}|${hw.group_number}|${hwDay}|${hw.class_number}`;
+              const key = hwDate ? `${legacyKey}|${hwDate}` : legacyKey;
               if (!homeworkMeta[key]) {
                 homeworkMeta[key] = {
                   count: 0,

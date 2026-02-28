@@ -1778,7 +1778,10 @@
                   <% const legacyKey = `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}`; %>
                   <% const datedKey = cls.class_date ? `${legacyKey}|${cls.class_date}` : null; %>
                   <% const baseKey = cls.class_date ? `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}|${cls.class_date}` : `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}`; %>
-                  <% const hwMeta = cls.is_general && homeworkMetaAll ? homeworkMetaAll[baseKey] : (homeworkMeta ? (datedKey ? homeworkMeta[datedKey] : homeworkMeta[legacyKey]) : null); %>
+                  <% const generalFallbackKey = `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}`; %>
+                  <% const hwMetaGeneral = cls.is_general && homeworkMetaAll ? (homeworkMetaAll[baseKey] || homeworkMetaAll[generalFallbackKey]) : null; %>
+                  <% const hwMetaGroup = homeworkMeta ? ((datedKey ? homeworkMeta[datedKey] : null) || homeworkMeta[legacyKey]) : null; %>
+                  <% const hwMeta = hwMetaGeneral || hwMetaGroup; %>
                   <% const groupLabel = cls.group_label ? cls.group_label : `Group ${cls.group_number}`; %>
                   <% const courseLabel = cls.course_name ? ` · ${cls.course_name}` : ''; %>
                   <% const prev = idx > 0 ? dayEntries[idx - 1] : null; %>
@@ -2909,14 +2912,19 @@
           hwCreditToggle.checked = false;
         }
 
+        const normalizedCardDay = String(day || '').trim().toLowerCase();
+        const normalizedCardDate = String(classDate || '').slice(0, 10);
         const filtered = homeworkData.filter((item) => {
+          const itemDay = String(item.day || '').trim().toLowerCase();
+          const itemDate = String(item.class_date || '').slice(0, 10);
+          const matchesDate = !normalizedCardDate || !itemDate || itemDate === normalizedCardDate;
           return (
             Number(item.subject_id) === subjectId &&
             (!isGeneral ? Number(item.group_number) === groupNum : true) &&
-            item.day === day &&
+            itemDay === normalizedCardDay &&
             Number(item.class_number) === classNum &&
             (Number.isNaN(courseId) ? true : Number(item.course_id) === courseId) &&
-            item.class_date === classDate
+            matchesDate
           );
         });
         currentHomeworkItems = filtered;
