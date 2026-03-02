@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.49",
+      "date": "2026-03-02",
+      "items": [
+        "feat(session-generator-types): manual session planner now supports three event types in slots: exam, credit, and consultation",
+        "feat(session-generator-publish): session publish flow now persists consultation events as session timetable items and includes them in duplicate checks/delete flow",
+        "fix(session-generator-journal-sync): session consultations (`[Сесія] Консультація`) are excluded from journal grade column sync so only exam/credit controls create grade columns"
+      ]
+    },
+    {
       "version": "1.0.48",
       "date": "2026-03-02",
       "items": [

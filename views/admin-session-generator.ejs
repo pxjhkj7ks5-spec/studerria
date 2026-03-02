@@ -800,6 +800,7 @@
                       <label class="form-label">Тип контролю</label>
                       <div class="btn-group w-100" role="group" aria-label="Session type">
                         <button class="btn btn-outline-primary active" type="button" data-manual-type="exam">Екзамен</button>
+                        <button class="btn btn-outline-secondary" type="button" data-manual-type="consultation">Консультація</button>
                         <button class="btn btn-outline-danger" type="button" data-manual-type="credit">Залік</button>
                       </div>
                     </div>
@@ -819,7 +820,7 @@
                       </select>
                     </div>
                     <div class="liquid-alert info">
-                      1) Оберіть тип/предмет/групу. 2) Натисніть слот у розкладі справа. 3) Повторний клік цим самим вибором видаляє подію.
+                      1) Оберіть тип (екзамен/консультація/залік), предмет і групу. 2) Натисніть слот у розкладі справа. 3) Повторний клік цим самим вибором видаляє подію.
                     </div>
                     <button class="btn btn-outline-secondary btn-sm" type="button" id="manualPlanClearBtn">Очистити ручний план</button>
                   </div>
@@ -1014,11 +1015,12 @@
         };
 
         const sortAssignments = (rows) => [...(rows || [])].sort((a, b) => {
+          const typeOrder = { exam: 1, consultation: 2, credit: 3 };
           const byDate = String(a.date || '').localeCompare(String(b.date || ''));
           if (byDate !== 0) return byDate;
           const byClass = Number(a.class_number || 0) - Number(b.class_number || 0);
           if (byClass !== 0) return byClass;
-          if (a.type !== b.type) return a.type === 'exam' ? -1 : 1;
+          if (a.type !== b.type) return Number(typeOrder[a.type] || 9) - Number(typeOrder[b.type] || 9);
           const bySubject = String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
           if (bySubject !== 0) return bySubject;
           return Number(a.group_number || 0) - Number(b.group_number || 0);
@@ -1026,12 +1028,15 @@
 
         const syncManualTypeButtons = () => {
           manualTypeButtons.forEach((button) => {
-            const isActive = String(button.dataset.manualType || '') === manualSelectedType;
+            const type = String(button.dataset.manualType || '');
+            const isActive = type === manualSelectedType;
             button.classList.toggle('active', isActive);
-            button.classList.toggle('btn-outline-primary', !isActive && button.dataset.manualType === 'exam');
-            button.classList.toggle('btn-primary', isActive && button.dataset.manualType === 'exam');
-            button.classList.toggle('btn-outline-danger', !isActive && button.dataset.manualType === 'credit');
-            button.classList.toggle('btn-danger', isActive && button.dataset.manualType === 'credit');
+            button.classList.toggle('btn-outline-primary', !isActive && type === 'exam');
+            button.classList.toggle('btn-primary', isActive && type === 'exam');
+            button.classList.toggle('btn-outline-secondary', !isActive && type === 'consultation');
+            button.classList.toggle('btn-secondary', isActive && type === 'consultation');
+            button.classList.toggle('btn-outline-danger', !isActive && type === 'credit');
+            button.classList.toggle('btn-danger', isActive && type === 'credit');
           });
         };
 
@@ -1069,7 +1074,7 @@
             }
             button.classList.add('is-assigned');
             const rowsHtml = slotRows.slice(0, 2).map((item) => `
-              <div><span class="mark-pill ${item.type === 'credit' ? 'danger' : 'info'}">${item.type === 'credit' ? 'Залік' : 'Екз'}</span> ${escapeHtml(item.subject_name)} · ${escapeHtml(item.group_label || 'Усі групи')}</div>
+              <div><span class="mark-pill ${item.type === 'credit' ? 'danger' : (item.type === 'consultation' ? 'muted' : 'info')}">${item.type === 'credit' ? 'Залік' : (item.type === 'consultation' ? 'Конс' : 'Екз')}</span> ${escapeHtml(item.subject_name)} · ${escapeHtml(item.group_label || 'Усі групи')}</div>
             `).join('');
             const moreHtml = slotRows.length > 2
               ? `<div class="small text-muted">+${slotRows.length - 2} ще</div>`
@@ -1087,7 +1092,7 @@
           }
           manualAssignmentsInput.value = rows.length ? JSON.stringify(rows.map((row) => ({
             subject_id: Number(row.subject_id || 0),
-            type: row.type === 'credit' ? 'credit' : 'exam',
+            type: row.type === 'credit' ? 'credit' : (row.type === 'consultation' ? 'consultation' : 'exam'),
             date: row.date || '',
             class_number: Number(row.class_number || 0),
             group_number: row.group_number ? Number(row.group_number) : null,
@@ -1153,7 +1158,10 @@
 
         manualTypeButtons.forEach((button) => {
           button.addEventListener('click', () => {
-            manualSelectedType = button.dataset.manualType === 'credit' ? 'credit' : 'exam';
+            const type = String(button.dataset.manualType || '').trim();
+            manualSelectedType = type === 'credit'
+              ? 'credit'
+              : (type === 'consultation' ? 'consultation' : 'exam');
             syncManualTypeButtons();
           });
         });

@@ -11347,6 +11347,7 @@ const buildHomeworkJournalTitle = (homeworkRow) => {
 };
 
 const SESSION_HOMEWORK_PREFIX = '[сесія]';
+const SESSION_HOMEWORK_CONSULTATION_PREFIX = '[сесія] консультація';
 const SESSION_COLUMN_POSITION_BASE = 900000;
 const isSessionHomeworkRow = (row) => {
   const text = String(row?.description || row?.homework_description || row?.source_homework_description || '')
@@ -11354,6 +11355,13 @@ const isSessionHomeworkRow = (row) => {
     .trim()
     .toLowerCase();
   return text.startsWith(SESSION_HOMEWORK_PREFIX);
+};
+const isSessionConsultationHomeworkRow = (row) => {
+  const text = String(row?.description || row?.homework_description || row?.source_homework_description || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  return text.startsWith(SESSION_HOMEWORK_CONSULTATION_PREFIX);
 };
 
 const resolveHomeworkSubmissionStatus = (homeworkRow, submissionRow) => {
@@ -11932,6 +11940,7 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
   }
   sql += ' ORDER BY COALESCE(h.custom_due_date, h.class_date, h.created_at) ASC, h.id ASC';
   const rawHomeworkRows = await db.all(sql, params);
+  const homeworkRowsForColumns = (rawHomeworkRows || []).filter((row) => !isSessionConsultationHomeworkRow(row));
 
   const columnParams = [subjectId, courseId];
   let columnsSql = `
@@ -11981,6 +11990,13 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
       }
       return;
     }
+    if (isSessionConsultationHomeworkRow(row)) {
+      const staleId = Number(row.id);
+      if (Number.isFinite(staleId) && staleId > 0) {
+        staleHomeworkColumnIds.push(staleId);
+      }
+      return;
+    }
     existingByHomeworkId.set(Number(row.source_homework_id), row);
     const position = Number(row.position || 0);
     const isSessionRow = isSessionHomeworkRow(row);
@@ -12021,7 +12037,7 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
 
   const dedupedHomeworkRows = [];
   const teacherBatchState = new Map();
-  (rawHomeworkRows || []).forEach((homeworkRow) => {
+  (homeworkRowsForColumns || []).forEach((homeworkRow) => {
     const isTeacherHomework = Number(homeworkRow.is_teacher_homework || 0) === 1;
     if (!isTeacherHomework) {
       dedupedHomeworkRows.push(homeworkRow);
@@ -20690,7 +20706,10 @@ const parseSessionManualAssignments = (rawValue) => {
       const subjectId = Number(row && row.subject_id);
       const classNumber = Number(row && row.class_number);
       const typeRaw = String(row && row.type ? row.type : '').trim().toLowerCase();
-      const type = typeRaw === 'credit' ? 'credit' : (typeRaw === 'exam' ? 'exam' : '');
+      let type = '';
+      if (typeRaw === 'credit') type = 'credit';
+      if (typeRaw === 'exam') type = 'exam';
+      if (typeRaw === 'consultation' || typeRaw === 'consult' || typeRaw === 'cons') type = 'consultation';
       const date = row && row.date ? String(row.date).slice(0, 10) : '';
       const groupNumberRaw = Number(row && row.group_number);
       const groupNumber = Number.isFinite(groupNumberRaw) && groupNumberRaw > 0
@@ -21136,7 +21155,9 @@ const buildSessionExpandedAssignments = (assessments = [], subjectById = new Map
         date,
         day_name: dayName,
         class_number: classNumber,
-        type: assessment.type === 'credit' ? 'credit' : 'exam',
+        type: assessment.type === 'credit'
+          ? 'credit'
+          : (assessment.type === 'consultation' ? 'consultation' : 'exam'),
         note: String(assessment.note || ''),
       });
     });
@@ -21337,7 +21358,8 @@ const buildSessionTeacherConflictReport = async ({
       const sameDraftSlotRows = draftMap.get(slotKey);
       sameDraftSlotRows.forEach((otherRow) => {
         const sameTarget = Number(otherRow.subject_id || 0) === Number(row.subject_id || 0)
-          && Number(otherRow.group_number || 0) === Number(row.group_number || 0);
+          && Number(otherRow.group_number || 0) === Number(row.group_number || 0)
+          && String(otherRow.type || '') === String(row.type || '');
         if (sameTarget) return;
         pushConflict({
           type: 'draft',
@@ -22405,7 +22427,9 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
         if (!dayName) return null;
         return {
           kind: 'assessment',
-          type: item.type === 'credit' ? 'credit' : 'exam',
+          type: item.type === 'credit'
+            ? 'credit'
+            : (item.type === 'consultation' ? 'consultation' : 'exam'),
           subject_id: Number(subject.id),
           subject_name: subject.name || '',
           date,
@@ -22419,9 +22443,10 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       })
       .filter(Boolean)
       .sort((a, b) => {
+        const typeOrder = { exam: 1, consultation: 2, credit: 3 };
         const byDate = String(a.date || '').localeCompare(String(b.date || ''));
         if (byDate !== 0) return byDate;
-        if (a.type !== b.type) return a.type === 'exam' ? -1 : 1;
+        if (a.type !== b.type) return Number(typeOrder[a.type] || 9) - Number(typeOrder[b.type] || 9);
         const byClass = Number(a.class_number || 0) - Number(b.class_number || 0);
         if (byClass !== 0) return byClass;
         const bySubject = String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
@@ -22476,15 +22501,19 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       }
       const subject = subjectById.get(subjectId);
       if (!subject) continue;
-      touchedSubjectIds.add(subjectId);
+      const isConsultation = assignment.type === 'consultation';
       const isCredit = assignment.type === 'credit' ? 1 : 0;
-      const typeLabel = isCredit ? 'Залік' : 'Екзамен';
+      if (!isConsultation) {
+        touchedSubjectIds.add(subjectId);
+      }
+      const typeLabel = isConsultation ? 'Консультація' : (isCredit ? 'Залік' : 'Екзамен');
       const descriptionBase = `[Сесія] ${typeLabel} · ${subject.name || assignment.subject_name || ''}`.trim();
       const description = assignment.note
         ? `${descriptionBase} · ${String(assignment.note).trim().slice(0, 120)}`
         : descriptionBase;
       const slot = bellSchedule[classNumber] || null;
       const timeLabel = slot ? `${slot.start}-${slot.end}` : `Пара ${classNumber}`;
+      const isControlFlag = isConsultation ? 0 : 1;
 
       let existingSql = `
         SELECT id
@@ -22495,12 +22524,16 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
           AND class_date = ?
           AND class_number = ?
           AND COALESCE(is_teacher_homework, 0) = 1
-          AND COALESCE(is_control, 0) = 1
-          AND COALESCE(is_credit, 0) = ?
           AND COALESCE(is_custom_deadline, 0) = 0
           AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
       `;
-      const existingParams = [subjectId, groupNumber, selectedCourseId, assessmentDate, classNumber, isCredit];
+      const existingParams = [subjectId, groupNumber, selectedCourseId, assessmentDate, classNumber];
+      if (isConsultation) {
+        existingSql += " AND COALESCE(is_control, 0) = 0 AND COALESCE(is_credit, 0) = 0 AND LOWER(TRIM(COALESCE(description, ''))) LIKE '[сесія] консультація%'";
+      } else {
+        existingSql += ' AND COALESCE(is_control, 0) = 1 AND COALESCE(is_credit, 0) = ?';
+        existingParams.push(isCredit);
+      }
       if (selectedSemesterId) {
         existingSql += ' AND (semester_id = ? OR semester_id IS NULL)';
         existingParams.push(selectedSemesterId);
@@ -22523,7 +22556,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
               created_by, created_at, course_id, semester_id, status, scheduled_at, published_at,
               is_control, is_teacher_homework, is_credit
             )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', NULL, ?, 1, 1, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', NULL, ?, ?, 1, ?)
         `,
         [
           `Група ${groupNumber}`,
@@ -22546,6 +22579,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
           selectedCourseId,
           selectedSemesterId || null,
           createdAt,
+          isControlFlag,
           isCredit,
         ]
       );
@@ -22705,7 +22739,6 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
       WHERE course_id = ?
         AND class_date = ANY(?)
         AND COALESCE(is_teacher_homework, 0) = 1
-        AND COALESCE(is_control, 0) = 1
         AND LOWER(TRIM(COALESCE(description, ''))) LIKE '[сесія]%'
         AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
     `;
