@@ -126,6 +126,19 @@
       });
   }
 
+  function initBootstrapTooltips(root) {
+    if (!window.bootstrap || !window.bootstrap.Tooltip) {
+      return;
+    }
+    const scope = root instanceof HTMLElement || root instanceof Document ? root : document;
+    if (!scope.querySelectorAll) {
+      return;
+    }
+    scope.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((node) => {
+      window.bootstrap.Tooltip.getOrCreateInstance(node);
+    });
+  }
+
   function initLivingSeparators() {
     const root = document.documentElement;
     if (!root || !document.querySelector('.living-separator')) {
@@ -216,6 +229,7 @@
           applySemanticBadges(node);
           applyGlassDock(node);
           applyFocusHalo(node);
+          initBootstrapTooltips(node);
         });
       });
     });
@@ -325,6 +339,7 @@
     applySemanticBadges(document);
     applyGlassDock(document);
     applyFocusHalo(document);
+    initBootstrapTooltips(document);
     initLivingSeparators();
     observeThemeChanges();
     observeDynamicBadges();

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.38",
+      "date": "2026-03-02",
+      "items": [
+        "fix(auth-footer-build-tooltip): enabled global Bootstrap tooltip initialization in design-system so the footer build timestamp hover works on login/register and other pages without local tooltip bootstrapping"
+      ]
+    },
+    {
       "version": "1.0.37",
       "date": "2026-03-02",
       "items": [
