@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.39",
+      "date": "2026-03-02",
+      "items": [
+        "fix(admin-template-locals): added unified default locals for admin.ejs and applied them to /admin, /starosta, and /deanery renders to prevent ReferenceError crashes (e.g. teacherRequests/homeworkTags missing in role-specific views)"
+      ]
+    },
+    {
       "version": "1.0.38",
       "date": "2026-03-02",
       "items": [

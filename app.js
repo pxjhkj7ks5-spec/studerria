@@ -19023,6 +19023,65 @@ app.post('/teamwork/react', requireLogin, writeLimiter, async (req, res) => {
   }
 });
 
+const buildAdminTemplateLocals = (overrides = {}) => ({
+  schedule: [],
+  homework: [],
+  homeworkTags: [],
+  users: [],
+  subjects: [],
+  studentGroups: [],
+  logs: [],
+  activityLogs: [],
+  activityTop: [],
+  dashboardStats: {
+    users: 0,
+    subjects: 0,
+    homework: 0,
+    teamworkTasks: 0,
+    teamworkGroups: 0,
+    teamworkMembers: 0,
+  },
+  teamworkTasks: [],
+  adminMessages: [],
+  courses: [],
+  teacherRequests: [],
+  semesters: [],
+  semestersByCourse: {},
+  activeSemester: null,
+  selectedCourseId: null,
+  limitedStaffView: false,
+  allowedSections: null,
+  allowCourseSelect: false,
+  weeklyLabels: [],
+  weeklyHomework: [],
+  weeklyTeamwork: [],
+  weeklyUserRoles: [],
+  weeklyUserSeries: [],
+  settings: settingsCache,
+  settingsMeta: null,
+  rolePermissions: settingsCache.role_permissions || { ...DEFAULT_ROLE_PERMISSIONS },
+  defaultRolePermissions: DEFAULT_ROLE_PERMISSIONS,
+  adminSectionOptions: ADMIN_SECTION_OPTIONS,
+  rbacRoles: [],
+  rbacPermissionOptions: RBAC_PERMISSION_OPTIONS,
+  courseKindOptions: COURSE_KIND_OPTIONS,
+  userRoleAssignments: {},
+  userPrimaryRoleMap: {},
+  activeScheduleDays: [...daysOfWeek],
+  filters: {},
+  usersStatus: 'active',
+  sorts: {},
+  historyFilters: {},
+  activityFilters: {},
+  messages: {
+    error: '',
+    success: '',
+    operationId: '',
+  },
+  deaneryMonitoring: null,
+  ...overrides,
+});
+
 app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
   try {
     await ensureDbReady();
@@ -19703,7 +19762,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     });
 
     try {
-        res.render('admin', {
+        res.render('admin', buildAdminTemplateLocals({
           username: req.session.user.username,
           userId: req.session.user.id,
           role: adminViewRole,
@@ -19781,7 +19840,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                         success: req.query.ok || '',
                                         operationId: req.query.op || '',
                                       },
-                                    });
+                                    }));
                                   } catch (renderErr) {
                                     return handleDbError(res, renderErr, 'admin.render');
                                   }
@@ -27748,7 +27807,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
   }
 
   try {
-    return res.render('admin', {
+    return res.render('admin', buildAdminTemplateLocals({
       username: req.session.user.username,
       userId: req.session.user.id,
       role: 'starosta',
@@ -27782,7 +27841,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
         schedule: '',
         homework: sort_homework || '',
       },
-    });
+    }));
   } catch (renderErr) {
     return handleDbError(res, renderErr, 'starosta.render');
   }
@@ -28120,7 +28179,7 @@ app.get('/deanery', requireDeanery, async (req, res) => {
       buildDeaneryMonitoringSnapshot(allowedCourses, courseId),
     ]);
     const schedule = sortSchedule(scheduleRows, sort_schedule);
-    return res.render('admin', {
+    return res.render('admin', buildAdminTemplateLocals({
       username: req.session.user.username,
       userId: req.session.user.id,
       role: 'deanery',
@@ -28155,7 +28214,7 @@ app.get('/deanery', requireDeanery, async (req, res) => {
         error: req.query.err || '',
         success: req.query.ok || '',
       },
-    });
+    }));
   } catch (err) {
     return handleDbError(res, err, 'deanery.render');
   }
