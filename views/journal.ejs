@@ -1754,13 +1754,12 @@
               : sourceType === 'checklist'
                 ? '+1/+0'
                 : 'Ручний';
-            const scoreScaleMax = sourceType === 'checklist' ? 1 : Number(competencyMeta.score_max ?? 5);
             const note = String(item && item.note ? item.note : '');
             return `
               <article class="journal-competency-item">
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                   <strong>${escapeHtml(label)}</strong>
-                  <span class="status-chip status-chip--info">${escapeHtml(scoreDisplay)} / ${escapeHtml(formatNumber(scoreScaleMax))}</span>
+                  <span class="status-chip status-chip--info">${escapeHtml(scoreDisplay)}</span>
                   <span class="status-chip status-chip--neutral">${escapeHtml(sourceLabel)}</span>
                 </div>
                 <div class="journal-competency-meta">
