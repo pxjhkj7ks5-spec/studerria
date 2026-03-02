@@ -1781,7 +1781,10 @@
                   <% const generalFallbackKey = `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}`; %>
                   <% const hwMetaGeneral = cls.is_general && homeworkMetaAll ? (homeworkMetaAll[baseKey] || homeworkMetaAll[generalFallbackKey]) : null; %>
                   <% const hwMetaGroup = homeworkMeta ? ((datedKey ? homeworkMeta[datedKey] : null) || homeworkMeta[legacyKey]) : null; %>
-                  <% const hwMeta = hwMetaGeneral || hwMetaGroup; %>
+                  <% const hwMetaAnyGroup = (!cls.is_general && (role === 'admin' || viewAs === 'student') && homeworkMetaAll)
+                    ? (homeworkMetaAll[baseKey] || homeworkMetaAll[generalFallbackKey])
+                    : null; %>
+                  <% const hwMeta = hwMetaGeneral || hwMetaGroup || hwMetaAnyGroup; %>
                   <% const groupLabel = cls.group_label ? cls.group_label : `Group ${cls.group_number}`; %>
                   <% const courseLabel = cls.course_name ? ` · ${cls.course_name}` : ''; %>
                   <% const prev = idx > 0 ? dayEntries[idx - 1] : null; %>
@@ -2592,6 +2595,7 @@
 
       const isTeacherView = <%- JSON.stringify(role === 'teacher') %>;
       const canSubmitHomework = <%- JSON.stringify(role === 'student' || role === 'starosta') %>;
+      const allowCrossGroupHomeworkFallback = <%- JSON.stringify(role === 'admin' || viewAs === 'student') %>;
       const homeworkModal = document.getElementById('homeworkModal');
       const homeworkData = <%- JSON.stringify(homework || []) %>;
       const customDeadlineItems = <%- JSON.stringify(customDeadlineItems || []) %>;
@@ -2914,7 +2918,7 @@
 
         const normalizedCardDay = String(day || '').trim().toLowerCase();
         const normalizedCardDate = String(classDate || '').slice(0, 10);
-        const filtered = homeworkData.filter((item) => {
+        let filtered = homeworkData.filter((item) => {
           const itemDay = String(item.day || '').trim().toLowerCase();
           const itemDate = String(item.class_date || '').slice(0, 10);
           const matchesDate = !normalizedCardDate || !itemDate || itemDate === normalizedCardDate;
@@ -2927,6 +2931,20 @@
             matchesDate
           );
         });
+        if (!filtered.length && allowCrossGroupHomeworkFallback) {
+          filtered = homeworkData.filter((item) => {
+            const itemDay = String(item.day || '').trim().toLowerCase();
+            const itemDate = String(item.class_date || '').slice(0, 10);
+            const matchesDate = !normalizedCardDate || !itemDate || itemDate === normalizedCardDate;
+            return (
+              Number(item.subject_id) === subjectId &&
+              itemDay === normalizedCardDay &&
+              Number(item.class_number) === classNum &&
+              (Number.isNaN(courseId) ? true : Number(item.course_id) === courseId) &&
+              matchesDate
+            );
+          });
+        }
         currentHomeworkItems = filtered;
         renderHomework(filtered);
         const first = filtered[0];

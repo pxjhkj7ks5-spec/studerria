@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.31",
+      "date": "2026-03-02",
+      "items": [
+        "fix(schedule-viewas-mobile): when admin uses student self-view without assigned student_groups, fallback now targets one valid group per subject instead of expanding to all groups",
+        "fix(schedule-homework-visibility): added slot-level homework meta fallback for admin/view-as so teacher homework chips and modal entries appear even if stored group differs",
+        "fix(admin-teacher-requests): approve/reject now resolve user by id and validate existing teacher_request, preventing false \"User not found\" on cross-course requests"
+      ]
+    },
+    {
       "version": "1.0.30",
       "date": "2026-02-28",
       "items": [

@@ -9678,8 +9678,25 @@ app.get('/schedule', requireLogin, async (req, res) => {
     ? viewAsCourseId
     : (courseId || 1);
   const viewAsCourse = isAdminViewAs ? await getCourseById(scheduleCourseId) : null;
+  const parsePreferredGroupNumber = (rawValue) => {
+    const parsed = Number(rawValue);
+    if (!Number.isInteger(parsed) || parsed < 1) return null;
+    return parsed;
+  };
+  const selfFallbackGroupNumber = (isAdminViewAs && viewAsMode === 'self')
+    ? (
+      parsePreferredGroupNumber(req.query.group_number)
+      || parsePreferredGroupNumber(req.query.group)
+      || parsePreferredGroupNumber(req.session.viewAsGroupNumber)
+      || parsePreferredGroupNumber(req.session.user && req.session.user.schedule_group)
+      || 1
+    )
+    : null;
+  const effectiveViewAsGroupNumber = isAdminViewAs
+    ? (viewAsMode === 'self' ? selfFallbackGroupNumber : (parsePreferredGroupNumber(viewAsGroupNumber) || 1))
+    : null;
   const viewAsLabel = isAdminViewAs
-    ? (viewAsMode === 'self' ? 'Ваші групи' : `Група ${viewAsGroupNumber || 1}`)
+    ? (viewAsMode === 'self' ? 'Ваші групи' : `Група ${effectiveViewAsGroupNumber || 1}`)
     : null;
 
   const activeSemester = await getActiveSemester(scheduleCourseId);
@@ -9744,6 +9761,33 @@ app.get('/schedule', requireLogin, async (req, res) => {
     );
   };
 
+  const loadCourseSubjectGroupsForSingleGroup = (requestedGroupNumber, cb) => {
+    db.all(
+      `
+        SELECT id AS subject_id, name AS subject_name, group_count
+        FROM subjects
+        WHERE course_id = ? AND visible = 1
+        ORDER BY name
+      `,
+      [scheduleCourseId],
+      (err, subjects) => {
+        if (err) {
+          return cb(err);
+        }
+        const fallbackGroup = parsePreferredGroupNumber(requestedGroupNumber) || 1;
+        const groups = (subjects || []).map((subject) => {
+          const maxGroups = Math.max(1, Number(subject.group_count || 1));
+          return {
+            subject_id: Number(subject.subject_id),
+            group_number: Math.min(fallbackGroup, maxGroups),
+            subject_name: subject.subject_name,
+          };
+        });
+        return cb(null, groups);
+      }
+    );
+  };
+
   const loadStudentGroups = (cb) => {
     if (!isAdminViewAs) {
       if (hasSessionRole(req, 'admin')) {
@@ -9776,7 +9820,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           if (Array.isArray(rows) && rows.length) {
             return cb(null, rows);
           }
-          return loadAllCourseSubjectGroups(cb);
+          return loadCourseSubjectGroupsForSingleGroup(selfFallbackGroupNumber, cb);
         }
       );
     }
@@ -9978,11 +10022,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
               totalWeeks,
               semester: activeSemester,
               bellSchedule,
-              group: isAdminViewAs ? `Група ${viewAsGroupNumber || 1}` : (group || 'A'),
+              group: isAdminViewAs ? `Група ${effectiveViewAsGroupNumber || 1}` : (group || 'A'),
               username,
               homework: [],
               homeworkMeta: {},
-              homeworkMetaAll: null,
+              homeworkMetaAll: {},
               homeworkTags: [],
               customDeadlinesByDate,
               weekendDeadlineCards,
@@ -9992,7 +10036,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               role: req.session.role,
               viewAs: req.session.viewAs || null,
               viewAsCourse,
-              viewAsGroupNumber: isAdminViewAs ? viewAsGroupNumber : null,
+              viewAsGroupNumber: isAdminViewAs ? effectiveViewAsGroupNumber : null,
               viewAsLabel,
               messageSubjects: studentGroups || [],
               userId,
@@ -10083,6 +10127,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               subgroups: Object.values(hw.subgroups),
             }));
             const homeworkMeta = {};
+            const homeworkMetaAll = {};
             homework.forEach((hw) => {
               const hwDay = normalizeWeekdayName(hw.day) || String(hw.day || '');
               const hwDate = toDateOnly(hw.class_date);
@@ -10118,6 +10163,39 @@ app.get('/schedule', requireLogin, async (req, res) => {
               if (hw.description && homeworkMeta[key].preview.length < 2) {
                 homeworkMeta[key].preview.push(hw.description);
               }
+              const allKey = hwDate
+                ? `${hw.subject_id}|${hwDay}|${hw.class_number}|${hwDate}`
+                : `${hw.subject_id}|${hwDay}|${hw.class_number}`;
+              if (!homeworkMetaAll[allKey]) {
+                homeworkMetaAll[allKey] = {
+                  count: 0,
+                  preview: [],
+                  control: false,
+                  teacher_homework: false,
+                  credit: false,
+                  meet: false,
+                  meet_link: '',
+                };
+              }
+              homeworkMetaAll[allKey].count += 1;
+              if (hw.is_control) {
+                homeworkMetaAll[allKey].control = true;
+              }
+              if (hw.is_teacher_homework) {
+                homeworkMetaAll[allKey].teacher_homework = true;
+              }
+              if (hw.is_credit) {
+                homeworkMetaAll[allKey].credit = true;
+              }
+              if (hw.meeting_url) {
+                homeworkMetaAll[allKey].meet = true;
+                if (!homeworkMetaAll[allKey].meet_link) {
+                  homeworkMetaAll[allKey].meet_link = String(hw.meeting_url);
+                }
+              }
+              if (hw.description && homeworkMetaAll[allKey].preview.length < 2) {
+                homeworkMetaAll[allKey].preview.push(hw.description);
+              }
             });
 
             const homeworkIds = homework.map((h) => h.id);
@@ -10130,11 +10208,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 totalWeeks,
                 semester: activeSemester,
                 bellSchedule,
-                group: isAdminViewAs ? `Група ${viewAsGroupNumber || 1}` : (group || 'A'),
+                group: isAdminViewAs ? `Група ${effectiveViewAsGroupNumber || 1}` : (group || 'A'),
                 username,
                 homework,
                 homeworkMeta,
-                homeworkMetaAll: null,
+                homeworkMetaAll,
                 homeworkTags: tagOptions,
                 customDeadlinesByDate,
                 weekendDeadlineCards,
@@ -10144,7 +10222,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 role: req.session.role,
                 viewAs: req.session.viewAs || null,
                 viewAsCourse,
-                viewAsGroupNumber: isAdminViewAs ? viewAsGroupNumber : null,
+                viewAsGroupNumber: isAdminViewAs ? effectiveViewAsGroupNumber : null,
                 viewAsLabel,
                 messageSubjects: studentGroups || [],
                 userId,
@@ -28620,10 +28698,15 @@ app.post('/admin/teacher-requests/:userId/approve', requireTeachersSectionAccess
   try {
     await ensureDbReady();
     const courseId = getAdminCourse(req);
-    const targetUser = await db.get('SELECT id, full_name, role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    const targetUser = await db.get('SELECT id, full_name, role, course_id FROM users WHERE id = ?', [userId]);
     if (!targetUser) {
       return res.redirect('/admin?err=User%20not%20found');
     }
+    const requestRow = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [userId]);
+    if (!requestRow) {
+      return res.redirect('/admin?err=Teacher%20request%20not%20found');
+    }
+    const targetCourseId = Number(targetUser.course_id || courseId || 1);
     const beforeSnapshot = await getUserRoleSnapshot(userId, targetUser.role || 'student');
     await db.run('UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?', ['approved', userId]);
     await assignUserRoles(userId, ['teacher'], { preferredPrimary: 'teacher' });
@@ -28631,7 +28714,7 @@ app.post('/admin/teacher-requests/:userId/approve', requireTeachersSectionAccess
       userId,
       actorUserId: Number(req.session.user.id),
       actorName: req.session.user.username,
-      courseId,
+      courseId: targetCourseId,
       source: 'teacher_request_approve',
       reason: 'Teacher request approved',
       beforeRoles: beforeSnapshot.role_keys,
@@ -28640,7 +28723,7 @@ app.post('/admin/teacher-requests/:userId/approve', requireTeachersSectionAccess
       afterPrimaryRole: 'teacher',
       targetFullName: targetUser.full_name || null,
     });
-    await recomputeUserSecurityCase(userId, { courseId, allowAutoQuarantine: false });
+    await recomputeUserSecurityCase(userId, { courseId: targetCourseId, allowAutoQuarantine: false });
     logAction(db, req, 'teacher_request_approve', { user_id: userId });
     broadcast('users_updated');
     return res.redirect('/admin?ok=Teacher%20approved');
@@ -28658,10 +28741,15 @@ app.post('/admin/teacher-requests/:userId/reject', requireTeachersSectionAccess,
   try {
     await ensureDbReady();
     const courseId = getAdminCourse(req);
-    const targetUser = await db.get('SELECT id, full_name, role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    const targetUser = await db.get('SELECT id, full_name, role, course_id FROM users WHERE id = ?', [userId]);
     if (!targetUser) {
       return res.redirect('/admin?err=User%20not%20found');
     }
+    const requestRow = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [userId]);
+    if (!requestRow) {
+      return res.redirect('/admin?err=Teacher%20request%20not%20found');
+    }
+    const targetCourseId = Number(targetUser.course_id || courseId || 1);
     const beforeSnapshot = await getUserRoleSnapshot(userId, targetUser.role || 'student');
     await db.run('UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?', ['rejected', userId]);
     await assignUserRoles(userId, ['student'], { preferredPrimary: 'student' });
@@ -28669,7 +28757,7 @@ app.post('/admin/teacher-requests/:userId/reject', requireTeachersSectionAccess,
       userId,
       actorUserId: Number(req.session.user.id),
       actorName: req.session.user.username,
-      courseId,
+      courseId: targetCourseId,
       source: 'teacher_request_reject',
       reason: 'Teacher request rejected',
       beforeRoles: beforeSnapshot.role_keys,
@@ -28678,7 +28766,7 @@ app.post('/admin/teacher-requests/:userId/reject', requireTeachersSectionAccess,
       afterPrimaryRole: 'student',
       targetFullName: targetUser.full_name || null,
     });
-    await recomputeUserSecurityCase(userId, { courseId, allowAutoQuarantine: false });
+    await recomputeUserSecurityCase(userId, { courseId: targetCourseId, allowAutoQuarantine: false });
     logAction(db, req, 'teacher_request_reject', { user_id: userId });
     broadcast('users_updated');
     return res.redirect('/admin?ok=Teacher%20rejected');
