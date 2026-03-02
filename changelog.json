@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.34",
+      "date": "2026-03-02",
+      "items": [
+        "fix(teacher-schedule-groups): seminar/lab/practice cards now display concrete group labels (\"Група N\" or \"Групи: ...\") instead of forcing \"Усі групи\" for teachers with all-group access"
+      ]
+    },
+    {
       "version": "1.0.33",
       "date": "2026-03-02",
       "items": [

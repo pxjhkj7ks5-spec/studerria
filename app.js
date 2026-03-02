@@ -9332,8 +9332,14 @@ app.get('/schedule', requireLogin, async (req, res) => {
       groupedMap.forEach((entry) => {
         const groups = Array.from(entry.group_numbers).sort((a, b) => a - b);
         const selection = selectionMap.get(entry.subject_id);
+        const lessonType = String(entry.lesson_type || '').toLowerCase();
+        const isSeminarLike = lessonType === 'seminar' || lessonType === 'lab' || lessonType === 'practice';
         let groupLabel = '';
-        if (selection && selection.general) {
+        if (isSeminarLike && groups.length === 1) {
+          groupLabel = `Група ${groups[0]}`;
+        } else if (isSeminarLike && groups.length > 1) {
+          groupLabel = `Групи: ${groups.join(', ')}`;
+        } else if (selection && selection.general) {
           groupLabel = 'Усі групи';
         } else if (groups.length === 1) {
           groupLabel = `Група ${groups[0]}`;
