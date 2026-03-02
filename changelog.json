@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.37",
+      "date": "2026-03-02",
+      "items": [
+        "fix(student-homework-toggle): schedule modal now hides the \"Add homework\" form for student-side roles when \"Allow student homework\" is disabled and shows an inline info state instead",
+        "fix(homework-disabled-ux): /homework/add and /homework/custom now redirect back to /schedule with an error flash instead of returning a blank 403 \"Homework disabled\" page"
+      ]
+    },
+    {
       "version": "1.0.36",
       "date": "2026-03-02",
       "items": [

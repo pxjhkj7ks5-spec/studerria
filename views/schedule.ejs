@@ -2039,93 +2039,100 @@
               </form>
             </div>
 
-            <h6>Add homework</h6>
-            <form method="POST" action="/homework/add" enctype="multipart/form-data" autocomplete="off">
-              <div class="mb-3">
-                <label for="hwText" class="form-label">Description</label>
-                <textarea id="hwText" name="description" class="form-control" rows="3" required></textarea>
-              </div>
-              <div class="mb-3">
-                <label for="hwLink" class="form-label">Link (optional)</label>
-                <input
-                  id="hwLink"
-                  name="link_url"
-                  type="text"
-                  inputmode="url"
-                  autocapitalize="none"
-                  class="form-control"
-                  placeholder="https://example.com"
-                  autocomplete="off"
-                />
-              </div>
-              <div class="mb-3">
-                <label for="hwMeeting" class="form-label">Online class link (Zoom/Teams)</label>
-                <input
-                  id="hwMeeting"
-                  name="meeting_url"
-                  type="text"
-                  inputmode="url"
-                  autocapitalize="none"
-                  class="form-control"
-                  placeholder="https://zoom.us/j/..."
-                  autocomplete="off"
-                />
-              </div>
-              <div class="mb-3">
-                <div class="control-toggle">
-                  <input class="toggle-input" type="checkbox" id="hwControl" name="is_control" value="1" />
-                  <label class="toggle" for="hwControl">
-                    <span class="toggle-knob"></span>
-                  </label>
-                  <span class="toggle-text">Контроль</span>
+            <% const canCreateHomeworkInSchedule = typeof canCreateHomework === 'boolean' ? canCreateHomework : true; %>
+            <% if (canCreateHomeworkInSchedule) { %>
+              <h6>Add homework</h6>
+              <form method="POST" action="/homework/add" enctype="multipart/form-data" autocomplete="off">
+                <div class="mb-3">
+                  <label for="hwText" class="form-label">Description</label>
+                  <textarea id="hwText" name="description" class="form-control" rows="3" required></textarea>
                 </div>
-              </div>
-              <% if (role && role !== 'student') { %>
+                <div class="mb-3">
+                  <label for="hwLink" class="form-label">Link (optional)</label>
+                  <input
+                    id="hwLink"
+                    name="link_url"
+                    type="text"
+                    inputmode="url"
+                    autocapitalize="none"
+                    class="form-control"
+                    placeholder="https://example.com"
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="mb-3">
+                  <label for="hwMeeting" class="form-label">Online class link (Zoom/Teams)</label>
+                  <input
+                    id="hwMeeting"
+                    name="meeting_url"
+                    type="text"
+                    inputmode="url"
+                    autocapitalize="none"
+                    class="form-control"
+                    placeholder="https://zoom.us/j/..."
+                    autocomplete="off"
+                  />
+                </div>
                 <div class="mb-3">
                   <div class="control-toggle">
-                    <input class="toggle-input" type="checkbox" id="hwCredit" name="is_credit" value="1" />
-                    <label class="toggle" for="hwCredit">
+                    <input class="toggle-input" type="checkbox" id="hwControl" name="is_control" value="1" />
+                    <label class="toggle" for="hwControl">
                       <span class="toggle-knob"></span>
                     </label>
-                    <span class="toggle-text">Залік</span>
+                    <span class="toggle-text">Контроль</span>
                   </div>
                 </div>
-              <% } %>
-              <div class="mb-3">
-                <label for="hwFile" class="form-label">Attachment (optional)</label>
-                <div class="file-field">
-                  <input id="hwFile" name="attachment" type="file" class="file-input" />
-                  <div class="file-ui">
-                    <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="hwFile">Оберіть</button>
-                    <span class="file-name" data-file-name="hwFile">Файл не вибрано</span>
+                <% if (role && role !== 'student') { %>
+                  <div class="mb-3">
+                    <div class="control-toggle">
+                      <input class="toggle-input" type="checkbox" id="hwCredit" name="is_credit" value="1" />
+                      <label class="toggle" for="hwCredit">
+                        <span class="toggle-knob"></span>
+                      </label>
+                      <span class="toggle-text">Залік</span>
+                    </div>
+                  </div>
+                <% } %>
+                <div class="mb-3">
+                  <label for="hwFile" class="form-label">Attachment (optional)</label>
+                  <div class="file-field">
+                    <input id="hwFile" name="attachment" type="file" class="file-input" />
+                    <div class="file-ui">
+                      <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="hwFile">Оберіть</button>
+                      <span class="file-name" data-file-name="hwFile">Файл не вибрано</span>
+                    </div>
                   </div>
                 </div>
+                <% if (role && role !== 'student') { %>
+                  <div class="row g-2 mb-3">
+                    <div class="col-12 col-md-4">
+                      <label for="hwStatus" class="form-label">Publication</label>
+                      <select id="hwStatus" name="status" class="form-select">
+                        <option value="published" selected>Publish now</option>
+                        <option value="scheduled">Schedule</option>
+                        <option value="draft">Draft</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-5">
+                      <label for="hwScheduledAt" class="form-label">Publish at</label>
+                      <input id="hwScheduledAt" name="scheduled_at" type="datetime-local" class="form-control" />
+                    </div>
+                  </div>
+                <% } %>
+                <input type="hidden" id="hwSubjectId" name="subject_id" />
+                <input type="hidden" id="hwGroupNum" name="group_number" />
+                <input type="hidden" id="hwDay" name="day_of_week" />
+                <input type="hidden" id="hwTime" name="time" />
+                <input type="hidden" id="hwClassNum" name="class_number" />
+                <input type="hidden" id="hwDate" name="class_date" />
+                <input type="hidden" id="hwCourseId" name="course_id" />
+                <button type="submit" class="btn btn-primary glass">Save homework</button>
+              </form>
+            <% } else { %>
+              <div class="alert alert-info mb-0">
+                Студентські ДЗ вимкнені в System Settings.
               </div>
-              <% if (role && role !== 'student') { %>
-                <div class="row g-2 mb-3">
-                  <div class="col-12 col-md-4">
-                    <label for="hwStatus" class="form-label">Publication</label>
-                    <select id="hwStatus" name="status" class="form-select">
-                      <option value="published" selected>Publish now</option>
-                      <option value="scheduled">Schedule</option>
-                      <option value="draft">Draft</option>
-                    </select>
-                  </div>
-                  <div class="col-12 col-md-5">
-                    <label for="hwScheduledAt" class="form-label">Publish at</label>
-                    <input id="hwScheduledAt" name="scheduled_at" type="datetime-local" class="form-control" />
-                  </div>
-                </div>
-              <% } %>
-              <input type="hidden" id="hwSubjectId" name="subject_id" />
-              <input type="hidden" id="hwGroupNum" name="group_number" />
-              <input type="hidden" id="hwDay" name="day_of_week" />
-              <input type="hidden" id="hwTime" name="time" />
-              <input type="hidden" id="hwClassNum" name="class_number" />
-              <input type="hidden" id="hwDate" name="class_date" />
-              <input type="hidden" id="hwCourseId" name="course_id" />
-              <button type="submit" class="btn btn-primary glass">Save homework</button>
-            </form>
+            <% } %>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
@@ -2901,12 +2908,18 @@
         document.getElementById('homeworkModalTitle').textContent = subject;
         document.getElementById('homeworkModalMeta').textContent = `${day} · ${time}`;
 
-        document.getElementById('hwDay').value = day;
-        document.getElementById('hwTime').value = timeBase;
-        document.getElementById('hwSubjectId').value = subjectId;
-        document.getElementById('hwGroupNum').value = groupNum;
-        document.getElementById('hwClassNum').value = classNum;
-        document.getElementById('hwDate').value = classDate || '';
+        const hwDayField = document.getElementById('hwDay');
+        if (hwDayField) hwDayField.value = day;
+        const hwTimeField = document.getElementById('hwTime');
+        if (hwTimeField) hwTimeField.value = timeBase;
+        const hwSubjectField = document.getElementById('hwSubjectId');
+        if (hwSubjectField) hwSubjectField.value = subjectId;
+        const hwGroupField = document.getElementById('hwGroupNum');
+        if (hwGroupField) hwGroupField.value = groupNum;
+        const hwClassField = document.getElementById('hwClassNum');
+        if (hwClassField) hwClassField.value = classNum;
+        const hwDateField = document.getElementById('hwDate');
+        if (hwDateField) hwDateField.value = classDate || '';
         const courseField = document.getElementById('hwCourseId');
         if (courseField) {
           courseField.value = Number.isNaN(courseId) ? '' : String(courseId);

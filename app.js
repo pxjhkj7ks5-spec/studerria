@@ -945,6 +945,13 @@ function hasSessionRole(req, roleKey) {
   return getSessionRoleList(req).includes(normalizeRoleKey(roleKey));
 }
 
+function canSessionCreateHomework(req) {
+  if (hasSessionRole(req, 'admin')) return true;
+  if (hasSessionRole(req, 'teacher')) return true;
+  if (hasSessionRole(req, 'deanery')) return true;
+  return Boolean(settingsCache.allow_homework_creation);
+}
+
 async function getUserRoleKeys(userId, fallbackRole = 'student') {
   const fallback = normalizeRoleKey(fallbackRole);
   if (!Number.isFinite(Number(userId))) {
@@ -9240,6 +9247,7 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
 
 app.get('/schedule', requireLogin, async (req, res) => {
   const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
+  const canCreateHomework = canSessionCreateHomework(req);
   if (hasSessionRole(req, 'teacher')) {
     try {
       await ensureDbReady();
@@ -9772,6 +9780,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         userId,
         teacherCourses,
         selectedCourseId: selectedCourse ? selectedCourse.id : null,
+        canCreateHomework,
       });
     } catch (err) {
       return handleDbError(res, err, 'teacher.schedule');
@@ -10172,6 +10181,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               messageSubjects: studentGroups || [],
               userId,
               selectedCourseId: scheduleCourseId,
+              canCreateHomework,
             })
           );
         }
@@ -10358,6 +10368,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 messageSubjects: studentGroups || [],
                 userId,
                 selectedCourseId: scheduleCourseId,
+                canCreateHomework,
               });
             };
 
@@ -27077,11 +27088,11 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   if (homeworkStatus === 'draft') {
     publishedAt = null;
   }
-  if (!settingsCache.allow_homework_creation && !hasSessionRole(req, 'admin')) {
+  if (!canSessionCreateHomework(req)) {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
     }
-    return res.status(403).send('Homework disabled');
+    return res.redirect('/schedule?err=Student%20homework%20is%20disabled');
   }
 
   try {
@@ -27318,11 +27329,11 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
   if (homeworkStatus === 'draft') {
     publishedAt = null;
   }
-  if (!settingsCache.allow_homework_creation && !hasSessionRole(req, 'admin')) {
+  if (!canSessionCreateHomework(req)) {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
     }
-    return res.status(403).send('Homework disabled');
+    return res.redirect('/schedule?err=Student%20homework%20is%20disabled');
   }
 
   try {
