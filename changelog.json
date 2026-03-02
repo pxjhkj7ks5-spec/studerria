@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.46",
+      "date": "2026-03-02",
+      "items": [
+        "ux(session-generator-cleanup): removed separate \"Що буде опубліковано\" and \"Коротко про логіку\" cards to simplify the manual planner screen",
+        "ux(session-generator-cleanup): removed extra \"Підказки/сценарії\" block and kept a compact publish panel with source + event counter",
+        "ux(session-generator-publish): replaced table-based publish preview UI with lightweight publish state sync (manual plan vs auto plan) while preserving publish behavior"
+      ]
+    },
+    {
       "version": "1.0.45",
       "date": "2026-03-02",
       "items": [

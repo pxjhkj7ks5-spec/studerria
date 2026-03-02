@@ -851,20 +851,6 @@
             </div>
           </div>
 
-          <div class="card liquid-panel">
-            <div class="card-body">
-              <div class="panel-title-row">
-                <h5>Підказки</h5>
-                <span class="session-subtle">новий режим</span>
-              </div>
-              <div class="d-grid gap-2">
-                <div class="liquid-alert info">Клік по слоту з обраним предметом додає подію, повторний клік тим самим набором видаляє її.</div>
-                <div class="liquid-alert info">Для семінарів вибирайте конкретну групу, для загальних подій лишайте “Усі групи предмета”.</div>
-                <div class="liquid-alert info">Якщо треба швидкий старт, можна зробити авто-чернетку і потім відредагувати вручну по слотах.</div>
-                <div class="liquid-alert info">У публікацію йде ручний план, якщо він не порожній; інакше — автоплан з превʼю.</div>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div class="col-12 col-xl-8">
@@ -990,120 +976,43 @@
             </div>
           </div>
 
-          <div class="card liquid-panel mb-4">
-            <div class="card-body">
-              <div class="panel-title-row">
-                <h5>Що буде опубліковано</h5>
-                <span class="session-subtle" id="sessionPublishSourceHint">Екзамени та заліки з цього превʼю</span>
-              </div>
-              <div class="timeline-empty <%= assessmentItems.length ? 'd-none' : '' %>" id="sessionPublishEmptyState">
-                <%= previewCleared ? 'План очищено. Спочатку згенеруйте сесію або додайте події вручну.' : 'Немає подій для публікації.' %>
-              </div>
-              <div class="subject-table-wrap <%= assessmentItems.length ? '' : 'd-none' %>" id="sessionPublishTableWrap">
-                <table class="table table-sm align-middle subject-table">
-                  <thead>
-                    <tr>
-                      <th>Дата</th>
-                      <th>Предмет</th>
-                      <th>Тип</th>
-                      <th>Група</th>
-                      <th>Нотатка</th>
-                      <th class="text-end">Дія</th>
-                    </tr>
-                  </thead>
-                  <tbody id="sessionPublishTableBody">
-                    <% assessmentItems.forEach(function(item) { %>
-                      <tr>
-                        <td class="small">
-                          <div class="fw-semibold"><%= item.date || '—' %></div>
-                          <div class="text-muted"><%= item.day_label || item.day_name || '' %></div>
-                        </td>
-                        <td>
-                          <div class="fw-semibold"><%= item.subject_name || '—' %></div>
-                          <div class="text-muted small">Пара <%= item.class_number || '—' %></div>
-                        </td>
-                        <td>
-                          <span class="mark-pill <%= item.type === 'credit' ? 'danger' : 'info' %>">
-                            <%= item.type === 'credit' ? 'Залік' : 'Екзамен' %>
-                          </span>
-                        </td>
-                        <td class="small"><%= item.group_label || 'Усі групи предмета' %></td>
-                        <td class="small"><%= item.note || '—' %></td>
-                        <td class="text-end small text-muted">авто</td>
-                      </tr>
-                    <% }); %>
-                  </tbody>
-                </table>
-              </div>
-
-              <div class="d-grid gap-2 mt-3">
-                <div class="liquid-alert warn">
-                  Після публікації кожен <strong>залік</strong> автоматично створює порожню колонку в журналі відповідного предмета.
+          <form method="POST" action="/admin/session-generator/publish" class="card liquid-panel mb-4">
+            <div class="card-body d-grid gap-2">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                  <div class="fw-semibold">Публікація сесії</div>
+                  <div class="session-subtle" id="sessionPublishSourceHint">Джерело: автоплан</div>
                 </div>
-                <div class="liquid-alert info">
-                  У звичайному розкладі залік буде підсвічений окремим кольором, щоб одразу бачити сесійні події.
-                </div>
+                <span class="mark-pill info">Подій: <span id="sessionPublishCount"><%= assessmentItems.length %></span></span>
               </div>
-
-              <form method="POST" action="/admin/session-generator/publish" class="mt-3 d-grid gap-2">
-                <input type="hidden" name="location" value="<%= activeLocation %>" />
-                <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
-                <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
-                <input type="hidden" name="draft_id" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
-                <input type="hidden" name="window_mode" value="<%= form && form.window_mode ? form.window_mode : 'days' %>" />
-                <input type="hidden" name="start_date" value="<%= form && form.start_date ? form.start_date : '' %>" />
-                <input type="hidden" name="session_days" value="<%= form && form.session_days ? form.session_days : '' %>" />
-                <input type="hidden" name="session_weeks_count" value="<%= form && form.session_weeks_count ? form.session_weeks_count : '' %>" />
-                <input type="hidden" name="session_weeks_set" value="<%= form && form.session_weeks_set ? form.session_weeks_set : '' %>" />
-                <input type="hidden" name="max_events_per_day" value="<%= form && form.max_events_per_day ? form.max_events_per_day : '' %>" />
-                <input type="hidden" name="reserve_every" value="<%= form && form.reserve_every ? form.reserve_every : '' %>" />
-                <input type="hidden" name="exam_gap_days" value="<%= form && form.exam_gap_days ? form.exam_gap_days : '' %>" />
-                <input type="hidden" name="retake_gap_days" value="<%= form && form.retake_gap_days ? form.retake_gap_days : '' %>" />
-                <input type="hidden" name="retake_window_days" value="<%= form && form.retake_window_days ? form.retake_window_days : '' %>" />
-                <input type="hidden" name="include_weekends" value="<%= form && form.include_weekends ? 1 : 0 %>" />
-                <input type="hidden" name="include_consultations" value="<%= form && form.include_consultations ? 1 : 0 %>" />
-                <input type="hidden" name="respect_study_days" value="<%= form && form.respect_study_days ? 1 : 0 %>" />
-                <input type="hidden" name="day_grouping_mode" value="<%= form && form.day_grouping_mode ? form.day_grouping_mode : 'none' %>" />
-                <input type="hidden" name="exam_sequence" value="<%= form && form.exam_sequence ? form.exam_sequence : 'exam_only' %>" />
-                <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
-                <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
-                <input type="hidden" name="manual_assignments_json" id="manualAssignmentsInput" value="" />
-                <button class="btn btn-danger" id="sessionPublishBtn" type="submit" <%= assessmentItems.length ? '' : 'disabled' %>>
-                  Опублікувати в розклад і журнал
-                </button>
-                <div class="session-subtle">
-                  Публікація створює події у розкладі як контрольні викладацькі записи (без перезапису наявних дублікатів).
-                  Якщо є ручний план, він має пріоритет над автогенерацією.
-                </div>
-              </form>
+              <div class="session-subtle">Ручний план має пріоритет. Якщо ручний план порожній, публікується автоплан.</div>
+              <input type="hidden" name="location" value="<%= activeLocation %>" />
+              <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
+              <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
+              <input type="hidden" name="draft_id" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
+              <input type="hidden" name="window_mode" value="<%= form && form.window_mode ? form.window_mode : 'days' %>" />
+              <input type="hidden" name="start_date" value="<%= form && form.start_date ? form.start_date : '' %>" />
+              <input type="hidden" name="session_days" value="<%= form && form.session_days ? form.session_days : '' %>" />
+              <input type="hidden" name="session_weeks_count" value="<%= form && form.session_weeks_count ? form.session_weeks_count : '' %>" />
+              <input type="hidden" name="session_weeks_set" value="<%= form && form.session_weeks_set ? form.session_weeks_set : '' %>" />
+              <input type="hidden" name="max_events_per_day" value="<%= form && form.max_events_per_day ? form.max_events_per_day : '' %>" />
+              <input type="hidden" name="reserve_every" value="<%= form && form.reserve_every ? form.reserve_every : '' %>" />
+              <input type="hidden" name="exam_gap_days" value="<%= form && form.exam_gap_days ? form.exam_gap_days : '' %>" />
+              <input type="hidden" name="retake_gap_days" value="<%= form && form.retake_gap_days ? form.retake_gap_days : '' %>" />
+              <input type="hidden" name="retake_window_days" value="<%= form && form.retake_window_days ? form.retake_window_days : '' %>" />
+              <input type="hidden" name="include_weekends" value="<%= form && form.include_weekends ? 1 : 0 %>" />
+              <input type="hidden" name="include_consultations" value="<%= form && form.include_consultations ? 1 : 0 %>" />
+              <input type="hidden" name="respect_study_days" value="<%= form && form.respect_study_days ? 1 : 0 %>" />
+              <input type="hidden" name="day_grouping_mode" value="<%= form && form.day_grouping_mode ? form.day_grouping_mode : 'none' %>" />
+              <input type="hidden" name="exam_sequence" value="<%= form && form.exam_sequence ? form.exam_sequence : 'exam_only' %>" />
+              <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
+              <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
+              <input type="hidden" name="manual_assignments_json" id="manualAssignmentsInput" value="" />
+              <button class="btn btn-danger" id="sessionPublishBtn" type="submit" <%= assessmentItems.length ? '' : 'disabled' %>>
+                Опублікувати в розклад і журнал
+              </button>
             </div>
-          </div>
-
-          <div class="card liquid-panel">
-            <div class="card-body">
-              <div class="panel-title-row">
-                <h5>Коротко про логіку</h5>
-                <span class="session-subtle">лише головне</span>
-              </div>
-              <div class="d-grid gap-2">
-                <div class="liquid-alert info">Базовий сценарій: оберіть тип + предмет і призначайте події кліком по слотах звичайного розкладу.</div>
-                <div class="liquid-alert info">Якщо групу не обрано, подія застосовується до всіх груп предмета під час публікації.</div>
-                <% ((preview && preview.assumptions) || []).slice(0, 2).forEach(function(item) { %>
-                  <div class="liquid-alert"><%= item %></div>
-                <% }); %>
-                <% if (preview && preview.assumptions && preview.assumptions.length > 2) { %>
-                  <details>
-                    <summary class="session-subtle">Ще <%= preview.assumptions.length - 2 %> технічних правил</summary>
-                    <div class="d-grid gap-2 mt-2">
-                      <% preview.assumptions.slice(2).forEach(function(item) { %>
-                        <div class="liquid-alert"><%= item %></div>
-                      <% }); %>
-                    </div>
-                  </details>
-                <% } %>
-              </div>
-            </div>
-          </div>
+          </form>
         </div>
       </div>
     </main>
@@ -1172,11 +1081,9 @@
         const manualGroupSelect = document.getElementById('manualGroupSelect');
         const manualPlanClearBtn = document.getElementById('manualPlanClearBtn');
         const manualAssignmentsInput = document.getElementById('manualAssignmentsInput');
-        const publishTableBody = document.getElementById('sessionPublishTableBody');
-        const publishEmptyState = document.getElementById('sessionPublishEmptyState');
-        const publishTableWrap = document.getElementById('sessionPublishTableWrap');
         const publishBtn = document.getElementById('sessionPublishBtn');
         const publishSourceHint = document.getElementById('sessionPublishSourceHint');
+        const publishCount = document.getElementById('sessionPublishCount');
         const slotButtons = Array.from(document.querySelectorAll('[data-slot-btn]'));
 
         const manualSubjects = <%- JSON.stringify(manualSubjectRows || []) %>;
@@ -1280,12 +1187,10 @@
           });
         };
 
-        const renderPublishTable = () => {
-          if (!publishTableBody || !publishTableWrap || !publishEmptyState || !publishBtn || !manualAssignmentsInput) return;
+        const syncPublishState = () => {
+          if (!publishBtn || !manualAssignmentsInput) return;
           const usingManual = manualAssignments.length > 0;
           const rows = usingManual ? sortAssignments(manualAssignments) : sortAssignments(autoAssessmentItems || []);
-          publishEmptyState.classList.toggle('d-none', rows.length > 0);
-          publishTableWrap.classList.toggle('d-none', rows.length === 0);
           publishBtn.disabled = rows.length === 0;
           manualAssignmentsInput.value = usingManual ? JSON.stringify(rows.map((row) => ({
             subject_id: Number(row.subject_id || 0),
@@ -1297,41 +1202,12 @@
           }))) : '';
           if (publishSourceHint) {
             publishSourceHint.textContent = usingManual
-              ? `Ручний план: ${rows.length} подій`
-              : 'Екзамени та заліки з цього превʼю';
+              ? 'Джерело: ручний план'
+              : 'Джерело: автоплан';
           }
-          if (!rows.length) {
-            publishTableBody.innerHTML = '';
-            return;
+          if (publishCount) {
+            publishCount.textContent = String(rows.length);
           }
-          publishTableBody.innerHTML = rows.map((item) => {
-            const dayName = String(item.day_name || '');
-            const note = String(item.note || '');
-            const canRemove = usingManual;
-            const rowKey = encodeURIComponent(assignmentKey(item));
-            return `
-              <tr>
-                <td class="small">
-                  <div class="fw-semibold">${escapeHtml(item.date || '—')}</div>
-                  <div class="text-muted">${escapeHtml(dayName || '')}</div>
-                </td>
-                <td>
-                  <div class="fw-semibold">${escapeHtml(item.subject_name || '—')}</div>
-                  <div class="text-muted small">Пара ${escapeHtml(item.class_number || '—')}</div>
-                </td>
-                <td>
-                  <span class="mark-pill ${item.type === 'credit' ? 'danger' : 'info'}">
-                    ${item.type === 'credit' ? 'Залік' : 'Екзамен'}
-                  </span>
-                </td>
-                <td class="small">${escapeHtml(item.group_label || 'Усі групи предмета')}</td>
-                <td class="small">${escapeHtml(note || '—')}</td>
-                <td class="text-end">
-                  ${canRemove ? `<button class="btn btn-sm btn-outline-danger" type="button" data-remove-manual="${rowKey}">Видалити</button>` : '<span class="small text-muted">авто</span>'}
-                </td>
-              </tr>
-            `;
-          }).join('');
         };
 
         const toggleManualAssignmentFromSlot = (button) => {
@@ -1371,7 +1247,7 @@
             manualAssignments.push(candidate);
           }
           renderSlotAssignments();
-          renderPublishTable();
+          syncPublishState();
         };
 
         if (manualSubjectSelect && !manualSubjectSelect.value && manualSubjects.length) {
@@ -1380,7 +1256,7 @@
         updateManualGroupOptions();
         syncManualTypeButtons();
         renderSlotAssignments();
-        renderPublishTable();
+        syncPublishState();
 
         manualTypeButtons.forEach((button) => {
           button.addEventListener('click', () => {
@@ -1395,7 +1271,7 @@
           manualPlanClearBtn.addEventListener('click', () => {
             manualAssignments = [];
             renderSlotAssignments();
-            renderPublishTable();
+            syncPublishState();
           });
         }
         slotButtons.forEach((button) => {
@@ -1403,25 +1279,6 @@
             toggleManualAssignmentFromSlot(button);
           });
         });
-        if (publishTableBody) {
-          publishTableBody.addEventListener('click', (event) => {
-            const target = event.target;
-            if (!(target instanceof HTMLElement)) return;
-            const encodedKey = String(target.dataset.removeManual || '').trim();
-            if (!encodedKey) return;
-            let decodedKey = '';
-            try {
-              decodedKey = decodeURIComponent(encodedKey);
-            } catch (_err) {
-              decodedKey = encodedKey;
-            }
-            const removeIndex = manualAssignments.findIndex((item) => assignmentKey(item) === decodedKey);
-            if (removeIndex < 0) return;
-            manualAssignments.splice(removeIndex, 1);
-            renderSlotAssignments();
-            renderPublishTable();
-          });
-        }
 
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
           if (window.bootstrap && window.bootstrap.Tooltip) {
