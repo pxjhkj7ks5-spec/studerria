@@ -3008,6 +3008,7 @@
       const messagesBadge = document.getElementById('messagesBadge');
       const mobileMenuBadge = document.getElementById('mobileMenuBadge');
       const messagesSubjectFilter = document.getElementById('messagesSubjectFilter');
+      const messagesModalEl = document.getElementById('messagesModal');
       const weekPrev = document.getElementById('weekPrev');
       const weekNext = document.getElementById('weekNext');
       const scheduleDrawer = document.getElementById('scheduleActionDrawer');
@@ -3171,7 +3172,8 @@
             const menuInstance = bootstrap.Modal.getInstance(mobileMenu) || new bootstrap.Modal(mobileMenu);
             menuInstance.hide();
           }
-          const modal = new bootstrap.Modal(document.getElementById('messagesModal'));
+          if (!messagesModalEl) return;
+          const modal = new bootstrap.Modal(messagesModalEl);
           modal.show();
         });
       }
@@ -3797,22 +3799,51 @@
       window.addEventListener('online', () => refreshSchedule());
       window.addEventListener('offline', () => updateSyncStatus());
 
-      async function loadMessages() {
+      let messageListRequestToken = 0;
+      let unreadBadgeRequestToken = 0;
+
+      async function refreshUnreadBadges() {
+        const targets = [messagesBadge, mobileMenuBadge].filter(Boolean);
+        if (!targets.length) return;
+        const requestToken = ++unreadBadgeRequestToken;
+        try {
+          const res = await fetch('/messages.json');
+          if (!res.ok) throw new Error('bad');
+          const data = await res.json();
+          if (requestToken !== unreadBadgeRequestToken) return;
+          updateUnreadBadges(Number(data.unread_count) || 0);
+        } catch (err) {
+          // keep last unread state on network failures
+        }
+      }
+
+      async function loadMessages(options = {}) {
+        const { markAsRead = false, showLoading = true } = options;
         if (!messagesList) return;
-        messagesList.innerHTML = '<li class="list-group-item text-muted">Завантаження...</li>';
+        if (showLoading) {
+          messagesList.innerHTML = '<li class="list-group-item text-muted">Завантаження...</li>';
+        }
         try {
           const subjectId = messagesSubjectFilter && messagesSubjectFilter.value
             ? `?subject_id=${encodeURIComponent(messagesSubjectFilter.value)}`
             : '';
+          const shouldSyncBadgeFromResponse = !subjectId;
+          const requestToken = ++messageListRequestToken;
           const res = await fetch(`/messages.json${subjectId}`);
           if (!res.ok) throw new Error('bad');
           const data = await res.json();
-          if (!data.messages || !data.messages.length) {
+          if (requestToken !== messageListRequestToken) return;
+          const messages = Array.isArray(data.messages) ? data.messages : [];
+          if (!messages.length) {
             messagesList.innerHTML = '<li class="list-group-item text-muted">Немає повідомлень</li>';
-            updateUnreadBadges(0);
+            if (shouldSyncBadgeFromResponse) {
+              updateUnreadBadges(Number(data.unread_count) || 0);
+            } else {
+              refreshUnreadBadges();
+            }
             return;
           }
-          messagesList.innerHTML = data.messages
+          messagesList.innerHTML = messages
             .map((m) => {
               const meta = m.target_all
                 ? 'Всі студенти'
@@ -3839,17 +3870,30 @@
               `;
             })
             .join('');
-          updateUnreadBadges(data.unread_count || 0);
-          const unreadIds = data.messages.filter((m) => !m.read_id).map((m) => m.id);
-          if (unreadIds.length) {
-            const nextUnread = Math.max(0, (data.unread_count || 0) - unreadIds.length);
-            fetch('/messages/read', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ message_ids: unreadIds }),
-            })
-              .then(() => updateUnreadBadges(nextUnread))
-              .catch(() => {});
+          if (shouldSyncBadgeFromResponse) {
+            updateUnreadBadges(Number(data.unread_count) || 0);
+          }
+          if (markAsRead) {
+            const unreadIds = messages
+              .filter((m) => !m.read_id)
+              .map((m) => Number(m.id))
+              .filter((id) => Number.isFinite(id));
+            if (unreadIds.length) {
+              try {
+                await fetch('/messages/read', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ message_ids: unreadIds }),
+                });
+              } catch (err) {
+                // ignore and keep current unread marker
+              }
+              refreshUnreadBadges();
+            } else if (!shouldSyncBadgeFromResponse) {
+              refreshUnreadBadges();
+            }
+          } else if (!shouldSyncBadgeFromResponse) {
+            refreshUnreadBadges();
           }
           const reactionButtons = messagesList.querySelectorAll('.msg-reactions .react-btn');
           reactionButtons.forEach((btn) => {
@@ -3878,16 +3922,24 @@
         }
       }
 
+      if (messagesModalEl) {
+        messagesModalEl.addEventListener('shown.bs.modal', () => {
+          loadMessages({ markAsRead: true, showLoading: true });
+        });
+      }
+
       if (messagesBtn) {
         messagesBtn.addEventListener('click', () => {
           setDrawerOpen(false);
-          const modal = new bootstrap.Modal(document.getElementById('messagesModal'));
+          if (!messagesModalEl) return;
+          const modal = new bootstrap.Modal(messagesModalEl);
           modal.show();
-          loadMessages();
         });
       }
       if (messagesSubjectFilter) {
-        messagesSubjectFilter.addEventListener('change', loadMessages);
+        messagesSubjectFilter.addEventListener('change', () => {
+          loadMessages({ markAsRead: true, showLoading: true });
+        });
       }
 
       const changelogTrigger = document.querySelector('.footer-link[data-bs-target="#changelogModal"]');
@@ -3900,7 +3952,8 @@
         });
       }
 
-      loadMessages();
+      refreshUnreadBadges();
+      setInterval(refreshUnreadBadges, 60000);
 
       const phrases = [
         "Start fresh — today is full of potential.",

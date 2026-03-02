@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.50",
+      "date": "2026-03-02",
+      "items": [
+        "fix(schedule-messages-badge): unread marker on menu button no longer auto-disappears on page load because messages are not auto-marked as read in background",
+        "fix(schedule-messages-badge): split unread-badge sync from message-list loading and keep global unread count stable even when subject filter is active",
+        "fix(schedule-messages-race): added request token guards to prevent stale async responses from hiding/glitching unread chip state"
+      ]
+    },
+    {
       "version": "1.0.49",
       "date": "2026-03-02",
       "items": [
