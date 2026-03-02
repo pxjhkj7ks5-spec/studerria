@@ -8909,6 +8909,95 @@ app.delete('/api/reminders/:id', requireLogin, writeLimiter, async (req, res) =>
   }
 });
 
+const hasStudentHomeworkAccess = async ({ userId, courseId, activeSemester, homework }) => {
+  const normalizedUserId = Number(userId);
+  const normalizedCourseId = Number(courseId || homework?.course_id || 1);
+  const subjectId = Number(homework?.subject_id || 0);
+  const targetGroupNumber = Number(homework?.group_number || 0);
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId < 1) return false;
+  if (!Number.isFinite(subjectId) || subjectId < 1) return false;
+
+  if (Number.isInteger(targetGroupNumber) && targetGroupNumber > 0) {
+    const exactAccess = await db.get(
+      `
+        SELECT 1
+        FROM student_groups
+        WHERE student_id = ? AND subject_id = ? AND group_number = ?
+        LIMIT 1
+      `,
+      [normalizedUserId, subjectId, targetGroupNumber]
+    );
+    if (exactAccess) {
+      return true;
+    }
+  }
+
+  const subjectEnrollment = await db.get(
+    `
+      SELECT group_number
+      FROM student_groups
+      WHERE student_id = ? AND subject_id = ?
+      LIMIT 1
+    `,
+    [normalizedUserId, subjectId]
+  );
+  if (!subjectEnrollment) {
+    return false;
+  }
+
+  let canUseSharedAudience = false;
+  const subjectMeta = await db.get(
+    `
+      SELECT is_general
+      FROM subjects
+      WHERE id = ? AND course_id = ?
+      LIMIT 1
+    `,
+    [subjectId, normalizedCourseId]
+  );
+  if (subjectMeta && (subjectMeta.is_general === true || Number(subjectMeta.is_general) === 1)) {
+    canUseSharedAudience = true;
+  }
+
+  const dayOfWeek = normalizeWeekdayName(homework?.day_of_week);
+  const classNumber = Number(homework?.class_number || 0);
+  if (!canUseSharedAudience && dayOfWeek && Number.isInteger(classNumber) && classNumber > 0) {
+    const params = [subjectId, normalizedCourseId, dayOfWeek, classNumber];
+    let sql = `
+      SELECT 1
+      FROM schedule_entries se
+      WHERE se.subject_id = ?
+        AND se.course_id = ?
+        AND se.day_of_week = ?
+        AND se.class_number = ?
+        AND COALESCE(se.lesson_type, '') = 'lecture'
+    `;
+    const homeworkSemesterId = Number(homework?.semester_id || 0);
+    if (homeworkSemesterId > 0) {
+      sql += ' AND (se.semester_id = ? OR se.semester_id IS NULL)';
+      params.push(homeworkSemesterId);
+    } else if (activeSemester && activeSemester.id) {
+      sql += ' AND (se.semester_id = ? OR se.semester_id IS NULL)';
+      params.push(activeSemester.id);
+    }
+    const classDateRaw = String(homework?.class_date || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(classDateRaw) && activeSemester && activeSemester.start_date) {
+      const classWeek = getAcademicWeekForSemester(new Date(`${classDateRaw}T12:00:00`), activeSemester);
+      if (Number.isFinite(classWeek) && classWeek > 0) {
+        sql += ' AND (se.week_number = ? OR se.week_number IS NULL OR se.week_number = 0)';
+        params.push(classWeek);
+      }
+    }
+    sql += ' LIMIT 1';
+    const lectureSlot = await db.get(sql, params);
+    if (lectureSlot) {
+      canUseSharedAudience = true;
+    }
+  }
+
+  return canUseSharedAudience;
+};
+
 app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, res) => {
   const homeworkId = Number(req.params.id);
   if (Number.isNaN(homeworkId)) {
@@ -8919,7 +9008,7 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
   const nowIso = new Date().toISOString();
   try {
     const homework = await db.get(
-      `SELECT id, subject_id, group_number
+      `SELECT id, subject_id, group_number, day_of_week, class_number, class_date, course_id, semester_id
        FROM homework
        WHERE id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}
          AND COALESCE(status, 'published') = 'published'
@@ -8929,10 +9018,12 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
     if (!homework) {
       return res.status(404).json({ error: 'Not found' });
     }
-    const access = await db.get(
-      'SELECT 1 FROM student_groups WHERE student_id = ? AND subject_id = ? AND group_number = ?',
-      [userId, homework.subject_id, homework.group_number]
-    );
+    const access = await hasStudentHomeworkAccess({
+      userId,
+      courseId,
+      activeSemester,
+      homework,
+    });
     if (!access) {
       return res.status(403).json({ error: 'Forbidden' });
     }
@@ -8992,7 +9083,7 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
   try {
     const homework = await db.get(
       `
-        SELECT id, subject_id, group_number, course_id, semester_id, custom_due_date, class_date
+        SELECT id, subject_id, group_number, day_of_week, class_number, course_id, semester_id, custom_due_date, class_date
         FROM homework
         WHERE id = ?
           AND course_id = ?
@@ -9008,15 +9099,12 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
       return res.redirect(redirectWith('err', 'Homework not found'));
     }
 
-    const studentAccess = await db.get(
-      `
-        SELECT 1
-        FROM student_groups
-        WHERE student_id = ? AND subject_id = ? AND group_number = ?
-        LIMIT 1
-      `,
-      [userId, homework.subject_id, homework.group_number]
-    );
+    const studentAccess = await hasStudentHomeworkAccess({
+      userId,
+      courseId,
+      activeSemester,
+      homework,
+    });
     if (!studentAccess) {
       if (req.file) fs.unlink(req.file.path, () => {});
       return res.status(403).send('Forbidden (homework submit)');
