@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.47",
+      "date": "2026-03-02",
+      "items": [
+        "feat(session-generator-manual): switched session generator to weeks-overlay workflow by default (manual placement on regular timetable slots, e.g. weeks 14-15)",
+        "feat(session-generator-conflicts): added teacher conflict check for manual session plan (same teacher/date/class collisions across schedule/session data) with dedicated \"Перевірити конфлікти\" action and publish blocking on conflicts",
+        "feat(session-generator-delete): added session delete action for selected session window weeks (removes [Сесія] events and re-syncs journal columns); removed auto-plan fallback from publish"
+      ]
+    },
+    {
       "version": "1.0.46",
       "date": "2026-03-02",
       "items": [

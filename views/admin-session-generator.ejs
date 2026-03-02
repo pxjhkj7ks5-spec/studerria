@@ -604,8 +604,8 @@
           <div>
             <h1 class="h3 mb-2">Генератор екзаменаційної сесії</h1>
             <div class="session-lead">
-              Основний режим: ручне призначення сесійних подій прямо по слотах звичайного розкладу
-              (тип контролю + предмет + група + клік по парі). За потреби можна використати і автогенерацію як стартовий чернетковий план.
+              Режим: ручне накладання сесії на звичайний розклад. Оберіть тижні сесії (наприклад 14-15),
+              потім тип контролю + предмет + групу і клікніть по слоту пари.
             </div>
           </div>
           <div class="session-chip-row">
@@ -616,17 +616,7 @@
             <% if (activeSemester) { %>
               <span class="session-chip">Семестр: <strong><%= activeSemester.title || ('#' + activeSemester.id) %></strong></span>
             <% } %>
-            <span class="session-chip">Джерело типів: <strong><%= gradingSource === 'subject_grading_settings' ? 'grading settings' : 'fallback' %></strong></span>
           </div>
-        </div>
-        <div class="soft-divider"></div>
-        <div class="session-stat-grid">
-          <div class="session-stat"><div class="session-stat-label">Предметів</div><div class="session-stat-value"><%= preview && preview.stats ? preview.stats.subjects_count : 0 %></div></div>
-          <div class="session-stat"><div class="session-stat-label">Оцінювань</div><div class="session-stat-value"><%= preview && preview.stats ? preview.stats.assessments_total : 0 %></div></div>
-          <div class="session-stat"><div class="session-stat-label">Екзамени</div><div class="session-stat-value"><%= preview && preview.stats ? preview.stats.exams_total : 0 %></div></div>
-          <div class="session-stat"><div class="session-stat-label">Заліки</div><div class="session-stat-value"><%= preview && preview.stats ? preview.stats.credits_total : 0 %></div></div>
-          <div class="session-stat"><div class="session-stat-label">Консультації</div><div class="session-stat-value"><%= preview && preview.stats ? preview.stats.consultations_total : 0 %></div></div>
-          <div class="session-stat"><div class="session-stat-label">Резерв / перескладання</div><div class="session-stat-value"><%= preview && preview.stats ? ((preview.stats.reserve_days_total || 0) + (preview.stats.retake_windows_total || 0)) : 0 %></div></div>
         </div>
       </div>
 
@@ -706,27 +696,12 @@
                     <% }); %>
                   </select>
                 </div>
-                <div class="col-12">
-                  <label class="form-label">Вікно сесії</label>
-                  <select class="form-select" name="window_mode" id="sessionWindowModeSelect">
-                    <% (sessionWindowOptions || []).forEach(function(opt) { %>
-                      <option value="<%= opt.value %>" <%= form && form.window_mode === opt.value ? 'selected' : '' %>><%= opt.label %></option>
-                    <% }); %>
-                  </select>
-                </div>
-                <div class="col-12 col-sm-6" data-window-mode="days">
-                  <label class="form-label">Старт сесії</label>
-                  <input class="form-control" type="date" name="start_date" value="<%= (form && form.start_date) || '' %>" required />
-                </div>
-                <div class="col-6 col-sm-3" data-window-mode="days">
-                  <label class="form-label">Днів</label>
-                  <input class="form-control" type="number" min="3" max="60" name="session_days" value="<%= form && form.session_days %>" />
-                </div>
-                <div class="col-6 col-sm-4" data-window-mode="weeks">
+                <input type="hidden" name="window_mode" value="weeks" />
+                <div class="col-4">
                   <label class="form-label">Тижнів сесії</label>
                   <input class="form-control" type="number" min="1" max="12" name="session_weeks_count" value="<%= form && form.session_weeks_count %>" />
                 </div>
-                <div class="col-12 col-sm-8" data-window-mode="weeks">
+                <div class="col-8">
                   <label class="form-label">Які тижні (опц.)</label>
                   <input class="form-control" type="text" name="session_weeks_set" value="<%= (form && form.session_weeks_set) || '' %>" placeholder="Напр. 14-15 або 15,16" />
                   <div class="small text-muted mt-1">
@@ -737,6 +712,8 @@
                     <% } %>
                   </div>
                 </div>
+                <input type="hidden" name="start_date" value="<%= (form && form.start_date) || '' %>" />
+                <input type="hidden" name="session_days" value="<%= form && form.session_days ? form.session_days : 14 %>" />
                 <div class="col-12 col-sm-4">
                   <label class="form-label">Активні дні курсу</label>
                   <div class="form-control d-flex align-items-center flex-wrap gap-1" style="min-height: 38px;">
@@ -759,76 +736,21 @@
                     <span class="form-check-label">Планувати тільки в активні навчальні дні курсу</span>
                   </label>
                 </div>
-                <div class="col-12">
-                  <details class="liquid-alert info">
-                    <summary><strong>Розширені налаштування автоплану (опційно)</strong></summary>
-                    <div class="row g-2 mt-1">
-                      <div class="col-6 col-sm-4">
-                        <label class="form-label">Max/день</label>
-                        <input class="form-control" type="number" min="1" max="6" name="max_events_per_day" value="<%= form && form.max_events_per_day %>" />
-                      </div>
-                      <div class="col-6 col-sm-4">
-                        <label class="form-label">Gap EX</label>
-                        <input class="form-control" type="number" min="0" max="5" name="exam_gap_days" value="<%= form && form.exam_gap_days %>" />
-                      </div>
-                      <div class="col-6 col-sm-4">
-                        <label class="form-label">Резерв кожні</label>
-                        <input class="form-control" type="number" min="0" max="20" name="reserve_every" value="<%= form && form.reserve_every %>" />
-                      </div>
-                      <div class="col-6 col-sm-4">
-                        <label class="form-label">Пересклад. через</label>
-                        <input class="form-control" type="number" min="1" max="14" name="retake_gap_days" value="<%= form && form.retake_gap_days %>" />
-                      </div>
-                      <div class="col-6 col-sm-4">
-                        <label class="form-label">Вікно перескл.</label>
-                        <input class="form-control" type="number" min="1" max="14" name="retake_window_days" value="<%= form && form.retake_window_days %>" />
-                      </div>
-                      <div class="col-12 col-sm-6">
-                        <label class="form-label">Стратегія</label>
-                        <select class="form-select" name="strategy">
-                          <% (strategyOptions || []).forEach(function(opt) { %>
-                            <option value="<%= opt.value %>" <%= form && form.strategy === opt.value ? 'selected' : '' %>><%= opt.label %></option>
-                          <% }); %>
-                        </select>
-                      </div>
-                      <div class="col-12 col-sm-6">
-                        <label class="form-label">Групування по днях</label>
-                        <select class="form-select" name="day_grouping_mode">
-                          <% (sessionGroupingOptions || []).forEach(function(opt) { %>
-                            <option value="<%= opt.value %>" <%= form && form.day_grouping_mode === opt.value ? 'selected' : '' %>><%= opt.label %></option>
-                          <% }); %>
-                        </select>
-                      </div>
-                      <div class="col-12 col-sm-6">
-                        <label class="form-label">Сценарій екзамену</label>
-                        <select class="form-select" name="exam_sequence">
-                          <% (examSequenceOptions || []).forEach(function(opt) { %>
-                            <option value="<%= opt.value %>" <%= form && form.exam_sequence === opt.value ? 'selected' : '' %>><%= opt.label %></option>
-                          <% }); %>
-                        </select>
-                      </div>
-                      <div class="col-12 col-sm-6">
-                        <label class="form-label">Сценарій заліку</label>
-                        <select class="form-select" name="credit_sequence">
-                          <% (creditSequenceOptions || []).forEach(function(opt) { %>
-                            <option value="<%= opt.value %>" <%= form && form.credit_sequence === opt.value ? 'selected' : '' %>><%= opt.label %></option>
-                          <% }); %>
-                        </select>
-                      </div>
-                      <div class="col-12">
-                        <label class="form-check mt-1">
-                          <input class="form-check-input" type="checkbox" name="include_consultations" value="1" <%= form && form.include_consultations ? 'checked' : '' %> />
-                          <span class="form-check-label">Авто-консультації (fallback для автоплану)</span>
-                        </label>
-                      </div>
-                    </div>
-                  </details>
-                </div>
+                <input type="hidden" name="max_events_per_day" value="<%= form && form.max_events_per_day ? form.max_events_per_day : 3 %>" />
+                <input type="hidden" name="reserve_every" value="<%= form && form.reserve_every ? form.reserve_every : 0 %>" />
+                <input type="hidden" name="exam_gap_days" value="<%= form && form.exam_gap_days ? form.exam_gap_days : 0 %>" />
+                <input type="hidden" name="retake_gap_days" value="<%= form && form.retake_gap_days ? form.retake_gap_days : 2 %>" />
+                <input type="hidden" name="retake_window_days" value="<%= form && form.retake_window_days ? form.retake_window_days : 3 %>" />
+                <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'balanced' %>" />
+                <input type="hidden" name="day_grouping_mode" value="<%= form && form.day_grouping_mode ? form.day_grouping_mode : 'none' %>" />
+                <input type="hidden" name="exam_sequence" value="<%= form && form.exam_sequence ? form.exam_sequence : 'exam_only' %>" />
+                <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
+                <input type="hidden" name="include_consultations" value="0" />
                 <div class="col-12 d-grid">
                   <button class="btn btn-primary" type="submit" <%= form && form.course_id ? '' : 'disabled' %>>Оновити сітку слотів</button>
                 </div>
                 <div class="col-12 session-subtle">
-                  Для ручного режиму зазвичай достатньо: курс, семестр, вікно, дні сесії та фільтр вихідних/навчальних днів.
+                  Автогенерацію прибрано: тепер тільки ручний режим з накладанням на вибрані тижні семестру.
                 </div>
               </form>
             </div>
@@ -864,31 +786,6 @@
             })
             .filter(function(subject) { return Number.isFinite(subject.id) && subject.id > 0; })
             .sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'uk'); }); %>
-          <% const assessmentItems = ((preview && preview.timelineItems) || [])
-            .filter(function(item) {
-              return item && item.kind === 'assessment' && (item.type === 'exam' || item.type === 'credit');
-            })
-            .sort(function(a, b) {
-              const byDate = String(a.date || '').localeCompare(String(b.date || ''));
-              if (byDate !== 0) return byDate;
-              if (a.type !== b.type) return a.type === 'exam' ? -1 : 1;
-              return String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
-            }); %>
-          <% if (preview && preview.warnings && preview.warnings.length) { %>
-            <div class="d-grid gap-2 mb-3">
-              <% preview.warnings.forEach(function(w) { %>
-                <div class="liquid-alert danger"><%= w %></div>
-              <% }); %>
-            </div>
-          <% } %>
-
-          <% if (preview && preview.notes && preview.notes.length) { %>
-            <div class="d-grid gap-2 mb-3">
-              <% preview.notes.forEach(function(n) { %>
-                <div class="liquid-alert info"><%= n %></div>
-              <% }); %>
-            </div>
-          <% } %>
 
           <div class="card liquid-panel mb-4">
             <div class="card-body">
@@ -981,16 +878,16 @@
               <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
                   <div class="fw-semibold">Публікація сесії</div>
-                  <div class="session-subtle" id="sessionPublishSourceHint">Джерело: автоплан</div>
+                  <div class="session-subtle" id="sessionPublishSourceHint">Джерело: ручний план</div>
                 </div>
-                <span class="mark-pill info">Подій: <span id="sessionPublishCount"><%= assessmentItems.length %></span></span>
+                <span class="mark-pill info">Подій: <span id="sessionPublishCount">0</span></span>
               </div>
-              <div class="session-subtle">Ручний план має пріоритет. Якщо ручний план порожній, публікується автоплан.</div>
+              <div class="session-subtle">1) Перевірте конфлікти викладачів. 2) Якщо все чисто, публікуйте в журнал і розклад.</div>
               <input type="hidden" name="location" value="<%= activeLocation %>" />
               <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
               <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
               <input type="hidden" name="draft_id" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
-              <input type="hidden" name="window_mode" value="<%= form && form.window_mode ? form.window_mode : 'days' %>" />
+              <input type="hidden" name="window_mode" value="weeks" />
               <input type="hidden" name="start_date" value="<%= form && form.start_date ? form.start_date : '' %>" />
               <input type="hidden" name="session_days" value="<%= form && form.session_days ? form.session_days : '' %>" />
               <input type="hidden" name="session_weeks_count" value="<%= form && form.session_weeks_count ? form.session_weeks_count : '' %>" />
@@ -1008,9 +905,33 @@
               <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
               <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
               <input type="hidden" name="manual_assignments_json" id="manualAssignmentsInput" value="" />
-              <button class="btn btn-danger" id="sessionPublishBtn" type="submit" <%= assessmentItems.length ? '' : 'disabled' %>>
-                Опублікувати в розклад і журнал
-              </button>
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-outline-secondary" id="sessionCheckConflictsBtn" type="submit" name="publish_action" value="check_conflicts" disabled>
+                  Перевірити конфлікти
+                </button>
+                <button class="btn btn-danger" id="sessionPublishBtn" type="submit" name="publish_action" value="publish" disabled>
+                  Опублікувати в розклад і журнал
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <form method="POST" action="/admin/session-generator/delete" class="card liquid-panel mb-4" onsubmit="return window.confirm('Видалити сесійні події у вибраному вікні тижнів?');">
+            <div class="card-body d-grid gap-2">
+              <div class="fw-semibold">Видалення сесії</div>
+              <div class="session-subtle">Видаляє лише події з префіксом [Сесія] у межах вибраних тижнів.</div>
+              <input type="hidden" name="location" value="<%= activeLocation %>" />
+              <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
+              <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
+              <input type="hidden" name="draft_id" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
+              <input type="hidden" name="window_mode" value="weeks" />
+              <input type="hidden" name="start_date" value="<%= form && form.start_date ? form.start_date : '' %>" />
+              <input type="hidden" name="session_days" value="<%= form && form.session_days ? form.session_days : '' %>" />
+              <input type="hidden" name="session_weeks_count" value="<%= form && form.session_weeks_count ? form.session_weeks_count : '' %>" />
+              <input type="hidden" name="session_weeks_set" value="<%= form && form.session_weeks_set ? form.session_weeks_set : '' %>" />
+              <input type="hidden" name="include_weekends" value="<%= form && form.include_weekends ? 1 : 0 %>" />
+              <input type="hidden" name="respect_study_days" value="<%= form && form.respect_study_days ? 1 : 0 %>" />
+              <button class="btn btn-outline-danger" type="submit">Видалити сесію у вибраному вікні</button>
             </div>
           </form>
         </div>
@@ -1058,48 +979,18 @@
           });
         }
 
-        const windowModeSelect = document.getElementById('sessionWindowModeSelect');
-        const windowModeRows = Array.from(document.querySelectorAll('[data-window-mode]'));
-        const syncWindowModeRows = () => {
-          const mode = windowModeSelect && windowModeSelect.value === 'weeks' ? 'weeks' : 'days';
-          windowModeRows.forEach((row) => {
-            const rowMode = String(row.dataset.windowMode || '').trim();
-            const visible = rowMode === mode;
-            row.classList.toggle('d-none', !visible);
-            row.querySelectorAll('input,select,textarea').forEach((control) => {
-              control.disabled = !visible;
-            });
-          });
-        };
-        if (windowModeSelect) {
-          windowModeSelect.addEventListener('change', syncWindowModeRows);
-        }
-        syncWindowModeRows();
-
         const manualTypeButtons = Array.from(document.querySelectorAll('[data-manual-type]'));
         const manualSubjectSelect = document.getElementById('manualSubjectSelect');
         const manualGroupSelect = document.getElementById('manualGroupSelect');
         const manualPlanClearBtn = document.getElementById('manualPlanClearBtn');
         const manualAssignmentsInput = document.getElementById('manualAssignmentsInput');
         const publishBtn = document.getElementById('sessionPublishBtn');
+        const checkConflictsBtn = document.getElementById('sessionCheckConflictsBtn');
         const publishSourceHint = document.getElementById('sessionPublishSourceHint');
         const publishCount = document.getElementById('sessionPublishCount');
         const slotButtons = Array.from(document.querySelectorAll('[data-slot-btn]'));
 
         const manualSubjects = <%- JSON.stringify(manualSubjectRows || []) %>;
-        const autoAssessmentItems = <%- JSON.stringify((assessmentItems || []).map(function(item) {
-          return {
-            subject_id: Number(item.subject_id || 0),
-            subject_name: item.subject_name || '',
-            group_number: Number(item.group_number || 0) || null,
-            group_label: item.group_label || '',
-            type: item.type === 'credit' ? 'credit' : 'exam',
-            date: item.date || '',
-            day_name: item.day_name || '',
-            class_number: Number(item.class_number || 0) || null,
-            note: item.note || '',
-          };
-        })) %>;
         const manualSubjectMap = new Map((manualSubjects || []).map((subject) => [Number(subject.id), subject]));
         let manualSelectedType = 'exam';
         let manualAssignments = [];
@@ -1189,10 +1080,12 @@
 
         const syncPublishState = () => {
           if (!publishBtn || !manualAssignmentsInput) return;
-          const usingManual = manualAssignments.length > 0;
-          const rows = usingManual ? sortAssignments(manualAssignments) : sortAssignments(autoAssessmentItems || []);
+          const rows = sortAssignments(manualAssignments);
           publishBtn.disabled = rows.length === 0;
-          manualAssignmentsInput.value = usingManual ? JSON.stringify(rows.map((row) => ({
+          if (checkConflictsBtn) {
+            checkConflictsBtn.disabled = rows.length === 0;
+          }
+          manualAssignmentsInput.value = rows.length ? JSON.stringify(rows.map((row) => ({
             subject_id: Number(row.subject_id || 0),
             type: row.type === 'credit' ? 'credit' : 'exam',
             date: row.date || '',
@@ -1201,9 +1094,9 @@
             note: row.note || '',
           }))) : '';
           if (publishSourceHint) {
-            publishSourceHint.textContent = usingManual
+            publishSourceHint.textContent = rows.length
               ? 'Джерело: ручний план'
-              : 'Джерело: автоплан';
+              : 'Джерело: ручний план (порожньо)';
           }
           if (publishCount) {
             publishCount.textContent = String(rows.length);

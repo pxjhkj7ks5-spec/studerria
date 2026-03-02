@@ -20485,7 +20485,7 @@ const SESSION_GENERATOR_MARK_LEGEND = [
 ];
 
 const SESSION_GENERATOR_DEFAULTS = {
-  window_mode: 'days',
+  window_mode: 'weeks',
   session_days: 14,
   session_weeks_count: 2,
   session_weeks_set: '',
@@ -21036,6 +21036,392 @@ const buildSessionSlotBoard = ({
       busy_count: slotRows.filter((s) => s.is_busy).length,
     };
   });
+};
+
+const normalizeSessionPublishAction = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'check' || raw === 'check_conflicts') return 'check_conflicts';
+  return 'publish';
+};
+
+const getSessionSubjectTeacherMap = async (subjectIds = []) => {
+  const safeIds = Array.from(new Set((subjectIds || [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0)));
+  if (!safeIds.length) return new Map();
+  const rows = await db.all(
+    `
+      SELECT
+        ts.subject_id,
+        ts.group_number,
+        ts.user_id,
+        COALESCE(NULLIF(TRIM(u.full_name), ''), ('ID ' || ts.user_id::TEXT)) AS teacher_name
+      FROM teacher_subjects ts
+      LEFT JOIN users u ON u.id = ts.user_id
+      WHERE ts.subject_id = ANY(?)
+    `,
+    [safeIds]
+  );
+  const result = new Map();
+  (rows || []).forEach((row) => {
+    const subjectId = Number(row.subject_id);
+    const teacherId = Number(row.user_id);
+    if (!Number.isFinite(subjectId) || subjectId < 1 || !Number.isFinite(teacherId) || teacherId < 1) return;
+    if (!result.has(subjectId)) {
+      result.set(subjectId, { all: new Map(), byGroup: new Map() });
+    }
+    const subjectMap = result.get(subjectId);
+    const teacherName = String(row.teacher_name || `ID ${teacherId}`);
+    if (row.group_number === null || typeof row.group_number === 'undefined') {
+      subjectMap.all.set(teacherId, teacherName);
+      return;
+    }
+    const groupNumber = Number(row.group_number);
+    if (!Number.isFinite(groupNumber) || groupNumber < 1) return;
+    if (!subjectMap.byGroup.has(groupNumber)) {
+      subjectMap.byGroup.set(groupNumber, new Map());
+    }
+    subjectMap.byGroup.get(groupNumber).set(teacherId, teacherName);
+  });
+  return result;
+};
+
+const resolveSessionTeachersForGroup = (teacherMapBySubject, subjectId, groupNumber) => {
+  const subjectMap = teacherMapBySubject && teacherMapBySubject.get(Number(subjectId));
+  if (!subjectMap) return [];
+  const collected = new Map();
+  (subjectMap.all || new Map()).forEach((name, teacherId) => {
+    collected.set(Number(teacherId), String(name || `ID ${teacherId}`));
+  });
+  const safeGroup = Number(groupNumber);
+  if (Number.isFinite(safeGroup) && safeGroup > 0 && subjectMap.byGroup && subjectMap.byGroup.has(safeGroup)) {
+    subjectMap.byGroup.get(safeGroup).forEach((name, teacherId) => {
+      collected.set(Number(teacherId), String(name || `ID ${teacherId}`));
+    });
+  }
+  return Array.from(collected.entries())
+    .map(([teacherId, teacherName]) => ({
+      id: Number(teacherId),
+      name: String(teacherName || `ID ${teacherId}`),
+    }))
+    .filter((teacher) => Number.isFinite(teacher.id) && teacher.id > 0)
+    .sort((a, b) => a.name.localeCompare(b.name, 'uk'));
+};
+
+const buildSessionExpandedAssignments = (assessments = [], subjectById = new Map()) => {
+  const rows = [];
+  (assessments || []).forEach((assessment) => {
+    const subjectId = Number(assessment.subject_id);
+    const subject = subjectById.get(subjectId);
+    if (!subject) return;
+    const groupCount = Math.max(1, Number(subject.group_count || 1));
+    const oneGroup = Number(assessment.group_number || 0);
+    const targetGroups = Number.isFinite(oneGroup) && oneGroup > 0
+      ? (oneGroup <= groupCount ? [oneGroup] : [])
+      : Array.from({ length: groupCount }, (_value, index) => index + 1);
+    const classNumber = Number(assessment.class_number || 0);
+    const date = toDateOnly(assessment.date);
+    const dayName = normalizeWeekdayName(
+      String(assessment.day_name || getDayNameFromDate(date) || '').trim()
+    );
+    if (!targetGroups.length || !dayName || !isValidDateString(date) || classNumber < 1 || classNumber > 7) {
+      return;
+    }
+    targetGroups.forEach((groupNumber) => {
+      rows.push({
+        subject_id: subjectId,
+        subject_name: subject.name || assessment.subject_name || '',
+        group_number: Number(groupNumber),
+        date,
+        day_name: dayName,
+        class_number: classNumber,
+        type: assessment.type === 'credit' ? 'credit' : 'exam',
+        note: String(assessment.note || ''),
+      });
+    });
+  });
+  return rows.sort((a, b) => {
+    const byDate = String(a.date || '').localeCompare(String(b.date || ''));
+    if (byDate !== 0) return byDate;
+    const byClass = Number(a.class_number || 0) - Number(b.class_number || 0);
+    if (byClass !== 0) return byClass;
+    const bySubject = String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
+    if (bySubject !== 0) return bySubject;
+    return Number(a.group_number || 0) - Number(b.group_number || 0);
+  });
+};
+
+const getSessionTeacherBusyMap = async (teacherIds = []) => {
+  const safeTeacherIds = Array.from(new Set((teacherIds || [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0)));
+  const busyMap = new Map();
+  if (!safeTeacherIds.length) return busyMap;
+
+  const scheduleRows = await db.all(
+    `
+      SELECT DISTINCT
+        ts.user_id AS teacher_id,
+        COALESCE(NULLIF(TRIM(u.full_name), ''), ('ID ' || ts.user_id::TEXT)) AS teacher_name,
+        se.id AS source_id,
+        se.course_id,
+        COALESCE(c.name, ('Курс ' || se.course_id::TEXT)) AS course_name,
+        se.subject_id,
+        s.name AS subject_name,
+        se.group_number,
+        se.day_of_week,
+        se.class_number,
+        se.week_number,
+        sem.start_date
+      FROM schedule_entries se
+      JOIN subjects s ON s.id = se.subject_id
+      JOIN semesters sem ON sem.id = se.semester_id
+      JOIN teacher_subjects ts ON ts.subject_id = se.subject_id
+        AND (ts.group_number IS NULL OR ts.group_number = se.group_number)
+      LEFT JOIN users u ON u.id = ts.user_id
+      LEFT JOIN courses c ON c.id = se.course_id
+      WHERE ts.user_id = ANY(?)
+        AND se.class_number BETWEEN 1 AND 7
+    `,
+    [safeTeacherIds]
+  );
+  (scheduleRows || []).forEach((row) => {
+    const teacherId = Number(row.teacher_id);
+    const classNumber = Number(row.class_number);
+    const weekNumber = Number(row.week_number);
+    const dayName = normalizeWeekdayName(row.day_of_week);
+    const startDate = row.start_date ? String(row.start_date) : null;
+    if (
+      !Number.isFinite(teacherId)
+      || teacherId < 1
+      || !Number.isFinite(classNumber)
+      || classNumber < 1
+      || classNumber > 7
+      || !Number.isFinite(weekNumber)
+      || weekNumber < 1
+      || !dayName
+      || !startDate
+    ) {
+      return;
+    }
+    const classDate = getDateForWeekDay(weekNumber, dayName, startDate);
+    if (!classDate || !isValidDateString(classDate)) return;
+    const slotKey = `${teacherId}|${classDate}|${classNumber}`;
+    if (!busyMap.has(slotKey)) busyMap.set(slotKey, []);
+    busyMap.get(slotKey).push({
+      source_kind: 'schedule',
+      source_ref: `schedule:${row.source_id}`,
+      teacher_id: teacherId,
+      teacher_name: String(row.teacher_name || `ID ${teacherId}`),
+      date: classDate,
+      class_number: classNumber,
+      course_id: Number(row.course_id || 0) || null,
+      course_name: String(row.course_name || ''),
+      subject_id: Number(row.subject_id || 0) || null,
+      subject_name: String(row.subject_name || ''),
+      group_number: Number(row.group_number || 0) || null,
+    });
+  });
+
+  const homeworkRows = await db.all(
+    `
+      SELECT DISTINCT
+        ts.user_id AS teacher_id,
+        COALESCE(NULLIF(TRIM(u.full_name), ''), ('ID ' || ts.user_id::TEXT)) AS teacher_name,
+        h.id AS source_id,
+        h.course_id,
+        COALESCE(c.name, ('Курс ' || h.course_id::TEXT)) AS course_name,
+        h.subject_id,
+        COALESCE(NULLIF(TRIM(s.name), ''), NULLIF(TRIM(h.subject), ''), 'Подія') AS subject_name,
+        h.group_number,
+        h.class_number,
+        h.class_date
+      FROM homework h
+      JOIN teacher_subjects ts ON ts.subject_id = h.subject_id
+        AND (ts.group_number IS NULL OR ts.group_number = h.group_number)
+      LEFT JOIN users u ON u.id = ts.user_id
+      LEFT JOIN subjects s ON s.id = h.subject_id
+      LEFT JOIN courses c ON c.id = h.course_id
+      WHERE ts.user_id = ANY(?)
+        AND h.class_date IS NOT NULL
+        AND h.class_number BETWEEN 1 AND 7
+        AND COALESCE(h.status, 'published') IN ('draft', 'scheduled', 'published')
+        AND COALESCE(h.is_teacher_homework, 0) = 1
+        AND (
+          COALESCE(h.is_control, 0) = 1
+          OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE '[сесія]%'
+        )
+    `,
+    [safeTeacherIds]
+  );
+  (homeworkRows || []).forEach((row) => {
+    const teacherId = Number(row.teacher_id);
+    const classNumber = Number(row.class_number);
+    const classDate = toDateOnly(row.class_date);
+    if (
+      !Number.isFinite(teacherId)
+      || teacherId < 1
+      || !Number.isFinite(classNumber)
+      || classNumber < 1
+      || classNumber > 7
+      || !isValidDateString(classDate)
+    ) {
+      return;
+    }
+    const slotKey = `${teacherId}|${classDate}|${classNumber}`;
+    if (!busyMap.has(slotKey)) busyMap.set(slotKey, []);
+    busyMap.get(slotKey).push({
+      source_kind: 'homework',
+      source_ref: `homework:${row.source_id}`,
+      teacher_id: teacherId,
+      teacher_name: String(row.teacher_name || `ID ${teacherId}`),
+      date: classDate,
+      class_number: classNumber,
+      course_id: Number(row.course_id || 0) || null,
+      course_name: String(row.course_name || ''),
+      subject_id: Number(row.subject_id || 0) || null,
+      subject_name: String(row.subject_name || ''),
+      group_number: Number(row.group_number || 0) || null,
+    });
+  });
+
+  return busyMap;
+};
+
+const buildSessionTeacherConflictReport = async ({
+  expandedAssignments = [],
+  selectedCourseId,
+}) => {
+  const subjectIds = Array.from(new Set((expandedAssignments || [])
+    .map((row) => Number(row.subject_id))
+    .filter((value) => Number.isFinite(value) && value > 0)));
+  const teacherMapBySubject = await getSessionSubjectTeacherMap(subjectIds);
+  const enrichedRows = [];
+  const unresolvedRows = [];
+  (expandedAssignments || []).forEach((row) => {
+    const teachers = resolveSessionTeachersForGroup(teacherMapBySubject, row.subject_id, row.group_number);
+    if (!teachers.length) {
+      unresolvedRows.push(row);
+      return;
+    }
+    enrichedRows.push({
+      ...row,
+      teachers,
+    });
+  });
+  const teacherIds = Array.from(new Set(enrichedRows.flatMap((row) => row.teachers.map((teacher) => teacher.id))));
+  const busyMap = await getSessionTeacherBusyMap(teacherIds);
+  const draftMap = new Map();
+  const conflicts = [];
+  const conflictDedup = new Set();
+
+  const pushConflict = (payload) => {
+    const key = [
+      payload.type,
+      Number(payload.teacher_id || 0),
+      String(payload.date || ''),
+      Number(payload.class_number || 0),
+      String(payload.source_ref || ''),
+      String(payload.other_ref || ''),
+    ].join('|');
+    if (conflictDedup.has(key)) return;
+    conflictDedup.add(key);
+    conflicts.push(payload);
+  };
+
+  enrichedRows.forEach((row) => {
+    row.teachers.forEach((teacher) => {
+      const slotKey = `${teacher.id}|${row.date}|${row.class_number}`;
+      if (!draftMap.has(slotKey)) draftMap.set(slotKey, []);
+      const sameDraftSlotRows = draftMap.get(slotKey);
+      sameDraftSlotRows.forEach((otherRow) => {
+        const sameTarget = Number(otherRow.subject_id || 0) === Number(row.subject_id || 0)
+          && Number(otherRow.group_number || 0) === Number(row.group_number || 0);
+        if (sameTarget) return;
+        pushConflict({
+          type: 'draft',
+          teacher_id: teacher.id,
+          teacher_name: teacher.name,
+          date: row.date,
+          class_number: row.class_number,
+          source_ref: `${row.subject_id}|${row.group_number}`,
+          other_ref: `${otherRow.subject_id}|${otherRow.group_number}`,
+          details: {
+            current: row,
+            other: otherRow,
+          },
+        });
+      });
+      sameDraftSlotRows.push(row);
+
+      const busyRows = busyMap.get(slotKey) || [];
+      busyRows.forEach((busy) => {
+        const sameTarget = Number(busy.course_id || 0) === Number(selectedCourseId || 0)
+          && Number(busy.subject_id || 0) === Number(row.subject_id || 0)
+          && Number(busy.group_number || 0) === Number(row.group_number || 0);
+        if (sameTarget) return;
+        pushConflict({
+          type: 'occupied',
+          teacher_id: teacher.id,
+          teacher_name: teacher.name,
+          date: row.date,
+          class_number: row.class_number,
+          source_ref: String(busy.source_ref || ''),
+          other_ref: `${row.subject_id}|${row.group_number}`,
+          details: {
+            current: row,
+            busy,
+          },
+        });
+      });
+    });
+  });
+
+  conflicts.sort((a, b) => {
+    const byDate = String(a.date || '').localeCompare(String(b.date || ''));
+    if (byDate !== 0) return byDate;
+    const byClass = Number(a.class_number || 0) - Number(b.class_number || 0);
+    if (byClass !== 0) return byClass;
+    return String(a.teacher_name || '').localeCompare(String(b.teacher_name || ''), 'uk');
+  });
+
+  return {
+    conflicts,
+    unresolvedRows,
+    checkedRows: enrichedRows.length,
+  };
+};
+
+const formatSessionTeacherConflictMessage = (report) => {
+  if (!report) return 'Невідома помилка перевірки конфліктів.';
+  const conflicts = Array.isArray(report.conflicts) ? report.conflicts : [];
+  const unresolvedRows = Array.isArray(report.unresolvedRows) ? report.unresolvedRows : [];
+  if (!conflicts.length && !unresolvedRows.length) {
+    return `Конфліктів викладачів не знайдено (${Number(report.checkedRows || 0)} перевірених подій).`;
+  }
+  const samples = conflicts.slice(0, 4).map((row) => {
+    if (row.type === 'draft') {
+      return `${row.teacher_name}: ${row.date}, пара ${row.class_number} (дубль у плані)`;
+    }
+    const busy = row.details && row.details.busy ? row.details.busy : null;
+    const courseLabel = busy && busy.course_name ? busy.course_name : (busy && busy.course_id ? `Курс ${busy.course_id}` : 'інший курс');
+    const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'інша пара';
+    const groupLabel = busy && Number.isFinite(Number(busy.group_number)) && Number(busy.group_number) > 0
+      ? `, група ${busy.group_number}`
+      : '';
+    return `${row.teacher_name}: ${row.date}, пара ${row.class_number} (${courseLabel} · ${subjectLabel}${groupLabel})`;
+  });
+  const parts = [];
+  if (conflicts.length) {
+    parts.push(`Знайдено конфліктів: ${conflicts.length}.`);
+  }
+  if (samples.length) {
+    parts.push(`Приклади: ${samples.join('; ')}.`);
+  }
+  if (unresolvedRows.length) {
+    parts.push(`Без привʼязаного викладача: ${unresolvedRows.length} подій.`);
+  }
+  return parts.join(' ').trim();
 };
 
 const sessionEventTitleLabel = (event) => {
@@ -21610,7 +21996,7 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     form.location = activeLocation;
     form.course_id = selectedCourseId;
     form.semester_id = selectedSemesterId;
-    form.window_mode = normalizeSessionWindowMode(form.window_mode || SESSION_GENERATOR_DEFAULTS.window_mode);
+    form.window_mode = 'weeks';
     form.session_weeks_count = parseSessionGeneratorInt(
       form.session_weeks_count,
       SESSION_GENERATOR_DEFAULTS.session_weeks_count,
@@ -21697,45 +22083,16 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       : [];
 
     const previewCleared = draftAction === 'clear';
-    let preview = null;
-    if (!previewCleared) {
-      const previewSeed = Number(selectedCourseId || 0) * 17 + Number(selectedSemesterId || 0) * 31
-        + Number(parseDateUTC(form.start_date) || 0) % 97
-        + Number(draftRecord && draftRecord.id ? draftRecord.id : 0) * 13;
-      preview = buildSessionGeneratorPreview({
-        subjects,
-        gradingBySubject,
-        startDate: form.start_date,
-        sessionDays: form.session_days,
-        explicitDates: explicitSessionDates,
-        maxEventsPerDay: form.max_events_per_day,
-        reserveEvery: form.reserve_every,
-        examGapDays: form.exam_gap_days,
-        retakeGapDays: form.retake_gap_days,
-        retakeWindowDays: form.retake_window_days,
-        includeConsultations: form.include_consultations,
-        includeWeekends: form.include_weekends,
-        respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
-        activeStudyDayNames,
-        dayGroupingMode: form.day_grouping_mode,
-        examSequence: form.exam_sequence,
-        creditSequence: form.credit_sequence,
-        strategy: form.strategy,
-        seed: previewSeed,
-      });
-    }
-
-    const slotCalendarBuckets = preview && Array.isArray(preview.dayBuckets) && preview.dayBuckets.length
-      ? preview.dayBuckets
-      : buildSessionDayBuckets({
-          startDate: form.start_date,
-          sessionDays: form.session_days,
-          explicitDates: explicitSessionDates,
-          maxEventsPerDay: form.max_events_per_day,
-          includeWeekends: form.include_weekends,
-          respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
-          activeStudyDayNames,
-        });
+    const preview = null;
+    const slotCalendarBuckets = buildSessionDayBuckets({
+      startDate: form.start_date,
+      sessionDays: form.session_days,
+      explicitDates: explicitSessionDates,
+      maxEventsPerDay: form.max_events_per_day,
+      includeWeekends: form.include_weekends,
+      respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
+      activeStudyDayNames,
+    });
 
     const slotWeekNumbers = Array.from(new Set((slotCalendarBuckets || [])
       .map((bucket) => getSemesterWeekNumberForDate(bucket.date, activeSemester))
@@ -21771,17 +22128,7 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       semester: activeSemester,
       scheduleRows: slotScheduleRows,
     });
-    const plannerItems = ((preview && preview.timelineItems) || [])
-      .filter((item) => item.kind !== 'reserve')
-      .map((item, idx) => ({
-        uid: `evt-${idx + 1}`,
-        label: `${item.title || ''}${item.subject_name ? ` · ${item.subject_name}` : ''}`.trim(),
-        kind: item.kind,
-        type: item.type || '',
-        subject_name: item.subject_name || '',
-        group_label: item.group_label || '',
-        marks: item.marks || [],
-      }));
+    const plannerItems = [];
 
     const selectedCourse = selectedCourseId ? await getCourseById(selectedCourseId) : null;
     const uiHints = [];
@@ -21791,11 +22138,8 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     if (previewCleared) {
       uiHints.push(`План #${draftRecord ? draftRecord.id : '—'} очищено до базових параметрів.`);
     }
-    if (gradingSource === 'fallback') {
-      uiHints.push('Налаштування grading для семестру не прочитались — типи контролю визначено евристично.');
-    }
     if (!selectedSemesterId) {
-      uiHints.push('Активний семестр не знайдено. Використано загальні fallback-налаштування для превʼю.');
+      uiHints.push('Активний семестр не знайдено. Сесійні слоти формуються в fallback-режимі за датою старту.');
     }
     if (form.respect_study_days && !activeStudyDayNames.length) {
       uiHints.push('Активні навчальні дні курсу не задані — фільтр по навчальних днях не застосовано.');
@@ -21892,6 +22236,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
   }
   try {
     const body = req.body || {};
+    const publishAction = normalizeSessionPublishAction(body.publish_action);
     const activeLocation = normalizeGeneratorLocation(body.location || 'kyiv');
     const selectedCourseId = parseSessionGeneratorInt(body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
     const selectedSemesterRaw = parseSessionGeneratorInt(body.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
@@ -21900,7 +22245,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       location: activeLocation,
       course_id: selectedCourseId,
       semester_id: selectedSemesterRaw,
-      window_mode: normalizeSessionWindowMode(body.window_mode || SESSION_GENERATOR_DEFAULTS.window_mode),
+      window_mode: 'weeks',
       start_date: isValidDateString(body.start_date)
         ? String(body.start_date)
         : buildSessionGeneratorDefaultStartDate(null),
@@ -22007,33 +22352,6 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       .filter((row) => row.is_active)
       .map((row) => row.day_name)
       .filter(Boolean);
-    let gradingRows = [];
-    try {
-      gradingRows = await db.all(
-        `
-          SELECT subject_id,
-                 COALESCE(exam_enabled, 1) AS exam_enabled,
-                 COALESCE(credit_enabled, 1) AS credit_enabled,
-                 COALESCE(exam_weight_points, 0) AS exam_weight_points,
-                 COALESCE(credit_weight_points, 0) AS credit_weight_points
-          FROM subject_grading_settings
-          WHERE course_id = ? AND semester_id = ?
-        `,
-        [selectedCourseId, selectedSemesterId]
-      );
-    } catch (err) {
-      gradingRows = [];
-    }
-    const gradingBySubject = {};
-    (gradingRows || []).forEach((row) => {
-      gradingBySubject[Number(row.subject_id)] = {
-        exam_enabled: Number(row.exam_enabled ?? 1) === 1 ? 1 : 0,
-        credit_enabled: Number(row.credit_enabled ?? 1) === 1 ? 1 : 0,
-        exam_weight_points: Number(row.exam_weight_points ?? 0) || 0,
-        credit_weight_points: Number(row.credit_weight_points ?? 0) || 0,
-      };
-    });
-
     let sessionWeekNumbers = [];
     if (form.window_mode === 'weeks' && Number(activeSemester.weeks_count || 0) > 0) {
       const semesterWeeksCount = Number(activeSemester.weeks_count || 0);
@@ -22059,7 +22377,12 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
 
     const subjectById = new Map((subjects || []).map((subject) => [Number(subject.id), subject]));
     const rawManualAssignments = parseSessionManualAssignments(body.manual_assignments_json);
-    let assessments = rawManualAssignments
+    if (!rawManualAssignments.length) {
+      return redirectToGenerator('err', 'Ручний план порожній. Додайте екзамени/заліки у слотах розкладу.');
+    }
+    const allowedDateSet = new Set(explicitSessionDates || []);
+    const outOfWindowRows = [];
+    const assessments = rawManualAssignments
       .map((item) => {
         const subject = subjectById.get(Number(item.subject_id));
         if (!subject) return null;
@@ -22069,6 +22392,14 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
         if (hasExplicitGroup && groupNumber > groupCount) return null;
         const safeGroupNumber = hasExplicitGroup ? groupNumber : null;
         const date = toDateOnly(item.date);
+        if (allowedDateSet.size && !allowedDateSet.has(date)) {
+          outOfWindowRows.push({
+            subject_name: subject.name || '',
+            date,
+            class_number: Number(item.class_number || 0),
+          });
+          return null;
+        }
         const dayName = normalizeWeekdayName(getDayNameFromDate(date));
         if (!dayName) return null;
         return {
@@ -22096,270 +22427,128 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
         if (bySubject !== 0) return bySubject;
         return Number(a.group_number || 0) - Number(b.group_number || 0);
       });
-    const useManualPlan = assessments.length > 0;
-    if (!assessments.length) {
-      const previewSeed = Number(selectedCourseId || 0) * 17 + Number(selectedSemesterId || 0) * 31
-        + Number(parseDateUTC(form.start_date) || 0) % 97
-        + Number(draftId || 0) * 13;
-      const preview = buildSessionGeneratorPreview({
-        subjects,
-        gradingBySubject,
-        startDate: form.start_date,
-        sessionDays: form.session_days,
-        explicitDates: explicitSessionDates,
-        maxEventsPerDay: form.max_events_per_day,
-        reserveEvery: form.reserve_every,
-        examGapDays: form.exam_gap_days,
-        retakeGapDays: form.retake_gap_days,
-        retakeWindowDays: form.retake_window_days,
-        includeConsultations: form.include_consultations,
-        includeWeekends: form.include_weekends,
-        respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
-        activeStudyDayNames,
-        dayGroupingMode: form.day_grouping_mode,
-        examSequence: form.exam_sequence,
-        creditSequence: form.credit_sequence,
-        strategy: form.strategy,
-        seed: previewSeed,
-      });
-      assessments = ((preview && preview.timelineItems) || [])
-        .filter((item) => (
-          item
-          && item.kind === 'assessment'
-          && (item.type === 'exam' || item.type === 'credit')
-          && Number.isFinite(Number(item.subject_id))
-          && Number(item.subject_id) > 0
-          && isValidDateString(item.date)
-        ))
-        .sort((a, b) => {
-          const byDate = String(a.date || '').localeCompare(String(b.date || ''));
-          if (byDate !== 0) return byDate;
-          if (a.type !== b.type) return a.type === 'exam' ? -1 : 1;
-          const bySubject = String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
-          if (bySubject !== 0) return bySubject;
-          return Number(a.group_number || 0) - Number(b.group_number || 0);
-        });
+    if (outOfWindowRows.length) {
+      return redirectToGenerator(
+        'err',
+        `Частина подій поза вікном сесії (${outOfWindowRows.length}). Перевірте тижні сесії та слоти.`
+      );
     }
     if (!assessments.length) {
-      return redirectToGenerator('err', 'Немає подій для публікації. Спочатку згенеруйте сесію.');
+      return redirectToGenerator('err', 'Немає коректних подій для публікації.');
     }
-    const daySlotCursor = new Map();
-    const creditSlotCursor = new Map();
-    const creditScheduleSlotsByDay = new Map();
-    const creditLastSlotByGroup = new Map();
-    const assessmentSubjectIds = Array.from(new Set(
-      assessments
-        .map((item) => Number(item.subject_id))
-        .filter((value) => Number.isFinite(value) && value > 0)
-    ));
-    if (assessmentSubjectIds.length) {
-      const placeholders = assessmentSubjectIds.map(() => '?').join(', ');
-      let scheduleSql = `
-        SELECT subject_id, group_number, day_of_week, class_number, week_number
-        FROM schedule_entries
-        WHERE course_id = ?
-          AND subject_id IN (${placeholders})
-          AND class_number BETWEEN 1 AND 7
-      `;
-      const scheduleParams = [selectedCourseId, ...assessmentSubjectIds];
-      if (selectedSemesterId) {
-        scheduleSql += ' AND semester_id = ?';
-        scheduleParams.push(selectedSemesterId);
-      } else {
-        scheduleSql += ' AND semester_id IS NULL';
-      }
-      const scheduleRows = await db.all(scheduleSql, scheduleParams);
-      const dayRankMap = new Map(fullWeekDays.map((dayName, index) => [dayName, index + 1]));
-      const slotSetByDay = new Map();
-      (scheduleRows || []).forEach((row) => {
-        const subjectId = Number(row.subject_id);
-        const groupNumber = Number(row.group_number);
-        const classNumber = Number(row.class_number);
-        const dayName = normalizeWeekdayName(row.day_of_week);
-        if (
-          !Number.isFinite(subjectId)
-          || subjectId < 1
-          || !Number.isFinite(groupNumber)
-          || groupNumber < 1
-          || !Number.isFinite(classNumber)
-          || classNumber < 1
-          || classNumber > 7
-          || !dayName
-        ) {
-          return;
-        }
-        const dayKey = `${subjectId}|${groupNumber}|${dayName}`;
-        if (!slotSetByDay.has(dayKey)) {
-          slotSetByDay.set(dayKey, new Set());
-        }
-        slotSetByDay.get(dayKey).add(classNumber);
-        const lastKey = `${subjectId}|${groupNumber}`;
-        const candidate = {
-          class_number: classNumber,
-          week_number: Number(row.week_number || 0),
-          day_rank: Number(dayRankMap.get(dayName) || 0),
-        };
-        const current = creditLastSlotByGroup.get(lastKey);
-        if (
-          !current
-          || candidate.week_number > current.week_number
-          || (candidate.week_number === current.week_number && candidate.day_rank > current.day_rank)
-          || (
-            candidate.week_number === current.week_number
-            && candidate.day_rank === current.day_rank
-            && candidate.class_number > current.class_number
-          )
-        ) {
-          creditLastSlotByGroup.set(lastKey, candidate);
-        }
-      });
-      slotSetByDay.forEach((slotSet, key) => {
-        creditScheduleSlotsByDay.set(
-          key,
-          Array.from(slotSet).sort((a, b) => Number(a) - Number(b))
-        );
-      });
+    const expandedAssignments = buildSessionExpandedAssignments(assessments, subjectById);
+    if (!expandedAssignments.length) {
+      return redirectToGenerator('err', 'Немає коректних призначень у ручному плані.');
     }
-    const getNextDefaultClassNumber = (dateValue) => {
-      const safeDate = toDateOnly(dateValue);
-      const dayCursor = Number(daySlotCursor.get(safeDate) || 1);
-      const classNumber = Math.max(1, Math.min(7, dayCursor));
-      daySlotCursor.set(safeDate, dayCursor + 1);
-      if (dayCursor > 7) {
-        overflowSlotCount += 1;
-      }
-      return classNumber;
-    };
-    const resolveCreditClassNumber = (subjectId, groupNumber, dayName) => {
-      const normalizedDay = normalizeWeekdayName(dayName);
-      const dayKey = `${subjectId}|${groupNumber}|${normalizedDay}`;
-      const slots = normalizedDay ? (creditScheduleSlotsByDay.get(dayKey) || []) : [];
-      if (slots.length) {
-        const cursor = Number(creditSlotCursor.get(dayKey) || 0);
-        creditSlotCursor.set(dayKey, cursor + 1);
-        return Number(slots[cursor % slots.length]);
-      }
-      const lastSlot = creditLastSlotByGroup.get(`${subjectId}|${groupNumber}`);
-      if (lastSlot && Number.isFinite(Number(lastSlot.class_number))) {
-        const safeClass = Number(lastSlot.class_number);
-        if (safeClass >= 1 && safeClass <= 7) {
-          return safeClass;
-        }
-      }
-      return null;
-    };
+    const conflictReport = await buildSessionTeacherConflictReport({
+      expandedAssignments,
+      selectedCourseId,
+    });
+    const conflictSummary = formatSessionTeacherConflictMessage(conflictReport);
+    if (publishAction === 'check_conflicts') {
+      return redirectToGenerator(conflictReport.conflicts.length ? 'err' : 'ok', conflictSummary);
+    }
+    if (conflictReport.conflicts.length) {
+      return redirectToGenerator('err', conflictSummary);
+    }
     const username = String(req.session.user?.username || '');
     const authorId = Number(req.session.user?.id || 0);
     const createdAt = new Date().toISOString();
     let createdCount = 0;
     let skippedCount = 0;
-    let overflowSlotCount = 0;
     const touchedSubjectIds = new Set();
 
-    for (const assessment of assessments) {
-      const subjectId = Number(assessment.subject_id);
+    for (const assignment of expandedAssignments) {
+      const subjectId = Number(assignment.subject_id);
+      const groupNumber = Number(assignment.group_number);
+      const classNumber = Number(assignment.class_number);
+      const assessmentDate = toDateOnly(assignment.date);
+      const dayName = normalizeWeekdayName(assignment.day_name);
+      if (
+        !Number.isFinite(subjectId) || subjectId < 1
+        || !Number.isFinite(groupNumber) || groupNumber < 1
+        || !Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7
+        || !isValidDateString(assessmentDate)
+        || !dayName
+      ) {
+        continue;
+      }
       const subject = subjectById.get(subjectId);
       if (!subject) continue;
       touchedSubjectIds.add(subjectId);
-      const groupCount = Math.max(1, Number(subject.group_count || 1));
-      const singleGroupNumber = Number(assessment.group_number || 0);
-      const targetGroups = Number.isFinite(singleGroupNumber) && singleGroupNumber > 0
-        ? [singleGroupNumber]
-        : Array.from({ length: groupCount }, (_value, index) => index + 1);
-      const assessmentDate = toDateOnly(assessment.date);
-      const dayName = normalizeWeekdayName(
-        String(assessment.day_name || getDayNameFromDate(assessmentDate) || '').trim()
-      );
-      if (!dayName) continue;
-      const isCredit = assessment.type === 'credit' ? 1 : 0;
+      const isCredit = assignment.type === 'credit' ? 1 : 0;
       const typeLabel = isCredit ? 'Залік' : 'Екзамен';
-      const descriptionBase = `[Сесія] ${typeLabel} · ${subject.name || assessment.subject_name || ''}`.trim();
-      const description = assessment.note
-        ? `${descriptionBase} · ${String(assessment.note).trim().slice(0, 120)}`
+      const descriptionBase = `[Сесія] ${typeLabel} · ${subject.name || assignment.subject_name || ''}`.trim();
+      const description = assignment.note
+        ? `${descriptionBase} · ${String(assignment.note).trim().slice(0, 120)}`
         : descriptionBase;
-      const manualClassNumber = Number(assessment.class_number || 0);
-      const forcedClassNumber = Number.isFinite(manualClassNumber) && manualClassNumber >= 1 && manualClassNumber <= 7
-        ? manualClassNumber
-        : null;
-      const defaultClassNumber = forcedClassNumber || (isCredit ? null : getNextDefaultClassNumber(assessmentDate));
+      const slot = bellSchedule[classNumber] || null;
+      const timeLabel = slot ? `${slot.start}-${slot.end}` : `Пара ${classNumber}`;
 
-      for (const groupNumber of targetGroups) {
-        let classNumber = Number(defaultClassNumber || 0);
-        if (!forcedClassNumber && isCredit) {
-          classNumber = Number(resolveCreditClassNumber(subjectId, groupNumber, dayName) || 0);
-          if (!Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) {
-            classNumber = getNextDefaultClassNumber(assessmentDate);
-          }
-        }
-        if (!Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) {
-          classNumber = 1;
-        }
-        const slot = bellSchedule[classNumber] || null;
-        const timeLabel = slot ? `${slot.start}-${slot.end}` : `Пара ${classNumber}`;
-        let existingSql = `
-          SELECT id
-          FROM homework
-          WHERE subject_id = ?
-            AND group_number = ?
-            AND course_id = ?
-            AND class_date = ?
-            AND class_number = ?
-            AND COALESCE(is_teacher_homework, 0) = 1
-            AND COALESCE(is_control, 0) = 1
-            AND COALESCE(is_credit, 0) = ?
-            AND COALESCE(is_custom_deadline, 0) = 0
-            AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
-        `;
-        const existingParams = [subjectId, groupNumber, selectedCourseId, assessmentDate, classNumber, isCredit];
-        if (selectedSemesterId) {
-          existingSql += ' AND (semester_id = ? OR semester_id IS NULL)';
-          existingParams.push(selectedSemesterId);
-        } else {
-          existingSql += ' AND semester_id IS NULL';
-        }
-        existingSql += ' LIMIT 1';
-        const existing = await db.get(existingSql, existingParams);
-        if (existing && Number(existing.id) > 0) {
-          skippedCount += 1;
-          continue;
-        }
-        await db.run(
-          `
-            INSERT INTO homework
-              (
-                group_name, subject, day, time, class_number, subject_id, group_number, day_of_week,
-                created_by_id, description, class_date, meeting_url, link_url, file_path, file_name,
-                created_by, created_at, course_id, semester_id, status, scheduled_at, published_at,
-                is_control, is_teacher_homework, is_credit
-              )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', NULL, ?, 1, 1, ?)
-          `,
-          [
-            `Група ${groupNumber}`,
-            subject.name || assessment.subject_name || '',
-            dayName,
-            timeLabel,
-            classNumber,
-            subjectId,
-            groupNumber,
-            dayName,
-            authorId || null,
-            description,
-            assessmentDate,
-            null,
-            null,
-            null,
-            null,
-            username || null,
-            createdAt,
-            selectedCourseId,
-            selectedSemesterId || null,
-            createdAt,
-            isCredit,
-          ]
-        );
-        createdCount += 1;
+      let existingSql = `
+        SELECT id
+        FROM homework
+        WHERE subject_id = ?
+          AND group_number = ?
+          AND course_id = ?
+          AND class_date = ?
+          AND class_number = ?
+          AND COALESCE(is_teacher_homework, 0) = 1
+          AND COALESCE(is_control, 0) = 1
+          AND COALESCE(is_credit, 0) = ?
+          AND COALESCE(is_custom_deadline, 0) = 0
+          AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
+      `;
+      const existingParams = [subjectId, groupNumber, selectedCourseId, assessmentDate, classNumber, isCredit];
+      if (selectedSemesterId) {
+        existingSql += ' AND (semester_id = ? OR semester_id IS NULL)';
+        existingParams.push(selectedSemesterId);
+      } else {
+        existingSql += ' AND semester_id IS NULL';
       }
+      existingSql += ' LIMIT 1';
+      const existing = await db.get(existingSql, existingParams);
+      if (existing && Number(existing.id) > 0) {
+        skippedCount += 1;
+        continue;
+      }
+
+      await db.run(
+        `
+          INSERT INTO homework
+            (
+              group_name, subject, day, time, class_number, subject_id, group_number, day_of_week,
+              created_by_id, description, class_date, meeting_url, link_url, file_path, file_name,
+              created_by, created_at, course_id, semester_id, status, scheduled_at, published_at,
+              is_control, is_teacher_homework, is_credit
+            )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', NULL, ?, 1, 1, ?)
+        `,
+        [
+          `Група ${groupNumber}`,
+          subject.name || assignment.subject_name || '',
+          dayName,
+          timeLabel,
+          classNumber,
+          subjectId,
+          groupNumber,
+          dayName,
+          authorId || null,
+          description,
+          assessmentDate,
+          null,
+          null,
+          null,
+          null,
+          username || null,
+          createdAt,
+          selectedCourseId,
+          selectedSemesterId || null,
+          createdAt,
+          isCredit,
+        ]
+      );
+      createdCount += 1;
     }
 
     let syncedSubjects = 0;
@@ -22386,16 +22575,193 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       }
     }
 
-    const suffix = overflowSlotCount > 0
-      ? ` Частина подій (${overflowSlotCount}) вийшла за межі 7 пар/день і була привʼязана до 7-ї пари.`
+    const unresolvedSuffix = conflictReport.unresolvedRows.length
+      ? ` Перевірка конфліктів неповна: для ${conflictReport.unresolvedRows.length} подій не знайдено привʼязаного викладача (teacher_subjects).`
       : '';
-    const modeLabel = useManualPlan ? ' (ручний план)' : '';
     const message = createdCount > 0
-      ? `Опубліковано ${createdCount} подій сесії${modeLabel}. Пропущено дублікатів: ${skippedCount}. Синхронізовано предметів у журналі: ${syncedSubjects}.${suffix}`
-      : `Нових подій не створено${modeLabel} (дублікатів: ${skippedCount}).${suffix}`;
+      ? `Опубліковано ${createdCount} подій сесії. Пропущено дублікатів: ${skippedCount}. Синхронізовано предметів у журналі: ${syncedSubjects}.${unresolvedSuffix}`
+      : `Нових подій не створено (дублікатів: ${skippedCount}).${unresolvedSuffix}`;
     return redirectToGenerator('ok', message.trim());
   } catch (err) {
     return handleDbError(res, err, 'admin.sessionGenerator.publish');
+  }
+});
+
+app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.sessionGenerator.delete.init');
+  }
+  try {
+    const body = req.body || {};
+    const activeLocation = normalizeGeneratorLocation(body.location || 'kyiv');
+    const selectedCourseId = parseSessionGeneratorInt(body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const selectedSemesterRaw = parseSessionGeneratorInt(body.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const draftId = parseSessionGeneratorInt(body.draft_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const form = {
+      location: activeLocation,
+      course_id: selectedCourseId,
+      semester_id: selectedSemesterRaw,
+      window_mode: 'weeks',
+      start_date: isValidDateString(body.start_date)
+        ? String(body.start_date)
+        : buildSessionGeneratorDefaultStartDate(null),
+      session_days: parseSessionGeneratorInt(body.session_days, SESSION_GENERATOR_DEFAULTS.session_days, 3, 60),
+      session_weeks_count: parseSessionGeneratorInt(
+        body.session_weeks_count,
+        SESSION_GENERATOR_DEFAULTS.session_weeks_count,
+        1,
+        12
+      ),
+      session_weeks_set: String(body.session_weeks_set || '').trim(),
+      include_weekends: parseSessionGeneratorFlag(body.include_weekends, SESSION_GENERATOR_DEFAULTS.include_weekends),
+      respect_study_days: parseSessionGeneratorFlag(body.respect_study_days, SESSION_GENERATOR_DEFAULTS.respect_study_days),
+    };
+    const redirectToGenerator = (messageKind, messageText) => {
+      const params = new URLSearchParams();
+      const safeSet = (key, value) => {
+        if (value === undefined || value === null || value === '') return;
+        params.set(key, String(value));
+      };
+      safeSet('location', activeLocation);
+      safeSet('course_id', selectedCourseId);
+      safeSet('semester_id', form.semester_id || selectedSemesterRaw);
+      safeSet('draft_id', draftId);
+      safeSet('window_mode', form.window_mode);
+      safeSet('start_date', form.start_date);
+      safeSet('session_days', form.session_days);
+      safeSet('session_weeks_count', form.session_weeks_count);
+      safeSet('session_weeks_set', form.session_weeks_set);
+      params.set('include_weekends', form.include_weekends ? '1' : '0');
+      params.set('respect_study_days', form.respect_study_days ? '1' : '0');
+      if (messageText) {
+        params.set(messageKind, String(messageText));
+      }
+      return res.redirect(`/admin/session-generator?${params.toString()}`);
+    };
+
+    if (!selectedCourseId) {
+      return redirectToGenerator('err', 'Оберіть курс для видалення сесії.');
+    }
+
+    const semesters = await getSemestersCached(selectedCourseId);
+    let activeSemester = null;
+    if (selectedSemesterRaw) {
+      activeSemester = (semesters || []).find((row) => Number(row.id) === Number(selectedSemesterRaw)) || null;
+    }
+    if (!activeSemester) {
+      activeSemester = await getActiveSemester(selectedCourseId);
+    }
+    if (!activeSemester && semesters && semesters.length) {
+      activeSemester = semesters[0];
+    }
+    if (!activeSemester) {
+      return redirectToGenerator('err', 'Активний семестр не знайдено.');
+    }
+    const selectedSemesterId = Number(activeSemester.id);
+    form.semester_id = selectedSemesterId;
+
+    let courseStudyDays = [];
+    try {
+      courseStudyDays = await getCourseStudyDays(selectedCourseId);
+    } catch (_err) {
+      courseStudyDays = [];
+    }
+    const activeStudyDayNames = (courseStudyDays || [])
+      .filter((row) => row.is_active)
+      .map((row) => row.day_name)
+      .filter(Boolean);
+
+    let sessionWeekNumbers = [];
+    if (Number(activeSemester.weeks_count || 0) > 0) {
+      const semesterWeeksCount = Number(activeSemester.weeks_count || 0);
+      const parsedWeeks = parseWeekSet(form.session_weeks_set, semesterWeeksCount);
+      if (parsedWeeks.length) {
+        sessionWeekNumbers = parsedWeeks;
+      } else {
+        const count = Math.min(Math.max(Number(form.session_weeks_count || 1), 1), semesterWeeksCount);
+        const startWeek = Math.max(1, semesterWeeksCount - count + 1);
+        sessionWeekNumbers = Array.from({ length: count }, (_value, index) => startWeek + index);
+      }
+      form.session_weeks_set = sessionWeekNumbers.join(',');
+    }
+    const explicitSessionDates = buildSessionDatesFromWeekNumbers({
+      semester: activeSemester,
+      weekNumbers: sessionWeekNumbers,
+      includeWeekends: form.include_weekends,
+      respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
+      activeStudyDayNames,
+    });
+    const targetDates = Array.from(new Set((explicitSessionDates || []).filter((date) => isValidDateString(date)))).sort();
+    if (!targetDates.length) {
+      return redirectToGenerator('err', 'Немає дат сесії для видалення. Перевірте тижні сесії.');
+    }
+
+    let sql = `
+      SELECT id, subject_id
+      FROM homework
+      WHERE course_id = ?
+        AND class_date = ANY(?)
+        AND COALESCE(is_teacher_homework, 0) = 1
+        AND COALESCE(is_control, 0) = 1
+        AND LOWER(TRIM(COALESCE(description, ''))) LIKE '[сесія]%'
+        AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
+    `;
+    const sqlParams = [selectedCourseId, targetDates];
+    if (selectedSemesterId) {
+      sql += ' AND (semester_id = ? OR semester_id IS NULL)';
+      sqlParams.push(selectedSemesterId);
+    } else {
+      sql += ' AND semester_id IS NULL';
+    }
+    const rows = await db.all(sql, sqlParams);
+    const targetHomeworkIds = Array.from(new Set((rows || [])
+      .map((row) => Number(row.id))
+      .filter((id) => Number.isFinite(id) && id > 0)));
+    if (!targetHomeworkIds.length) {
+      return redirectToGenerator('ok', 'У вибраному вікні сесії немає подій для видалення.');
+    }
+    const touchedSubjectIds = new Set((rows || [])
+      .map((row) => Number(row.subject_id))
+      .filter((subjectId) => Number.isFinite(subjectId) && subjectId > 0));
+    await db.run(
+      'DELETE FROM journal_columns WHERE source_homework_id = ANY(?)',
+      [targetHomeworkIds]
+    );
+    await db.run(
+      'DELETE FROM homework WHERE id = ANY(?)',
+      [targetHomeworkIds]
+    );
+    let syncedSubjects = 0;
+    for (const subjectId of touchedSubjectIds) {
+      try {
+        const gradingSettings = await ensureSubjectGradingSettings(
+          Number(subjectId),
+          selectedCourseId,
+          selectedSemesterId,
+          Number(req.session.user?.id || 0) || null
+        );
+        await syncJournalColumnsFromHomework(
+          Number(subjectId),
+          selectedCourseId,
+          selectedSemesterId,
+          gradingSettings,
+          Number(req.session.user?.id || 0) || null
+        );
+        syncedSubjects += 1;
+      } catch (err) {
+        if (!isDbSchemaCompatibilityError(err)) {
+          throw err;
+        }
+      }
+    }
+    return redirectToGenerator(
+      'ok',
+      `Видалено ${targetHomeworkIds.length} подій сесії у вибраному вікні. Синхронізовано предметів у журналі: ${syncedSubjects}.`
+    );
+  } catch (err) {
+    return handleDbError(res, err, 'admin.sessionGenerator.delete');
   }
 });
 
