@@ -20670,6 +20670,48 @@ const parseSessionGeneratorInt = (value, fallback, min, max) => {
   return rounded;
 };
 
+const parseSessionManualAssignments = (rawValue) => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return [];
+  let payload = rawValue;
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    if (!trimmed) return [];
+    try {
+      payload = JSON.parse(trimmed);
+    } catch (_err) {
+      return [];
+    }
+  }
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .slice(0, 2000)
+    .map((row) => {
+      const subjectId = Number(row && row.subject_id);
+      const classNumber = Number(row && row.class_number);
+      const typeRaw = String(row && row.type ? row.type : '').trim().toLowerCase();
+      const type = typeRaw === 'credit' ? 'credit' : (typeRaw === 'exam' ? 'exam' : '');
+      const date = row && row.date ? String(row.date).slice(0, 10) : '';
+      const groupNumberRaw = Number(row && row.group_number);
+      const groupNumber = Number.isFinite(groupNumberRaw) && groupNumberRaw > 0
+        ? Math.floor(groupNumberRaw)
+        : null;
+      const note = row && row.note ? String(row.note).trim().slice(0, 255) : '';
+      if (!Number.isFinite(subjectId) || subjectId < 1) return null;
+      if (!Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) return null;
+      if (!type) return null;
+      if (!date || !isValidDateString(date)) return null;
+      return {
+        subject_id: Math.floor(subjectId),
+        class_number: Math.floor(classNumber),
+        type,
+        date,
+        group_number: groupNumber,
+        note,
+      };
+    })
+    .filter(Boolean);
+};
+
 const toIsoDateOnly = (value) => {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
@@ -21029,7 +21071,7 @@ const buildSessionGeneratorPreview = ({
   const notes = [];
   const assumptions = [
     'Тип контролю визначається за grading settings (якщо є) + fallback правилами класифікації.',
-    'Publish у журнал/розклад поки не виконується — сторінка формує планування сесії та розміщення по слотах.',
+    'Опублікувати можна як авто-план, так і ручний план із вибраних слотів; заліки синхронізуються в журнал.',
   ];
   if (!subjects.length) {
     return {
@@ -21785,6 +21827,7 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       coursesByLocation,
       selectedCourse,
       selectedCourseId,
+      subjects,
       semesters,
       activeSemester,
       selectedSemesterId,
@@ -22014,52 +22057,92 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
         })
       : [];
 
-    const previewSeed = Number(selectedCourseId || 0) * 17 + Number(selectedSemesterId || 0) * 31
-      + Number(parseDateUTC(form.start_date) || 0) % 97
-      + Number(draftId || 0) * 13;
-    const preview = buildSessionGeneratorPreview({
-      subjects,
-      gradingBySubject,
-      startDate: form.start_date,
-      sessionDays: form.session_days,
-      explicitDates: explicitSessionDates,
-      maxEventsPerDay: form.max_events_per_day,
-      reserveEvery: form.reserve_every,
-      examGapDays: form.exam_gap_days,
-      retakeGapDays: form.retake_gap_days,
-      retakeWindowDays: form.retake_window_days,
-      includeConsultations: form.include_consultations,
-      includeWeekends: form.include_weekends,
-      respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
-      activeStudyDayNames,
-      dayGroupingMode: form.day_grouping_mode,
-      examSequence: form.exam_sequence,
-      creditSequence: form.credit_sequence,
-      strategy: form.strategy,
-      seed: previewSeed,
-    });
-    const assessments = ((preview && preview.timelineItems) || [])
-      .filter((item) => (
-        item
-        && item.kind === 'assessment'
-        && (item.type === 'exam' || item.type === 'credit')
-        && Number.isFinite(Number(item.subject_id))
-        && Number(item.subject_id) > 0
-        && isValidDateString(item.date)
-      ))
+    const subjectById = new Map((subjects || []).map((subject) => [Number(subject.id), subject]));
+    const rawManualAssignments = parseSessionManualAssignments(body.manual_assignments_json);
+    let assessments = rawManualAssignments
+      .map((item) => {
+        const subject = subjectById.get(Number(item.subject_id));
+        if (!subject) return null;
+        const groupCount = Math.max(1, Number(subject.group_count || 1));
+        const groupNumber = Number(item.group_number || 0);
+        const hasExplicitGroup = Number.isFinite(groupNumber) && groupNumber > 0;
+        if (hasExplicitGroup && groupNumber > groupCount) return null;
+        const safeGroupNumber = hasExplicitGroup ? groupNumber : null;
+        const date = toDateOnly(item.date);
+        const dayName = normalizeWeekdayName(getDayNameFromDate(date));
+        if (!dayName) return null;
+        return {
+          kind: 'assessment',
+          type: item.type === 'credit' ? 'credit' : 'exam',
+          subject_id: Number(subject.id),
+          subject_name: subject.name || '',
+          date,
+          day_name: dayName,
+          class_number: Number(item.class_number),
+          group_number: safeGroupNumber,
+          group_label: safeGroupNumber ? `Група ${safeGroupNumber}` : (groupCount > 1 ? `Всі групи (${groupCount})` : 'Всі'),
+          note: item.note || '',
+          marks: [item.type === 'credit' ? 'CR' : 'EX'],
+        };
+      })
+      .filter(Boolean)
       .sort((a, b) => {
         const byDate = String(a.date || '').localeCompare(String(b.date || ''));
         if (byDate !== 0) return byDate;
         if (a.type !== b.type) return a.type === 'exam' ? -1 : 1;
+        const byClass = Number(a.class_number || 0) - Number(b.class_number || 0);
+        if (byClass !== 0) return byClass;
         const bySubject = String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
         if (bySubject !== 0) return bySubject;
         return Number(a.group_number || 0) - Number(b.group_number || 0);
       });
+    const useManualPlan = assessments.length > 0;
+    if (!assessments.length) {
+      const previewSeed = Number(selectedCourseId || 0) * 17 + Number(selectedSemesterId || 0) * 31
+        + Number(parseDateUTC(form.start_date) || 0) % 97
+        + Number(draftId || 0) * 13;
+      const preview = buildSessionGeneratorPreview({
+        subjects,
+        gradingBySubject,
+        startDate: form.start_date,
+        sessionDays: form.session_days,
+        explicitDates: explicitSessionDates,
+        maxEventsPerDay: form.max_events_per_day,
+        reserveEvery: form.reserve_every,
+        examGapDays: form.exam_gap_days,
+        retakeGapDays: form.retake_gap_days,
+        retakeWindowDays: form.retake_window_days,
+        includeConsultations: form.include_consultations,
+        includeWeekends: form.include_weekends,
+        respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
+        activeStudyDayNames,
+        dayGroupingMode: form.day_grouping_mode,
+        examSequence: form.exam_sequence,
+        creditSequence: form.credit_sequence,
+        strategy: form.strategy,
+        seed: previewSeed,
+      });
+      assessments = ((preview && preview.timelineItems) || [])
+        .filter((item) => (
+          item
+          && item.kind === 'assessment'
+          && (item.type === 'exam' || item.type === 'credit')
+          && Number.isFinite(Number(item.subject_id))
+          && Number(item.subject_id) > 0
+          && isValidDateString(item.date)
+        ))
+        .sort((a, b) => {
+          const byDate = String(a.date || '').localeCompare(String(b.date || ''));
+          if (byDate !== 0) return byDate;
+          if (a.type !== b.type) return a.type === 'exam' ? -1 : 1;
+          const bySubject = String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
+          if (bySubject !== 0) return bySubject;
+          return Number(a.group_number || 0) - Number(b.group_number || 0);
+        });
+    }
     if (!assessments.length) {
       return redirectToGenerator('err', 'Немає подій для публікації. Спочатку згенеруйте сесію.');
     }
-
-    const subjectById = new Map((subjects || []).map((subject) => [Number(subject.id), subject]));
     const daySlotCursor = new Map();
     const creditSlotCursor = new Map();
     const creditScheduleSlotsByDay = new Map();
@@ -22190,12 +22273,19 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       if (!dayName) continue;
       const isCredit = assessment.type === 'credit' ? 1 : 0;
       const typeLabel = isCredit ? 'Залік' : 'Екзамен';
-      const description = `[Сесія] ${typeLabel} · ${subject.name || assessment.subject_name || ''}`.trim();
-      const defaultClassNumber = isCredit ? null : getNextDefaultClassNumber(assessmentDate);
+      const descriptionBase = `[Сесія] ${typeLabel} · ${subject.name || assessment.subject_name || ''}`.trim();
+      const description = assessment.note
+        ? `${descriptionBase} · ${String(assessment.note).trim().slice(0, 120)}`
+        : descriptionBase;
+      const manualClassNumber = Number(assessment.class_number || 0);
+      const forcedClassNumber = Number.isFinite(manualClassNumber) && manualClassNumber >= 1 && manualClassNumber <= 7
+        ? manualClassNumber
+        : null;
+      const defaultClassNumber = forcedClassNumber || (isCredit ? null : getNextDefaultClassNumber(assessmentDate));
 
       for (const groupNumber of targetGroups) {
         let classNumber = Number(defaultClassNumber || 0);
-        if (isCredit) {
+        if (!forcedClassNumber && isCredit) {
           classNumber = Number(resolveCreditClassNumber(subjectId, groupNumber, dayName) || 0);
           if (!Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) {
             classNumber = getNextDefaultClassNumber(assessmentDate);
@@ -22299,9 +22389,10 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
     const suffix = overflowSlotCount > 0
       ? ` Частина подій (${overflowSlotCount}) вийшла за межі 7 пар/день і була привʼязана до 7-ї пари.`
       : '';
+    const modeLabel = useManualPlan ? ' (ручний план)' : '';
     const message = createdCount > 0
-      ? `Опубліковано ${createdCount} подій сесії. Пропущено дублікатів: ${skippedCount}. Синхронізовано предметів у журналі: ${syncedSubjects}.${suffix}`
-      : `Нових подій не створено (дублікатів: ${skippedCount}).${suffix}`;
+      ? `Опубліковано ${createdCount} подій сесії${modeLabel}. Пропущено дублікатів: ${skippedCount}. Синхронізовано предметів у журналі: ${syncedSubjects}.${suffix}`
+      : `Нових подій не створено${modeLabel} (дублікатів: ${skippedCount}).${suffix}`;
     return redirectToGenerator('ok', message.trim());
   } catch (err) {
     return handleDbError(res, err, 'admin.sessionGenerator.publish');

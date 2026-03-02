@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.44",
+      "date": "2026-03-02",
+      "items": [
+        "feat(session-generator-manual): redesigned session generator with manual slot-based constructor (select exam/credit + subject + group, then click regular schedule slots to assign events)",
+        "feat(session-generator-publish): publish endpoint now accepts `manual_assignments_json` and prioritizes manual plan over auto-preview generation",
+        "ux(session-generator): added interactive publish table syncing with manual slot selections, inline remove actions, and clearer source hint (manual vs auto)"
+      ]
+    },
+    {
       "version": "1.0.43",
       "date": "2026-03-02",
       "items": [

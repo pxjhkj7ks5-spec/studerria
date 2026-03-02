@@ -604,8 +604,8 @@
           <div>
             <h1 class="h3 mb-2">Генератор екзаменаційної сесії</h1>
             <div class="session-lead">
-              Окрема сторінка для швидкого накидання таймлайна сесії: розкладає екзамени/заліки по днях,
-              додає консультації, резервні позначки та вікно перескладань. Логіка евристична, щоб було з чого стартувати.
+              Основний режим: ручне призначення сесійних подій прямо по слотах звичайного розкладу
+              (тип контролю + предмет + група + клік по парі). За потреби можна використати і автогенерацію як стартовий чернетковий план.
             </div>
           </div>
           <div class="session-chip-row">
@@ -858,6 +858,16 @@
         </div>
 
         <div class="col-12 col-xl-8">
+          <% const manualSubjectRows = (subjects || [])
+            .map(function(subject) {
+              return {
+                id: Number(subject.id),
+                name: subject.name || '',
+                group_count: Math.max(1, Number(subject.group_count || 1)),
+              };
+            })
+            .filter(function(subject) { return Number.isFinite(subject.id) && subject.id > 0; })
+            .sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'uk'); }); %>
           <% const assessmentItems = ((preview && preview.timelineItems) || [])
             .filter(function(item) {
               return item && item.kind === 'assessment' && (item.type === 'exam' || item.type === 'credit');
@@ -887,46 +897,134 @@
           <div class="card liquid-panel mb-4">
             <div class="card-body">
               <div class="panel-title-row">
-                <h5>Що буде опубліковано</h5>
-                <span class="session-subtle">Екзамени та заліки з цього превʼю</span>
+                <h5>Ручне призначення сесії</h5>
+                <span class="session-subtle">оберіть тип і предмет, потім клік по слоту</span>
               </div>
-              <% if (!assessmentItems.length) { %>
-                <div class="timeline-empty"><%= previewCleared ? 'План очищено. Спочатку згенеруйте сесію.' : 'Немає подій для публікації.' %></div>
-              <% } else { %>
-                <div class="subject-table-wrap">
-                  <table class="table table-sm align-middle subject-table">
-                    <thead>
-                      <tr>
-                        <th>Дата</th>
-                        <th>Предмет</th>
-                        <th>Тип</th>
-                        <th>Група</th>
-                        <th>Нотатка</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <% assessmentItems.forEach(function(item) { %>
-                        <tr>
-                          <td class="small">
-                            <div class="fw-semibold"><%= item.date || '—' %></div>
-                            <div class="text-muted"><%= item.day_label || item.day_name || '' %></div>
-                          </td>
-                          <td>
-                            <div class="fw-semibold"><%= item.subject_name || '—' %></div>
-                          </td>
-                          <td>
-                            <span class="mark-pill <%= item.type === 'credit' ? 'danger' : 'info' %>">
-                              <%= item.type === 'credit' ? 'Залік' : 'Екзамен' %>
-                            </span>
-                          </td>
-                          <td class="small"><%= item.group_label || 'Усі групи предмета' %></td>
-                          <td class="small"><%= item.note || '—' %></td>
-                        </tr>
-                      <% }); %>
-                    </tbody>
-                  </table>
+              <div class="row g-3">
+                <div class="col-12 col-lg-4">
+                  <div class="d-grid gap-2">
+                    <div>
+                      <label class="form-label">Тип контролю</label>
+                      <div class="btn-group w-100" role="group" aria-label="Session type">
+                        <button class="btn btn-outline-primary active" type="button" data-manual-type="exam">Екзамен</button>
+                        <button class="btn btn-outline-danger" type="button" data-manual-type="credit">Залік</button>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="form-label" for="manualSubjectSelect">Предмет</label>
+                      <select class="form-select" id="manualSubjectSelect">
+                        <option value="">Оберіть предмет</option>
+                        <% manualSubjectRows.forEach(function(subject) { %>
+                          <option value="<%= subject.id %>"><%= subject.name %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="form-label" for="manualGroupSelect">Група</label>
+                      <select class="form-select" id="manualGroupSelect" disabled>
+                        <option value="">Усі групи предмета</option>
+                      </select>
+                    </div>
+                    <div class="liquid-alert info">
+                      1) Оберіть тип/предмет/групу. 2) Натисніть слот у розкладі справа. 3) Повторний клік цим самим вибором видаляє подію.
+                    </div>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" id="manualPlanClearBtn">Очистити ручний план</button>
+                  </div>
                 </div>
-              <% } %>
+                <div class="col-12 col-lg-8">
+                  <% if (!(slotBoard && slotBoard.length)) { %>
+                    <div class="timeline-empty">Немає слотів для поточних параметрів сесії.</div>
+                  <% } else { %>
+                    <div class="d-grid gap-2">
+                      <% (slotBoard || []).forEach(function(day) { %>
+                        <div class="slot-day-card">
+                          <div class="slot-day-head">
+                            <div>
+                              <div class="timeline-day-title"><%= day.day_short || '' %> · <%= day.date || '' %></div>
+                              <div class="timeline-day-subtitle"><%= day.day_name || '' %> · тиждень <%= day.week_number || '—' %></div>
+                            </div>
+                            <span class="mark-pill muted">вільно <%= day.free_count || 0 %> / зайнято <%= day.busy_count || 0 %></span>
+                          </div>
+                          <div class="slot-row-grid">
+                            <% (day.slots || []).forEach(function(slot) { %>
+                              <button
+                                class="slot-cell <%= slot.is_busy ? 'is-busy' : 'is-free' %>"
+                                type="button"
+                                data-slot-btn
+                                data-slot-date="<%= day.date || '' %>"
+                                data-slot-day="<%= day.day_name || '' %>"
+                                data-slot-class="<%= slot.class_number || '' %>"
+                                data-slot-time="<%= slot.time_label || '' %>"
+                              >
+                                <div class="slot-cell-top">Пара <%= slot.class_number %></div>
+                                <div class="slot-cell-time"><%= slot.time_label || '' %></div>
+                                <% if (slot.is_busy && slot.busy && slot.busy.length) { %>
+                                  <div class="slot-cell-content">
+                                    <% slot.busy.slice(0, 2).forEach(function(busy, idx) { %>
+                                      <div><%= busy.subject_name || 'Пара' %> · Г<%= busy.group_number || '-' %><%= idx === 1 && slot.busy.length > 2 ? '…' : '' %></div>
+                                    <% }); %>
+                                  </div>
+                                <% } else { %>
+                                  <div class="slot-cell-content text-muted">Вільний слот</div>
+                                <% } %>
+                                <div class="slot-cell-assignment" data-slot-assignment></div>
+                              </button>
+                            <% }); %>
+                          </div>
+                        </div>
+                      <% }); %>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card liquid-panel mb-4">
+            <div class="card-body">
+              <div class="panel-title-row">
+                <h5>Що буде опубліковано</h5>
+                <span class="session-subtle" id="sessionPublishSourceHint">Екзамени та заліки з цього превʼю</span>
+              </div>
+              <div class="timeline-empty <%= assessmentItems.length ? 'd-none' : '' %>" id="sessionPublishEmptyState">
+                <%= previewCleared ? 'План очищено. Спочатку згенеруйте сесію або додайте події вручну.' : 'Немає подій для публікації.' %>
+              </div>
+              <div class="subject-table-wrap <%= assessmentItems.length ? '' : 'd-none' %>" id="sessionPublishTableWrap">
+                <table class="table table-sm align-middle subject-table">
+                  <thead>
+                    <tr>
+                      <th>Дата</th>
+                      <th>Предмет</th>
+                      <th>Тип</th>
+                      <th>Група</th>
+                      <th>Нотатка</th>
+                      <th class="text-end">Дія</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sessionPublishTableBody">
+                    <% assessmentItems.forEach(function(item) { %>
+                      <tr>
+                        <td class="small">
+                          <div class="fw-semibold"><%= item.date || '—' %></div>
+                          <div class="text-muted"><%= item.day_label || item.day_name || '' %></div>
+                        </td>
+                        <td>
+                          <div class="fw-semibold"><%= item.subject_name || '—' %></div>
+                          <div class="text-muted small">Пара <%= item.class_number || '—' %></div>
+                        </td>
+                        <td>
+                          <span class="mark-pill <%= item.type === 'credit' ? 'danger' : 'info' %>">
+                            <%= item.type === 'credit' ? 'Залік' : 'Екзамен' %>
+                          </span>
+                        </td>
+                        <td class="small"><%= item.group_label || 'Усі групи предмета' %></td>
+                        <td class="small"><%= item.note || '—' %></td>
+                        <td class="text-end small text-muted">авто</td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
 
               <div class="d-grid gap-2 mt-3">
                 <div class="liquid-alert warn">
@@ -959,11 +1057,13 @@
                 <input type="hidden" name="exam_sequence" value="<%= form && form.exam_sequence ? form.exam_sequence : 'exam_only' %>" />
                 <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
                 <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
-                <button class="btn btn-danger" type="submit" <%= assessmentItems.length ? '' : 'disabled' %>>
+                <input type="hidden" name="manual_assignments_json" id="manualAssignmentsInput" value="" />
+                <button class="btn btn-danger" id="sessionPublishBtn" type="submit" <%= assessmentItems.length ? '' : 'disabled' %>>
                   Опублікувати в розклад і журнал
                 </button>
                 <div class="session-subtle">
                   Публікація створює події у розкладі як контрольні викладацькі записи (без перезапису наявних дублікатів).
+                  Якщо є ручний план, він має пріоритет над автогенерацією.
                 </div>
               </form>
             </div>
@@ -976,8 +1076,8 @@
                 <span class="session-subtle">лише головне</span>
               </div>
               <div class="d-grid gap-2">
-                <div class="liquid-alert info">Генератор розкладає екзамени/заліки по датах за обраними параметрами.</div>
-                <div class="liquid-alert info">Якщо предмет має групи, події публікуються по відповідних групах автоматично.</div>
+                <div class="liquid-alert info">Базовий сценарій: оберіть тип + предмет і призначайте події кліком по слотах звичайного розкладу.</div>
+                <div class="liquid-alert info">Якщо групу не обрано, подія застосовується до всіх груп предмета під час публікації.</div>
                 <% ((preview && preview.assumptions) || []).slice(0, 2).forEach(function(item) { %>
                   <div class="liquid-alert"><%= item %></div>
                 <% }); %>
@@ -1036,6 +1136,262 @@
             const url = String(draftSwitcher.value || '').trim();
             if (!url) return;
             window.location.href = url;
+          });
+        }
+
+        const manualTypeButtons = Array.from(document.querySelectorAll('[data-manual-type]'));
+        const manualSubjectSelect = document.getElementById('manualSubjectSelect');
+        const manualGroupSelect = document.getElementById('manualGroupSelect');
+        const manualPlanClearBtn = document.getElementById('manualPlanClearBtn');
+        const manualAssignmentsInput = document.getElementById('manualAssignmentsInput');
+        const publishTableBody = document.getElementById('sessionPublishTableBody');
+        const publishEmptyState = document.getElementById('sessionPublishEmptyState');
+        const publishTableWrap = document.getElementById('sessionPublishTableWrap');
+        const publishBtn = document.getElementById('sessionPublishBtn');
+        const publishSourceHint = document.getElementById('sessionPublishSourceHint');
+        const slotButtons = Array.from(document.querySelectorAll('[data-slot-btn]'));
+
+        const manualSubjects = <%- JSON.stringify(manualSubjectRows || []) %>;
+        const autoAssessmentItems = <%- JSON.stringify((assessmentItems || []).map(function(item) {
+          return {
+            subject_id: Number(item.subject_id || 0),
+            subject_name: item.subject_name || '',
+            group_number: Number(item.group_number || 0) || null,
+            group_label: item.group_label || '',
+            type: item.type === 'credit' ? 'credit' : 'exam',
+            date: item.date || '',
+            day_name: item.day_name || '',
+            class_number: Number(item.class_number || 0) || null,
+            note: item.note || '',
+          };
+        })) %>;
+        const manualSubjectMap = new Map((manualSubjects || []).map((subject) => [Number(subject.id), subject]));
+        let manualSelectedType = 'exam';
+        let manualAssignments = [];
+
+        const escapeHtml = (rawValue) => String(rawValue || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+
+        const assignmentKey = (item) => {
+          const group = Number(item && item.group_number ? item.group_number : 0);
+          return [
+            String(item && item.date ? item.date : ''),
+            String(item && item.class_number ? item.class_number : ''),
+            String(item && item.subject_id ? item.subject_id : ''),
+            String(item && item.type ? item.type : ''),
+            String(group),
+          ].join('|');
+        };
+
+        const sortAssignments = (rows) => [...(rows || [])].sort((a, b) => {
+          const byDate = String(a.date || '').localeCompare(String(b.date || ''));
+          if (byDate !== 0) return byDate;
+          const byClass = Number(a.class_number || 0) - Number(b.class_number || 0);
+          if (byClass !== 0) return byClass;
+          if (a.type !== b.type) return a.type === 'exam' ? -1 : 1;
+          const bySubject = String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
+          if (bySubject !== 0) return bySubject;
+          return Number(a.group_number || 0) - Number(b.group_number || 0);
+        });
+
+        const syncManualTypeButtons = () => {
+          manualTypeButtons.forEach((button) => {
+            const isActive = String(button.dataset.manualType || '') === manualSelectedType;
+            button.classList.toggle('active', isActive);
+            button.classList.toggle('btn-outline-primary', !isActive && button.dataset.manualType === 'exam');
+            button.classList.toggle('btn-primary', isActive && button.dataset.manualType === 'exam');
+            button.classList.toggle('btn-outline-danger', !isActive && button.dataset.manualType === 'credit');
+            button.classList.toggle('btn-danger', isActive && button.dataset.manualType === 'credit');
+          });
+        };
+
+        const updateManualGroupOptions = () => {
+          if (!manualGroupSelect || !manualSubjectSelect) return;
+          const subjectId = Number(manualSubjectSelect.value || 0);
+          const subject = manualSubjectMap.get(subjectId);
+          if (!subject) {
+            manualGroupSelect.innerHTML = '<option value="">Усі групи предмета</option>';
+            manualGroupSelect.disabled = true;
+            return;
+          }
+          const groupCount = Math.max(1, Number(subject.group_count || 1));
+          const options = ['<option value="">Усі групи предмета</option>'];
+          for (let index = 1; index <= groupCount; index += 1) {
+            options.push(`<option value="${index}">Група ${index}</option>`);
+          }
+          manualGroupSelect.innerHTML = options.join('');
+          manualGroupSelect.disabled = false;
+        };
+
+        const renderSlotAssignments = () => {
+          slotButtons.forEach((button) => {
+            const date = String(button.dataset.slotDate || '');
+            const classNumber = Number(button.dataset.slotClass || 0);
+            const slotRows = sortAssignments(manualAssignments.filter((item) =>
+              String(item.date || '') === date && Number(item.class_number || 0) === classNumber
+            ));
+            const holder = button.querySelector('[data-slot-assignment]');
+            if (!holder) return;
+            if (!slotRows.length) {
+              holder.innerHTML = '';
+              button.classList.remove('is-assigned');
+              return;
+            }
+            button.classList.add('is-assigned');
+            const rowsHtml = slotRows.slice(0, 2).map((item) => `
+              <div><span class="mark-pill ${item.type === 'credit' ? 'danger' : 'info'}">${item.type === 'credit' ? 'Залік' : 'Екз'}</span> ${escapeHtml(item.subject_name)} · ${escapeHtml(item.group_label || 'Усі групи')}</div>
+            `).join('');
+            const moreHtml = slotRows.length > 2
+              ? `<div class="small text-muted">+${slotRows.length - 2} ще</div>`
+              : '';
+            holder.innerHTML = rowsHtml + moreHtml;
+          });
+        };
+
+        const renderPublishTable = () => {
+          if (!publishTableBody || !publishTableWrap || !publishEmptyState || !publishBtn || !manualAssignmentsInput) return;
+          const usingManual = manualAssignments.length > 0;
+          const rows = usingManual ? sortAssignments(manualAssignments) : sortAssignments(autoAssessmentItems || []);
+          publishEmptyState.classList.toggle('d-none', rows.length > 0);
+          publishTableWrap.classList.toggle('d-none', rows.length === 0);
+          publishBtn.disabled = rows.length === 0;
+          manualAssignmentsInput.value = usingManual ? JSON.stringify(rows.map((row) => ({
+            subject_id: Number(row.subject_id || 0),
+            type: row.type === 'credit' ? 'credit' : 'exam',
+            date: row.date || '',
+            class_number: Number(row.class_number || 0),
+            group_number: row.group_number ? Number(row.group_number) : null,
+            note: row.note || '',
+          }))) : '';
+          if (publishSourceHint) {
+            publishSourceHint.textContent = usingManual
+              ? `Ручний план: ${rows.length} подій`
+              : 'Екзамени та заліки з цього превʼю';
+          }
+          if (!rows.length) {
+            publishTableBody.innerHTML = '';
+            return;
+          }
+          publishTableBody.innerHTML = rows.map((item) => {
+            const dayName = String(item.day_name || '');
+            const note = String(item.note || '');
+            const canRemove = usingManual;
+            const rowKey = encodeURIComponent(assignmentKey(item));
+            return `
+              <tr>
+                <td class="small">
+                  <div class="fw-semibold">${escapeHtml(item.date || '—')}</div>
+                  <div class="text-muted">${escapeHtml(dayName || '')}</div>
+                </td>
+                <td>
+                  <div class="fw-semibold">${escapeHtml(item.subject_name || '—')}</div>
+                  <div class="text-muted small">Пара ${escapeHtml(item.class_number || '—')}</div>
+                </td>
+                <td>
+                  <span class="mark-pill ${item.type === 'credit' ? 'danger' : 'info'}">
+                    ${item.type === 'credit' ? 'Залік' : 'Екзамен'}
+                  </span>
+                </td>
+                <td class="small">${escapeHtml(item.group_label || 'Усі групи предмета')}</td>
+                <td class="small">${escapeHtml(note || '—')}</td>
+                <td class="text-end">
+                  ${canRemove ? `<button class="btn btn-sm btn-outline-danger" type="button" data-remove-manual="${rowKey}">Видалити</button>` : '<span class="small text-muted">авто</span>'}
+                </td>
+              </tr>
+            `;
+          }).join('');
+        };
+
+        const toggleManualAssignmentFromSlot = (button) => {
+          if (!button || !manualSubjectSelect) return;
+          const subjectId = Number(manualSubjectSelect.value || 0);
+          const subject = manualSubjectMap.get(subjectId);
+          if (!subject) {
+            window.alert('Оберіть предмет перед додаванням події.');
+            return;
+          }
+          const classNumber = Number(button.dataset.slotClass || 0);
+          const date = String(button.dataset.slotDate || '');
+          const dayName = String(button.dataset.slotDay || '');
+          if (!classNumber || !date) return;
+          const groupNumber = manualGroupSelect && manualGroupSelect.value
+            ? Number(manualGroupSelect.value)
+            : null;
+          const groupLabel = groupNumber
+            ? `Група ${groupNumber}`
+            : (Number(subject.group_count || 1) > 1 ? `Всі групи (${subject.group_count})` : 'Всі');
+          const candidate = {
+            subject_id: Number(subject.id),
+            subject_name: String(subject.name || ''),
+            group_number: Number.isFinite(groupNumber) && groupNumber > 0 ? groupNumber : null,
+            group_label: groupLabel,
+            type: manualSelectedType,
+            date,
+            day_name: dayName,
+            class_number: classNumber,
+            note: '',
+          };
+          const key = assignmentKey(candidate);
+          const existingIndex = manualAssignments.findIndex((item) => assignmentKey(item) === key);
+          if (existingIndex >= 0) {
+            manualAssignments.splice(existingIndex, 1);
+          } else {
+            manualAssignments.push(candidate);
+          }
+          renderSlotAssignments();
+          renderPublishTable();
+        };
+
+        if (manualSubjectSelect && !manualSubjectSelect.value && manualSubjects.length) {
+          manualSubjectSelect.value = String(manualSubjects[0].id);
+        }
+        updateManualGroupOptions();
+        syncManualTypeButtons();
+        renderSlotAssignments();
+        renderPublishTable();
+
+        manualTypeButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            manualSelectedType = button.dataset.manualType === 'credit' ? 'credit' : 'exam';
+            syncManualTypeButtons();
+          });
+        });
+        if (manualSubjectSelect) {
+          manualSubjectSelect.addEventListener('change', updateManualGroupOptions);
+        }
+        if (manualPlanClearBtn) {
+          manualPlanClearBtn.addEventListener('click', () => {
+            manualAssignments = [];
+            renderSlotAssignments();
+            renderPublishTable();
+          });
+        }
+        slotButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            toggleManualAssignmentFromSlot(button);
+          });
+        });
+        if (publishTableBody) {
+          publishTableBody.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) return;
+            const encodedKey = String(target.dataset.removeManual || '').trim();
+            if (!encodedKey) return;
+            let decodedKey = '';
+            try {
+              decodedKey = decodeURIComponent(encodedKey);
+            } catch (_err) {
+              decodedKey = encodedKey;
+            }
+            const removeIndex = manualAssignments.findIndex((item) => assignmentKey(item) === decodedKey);
+            if (removeIndex < 0) return;
+            manualAssignments.splice(removeIndex, 1);
+            renderSlotAssignments();
+            renderPublishTable();
           });
         }
 
