@@ -19835,6 +19835,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         semestersByCourse,
         activeSemester,
         selectedCourseId: courseId,
+        allowCourseSelect: isAdminPanelOwner && Array.isArray(courses) && courses.length > 1,
         limitedStaffView: !isAdminPanelOwner,
         allowedSections,
         weeklyLabels,
