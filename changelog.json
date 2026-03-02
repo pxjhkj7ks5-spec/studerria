@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.35",
+      "date": "2026-03-02",
+      "items": [
+        "fix(admin-schedule-groups): in normal admin schedule view, fallback now loads a single effective group per subject instead of all groups, preventing all-group pair duplication on the schedule page"
+      ]
+    },
+    {
       "version": "1.0.34",
       "date": "2026-03-02",
       "items": [

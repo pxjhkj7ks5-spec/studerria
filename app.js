@@ -9726,6 +9726,14 @@ app.get('/schedule', requireLogin, async (req, res) => {
       || 1
     )
     : null;
+  const adminFallbackGroupNumber = (!isAdminViewAs && hasSessionRole(req, 'admin'))
+    ? (
+      parsePreferredGroupNumber(req.query.group_number)
+      || parsePreferredGroupNumber(req.query.group)
+      || parsePreferredGroupNumber(req.session.user && req.session.user.schedule_group)
+      || 1
+    )
+    : null;
   const effectiveViewAsGroupNumber = isAdminViewAs
     ? (viewAsMode === 'self' ? selfFallbackGroupNumber : (parsePreferredGroupNumber(viewAsGroupNumber) || 1))
     : null;
@@ -9825,7 +9833,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
   const loadStudentGroups = (cb) => {
     if (!isAdminViewAs) {
       if (hasSessionRole(req, 'admin')) {
-        return loadAllCourseSubjectGroups(cb);
+        return loadCourseSubjectGroupsForSingleGroup(adminFallbackGroupNumber, cb);
       }
       return db.all(
         `
