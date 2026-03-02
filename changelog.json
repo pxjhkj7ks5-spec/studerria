@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "1.0.54",
+      "date": "2026-03-02",
+      "items": [
+        "feat(session-generator-draft-v2): moved session-generator drafts to DB (`session_generator_drafts`) with autosave/restore for manual slot plan across devices and sessions",
+        "feat(session-generator-live): added live conflict API and inline slot-level conflict badges/messages while planning, plus manual \"Оновити live-конфлікти\" recheck action",
+        "feat(session-generator-bulk): added drag-to-fill bulk assignment mode for exam/consultation/credit across multiple slots and days",
+        "feat(session-generator-filters): added slot-grid filters by teacher, subject, group, and event type for faster manual session planning",
+        "ux(session-generator-blocking-hints): added contextual blocking explanation panel (teacher conflict, duplicate-in-plan, regular-schedule overlap, out-of-window hint)"
+      ]
+    },
+    {
       "version": "1.0.53",
       "date": "2026-03-02",
       "items": [

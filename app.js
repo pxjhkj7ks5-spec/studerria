@@ -20559,7 +20559,7 @@ const SESSION_GENERATOR_DEFAULTS = {
 };
 
 const SESSION_GENERATOR_DRAFTS_LIMIT = 12;
-const SESSION_GENERATOR_DRAFTS_SESSION_KEY = 'session_generator_drafts';
+const SESSION_GENERATOR_DRAFTS_MAX_ASSIGNMENTS = 2000;
 const SESSION_GENERATOR_FORM_QUERY_KEYS = new Set([
   'window_mode',
   'start_date',
@@ -20582,71 +20582,196 @@ const SESSION_GENERATOR_FORM_QUERY_KEYS = new Set([
 
 const hasOwnQueryKey = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
-const getSessionGeneratorDraftStore = (req) => {
-  if (!req.session) {
-    return { next_id: 1, current_id: null, items: {} };
+const normalizeSessionGeneratorDraftForm = (rawValue, fallback = {}) => {
+  let payload = rawValue;
+  if (payload === undefined || payload === null || payload === '') {
+    return { ...(fallback || {}) };
   }
-  if (!req.session[SESSION_GENERATOR_DRAFTS_SESSION_KEY] || typeof req.session[SESSION_GENERATOR_DRAFTS_SESSION_KEY] !== 'object') {
-    req.session[SESSION_GENERATOR_DRAFTS_SESSION_KEY] = { next_id: 1, current_id: null, items: {} };
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    if (!trimmed) return { ...(fallback || {}) };
+    try {
+      payload = JSON.parse(trimmed);
+    } catch (_err) {
+      return { ...(fallback || {}) };
+    }
   }
-  const store = req.session[SESSION_GENERATOR_DRAFTS_SESSION_KEY];
-  if (!store.items || typeof store.items !== 'object') store.items = {};
-  const nextId = Number(store.next_id);
-  store.next_id = Number.isFinite(nextId) && nextId > 0 ? Math.floor(nextId) : 1;
-  const currentId = Number(store.current_id);
-  store.current_id = Number.isFinite(currentId) && currentId > 0 ? Math.floor(currentId) : null;
-  if (store.current_id && !store.items[store.current_id]) {
-    store.current_id = null;
+  if (!payload || Array.isArray(payload) || typeof payload !== 'object') {
+    return { ...(fallback || {}) };
   }
-  return store;
-};
-
-const getSessionGeneratorDraftRecord = (store, draftId) => {
-  const id = Number(draftId);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  if (!store || !store.items || !store.items[id]) return null;
-  return store.items[id];
-};
-
-const pruneSessionGeneratorDraftStore = (store) => {
-  if (!store || !store.items) return;
-  const entries = Object.values(store.items).sort((a, b) =>
-    String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
-  );
-  entries.slice(SESSION_GENERATOR_DRAFTS_LIMIT).forEach((entry) => {
-    if (!entry || !entry.id) return;
-    delete store.items[entry.id];
+  const normalized = { ...(fallback || {}) };
+  Object.entries(payload).forEach(([key, value]) => {
+    const safeKey = String(key || '');
+    if (
+      SESSION_GENERATOR_FORM_QUERY_KEYS.has(safeKey)
+      || safeKey === 'location'
+      || safeKey === 'course_id'
+      || safeKey === 'semester_id'
+    ) {
+      normalized[safeKey] = value;
+    }
   });
-  if (store.current_id && !store.items[store.current_id]) {
-    store.current_id = entries[0] && store.items[entries[0].id] ? entries[0].id : null;
-  }
+  return normalized;
 };
 
-const createSessionGeneratorDraftRecord = (store, seedForm = {}) => {
-  const id = Math.max(1, Number(store.next_id || 1));
-  const now = new Date().toISOString();
-  const record = {
+const normalizeSessionGeneratorDraftAssignments = (rawValue) =>
+  parseSessionManualAssignments(rawValue).slice(0, SESSION_GENERATOR_DRAFTS_MAX_ASSIGNMENTS);
+
+const mapSessionGeneratorDraftRow = (row) => {
+  if (!row) return null;
+  const id = Number(row.id);
+  if (!Number.isFinite(id) || id < 1) return null;
+  return {
     id,
-    created_at: now,
-    updated_at: now,
-    form: { ...(seedForm || {}) },
+    user_id: Number(row.user_id || 0) || null,
+    location: normalizeGeneratorLocation(row.location || 'kyiv'),
+    course_id: Number.isFinite(Number(row.course_id)) && Number(row.course_id) > 0 ? Number(row.course_id) : null,
+    semester_id: Number.isFinite(Number(row.semester_id)) && Number(row.semester_id) > 0 ? Number(row.semester_id) : null,
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null,
+    form: normalizeSessionGeneratorDraftForm(row.form_json, {}),
+    assignments: normalizeSessionGeneratorDraftAssignments(row.assignments_json),
   };
-  store.items[id] = record;
-  store.next_id = id + 1;
-  store.current_id = id;
-  pruneSessionGeneratorDraftStore(store);
-  return store.items[id] || record;
 };
 
-const saveSessionGeneratorDraftRecord = (store, draftRecord, form) => {
-  if (!store || !draftRecord || !draftRecord.id) return null;
-  const id = Number(draftRecord.id);
-  if (!store.items[id]) return null;
-  const nextRecord = store.items[id];
-  nextRecord.form = { ...(form || {}) };
-  nextRecord.updated_at = new Date().toISOString();
-  store.current_id = id;
-  return nextRecord;
+const pruneSessionGeneratorDraftRecords = async (userId) => {
+  const safeUserId = Number(userId);
+  if (!Number.isFinite(safeUserId) || safeUserId < 1) return;
+  await db.run(
+    `
+      DELETE FROM session_generator_drafts
+      WHERE user_id = ?
+        AND id IN (
+          SELECT id
+          FROM session_generator_drafts
+          WHERE user_id = ?
+          ORDER BY updated_at DESC, id DESC
+          OFFSET ?
+        )
+    `,
+    [safeUserId, safeUserId, SESSION_GENERATOR_DRAFTS_LIMIT]
+  );
+};
+
+const listSessionGeneratorDraftRecords = async (userId) => {
+  const safeUserId = Number(userId);
+  if (!Number.isFinite(safeUserId) || safeUserId < 1) return [];
+  const rows = await db.all(
+    `
+      SELECT id, user_id, location, course_id, semester_id, form_json, assignments_json, created_at, updated_at
+      FROM session_generator_drafts
+      WHERE user_id = ?
+      ORDER BY updated_at DESC, id DESC
+      LIMIT ?
+    `,
+    [safeUserId, SESSION_GENERATOR_DRAFTS_LIMIT]
+  );
+  return (rows || [])
+    .map((row) => mapSessionGeneratorDraftRow(row))
+    .filter(Boolean);
+};
+
+const getSessionGeneratorDraftRecordById = async (userId, draftId) => {
+  const safeUserId = Number(userId);
+  const safeDraftId = Number(draftId);
+  if (!Number.isFinite(safeUserId) || safeUserId < 1 || !Number.isFinite(safeDraftId) || safeDraftId < 1) {
+    return null;
+  }
+  const row = await db.get(
+    `
+      SELECT id, user_id, location, course_id, semester_id, form_json, assignments_json, created_at, updated_at
+      FROM session_generator_drafts
+      WHERE id = ? AND user_id = ?
+      LIMIT 1
+    `,
+    [safeDraftId, safeUserId]
+  );
+  return mapSessionGeneratorDraftRow(row);
+};
+
+const createSessionGeneratorDraftRecord = async (userId, seedForm = {}, seedAssignments = []) => {
+  const safeUserId = Number(userId);
+  if (!Number.isFinite(safeUserId) || safeUserId < 1) return null;
+  const baseForm = normalizeSessionGeneratorDraftForm(seedForm, {});
+  const location = normalizeGeneratorLocation(baseForm.location || 'kyiv');
+  const courseId = parseSessionGeneratorInt(baseForm.course_id, null, 1, Number.MAX_SAFE_INTEGER);
+  const semesterId = parseSessionGeneratorInt(baseForm.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
+  const formPayload = {
+    ...baseForm,
+    location,
+    course_id: courseId,
+    semester_id: semesterId,
+  };
+  const assignmentsPayload = normalizeSessionGeneratorDraftAssignments(seedAssignments);
+  const row = await db.get(
+    `
+      INSERT INTO session_generator_drafts
+        (user_id, location, course_id, semester_id, form_json, assignments_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+      RETURNING id, user_id, location, course_id, semester_id, form_json, assignments_json, created_at, updated_at
+    `,
+    [
+      safeUserId,
+      location,
+      courseId || null,
+      semesterId || null,
+      JSON.stringify(formPayload),
+      JSON.stringify(assignmentsPayload),
+    ]
+  );
+  await pruneSessionGeneratorDraftRecords(safeUserId);
+  return mapSessionGeneratorDraftRow(row);
+};
+
+const saveSessionGeneratorDraftRecord = async (userId, draftId, payload = {}) => {
+  const safeUserId = Number(userId);
+  const safeDraftId = Number(draftId);
+  if (!Number.isFinite(safeUserId) || safeUserId < 1 || !Number.isFinite(safeDraftId) || safeDraftId < 1) {
+    return null;
+  }
+  const current = await getSessionGeneratorDraftRecordById(safeUserId, safeDraftId);
+  if (!current) return null;
+  const form = normalizeSessionGeneratorDraftForm(
+    payload && hasOwnQueryKey(payload, 'form') ? payload.form : current.form,
+    current.form
+  );
+  const location = normalizeGeneratorLocation(form.location || current.location || 'kyiv');
+  const courseId = parseSessionGeneratorInt(form.course_id, current.course_id, 1, Number.MAX_SAFE_INTEGER);
+  const semesterId = parseSessionGeneratorInt(form.semester_id, current.semester_id, 1, Number.MAX_SAFE_INTEGER);
+  const assignments = payload && hasOwnQueryKey(payload, 'assignments')
+    ? normalizeSessionGeneratorDraftAssignments(payload.assignments)
+    : normalizeSessionGeneratorDraftAssignments(current.assignments);
+  const formPayload = {
+    ...form,
+    location,
+    course_id: courseId,
+    semester_id: semesterId,
+  };
+  const row = await db.get(
+    `
+      UPDATE session_generator_drafts
+      SET
+        location = ?,
+        course_id = ?,
+        semester_id = ?,
+        form_json = ?,
+        assignments_json = ?,
+        updated_at = NOW()
+      WHERE id = ? AND user_id = ?
+      RETURNING id, user_id, location, course_id, semester_id, form_json, assignments_json, created_at, updated_at
+    `,
+    [
+      location,
+      courseId || null,
+      semesterId || null,
+      JSON.stringify(formPayload),
+      JSON.stringify(assignments),
+      safeDraftId,
+      safeUserId,
+    ]
+  );
+  await pruneSessionGeneratorDraftRecords(safeUserId);
+  return mapSessionGeneratorDraftRow(row);
 };
 
 const buildSessionGeneratorFormDefaults = ({ activeLocation, selectedCourseId, selectedSemesterId, defaultStartDate }) => ({
@@ -20768,6 +20893,26 @@ const parseSessionManualAssignments = (rawValue) => {
       };
     })
     .filter(Boolean);
+};
+
+const parseIsoDateList = (rawValue, limit = 180) => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return [];
+  let payload = rawValue;
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    if (!trimmed) return [];
+    try {
+      payload = JSON.parse(trimmed);
+    } catch (_err) {
+      payload = trimmed.split(',');
+    }
+  }
+  if (!Array.isArray(payload)) return [];
+  const dates = payload
+    .slice(0, Math.max(1, Number(limit) || 1))
+    .map((value) => String(value || '').slice(0, 10))
+    .filter((value) => isValidDateString(value));
+  return Array.from(new Set(dates)).sort();
 };
 
 const toIsoDateOnly = (value) => {
@@ -21054,6 +21199,7 @@ const buildSessionSlotBoard = ({
   dayBuckets = [],
   semester,
   scheduleRows = [],
+  teacherMapBySubject = new Map(),
 }) => {
   const busyMap = new Map();
   (scheduleRows || []).forEach((row) => {
@@ -21063,10 +21209,20 @@ const buildSessionSlotBoard = ({
     if (!week || !classNum || !dayName) return;
     const key = `${week}|${dayName}|${classNum}`;
     if (!busyMap.has(key)) busyMap.set(key, []);
+    const subjectId = Number(row.subject_id || 0);
+    const groupNumber = Number(row.group_number || 0);
+    const teachers = resolveSessionTeachersForGroup(
+      teacherMapBySubject,
+      subjectId,
+      Number.isFinite(groupNumber) && groupNumber > 0 ? groupNumber : null
+    );
     busyMap.get(key).push({
+      subject_id: Number.isFinite(subjectId) && subjectId > 0 ? subjectId : null,
       subject_name: row.subject_name || 'Пара',
       lesson_type: row.lesson_type || '',
       group_number: row.group_number,
+      teacher_ids: teachers.map((teacher) => Number(teacher.id)).filter((id) => Number.isFinite(id) && id > 0),
+      teacher_names: teachers.map((teacher) => String(teacher.name || '')).filter(Boolean),
     });
   });
 
@@ -21164,6 +21320,60 @@ const resolveSessionTeachersForGroup = (teacherMapBySubject, subjectId, groupNum
     }))
     .filter((teacher) => Number.isFinite(teacher.id) && teacher.id > 0)
     .sort((a, b) => a.name.localeCompare(b.name, 'uk'));
+};
+
+const serializeSessionTeacherMap = (teacherMapBySubject) => {
+  const payload = {};
+  if (!teacherMapBySubject || typeof teacherMapBySubject.forEach !== 'function') return payload;
+  teacherMapBySubject.forEach((subjectMap, subjectIdRaw) => {
+    const subjectId = Number(subjectIdRaw);
+    if (!Number.isFinite(subjectId) || subjectId < 1) return;
+    const all = Array.from((subjectMap && subjectMap.all) ? subjectMap.all.keys() : [])
+      .map((teacherId) => Number(teacherId))
+      .filter((teacherId) => Number.isFinite(teacherId) && teacherId > 0);
+    const byGroup = {};
+    if (subjectMap && subjectMap.byGroup && typeof subjectMap.byGroup.forEach === 'function') {
+      subjectMap.byGroup.forEach((groupMap, groupNumberRaw) => {
+        const groupNumber = Number(groupNumberRaw);
+        if (!Number.isFinite(groupNumber) || groupNumber < 1) return;
+        const ids = Array.from(groupMap.keys())
+          .map((teacherId) => Number(teacherId))
+          .filter((teacherId) => Number.isFinite(teacherId) && teacherId > 0);
+        if (ids.length) {
+          byGroup[String(groupNumber)] = ids;
+        }
+      });
+    }
+    payload[String(subjectId)] = {
+      all,
+      by_group: byGroup,
+    };
+  });
+  return payload;
+};
+
+const buildSessionTeacherFilterOptions = (teacherMapBySubject) => {
+  const optionsMap = new Map();
+  if (!teacherMapBySubject || typeof teacherMapBySubject.forEach !== 'function') return [];
+  teacherMapBySubject.forEach((subjectMap) => {
+    (subjectMap && subjectMap.all ? subjectMap.all : new Map()).forEach((name, teacherIdRaw) => {
+      const teacherId = Number(teacherIdRaw);
+      if (!Number.isFinite(teacherId) || teacherId < 1) return;
+      optionsMap.set(teacherId, String(name || `ID ${teacherId}`));
+    });
+    if (subjectMap && subjectMap.byGroup && typeof subjectMap.byGroup.forEach === 'function') {
+      subjectMap.byGroup.forEach((groupMap) => {
+        groupMap.forEach((name, teacherIdRaw) => {
+          const teacherId = Number(teacherIdRaw);
+          if (!Number.isFinite(teacherId) || teacherId < 1) return;
+          optionsMap.set(teacherId, String(name || `ID ${teacherId}`));
+        });
+      });
+    }
+  });
+  return Array.from(optionsMap.entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uk'));
 };
 
 const buildSessionExpandedAssignments = (assessments = [], subjectById = new Map()) => {
@@ -21483,6 +21693,45 @@ const formatSessionTeacherConflictMessage = (report) => {
     parts.push(`Без привʼязаного викладача: ${unresolvedRows.length} подій.`);
   }
   return parts.join(' ').trim();
+};
+
+const buildSessionConflictSlotMap = (report) => {
+  const slotMap = {};
+  const conflicts = Array.isArray(report && report.conflicts) ? report.conflicts : [];
+  conflicts.forEach((conflict) => {
+    const date = String(conflict && conflict.date ? conflict.date : '');
+    const classNumber = Number(conflict && conflict.class_number ? conflict.class_number : 0);
+    if (!date || !Number.isFinite(classNumber) || classNumber < 1) return;
+    const key = `${date}|${classNumber}`;
+    if (!slotMap[key]) {
+      slotMap[key] = {
+        date,
+        class_number: classNumber,
+        conflicts_total: 0,
+        draft_conflicts: 0,
+        occupied_conflicts: 0,
+        reasons: [],
+      };
+    }
+    const slotRow = slotMap[key];
+    slotRow.conflicts_total += 1;
+    if (conflict.type === 'draft') {
+      slotRow.draft_conflicts += 1;
+      slotRow.reasons.push(`${conflict.teacher_name || 'Викладач'}: дубль у ручному плані`);
+    } else {
+      slotRow.occupied_conflicts += 1;
+      const busy = conflict.details && conflict.details.busy ? conflict.details.busy : null;
+      const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'інша подія';
+      const courseLabel = busy && busy.course_name ? busy.course_name : 'інший курс';
+      slotRow.reasons.push(`${conflict.teacher_name || 'Викладач'}: зайнятий (${courseLabel} · ${subjectLabel})`);
+    }
+  });
+  Object.values(slotMap).forEach((slotRow) => {
+    const uniqueReasons = Array.from(new Set((slotRow.reasons || []).map((text) => String(text).trim()).filter(Boolean)));
+    slotRow.reasons = uniqueReasons.slice(0, 4);
+    slotRow.reason_text = uniqueReasons.slice(0, 2).join('; ');
+  });
+  return slotMap;
 };
 
 const sessionEventTitleLabel = (event) => {
@@ -21899,12 +22148,16 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
   }
   try {
     const query = req.query || {};
-    const draftStore = getSessionGeneratorDraftStore(req);
+    const userId = Number(req.session && req.session.user ? req.session.user.id : 0);
     const requestedDraftId = parseSessionGeneratorInt(query.draft_id, null, 1, Number.MAX_SAFE_INTEGER);
     const draftActionRaw = String(query.draft_action || query.action || '').trim().toLowerCase();
     const draftAction = draftActionRaw === 'new' ? 'new' : draftActionRaw === 'clear' ? 'clear' : '';
-    let draftRecord = getSessionGeneratorDraftRecord(draftStore, requestedDraftId)
-      || getSessionGeneratorDraftRecord(draftStore, draftStore.current_id);
+    let draftEntries = Number.isFinite(userId) && userId > 0
+      ? await listSessionGeneratorDraftRecords(userId)
+      : [];
+    let draftRecord = requestedDraftId
+      ? ((draftEntries || []).find((entry) => Number(entry.id) === Number(requestedDraftId)) || null)
+      : ((draftEntries || [])[0] || null);
 
     const seedLocation = normalizeGeneratorLocation(
       hasOwnQueryKey(query, 'location')
@@ -21963,7 +22216,10 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     });
 
     if (draftAction === 'new' || !draftRecord) {
-      draftRecord = createSessionGeneratorDraftRecord(draftStore, defaultForm);
+      draftRecord = await createSessionGeneratorDraftRecord(userId, defaultForm, []);
+      draftEntries = Number.isFinite(userId) && userId > 0
+        ? await listSessionGeneratorDraftRecords(userId)
+        : [];
     }
 
     const baseForm = {
@@ -21978,6 +22234,9 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     }
 
     const hasFormPayload = hasSessionGeneratorFormPayload(query);
+    const draftAssignmentsSeed = draftAction === 'clear'
+      ? []
+      : normalizeSessionGeneratorDraftAssignments((draftRecord && draftRecord.assignments) || []);
     let form = { ...baseForm };
     if (draftAction === 'clear') {
       form = { ...defaultForm };
@@ -22071,7 +22330,12 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     if (!form.start_date || !isValidDateString(form.start_date)) {
       form.start_date = defaultStartDate;
     }
-    draftRecord = saveSessionGeneratorDraftRecord(draftStore, draftRecord, form) || draftRecord;
+    if (draftRecord && draftRecord.id) {
+      draftRecord = await saveSessionGeneratorDraftRecord(userId, draftRecord.id, {
+        form,
+        assignments: draftAssignmentsSeed,
+      }) || draftRecord;
+    }
 
     let subjects = [];
     let courseStudyDays = [];
@@ -22087,6 +22351,14 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       .filter((row) => row.is_active)
       .map((row) => row.day_name)
       .filter(Boolean);
+    const subjectIds = Array.from(new Set((subjects || [])
+      .map((subject) => Number(subject.id))
+      .filter((value) => Number.isFinite(value) && value > 0)));
+    const teacherMapBySubject = subjectIds.length
+      ? await getSessionSubjectTeacherMap(subjectIds)
+      : new Map();
+    const sessionTeacherMapPayload = serializeSessionTeacherMap(teacherMapBySubject);
+    const sessionTeacherFilterOptions = buildSessionTeacherFilterOptions(teacherMapBySubject);
 
     let gradingRows = [];
     let gradingSource = 'none';
@@ -22169,6 +22441,7 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
                    se.day_of_week,
                    se.class_number,
                    se.group_number,
+                   se.subject_id,
                    COALESCE(se.lesson_type, '') AS lesson_type,
                    s.name AS subject_name
             FROM schedule_entries se
@@ -22188,7 +22461,49 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       dayBuckets: slotCalendarBuckets,
       semester: activeSemester,
       scheduleRows: slotScheduleRows,
+      teacherMapBySubject,
     });
+    const subjectById = new Map((subjects || []).map((subject) => [Number(subject.id), subject]));
+    const allowedDateSet = new Set((explicitSessionDates || []).filter((date) => isValidDateString(date)));
+    const draftAssignmentsRaw = normalizeSessionGeneratorDraftAssignments((draftRecord && draftRecord.assignments) || []);
+    const manualAssignmentsInitial = draftAssignmentsRaw
+      .map((item) => {
+        const subjectId = Number(item.subject_id);
+        const subject = subjectById.get(subjectId);
+        if (!subject) return null;
+        const date = toDateOnly(item.date);
+        if (!isValidDateString(date)) return null;
+        if (allowedDateSet.size && !allowedDateSet.has(date)) return null;
+        const classNumber = Number(item.class_number);
+        if (!Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) return null;
+        const groupCount = Math.max(1, Number(subject.group_count || 1));
+        const groupNumberRaw = Number(item.group_number || 0);
+        const groupNumber = Number.isFinite(groupNumberRaw) && groupNumberRaw > 0
+          ? Math.floor(groupNumberRaw)
+          : null;
+        if (groupNumber && groupNumber > groupCount) return null;
+        return {
+          subject_id: subjectId,
+          type: item.type === 'credit'
+            ? 'credit'
+            : (item.type === 'consultation' ? 'consultation' : 'exam'),
+          date,
+          class_number: classNumber,
+          group_number: groupNumber,
+          note: item.note ? String(item.note).slice(0, 255) : '',
+        };
+      })
+      .filter(Boolean);
+    if (
+      draftRecord
+      && draftRecord.id
+      && JSON.stringify(draftAssignmentsRaw) !== JSON.stringify(manualAssignmentsInitial)
+    ) {
+      draftRecord = await saveSessionGeneratorDraftRecord(userId, draftRecord.id, {
+        form,
+        assignments: manualAssignmentsInitial,
+      }) || draftRecord;
+    }
     const plannerItems = [];
 
     const selectedCourse = selectedCourseId ? await getCourseById(selectedCourseId) : null;
@@ -22209,16 +22524,16 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       uiHints.push('Режим "сесійні тижні" потребує активного семестру з датою старту. Зараз використано звичайний режим за днями.');
     }
 
-    const draftEntries = Object.values(draftStore.items || {}).sort((a, b) =>
-      String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
-    );
+    draftEntries = Number.isFinite(userId) && userId > 0
+      ? await listSessionGeneratorDraftRecords(userId)
+      : [];
     const draftMeta = draftRecord
       ? {
           id: Number(draftRecord.id),
           created_at: draftRecord.created_at || null,
           updated_at: draftRecord.updated_at || null,
-          total: draftEntries.length,
-          list: draftEntries.map((item) => ({
+          total: (draftEntries || []).length,
+          list: (draftEntries || []).map((item) => ({
             id: Number(item.id),
             updated_at: item.updated_at || null,
           })),
@@ -22247,6 +22562,9 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       slotBoard,
       plannerItems,
       draftMeta,
+      manualAssignmentsInitial,
+      sessionTeacherFilterOptions,
+      sessionTeacherMapPayload,
       sessionMarkLegend: SESSION_GENERATOR_MARK_LEGEND,
       strategyOptions: [
         { value: 'exams_first', label: 'Екзамени спочатку' },
@@ -22289,6 +22607,141 @@ app.get('/admin/session-generator/index', requireScheduleGeneratorSectionAccess,
   return res.redirect(`/admin/session-generator${query ? `?${query}` : ''}`);
 });
 
+app.post('/admin/session-generator/draft/save', requireScheduleGeneratorSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'db_init_failed' });
+  }
+  try {
+    const body = req.body || {};
+    const userId = Number(req.session && req.session.user ? req.session.user.id : 0);
+    if (!Number.isFinite(userId) || userId < 1) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+    const location = normalizeGeneratorLocation(body.location || 'kyiv');
+    const courseId = parseSessionGeneratorInt(body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const semesterId = parseSessionGeneratorInt(body.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const draftId = parseSessionGeneratorInt(body.draft_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const formPayload = normalizeSessionGeneratorDraftForm(body.form_json, {});
+    formPayload.location = location;
+    formPayload.course_id = courseId;
+    formPayload.semester_id = semesterId;
+    const assignmentsPayload = normalizeSessionGeneratorDraftAssignments(body.manual_assignments_json);
+
+    let draftRecord = null;
+    if (draftId) {
+      draftRecord = await saveSessionGeneratorDraftRecord(userId, draftId, {
+        form: formPayload,
+        assignments: assignmentsPayload,
+      });
+    }
+    if (!draftRecord) {
+      draftRecord = await createSessionGeneratorDraftRecord(userId, formPayload, assignmentsPayload);
+    }
+    if (!draftRecord) {
+      return res.status(500).json({ ok: false, error: 'draft_save_failed' });
+    }
+    return res.json({
+      ok: true,
+      draft_id: Number(draftRecord.id),
+      updated_at: draftRecord.updated_at || null,
+      assignments_count: assignmentsPayload.length,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'draft_save_failed' });
+  }
+});
+
+app.post('/admin/session-generator/conflicts/live', requireScheduleGeneratorSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'db_init_failed' });
+  }
+  try {
+    const body = req.body || {};
+    const selectedCourseId = parseSessionGeneratorInt(body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const selectedSemesterId = parseSessionGeneratorInt(body.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
+    if (!selectedCourseId) {
+      return res.status(400).json({ ok: false, error: 'course_required' });
+    }
+
+    const manualAssignments = parseSessionManualAssignments(body.manual_assignments_json);
+    const explicitDates = parseIsoDateList(body.explicit_dates_json);
+    const explicitDateSet = new Set(explicitDates);
+    const subjects = await getSubjectsCached(selectedCourseId, { visibleOnly: true });
+    const subjectById = new Map((subjects || []).map((subject) => [Number(subject.id), subject]));
+    const outOfWindowRows = [];
+
+    const assessments = manualAssignments
+      .map((item) => {
+        const subject = subjectById.get(Number(item.subject_id));
+        if (!subject) return null;
+        const groupCount = Math.max(1, Number(subject.group_count || 1));
+        const groupNumberRaw = Number(item.group_number || 0);
+        const hasExplicitGroup = Number.isFinite(groupNumberRaw) && groupNumberRaw > 0;
+        if (hasExplicitGroup && groupNumberRaw > groupCount) return null;
+        const safeGroupNumber = hasExplicitGroup ? Math.floor(groupNumberRaw) : null;
+        const date = toDateOnly(item.date);
+        if (!date || !isValidDateString(date)) return null;
+        if (explicitDateSet.size && !explicitDateSet.has(date)) {
+          outOfWindowRows.push({
+            subject_id: Number(subject.id),
+            subject_name: subject.name || '',
+            date,
+            class_number: Number(item.class_number || 0),
+          });
+          return null;
+        }
+        const classNumber = Number(item.class_number || 0);
+        if (!Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) return null;
+        const dayName = normalizeWeekdayName(getDayNameFromDate(date));
+        if (!dayName) return null;
+        return {
+          kind: 'assessment',
+          type: item.type === 'credit'
+            ? 'credit'
+            : (item.type === 'consultation' ? 'consultation' : 'exam'),
+          subject_id: Number(subject.id),
+          subject_name: subject.name || '',
+          date,
+          day_name: dayName,
+          class_number: classNumber,
+          group_number: safeGroupNumber,
+          note: item.note || '',
+          marks: [item.type === 'credit' ? 'CR' : 'EX'],
+        };
+      })
+      .filter(Boolean);
+
+    const expandedAssignments = buildSessionExpandedAssignments(assessments, subjectById);
+    const conflictReport = expandedAssignments.length
+      ? await buildSessionTeacherConflictReport({
+          expandedAssignments,
+          selectedCourseId,
+        })
+      : { conflicts: [], unresolvedRows: [], checkedRows: 0 };
+    const slotConflicts = buildSessionConflictSlotMap(conflictReport);
+    const summary = formatSessionTeacherConflictMessage(conflictReport);
+
+    return res.json({
+      ok: true,
+      summary,
+      checked_rows: Number(conflictReport.checkedRows || 0),
+      conflicts_total: (conflictReport.conflicts || []).length,
+      unresolved_total: (conflictReport.unresolvedRows || []).length,
+      out_of_window_total: outOfWindowRows.length,
+      out_of_window_samples: outOfWindowRows.slice(0, 6),
+      slot_conflicts: slotConflicts,
+      conflicts: (conflictReport.conflicts || []).slice(0, 30),
+      semester_id: selectedSemesterId || null,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'conflict_check_failed' });
+  }
+});
+
 app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
@@ -22302,6 +22755,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
     const selectedCourseId = parseSessionGeneratorInt(body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
     const selectedSemesterRaw = parseSessionGeneratorInt(body.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
     const draftId = parseSessionGeneratorInt(body.draft_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const userId = Number(req.session && req.session.user ? req.session.user.id : 0);
     let form = {
       location: activeLocation,
       course_id: selectedCourseId,
@@ -22438,6 +22892,16 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
 
     const subjectById = new Map((subjects || []).map((subject) => [Number(subject.id), subject]));
     const rawManualAssignments = parseSessionManualAssignments(body.manual_assignments_json);
+    if (draftId && Number.isFinite(userId) && userId > 0) {
+      try {
+        await saveSessionGeneratorDraftRecord(userId, draftId, {
+          form,
+          assignments: rawManualAssignments,
+        });
+      } catch (_err) {
+        // Non-blocking: publish must not fail because draft autosave failed.
+      }
+    }
     if (!rawManualAssignments.length) {
       return redirectToGenerator('err', 'Ручний план порожній. Додайте екзамени/заліки у слотах розкладу.');
     }

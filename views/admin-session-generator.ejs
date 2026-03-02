@@ -551,6 +551,22 @@
         background: rgba(82, 170, 255, 0.10);
         box-shadow: inset 0 0 0 1px rgba(82, 170, 255, 0.18);
       }
+      .slot-cell.is-filter-hidden {
+        opacity: 0.28;
+      }
+      .slot-cell.is-drag-target {
+        border-color: rgba(113, 228, 182, 0.62);
+        box-shadow: inset 0 0 0 1px rgba(113, 228, 182, 0.42);
+      }
+      .slot-cell.is-conflict {
+        border-color: rgba(255, 110, 130, 0.74);
+        background: rgba(255, 110, 130, 0.14);
+        box-shadow: inset 0 0 0 1px rgba(255, 110, 130, 0.46);
+      }
+      .slot-cell.is-recommended {
+        border-color: rgba(113, 228, 182, 0.72);
+        background: rgba(113, 228, 182, 0.14);
+      }
       .slot-cell-top {
         font-weight: 700;
         font-size: 0.78rem;
@@ -572,6 +588,21 @@
         word-break: break-word;
       }
       body.theme-light .slot-cell-assignment { color: rgba(20,28,38,0.78); }
+      .slot-cell-conflict {
+        margin-top: 0.18rem;
+        font-size: 0.68rem;
+        line-height: 1.15;
+        color: rgba(255, 191, 201, 0.92);
+      }
+      body.theme-light .slot-cell-conflict {
+        color: rgba(163, 36, 58, 0.92);
+      }
+      .live-conflict-ok {
+        box-shadow: inset 3px 0 0 rgba(113, 228, 182, 0.85);
+      }
+      .live-conflict-err {
+        box-shadow: inset 3px 0 0 rgba(255, 110, 130, 0.85);
+      }
       .tiny-dot {
         width: 0.45rem;
         height: 0.45rem;
@@ -579,6 +610,10 @@
         background: currentColor;
         opacity: 0.7;
         display: inline-block;
+      }
+      body.session-dragging {
+        user-select: none;
+        cursor: crosshair;
       }
       @media (max-width: 991px) {
         .session-stat-grid {
@@ -885,16 +920,63 @@
                       </select>
                     </div>
                     <div class="liquid-alert info">
-                      1) Оберіть тип (екзамен/консультація/залік), предмет і групу. 2) Натисніть слот у розкладі справа. 3) Повторний клік цим самим вибором видаляє подію.
+                      1) Оберіть тип + предмет + групу. 2) Клік по слоту додає/видаляє подію. 3) Для масового заповнення затисніть кнопку миші і протягніть по слотах.
                     </div>
-                    <button class="btn btn-outline-secondary btn-sm" type="button" id="manualPlanClearBtn">Очистити ручний план</button>
+                    <div class="d-grid gap-2">
+                      <button class="btn btn-outline-secondary btn-sm" type="button" id="manualPlanClearBtn">Очистити ручний план</button>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" id="manualConflictsRecheckBtn">Оновити live-конфлікти</button>
+                    </div>
+                    <div class="liquid-alert info" id="manualLiveConflictStatus">
+                      Live-конфлікти: перевірка не запускалась.
+                    </div>
+                    <div class="liquid-alert warn" id="manualBlockReasonBox">
+                      Пояснення блокувань: оберіть предмет і наведіть/клікніть по слоту.
+                    </div>
                   </div>
                 </div>
                 <div class="col-12 col-lg-8 manual-slots-col">
                   <% if (!(slotBoard && slotBoard.length)) { %>
                     <div class="timeline-empty">Немає слотів для поточних параметрів сесії.</div>
                   <% } else { %>
-                    <div class="d-grid gap-2">
+                    <div class="row g-2 mb-2">
+                      <div class="col-12 col-md-6">
+                        <label class="form-label small mb-1" for="slotFilterTeacher">Фільтр: викладач</label>
+                        <select class="form-select form-select-sm" id="slotFilterTeacher">
+                          <option value="">Усі викладачі</option>
+                          <% (sessionTeacherFilterOptions || []).forEach(function(teacher) { %>
+                            <option value="<%= teacher.id %>"><%= teacher.name %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label small mb-1" for="slotFilterSubject">Фільтр: предмет</label>
+                        <select class="form-select form-select-sm" id="slotFilterSubject">
+                          <option value="">Усі предмети</option>
+                          <% manualSubjectRows.forEach(function(subject) { %>
+                            <option value="<%= subject.id %>"><%= subject.name %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label small mb-1" for="slotFilterGroup">Фільтр: група</label>
+                        <select class="form-select form-select-sm" id="slotFilterGroup">
+                          <option value="">Усі групи</option>
+                          <% for (let groupIdx = 1; groupIdx <= 6; groupIdx += 1) { %>
+                            <option value="<%= groupIdx %>">Група <%= groupIdx %></option>
+                          <% } %>
+                        </select>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label small mb-1" for="slotFilterType">Фільтр: тип події</label>
+                        <select class="form-select form-select-sm" id="slotFilterType">
+                          <option value="">Усі типи</option>
+                          <option value="exam">Екзамен</option>
+                          <option value="consultation">Консультація</option>
+                          <option value="credit">Залік</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="d-grid gap-2" id="sessionSlotBoardRoot">
                       <% (slotBoard || []).forEach(function(day) { %>
                         <div class="slot-day-card">
                           <div class="slot-day-head">
@@ -912,8 +994,10 @@
                                 data-slot-btn
                                 data-slot-date="<%= day.date || '' %>"
                                 data-slot-day="<%= day.day_name || '' %>"
+                                data-slot-week="<%= day.week_number || '' %>"
                                 data-slot-class="<%= slot.class_number || '' %>"
                                 data-slot-time="<%= slot.time_label || '' %>"
+                                data-slot-busy-meta="<%= encodeURIComponent(JSON.stringify(slot.busy || [])) %>"
                               >
                                 <div class="slot-cell-top">Пара <%= slot.class_number %></div>
                                 <div class="slot-cell-time"><%= slot.time_label || '' %></div>
@@ -927,6 +1011,7 @@
                                   <div class="slot-cell-content text-muted">Вільний слот</div>
                                 <% } %>
                                 <div class="slot-cell-assignment" data-slot-assignment></div>
+                                <div class="slot-cell-conflict" data-slot-conflict></div>
                               </button>
                             <% }); %>
                           </div>
@@ -1029,6 +1114,16 @@
         const locationInput = document.getElementById('sessionLocationInput');
         const draftSwitcher = document.querySelector('[data-draft-switch]');
         const form = document.getElementById('sessionGeneratorForm');
+        const publishForm = document.querySelector('form[action="/admin/session-generator/publish"]');
+        const publishDraftInput = publishForm ? publishForm.querySelector('input[name="draft_id"]') : null;
+        const draftIdInput = document.getElementById('sessionDraftIdInput');
+        const liveConflictStatus = document.getElementById('manualLiveConflictStatus');
+        const manualBlockReasonBox = document.getElementById('manualBlockReasonBox');
+        const manualConflictsRecheckBtn = document.getElementById('manualConflictsRecheckBtn');
+        const slotFilterTeacher = document.getElementById('slotFilterTeacher');
+        const slotFilterSubject = document.getElementById('slotFilterSubject');
+        const slotFilterGroup = document.getElementById('slotFilterGroup');
+        const slotFilterType = document.getElementById('slotFilterType');
         document.querySelectorAll('[data-location]').forEach((btn) => {
           btn.addEventListener('click', () => {
             if (!locationInput || !form) return;
@@ -1057,9 +1152,28 @@
         const slotButtons = Array.from(document.querySelectorAll('[data-slot-btn]'));
 
         const manualSubjects = <%- JSON.stringify(manualSubjectRows || []) %>;
+        const manualAssignmentsSeed = <%- JSON.stringify(manualAssignmentsInitial || []) %>;
+        const sessionTeacherMapPayload = <%- JSON.stringify(sessionTeacherMapPayload || {}) %>;
         const manualSubjectMap = new Map((manualSubjects || []).map((subject) => [Number(subject.id), subject]));
         let manualSelectedType = 'exam';
         let manualAssignments = [];
+        let liveConflictState = {
+          conflicts_total: 0,
+          unresolved_total: 0,
+          out_of_window_total: 0,
+          summary: '',
+          slot_conflicts: {},
+        };
+        let lastHoveredSlotKey = '';
+        let liveConflictRequestToken = 0;
+        let saveDraftTimer = null;
+        let liveConflictTimer = null;
+        const dragState = {
+          active: false,
+          pointerId: null,
+          mode: 'add',
+          visitedSlotKeys: new Set(),
+        };
 
         const escapeHtml = (rawValue) => String(rawValue || '')
           .replace(/&/g, '&amp;')
@@ -1067,6 +1181,75 @@
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#039;');
+
+        const slotKey = (date, classNumber) => `${String(date || '')}|${Number(classNumber || 0)}`;
+
+        const parseBusyMeta = (button) => {
+          if (!button) return [];
+          const raw = String(button.dataset.slotBusyMeta || '').trim();
+          if (!raw) return [];
+          try {
+            const decoded = decodeURIComponent(raw);
+            const payload = JSON.parse(decoded);
+            return Array.isArray(payload) ? payload : [];
+          } catch (_err) {
+            return [];
+          }
+        };
+
+        const slotMetaByKey = new Map();
+        slotButtons.forEach((button) => {
+          const key = slotKey(button.dataset.slotDate, button.dataset.slotClass);
+          slotMetaByKey.set(key, {
+            button,
+            date: String(button.dataset.slotDate || ''),
+            class_number: Number(button.dataset.slotClass || 0),
+            day_name: String(button.dataset.slotDay || ''),
+            week_number: Number(button.dataset.slotWeek || 0) || null,
+            busy_rows: parseBusyMeta(button),
+          });
+        });
+        const explicitSessionDates = Array.from(new Set(Array.from(slotMetaByKey.values())
+          .map((slot) => String(slot.date || ''))
+          .filter(Boolean)))
+          .sort();
+
+        const normalizeAssignmentType = (value) => {
+          const raw = String(value || '').trim().toLowerCase();
+          if (raw === 'credit') return 'credit';
+          if (raw === 'consultation' || raw === 'consult' || raw === 'cons') return 'consultation';
+          return 'exam';
+        };
+
+        const normalizeAssignmentRow = (rawRow) => {
+          const row = rawRow || {};
+          const subjectId = Number(row.subject_id || 0);
+          const subject = manualSubjectMap.get(subjectId);
+          if (!subject) return null;
+          const classNumber = Number(row.class_number || 0);
+          if (!Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) return null;
+          const date = String(row.date || '').slice(0, 10);
+          if (!date) return null;
+          const groupCount = Math.max(1, Number(subject.group_count || 1));
+          const groupNumberRaw = Number(row.group_number || 0);
+          const groupNumber = Number.isFinite(groupNumberRaw) && groupNumberRaw > 0
+            ? Math.floor(groupNumberRaw)
+            : null;
+          if (groupNumber && groupNumber > groupCount) return null;
+          return {
+            subject_id: subjectId,
+            subject_name: String(subject.name || ''),
+            group_number: groupNumber,
+            group_label: groupNumber
+              ? `Група ${groupNumber}`
+              : (groupCount > 1 ? `Всі групи (${groupCount})` : 'Всі'),
+            type: normalizeAssignmentType(row.type),
+            date,
+            day_name: String(row.day_name || ''),
+            class_number: classNumber,
+            note: row.note ? String(row.note).slice(0, 255) : '',
+          };
+        };
 
         const assignmentKey = (item) => {
           const group = Number(item && item.group_number ? item.group_number : 0);
@@ -1090,6 +1273,88 @@
           if (bySubject !== 0) return bySubject;
           return Number(a.group_number || 0) - Number(b.group_number || 0);
         });
+
+        const dedupeAssignments = (rows) => {
+          const seen = new Set();
+          const result = [];
+          (rows || []).forEach((row) => {
+            const normalized = normalizeAssignmentRow(row);
+            if (!normalized) return;
+            const key = assignmentKey(normalized);
+            if (seen.has(key)) return;
+            seen.add(key);
+            result.push(normalized);
+          });
+          return result;
+        };
+
+        const getAssignmentTeacherIds = (assignment) => {
+          const subjectId = String(Number(assignment && assignment.subject_id ? assignment.subject_id : 0));
+          const subjectMap = sessionTeacherMapPayload && typeof sessionTeacherMapPayload === 'object'
+            ? sessionTeacherMapPayload[subjectId]
+            : null;
+          if (!subjectMap) return [];
+          const allIds = Array.isArray(subjectMap.all) ? subjectMap.all : [];
+          const byGroup = subjectMap.by_group && typeof subjectMap.by_group === 'object'
+            ? subjectMap.by_group
+            : {};
+          const groupKey = assignment && assignment.group_number ? String(assignment.group_number) : '';
+          const groupIds = groupKey && Array.isArray(byGroup[groupKey]) ? byGroup[groupKey] : [];
+          return Array.from(new Set([...(allIds || []), ...(groupIds || [])]
+            .map((value) => Number(value))
+            .filter((value) => Number.isFinite(value) && value > 0)));
+        };
+
+        const buildCandidateFromSlot = (button) => {
+          if (!button || !manualSubjectSelect) return null;
+          const subjectId = Number(manualSubjectSelect.value || 0);
+          const subject = manualSubjectMap.get(subjectId);
+          if (!subject) return null;
+          const classNumber = Number(button.dataset.slotClass || 0);
+          const date = String(button.dataset.slotDate || '');
+          const dayName = String(button.dataset.slotDay || '');
+          if (!classNumber || !date) return null;
+          const groupNumber = manualGroupSelect && manualGroupSelect.value
+            ? Number(manualGroupSelect.value)
+            : null;
+          const normalized = normalizeAssignmentRow({
+            subject_id: subjectId,
+            subject_name: subject.name,
+            group_number: Number.isFinite(groupNumber) && groupNumber > 0 ? groupNumber : null,
+            type: manualSelectedType,
+            date,
+            day_name: dayName,
+            class_number: classNumber,
+            note: '',
+          });
+          return normalized;
+        };
+
+        const slotMatchesFilters = (slotKeyValue, slotRows) => {
+          const teacherFilter = Number(slotFilterTeacher && slotFilterTeacher.value ? slotFilterTeacher.value : 0);
+          const subjectFilter = Number(slotFilterSubject && slotFilterSubject.value ? slotFilterSubject.value : 0);
+          const groupFilter = Number(slotFilterGroup && slotFilterGroup.value ? slotFilterGroup.value : 0);
+          const typeFilter = String(slotFilterType && slotFilterType.value ? slotFilterType.value : '').trim();
+          const hasFilters = !!(teacherFilter || subjectFilter || groupFilter || typeFilter);
+          if (!hasFilters) return true;
+          const slotMeta = slotMetaByKey.get(slotKeyValue);
+          const busyRows = slotMeta && Array.isArray(slotMeta.busy_rows) ? slotMeta.busy_rows : [];
+          const subjectMatch = !subjectFilter
+            || slotRows.some((row) => Number(row.subject_id || 0) === subjectFilter)
+            || busyRows.some((row) => Number(row.subject_id || 0) === subjectFilter);
+          const groupMatch = !groupFilter
+            || slotRows.some((row) => {
+              const rowGroup = Number(row.group_number || 0);
+              return !rowGroup || rowGroup === groupFilter;
+            })
+            || busyRows.some((row) => Number(row.group_number || 0) === groupFilter);
+          const typeMatch = !typeFilter
+            || slotRows.some((row) => String(row.type || '') === typeFilter);
+          const teacherMatch = !teacherFilter
+            || slotRows.some((row) => getAssignmentTeacherIds(row).includes(teacherFilter))
+            || busyRows.some((row) => Array.isArray(row.teacher_ids) && row.teacher_ids.map(Number).includes(teacherFilter));
+          return subjectMatch && groupMatch && typeMatch && teacherMatch;
+        };
 
         const syncManualTypeButtons = () => {
           manualTypeButtons.forEach((button) => {
@@ -1123,28 +1388,87 @@
           manualGroupSelect.disabled = false;
         };
 
+        const updateBlockReasonMessage = (button) => {
+          if (!manualBlockReasonBox) return;
+          if (!button) {
+            manualBlockReasonBox.textContent = 'Пояснення блокувань: оберіть предмет і наведіть/клікніть по слоту.';
+            return;
+          }
+          const candidate = buildCandidateFromSlot(button);
+          if (!candidate) {
+            manualBlockReasonBox.textContent = 'Оберіть предмет і групу, щоб побачити пояснення для слоту.';
+            return;
+          }
+          const currentSlotKey = slotKey(candidate.date, candidate.class_number);
+          const reasons = [];
+          const exactAssignmentExists = manualAssignments.some((row) => assignmentKey(row) === assignmentKey(candidate));
+          if (exactAssignmentExists) {
+            reasons.push('У плані вже є ідентична подія. Повторний клік видалить її.');
+          }
+          const slotMeta = slotMetaByKey.get(currentSlotKey);
+          const busyRows = slotMeta && Array.isArray(slotMeta.busy_rows) ? slotMeta.busy_rows : [];
+          if (busyRows.length) {
+            reasons.push('Слот уже має звичайну пару в розкладі (накладання допустиме, але перевірте доцільність).');
+          }
+          const slotConflict = liveConflictState && liveConflictState.slot_conflicts
+            ? liveConflictState.slot_conflicts[currentSlotKey]
+            : null;
+          if (slotConflict && slotConflict.reason_text) {
+            reasons.push(`Конфлікт викладача: ${slotConflict.reason_text}`);
+          }
+          if (explicitSessionDates.length && !explicitSessionDates.includes(candidate.date)) {
+            reasons.push('Дата поза вибраним вікном тижнів сесії.');
+          }
+          if (!reasons.length) {
+            reasons.push('Слот виглядає придатним для призначення за поточними фільтрами.');
+          }
+          manualBlockReasonBox.textContent = reasons.join(' ');
+        };
+
         const renderSlotAssignments = () => {
           slotButtons.forEach((button) => {
             const date = String(button.dataset.slotDate || '');
             const classNumber = Number(button.dataset.slotClass || 0);
+            const currentSlotKey = slotKey(date, classNumber);
             const slotRows = sortAssignments(manualAssignments.filter((item) =>
               String(item.date || '') === date && Number(item.class_number || 0) === classNumber
             ));
             const holder = button.querySelector('[data-slot-assignment]');
+            const conflictHolder = button.querySelector('[data-slot-conflict]');
+            const matchesFilters = slotMatchesFilters(currentSlotKey, slotRows);
+            button.classList.toggle('is-filter-hidden', !matchesFilters);
+            button.classList.remove('is-conflict');
+            button.classList.remove('is-recommended');
             if (!holder) return;
             if (!slotRows.length) {
               holder.innerHTML = '';
               button.classList.remove('is-assigned');
-              return;
+            } else {
+              button.classList.add('is-assigned');
+              const rowsHtml = slotRows.slice(0, 2).map((item) => `
+                <div><span class="mark-pill ${item.type === 'credit' ? 'danger' : (item.type === 'consultation' ? 'muted' : 'info')}">${item.type === 'credit' ? 'Залік' : (item.type === 'consultation' ? 'Конс' : 'Екз')}</span> ${escapeHtml(item.subject_name)} · ${escapeHtml(item.group_label || 'Усі групи')}</div>
+              `).join('');
+              const moreHtml = slotRows.length > 2
+                ? `<div class="small text-muted">+${slotRows.length - 2} ще</div>`
+                : '';
+              holder.innerHTML = rowsHtml + moreHtml;
             }
-            button.classList.add('is-assigned');
-            const rowsHtml = slotRows.slice(0, 2).map((item) => `
-              <div><span class="mark-pill ${item.type === 'credit' ? 'danger' : (item.type === 'consultation' ? 'muted' : 'info')}">${item.type === 'credit' ? 'Залік' : (item.type === 'consultation' ? 'Конс' : 'Екз')}</span> ${escapeHtml(item.subject_name)} · ${escapeHtml(item.group_label || 'Усі групи')}</div>
-            `).join('');
-            const moreHtml = slotRows.length > 2
-              ? `<div class="small text-muted">+${slotRows.length - 2} ще</div>`
-              : '';
-            holder.innerHTML = rowsHtml + moreHtml;
+            const slotConflict = liveConflictState && liveConflictState.slot_conflicts
+              ? liveConflictState.slot_conflicts[currentSlotKey]
+              : null;
+            if (conflictHolder) {
+              if (slotConflict && slotConflict.reason_text) {
+                conflictHolder.textContent = slotConflict.reason_text;
+              } else {
+                conflictHolder.textContent = '';
+              }
+            }
+            button.classList.toggle('is-conflict', !!(slotConflict && slotConflict.conflicts_total > 0));
+            const hasSubjectSelection = Number(manualSubjectSelect && manualSubjectSelect.value ? manualSubjectSelect.value : 0) > 0;
+            const slotIsFree = String(button.className || '').includes('is-free');
+            if (hasSubjectSelection && slotIsFree && !slotConflict) {
+              button.classList.add('is-recommended');
+            }
           });
         };
 
@@ -1173,53 +1497,228 @@
           }
         };
 
-        const toggleManualAssignmentFromSlot = (button) => {
-          if (!button || !manualSubjectSelect) return;
-          const subjectId = Number(manualSubjectSelect.value || 0);
-          const subject = manualSubjectMap.get(subjectId);
-          if (!subject) {
-            window.alert('Оберіть предмет перед додаванням події.');
-            return;
-          }
-          const classNumber = Number(button.dataset.slotClass || 0);
-          const date = String(button.dataset.slotDate || '');
-          const dayName = String(button.dataset.slotDay || '');
-          if (!classNumber || !date) return;
-          const groupNumber = manualGroupSelect && manualGroupSelect.value
-            ? Number(manualGroupSelect.value)
-            : null;
-          const groupLabel = groupNumber
-            ? `Група ${groupNumber}`
-            : (Number(subject.group_count || 1) > 1 ? `Всі групи (${subject.group_count})` : 'Всі');
-          const candidate = {
-            subject_id: Number(subject.id),
-            subject_name: String(subject.name || ''),
-            group_number: Number.isFinite(groupNumber) && groupNumber > 0 ? groupNumber : null,
-            group_label: groupLabel,
-            type: manualSelectedType,
-            date,
-            day_name: dayName,
-            class_number: classNumber,
-            note: '',
-          };
-          const key = assignmentKey(candidate);
-          const existingIndex = manualAssignments.findIndex((item) => assignmentKey(item) === key);
-          if (existingIndex >= 0) {
-            manualAssignments.splice(existingIndex, 1);
-          } else {
-            manualAssignments.push(candidate);
-          }
-          renderSlotAssignments();
-          syncPublishState();
+        const setLiveConflictStatusText = (text, mode) => {
+          if (!liveConflictStatus) return;
+          liveConflictStatus.textContent = text || 'Live-конфлікти: немає даних.';
+          liveConflictStatus.classList.remove('live-conflict-ok', 'live-conflict-err');
+          if (mode === 'ok') liveConflictStatus.classList.add('live-conflict-ok');
+          if (mode === 'err') liveConflictStatus.classList.add('live-conflict-err');
         };
 
-        if (manualSubjectSelect && !manualSubjectSelect.value && manualSubjects.length) {
-          manualSubjectSelect.value = String(manualSubjects[0].id);
-        }
-        updateManualGroupOptions();
-        syncManualTypeButtons();
-        renderSlotAssignments();
-        syncPublishState();
+        const getDraftPayloadFromForm = () => {
+          const payload = {};
+          if (!publishForm) return payload;
+          [
+            'window_mode',
+            'start_date',
+            'session_days',
+            'session_weeks_count',
+            'session_weeks_set',
+            'max_events_per_day',
+            'reserve_every',
+            'exam_gap_days',
+            'retake_gap_days',
+            'retake_window_days',
+            'include_weekends',
+            'include_consultations',
+            'respect_study_days',
+            'day_grouping_mode',
+            'exam_sequence',
+            'credit_sequence',
+            'strategy',
+          ].forEach((key) => {
+            const input = publishForm.querySelector(`input[name="${key}"]`);
+            if (!input) return;
+            payload[key] = input.value;
+          });
+          return payload;
+        };
+
+        const persistDraftSoon = () => {
+          if (!publishForm) return;
+          if (saveDraftTimer) {
+            window.clearTimeout(saveDraftTimer);
+          }
+          saveDraftTimer = window.setTimeout(async () => {
+            saveDraftTimer = null;
+            const courseIdInput = publishForm.querySelector('input[name="course_id"]');
+            const semesterIdInput = publishForm.querySelector('input[name="semester_id"]');
+            const locationInputLocal = publishForm.querySelector('input[name="location"]');
+            const payload = {
+              draft_id: draftIdInput && draftIdInput.value ? Number(draftIdInput.value) : null,
+              location: locationInputLocal ? locationInputLocal.value : 'kyiv',
+              course_id: courseIdInput ? Number(courseIdInput.value || 0) : null,
+              semester_id: semesterIdInput ? Number(semesterIdInput.value || 0) : null,
+              manual_assignments_json: sortAssignments(manualAssignments),
+              form_json: getDraftPayloadFromForm(),
+            };
+            try {
+              const response = await fetch('/admin/session-generator/draft/save', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(payload),
+              });
+              if (!response.ok) return;
+              const data = await response.json();
+              if (!data || !data.ok) return;
+              if (data.draft_id) {
+                const nextId = String(data.draft_id);
+                if (draftIdInput) draftIdInput.value = nextId;
+                if (publishDraftInput) publishDraftInput.value = nextId;
+              }
+            } catch (_err) {
+              // Silent autosave failure.
+            }
+          }, 450);
+        };
+
+        const runLiveConflictCheck = async (force = false) => {
+          const rows = sortAssignments(manualAssignments);
+          if (!rows.length) {
+            liveConflictState = {
+              conflicts_total: 0,
+              unresolved_total: 0,
+              out_of_window_total: 0,
+              summary: '',
+              slot_conflicts: {},
+            };
+            setLiveConflictStatusText('Live-конфлікти: ручний план порожній.', 'ok');
+            renderSlotAssignments();
+            if (force) {
+              updateBlockReasonMessage(lastHoveredSlotKey && slotMetaByKey.get(lastHoveredSlotKey)
+                ? slotMetaByKey.get(lastHoveredSlotKey).button
+                : null);
+            }
+            return;
+          }
+          const myToken = ++liveConflictRequestToken;
+          const courseIdInput = publishForm ? publishForm.querySelector('input[name="course_id"]') : null;
+          const semesterIdInput = publishForm ? publishForm.querySelector('input[name="semester_id"]') : null;
+          const payload = {
+            course_id: courseIdInput ? Number(courseIdInput.value || 0) : null,
+            semester_id: semesterIdInput ? Number(semesterIdInput.value || 0) : null,
+            manual_assignments_json: rows,
+            explicit_dates_json: explicitSessionDates,
+          };
+          try {
+            const response = await fetch('/admin/session-generator/conflicts/live', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+              },
+              body: JSON.stringify(payload),
+            });
+            if (!response.ok) {
+              throw new Error('live_conflict_request_failed');
+            }
+            const data = await response.json();
+            if (myToken !== liveConflictRequestToken) return;
+            if (!data || !data.ok) {
+              throw new Error('live_conflict_payload_invalid');
+            }
+            liveConflictState = {
+              conflicts_total: Number(data.conflicts_total || 0),
+              unresolved_total: Number(data.unresolved_total || 0),
+              out_of_window_total: Number(data.out_of_window_total || 0),
+              summary: String(data.summary || ''),
+              slot_conflicts: data.slot_conflicts && typeof data.slot_conflicts === 'object'
+                ? data.slot_conflicts
+                : {},
+            };
+            if (!liveConflictState.conflicts_total && !liveConflictState.out_of_window_total) {
+              setLiveConflictStatusText(
+                `Live-конфлікти: не знайдено (${Number(data.checked_rows || 0)} перевірених подій).`,
+                'ok'
+              );
+            } else {
+              const base = liveConflictState.summary || `Live-конфлікти: ${liveConflictState.conflicts_total}.`;
+              const outOfWindowPart = liveConflictState.out_of_window_total
+                ? ` Поза вікном тижнів: ${liveConflictState.out_of_window_total}.`
+                : '';
+              setLiveConflictStatusText(`${base}${outOfWindowPart}`.trim(), 'err');
+            }
+          } catch (_err) {
+            if (myToken !== liveConflictRequestToken) return;
+            setLiveConflictStatusText('Live-конфлікти: не вдалося оновити (перевірка недоступна).', 'err');
+          }
+          renderSlotAssignments();
+          if (force) {
+            updateBlockReasonMessage(lastHoveredSlotKey && slotMetaByKey.get(lastHoveredSlotKey)
+              ? slotMetaByKey.get(lastHoveredSlotKey).button
+              : null);
+          }
+        };
+
+        const runLiveConflictCheckSoon = () => {
+          if (liveConflictTimer) {
+            window.clearTimeout(liveConflictTimer);
+          }
+          liveConflictTimer = window.setTimeout(() => {
+            liveConflictTimer = null;
+            runLiveConflictCheck();
+          }, 260);
+        };
+
+        const toggleManualAssignmentFromSlot = (button, explicitMode) => {
+          const candidate = buildCandidateFromSlot(button);
+          if (!candidate) {
+            window.alert('Оберіть предмет перед додаванням події.');
+            return false;
+          }
+          const key = assignmentKey(candidate);
+          const existingIndex = manualAssignments.findIndex((item) => assignmentKey(item) === key);
+          const mode = explicitMode || (existingIndex >= 0 ? 'remove' : 'add');
+          if (mode === 'remove') {
+            if (existingIndex < 0) return false;
+            manualAssignments.splice(existingIndex, 1);
+          } else {
+            if (existingIndex >= 0) return false;
+            manualAssignments.push(candidate);
+          }
+          manualAssignments = dedupeAssignments(manualAssignments);
+          renderSlotAssignments();
+          syncPublishState();
+          persistDraftSoon();
+          runLiveConflictCheckSoon();
+          updateBlockReasonMessage(button);
+          return true;
+        };
+
+        const activateDragMode = (button, pointerId) => {
+          const candidate = buildCandidateFromSlot(button);
+          if (!candidate) return false;
+          const exists = manualAssignments.some((item) => assignmentKey(item) === assignmentKey(candidate));
+          dragState.active = true;
+          dragState.pointerId = pointerId;
+          dragState.mode = exists ? 'remove' : 'add';
+          dragState.visitedSlotKeys = new Set();
+          document.body.classList.add('session-dragging');
+          return true;
+        };
+
+        const applyDragToSlot = (button) => {
+          if (!dragState.active || !button) return;
+          const currentKey = slotKey(button.dataset.slotDate, button.dataset.slotClass);
+          if (!currentKey || dragState.visitedSlotKeys.has(currentKey)) return;
+          dragState.visitedSlotKeys.add(currentKey);
+          const changed = toggleManualAssignmentFromSlot(button, dragState.mode);
+          if (changed) {
+            button.classList.add('is-drag-target');
+          }
+        };
+
+        const stopDragMode = () => {
+          if (!dragState.active) return;
+          dragState.active = false;
+          dragState.pointerId = null;
+          dragState.visitedSlotKeys = new Set();
+          document.body.classList.remove('session-dragging');
+          slotButtons.forEach((button) => button.classList.remove('is-drag-target'));
+        };
 
         manualTypeButtons.forEach((button) => {
           button.addEventListener('click', () => {
@@ -1228,23 +1727,91 @@
               ? 'credit'
               : (type === 'consultation' ? 'consultation' : 'exam');
             syncManualTypeButtons();
+            renderSlotAssignments();
           });
         });
         if (manualSubjectSelect) {
-          manualSubjectSelect.addEventListener('change', updateManualGroupOptions);
+          manualSubjectSelect.addEventListener('change', () => {
+            updateManualGroupOptions();
+            renderSlotAssignments();
+          });
+        }
+        if (manualGroupSelect) {
+          manualGroupSelect.addEventListener('change', () => {
+            renderSlotAssignments();
+          });
         }
         if (manualPlanClearBtn) {
           manualPlanClearBtn.addEventListener('click', () => {
             manualAssignments = [];
             renderSlotAssignments();
             syncPublishState();
+            persistDraftSoon();
+            runLiveConflictCheckSoon();
           });
         }
-        slotButtons.forEach((button) => {
-          button.addEventListener('click', () => {
-            toggleManualAssignmentFromSlot(button);
+        if (manualConflictsRecheckBtn) {
+          manualConflictsRecheckBtn.addEventListener('click', () => {
+            runLiveConflictCheck(true);
+          });
+        }
+        [slotFilterTeacher, slotFilterSubject, slotFilterGroup, slotFilterType].forEach((filterSelect) => {
+          if (!filterSelect) return;
+          filterSelect.addEventListener('change', () => {
+            renderSlotAssignments();
           });
         });
+
+        slotButtons.forEach((button) => {
+          button.addEventListener('pointerdown', (event) => {
+            if (event.button !== 0) return;
+            const started = activateDragMode(button, event.pointerId);
+            if (!started) return;
+            applyDragToSlot(button);
+            lastHoveredSlotKey = slotKey(button.dataset.slotDate, button.dataset.slotClass);
+            updateBlockReasonMessage(button);
+            event.preventDefault();
+          });
+          button.addEventListener('pointerenter', (event) => {
+            if (!dragState.active) return;
+            if (dragState.pointerId !== null && dragState.pointerId !== event.pointerId) return;
+            applyDragToSlot(button);
+            lastHoveredSlotKey = slotKey(button.dataset.slotDate, button.dataset.slotClass);
+            updateBlockReasonMessage(button);
+          });
+          button.addEventListener('mouseenter', () => {
+            lastHoveredSlotKey = slotKey(button.dataset.slotDate, button.dataset.slotClass);
+            updateBlockReasonMessage(button);
+          });
+          button.addEventListener('focus', () => {
+            lastHoveredSlotKey = slotKey(button.dataset.slotDate, button.dataset.slotClass);
+            updateBlockReasonMessage(button);
+          });
+          button.addEventListener('click', (event) => {
+            if (dragState.active) {
+              event.preventDefault();
+            }
+          });
+        });
+        window.addEventListener('pointerup', (event) => {
+          if (!dragState.active) return;
+          if (dragState.pointerId !== null && dragState.pointerId !== event.pointerId) return;
+          stopDragMode();
+        });
+        window.addEventListener('pointercancel', () => {
+          stopDragMode();
+        });
+
+        manualAssignments = dedupeAssignments(manualAssignmentsSeed);
+        if (manualSubjectSelect && !manualSubjectSelect.value && manualSubjects.length) {
+          manualSubjectSelect.value = String(manualSubjects[0].id);
+        }
+        updateManualGroupOptions();
+        syncManualTypeButtons();
+        renderSlotAssignments();
+        syncPublishState();
+        setLiveConflictStatusText('Live-конфлікти: оновлення...', null);
+        runLiveConflictCheck();
 
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
           if (window.bootstrap && window.bootstrap.Tooltip) {
