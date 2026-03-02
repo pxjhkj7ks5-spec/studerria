@@ -911,6 +911,28 @@ function normalizeRoleList(input) {
   return normalized;
 }
 
+function resolveLegacySessionRole(roleKeys = [], currentRole = 'student') {
+  const normalizedRoles = normalizeRoleList(roleKeys);
+  const normalizedCurrent = normalizeRoleKey(currentRole || 'student');
+  if (
+    normalizedCurrent
+    && LEGACY_SESSION_ROLES.has(normalizedCurrent)
+    && normalizedRoles.includes(normalizedCurrent)
+  ) {
+    return normalizedCurrent;
+  }
+  return normalizedRoles.find((key) => LEGACY_SESSION_ROLES.has(key)) || 'student';
+}
+
+function resolveMyDayRole(primaryRole = 'student', roleKeys = []) {
+  const normalizedPrimary = normalizeRoleKey(primaryRole || 'student');
+  const normalizedRoles = normalizeRoleList([normalizedPrimary, ...(Array.isArray(roleKeys) ? roleKeys : [])]);
+  if (normalizedPrimary === 'deanery' && normalizedRoles.includes('teacher')) {
+    return 'teacher';
+  }
+  return normalizedPrimary;
+}
+
 function getSessionRoleList(req) {
   if (!req || !req.session) return ['student'];
   const roleList = normalizeRoleList(req.session.roles);
@@ -1523,8 +1545,7 @@ app.use(async (req, res, next) => {
     await ensureDbReady();
     const roleKeys = await getUserRoleKeys(req.session.user.id, req.session.role || 'student');
     req.session.roles = roleKeys;
-    const legacyRole = roleKeys.find((key) => LEGACY_SESSION_ROLES.has(key))
-      || normalizeRoleKey(req.session.role || 'student');
+    const legacyRole = resolveLegacySessionRole(roleKeys, req.session.role || 'student');
     req.session.role = legacyRole;
     res.locals.userRoles = roleKeys;
   } catch (err) {
@@ -8594,16 +8615,19 @@ const renderMyDayPage = async (req, res) => {
   }
   try {
     const competencySubjectId = Number(req.query.competency_subject_id || 0);
+    const roleKeys = normalizeRoleList(req.session.roles || []);
+    const myDayRole = resolveMyDayRole(req.session.role || 'student', roleKeys);
     const myDay = await buildMyDayData(
       req.session.user,
-      req.session.role,
-      req.session.roles || [],
+      myDayRole,
+      roleKeys,
       { competencySubjectId }
     );
     return res.render('my-day', {
       username: req.session.user.username,
       userId: req.session.user.id,
       role: req.session.role,
+      homeViewRole: myDayRole,
       viewAs: req.session.viewAs || null,
       myDay,
       okMessage: String(req.query.ok || ''),
@@ -8625,10 +8649,12 @@ app.get('/home', requireLogin, renderMyDayPage);
 app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
   try {
     const competencySubjectId = Number(req.query.competency_subject_id || 0);
+    const roleKeys = normalizeRoleList(req.session.roles || []);
+    const myDayRole = resolveMyDayRole(req.session.role || 'student', roleKeys);
     const myDay = await buildMyDayData(
       req.session.user,
-      req.session.role,
-      req.session.roles || [],
+      myDayRole,
+      roleKeys,
       { competencySubjectId }
     );
     return res.json(myDay);
@@ -8639,7 +8665,9 @@ app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
 
 app.get('/api/my-day/progress-risk', requireLogin, readLimiter, async (req, res) => {
   try {
-    const myDay = await buildMyDayData(req.session.user, req.session.role, req.session.roles || []);
+    const roleKeys = normalizeRoleList(req.session.roles || []);
+    const myDayRole = resolveMyDayRole(req.session.role || 'student', roleKeys);
+    const myDay = await buildMyDayData(req.session.user, myDayRole, roleKeys);
     return res.json(myDay.progress_dashboard || {
       enabled: false,
       subjects: [],
@@ -29777,7 +29805,14 @@ app.post('/admin/users/roles', requireRoleAccessSectionAccess, async (req, res) 
       return res.redirect('/admin?err=Cannot%20remove%20your%20own%20admin%20role');
     }
     const beforeSnapshot = await getUserRoleSnapshot(userId, user.role || 'student');
-    const preferredPrimary = req.body.primary_role || user.role || 'student';
+    const requestedPrimary = normalizeRoleKey(req.body.primary_role || '');
+    const currentPrimary = normalizeRoleKey(beforeSnapshot.primary_role || user.role || 'student');
+    let preferredPrimary = currentPrimary;
+    if (!selectedRoles.includes(preferredPrimary)) {
+      preferredPrimary = selectedRoles.includes(requestedPrimary)
+        ? requestedPrimary
+        : (selectedRoles.find((roleKey) => LEGACY_SESSION_ROLES.has(roleKey)) || selectedRoles[0] || 'student');
+    }
     const result = await assignUserRoles(userId, selectedRoles, { preferredPrimary });
     await recordUserRoleChangeEvent({
       userId,

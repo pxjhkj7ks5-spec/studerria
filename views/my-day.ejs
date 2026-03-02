@@ -38,8 +38,11 @@
       const teacherCompetencyPicker = cockpit.teacher_competency_picker || {};
       const teacherCompetencySubjects = Array.isArray(teacherCompetencyPicker.subjects) ? teacherCompetencyPicker.subjects : [];
       const teacherSelectedCompetencySubjectId = Number(teacherCompetencyPicker.selected_subject_id || 0);
-      const isStudentLikeMyDayView = role === 'student' || role === 'admin';
-      const isTeacherMyDayView = role === 'teacher';
+      const effectiveHomeViewRole = typeof homeViewRole === 'string' && homeViewRole ? homeViewRole : role;
+      const isStudentLikeMyDayView = effectiveHomeViewRole === 'student'
+        || effectiveHomeViewRole === 'admin'
+        || effectiveHomeViewRole === 'starosta';
+      const isTeacherMyDayView = effectiveHomeViewRole === 'teacher';
       const isDefaultStaffMyDayView = !isStudentLikeMyDayView && !isTeacherMyDayView;
       const whatIfSubjects = Array.isArray(cockpit.what_if_subjects) ? cockpit.what_if_subjects : [];
       const defaultWhatIfSubjectId = Number(cockpit.what_if_default_subject_id || 0);
