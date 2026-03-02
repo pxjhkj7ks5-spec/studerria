@@ -1781,7 +1781,7 @@
                   <% const generalFallbackKey = `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}`; %>
                   <% const hwMetaGeneral = cls.is_general && homeworkMetaAll ? (homeworkMetaAll[baseKey] || homeworkMetaAll[generalFallbackKey]) : null; %>
                   <% const hwMetaGroup = homeworkMeta ? ((datedKey ? homeworkMeta[datedKey] : null) || homeworkMeta[legacyKey]) : null; %>
-                  <% const hwMetaAnyGroup = (!cls.is_general && (role === 'admin' || viewAs === 'student') && homeworkMetaAll)
+                  <% const hwMetaAnyGroup = (!cls.is_general && ((role === 'admin' || viewAs === 'student') || cls.lesson_type === 'lecture') && homeworkMetaAll)
                     ? (homeworkMetaAll[baseKey] || homeworkMetaAll[generalFallbackKey])
                     : null; %>
                   <% const hwMeta = hwMetaGeneral || hwMetaGroup || hwMetaAnyGroup; %>
@@ -1809,6 +1809,7 @@
                     data-time-base="<%= timeLabel %>"
                     data-classnum="<%= cls.class_number %>"
                     data-groupnum="<%= cls.group_number %>"
+                    data-lessontype="<%= cls.lesson_type || '' %>"
                     data-courseid="<%= cls.course_id || '' %>"
                     data-date="<%= cls.class_date %>"
                     data-is-general="<%= cls.is_general ? 1 : 0 %>"
@@ -2892,6 +2893,7 @@
         const timeBase = button.getAttribute('data-time-base') || time;
         const classNum = Number(button.getAttribute('data-classnum'));
         const groupNum = Number(button.getAttribute('data-groupnum'));
+        const lessonType = String(button.getAttribute('data-lessontype') || '').toLowerCase();
         const courseId = Number(button.getAttribute('data-courseid'));
         const classDate = button.getAttribute('data-date');
         const isGeneral = button.getAttribute('data-is-general') === '1';
@@ -2931,7 +2933,7 @@
             matchesDate
           );
         });
-        if (!filtered.length && allowCrossGroupHomeworkFallback) {
+        if (!filtered.length && (allowCrossGroupHomeworkFallback || lessonType === 'lecture')) {
           filtered = homeworkData.filter((item) => {
             const itemDay = String(item.day || '').trim().toLowerCase();
             const itemDate = String(item.class_date || '').slice(0, 10);

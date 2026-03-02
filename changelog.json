@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.32",
+      "date": "2026-03-02",
+      "items": [
+        "fix(homework-teacher-slot): when teacher creates homework from a lecture/general class slot, records are now created for all teacher-accessible groups, not only a single schedule row group",
+        "fix(schedule-homework-lookup): student schedule homework target builder now keeps lecture-slot groups so shared lecture homework is not dropped by strict student-group filtering",
+        "fix(schedule-homework-ui): lecture cards now use slot-level homework fallback for chip/meta and modal list when strict group match returns empty"
+      ]
+    },
+    {
       "version": "1.0.31",
       "date": "2026-03-02",
       "items": [

@@ -9898,9 +9898,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
           const subjectId = Number(row.subject_id);
           const groupNumber = Number(row.group_number);
           if (!Number.isFinite(subjectId) || !Number.isFinite(groupNumber) || groupNumber < 1) return;
+          const isLectureSlot = String(row.lesson_type || '').toLowerCase() === 'lecture';
           if (baseGroupsBySubject.size) {
             const allowedGroups = baseGroupsBySubject.get(subjectId);
-            if (!allowedGroups || !allowedGroups.has(groupNumber)) {
+            if (!isLectureSlot && (!allowedGroups || !allowedGroups.has(groupNumber))) {
               return;
             }
           }
@@ -26981,7 +26982,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
 
       const scheduleGroupParams = [subjectId, courseId || 1, day_of_week, classNum];
       let scheduleGroupSql = `
-        SELECT DISTINCT group_number
+        SELECT DISTINCT group_number, COALESCE(lesson_type, '') AS lesson_type
         FROM schedule_entries
         WHERE subject_id = ?
           AND course_id = ?
@@ -27002,11 +27003,22 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
       }
       scheduleGroupSql += ' ORDER BY group_number ASC';
       const scheduleGroupsRows = await db.all(scheduleGroupSql, scheduleGroupParams);
-      const scheduleGroups = (scheduleGroupsRows || [])
+      const scheduleRows = Array.isArray(scheduleGroupsRows) ? scheduleGroupsRows : [];
+      const scheduleGroups = scheduleRows
         .map((row) => Number(row.group_number))
         .filter((value) => Number.isInteger(value) && value >= 1 && value <= maxGroups);
+      const hasLectureSlot = scheduleRows.some((row) => String(row.lesson_type || '').toLowerCase() === 'lecture');
+      const subjectIsGeneral = subjectRow.is_general === true || Number(subjectRow.is_general) === 1;
+      const accessibleTeacherGroups = teacherAccess.allowAll
+        ? Array.from({ length: maxGroups }, (_v, index) => index + 1)
+        : Array.from(teacherAccess.groups || [])
+          .filter((value) => Number.isInteger(value) && value >= 1 && value <= maxGroups)
+          .sort((a, b) => a - b);
 
-      if (scheduleGroups.length) {
+      if ((hasLectureSlot || subjectIsGeneral) && accessibleTeacherGroups.length) {
+        // Lecture/general subjects are shared across groups in UI: create rows for all teacher-accessible groups.
+        targetGroups = accessibleTeacherGroups;
+      } else if (scheduleGroups.length) {
         targetGroups = scheduleGroups.filter((value) => teacherAccess.allowAll || teacherAccess.groups.has(value));
       } else if (Number.isInteger(groupNum) && groupNum >= 1 && groupNum <= maxGroups) {
         if (!teacherAccess.allowAll && !teacherAccess.groups.has(groupNum)) {
