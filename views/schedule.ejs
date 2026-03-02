@@ -1273,6 +1273,87 @@
         border-color: rgba(239, 68, 68, 0.7);
         box-shadow: 0 14px 30px rgba(185, 28, 28, 0.2);
       }
+      .schedule-card.has-session {
+        border-width: 1.5px;
+      }
+      .schedule-card.session-exam {
+        border-color: rgba(239, 68, 68, 0.62);
+        box-shadow: 0 12px 30px rgba(220, 38, 38, 0.22);
+      }
+      .schedule-card.session-credit {
+        border-color: rgba(249, 115, 22, 0.6);
+        box-shadow: 0 12px 28px rgba(217, 119, 6, 0.2);
+      }
+      .schedule-card.session-consultation {
+        border-color: rgba(14, 165, 165, 0.58);
+        box-shadow: 0 12px 28px rgba(13, 148, 136, 0.2);
+      }
+      .schedule-card.session-mixed,
+      .schedule-card.session-session {
+        border-color: rgba(125, 211, 252, 0.58);
+        box-shadow: 0 12px 26px rgba(59, 130, 246, 0.18);
+      }
+      body.theme-dark .schedule-card.session-exam {
+        background: linear-gradient(135deg, hsla(var(--subject-h), 30%, 18%, 0.7), rgba(127, 29, 29, 0.34));
+      }
+      body.theme-dark .schedule-card.session-credit {
+        background: linear-gradient(135deg, hsla(var(--subject-h), 30%, 18%, 0.7), rgba(124, 45, 18, 0.3));
+      }
+      body.theme-dark .schedule-card.session-consultation {
+        background: linear-gradient(135deg, hsla(var(--subject-h), 30%, 18%, 0.7), rgba(15, 118, 110, 0.3));
+      }
+      body.theme-dark .schedule-card.session-mixed,
+      body.theme-dark .schedule-card.session-session {
+        background: linear-gradient(135deg, hsla(var(--subject-h), 30%, 18%, 0.7), rgba(30, 64, 175, 0.28));
+      }
+      body.theme-light .schedule-card.session-exam {
+        background: linear-gradient(135deg, hsla(var(--subject-h), 60%, 90%, 0.96), rgba(254, 226, 226, 0.98));
+      }
+      body.theme-light .schedule-card.session-credit {
+        background: linear-gradient(135deg, hsla(var(--subject-h), 60%, 90%, 0.96), rgba(255, 237, 213, 0.98));
+      }
+      body.theme-light .schedule-card.session-consultation {
+        background: linear-gradient(135deg, hsla(var(--subject-h), 60%, 90%, 0.96), rgba(204, 251, 241, 0.98));
+      }
+      body.theme-light .schedule-card.session-mixed,
+      body.theme-light .schedule-card.session-session {
+        background: linear-gradient(135deg, hsla(var(--subject-h), 60%, 90%, 0.96), rgba(219, 234, 254, 0.98));
+      }
+      .session-chip {
+        border-radius: 999px;
+      }
+      .session-chip--exam {
+        background: rgba(239, 68, 68, 0.16);
+        border-color: rgba(239, 68, 68, 0.42);
+        color: rgba(254, 226, 226, 0.98) !important;
+      }
+      .session-chip--credit {
+        background: rgba(249, 115, 22, 0.16);
+        border-color: rgba(249, 115, 22, 0.4);
+        color: rgba(255, 237, 213, 0.98) !important;
+      }
+      .session-chip--consultation {
+        background: rgba(20, 184, 166, 0.16);
+        border-color: rgba(20, 184, 166, 0.4);
+        color: rgba(204, 251, 241, 0.98) !important;
+      }
+      .session-chip--mixed {
+        background: rgba(59, 130, 246, 0.16);
+        border-color: rgba(59, 130, 246, 0.38);
+        color: rgba(219, 234, 254, 0.98) !important;
+      }
+      body.theme-light .session-chip--exam {
+        color: rgba(153, 27, 27, 0.94) !important;
+      }
+      body.theme-light .session-chip--credit {
+        color: rgba(154, 52, 18, 0.94) !important;
+      }
+      body.theme-light .session-chip--consultation {
+        color: rgba(17, 94, 89, 0.94) !important;
+      }
+      body.theme-light .session-chip--mixed {
+        color: rgba(30, 64, 175, 0.94) !important;
+      }
       .schedule-card.chain-prev {
         margin-top: -8px;
         border-top-left-radius: 10px;
@@ -1785,6 +1866,18 @@
                     ? (homeworkMetaAll[baseKey] || homeworkMetaAll[generalFallbackKey])
                     : null; %>
                   <% const hwMeta = hwMetaGeneral || hwMetaGroup || hwMetaAnyGroup; %>
+                  <% const sessionKindRaw = hwMeta && hwMeta.session_kind ? String(hwMeta.session_kind) : ''; %>
+                  <% const sessionKind = ['exam', 'credit', 'consultation', 'mixed', 'session'].includes(sessionKindRaw) ? sessionKindRaw : ''; %>
+                  <% const sessionChipText = sessionKind === 'exam'
+                    ? 'Сесія · Екзамен'
+                    : sessionKind === 'credit'
+                      ? 'Сесія · Залік'
+                      : sessionKind === 'consultation'
+                        ? 'Сесія · Консультація'
+                        : sessionKind
+                          ? 'Сесія'
+                          : ''; %>
+                  <% const sessionCardClass = sessionKind ? `has-session session-${sessionKind}` : ''; %>
                   <% const groupLabel = cls.group_label ? cls.group_label : `Group ${cls.group_number}`; %>
                   <% const courseLabel = cls.course_name ? ` · ${cls.course_name}` : ''; %>
                   <% const prev = idx > 0 ? dayEntries[idx - 1] : null; %>
@@ -1792,11 +1885,12 @@
                   <% const chainPrev = prev && prev.subject_id === cls.subject_id && cls.class_number === prev.class_number + 1; %>
                   <% const chainNext = next && next.subject_id === cls.subject_id && next.class_number === cls.class_number + 1; %>
                   <% const tooltipParts = [subjectName, groupLabel, `Class ${cls.class_number}`, timeLabel]; %>
+                  <% if (sessionChipText) { tooltipParts.push(sessionChipText); } %>
                   <% if (showTypeBadge) { tooltipParts.push(typeLabel); } %>
                   <% if (cls.course_name) { tooltipParts.push(cls.course_name); } %>
                   <% if (hwMeta && hwMeta.preview && hwMeta.preview.length) { tooltipParts.push(...hwMeta.preview); } %>
                   <div
-                    class="list-group-item schedule-card liquid-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %> <%= hwMeta && hwMeta.credit ? 'has-credit' : '' %>"
+                    class="list-group-item schedule-card liquid-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %> <%= hwMeta && hwMeta.credit ? 'has-credit' : '' %> <%= sessionCardClass %>"
                     role="button"
                     tabindex="0"
                     data-bs-toggle="modal"
@@ -1829,6 +1923,9 @@
                       <div class="schedule-aside">
                         <div class="schedule-time classTime"><%= timeLabel %></div>
                         <div class="schedule-flags">
+                          <% if (sessionChipText) { %>
+                            <span class="session-chip chip <%= sessionKind === 'exam' ? 'session-chip--exam' : sessionKind === 'credit' ? 'session-chip--credit' : sessionKind === 'consultation' ? 'session-chip--consultation' : 'session-chip--mixed' %>"><%= sessionChipText %></span>
+                          <% } %>
                           <% if (hwMeta && hwMeta.control) { %>
                             <span class="control-chip chip badge--control">Контроль</span>
                           <% } %>
@@ -2082,17 +2179,6 @@
                     <span class="toggle-text">Контроль</span>
                   </div>
                 </div>
-                <% if (role && role !== 'student') { %>
-                  <div class="mb-3">
-                    <div class="control-toggle">
-                      <input class="toggle-input" type="checkbox" id="hwCredit" name="is_credit" value="1" />
-                      <label class="toggle" for="hwCredit">
-                        <span class="toggle-knob"></span>
-                      </label>
-                      <span class="toggle-text">Залік</span>
-                    </div>
-                  </div>
-                <% } %>
                 <div class="mb-3">
                   <label for="hwFile" class="form-label">Attachment (optional)</label>
                   <div class="file-field">
@@ -2267,17 +2353,6 @@
                   <label class="form-label">Опис</label>
                   <textarea class="form-control" name="description" rows="3" required></textarea>
                 </div>
-                <% if (role && role !== 'student') { %>
-                  <div class="col-12">
-                    <div class="control-toggle">
-                      <input class="toggle-input" type="checkbox" id="customIsCredit" name="is_credit" value="1" />
-                      <label class="toggle" for="customIsCredit">
-                        <span class="toggle-knob"></span>
-                      </label>
-                      <span class="toggle-text">Позначити як залік</span>
-                    </div>
-                  </div>
-                <% } %>
                 <div class="col-12 col-md-6">
                   <label class="form-label">Посилання (опц.)</label>
                   <input
@@ -2622,7 +2697,6 @@
       const joinSubgroupId = document.getElementById('joinSubgroupId');
       const currentUser = <%- JSON.stringify(username) %>;
       const hwControlToggle = document.getElementById('hwControl');
-      const hwCreditToggle = document.getElementById('hwCredit');
       let currentHomeworkItems = [];
 
       function updateReactionButtons(container, reactions, reacted) {
@@ -2723,6 +2797,21 @@
           }
           const priorityWrap = document.createElement('div');
           priorityWrap.className = 'd-flex flex-wrap gap-2 mb-2';
+          const sessionType = String(item.session_type || '').toLowerCase();
+          if (sessionType) {
+            const sessionChip = document.createElement('span');
+            sessionChip.className = 'priority-chip priority-control';
+            if (sessionType === 'exam') {
+              sessionChip.textContent = 'Сесія: Екзамен';
+            } else if (sessionType === 'credit') {
+              sessionChip.textContent = 'Сесія: Залік';
+            } else if (sessionType === 'consultation') {
+              sessionChip.textContent = 'Сесія: Консультація';
+            } else {
+              sessionChip.textContent = 'Сесія';
+            }
+            priorityWrap.appendChild(sessionChip);
+          }
           if (item.is_control) {
             const control = document.createElement('span');
             control.className = 'priority-chip priority-control';
@@ -2926,9 +3015,6 @@
         }
         if (hwControlToggle) {
           hwControlToggle.checked = false;
-        }
-        if (hwCreditToggle) {
-          hwCreditToggle.checked = false;
         }
 
         const normalizedCardDay = String(day || '').trim().toLowerCase();

@@ -9245,6 +9245,26 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
   }
 });
 
+function detectSessionHomeworkType(description) {
+  const text = String(description || '').trim().toLowerCase();
+  if (!text.startsWith('[сесія]')) return null;
+  if (text.includes('консультац')) return 'consultation';
+  if (text.includes('залік')) return 'credit';
+  if (text.includes('екзам')) return 'exam';
+  return 'session';
+}
+
+function applySessionMetaFlags(target, sessionType) {
+  if (!target || !sessionType) return;
+  target.session_count = Number(target.session_count || 0) + 1;
+  const currentKind = String(target.session_kind || '');
+  if (!currentKind || currentKind === sessionType) {
+    target.session_kind = sessionType;
+    return;
+  }
+  target.session_kind = 'mixed';
+}
+
 app.get('/schedule', requireLogin, async (req, res) => {
   const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
   const canCreateHomework = canSessionCreateHomework(req);
@@ -9490,6 +9510,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         const homeworkMap = new Map();
         (hwRows || []).forEach((row) => {
           if (!homeworkMap.has(row.id)) {
+            const sessionType = detectSessionHomeworkType(row.description);
             homeworkMap.set(row.id, {
               id: row.id,
               group_number: row.group_number,
@@ -9508,6 +9529,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
               is_control: Number(row.is_control || 0),
               is_teacher_homework: Number(row.is_teacher_homework || 0),
               is_credit: Number(row.is_credit || 0),
+              session_type: sessionType,
+              is_session: Boolean(sessionType),
               course_id: row.course_id,
               subgroups: {},
             });
@@ -9544,6 +9567,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
               control: false,
               teacher_homework: false,
               credit: false,
+              session_kind: '',
+              session_count: 0,
               meet: false,
               meet_link: '',
             };
@@ -9558,6 +9583,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           if (hw.is_credit) {
             homeworkMeta[key].credit = true;
           }
+          applySessionMetaFlags(homeworkMeta[key], hw.session_type);
           if (hw.meeting_url) {
             homeworkMeta[key].meet = true;
             if (!homeworkMeta[key].meet_link) {
@@ -9577,6 +9603,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
               control: false,
               teacher_homework: false,
               credit: false,
+              session_kind: '',
+              session_count: 0,
               meet: false,
               meet_link: '',
             };
@@ -9591,6 +9619,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           if (hw.is_credit) {
             homeworkMetaAll[allKey].credit = true;
           }
+          applySessionMetaFlags(homeworkMetaAll[allKey], hw.session_type);
           if (hw.meeting_url) {
             homeworkMetaAll[allKey].meet = true;
             if (!homeworkMetaAll[allKey].meet_link) {
@@ -10225,6 +10254,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             const homeworkMap = new Map();
             rows.forEach((row) => {
               if (!homeworkMap.has(row.id)) {
+                const sessionType = detectSessionHomeworkType(row.description);
                 homeworkMap.set(row.id, {
                   id: row.id,
                   group_number: row.group_number,
@@ -10244,6 +10274,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
                   is_control: Number(row.is_control || 0),
                   is_teacher_homework: Number(row.is_teacher_homework || 0),
                   is_credit: Number(row.is_credit || 0),
+                  session_type: sessionType,
+                  is_session: Boolean(sessionType),
                   course_id: row.course_id,
                   subgroups: {},
                 });
@@ -10281,6 +10313,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
                   control: false,
                   teacher_homework: false,
                   credit: false,
+                  session_kind: '',
+                  session_count: 0,
                   meet: false,
                   meet_link: '',
                 };
@@ -10295,6 +10329,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               if (hw.is_credit) {
                 homeworkMeta[key].credit = true;
               }
+              applySessionMetaFlags(homeworkMeta[key], hw.session_type);
               if (hw.meeting_url) {
                 homeworkMeta[key].meet = true;
                 if (!homeworkMeta[key].meet_link) {
@@ -10314,6 +10349,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
                   control: false,
                   teacher_homework: false,
                   credit: false,
+                  session_kind: '',
+                  session_count: 0,
                   meet: false,
                   meet_link: '',
                 };
@@ -10328,6 +10365,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               if (hw.is_credit) {
                 homeworkMetaAll[allKey].credit = true;
               }
+              applySessionMetaFlags(homeworkMetaAll[allKey], hw.session_type);
               if (hw.meeting_url) {
                 homeworkMetaAll[allKey].meet = true;
                 if (!homeworkMetaAll[allKey].meet_link) {

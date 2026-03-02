@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.51",
+      "date": "2026-03-02",
+      "items": [
+        "ux(schedule-homework-form): removed \"Залік\" toggle from regular and custom homework creation forms in schedule modal for a cleaner add-homework flow",
+        "feat(schedule-session-visibility): added explicit session detection from homework descriptions (`[Сесія] ...`) and propagated `session_type`/session meta into schedule data",
+        "ux(schedule-session-cards): session slots in timetable now get dedicated background accent and chip marker by type (Екзамен / Залік / Консультація), plus session marker in class homework modal list"
+      ]
+    },
+    {
       "version": "1.0.50",
       "date": "2026-03-02",
       "items": [
