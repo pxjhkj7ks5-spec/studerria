@@ -389,6 +389,26 @@
       .liquid-alert.danger {
         box-shadow: inset 3px 0 0 rgba(255, 113, 140, 0.78);
       }
+      .manual-controls-col,
+      .manual-slots-col {
+        min-width: 0;
+      }
+      .manual-type-group {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+      }
+      .manual-type-group > .btn {
+        min-width: 0;
+        margin-left: 0 !important;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.15;
+        padding-inline: 0.55rem;
+      }
+      .manual-type-group > .btn:not(:first-child) {
+        border-left-width: 1px;
+      }
       .planner-queue {
         border-radius: 16px;
         border: 1px solid rgba(255,255,255,0.1);
@@ -550,6 +570,11 @@
         }
         .location-toggle-group .btn {
           flex: 1 1 auto;
+        }
+      }
+      @media (max-width: 575px) {
+        .manual-type-group {
+          grid-template-columns: 1fr;
         }
       }
       @media (prefers-reduced-motion: no-preference) {
@@ -794,11 +819,11 @@
                 <span class="session-subtle">оберіть тип і предмет, потім клік по слоту</span>
               </div>
               <div class="row g-3">
-                <div class="col-12 col-lg-4">
+                <div class="col-12 col-lg-4 manual-controls-col">
                   <div class="d-grid gap-2">
                     <div>
                       <label class="form-label">Тип контролю</label>
-                      <div class="btn-group w-100" role="group" aria-label="Session type">
+                      <div class="btn-group w-100 manual-type-group" role="group" aria-label="Session type">
                         <button class="btn btn-outline-primary active" type="button" data-manual-type="exam">Екзамен</button>
                         <button class="btn btn-outline-secondary" type="button" data-manual-type="consultation">Консультація</button>
                         <button class="btn btn-outline-danger" type="button" data-manual-type="credit">Залік</button>
@@ -825,7 +850,7 @@
                     <button class="btn btn-outline-secondary btn-sm" type="button" id="manualPlanClearBtn">Очистити ручний план</button>
                   </div>
                 </div>
-                <div class="col-12 col-lg-8">
+                <div class="col-12 col-lg-8 manual-slots-col">
                   <% if (!(slotBoard && slotBoard.length)) { %>
                     <div class="timeline-empty">Немає слотів для поточних параметрів сесії.</div>
                   <% } else { %>

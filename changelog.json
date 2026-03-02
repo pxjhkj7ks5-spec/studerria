@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.52",
+      "date": "2026-03-02",
+      "items": [
+        "fix(session-generator-layout): prevented overlap between manual controls and slot grid by making manual type buttons responsive (wrapping text/grid) and constraining both columns with `min-width: 0`"
+      ]
+    },
+    {
       "version": "1.0.51",
       "date": "2026-03-02",
       "items": [
