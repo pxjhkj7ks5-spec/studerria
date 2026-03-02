@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.45",
+      "date": "2026-03-02",
+      "items": [
+        "ux(session-generator-settings): adapted settings panel for the new manual slot-based workflow (basic calendar controls first, advanced auto-plan options collapsed)",
+        "ux(session-generator-settings): added dynamic window-mode field switching (days vs weeks) so only relevant inputs are shown and submitted",
+        "tune(session-generator-defaults): updated auto-plan defaults to calmer baseline for manual-first flow (no reserve by default, exam-only sequence, consultations disabled)"
+      ]
+    },
+    {
       "version": "1.0.44",
       "date": "2026-03-02",
       "items": [

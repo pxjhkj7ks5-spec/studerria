@@ -643,12 +643,13 @@
           <div class="card liquid-panel mb-4">
             <div class="card-body">
               <div class="panel-title-row">
-                <h5>Параметри генерації</h5>
+                <h5>Параметри календаря</h5>
                 <div class="location-toggle-group" role="tablist" aria-label="Campus">
                   <button class="btn btn-sm <%= activeLocation === 'kyiv' ? 'btn-primary' : 'btn-outline-secondary' %>" type="button" data-location="kyiv">Kyiv</button>
                   <button class="btn btn-sm <%= activeLocation === 'munich' ? 'btn-primary' : 'btn-outline-secondary' %>" type="button" data-location="munich">Munich</button>
                 </div>
               </div>
+              <div class="session-subtle mb-2">Налаштування впливають на сітку слотів для ручного призначення подій.</div>
               <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
                 <a
                   class="btn btn-outline-secondary btn-sm"
@@ -713,23 +714,19 @@
                     <% }); %>
                   </select>
                 </div>
-                <div class="col-12 col-sm-6">
+                <div class="col-12 col-sm-6" data-window-mode="days">
                   <label class="form-label">Старт сесії</label>
                   <input class="form-control" type="date" name="start_date" value="<%= (form && form.start_date) || '' %>" required />
                 </div>
-                <div class="col-6 col-sm-3">
+                <div class="col-6 col-sm-3" data-window-mode="days">
                   <label class="form-label">Днів</label>
                   <input class="form-control" type="number" min="3" max="60" name="session_days" value="<%= form && form.session_days %>" />
                 </div>
-                <div class="col-6 col-sm-3">
-                  <label class="form-label">Max/день</label>
-                  <input class="form-control" type="number" min="1" max="6" name="max_events_per_day" value="<%= form && form.max_events_per_day %>" />
-                </div>
-                <div class="col-6 col-sm-4">
+                <div class="col-6 col-sm-4" data-window-mode="weeks">
                   <label class="form-label">Тижнів сесії</label>
                   <input class="form-control" type="number" min="1" max="12" name="session_weeks_count" value="<%= form && form.session_weeks_count %>" />
                 </div>
-                <div class="col-12 col-sm-8">
+                <div class="col-12 col-sm-8" data-window-mode="weeks">
                   <label class="form-label">Які тижні (опц.)</label>
                   <input class="form-control" type="text" name="session_weeks_set" value="<%= (form && form.session_weeks_set) || '' %>" placeholder="Напр. 14-15 або 15,16" />
                   <div class="small text-muted mt-1">
@@ -739,54 +736,6 @@
                       Якщо порожньо, візьмемо останні N тижнів семестру.
                     <% } %>
                   </div>
-                </div>
-                <div class="col-12 col-sm-6">
-                  <label class="form-label">Стратегія</label>
-                  <select class="form-select" name="strategy">
-                    <% (strategyOptions || []).forEach(function(opt) { %>
-                      <option value="<%= opt.value %>" <%= form && form.strategy === opt.value ? 'selected' : '' %>><%= opt.label %></option>
-                    <% }); %>
-                  </select>
-                </div>
-                <div class="col-12 col-sm-6">
-                  <label class="form-label">Групування по днях</label>
-                  <select class="form-select" name="day_grouping_mode">
-                    <% (sessionGroupingOptions || []).forEach(function(opt) { %>
-                      <option value="<%= opt.value %>" <%= form && form.day_grouping_mode === opt.value ? 'selected' : '' %>><%= opt.label %></option>
-                    <% }); %>
-                  </select>
-                </div>
-                <div class="col-12 col-sm-6">
-                  <label class="form-label">Сценарій екзамену</label>
-                  <select class="form-select" name="exam_sequence">
-                    <% (examSequenceOptions || []).forEach(function(opt) { %>
-                      <option value="<%= opt.value %>" <%= form && form.exam_sequence === opt.value ? 'selected' : '' %>><%= opt.label %></option>
-                    <% }); %>
-                  </select>
-                </div>
-                <div class="col-12 col-sm-6">
-                  <label class="form-label">Сценарій заліку</label>
-                  <select class="form-select" name="credit_sequence">
-                    <% (creditSequenceOptions || []).forEach(function(opt) { %>
-                      <option value="<%= opt.value %>" <%= form && form.credit_sequence === opt.value ? 'selected' : '' %>><%= opt.label %></option>
-                    <% }); %>
-                  </select>
-                </div>
-                <div class="col-6 col-sm-3">
-                  <label class="form-label">Gap EX</label>
-                  <input class="form-control" type="number" min="0" max="5" name="exam_gap_days" value="<%= form && form.exam_gap_days %>" />
-                </div>
-                <div class="col-6 col-sm-3">
-                  <label class="form-label">Резерв кожні</label>
-                  <input class="form-control" type="number" min="0" max="20" name="reserve_every" value="<%= form && form.reserve_every %>" />
-                </div>
-                <div class="col-6 col-sm-4">
-                  <label class="form-label">Пересклад. через</label>
-                  <input class="form-control" type="number" min="1" max="14" name="retake_gap_days" value="<%= form && form.retake_gap_days %>" />
-                </div>
-                <div class="col-6 col-sm-4">
-                  <label class="form-label">Вікно перескл.</label>
-                  <input class="form-control" type="number" min="1" max="14" name="retake_window_days" value="<%= form && form.retake_window_days %>" />
                 </div>
                 <div class="col-12 col-sm-4">
                   <label class="form-label">Активні дні курсу</label>
@@ -802,10 +751,6 @@
                 </div>
                 <div class="col-12 d-grid gap-2">
                   <label class="form-check">
-                    <input class="form-check-input" type="checkbox" name="include_consultations" value="1" <%= form && form.include_consultations ? 'checked' : '' %> />
-                    <span class="form-check-label">Авто-консультації (fallback, якщо сценарій без консультації)</span>
-                  </label>
-                  <label class="form-check">
                     <input class="form-check-input" type="checkbox" name="include_weekends" value="1" <%= form && form.include_weekends ? 'checked' : '' %> />
                     <span class="form-check-label">Дозволити суботу/неділю у сесії</span>
                   </label>
@@ -814,11 +759,76 @@
                     <span class="form-check-label">Планувати тільки в активні навчальні дні курсу</span>
                   </label>
                 </div>
+                <div class="col-12">
+                  <details class="liquid-alert info">
+                    <summary><strong>Розширені налаштування автоплану (опційно)</strong></summary>
+                    <div class="row g-2 mt-1">
+                      <div class="col-6 col-sm-4">
+                        <label class="form-label">Max/день</label>
+                        <input class="form-control" type="number" min="1" max="6" name="max_events_per_day" value="<%= form && form.max_events_per_day %>" />
+                      </div>
+                      <div class="col-6 col-sm-4">
+                        <label class="form-label">Gap EX</label>
+                        <input class="form-control" type="number" min="0" max="5" name="exam_gap_days" value="<%= form && form.exam_gap_days %>" />
+                      </div>
+                      <div class="col-6 col-sm-4">
+                        <label class="form-label">Резерв кожні</label>
+                        <input class="form-control" type="number" min="0" max="20" name="reserve_every" value="<%= form && form.reserve_every %>" />
+                      </div>
+                      <div class="col-6 col-sm-4">
+                        <label class="form-label">Пересклад. через</label>
+                        <input class="form-control" type="number" min="1" max="14" name="retake_gap_days" value="<%= form && form.retake_gap_days %>" />
+                      </div>
+                      <div class="col-6 col-sm-4">
+                        <label class="form-label">Вікно перескл.</label>
+                        <input class="form-control" type="number" min="1" max="14" name="retake_window_days" value="<%= form && form.retake_window_days %>" />
+                      </div>
+                      <div class="col-12 col-sm-6">
+                        <label class="form-label">Стратегія</label>
+                        <select class="form-select" name="strategy">
+                          <% (strategyOptions || []).forEach(function(opt) { %>
+                            <option value="<%= opt.value %>" <%= form && form.strategy === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="col-12 col-sm-6">
+                        <label class="form-label">Групування по днях</label>
+                        <select class="form-select" name="day_grouping_mode">
+                          <% (sessionGroupingOptions || []).forEach(function(opt) { %>
+                            <option value="<%= opt.value %>" <%= form && form.day_grouping_mode === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="col-12 col-sm-6">
+                        <label class="form-label">Сценарій екзамену</label>
+                        <select class="form-select" name="exam_sequence">
+                          <% (examSequenceOptions || []).forEach(function(opt) { %>
+                            <option value="<%= opt.value %>" <%= form && form.exam_sequence === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="col-12 col-sm-6">
+                        <label class="form-label">Сценарій заліку</label>
+                        <select class="form-select" name="credit_sequence">
+                          <% (creditSequenceOptions || []).forEach(function(opt) { %>
+                            <option value="<%= opt.value %>" <%= form && form.credit_sequence === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-check mt-1">
+                          <input class="form-check-input" type="checkbox" name="include_consultations" value="1" <%= form && form.include_consultations ? 'checked' : '' %> />
+                          <span class="form-check-label">Авто-консультації (fallback для автоплану)</span>
+                        </label>
+                      </div>
+                    </div>
+                  </details>
+                </div>
                 <div class="col-12 d-grid">
-                  <button class="btn btn-primary" type="submit" <%= form && form.course_id ? '' : 'disabled' %>>Згенерувати сесію</button>
+                  <button class="btn btn-primary" type="submit" <%= form && form.course_id ? '' : 'disabled' %>>Оновити сітку слотів</button>
                 </div>
                 <div class="col-12 session-subtle">
-                  Тепер можна задавати сценарії екзамену/заліку окремо (мінімум: лише залік, максимум: консультація + екзамен + залік).
+                  Для ручного режиму зазвичай достатньо: курс, семестр, вікно, дні сесії та фільтр вихідних/навчальних днів.
                 </div>
               </form>
             </div>
@@ -844,14 +854,14 @@
           <div class="card liquid-panel">
             <div class="card-body">
               <div class="panel-title-row">
-                <h5>Сценарії сесії</h5>
-                <span class="session-subtle">концепція</span>
+                <h5>Підказки</h5>
+                <span class="session-subtle">новий режим</span>
               </div>
               <div class="d-grid gap-2">
-                <div class="liquid-alert info">Мінімальна сесія для предмета: <strong>Лише залік</strong> (одна подія в один день).</div>
-                <div class="liquid-alert info">Середня: <strong>Консультація + екзамен</strong>.</div>
-                <div class="liquid-alert info">Максимальна: <strong>Консультація + екзамен + залік</strong> (наприклад, англійська).</div>
-                <div class="liquid-alert info">Обмеження дня: можна перемкнути режим <em>один предмет на день</em> або <em>один тип активності на день</em>.</div>
+                <div class="liquid-alert info">Клік по слоту з обраним предметом додає подію, повторний клік тим самим набором видаляє її.</div>
+                <div class="liquid-alert info">Для семінарів вибирайте конкретну групу, для загальних подій лишайте “Усі групи предмета”.</div>
+                <div class="liquid-alert info">Якщо треба швидкий старт, можна зробити авто-чернетку і потім відредагувати вручну по слотах.</div>
+                <div class="liquid-alert info">У публікацію йде ручний план, якщо він не порожній; інакше — автоплан з превʼю.</div>
               </div>
             </div>
           </div>
@@ -1138,6 +1148,24 @@
             window.location.href = url;
           });
         }
+
+        const windowModeSelect = document.getElementById('sessionWindowModeSelect');
+        const windowModeRows = Array.from(document.querySelectorAll('[data-window-mode]'));
+        const syncWindowModeRows = () => {
+          const mode = windowModeSelect && windowModeSelect.value === 'weeks' ? 'weeks' : 'days';
+          windowModeRows.forEach((row) => {
+            const rowMode = String(row.dataset.windowMode || '').trim();
+            const visible = rowMode === mode;
+            row.classList.toggle('d-none', !visible);
+            row.querySelectorAll('input,select,textarea').forEach((control) => {
+              control.disabled = !visible;
+            });
+          });
+        };
+        if (windowModeSelect) {
+          windowModeSelect.addEventListener('change', syncWindowModeRows);
+        }
+        syncWindowModeRows();
 
         const manualTypeButtons = Array.from(document.querySelectorAll('[data-manual-type]'));
         const manualSubjectSelect = document.getElementById('manualSubjectSelect');
