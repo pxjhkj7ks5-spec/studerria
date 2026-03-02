@@ -28614,6 +28614,48 @@ app.post('/admin/homework/delete/:id', requireHomeworkSectionAccess, (req, res) 
   });
 });
 
+app.post('/admin/homework/delete-multiple', requireHomeworkSectionAccess, writeLimiter, async (req, res) => {
+  const rawIds = Array.isArray(req.body.ids) ? req.body.ids : (req.body.ids ? [req.body.ids] : []);
+  const ids = rawIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0);
+  if (!ids.length) {
+    return res.redirect('/admin?err=No%20homework%20selected');
+  }
+  const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  const placeholders = ids.map(() => '?').join(',');
+  try {
+    const scoped = await db.all(
+      `SELECT id, file_path FROM homework WHERE id IN (${placeholders}) AND course_id = ?`,
+      [...ids, courseId]
+    );
+    if (!scoped.length) {
+      return res.redirect('/admin?err=No%20homework%20found');
+    }
+    const scopedIds = scoped.map((row) => row.id);
+    const scopedPlaceholders = scopedIds.map(() => '?').join(',');
+
+    await db.run(
+      `DELETE FROM subgroup_members
+       WHERE subgroup_id IN (SELECT id FROM subgroups WHERE homework_id IN (${scopedPlaceholders}))`,
+      scopedIds
+    );
+    await db.run(`DELETE FROM subgroups WHERE homework_id IN (${scopedPlaceholders})`, scopedIds);
+    await db.run(`DELETE FROM homework WHERE id IN (${scopedPlaceholders})`, scopedIds);
+
+    scoped.forEach((row) => {
+      if (!row || !row.file_path) return;
+      const relativePath = row.file_path.replace(/^\/+/, '');
+      const absPath = path.join(__dirname, relativePath);
+      fs.unlink(absPath, () => {});
+    });
+
+    logActivity(db, req, 'homework_delete_multiple', 'homework', null, { ids: scopedIds, count: scopedIds.length }, courseId);
+    logAction(db, req, 'homework_delete_multiple', { ids: scopedIds, count: scopedIds.length });
+    return res.redirect(`/admin?ok=Deleted%20${scopedIds.length}%20homework%20items`);
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
+});
+
 app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
   const { name, group_count, default_group, show_in_teamwork, visible, is_required, is_general } = req.body;
   const count = Number(group_count);

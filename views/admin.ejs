@@ -1962,9 +1962,20 @@
               </form>
             </div>
           </div>
-          <div class="bulk-bar d-none" id="homeworkBulkBar">
+          <div class="bulk-bar" id="homeworkBulkBar">
             <div class="d-flex flex-wrap align-items-center gap-2">
               <span class="text-muted">Selected: <span id="homeworkSelectedCount">0</span></span>
+              <form id="homeworkBulkDeleteForm" method="POST" action="/admin/homework/delete-multiple" class="d-inline">
+                <button
+                  class="btn btn-sm btn-outline-danger"
+                  type="submit"
+                  id="bulkDeleteBtn"
+                  data-confirm="Delete selected homework?"
+                  data-confirm-level="danger"
+                >
+                  Delete selected
+                </button>
+              </form>
               <select class="form-select form-select-sm w-auto" id="homeworkBulkAction">
                 <option value="">Bulk action</option>
                 <option value="add_tags">Add tags</option>
@@ -2001,7 +2012,7 @@
               <tbody>
                 <% homework.forEach(function(item) { %>
                   <tr>
-                    <td><input type="checkbox" class="homework-select" value="<%= item.id %>" /></td>
+                    <td><input type="checkbox" class="homework-select" name="ids" form="homeworkBulkDeleteForm" value="<%= item.id %>" /></td>
                     <td><%= item.id %></td>
                     <td><%= item.group_number %></td>
                     <td><%= item.subject_name || item.subject %> (<%= item.day_of_week || item.day %>)</td>
@@ -7762,6 +7773,7 @@
       const homeworkSelectedCount = document.getElementById('homeworkSelectedCount');
       const homeworkBulkAction = document.getElementById('homeworkBulkAction');
       const bulkApplyBtn = document.getElementById('bulkApplyBtn');
+      const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
       const bulkTags = document.getElementById('bulkTags');
       const bulkDeadline = document.getElementById('bulkDeadline');
       const bulkShift = document.getElementById('bulkShift');
@@ -7776,7 +7788,9 @@
         if (!homeworkSelectedCount || !homeworkBulkBar) return;
         const count = getSelectedHomeworkIds().length;
         homeworkSelectedCount.textContent = String(count);
-        homeworkBulkBar.classList.toggle('d-none', count === 0);
+        if (bulkDeleteBtn) {
+          bulkDeleteBtn.disabled = count === 0;
+        }
       }
 
       function resetBulkInputs() {
@@ -7808,6 +7822,7 @@
       document.querySelectorAll('.homework-select').forEach((el) => {
         el.addEventListener('change', updateBulkBar);
       });
+      updateBulkBar();
 
       if (bulkApplyBtn) {
         bulkApplyBtn.addEventListener('click', async () => {

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.42",
+      "date": "2026-03-02",
+      "items": [
+        "feat(admin-homework): added bulk delete form action for selected homework IDs in the Homework table",
+        "fix(admin-homework-bulk): bulk action bar is now always visible and includes a dedicated \"Delete selected\" control",
+        "fix(admin-homework-delete): added scoped /admin/homework/delete-multiple route with subgroup cleanup and attachment file unlink"
+      ]
+    },
+    {
       "version": "1.0.41",
       "date": "2026-03-02",
       "items": [
