@@ -4496,11 +4496,11 @@ const parseVisitExcludeAdmin = (rawValue) => {
 const buildVisitDayLabels = (days) => {
   const normalizedDays = parseVisitDays(days);
   const end = new Date();
-  end.setHours(0, 0, 0, 0);
+  end.setUTCHours(0, 0, 0, 0);
   const labels = [];
   for (let offset = normalizedDays - 1; offset >= 0; offset -= 1) {
     const d = new Date(end);
-    d.setDate(end.getDate() - offset);
+    d.setUTCDate(end.getUTCDate() - offset);
     labels.push(d.toISOString().slice(0, 10));
   }
   return labels;
@@ -24446,7 +24446,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             COUNT(*)::int AS total_visits,
             COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors,
             COUNT(DISTINCT v.user_id)::int AS signed_users,
-            COUNT(DISTINCT DATE(v.created_at))::int AS active_days
+            COUNT(DISTINCT (v.created_at AT TIME ZONE 'UTC')::date)::int AS active_days
           FROM site_visit_events v
           WHERE v.course_id = ?
             AND v.created_at >= ?
@@ -24457,14 +24457,14 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       db.all(
         `
           SELECT
-            DATE(v.created_at) AS day,
+            TO_CHAR((v.created_at AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS day,
             COUNT(*)::int AS visits,
             COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
           FROM site_visit_events v
           WHERE v.course_id = ?
             AND v.created_at >= ?
             ${excludeAdminClause}
-          GROUP BY DATE(v.created_at)
+          GROUP BY (v.created_at AT TIME ZONE 'UTC')::date
           ORDER BY day ASC
         `,
         [courseId, sinceIso]
@@ -24513,10 +24513,28 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       signed_users: Number(row?.signed_users || 0),
       active_days: Number(row?.active_days || 0),
     });
+    const normalizeVisitDayKey = (rawDay) => {
+      if (!rawDay) return '';
+      if (typeof rawDay === 'string') {
+        const trimmed = rawDay.trim();
+        const direct = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+        if (direct && direct[1]) return direct[1];
+        const parsed = new Date(trimmed);
+        if (Number.isNaN(parsed.getTime())) return '';
+        return parsed.toISOString().slice(0, 10);
+      }
+      if (rawDay instanceof Date) {
+        if (Number.isNaN(rawDay.getTime())) return '';
+        return rawDay.toISOString().slice(0, 10);
+      }
+      const parsed = new Date(rawDay);
+      if (Number.isNaN(parsed.getTime())) return '';
+      return parsed.toISOString().slice(0, 10);
+    };
     const mapDailyByLabels = (rows) => {
       const map = new Map();
       (rows || []).forEach((row) => {
-        const key = row && row.day ? String(row.day).slice(0, 10) : '';
+        const key = normalizeVisitDayKey(row && row.day);
         if (!key) return;
         map.set(key, {
           visits: Number(row.visits || 0),
@@ -24555,7 +24573,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
               COUNT(*)::int AS total_visits,
               COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors,
               COUNT(DISTINCT v.user_id)::int AS signed_users,
-              COUNT(DISTINCT DATE(v.created_at))::int AS active_days
+              COUNT(DISTINCT (v.created_at AT TIME ZONE 'UTC')::date)::int AS active_days
             FROM site_visit_events v
             WHERE v.course_id = ?
               AND v.created_at >= ?
@@ -24565,13 +24583,13 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
         db.all(
           `
             SELECT
-              DATE(v.created_at) AS day,
+              TO_CHAR((v.created_at AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS day,
               COUNT(*)::int AS visits,
               COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
             FROM site_visit_events v
             WHERE v.course_id = ?
               AND v.created_at >= ?
-            GROUP BY DATE(v.created_at)
+            GROUP BY (v.created_at AT TIME ZONE 'UTC')::date
             ORDER BY day ASC
           `,
           [courseId, sinceIso]

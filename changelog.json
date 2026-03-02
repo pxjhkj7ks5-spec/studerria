@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.43",
+      "date": "2026-03-02",
+      "items": [
+        "fix(visit-analytics-chart): normalized daily analytics aggregation to UTC date keys (`YYYY-MM-DD`) so chart points match summary totals instead of rendering zeros",
+        "fix(visit-analytics-chart): hardened day-key parsing in API mapper and frontend chart dataset mapping for backward-compatible payload shapes"
+      ]
+    },
+    {
       "version": "1.0.42",
       "date": "2026-03-02",
       "items": [

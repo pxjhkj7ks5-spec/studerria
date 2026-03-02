@@ -5585,9 +5585,9 @@
 
       const renderVisitChart = (dailyRows) => {
         if (!visitChartCanvas || !visitChartCtor) return;
-        const labels = (dailyRows || []).map((row) => row.day || '');
-        const visits = (dailyRows || []).map((row) => Number(row.visits || 0));
-        const unique = (dailyRows || []).map((row) => Number(row.unique_visitors || 0));
+        const labels = (dailyRows || []).map((row) => row.day || row.date || row.label || '');
+        const visits = (dailyRows || []).map((row) => Number(row.visits ?? row.total_visits ?? row.count ?? 0));
+        const unique = (dailyRows || []).map((row) => Number(row.unique_visitors ?? row.unique ?? 0));
         if (visitChart) {
           visitChart.destroy();
           visitChart = null;
