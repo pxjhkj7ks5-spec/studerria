@@ -409,6 +409,46 @@
       .manual-type-group > .btn:not(:first-child) {
         border-left-width: 1px;
       }
+      .manual-type-group > .btn[data-manual-type="consultation"] {
+        border-color: rgba(45, 212, 191, 0.34);
+      }
+      .manual-type-group > .btn[data-manual-type="consultation"].btn-outline-secondary {
+        color: rgba(153, 246, 228, 0.96);
+        background: rgba(20, 184, 166, 0.08);
+      }
+      .manual-type-group > .btn[data-manual-type="consultation"].btn-outline-secondary:hover,
+      .manual-type-group > .btn[data-manual-type="consultation"].btn-outline-secondary:focus-visible {
+        color: rgba(204, 251, 241, 0.98);
+        background: rgba(20, 184, 166, 0.2);
+        border-color: rgba(94, 234, 212, 0.62);
+      }
+      .manual-type-group > .btn[data-manual-type="consultation"].btn-secondary,
+      .manual-type-group > .btn[data-manual-type="consultation"].active {
+        color: #ecfeff;
+        background: linear-gradient(135deg, rgba(13, 148, 136, 0.96), rgba(20, 184, 166, 0.9));
+        border-color: rgba(94, 234, 212, 0.74);
+        box-shadow: 0 10px 24px rgba(13, 148, 136, 0.28);
+      }
+      body.theme-light .manual-type-group > .btn[data-manual-type="consultation"] {
+        border-color: rgba(13, 148, 136, 0.36);
+      }
+      body.theme-light .manual-type-group > .btn[data-manual-type="consultation"].btn-outline-secondary {
+        color: rgba(15, 118, 110, 0.92);
+        background: rgba(20, 184, 166, 0.08);
+      }
+      body.theme-light .manual-type-group > .btn[data-manual-type="consultation"].btn-outline-secondary:hover,
+      body.theme-light .manual-type-group > .btn[data-manual-type="consultation"].btn-outline-secondary:focus-visible {
+        color: rgba(17, 94, 89, 0.96);
+        background: rgba(20, 184, 166, 0.18);
+        border-color: rgba(13, 148, 136, 0.52);
+      }
+      body.theme-light .manual-type-group > .btn[data-manual-type="consultation"].btn-secondary,
+      body.theme-light .manual-type-group > .btn[data-manual-type="consultation"].active {
+        color: #f0fdfa;
+        background: linear-gradient(135deg, rgba(15, 118, 110, 0.96), rgba(13, 148, 136, 0.9));
+        border-color: rgba(13, 148, 136, 0.7);
+        box-shadow: 0 10px 22px rgba(15, 118, 110, 0.24);
+      }
       .planner-queue {
         border-radius: 16px;
         border: 1px solid rgba(255,255,255,0.1);
