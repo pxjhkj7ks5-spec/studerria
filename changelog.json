@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.40",
+      "date": "2026-03-02",
+      "items": [
+        "fix(session-generator-journal-order): session homework/events (\"[Сесія] ...\") are now forced to a tail position band and journal column sorting now keeps them pinned at the end, so generated session columns no longer jump to the beginning"
+      ]
+    },
+    {
       "version": "1.0.39",
       "date": "2026-03-02",
       "items": [

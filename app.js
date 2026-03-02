@@ -11346,6 +11346,16 @@ const buildHomeworkJournalTitle = (homeworkRow) => {
   return dueDate ? `${shortBase} (${dueDate})` : shortBase;
 };
 
+const SESSION_HOMEWORK_PREFIX = '[сесія]';
+const SESSION_COLUMN_POSITION_BASE = 900000;
+const isSessionHomeworkRow = (row) => {
+  const text = String(row?.description || row?.homework_description || row?.source_homework_description || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  return text.startsWith(SESSION_HOMEWORK_PREFIX);
+};
+
 const resolveHomeworkSubmissionStatus = (homeworkRow, submissionRow) => {
   if (!submissionRow) return 'missing';
   const dueDate = toDateOnly(homeworkRow?.custom_due_date || homeworkRow?.class_date);
@@ -11935,7 +11945,8 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
       jc.is_credit,
       jc.position,
       COALESCE(gc.grades_count, 0) AS grades_count,
-      COALESCE(hs.is_teacher_homework, 0) AS source_is_teacher_homework
+      COALESCE(hs.is_teacher_homework, 0) AS source_is_teacher_homework,
+      hs.description AS source_homework_description
     FROM journal_columns jc
     LEFT JOIN (
       SELECT column_id, COUNT(*) AS grades_count
@@ -11960,6 +11971,8 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
   const staleHomeworkColumnIds = [];
   let maxNonCreditPosition = 0;
   let maxCreditPosition = 0;
+  let maxSessionNonCreditPosition = 0;
+  let maxSessionCreditPosition = 0;
   (existing || []).forEach((row) => {
     if (Number(row.source_is_teacher_homework || 0) !== 1) {
       const staleId = Number(row.id);
@@ -11970,12 +11983,30 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
     }
     existingByHomeworkId.set(Number(row.source_homework_id), row);
     const position = Number(row.position || 0);
+    const isSessionRow = isSessionHomeworkRow(row);
     if (Number(row.is_credit) === 1) {
-      if (position > maxCreditPosition) maxCreditPosition = position;
+      if (isSessionRow) {
+        if (position > maxSessionCreditPosition) maxSessionCreditPosition = position;
+      } else if (position > maxCreditPosition) {
+        maxCreditPosition = position;
+      }
+    } else if (isSessionRow) {
+      if (position > maxSessionNonCreditPosition) maxSessionNonCreditPosition = position;
     } else if (position > maxNonCreditPosition) {
       maxNonCreditPosition = position;
     }
   });
+  const computedSessionBase = Math.max(
+    SESSION_COLUMN_POSITION_BASE,
+    maxNonCreditPosition + 1000,
+    maxCreditPosition + 1000
+  );
+  if (maxSessionNonCreditPosition < computedSessionBase) {
+    maxSessionNonCreditPosition = computedSessionBase;
+  }
+  if (maxSessionCreditPosition < computedSessionBase) {
+    maxSessionCreditPosition = computedSessionBase;
+  }
   if (staleHomeworkColumnIds.length) {
     await db.run(
       `
@@ -12050,6 +12081,7 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
   for (const homeworkRow of dedupedHomeworkRows) {
     const homeworkId = Number(homeworkRow.id);
     const isCredit = Number(homeworkRow.is_credit || 0) === 1 ? 1 : 0;
+    const isSessionEvent = isSessionHomeworkRow(homeworkRow);
     const columnType = isCredit ? 'credit' : 'homework';
     const title = buildHomeworkJournalTitle(homeworkRow);
     const defaultMaxPoints = parsePositiveDecimal(
@@ -12058,11 +12090,21 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
     );
     const existingRow = existingByHomeworkId.get(homeworkId);
     if (existingRow) {
+      let targetPosition = Number(existingRow.position || 0);
+      if (isSessionEvent && targetPosition < computedSessionBase) {
+        targetPosition = isCredit ? (maxSessionCreditPosition + 10) : (maxSessionNonCreditPosition + 10);
+        if (isCredit) maxSessionCreditPosition = targetPosition;
+        else maxSessionNonCreditPosition = targetPosition;
+      } else if (isSessionEvent) {
+        if (isCredit && targetPosition > maxSessionCreditPosition) maxSessionCreditPosition = targetPosition;
+        if (!isCredit && targetPosition > maxSessionNonCreditPosition) maxSessionNonCreditPosition = targetPosition;
+      }
       const existingMaxPoints = parsePositiveDecimal(existingRow.max_points, defaultMaxPoints);
       const needsUpdate = String(existingRow.title || '') !== title
         || String(existingRow.column_type || '') !== columnType
         || Number(existingRow.is_credit || 0) !== isCredit
-        || Number(existingMaxPoints) !== Number(defaultMaxPoints);
+        || Number(existingMaxPoints) !== Number(defaultMaxPoints)
+        || Number(existingRow.position || 0) !== Number(targetPosition || 0);
       if (needsUpdate) {
         await db.run(
           `
@@ -12071,17 +12113,25 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
                 column_type = ?,
                 is_credit = ?,
                 max_points = ?,
+                position = ?,
                 updated_at = NOW()
             WHERE id = ?
           `,
-          [title, columnType, isCredit, defaultMaxPoints, existingRow.id]
+          [title, columnType, isCredit, defaultMaxPoints, targetPosition, existingRow.id]
         );
       }
       continue;
     }
-    const nextPosition = isCredit ? (maxCreditPosition + 10) : (maxNonCreditPosition + 10);
-    if (isCredit) maxCreditPosition = nextPosition;
-    else maxNonCreditPosition = nextPosition;
+    let nextPosition = isCredit ? (maxCreditPosition + 10) : (maxNonCreditPosition + 10);
+    if (isSessionEvent) {
+      nextPosition = isCredit ? (maxSessionCreditPosition + 10) : (maxSessionNonCreditPosition + 10);
+      if (isCredit) maxSessionCreditPosition = nextPosition;
+      else maxSessionNonCreditPosition = nextPosition;
+    } else if (isCredit) {
+      maxCreditPosition = nextPosition;
+    } else {
+      maxNonCreditPosition = nextPosition;
+    }
     const includeInFinalDefault = getGradingTypeEnabled(gradingSettings, columnType) ? 1 : 0;
     await db.run(
       `
@@ -12283,6 +12333,7 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
   }
   sql += `
     ORDER BY
+      CASE WHEN COALESCE(h.description, '') ILIKE '[Сесія]%' THEN 1 ELSE 0 END ASC,
       CASE WHEN COALESCE(jc.is_credit, 0) = 1 THEN 1 ELSE 0 END ASC,
       COALESCE(jc.position, 0) ASC,
       COALESCE(h.custom_due_date, h.class_date, h.created_at, jc.created_at::text) ASC,
