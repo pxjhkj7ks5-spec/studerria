@@ -1,3 +1,9 @@
+<%
+  const pathways = registrationPathways || { tracks: [], programs: [], admissions: [], links: [], courses: [] };
+  const selectedTrackValue = typeof selectedTrack === 'string' && selectedTrack ? selectedTrack : 'bachelor';
+  const selectedProgramValue = Number.isFinite(Number(selectedProgramId)) ? Number(selectedProgramId) : null;
+  const selectedAdmissionValue = Number.isFinite(Number(selectedAdmissionId)) ? Number(selectedAdmissionId) : null;
+%>
 <!doctype html>
 <html lang="<%= lang %>">
   <head>
@@ -96,6 +102,67 @@
         background: rgba(59, 130, 246, 0.2);
         border-color: rgba(59, 130, 246, 0.9);
       }
+      .pathway-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      }
+      .track-option {
+        position: relative;
+        border: 1px solid rgba(148, 163, 184, 0.45);
+        border-radius: 14px;
+        padding: 0.65rem 0.8rem;
+        cursor: pointer;
+        text-align: center;
+        font-weight: 600;
+        transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+      }
+      .track-option input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .track-option:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 18px rgba(15, 23, 42, 0.1);
+      }
+      .track-option.is-selected {
+        border-color: rgba(59, 130, 246, 0.9);
+        background: rgba(59, 130, 246, 0.14);
+        box-shadow: 0 10px 22px rgba(59, 130, 246, 0.2);
+      }
+      .track-option.is-disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .pathway-label {
+        display: block;
+        font-size: 0.85rem;
+        opacity: 0.74;
+        margin-bottom: 6px;
+      }
+      body.theme-dark .track-option {
+        border-color: rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.05);
+      }
+      body.theme-dark .track-option.is-selected {
+        border-color: rgba(59, 130, 246, 0.9);
+        background: rgba(59, 130, 246, 0.2);
+      }
+      .pathway-select {
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.42);
+        min-height: 44px;
+      }
+      body.theme-dark .pathway-select {
+        border-color: rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.06);
+        color: #f8fafc;
+      }
+      .pathway-hint {
+        font-size: 0.8rem;
+        opacity: 0.75;
+      }
       .btn-primary {
         background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
         border: none;
@@ -173,14 +240,71 @@
               <div class="alert alert-danger" role="alert"><%= error %></div>
               <% } %>
               <form method="POST" action="/register/course">
+                <div class="mb-3">
+                  <span class="pathway-label">Track</span>
+                  <div class="pathway-grid" id="trackGrid">
+                    <% (pathways.tracks || []).forEach((track) => { %>
+                      <label
+                        class="track-option <%= track.enabled ? '' : 'is-disabled' %>"
+                        data-track-card="<%= track.key %>"
+                      >
+                        <input
+                          type="radio"
+                          name="study_track"
+                          value="<%= track.key %>"
+                          <%= selectedTrackValue === track.key ? 'checked' : '' %>
+                          <%= track.enabled ? '' : 'disabled' %>
+                          required
+                        />
+                        <span><%= track.label %></span>
+                      </label>
+                    <% }) %>
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <label class="pathway-label" for="studyProgramSelect">Program</label>
+                  <select
+                    id="studyProgramSelect"
+                    name="study_program_id"
+                    class="form-select pathway-select"
+                    data-selected-program="<%= selectedProgramValue || '' %>"
+                  >
+                    <option value="">Select program</option>
+                  </select>
+                </div>
+
+                <div class="mb-3">
+                  <label class="pathway-label" for="admissionSelect">Admission year</label>
+                  <select
+                    id="admissionSelect"
+                    name="admission_id"
+                    class="form-select pathway-select"
+                    data-selected-admission="<%= selectedAdmissionValue || '' %>"
+                  >
+                    <option value="">Select admission year</option>
+                  </select>
+                </div>
+
                 <div class="d-grid gap-2 mb-3">
-                  <% courses.forEach(course => { %>
-                    <label class="course-option d-flex align-items-center">
-                      <input type="radio" name="course_id" value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'checked' : '' %> required />
+                  <% courses.forEach((course) => { %>
+                    <label
+                      class="course-option d-flex align-items-center"
+                      data-course-card="<%= course.id %>"
+                      data-course-teacher="<%= (course.is_teacher_course === true || Number(course.is_teacher_course) === 1) ? '1' : '0' %>"
+                    >
+                      <input
+                        type="radio"
+                        name="course_id"
+                        value="<%= course.id %>"
+                        <%= Number(selectedCourseId) === Number(course.id) ? 'checked' : '' %>
+                        required
+                      />
                       <span><%= course.name %></span>
                     </label>
                   <% }) %>
                 </div>
+                <p class="pathway-hint mb-3">Programs and admission years define which courses and subjects are visible.</p>
                 <button type="submit" class="btn btn-primary w-100"><%= t('registerCourse.continue') %></button>
                 <a href="/register" class="btn btn-outline-secondary w-100 mt-2"><%= t('registerCourse.backToRegister') %></a>
               </form>
@@ -197,14 +321,194 @@
       crossorigin="anonymous"
     ></script>
     <script>
-      document.querySelectorAll('.course-option').forEach((option) => {
-        const input = option.querySelector('input[type="radio"]');
-        if (input && input.checked) option.classList.add('is-selected');
-        option.addEventListener('click', () => {
-          document.querySelectorAll('.course-option').forEach((el) => el.classList.remove('is-selected'));
-          option.classList.add('is-selected');
+      const pathwayPayload = <%- JSON.stringify(pathways) %>;
+      const pathwayPrograms = Array.isArray(pathwayPayload.programs) ? pathwayPayload.programs : [];
+      const pathwayAdmissions = Array.isArray(pathwayPayload.admissions) ? pathwayPayload.admissions : [];
+      const pathwayLinks = Array.isArray(pathwayPayload.links) ? pathwayPayload.links : [];
+
+      const trackInputs = Array.from(document.querySelectorAll('input[name="study_track"]'));
+      const programSelect = document.getElementById('studyProgramSelect');
+      const admissionSelect = document.getElementById('admissionSelect');
+      const courseCards = Array.from(document.querySelectorAll('[data-course-card]'));
+      const selectedProgramSeed = Number(programSelect?.dataset.selectedProgram || 0);
+      const selectedAdmissionSeed = Number(admissionSelect?.dataset.selectedAdmission || 0);
+
+      const admissionToCourseSet = new Map();
+      pathwayLinks.forEach((link) => {
+        const admissionId = Number(link.admission_id || 0);
+        const courseId = Number(link.course_id || 0);
+        if (!admissionToCourseSet.has(admissionId)) {
+          admissionToCourseSet.set(admissionId, new Set());
+        }
+        if (courseId > 0) {
+          admissionToCourseSet.get(admissionId).add(courseId);
+        }
+      });
+
+      function getSelectedTrack() {
+        const checked = trackInputs.find((input) => input.checked);
+        if (checked) return checked.value;
+        const firstEnabled = trackInputs.find((input) => !input.disabled);
+        if (firstEnabled) {
+          firstEnabled.checked = true;
+          return firstEnabled.value;
+        }
+        return 'bachelor';
+      }
+
+      function syncTrackCards() {
+        document.querySelectorAll('[data-track-card]').forEach((card) => {
+          const key = card.dataset.trackCard;
+          const input = card.querySelector(`input[name="study_track"][value="${key}"]`);
+          card.classList.toggle('is-selected', Boolean(input && input.checked));
+          card.classList.toggle('is-disabled', Boolean(input && input.disabled));
+        });
+      }
+
+      function setOptions(selectEl, options, selectedValue, emptyLabel) {
+        if (!selectEl) return;
+        selectEl.innerHTML = '';
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = emptyLabel;
+        selectEl.appendChild(emptyOption);
+        options.forEach((option) => {
+          const node = document.createElement('option');
+          node.value = String(option.value);
+          node.textContent = option.label;
+          if (String(selectedValue || '') === String(option.value)) {
+            node.selected = true;
+          }
+          selectEl.appendChild(node);
+        });
+      }
+
+      function refreshProgramOptions() {
+        const trackKey = getSelectedTrack();
+        const programIdsByTrack = new Set(
+          pathwayPrograms
+            .filter((program) => program.track_key === trackKey)
+            .map((program) => Number(program.id))
+        );
+        const options = pathwayPrograms
+          .filter((program) => programIdsByTrack.has(Number(program.id)))
+          .map((program) => ({
+            value: Number(program.id),
+            label: program.code ? `${program.name} (${program.code})` : program.name,
+          }));
+        const currentValue = Number(programSelect?.value || selectedProgramSeed || 0);
+        const resolvedValue = options.some((option) => Number(option.value) === currentValue)
+          ? currentValue
+          : (options[0] ? Number(options[0].value) : null);
+        setOptions(programSelect, options, resolvedValue, 'Select program');
+      }
+
+      function refreshAdmissionOptions() {
+        const programId = Number(programSelect?.value || 0);
+        const options = pathwayAdmissions
+          .filter((admission) => Number(admission.program_id) === programId)
+          .map((admission) => ({
+            value: Number(admission.id),
+            label: admission.label
+              ? `${admission.admission_year || ''} - ${admission.label}`.trim()
+              : String(admission.admission_year || 'Admission'),
+          }));
+        const currentValue = Number(admissionSelect?.value || selectedAdmissionSeed || 0);
+        const resolvedValue = options.some((option) => Number(option.value) === currentValue)
+          ? currentValue
+          : (options[0] ? Number(options[0].value) : null);
+        setOptions(admissionSelect, options, resolvedValue, 'Select admission year');
+      }
+
+      function getTrackCourseFilter(trackKey) {
+        if (trackKey === 'teacher') {
+          return (courseCard) => courseCard.dataset.courseTeacher === '1';
+        }
+        return (courseCard) => courseCard.dataset.courseTeacher !== '1';
+      }
+
+      function refreshCourseOptions() {
+        const trackKey = getSelectedTrack();
+        const admissionId = Number(admissionSelect?.value || 0);
+        const mappedCourses = admissionToCourseSet.get(admissionId);
+        const trackFilter = getTrackCourseFilter(trackKey);
+        let anyVisible = false;
+        let firstVisibleInput = null;
+
+        courseCards.forEach((card) => {
+          const input = card.querySelector('input[type="radio"][name="course_id"]');
+          if (!input) return;
+          const courseId = Number(input.value || 0);
+          const mappedVisible = mappedCourses ? mappedCourses.has(courseId) : true;
+          const trackVisible = trackFilter(card);
+          const visible = mappedVisible && trackVisible;
+          card.style.display = visible ? '' : 'none';
+          input.disabled = !visible;
+          if (!visible && input.checked) {
+            input.checked = false;
+            card.classList.remove('is-selected');
+          }
+          if (visible) {
+            anyVisible = true;
+            if (!firstVisibleInput) firstVisibleInput = input;
+          }
+        });
+
+        const checkedVisible = courseCards.some((card) => {
+          const input = card.querySelector('input[type="radio"][name="course_id"]');
+          return Boolean(input && !input.disabled && input.checked);
+        });
+
+        if (!checkedVisible && firstVisibleInput) {
+          firstVisibleInput.checked = true;
+        }
+        if (!anyVisible) {
+          courseCards.forEach((card) => card.classList.remove('is-selected'));
+        }
+        syncCourseCards();
+      }
+
+      function syncCourseCards() {
+        courseCards.forEach((card) => {
+          const input = card.querySelector('input[type="radio"][name="course_id"]');
+          card.classList.toggle('is-selected', Boolean(input && input.checked));
+        });
+      }
+
+      function refreshPathwaySelections() {
+        syncTrackCards();
+        refreshProgramOptions();
+        refreshAdmissionOptions();
+        refreshCourseOptions();
+      }
+
+      trackInputs.forEach((input) => {
+        input.addEventListener('change', refreshPathwaySelections);
+      });
+
+      if (programSelect) {
+        programSelect.addEventListener('change', () => {
+          refreshAdmissionOptions();
+          refreshCourseOptions();
+        });
+      }
+
+      if (admissionSelect) {
+        admissionSelect.addEventListener('change', refreshCourseOptions);
+      }
+
+      courseCards.forEach((card) => {
+        card.addEventListener('click', () => {
+          const input = card.querySelector('input[type="radio"][name="course_id"]');
+          if (!input || input.disabled) return;
+          courseCards.forEach((item) => item.classList.remove('is-selected'));
+          input.checked = true;
+          card.classList.add('is-selected');
         });
       });
+
+      refreshPathwaySelections();
+
       const themeToggle = document.getElementById('themeToggle');
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
       document.body.classList.remove('theme-light', 'theme-dark');

@@ -29,6 +29,7 @@ const userRegistrationEvents = require('./028_user_registration_events');
 const securityRiskAudit = require('./029_security_risk_audit');
 const competencyAutoSources = require('./030_competency_auto_sources');
 const sessionGeneratorDrafts = require('./031_session_generator_drafts');
+const registrationPathways = require('./032_registration_pathways');
 
 module.exports = [
   init,
@@ -62,4 +63,5 @@ module.exports = [
   securityRiskAudit,
   competencyAutoSources,
   sessionGeneratorDrafts,
+  registrationPathways,
 ];

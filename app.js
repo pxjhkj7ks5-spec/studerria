@@ -387,6 +387,12 @@ const COURSE_KIND_OPTIONS = [
   { key: 'regular', label: 'Regular courses' },
   { key: 'teacher', label: 'Teacher courses' },
 ];
+const REGISTRATION_TRACK_OPTIONS = [
+  { key: 'bachelor', label: 'Bachelor' },
+  { key: 'master', label: 'Master' },
+  { key: 'teacher', label: 'Teacher' },
+];
+const REGISTRATION_TRACK_KEYS = new Set(REGISTRATION_TRACK_OPTIONS.map((item) => item.key));
 
 const SETTINGS_RETENTION_MIN_DAYS = 14;
 const SETTINGS_RETENTION_MAX_DAYS = 3650;
@@ -1429,6 +1435,18 @@ const initDb = async () => {
   await pool.query('UPDATE users SET course_id = 1 WHERE course_id IS NULL');
   await pool.query("UPDATE users SET language = 'uk' WHERE language IS NULL");
   await pool.query('UPDATE users SET created_at = NOW() WHERE created_at IS NULL');
+  await pool.query(
+    `
+      UPDATE users u
+      SET study_track = CASE
+        WHEN c.is_teacher_course = true THEN 'teacher'
+        ELSE 'bachelor'
+      END
+      FROM courses c
+      WHERE u.course_id = c.id
+        AND (u.study_track IS NULL OR TRIM(u.study_track) = '')
+    `
+  );
   await pool.query('UPDATE subjects SET course_id = 1 WHERE course_id IS NULL');
   await pool.query('UPDATE subjects SET visible = 1 WHERE visible IS NULL');
   await pool.query('UPDATE schedule_entries SET course_id = 1 WHERE course_id IS NULL');
@@ -1892,6 +1910,8 @@ const resolveImportScope = async (req, type) => {
 const referenceCache = {
   courses: { data: null, expiresAt: 0 },
   subjects: new Map(),
+  registrationSubjects: new Map(),
+  registrationPathways: { data: null, expiresAt: 0 },
   semesters: new Map(),
   activeSemester: new Map(),
   studyDays: new Map(),
@@ -1927,15 +1947,23 @@ function cacheDelete(store, key) {
 
 function invalidateCoursesCache() {
   cacheDelete(referenceCache.courses, 'courses');
+  cacheDelete(referenceCache.registrationPathways, 'pathways');
 }
 
 function invalidateSubjectsCache(courseId) {
   if (!courseId) {
     referenceCache.subjects.clear();
+    referenceCache.registrationSubjects.clear();
     return;
   }
   referenceCache.subjects.delete(`${courseId}|all`);
   referenceCache.subjects.delete(`${courseId}|visible`);
+  const prefix = `${courseId}|`;
+  for (const key of referenceCache.registrationSubjects.keys()) {
+    if (String(key).startsWith(prefix)) {
+      referenceCache.registrationSubjects.delete(key);
+    }
+  }
 }
 
 function invalidateSemestersCache(courseId) {
@@ -2001,6 +2029,221 @@ async function isTeacherCourse(courseId) {
   const course = await getCourseById(courseId);
   if (!course) return false;
   return course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
+}
+
+function normalizeRegistrationTrack(rawTrack, fallback = 'bachelor') {
+  const normalized = String(rawTrack || '').trim().toLowerCase();
+  if (REGISTRATION_TRACK_KEYS.has(normalized)) {
+    return normalized;
+  }
+  if (REGISTRATION_TRACK_KEYS.has(fallback)) {
+    return fallback;
+  }
+  return 'bachelor';
+}
+
+function inferRegistrationTrackFromCourse(course) {
+  if (!course) {
+    return 'bachelor';
+  }
+  const isTeacher = course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
+  return isTeacher ? 'teacher' : 'bachelor';
+}
+
+async function getRegistrationPathways() {
+  const cached = cacheGet(referenceCache.registrationPathways, 'pathways');
+  if (cached) return cached;
+
+  const courses = await getCoursesCached();
+  const courseById = new Map((courses || []).map((course) => [Number(course.id), course]));
+  const programs = [];
+  const admissions = [];
+  const links = [];
+
+  try {
+    const rows = await db.all(
+      `
+        SELECT
+          p.id AS program_id,
+          p.track_key,
+          p.code AS program_code,
+          p.name AS program_name,
+          p.sort_order,
+          a.id AS admission_id,
+          a.admission_year,
+          a.label AS admission_label,
+          pac.course_id
+        FROM study_programs p
+        JOIN program_admissions a ON a.program_id = p.id
+        JOIN program_admission_courses pac ON pac.admission_id = a.id
+        WHERE p.is_active = true
+          AND a.is_active = true
+          AND pac.is_visible = true
+        ORDER BY
+          p.track_key ASC,
+          COALESCE(p.sort_order, 100) ASC,
+          p.name ASC,
+          a.admission_year DESC,
+          pac.course_id ASC
+      `
+    );
+
+    const programById = new Map();
+    const admissionById = new Map();
+    for (const row of rows || []) {
+      const programId = Number(row.program_id || 0);
+      const admissionId = Number(row.admission_id || 0);
+      const courseId = Number(row.course_id || 0);
+      if (!Number.isFinite(programId) || programId < 1) continue;
+      if (!Number.isFinite(admissionId) || admissionId < 1) continue;
+      if (!Number.isFinite(courseId) || courseId < 1 || !courseById.has(courseId)) continue;
+      const trackKey = normalizeRegistrationTrack(row.track_key, inferRegistrationTrackFromCourse(courseById.get(courseId)));
+
+      if (!programById.has(programId)) {
+        const item = {
+          id: programId,
+          track_key: trackKey,
+          name: String(row.program_name || '').trim() || `Program ${programId}`,
+          code: String(row.program_code || '').trim() || '',
+          sort_order: Number.isFinite(Number(row.sort_order)) ? Number(row.sort_order) : 100,
+        };
+        programById.set(programId, item);
+        programs.push(item);
+      }
+
+      if (!admissionById.has(admissionId)) {
+        const yearValue = Number(row.admission_year || 0);
+        const item = {
+          id: admissionId,
+          program_id: programId,
+          admission_year: Number.isFinite(yearValue) && yearValue > 0 ? yearValue : null,
+          label: String(row.admission_label || '').trim() || '',
+        };
+        admissionById.set(admissionId, item);
+        admissions.push(item);
+      }
+
+      links.push({
+        admission_id: admissionId,
+        course_id: courseId,
+      });
+    }
+  } catch (err) {
+    if (!(err && (err.code === '42P01' || err.code === '42703'))) {
+      throw err;
+    }
+  }
+
+  if (!programs.length || !admissions.length || !links.length) {
+    const fallbackYear = new Date().getUTCFullYear();
+    const fallbackPrograms = [
+      { id: -101, track_key: 'bachelor', name: 'Bachelor Program', code: 'BSC', sort_order: 10 },
+      { id: -102, track_key: 'master', name: 'Master Program', code: 'MSC', sort_order: 20 },
+      { id: -103, track_key: 'teacher', name: 'Teacher Track', code: 'TEACHER', sort_order: 30 },
+    ];
+    const fallbackAdmissions = [
+      { id: -201, program_id: -101, admission_year: fallbackYear, label: `Cohort ${fallbackYear}` },
+      { id: -202, program_id: -102, admission_year: fallbackYear, label: `Cohort ${fallbackYear}` },
+      { id: -203, program_id: -103, admission_year: fallbackYear, label: `Cohort ${fallbackYear}` },
+    ];
+    fallbackPrograms.forEach((item) => programs.push(item));
+    fallbackAdmissions.forEach((item) => admissions.push(item));
+    for (const course of courses || []) {
+      const courseId = Number(course.id || 0);
+      if (!Number.isFinite(courseId) || courseId < 1) continue;
+      const isTeacher = course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
+      if (isTeacher) {
+        links.push({ admission_id: -203, course_id: courseId });
+        continue;
+      }
+      links.push({ admission_id: -201, course_id: courseId });
+      links.push({ admission_id: -202, course_id: courseId });
+    }
+  }
+
+  programs.sort((a, b) => {
+    const trackDiff = String(a.track_key).localeCompare(String(b.track_key));
+    if (trackDiff !== 0) return trackDiff;
+    const orderDiff = Number(a.sort_order || 0) - Number(b.sort_order || 0);
+    if (orderDiff !== 0) return orderDiff;
+    return String(a.name || '').localeCompare(String(b.name || ''));
+  });
+  admissions.sort((a, b) => {
+    const yearA = Number(a.admission_year || 0);
+    const yearB = Number(b.admission_year || 0);
+    if (yearA !== yearB) return yearB - yearA;
+    return Number(a.id || 0) - Number(b.id || 0);
+  });
+
+  const allowedTrackSet = new Set();
+  links.forEach((link) => {
+    const admission = admissions.find((item) => Number(item.id) === Number(link.admission_id));
+    if (!admission) return;
+    const program = programs.find((item) => Number(item.id) === Number(admission.program_id));
+    if (!program) return;
+    allowedTrackSet.add(program.track_key);
+  });
+
+  const tracks = REGISTRATION_TRACK_OPTIONS.map((track) => ({
+    ...track,
+    enabled: allowedTrackSet.has(track.key),
+  }));
+
+  return cacheSet(referenceCache.registrationPathways, 'pathways', {
+    tracks,
+    programs,
+    admissions,
+    links,
+    courses,
+  });
+}
+
+async function getRegistrationSubjects(courseId, admissionId) {
+  const normalizedCourseId = Number(courseId || 0);
+  if (!Number.isFinite(normalizedCourseId) || normalizedCourseId < 1) {
+    return [];
+  }
+  const normalizedAdmissionId = Number(admissionId || 0);
+  const cacheKey = `${normalizedCourseId}|${normalizedAdmissionId > 0 ? normalizedAdmissionId : 'none'}`;
+  const cached = cacheGet(referenceCache.registrationSubjects, cacheKey);
+  if (cached) return cached;
+
+  const visibleSubjects = await getSubjectsCached(normalizedCourseId, { visibleOnly: true });
+  if (!Number.isFinite(normalizedAdmissionId) || normalizedAdmissionId < 1) {
+    return cacheSet(referenceCache.registrationSubjects, cacheKey, visibleSubjects || []);
+  }
+
+  try {
+    const overrideRows = await db.all(
+      `
+        SELECT subject_id, is_visible
+        FROM subject_visibility_by_admission
+        WHERE admission_id = ?
+      `,
+      [normalizedAdmissionId]
+    );
+    if (!overrideRows || !overrideRows.length) {
+      return cacheSet(referenceCache.registrationSubjects, cacheKey, visibleSubjects || []);
+    }
+    const visibilityBySubject = new Map();
+    (overrideRows || []).forEach((row) => {
+      const subjectId = Number(row.subject_id || 0);
+      if (!Number.isFinite(subjectId) || subjectId < 1) return;
+      const isVisible = row.is_visible === true || Number(row.is_visible) === 1;
+      visibilityBySubject.set(subjectId, isVisible);
+    });
+    const filtered = (visibleSubjects || []).filter((subject) => {
+      const subjectId = Number(subject.id || 0);
+      if (!visibilityBySubject.has(subjectId)) return true;
+      return visibilityBySubject.get(subjectId) === true;
+    });
+    return cacheSet(referenceCache.registrationSubjects, cacheKey, filtered);
+  } catch (err) {
+    if (err && (err.code === '42P01' || err.code === '42703')) {
+      return cacheSet(referenceCache.registrationSubjects, cacheKey, visibleSubjects || []);
+    }
+    throw err;
+  }
 }
 
 async function getSubjectsCached(courseId, options = {}) {
@@ -5684,214 +5927,336 @@ app.post('/register', registerLimiter, async (req, res) => {
   }
 });
 
-app.get('/register/course', (req, res) => {
+app.get('/register/course', async (req, res) => {
   if (!req.session.pendingUserId) {
     return res.redirect('/register');
   }
-  ensureDbReady().catch((err) => {
-    console.error('DB init failed', err);
-  });
-  (async () => {
-    try {
-      const [courses, pendingUser] = await Promise.all([
-        getCoursesCached(),
-        db.get('SELECT course_id FROM users WHERE id = ?', [req.session.pendingUserId]),
-      ]);
-      if (!pendingUser) {
-        req.session.pendingUserId = null;
-        req.session.rememberMe = null;
-        return res.redirect('/register?error=Session%20expired');
-      }
-      const selectedCourseId = pendingUser && pendingUser.course_id ? Number(pendingUser.course_id) : null;
-      return res.render('register-course', { courses, selectedCourseId, error: req.query.error || '' });
-    } catch (err) {
-      return res.status(500).send('Database error');
+  try {
+    await ensureDbReady();
+    const [courses, pendingUser, registrationPathways] = await Promise.all([
+      getCoursesCached(),
+      db.get(
+        'SELECT course_id, study_track, study_program_id, admission_id FROM users WHERE id = ?',
+        [req.session.pendingUserId]
+      ),
+      getRegistrationPathways(),
+    ]);
+    if (!pendingUser) {
+      req.session.pendingUserId = null;
+      req.session.rememberMe = null;
+      return res.redirect('/register?error=Session%20expired');
     }
-  })();
+    const selectedCourseId = pendingUser && pendingUser.course_id ? Number(pendingUser.course_id) : null;
+    const selectedCourse = (courses || []).find((course) => Number(course.id) === Number(selectedCourseId)) || null;
+    const selectedTrack = normalizeRegistrationTrack(
+      pendingUser.study_track,
+      inferRegistrationTrackFromCourse(selectedCourse)
+    );
+    const selectedProgramId = Number.isFinite(Number(pendingUser.study_program_id))
+      ? Number(pendingUser.study_program_id)
+      : null;
+    const selectedAdmissionId = Number.isFinite(Number(pendingUser.admission_id))
+      ? Number(pendingUser.admission_id)
+      : null;
+    return res.render('register-course', {
+      courses,
+      selectedCourseId,
+      selectedTrack,
+      selectedProgramId,
+      selectedAdmissionId,
+      registrationPathways,
+      error: req.query.error || '',
+    });
+  } catch (err) {
+    console.error('Register course step failed', err);
+    return res.status(500).send('Database error');
+  }
 });
 
-app.post('/register/course', registerLimiter, (req, res) => {
-  const userId = req.session.pendingUserId;
-  if (!userId) {
+app.post('/register/course', registerLimiter, async (req, res) => {
+  const userId = Number(req.session.pendingUserId || 0);
+  if (!Number.isInteger(userId) || userId < 1) {
     return res.redirect('/register');
   }
+
   const courseId = Number(req.body.course_id);
-  if (Number.isNaN(courseId)) {
+  if (!Number.isFinite(courseId) || courseId < 1) {
     return res.redirect('/register/course?error=Select%20course');
   }
-  db.get('SELECT id, is_teacher_course FROM courses WHERE id = ?', [courseId], (err, course) => {
-    if (err || !course) {
+
+  const rawTrack = String(req.body.study_track || req.body.track || '').trim().toLowerCase();
+  const trackFromBody = REGISTRATION_TRACK_KEYS.has(rawTrack) ? rawTrack : '';
+  const requestedProgramId = Number(req.body.study_program_id || 0);
+  const requestedAdmissionId = Number(req.body.admission_id || 0);
+  let selectedProgramId = Number.isFinite(requestedProgramId) && requestedProgramId > 0 ? requestedProgramId : null;
+  let selectedAdmissionId = Number.isFinite(requestedAdmissionId) && requestedAdmissionId > 0 ? requestedAdmissionId : null;
+
+  try {
+    await ensureDbReady();
+    const [pendingUser, course] = await Promise.all([
+      db.get('SELECT id FROM users WHERE id = ?', [userId]),
+      db.get('SELECT id, is_teacher_course FROM courses WHERE id = ?', [courseId]),
+    ]);
+    if (!pendingUser) {
+      req.session.pendingUserId = null;
+      req.session.rememberMe = null;
+      return res.redirect('/register?error=Session%20expired');
+    }
+    if (!course) {
       return res.redirect('/register/course?error=Invalid%20course');
     }
-    db.run('UPDATE users SET course_id = ? WHERE id = ?', [courseId, userId], (updErr) => {
-      if (updErr) {
-        return res.redirect('/register/course?error=Database%20error');
-      }
-      db.run(
-        'UPDATE user_registration_events SET course_id = COALESCE(course_id, ?) WHERE user_id = ?',
-        [courseId, userId],
-        (eventErr) => {
-          if (eventErr) {
-            console.error('Database error (register.course.registration_event)', eventErr);
-          }
-        }
+
+    const teacherCourse = course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
+    let selectedTrack = trackFromBody || inferRegistrationTrackFromCourse(course);
+    if (teacherCourse) {
+      selectedTrack = 'teacher';
+    }
+
+    if (selectedProgramId && selectedAdmissionId) {
+      const explicitPath = await db.get(
+        `
+          SELECT p.track_key
+          FROM study_programs p
+          JOIN program_admissions a ON a.program_id = p.id
+          JOIN program_admission_courses pac ON pac.admission_id = a.id
+          WHERE p.id = ?
+            AND a.id = ?
+            AND pac.course_id = ?
+            AND p.is_active = true
+            AND a.is_active = true
+            AND pac.is_visible = true
+        `,
+        [selectedProgramId, selectedAdmissionId, courseId]
       );
-      if (course.is_teacher_course === true || Number(course.is_teacher_course) === 1) {
-        return res.redirect('/register/teacher-subjects');
+      if (explicitPath) {
+        const explicitTrack = normalizeRegistrationTrack(explicitPath.track_key, selectedTrack);
+        if (trackFromBody && explicitTrack !== selectedTrack) {
+          return res.redirect('/register/course?error=Invalid%20pathway');
+        }
+        selectedTrack = explicitTrack;
+      } else {
+        selectedProgramId = null;
+        selectedAdmissionId = null;
       }
-      return res.redirect('/register/subjects');
-    });
-  });
+    }
+
+    if (!selectedProgramId || !selectedAdmissionId) {
+      const hasTrackFilter = REGISTRATION_TRACK_KEYS.has(selectedTrack);
+      const fallbackPath = await db.get(
+        `
+          SELECT
+            p.id AS program_id,
+            a.id AS admission_id,
+            p.track_key
+          FROM study_programs p
+          JOIN program_admissions a ON a.program_id = p.id
+          JOIN program_admission_courses pac ON pac.admission_id = a.id
+          WHERE pac.course_id = ?
+            AND p.is_active = true
+            AND a.is_active = true
+            AND pac.is_visible = true
+            ${hasTrackFilter ? 'AND p.track_key = ?' : ''}
+          ORDER BY
+            CASE p.track_key
+              WHEN 'teacher' THEN 0
+              WHEN 'master' THEN 1
+              WHEN 'bachelor' THEN 2
+              ELSE 3
+            END,
+            a.admission_year DESC,
+            a.id DESC
+          LIMIT 1
+        `,
+        hasTrackFilter ? [courseId, selectedTrack] : [courseId]
+      );
+      if (fallbackPath) {
+        selectedProgramId = Number(fallbackPath.program_id || 0) || null;
+        selectedAdmissionId = Number(fallbackPath.admission_id || 0) || null;
+        selectedTrack = normalizeRegistrationTrack(fallbackPath.track_key, selectedTrack);
+      }
+    }
+
+    selectedTrack = normalizeRegistrationTrack(selectedTrack, teacherCourse ? 'teacher' : 'bachelor');
+
+    await db.run(
+      'UPDATE users SET course_id = ?, study_track = ?, study_program_id = ?, admission_id = ? WHERE id = ?',
+      [courseId, selectedTrack, selectedProgramId, selectedAdmissionId, userId]
+    );
+    await db.run(
+      'UPDATE user_registration_events SET course_id = COALESCE(course_id, ?) WHERE user_id = ?',
+      [courseId, userId]
+    );
+
+    if (teacherCourse || selectedTrack === 'teacher') {
+      return res.redirect('/register/teacher-subjects');
+    }
+    return res.redirect('/register/subjects');
+  } catch (err) {
+    console.error('Register course save failed', err);
+    return res.redirect('/register/course?error=Database%20error');
+  }
 });
 
-app.get('/register/subjects', (req, res) => {
+app.get('/register/subjects', async (req, res) => {
   if (!req.session.pendingUserId) {
     return res.redirect('/register');
   }
-  ensureDbReady().catch((err) => {
-    console.error('DB init failed', err);
-  });
-  db.get('SELECT course_id FROM users WHERE id = ?', [req.session.pendingUserId], (uErr, user) => {
-    if (uErr || !user || !user.course_id) {
+  try {
+    await ensureDbReady();
+    const user = await db.get(
+      'SELECT course_id, admission_id FROM users WHERE id = ?',
+      [req.session.pendingUserId]
+    );
+    if (!user || !user.course_id) {
       return res.redirect('/register/course');
     }
-    db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [user.course_id], (cErr, course) => {
-      if (!cErr && course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
-        return res.redirect('/register/teacher-subjects');
-      }
-    (async () => {
-      try {
-        const subjects = await getSubjectsCached(user.course_id, { visibleOnly: true });
-        const isRequired = (s) => s && (s.is_required === true || s.is_required === 1 || s.is_required === '1');
-        const requiredAuto = (subjects || []).filter((s) => isRequired(s) && Number(s.group_count) === 1);
-        await Promise.all(
-          requiredAuto.map((s) =>
-            db.run(
-              `INSERT INTO student_groups (student_id, subject_id, group_number)
-               VALUES (?, ?, 1)
-               ON CONFLICT(student_id, subject_id) DO NOTHING`,
-              [req.session.pendingUserId, s.id]
-            )
-          )
-        );
-        const optoutRows = await db.all(
-          'SELECT subject_id FROM user_subject_optouts WHERE user_id = ?',
-          [req.session.pendingUserId]
-        );
-        const optouts = (optoutRows || []).map((r) => r.subject_id);
-        res.render('register-subjects', { subjects, optouts, error: req.query.error || '' });
-      } catch (err) {
-        res.status(500).send('Database error');
-      }
-    })();
-    });
-  });
+    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [user.course_id]);
+    if (course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+      return res.redirect('/register/teacher-subjects');
+    }
+
+    const subjects = await getRegistrationSubjects(user.course_id, user.admission_id);
+    const isRequired = (subject) =>
+      subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
+    const requiredAuto = (subjects || []).filter((subject) => isRequired(subject) && Number(subject.group_count) === 1);
+    await Promise.all(
+      requiredAuto.map((subject) =>
+        db.run(
+          `
+            INSERT INTO student_groups (student_id, subject_id, group_number)
+            VALUES (?, ?, 1)
+            ON CONFLICT(student_id, subject_id) DO NOTHING
+          `,
+          [req.session.pendingUserId, subject.id]
+        )
+      )
+    );
+
+    const optoutRows = await db.all(
+      'SELECT subject_id FROM user_subject_optouts WHERE user_id = ?',
+      [req.session.pendingUserId]
+    );
+    const optouts = (optoutRows || []).map((row) => Number(row.subject_id));
+    return res.render('register-subjects', { subjects, optouts, error: req.query.error || '' });
+  } catch (err) {
+    console.error('Register subjects step failed', err);
+    return res.status(500).send('Database error');
+  }
 });
 
-app.post('/register/subjects', registerLimiter, (req, res) => {
-  const userId = req.session.pendingUserId;
-  if (!userId) {
+app.post('/register/subjects', registerLimiter, async (req, res) => {
+  const userId = Number(req.session.pendingUserId || 0);
+  if (!Number.isInteger(userId) || userId < 1) {
     return res.redirect('/register');
   }
 
-  db.get('SELECT course_id FROM users WHERE id = ?', [userId], (uErr, userRow) => {
-    if (uErr || !userRow || !userRow.course_id) {
+  const upsertStudentGroupSql = `
+    INSERT INTO student_groups (student_id, subject_id, group_number)
+    VALUES (?, ?, ?)
+    ON CONFLICT(student_id, subject_id)
+    DO UPDATE SET group_number = excluded.group_number
+  `;
+
+  try {
+    await ensureDbReady();
+    const userRow = await db.get(
+      'SELECT course_id, admission_id FROM users WHERE id = ?',
+      [userId]
+    );
+    if (!userRow || !userRow.course_id) {
       return res.redirect('/register/course');
     }
-    db.all(
-      'SELECT id, group_count, default_group, is_required FROM subjects WHERE course_id = ? AND visible = 1',
-      [userRow.course_id],
-      (err, subjects) => {
-      if (err) {
-        return res.status(500).send('Database error');
-      }
-      let hasMissingRequired = false;
-      const stmt = db.prepare(
-        `
-          INSERT INTO student_groups (student_id, subject_id, group_number)
-          VALUES (?, ?, ?)
-          ON CONFLICT(student_id, subject_id)
-          DO UPDATE SET group_number = excluded.group_number
-        `
-      );
-      const deleteStmt = db.prepare('DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?');
-      const optoutStmt = db.prepare(
-        `INSERT INTO user_subject_optouts (user_id, subject_id) VALUES (?, ?)
-         ON CONFLICT(user_id, subject_id) DO NOTHING`
-      );
-      const optoutDeleteStmt = db.prepare('DELETE FROM user_subject_optouts WHERE user_id = ? AND subject_id = ?');
-      const isRequired = (s) => s && (s.is_required === true || s.is_required === 1 || s.is_required === '1');
-      subjects.forEach((s) => {
-        const value = req.body[`subject_${s.id}`];
-        const requiredFlag = isRequired(s);
-        const optout = req.body[`optout_${s.id}`] === '1' || req.body[`optout_${s.id}`] === 'on';
-        if (requiredFlag) {
-          optoutDeleteStmt.run(userId, s.id);
-          if (Number(s.group_count) === 1) {
-            stmt.run(userId, s.id, 1);
-            return;
-          }
-          if (!value) {
-            hasMissingRequired = true;
-            return;
-          }
-          const groupNum = Number(value);
-          if (groupNum >= 1 && groupNum <= s.group_count) {
-            stmt.run(userId, s.id, groupNum);
-          } else {
-            hasMissingRequired = true;
-          }
-          return;
+
+    const subjects = await getRegistrationSubjects(userRow.course_id, userRow.admission_id);
+    const isRequired = (subject) =>
+      subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
+    let hasMissingRequired = false;
+
+    for (const subject of subjects || []) {
+      const subjectId = Number(subject.id || 0);
+      if (!Number.isFinite(subjectId) || subjectId < 1) continue;
+
+      const groupCount = Math.max(1, Number(subject.group_count || 1));
+      const selectedValue = req.body[`subject_${subjectId}`];
+      const selectedGroup = Number(selectedValue);
+      const optout = req.body[`optout_${subjectId}`] === '1' || req.body[`optout_${subjectId}`] === 'on';
+      const requiredFlag = isRequired(subject);
+
+      if (requiredFlag) {
+        await db.run('DELETE FROM user_subject_optouts WHERE user_id = ? AND subject_id = ?', [userId, subjectId]);
+        if (groupCount === 1) {
+          await db.run(upsertStudentGroupSql, [userId, subjectId, 1]);
+          continue;
         }
-        if (optout) {
-          deleteStmt.run(userId, s.id);
-          optoutStmt.run(userId, s.id);
-          return;
+        if (!selectedValue) {
+          hasMissingRequired = true;
+          continue;
         }
-        optoutDeleteStmt.run(userId, s.id);
-        if (!value) {
-          if (Number(s.group_count) === 1) {
-            stmt.run(userId, s.id, 1);
-            return;
-          }
-          return;
-        }
-        const groupNum = Number(value);
-        if (groupNum >= 1 && groupNum <= s.group_count) {
-          stmt.run(userId, s.id, groupNum);
+        if (Number.isFinite(selectedGroup) && selectedGroup >= 1 && selectedGroup <= groupCount) {
+          await db.run(upsertStudentGroupSql, [userId, subjectId, selectedGroup]);
         } else {
           hasMissingRequired = true;
         }
-      });
-      stmt.finalize(() => {
-        deleteStmt.finalize();
-        optoutStmt.finalize();
-        optoutDeleteStmt.finalize();
-        if (hasMissingRequired) {
-          return res.redirect('/register/subjects?error=Select%20group');
+        continue;
+      }
+
+      if (optout) {
+        await db.run('DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?', [userId, subjectId]);
+        await db.run(
+          `
+            INSERT INTO user_subject_optouts (user_id, subject_id)
+            VALUES (?, ?)
+            ON CONFLICT(user_id, subject_id) DO NOTHING
+          `,
+          [userId, subjectId]
+        );
+        continue;
+      }
+
+      await db.run('DELETE FROM user_subject_optouts WHERE user_id = ? AND subject_id = ?', [userId, subjectId]);
+      if (!selectedValue) {
+        if (groupCount === 1) {
+          await db.run(upsertStudentGroupSql, [userId, subjectId, 1]);
         }
-        db.get('SELECT id, full_name, role, schedule_group, course_id, language FROM users WHERE id = ?', [userId], (uErr2, user) => {
-          if (uErr2 || !user) {
-            return res.redirect('/login');
-          }
-          req.session.user = {
-            id: user.id,
-            username: user.full_name,
-            schedule_group: user.schedule_group,
-            course_id: user.course_id || 1,
-            language: user.language || getPreferredLang(req),
-          };
-          req.session.role = user.role;
-          applyRememberMe(req, Boolean(req.session.rememberMe));
-          req.session.pendingUserId = null;
-          req.session.rememberMe = null;
-          logAction(db, req, 'register_subjects', { user_id: user.id });
-          broadcast('users_updated');
-          return req.session.save(() => res.redirect('/home?welcome=1'));
-        });
-      });
-    });
-  });
+        continue;
+      }
+      if (Number.isFinite(selectedGroup) && selectedGroup >= 1 && selectedGroup <= groupCount) {
+        await db.run(upsertStudentGroupSql, [userId, subjectId, selectedGroup]);
+      } else {
+        hasMissingRequired = true;
+      }
+    }
+
+    if (hasMissingRequired) {
+      return res.redirect('/register/subjects?error=Select%20group');
+    }
+
+    const user = await db.get(
+      'SELECT id, full_name, role, schedule_group, course_id, language FROM users WHERE id = ?',
+      [userId]
+    );
+    if (!user) {
+      return res.redirect('/login');
+    }
+
+    req.session.user = {
+      id: user.id,
+      username: user.full_name,
+      schedule_group: user.schedule_group,
+      course_id: user.course_id || 1,
+      language: user.language || getPreferredLang(req),
+    };
+    req.session.role = user.role;
+    applyRememberMe(req, Boolean(req.session.rememberMe));
+    req.session.pendingUserId = null;
+    req.session.rememberMe = null;
+    logAction(db, req, 'register_subjects', { user_id: user.id });
+    broadcast('users_updated');
+    return req.session.save(() => res.redirect('/home?welcome=1'));
+  } catch (err) {
+    console.error('Register subjects save failed', err);
+    return res.redirect('/register/subjects?error=Database%20error');
+  }
 });
 
 app.get('/register/teacher-subjects', (req, res) => {

@@ -183,6 +183,9 @@
         padding: 0.75rem 1rem;
         font-weight: 600;
       }
+      .subject-search {
+        border-radius: 12px;
+      }
       .app-footer {
         font-size: 0.8rem;
       }
@@ -210,12 +213,27 @@
       <% } %>
 
       <form method="POST" action="<%= isProfileEdit ? '/teacher/subjects' : '/register/teacher-subjects' %>">
+        <div class="mb-3">
+          <label class="form-label small" for="teacherSubjectSearch">Quick search</label>
+          <input
+            id="teacherSubjectSearch"
+            class="form-control subject-search"
+            type="search"
+            placeholder="Subject, course, program..."
+            autocomplete="off"
+          />
+        </div>
+
         <div class="d-grid gap-3">
           <% (subjects || []).forEach(function(s) { %>
             <% const selectedGroup = selections && selections.get ? selections.get(s.id) : null; %>
             <% const isSelected = selections && selections.get ? selections.has(s.id) : false; %>
             <% const generalFlag = s.is_general === true || Number(s.is_general) === 1; %>
-            <div class="glass subject-card">
+            <div
+              class="glass subject-card"
+              data-subject-item="1"
+              data-search="<%= `${s.name || ''} ${s.course_name || ''}`.toLowerCase() %>"
+            >
               <div class="subject-row">
                 <div class="subject-info">
                   <div class="subject-name"><%= s.name %></div>
@@ -298,6 +316,20 @@
         toggle.addEventListener('change', sync);
         sync();
       });
+
+      const teacherSubjectSearch = document.getElementById('teacherSubjectSearch');
+      if (teacherSubjectSearch) {
+        const subjectItems = Array.from(document.querySelectorAll('[data-subject-item]'));
+        const applyFilter = () => {
+          const query = teacherSubjectSearch.value.trim().toLowerCase();
+          subjectItems.forEach((item) => {
+            const source = String(item.dataset.search || '');
+            const visible = !query || source.includes(query);
+            item.style.display = visible ? '' : 'none';
+          });
+        };
+        teacherSubjectSearch.addEventListener('input', applyFilter);
+      }
     </script>
       <script src="/js/design-system.js" defer></script>
   </body>

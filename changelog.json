@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "1.0.59",
+      "date": "2026-03-04",
+      "items": [
+        "feat(registration-pathways): introduced structured registration pathways with study track (bachelor/master/teacher), program, and admission year linked to courses",
+        "feat(registration-subject-visibility): added admission-level subject visibility support (`subject_visibility_by_admission`) and connected register-subjects flow to pathway-aware subject selection",
+        "ux(design-system): upgraded global ambient background with animated gradients, subtle mouse-follow spotlight, and reduced-motion fallback",
+        "feat(react-islands): added first React island runtime with footer release pill and integrated it globally through app footer",
+        "ux(teacher-subjects): added quick search in teacher subject selection to speed up finding courses/subjects during onboarding and profile edits"
+      ]
+    },
+    {
       "version": "1.0.58",
       "date": "2026-03-04",
       "items": [

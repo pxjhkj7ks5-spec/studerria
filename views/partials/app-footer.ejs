@@ -3,10 +3,23 @@
   if (typeof footerMetaClass === 'string' && footerMetaClass.trim()) {
     footerMetaClassList.push(footerMetaClass.trim());
   }
+  const latestRelease = Array.isArray(changelog) && changelog.length ? changelog[0] : null;
+  const footerReleaseProps = {
+    appVersion: appVersion || '',
+    latestVersion: latestRelease && latestRelease.version ? String(latestRelease.version) : '',
+    latestDate: latestRelease && latestRelease.date ? String(latestRelease.date) : '',
+  };
+  const footerReleasePropsJson = JSON.stringify(footerReleaseProps).replace(/'/g, '&#39;');
 %>
 <footer class="app-footer text-center py-4">
   <small class="<%= footerMetaClassList.join(' ') %>">
     <span class="footer-version">v<%= appVersion %></span>
+    <span
+      class="footer-release-slot"
+      data-react-island="footer-release-pill"
+      data-island-props='<%- footerReleasePropsJson %>'
+      aria-hidden="true"
+    ></span>
     <button
       type="button"
       class="footer-build"
@@ -28,3 +41,18 @@
     </button>
   </small>
 </footer>
+<script>
+  window.__KMA_APP_META__ = Object.assign({}, window.__KMA_APP_META__, <%- JSON.stringify(footerReleaseProps) %>);
+</script>
+<script
+  src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"
+  crossorigin="anonymous"
+  defer
+></script>
+<script
+  src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"
+  crossorigin="anonymous"
+  defer
+></script>
+<script src="/js/islands/runtime.js" defer></script>
+<script src="/js/islands/footer-release-island.js" defer></script>
