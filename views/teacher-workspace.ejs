@@ -215,6 +215,55 @@
       body.theme-light .template-link {
         color: #1d4ed8;
       }
+      .clone-subject-list {
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        padding: 8px;
+        max-height: 42vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        background: rgba(15, 23, 42, 0.2);
+      }
+      body.theme-light .clone-subject-list {
+        background: rgba(255, 255, 255, 0.78);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .clone-subject-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-radius: 10px;
+        padding: 8px 10px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: rgba(15, 23, 42, 0.25);
+        cursor: pointer;
+      }
+      .clone-subject-item:hover {
+        border-color: rgba(125, 211, 252, 0.45);
+      }
+      body.theme-light .clone-subject-item {
+        background: rgba(255, 255, 255, 0.92);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .clone-subject-text {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .clone-subject-text strong {
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+      .clone-subject-text small {
+        font-size: 0.76rem;
+        color: rgba(203, 213, 225, 0.75);
+      }
+      body.theme-light .clone-subject-text small {
+        color: rgba(15, 23, 42, 0.58);
+      }
       .hint {
         font-size: 0.82rem;
         color: rgba(203, 213, 225, 0.78);
@@ -408,6 +457,13 @@
                         >
                           Edit
                         </button>
+                        <button
+                          class="btn btn-outline-info btn-sm"
+                          type="button"
+                          data-template-clone="<%= template.id %>"
+                        >
+                          Clone
+                        </button>
                         <form method="POST" action="/teacher/workspace/templates/<%= template.id %>/delete">
                           <input type="hidden" name="course_id" value="<%= selectedCourseId || '' %>" />
                           <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
@@ -529,6 +585,64 @@
         </div>
       </div>
 
+      <div class="modal fade" id="cloneTemplateModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content">
+            <form method="POST" id="cloneTemplateForm" action="/teacher/workspace/templates/0/clone" autocomplete="off">
+              <div class="modal-header">
+                <h5 class="modal-title">Clone template to subjects</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <input type="hidden" id="cloneTemplateCourseContext" name="course_id_context" value="<%= selectedCourseId || '' %>" />
+                <p class="mb-2 small text-muted">
+                  Source:
+                  <strong id="cloneTemplateSourceTitle">-</strong>
+                </p>
+                <div class="mb-2">
+                  <label for="cloneTemplateSearch" class="form-label">Find subject</label>
+                  <input
+                    id="cloneTemplateSearch"
+                    class="form-control"
+                    type="search"
+                    placeholder="Type subject or course name"
+                    autocomplete="off"
+                  />
+                </div>
+                <div id="cloneTemplateError" class="alert alert-warning py-2 d-none mb-2"></div>
+                <% if ((teacherSubjectsAll || []).length) { %>
+                  <div class="clone-subject-list" id="cloneSubjectList">
+                    <% (teacherSubjectsAll || []).forEach(function(subject) { %>
+                      <label class="clone-subject-item" data-clone-subject-item>
+                        <input class="form-check-input" type="checkbox" name="target_subject_ids" value="<%= subject.id %>" />
+                        <span class="clone-subject-text">
+                          <strong><%= subject.name %></strong>
+                          <small><%= subject.course_name ? subject.course_name : `Course ${subject.course_id}` %></small>
+                        </span>
+                      </label>
+                    <% }) %>
+                  </div>
+                  <div id="cloneSubjectEmpty" class="small text-muted mt-2 d-none">No subjects match this filter.</div>
+                <% } else { %>
+                  <div class="alert alert-warning mb-0">
+                    No subjects available yet. Configure your teaching subjects first.
+                  </div>
+                <% } %>
+                <p class="hint mt-2 mb-0">
+                  Clones keep title, description, links, tags, and control/credit flags.
+                </p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary" <%= (teacherSubjectsAll || []).length ? '' : 'disabled' %>>
+                  Clone to selected
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
       <%- include('partials/app-footer') %>
     </main>
 
@@ -607,6 +721,18 @@
       const editControlInput = document.getElementById('editTemplateControl');
       const editCreditInput = document.getElementById('editTemplateCredit');
       const syncEditSubjects = bindCourseSubjectFilter(editCourseSelect, editSubjectSelect);
+      const cloneModalEl = document.getElementById('cloneTemplateModal');
+      const cloneModal = cloneModalEl && window.bootstrap ? new window.bootstrap.Modal(cloneModalEl) : null;
+      const cloneTemplateForm = document.getElementById('cloneTemplateForm');
+      const cloneTemplateCourseContextInput = document.getElementById('cloneTemplateCourseContext');
+      const cloneTemplateSourceTitle = document.getElementById('cloneTemplateSourceTitle');
+      const cloneTemplateSearch = document.getElementById('cloneTemplateSearch');
+      const cloneTemplateError = document.getElementById('cloneTemplateError');
+      const cloneSubjectList = document.getElementById('cloneSubjectList');
+      const cloneSubjectEmpty = document.getElementById('cloneSubjectEmpty');
+      const cloneSubjectItems = cloneSubjectList
+        ? Array.from(cloneSubjectList.querySelectorAll('[data-clone-subject-item]'))
+        : [];
 
       const templateById = new Map();
       (workspaceTemplates || []).forEach((template) => {
@@ -615,6 +741,48 @@
           templateById.set(templateId, template);
         }
       });
+
+      function hideCloneError() {
+        if (!cloneTemplateError) return;
+        cloneTemplateError.classList.add('d-none');
+        cloneTemplateError.textContent = '';
+      }
+
+      function syncCloneSubjectFilter() {
+        if (!cloneSubjectItems.length) return;
+        const query = String(cloneTemplateSearch && cloneTemplateSearch.value ? cloneTemplateSearch.value : '')
+          .trim()
+          .toLowerCase();
+        let visibleCount = 0;
+        cloneSubjectItems.forEach((item) => {
+          const text = String(item.textContent || '').toLowerCase();
+          const visible = !query || text.includes(query);
+          item.hidden = !visible;
+          if (visible) {
+            visibleCount += 1;
+          }
+        });
+        if (cloneSubjectEmpty) {
+          cloneSubjectEmpty.classList.toggle('d-none', visibleCount > 0);
+        }
+      }
+
+      function clearCloneSelection() {
+        cloneSubjectItems.forEach((item) => {
+          const checkbox = item.querySelector('input[type="checkbox"][name="target_subject_ids"]');
+          if (checkbox) {
+            checkbox.checked = false;
+          }
+          item.hidden = false;
+        });
+        if (cloneTemplateSearch) {
+          cloneTemplateSearch.value = '';
+        }
+        if (cloneSubjectEmpty) {
+          cloneSubjectEmpty.classList.add('d-none');
+        }
+        hideCloneError();
+      }
 
       function openTemplateEditor(templateIdRaw) {
         const templateId = Number(templateIdRaw);
@@ -671,9 +839,61 @@
         editModal.show();
       }
 
+      function openTemplateCloner(templateIdRaw) {
+        const templateId = Number(templateIdRaw);
+        if (!Number.isInteger(templateId) || templateId < 1 || !cloneModal || !cloneTemplateForm) {
+          return;
+        }
+        const template = templateById.get(templateId);
+        if (!template) {
+          return;
+        }
+        cloneTemplateForm.setAttribute('action', `/teacher/workspace/templates/${templateId}/clone`);
+        if (cloneTemplateCourseContextInput) {
+          const preferredCourseId = Number.isInteger(Number(selectedCourseContext)) && Number(selectedCourseContext) > 0
+            ? Number(selectedCourseContext)
+            : (Number.isInteger(Number(template.course_id)) && Number(template.course_id) > 0 ? Number(template.course_id) : null);
+          cloneTemplateCourseContextInput.value = preferredCourseId ? String(preferredCourseId) : '';
+        }
+        if (cloneTemplateSourceTitle) {
+          cloneTemplateSourceTitle.textContent = String(template.title || `Template #${templateId}`);
+        }
+        clearCloneSelection();
+        cloneModal.show();
+      }
+
+      if (cloneTemplateSearch) {
+        cloneTemplateSearch.addEventListener('input', syncCloneSubjectFilter);
+      }
+      if (cloneSubjectList) {
+        cloneSubjectList.addEventListener('change', hideCloneError);
+      }
+      if (cloneModalEl) {
+        cloneModalEl.addEventListener('hidden.bs.modal', clearCloneSelection);
+      }
+      if (cloneTemplateForm) {
+        cloneTemplateForm.addEventListener('submit', (event) => {
+          const checkedCount = cloneSubjectList
+            ? cloneSubjectList.querySelectorAll('input[name="target_subject_ids"]:checked').length
+            : 0;
+          if (checkedCount < 1) {
+            event.preventDefault();
+            if (cloneTemplateError) {
+              cloneTemplateError.textContent = 'Select at least one subject to clone this template.';
+              cloneTemplateError.classList.remove('d-none');
+            }
+          }
+        });
+      }
+
       document.querySelectorAll('[data-template-edit]').forEach((button) => {
         button.addEventListener('click', () => {
           openTemplateEditor(button.getAttribute('data-template-edit'));
+        });
+      });
+      document.querySelectorAll('[data-template-clone]').forEach((button) => {
+        button.addEventListener('click', () => {
+          openTemplateCloner(button.getAttribute('data-template-clone'));
         });
       });
     </script>

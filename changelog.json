@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.64",
+      "date": "2026-03-05",
+      "items": [
+        "feat(teacher-workspace-clone): added template clone flow to copy one homework template to multiple selected subjects/courses in one action",
+        "feat(teacher-homework-templates): introduced `POST /teacher/workspace/templates/:id/clone` with ownership checks, target-subject access validation, and duplicate-skip guard",
+        "ux(teacher-workspace): added clone modal with subject search/filter, multi-select checklist, and inline validation before submit"
+      ]
+    },
+    {
       "version": "1.0.63",
       "date": "2026-03-05",
       "items": [

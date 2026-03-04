@@ -6658,24 +6658,31 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
 
     const subjectMap = new Map();
     teacherSubjects.forEach((subject) => {
-      const courseId = Number(subject.course_id);
-      if (selectedCourseId && courseId !== selectedCourseId) return;
       const subjectId = Number(subject.subject_id);
       if (!Number.isFinite(subjectId) || subjectId < 1 || subjectMap.has(subjectId)) return;
       subjectMap.set(subjectId, {
         id: subjectId,
-        name: String(subject.subject_name || ''),
-        course_id: courseId,
+        name: String(subject.subject_name || '').trim(),
+        course_id: Number(subject.course_id),
         course_name: String(subject.course_name || ''),
       });
     });
+    const allTeacherSubjects = Array.from(subjectMap.values()).sort((a, b) => {
+      const byCourse = Number(a.course_id) - Number(b.course_id);
+      if (byCourse !== 0) return byCourse;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'uk', { sensitivity: 'base' });
+    });
+    const scopedTeacherSubjects = selectedCourseId
+      ? allTeacherSubjects.filter((subject) => Number(subject.course_id) === Number(selectedCourseId))
+      : allTeacherSubjects;
 
     return res.render('teacher-workspace', {
       role: 'teacher',
       username,
       teacherCourses,
       selectedCourseId,
-      teacherSubjects: Array.from(subjectMap.values()),
+      teacherSubjects: scopedTeacherSubjects,
+      teacherSubjectsAll: allTeacherSubjects,
       templates,
       error: decodeMessage(req.query.error),
       success: decodeMessage(req.query.ok),
@@ -6877,6 +6884,194 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, async (req, re
     return res.redirect(`/teacher/workspace?ok=Template%20updated${courseQuery}`);
   } catch (err) {
     console.error('Teacher workspace template update failed', err);
+    return res.redirect(`/teacher/workspace?error=Database%20error${fallbackCourseQuery}`);
+  }
+});
+
+app.post('/teacher/workspace/templates/:id/clone', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.workspace.templates.clone.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
+  }
+  const { id: userId } = req.session.user;
+  const templateId = Number(req.params.id);
+  if (!Number.isInteger(templateId) || templateId < 1) {
+    return res.redirect('/teacher/workspace?error=Invalid%20template');
+  }
+  const contextCourseId = Number(req.body.course_id_context);
+  const fallbackCourseId = Number.isInteger(contextCourseId) && contextCourseId > 0 ? contextCourseId : null;
+  const fallbackCourseQuery = fallbackCourseId ? `&course=${fallbackCourseId}` : '';
+  const rawTargetSubjectIds = req.body.target_subject_ids;
+  const targetSubjectIds = Array.from(
+    new Set(
+      (Array.isArray(rawTargetSubjectIds) ? rawTargetSubjectIds : [rawTargetSubjectIds])
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    )
+  ).slice(0, 240);
+
+  if (!targetSubjectIds.length) {
+    return res.redirect(`/teacher/workspace?error=Select%20at%20least%20one%20subject${fallbackCourseQuery}`);
+  }
+
+  try {
+    const sourceTemplate = await db.get(
+      `
+        SELECT
+          id,
+          user_id,
+          course_id,
+          subject_id,
+          title,
+          description,
+          link_url,
+          meeting_url,
+          tags,
+          is_control,
+          is_credit
+        FROM teacher_homework_templates
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [templateId]
+    );
+    if (!sourceTemplate) {
+      return res.redirect(`/teacher/workspace?error=Template%20not%20found${fallbackCourseQuery}`);
+    }
+    if (Number(sourceTemplate.user_id) !== Number(userId)) {
+      return res.status(403).send('Forbidden');
+    }
+
+    const placeholders = targetSubjectIds.map(() => '?').join(', ');
+    const rows = await db.all(
+      `
+        SELECT DISTINCT
+          s.id AS subject_id,
+          s.course_id,
+          s.name AS subject_name,
+          c.name AS course_name
+        FROM teacher_subjects ts
+        JOIN subjects s ON s.id = ts.subject_id
+        LEFT JOIN courses c ON c.id = s.course_id
+        WHERE ts.user_id = ?
+          AND ts.subject_id IN (${placeholders})
+      `,
+      [userId, ...targetSubjectIds]
+    );
+    const targetMap = new Map();
+    (rows || []).forEach((row) => {
+      const subjectId = Number(row.subject_id);
+      const courseId = Number(row.course_id);
+      if (!Number.isInteger(subjectId) || subjectId < 1 || !Number.isInteger(courseId) || courseId < 1) {
+        return;
+      }
+      if (!targetMap.has(subjectId)) {
+        targetMap.set(subjectId, {
+          subject_id: subjectId,
+          course_id: courseId,
+          subject_name: row.subject_name ? String(row.subject_name) : '',
+          course_name: row.course_name ? String(row.course_name) : '',
+        });
+      }
+    });
+    if (!targetMap.size) {
+      return res.redirect(`/teacher/workspace?error=Invalid%20subject%20selection${fallbackCourseQuery}`);
+    }
+
+    const sourceTitle = String(sourceTemplate.title || '').trim();
+    const sourceDescription = String(sourceTemplate.description || '').trim();
+    const sourceLinkUrl = sourceTemplate.link_url ? String(sourceTemplate.link_url) : null;
+    const sourceMeetingUrl = sourceTemplate.meeting_url ? String(sourceTemplate.meeting_url) : null;
+    const sourceTags = sourceTemplate.tags ? String(sourceTemplate.tags) : '';
+    const sourceIsControl = sourceTemplate.is_control === true || Number(sourceTemplate.is_control) === 1 ? 1 : 0;
+    const sourceIsCredit = sourceTemplate.is_credit === true || Number(sourceTemplate.is_credit) === 1 ? 1 : 0;
+
+    let createdCount = 0;
+    let duplicateCount = 0;
+    for (const target of targetMap.values()) {
+      const duplicate = await db.get(
+        `
+          SELECT id
+          FROM teacher_homework_templates
+          WHERE user_id = ?
+            AND subject_id = ?
+            AND COALESCE(course_id, 0) = COALESCE(?, 0)
+            AND LOWER(title) = LOWER(?)
+            AND COALESCE(description, '') = COALESCE(?, '')
+          LIMIT 1
+        `,
+        [
+          userId,
+          Number(target.subject_id),
+          Number(target.course_id),
+          sourceTitle,
+          sourceDescription,
+        ]
+      );
+      if (duplicate) {
+        duplicateCount += 1;
+        continue;
+      }
+
+      const inserted = await db.get(
+        `
+          INSERT INTO teacher_homework_templates
+            (user_id, course_id, subject_id, title, description, link_url, meeting_url, tags, is_control, is_credit, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+          RETURNING id
+        `,
+        [
+          userId,
+          Number(target.course_id),
+          Number(target.subject_id),
+          sourceTitle,
+          sourceDescription,
+          sourceLinkUrl,
+          sourceMeetingUrl,
+          sourceTags,
+          sourceIsControl,
+          sourceIsCredit,
+        ]
+      );
+      if (inserted && inserted.id) {
+        createdCount += 1;
+      }
+    }
+
+    const invalidCount = Math.max(0, Number(targetSubjectIds.length) - Number(targetMap.size));
+    logAction(db, req, 'teacher_homework_template_clone', {
+      source_template_id: templateId,
+      source_subject_id: sourceTemplate.subject_id ? Number(sourceTemplate.subject_id) : null,
+      source_course_id: sourceTemplate.course_id ? Number(sourceTemplate.course_id) : null,
+      created_count: createdCount,
+      duplicate_count: duplicateCount,
+      invalid_count: invalidCount,
+      target_subject_ids: Array.from(targetMap.keys()),
+    });
+
+    const suffixes = [];
+    if (duplicateCount > 0) {
+      suffixes.push(`${duplicateCount} duplicates skipped`);
+    }
+    if (invalidCount > 0) {
+      suffixes.push(`${invalidCount} invalid selections skipped`);
+    }
+    const baseMessage = createdCount > 0
+      ? `Template cloned to ${createdCount} subject${createdCount === 1 ? '' : 's'}`
+      : 'No templates were cloned';
+    const fullMessage = suffixes.length ? `${baseMessage} (${suffixes.join(', ')})` : baseMessage;
+    const redirectCourseId = fallbackCourseId
+      || (Number.isInteger(Number(sourceTemplate.course_id)) && Number(sourceTemplate.course_id) > 0
+        ? Number(sourceTemplate.course_id)
+        : null);
+    const courseQuery = redirectCourseId ? `&course=${redirectCourseId}` : '';
+    return res.redirect(`/teacher/workspace?ok=${encodeURIComponent(fullMessage)}${courseQuery}`);
+  } catch (err) {
+    console.error('Teacher workspace template clone failed', err);
     return res.redirect(`/teacher/workspace?error=Database%20error${fallbackCourseQuery}`);
   }
 });
