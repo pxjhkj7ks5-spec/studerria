@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.55",
+      "date": "2026-03-04",
+      "items": [
+        "fix(register-navigation): added explicit back navigation on course selection and preserved selected course when revisiting the step",
+        "fix(register-pending-flow): returning to the first register step now pre-fills pending PIB and updates existing pending account instead of creating duplicates"
+      ]
+    },
+    {
       "version": "1.0.54",
       "date": "2026-03-02",
       "items": [

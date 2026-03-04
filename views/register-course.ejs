@@ -176,12 +176,13 @@
                 <div class="d-grid gap-2 mb-3">
                   <% courses.forEach(course => { %>
                     <label class="course-option d-flex align-items-center">
-                      <input type="radio" name="course_id" value="<%= course.id %>" required />
+                      <input type="radio" name="course_id" value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'checked' : '' %> required />
                       <span><%= course.name %></span>
                     </label>
                   <% }) %>
                 </div>
                 <button type="submit" class="btn btn-primary w-100"><%= t('registerCourse.continue') %></button>
+                <a href="/register" class="btn btn-outline-secondary w-100 mt-2"><%= t('registerCourse.backToRegister') %></a>
               </form>
             </div>
           </div>

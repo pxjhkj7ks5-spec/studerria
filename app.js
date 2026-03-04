@@ -5554,8 +5554,24 @@ app.post('/login', authLimiter, async (req, res) => {
   });
 });
 
-app.get('/register', (req, res) => {
-  res.render('register', { error: req.query.error || '' });
+app.get('/register', async (req, res) => {
+  let pendingFullName = '';
+  const pendingUserId = Number(req.session.pendingUserId || 0);
+  if (Number.isInteger(pendingUserId) && pendingUserId > 0) {
+    try {
+      await ensureDbReady();
+      const pendingUser = await db.get('SELECT full_name FROM users WHERE id = ?', [pendingUserId]);
+      if (pendingUser && pendingUser.full_name) {
+        pendingFullName = String(pendingUser.full_name).trim();
+      } else {
+        req.session.pendingUserId = null;
+        req.session.rememberMe = null;
+      }
+    } catch (err) {
+      console.error('Register prefill failed', err);
+    }
+  }
+  res.render('register', { error: req.query.error || '', pendingFullName });
 });
 
 app.post('/register', registerLimiter, async (req, res) => {
@@ -5565,6 +5581,42 @@ app.post('/register', registerLimiter, async (req, res) => {
   }
   if (password !== confirm_password) {
     return res.redirect('/register?error=Passwords%20do%20not%20match');
+  }
+
+  const pendingUserId = Number(req.session.pendingUserId || 0);
+  if (Number.isInteger(pendingUserId) && pendingUserId > 0) {
+    try {
+      await ensureDbReady();
+      const pendingUser = await db.get('SELECT id FROM users WHERE id = ?', [pendingUserId]);
+      if (!pendingUser) {
+        req.session.pendingUserId = null;
+        req.session.rememberMe = null;
+        return res.redirect('/register?error=Session%20expired');
+      }
+      const normalizedName = full_name.trim().replace(/\s+/g, ' ');
+      const existing = await db.get(
+        'SELECT id FROM users WHERE LOWER(full_name) = LOWER(?) AND id <> ?',
+        [normalizedName, pendingUserId]
+      );
+      if (existing) {
+        return res.redirect('/register?error=User%20already%20exists');
+      }
+      const hash = await bcrypt.hash(password, 10);
+      const preferredLang = getPreferredLang(req);
+      await db.run(
+        'UPDATE users SET full_name = ?, password_hash = ?, language = ? WHERE id = ?',
+        [normalizedName, hash, preferredLang, pendingUserId]
+      );
+      await db.run(
+        'UPDATE user_registration_events SET full_name = ? WHERE user_id = ?',
+        [normalizedName, pendingUserId]
+      );
+      req.session.rememberMe = isRememberRequested(remember_me);
+      return res.redirect('/register/course');
+    } catch (err) {
+      console.error('Register pending update failed', err);
+      return res.redirect('/register?error=Database%20error');
+    }
   }
 
   try {
@@ -5641,8 +5693,17 @@ app.get('/register/course', (req, res) => {
   });
   (async () => {
     try {
-      const courses = await getCoursesCached();
-      return res.render('register-course', { courses, error: req.query.error || '' });
+      const [courses, pendingUser] = await Promise.all([
+        getCoursesCached(),
+        db.get('SELECT course_id FROM users WHERE id = ?', [req.session.pendingUserId]),
+      ]);
+      if (!pendingUser) {
+        req.session.pendingUserId = null;
+        req.session.rememberMe = null;
+        return res.redirect('/register?error=Session%20expired');
+      }
+      const selectedCourseId = pendingUser && pendingUser.course_id ? Number(pendingUser.course_id) : null;
+      return res.render('register-course', { courses, selectedCourseId, error: req.query.error || '' });
     } catch (err) {
       return res.status(500).send('Database error');
     }

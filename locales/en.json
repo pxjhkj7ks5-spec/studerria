@@ -33,6 +33,7 @@
   "register.modalClose": "Close",
   "registerCourse.title": "Select Course",
   "registerCourse.continue": "Continue",
+  "registerCourse.backToRegister": "Back to registration",
   "registerSubjects.title": "Select Subject Groups",
   "registerSubjects.subtitle": "Choose a group for each subject (optional if not applicable).",
   "registerSubjects.noSubjects": "No subjects available yet.",

@@ -204,5 +204,6 @@
   "admin.messageTargetHintCourseOnly": "Надсилання доступне лише в межах поточного курсу.",
   "admin.selectSubject": "Оберіть предмет",
   "admin.group": "Група",
-  "admin.send": "Надіслати"
+  "admin.send": "Надіслати",
+  "registerCourse.backToRegister": "Назад до реєстрації"
 }
