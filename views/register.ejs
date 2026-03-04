@@ -591,7 +591,7 @@
         clearInvalidState();
         el.classList.add('field-invalid');
         if (el === agreeInput && consentError) {
-          consentError.textContent = message || 'Please check consent';
+          consentError.textContent = message || 'Поставте прапорець згоди';
           consentError.classList.add('is-visible');
         } else {
           showCustomTooltip(el, message);
@@ -603,19 +603,19 @@
 
       function getFieldValidationMessage(el) {
         if (el === nameInput && !nameInput.value.trim()) {
-          return nameInput.validationMessage || 'Enter your full name';
+          return nameInput.validationMessage || 'Заповніть ім\'я';
         }
         if (el === passwordInput && !passwordInput.value) {
-          return passwordInput.validationMessage || 'Enter password';
+          return passwordInput.validationMessage || 'Вкажіть пароль';
         }
         if (el === confirmInput && !confirmInput.value) {
-          return confirmInput.validationMessage || 'Confirm password';
+          return confirmInput.validationMessage || 'Підтвердіть пароль';
         }
         if (el === confirmInput && passwordInput && confirmInput.value !== passwordInput.value) {
-          return 'Passwords do not match';
+          return 'Паролі не співпадають';
         }
         if (el === agreeInput && !agreeInput.checked) {
-          return 'Please check consent';
+          return 'Поставте прапорець згоди';
         }
         return '';
       }
