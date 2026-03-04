@@ -7,6 +7,13 @@
   const isJournal = activePage === 'journal';
   const isTeacherHub = activePage === 'teacher-hub';
   const isTeacherWorkspace = activePage === 'teacher-workspace';
+  const isAdminPathways = activePage === 'admin-pathways';
+  const topbarCanManagePathways = (typeof canManagePathways !== 'undefined')
+    ? Boolean(canManagePathways)
+    : false;
+  const topbarPathwaysHref = (typeof pathwaysPanelHref !== 'undefined')
+    ? pathwaysPanelHref
+    : '/admin/pathways';
   const brandTitle = isSchedule ? 'Studerria' : (pageTitle || 'Studerria');
 %>
 <nav class="navbar navbar-expand-lg topbar topbar--title-spotlight">
@@ -81,7 +88,7 @@
         >
           ☰
         </button>
-      <% } else if (isSubjects || isJournal || isTeamwork || isProfile || isTeacherHub || isTeacherWorkspace) { %>
+      <% } else if (isSubjects || isJournal || isTeamwork || isProfile || isTeacherHub || isTeacherWorkspace || isAdminPathways) { %>
         <span class="me-2 muted desktop-only text-nowrap">
           <% if (role === 'admin') { %>
             <%= t('role.admin') %>: <%= username %>
@@ -142,6 +149,9 @@
           <% } %>
           <% if (role === 'deanery') { %>
             <a class="btn btn-glass me-1 desktop-only" href="/deanery"><%= t('menu.deanery') %></a>
+          <% } %>
+          <% if (topbarCanManagePathways && !isAdminPathways) { %>
+            <a class="btn btn-glass me-1 desktop-only" href="<%= topbarPathwaysHref || '/admin/pathways' %>">Pathways</a>
           <% } %>
         <% } %>
         <button

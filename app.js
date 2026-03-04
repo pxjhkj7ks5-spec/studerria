@@ -393,6 +393,11 @@ const REGISTRATION_TRACK_OPTIONS = [
   { key: 'teacher', label: 'Teacher' },
 ];
 const REGISTRATION_TRACK_KEYS = new Set(REGISTRATION_TRACK_OPTIONS.map((item) => item.key));
+const PATHWAY_TRACK_FILTER_OPTIONS = [
+  { key: 'all', label: 'All tracks' },
+  ...REGISTRATION_TRACK_OPTIONS,
+];
+const PATHWAY_TRACK_FILTER_KEYS = new Set(PATHWAY_TRACK_FILTER_OPTIONS.map((item) => item.key));
 
 const SETTINGS_RETENTION_MIN_DAYS = 14;
 const SETTINGS_RETENTION_MAX_DAYS = 3650;
@@ -1625,6 +1630,13 @@ function requireUsersOrStudentsSectionAccess(req, res, next) {
   return res.status(403).send('Forbidden (update page)');
 }
 
+function requirePathwaysSectionAccess(req, res, next) {
+  if (hasAdminSectionAccess(req, 'admin-subjects') || hasAdminSectionAccess(req, 'admin-courses')) {
+    return next();
+  }
+  return res.status(403).send('Forbidden (update page)');
+}
+
 function isStudentLikeLegacyRole(rawRole) {
   const normalized = normalizeRoleKey(rawRole);
   return normalized === 'student' || normalized === 'starosta';
@@ -1656,8 +1668,11 @@ app.use(async (req, res, next) => {
   if (!req.session || !req.session.user) {
     req.allowedAdminSections = [];
     req.canAccessAdminPanel = false;
+    req.canManagePathways = false;
     res.locals.hasCustomAdminPanelAccess = false;
     res.locals.customAdminPanelHref = '/admin';
+    res.locals.canManagePathways = false;
+    res.locals.pathwaysPanelHref = '/admin/pathways';
     return next();
   }
   const roleKeys = getSessionRoleList(req);
@@ -1674,11 +1689,17 @@ app.use(async (req, res, next) => {
     }
   }
   const canAccessAdminPanel = isAdmin || (Array.isArray(allowedSections) && allowedSections.length > 0);
+  const canManagePathways = isAdmin
+    || (Array.isArray(allowedSections)
+      && (allowedSections.includes('admin-subjects') || allowedSections.includes('admin-courses')));
   const hasLegacyStaffRole = roleKeys.some((key) => ['admin', 'deanery', 'starosta'].includes(key));
   req.allowedAdminSections = isAdmin ? null : allowedSections;
   req.canAccessAdminPanel = canAccessAdminPanel;
+  req.canManagePathways = canManagePathways;
   res.locals.hasCustomAdminPanelAccess = canAccessAdminPanel && !hasLegacyStaffRole;
   res.locals.customAdminPanelHref = '/admin';
+  res.locals.canManagePathways = canManagePathways;
+  res.locals.pathwaysPanelHref = '/admin/pathways';
   return next();
 });
 
@@ -1950,6 +1971,11 @@ function invalidateCoursesCache() {
   cacheDelete(referenceCache.registrationPathways, 'pathways');
 }
 
+function invalidateRegistrationPathwaysCache() {
+  cacheDelete(referenceCache.registrationPathways, 'pathways');
+  referenceCache.registrationSubjects.clear();
+}
+
 function invalidateSubjectsCache(courseId) {
   if (!courseId) {
     referenceCache.subjects.clear();
@@ -2196,6 +2222,60 @@ async function getRegistrationPathways() {
     links,
     courses,
   });
+}
+
+async function cloneAdmissionConfigurationFromLatest(programId, targetAdmissionId) {
+  const normalizedProgramId = parsePositiveIntStrict(programId);
+  const normalizedTargetAdmissionId = parsePositiveIntStrict(targetAdmissionId);
+  if (!normalizedProgramId || !normalizedTargetAdmissionId) {
+    return;
+  }
+
+  const sourceAdmission = await db.get(
+    `
+      SELECT id
+      FROM program_admissions
+      WHERE program_id = ?
+        AND id <> ?
+      ORDER BY admission_year DESC, id DESC
+      LIMIT 1
+    `,
+    [normalizedProgramId, normalizedTargetAdmissionId]
+  );
+  const sourceAdmissionId = parsePositiveIntStrict(sourceAdmission && sourceAdmission.id);
+  if (!sourceAdmissionId) {
+    return;
+  }
+
+  await db.run(
+    `
+      INSERT INTO program_admission_courses
+        (admission_id, course_id, is_visible, created_at, updated_at)
+      SELECT ?, pac.course_id, pac.is_visible, NOW(), NOW()
+      FROM program_admission_courses pac
+      WHERE pac.admission_id = ?
+      ON CONFLICT (admission_id, course_id)
+      DO UPDATE SET
+        is_visible = EXCLUDED.is_visible,
+        updated_at = NOW()
+    `,
+    [normalizedTargetAdmissionId, sourceAdmissionId]
+  );
+
+  await db.run(
+    `
+      INSERT INTO subject_visibility_by_admission
+        (admission_id, subject_id, is_visible, created_at, updated_at)
+      SELECT ?, sva.subject_id, sva.is_visible, NOW(), NOW()
+      FROM subject_visibility_by_admission sva
+      WHERE sva.admission_id = ?
+      ON CONFLICT (admission_id, subject_id)
+      DO UPDATE SET
+        is_visible = EXCLUDED.is_visible,
+        updated_at = NOW()
+    `,
+    [normalizedTargetAdmissionId, sourceAdmissionId]
+  );
 }
 
 async function getRegistrationSubjects(courseId, admissionId) {
@@ -5041,6 +5121,54 @@ function getStaffPanelBase(req, courseId) {
   return `/admin?course=${courseId}`;
 }
 
+function parsePositiveIntStrict(rawValue, fallback = null) {
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function parseBooleanFlag(rawValue, fallback = false) {
+  if (rawValue === null || typeof rawValue === 'undefined') {
+    return Boolean(fallback);
+  }
+  const normalized = String(rawValue).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return Boolean(fallback);
+}
+
+function sanitizeCompactText(rawValue, maxLength = 160) {
+  const compact = String(rawValue || '').replace(/\s+/g, ' ').trim();
+  if (!compact) return '';
+  return compact.slice(0, Math.max(1, Number(maxLength) || 160));
+}
+
+function normalizePathwayTrackFilter(rawFilter, fallback = 'all') {
+  const normalized = String(rawFilter || '').trim().toLowerCase();
+  if (PATHWAY_TRACK_FILTER_KEYS.has(normalized)) {
+    return normalized;
+  }
+  return PATHWAY_TRACK_FILTER_KEYS.has(fallback) ? fallback : 'all';
+}
+
+function buildAdminPathwaysUrl(params = {}) {
+  const query = new URLSearchParams();
+  const courseId = parsePositiveIntStrict(params.courseId);
+  if (courseId) query.set('course', String(courseId));
+  const track = normalizePathwayTrackFilter(params.track || 'all');
+  if (track && track !== 'all') query.set('track', track);
+  const programId = parsePositiveIntStrict(params.programId);
+  if (programId) query.set('program_id', String(programId));
+  const admissionId = parsePositiveIntStrict(params.admissionId);
+  if (admissionId) query.set('admission_id', String(admissionId));
+  if (params.error) query.set('error', String(params.error));
+  if (params.ok) query.set('ok', String(params.ok));
+  const queryString = query.toString();
+  return `/admin/pathways${queryString ? `?${queryString}` : ''}`;
+}
+
 function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[key]) {
   if (
     key === 'allow_homework_creation'
@@ -5534,20 +5662,68 @@ async function isCourseDayActive(courseId, dayName) {
 }
 
 async function getTeacherSubjectCatalog() {
-  return db.all(
-    `
-      SELECT s.id, s.name, s.group_count, s.is_general, s.course_id, c.name AS course_name
-      FROM subjects s
-      JOIN courses c ON c.id = s.course_id
-      WHERE s.visible = 1
-        AND EXISTS (
-          SELECT 1
-          FROM semesters sem
-          WHERE sem.course_id = s.course_id AND sem.is_active = 1
-        )
-      ORDER BY c.id, s.name
-    `
-  );
+  try {
+    return await db.all(
+      `
+        SELECT
+          s.id,
+          s.name,
+          s.group_count,
+          s.is_general,
+          s.course_id,
+          c.name AS course_name,
+          COALESCE(pathways.pathway_labels, '') AS pathway_labels
+        FROM subjects s
+        JOIN courses c ON c.id = s.course_id
+        LEFT JOIN LATERAL (
+          SELECT STRING_AGG(
+            DISTINCT (
+              CASE
+                WHEN COALESCE(p.code, '') <> '' THEN p.code || ' '
+                ELSE ''
+              END
+              || p.name
+              || ' '
+              || a.admission_year::text
+            ),
+            ', '
+          ) AS pathway_labels
+          FROM program_admission_courses pac
+          JOIN program_admissions a ON a.id = pac.admission_id
+          JOIN study_programs p ON p.id = a.program_id
+          WHERE pac.course_id = s.course_id
+            AND pac.is_visible = true
+            AND a.is_active = true
+            AND p.is_active = true
+        ) pathways ON true
+        WHERE s.visible = 1
+          AND EXISTS (
+            SELECT 1
+            FROM semesters sem
+            WHERE sem.course_id = s.course_id AND sem.is_active = 1
+          )
+        ORDER BY c.id, s.name
+      `
+    );
+  } catch (err) {
+    if (!(err && (err.code === '42P01' || err.code === '42703'))) {
+      throw err;
+    }
+    return db.all(
+      `
+        SELECT s.id, s.name, s.group_count, s.is_general, s.course_id, c.name AS course_name
+        FROM subjects s
+        JOIN courses c ON c.id = s.course_id
+        WHERE s.visible = 1
+          AND EXISTS (
+            SELECT 1
+            FROM semesters sem
+            WHERE sem.course_id = s.course_id AND sem.is_active = 1
+          )
+        ORDER BY c.id, s.name
+      `
+    );
+  }
 }
 
 async function getTeacherSelections(userId) {
@@ -21512,6 +21688,578 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
           });
         }
       );
+});
+
+app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.init');
+  }
+  try {
+    const courses = await getCoursesCached();
+    if (!Array.isArray(courses) || !courses.length) {
+      return res.redirect('/admin?err=No%20courses%20configured');
+    }
+
+    const rememberedCourseId = getAdminCourse(req);
+    let selectedCourseId = parsePositiveIntStrict(req.query.course, rememberedCourseId);
+    if (!(courses || []).some((course) => Number(course.id) === Number(selectedCourseId))) {
+      selectedCourseId = Number(courses[0].id);
+    }
+    req.session.adminCourse = selectedCourseId;
+
+    const trackFilter = normalizePathwayTrackFilter(req.query.track, 'all');
+
+    const programRows = await db.all(
+      `
+        SELECT
+          p.id,
+          p.track_key,
+          p.code,
+          p.name,
+          p.sort_order,
+          p.is_active,
+          COUNT(a.id)::int AS admissions_count
+        FROM study_programs p
+        LEFT JOIN program_admissions a ON a.program_id = p.id
+        GROUP BY p.id
+        ORDER BY
+          CASE p.track_key
+            WHEN 'bachelor' THEN 0
+            WHEN 'master' THEN 1
+            WHEN 'teacher' THEN 2
+            ELSE 3
+          END,
+          COALESCE(p.sort_order, 100),
+          p.name
+      `
+    );
+    const programs = (programRows || []).map((row) => ({
+      id: Number(row.id || 0),
+      track_key: normalizeRegistrationTrack(row.track_key, 'bachelor'),
+      code: sanitizeCompactText(row.code || '', 40),
+      name: sanitizeCompactText(row.name || '', 140),
+      sort_order: Number.isFinite(Number(row.sort_order)) ? Number(row.sort_order) : 100,
+      is_active: row.is_active === true || Number(row.is_active) === 1,
+      admissions_count: Number(row.admissions_count || 0),
+    }));
+    const filteredPrograms = programs.filter((program) =>
+      trackFilter === 'all' ? true : program.track_key === trackFilter
+    );
+
+    let selectedProgramId = parsePositiveIntStrict(req.query.program_id);
+    if (!filteredPrograms.some((item) => Number(item.id) === Number(selectedProgramId))) {
+      selectedProgramId = parsePositiveIntStrict(
+        (filteredPrograms[0] && filteredPrograms[0].id) || (programs[0] && programs[0].id)
+      );
+    }
+
+    const admissionRows = await db.all(
+      `
+        SELECT
+          a.id,
+          a.program_id,
+          a.admission_year,
+          a.label,
+          a.is_active,
+          p.track_key,
+          p.code AS program_code,
+          p.name AS program_name
+        FROM program_admissions a
+        JOIN study_programs p ON p.id = a.program_id
+        ORDER BY
+          CASE p.track_key
+            WHEN 'bachelor' THEN 0
+            WHEN 'master' THEN 1
+            WHEN 'teacher' THEN 2
+            ELSE 3
+          END,
+          COALESCE(p.sort_order, 100),
+          p.name,
+          a.admission_year DESC,
+          a.id DESC
+      `
+    );
+    const admissions = (admissionRows || []).map((row) => ({
+      id: Number(row.id || 0),
+      program_id: Number(row.program_id || 0),
+      admission_year: Number(row.admission_year || 0),
+      label: sanitizeCompactText(row.label || '', 120),
+      is_active: row.is_active === true || Number(row.is_active) === 1,
+      track_key: normalizeRegistrationTrack(row.track_key, 'bachelor'),
+      program_code: sanitizeCompactText(row.program_code || '', 40),
+      program_name: sanitizeCompactText(row.program_name || '', 140),
+    }));
+    const selectedProgramAdmissions = admissions.filter(
+      (admission) => Number(admission.program_id) === Number(selectedProgramId)
+    );
+
+    let selectedAdmissionId = parsePositiveIntStrict(req.query.admission_id);
+    if (!selectedProgramAdmissions.some((item) => Number(item.id) === Number(selectedAdmissionId))) {
+      selectedAdmissionId = parsePositiveIntStrict(selectedProgramAdmissions[0] && selectedProgramAdmissions[0].id);
+    }
+
+    let courseMappings = (courses || []).map((course) => ({
+      course_id: Number(course.id || 0),
+      course_name: sanitizeCompactText(course.name || '', 120),
+      is_teacher_course: course.is_teacher_course === true || Number(course.is_teacher_course) === 1,
+      is_visible: false,
+    }));
+    if (selectedAdmissionId) {
+      const mappingRows = await db.all(
+        `
+          SELECT
+            c.id AS course_id,
+            c.name AS course_name,
+            c.is_teacher_course,
+            COALESCE(pac.is_visible, false) AS is_visible
+          FROM courses c
+          LEFT JOIN program_admission_courses pac
+            ON pac.course_id = c.id
+           AND pac.admission_id = ?
+          ORDER BY c.id
+        `,
+        [selectedAdmissionId]
+      );
+      courseMappings = (mappingRows || []).map((row) => ({
+        course_id: Number(row.course_id || 0),
+        course_name: sanitizeCompactText(row.course_name || '', 120),
+        is_teacher_course: row.is_teacher_course === true || Number(row.is_teacher_course) === 1,
+        is_visible: row.is_visible === true || Number(row.is_visible) === 1,
+      }));
+    }
+
+    const allCourseSubjects = await getSubjectsCached(selectedCourseId, { visibleOnly: false });
+    let visibilityRows = [];
+    if (selectedAdmissionId) {
+      visibilityRows = await db.all(
+        `
+          SELECT sva.subject_id, sva.is_visible
+          FROM subject_visibility_by_admission sva
+          JOIN subjects s ON s.id = sva.subject_id
+          WHERE sva.admission_id = ?
+            AND s.course_id = ?
+        `,
+        [selectedAdmissionId, selectedCourseId]
+      );
+    }
+    const visibilityBySubject = new Map();
+    (visibilityRows || []).forEach((row) => {
+      const subjectId = Number(row.subject_id || 0);
+      if (!subjectId) return;
+      visibilityBySubject.set(subjectId, row.is_visible === true || Number(row.is_visible) === 1);
+    });
+
+    const subjectVisibilityItems = (allCourseSubjects || []).map((subject) => {
+      const subjectId = Number(subject.id || 0);
+      const baseVisible = subject.visible === true || Number(subject.visible) === 1;
+      const overrideVisible = visibilityBySubject.has(subjectId) ? visibilityBySubject.get(subjectId) : null;
+      const effectiveVisible = baseVisible && (overrideVisible === null ? true : overrideVisible);
+      return {
+        id: subjectId,
+        name: sanitizeCompactText(subject.name || '', 140),
+        group_count: Number(subject.group_count || 1),
+        base_visible: baseVisible,
+        override_visible: overrideVisible,
+        effective_visible: effectiveVisible,
+      };
+    });
+    const configurableSubjectVisibility = subjectVisibilityItems.filter((item) => item.base_visible);
+    const hiddenSubjectCount = subjectVisibilityItems.length - configurableSubjectVisibility.length;
+
+    const mappingSummary = {
+      total: courseMappings.length,
+      visible: courseMappings.filter((row) => row.is_visible).length,
+    };
+    const visibilitySummary = {
+      total: configurableSubjectVisibility.length,
+      visible: configurableSubjectVisibility.filter((row) => row.effective_visible).length,
+    };
+    visibilitySummary.hidden = Math.max(0, visibilitySummary.total - visibilitySummary.visible);
+
+    const pageRole = hasSessionRole(req, 'admin')
+      ? 'admin'
+      : (hasSessionRole(req, 'deanery')
+        ? 'deanery'
+        : normalizeRoleKey(req.session.role || 'student'));
+
+    return res.render('admin-pathways', {
+      role: pageRole,
+      username: req.session.user.username,
+      settings: settingsCache,
+      error: String(req.query.error || ''),
+      success: String(req.query.ok || ''),
+      courses,
+      selectedCourseId,
+      trackFilter,
+      trackFilterOptions: PATHWAY_TRACK_FILTER_OPTIONS,
+      programs,
+      filteredPrograms,
+      selectedProgramId,
+      admissions,
+      selectedProgramAdmissions,
+      selectedAdmissionId,
+      courseMappings,
+      mappingSummary,
+      subjectVisibilityItems: configurableSubjectVisibility,
+      hiddenSubjectCount,
+      visibilitySummary,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.render');
+  }
+});
+
+app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return res.redirect(
+      buildAdminPathwaysUrl({
+        courseId: parsePositiveIntStrict(req.body.course_id, getAdminCourse(req)),
+        track: normalizePathwayTrackFilter(req.body.track, 'all'),
+        error: 'Database error',
+      })
+    );
+  }
+
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const trackKey = normalizeRegistrationTrack(req.body.track_key, 'bachelor');
+  const name = sanitizeCompactText(req.body.name, 140);
+  const code = sanitizeCompactText(req.body.code, 40);
+  const sortOrderRaw = Number(req.body.sort_order);
+  const sortOrder = Number.isFinite(sortOrderRaw) ? Math.max(1, Math.min(9999, Math.round(sortOrderRaw))) : 100;
+
+  if (!name) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      error: 'Program name is required',
+    }));
+  }
+
+  try {
+    const inserted = await db.get(
+      `
+        INSERT INTO study_programs
+          (track_key, code, name, sort_order, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, true, NOW(), NOW())
+        RETURNING id
+      `,
+      [trackKey, code || null, name, sortOrder]
+    );
+    invalidateRegistrationPathwaysCache();
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId: inserted && inserted.id,
+      ok: 'Program added',
+    }));
+  } catch (err) {
+    if (err && err.code === '23505') {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        error: 'Program already exists for this track',
+      }));
+    }
+    return handleDbError(res, err, 'admin.pathways.program.add');
+  }
+});
+
+app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const programId = parsePositiveIntStrict(req.params.id);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  if (!programId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      error: 'Invalid program',
+    }));
+  }
+
+  const trackKey = normalizeRegistrationTrack(req.body.track_key, 'bachelor');
+  const name = sanitizeCompactText(req.body.name, 140);
+  const code = sanitizeCompactText(req.body.code, 40);
+  const sortOrderRaw = Number(req.body.sort_order);
+  const sortOrder = Number.isFinite(sortOrderRaw) ? Math.max(1, Math.min(9999, Math.round(sortOrderRaw))) : 100;
+  const isActive = parseBooleanFlag(req.body.is_active, false);
+
+  if (!name) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      error: 'Program name is required',
+    }));
+  }
+
+  try {
+    await db.run(
+      `
+        UPDATE study_programs
+        SET track_key = ?, code = ?, name = ?, sort_order = ?, is_active = ?, updated_at = NOW()
+        WHERE id = ?
+      `,
+      [trackKey, code || null, name, sortOrder, isActive, programId]
+    );
+    invalidateRegistrationPathwaysCache();
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      ok: 'Program updated',
+    }));
+  } catch (err) {
+    if (err && err.code === '23505') {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        error: 'Program already exists for this track',
+      }));
+    }
+    return handleDbError(res, err, 'admin.pathways.program.update');
+  }
+});
+
+app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+  const yearRaw = Number(req.body.admission_year);
+  const admissionYear = Number.isFinite(yearRaw) ? Math.max(2000, Math.min(2100, Math.round(yearRaw))) : null;
+  const label = sanitizeCompactText(req.body.label, 120);
+
+  if (!programId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      error: 'Select program',
+    }));
+  }
+  if (!admissionYear) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      error: 'Admission year is required',
+    }));
+  }
+
+  try {
+    const inserted = await db.get(
+      `
+        INSERT INTO program_admissions
+          (program_id, admission_year, label, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, true, NOW(), NOW())
+        RETURNING id
+      `,
+      [programId, admissionYear, label || null]
+    );
+    const admissionId = parsePositiveIntStrict(inserted && inserted.id);
+    if (admissionId) {
+      await cloneAdmissionConfigurationFromLatest(programId, admissionId);
+    }
+    invalidateRegistrationPathwaysCache();
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      ok: 'Admission year added',
+    }));
+  } catch (err) {
+    if (err && err.code === '23505') {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        error: 'Admission year already exists for this program',
+      }));
+    }
+    return handleDbError(res, err, 'admin.pathways.admission.add');
+  }
+});
+
+app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const admissionId = parsePositiveIntStrict(req.params.id);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+  const yearRaw = Number(req.body.admission_year);
+  const admissionYear = Number.isFinite(yearRaw) ? Math.max(2000, Math.min(2100, Math.round(yearRaw))) : null;
+  const label = sanitizeCompactText(req.body.label, 120);
+  const isActive = parseBooleanFlag(req.body.is_active, false);
+
+  if (!admissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      error: 'Invalid admission year',
+    }));
+  }
+  if (!programId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: 'Program is required',
+    }));
+  }
+  if (!admissionYear) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: 'Admission year is required',
+    }));
+  }
+
+  try {
+    await db.run(
+      `
+        UPDATE program_admissions
+        SET program_id = ?, admission_year = ?, label = ?, is_active = ?, updated_at = NOW()
+        WHERE id = ?
+      `,
+      [programId, admissionYear, label || null, isActive, admissionId]
+    );
+    invalidateRegistrationPathwaysCache();
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      ok: 'Admission year updated',
+    }));
+  } catch (err) {
+    if (err && err.code === '23505') {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        error: 'Admission year already exists for this program',
+      }));
+    }
+    return handleDbError(res, err, 'admin.pathways.admission.update');
+  }
+});
+
+app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const admissionId = parsePositiveIntStrict(req.params.id);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+
+  if (!admissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      error: 'Invalid admission year',
+    }));
+  }
+
+  try {
+    const courses = await getCoursesCached();
+    for (const course of courses || []) {
+      const mappedFlag = parseBooleanFlag(req.body[`course_${course.id}`], false);
+      await db.run(
+        `
+          INSERT INTO program_admission_courses
+            (admission_id, course_id, is_visible, created_at, updated_at)
+          VALUES (?, ?, ?, NOW(), NOW())
+          ON CONFLICT (admission_id, course_id)
+          DO UPDATE SET
+            is_visible = EXCLUDED.is_visible,
+            updated_at = NOW()
+        `,
+        [admissionId, course.id, mappedFlag]
+      );
+    }
+    invalidateRegistrationPathwaysCache();
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      ok: 'Course mapping saved',
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.courses.save');
+  }
+});
+
+app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const admissionId = parsePositiveIntStrict(req.params.id);
+  const selectedCourseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+
+  if (!admissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId: selectedCourseId,
+      track: trackFilter,
+      programId,
+      error: 'Invalid admission year',
+    }));
+  }
+  if (!selectedCourseId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: 'Invalid course',
+    }));
+  }
+
+  try {
+    const subjects = await getSubjectsCached(selectedCourseId, { visibleOnly: false });
+    for (const subject of subjects || []) {
+      const subjectId = parsePositiveIntStrict(subject.id);
+      if (!subjectId) continue;
+      const baseVisible = subject.visible === true || Number(subject.visible) === 1;
+      if (!baseVisible) {
+        await db.run(
+          'DELETE FROM subject_visibility_by_admission WHERE admission_id = ? AND subject_id = ?',
+          [admissionId, subjectId]
+        );
+        continue;
+      }
+      const visibilityFlag = parseBooleanFlag(req.body[`subject_${subjectId}`], false);
+      await db.run(
+        `
+          INSERT INTO subject_visibility_by_admission
+            (admission_id, subject_id, is_visible, created_at, updated_at)
+          VALUES (?, ?, ?, NOW(), NOW())
+          ON CONFLICT (admission_id, subject_id)
+          DO UPDATE SET
+            is_visible = EXCLUDED.is_visible,
+            updated_at = NOW()
+        `,
+        [admissionId, subjectId, visibilityFlag]
+      );
+    }
+    invalidateRegistrationPathwaysCache();
+    invalidateSubjectsCache(selectedCourseId);
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId: selectedCourseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      ok: 'Subject visibility saved',
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.subjects.save');
+  }
 });
 
 app.post('/admin/activity/reset-points', requireActivitySectionAccess, writeLimiter, async (req, res) => {

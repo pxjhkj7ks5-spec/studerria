@@ -229,15 +229,16 @@
             <% const selectedGroup = selections && selections.get ? selections.get(s.id) : null; %>
             <% const isSelected = selections && selections.get ? selections.has(s.id) : false; %>
             <% const generalFlag = s.is_general === true || Number(s.is_general) === 1; %>
+            <% const pathwayMeta = s.pathway_labels ? ` • ${s.pathway_labels}` : ''; %>
             <div
               class="glass subject-card"
               data-subject-item="1"
-              data-search="<%= `${s.name || ''} ${s.course_name || ''}`.toLowerCase() %>"
+              data-search="<%= `${s.name || ''} ${s.course_name || ''} ${s.pathway_labels || ''}`.toLowerCase() %>"
             >
               <div class="subject-row">
                 <div class="subject-info">
                   <div class="subject-name"><%= s.name %></div>
-                  <div class="subject-course"><%= s.course_name %></div>
+                  <div class="subject-course"><%= `${s.course_name || ''}${pathwayMeta}` %></div>
                 </div>
                 <div class="form-check subject-toggle">
                   <input

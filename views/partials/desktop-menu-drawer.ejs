@@ -1,6 +1,7 @@
 <%
   const drawerIsSchedule = activePage === 'schedule';
   const drawerIsMyDay = activePage === 'my-day';
+  const drawerIsAdminPathways = activePage === 'admin-pathways';
   const drawerFirstHref = drawerIsMyDay ? '/schedule' : '/home';
   const drawerFirstLabel = drawerIsMyDay ? '📅 Розклад' : '🏠 Головна';
   const drawerViewAs = (typeof viewAs !== 'undefined') ? viewAs : null;
@@ -11,6 +12,12 @@
   const drawerCustomAdminPanelHref = (typeof customAdminPanelHref !== 'undefined')
     ? customAdminPanelHref
     : '/admin';
+  const drawerCanManagePathways = (typeof canManagePathways !== 'undefined')
+    ? Boolean(canManagePathways)
+    : false;
+  const drawerPathwaysHref = (typeof pathwaysPanelHref !== 'undefined')
+    ? pathwaysPanelHref
+    : '/admin/pathways';
   const canShowCustomDeadlines = (role === 'student' || role === 'starosta' || role === 'teacher' || drawerViewAs === 'student')
     && drawerSettings
     && drawerSettings.allow_custom_deadlines;
@@ -34,6 +41,10 @@
     <% } %>
     <% if (role === 'deanery') { %>
       <a class="drawer-action" href="/deanery">🏛️ <%= t('menu.deanery') %></a>
+    <% } %>
+
+    <% if (drawerCanManagePathways && !drawerIsAdminPathways) { %>
+      <a class="drawer-action" href="<%= drawerPathwaysHref || '/admin/pathways' %>">🧭 Pathways</a>
     <% } %>
 
     <a class="drawer-action" href="<%= drawerFirstHref %>"><%= drawerFirstLabel %></a>
@@ -80,3 +91,4 @@
     </form>
   </div>
 </aside>
+

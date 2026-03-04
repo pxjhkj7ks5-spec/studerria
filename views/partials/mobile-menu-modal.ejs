@@ -6,6 +6,7 @@
   const isJournal = activePage === 'journal';
   const isTeacherHub = activePage === 'teacher-hub';
   const isTeacherWorkspace = activePage === 'teacher-workspace';
+  const isAdminPathways = activePage === 'admin-pathways';
   const mobileSettings = (typeof settings !== 'undefined') ? settings : null;
   const mobileHasCustomAdminPanelAccess = (typeof hasCustomAdminPanelAccess !== 'undefined')
     ? Boolean(hasCustomAdminPanelAccess)
@@ -13,6 +14,12 @@
   const mobileCustomAdminPanelHref = (typeof customAdminPanelHref !== 'undefined')
     ? customAdminPanelHref
     : '/admin';
+  const mobileCanManagePathways = (typeof canManagePathways !== 'undefined')
+    ? Boolean(canManagePathways)
+    : false;
+  const mobilePathwaysHref = (typeof pathwaysPanelHref !== 'undefined')
+    ? pathwaysPanelHref
+    : '/admin/pathways';
 %>
 <div class="modal fade" id="mobileMenuModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -35,6 +42,9 @@
           <% } %>
           <% if (role === 'deanery') { %>
             <a class="btn w-100 glass mobile-menu-action" href="/deanery">🏛️ <%= t('menu.deanery') %></a>
+          <% } %>
+          <% if (mobileCanManagePathways && !isAdminPathways) { %>
+            <a class="btn w-100 glass mobile-menu-action" href="<%= mobilePathwaysHref || '/admin/pathways' %>">Pathways</a>
           <% } %>
           <% if (!isMyDay) { %>
             <a class="btn w-100 glass mobile-menu-action" href="/home">🏠 Головна</a>
@@ -97,3 +107,4 @@
     </div>
   </div>
 </div>
+

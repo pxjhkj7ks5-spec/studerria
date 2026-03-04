@@ -1,0 +1,553 @@
+<%
+  const selectedCourseValue = Number(selectedCourseId || 0);
+  const activeTrack = trackFilter || 'all';
+  const selectedProgramValue = Number(selectedProgramId || 0);
+  const selectedAdmissionValue = Number(selectedAdmissionId || 0);
+  const selectedProgram = (programs || []).find((item) => Number(item.id) === selectedProgramValue) || null;
+  const selectedAdmission = (admissions || []).find((item) => Number(item.id) === selectedAdmissionValue) || null;
+
+  const buildPathwaysUrl = (overrides) => {
+    const params = new URLSearchParams();
+    const next = Object.assign({}, {
+      course: selectedCourseValue,
+      track: activeTrack,
+      program_id: selectedProgramValue,
+      admission_id: selectedAdmissionValue,
+    }, overrides || {});
+
+    Object.keys(next).forEach((key) => {
+      const value = next[key];
+      if (value === null || typeof value === 'undefined') return;
+      if (String(value) === '' || String(value) === '0') return;
+      if (key === 'track' && String(value) === 'all') return;
+      params.set(key, String(value));
+    });
+
+    const query = params.toString();
+    return `/admin/pathways${query ? `?${query}` : ''}`;
+  };
+%>
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin pathways</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/css/design-system.css" />
+    <style>
+      :root {
+        --pathways-border-dark: rgba(255, 255, 255, 0.14);
+        --pathways-border-light: rgba(15, 23, 42, 0.12);
+        --pathways-bg-dark: rgba(255, 255, 255, 0.06);
+        --pathways-bg-light: rgba(255, 255, 255, 0.74);
+      }
+      body {
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+      }
+      body.theme-dark {
+        background:
+          radial-gradient(1200px 760px at 12% 4%, rgba(56, 189, 248, 0.18), transparent 64%),
+          radial-gradient(1000px 720px at 84% 18%, rgba(129, 140, 248, 0.2), transparent 62%),
+          linear-gradient(148deg, #071122 0%, #101b31 50%, #14243d 100%);
+        color: #f8fafc;
+      }
+      body.theme-light {
+        background:
+          radial-gradient(1200px 760px at 14% 6%, rgba(186, 230, 253, 0.5), transparent 64%),
+          radial-gradient(1000px 720px at 84% 18%, rgba(221, 214, 254, 0.54), transparent 62%),
+          linear-gradient(128deg, #e9eff8 0%, #eff5ff 50%, #f7f9ff 100%);
+        color: #0f172a;
+      }
+      .shell {
+        padding-top: 24px;
+        padding-bottom: 48px;
+      }
+      .glass {
+        border-radius: 22px;
+        backdrop-filter: blur(18px);
+      }
+      body.theme-dark .glass {
+        border: 1px solid var(--pathways-border-dark);
+        background: var(--pathways-bg-dark);
+        box-shadow: 0 18px 46px rgba(2, 6, 23, 0.5);
+      }
+      body.theme-light .glass {
+        border: 1px solid var(--pathways-border-light);
+        background: var(--pathways-bg-light);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+      }
+      .hero {
+        padding: 24px;
+      }
+      .hero-title {
+        margin: 0;
+        font-size: clamp(1.75rem, 2.8vw, 2.45rem);
+        font-weight: 700;
+      }
+      .hero-subtitle {
+        margin-top: 10px;
+        max-width: 860px;
+        color: rgba(226, 232, 240, 0.82);
+      }
+      body.theme-light .hero-subtitle {
+        color: rgba(15, 23, 42, 0.64);
+      }
+      .chip-row {
+        margin-top: 14px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .chip {
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.34);
+        background: rgba(15, 23, 42, 0.32);
+        padding: 5px 12px;
+        font-size: 0.82rem;
+      }
+      body.theme-light .chip {
+        border-color: rgba(15, 23, 42, 0.14);
+        background: rgba(255, 255, 255, 0.9);
+      }
+      .section {
+        padding: 20px;
+      }
+      .section-title {
+        margin: 0;
+        font-size: 1.08rem;
+        font-weight: 650;
+      }
+      .section-subtitle {
+        margin: 8px 0 0;
+        font-size: 0.84rem;
+        color: rgba(203, 213, 225, 0.76);
+      }
+      body.theme-light .section-subtitle {
+        color: rgba(15, 23, 42, 0.62);
+      }
+      .soft-panel {
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        background: rgba(15, 23, 42, 0.26);
+        padding: 14px;
+      }
+      body.theme-light .soft-panel {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.88);
+      }
+      .compact-input,
+      .compact-select {
+        min-height: 40px;
+        border-radius: 11px;
+        border: 1px solid rgba(148, 163, 184, 0.34);
+      }
+      body.theme-dark .compact-input,
+      body.theme-dark .compact-select {
+        background: rgba(255, 255, 255, 0.06);
+        color: #f8fafc;
+        border-color: rgba(148, 163, 184, 0.28);
+      }
+      body.theme-light .compact-input,
+      body.theme-light .compact-select {
+        background: rgba(255, 255, 255, 0.92);
+      }
+      .program-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+        gap: 12px;
+      }
+      .form-check-input {
+        width: 1.05rem;
+        height: 1.05rem;
+      }
+      .subject-list {
+        max-height: 440px;
+        overflow: auto;
+        padding-right: 4px;
+      }
+      .subject-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        background: rgba(15, 23, 42, 0.28);
+      }
+      body.theme-light .subject-row {
+        background: rgba(255, 255, 255, 0.92);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .admission-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        padding: 10px 12px;
+        background: rgba(15, 23, 42, 0.28);
+      }
+      body.theme-light .admission-row {
+        background: rgba(255, 255, 255, 0.9);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .row-label {
+        font-weight: 600;
+      }
+      .muted {
+        font-size: 0.82rem;
+        color: rgba(203, 213, 225, 0.74);
+      }
+      body.theme-light .muted {
+        color: rgba(15, 23, 42, 0.6);
+      }
+      .btn-pill {
+        border-radius: 999px;
+      }
+      .btn-soft {
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        background: rgba(255, 255, 255, 0.1);
+        color: inherit;
+      }
+      body.theme-light .btn-soft {
+        background: rgba(255, 255, 255, 0.9);
+      }
+      .btn-soft:hover {
+        border-color: rgba(125, 211, 252, 0.52);
+      }
+    </style>
+  </head>
+  <body class="theme-dark">
+    <%- include('partials/topbar', {
+      role,
+      username,
+      t,
+      activePage: 'admin-pathways',
+      pageTitle: 'Admin pathways',
+      settings: settings,
+      canManagePathways: true,
+      pathwaysPanelHref: '/admin/pathways',
+    }) %>
+    <%- include('partials/desktop-menu-drawer', {
+      role,
+      t,
+      activePage: 'admin-pathways',
+      settings: settings,
+      canManagePathways: true,
+      pathwaysPanelHref: '/admin/pathways',
+    }) %>
+
+    <main class="container shell">
+      <% if (error) { %>
+        <div class="alert alert-danger glass mb-3"><%= error %></div>
+      <% } %>
+      <% if (success) { %>
+        <div class="alert alert-success glass mb-3"><%= success %></div>
+      <% } %>
+
+      <section class="glass hero mb-3">
+        <h1 class="hero-title">Academic pathways workspace</h1>
+        <p class="hero-subtitle">
+          Керуйте треками, програмами, роками вступу та видимістю предметів для кожної когорти. Нові admission роки автоматично успадковують конфігурацію з останнього року в межах програми.
+        </p>
+        <div class="chip-row">
+          <span class="chip">Programs: <%= (programs || []).length %></span>
+          <span class="chip">Admissions: <%= (admissions || []).length %></span>
+          <span class="chip">Mapped courses: <%= Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) %> / <%= Number(mappingSummary && mappingSummary.total ? mappingSummary.total : 0) %></span>
+          <span class="chip">Visible subjects: <%= Number(visibilitySummary && visibilitySummary.visible ? visibilitySummary.visible : 0) %> / <%= Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) %></span>
+        </div>
+      </section>
+
+      <section class="glass section mb-3">
+        <h2 class="section-title">Scope</h2>
+        <p class="section-subtitle">Виберіть курс і трек для фокусного редагування.</p>
+        <form method="GET" action="/admin/pathways" class="row g-2 mt-1">
+          <div class="col-12 col-md-6 col-xl-4">
+            <label class="form-label small" for="pathwayCourseSelect">Course</label>
+            <select id="pathwayCourseSelect" class="form-select compact-select" name="course">
+              <% (courses || []).forEach((course) => { %>
+                <option value="<%= course.id %>" <%= Number(course.id) === Number(selectedCourseValue) ? 'selected' : '' %>>
+                  <%= course.name %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12 col-md-6 col-xl-3">
+            <label class="form-label small" for="pathwayTrackSelect">Track filter</label>
+            <select id="pathwayTrackSelect" class="form-select compact-select" name="track">
+              <% (trackFilterOptions || []).forEach((item) => { %>
+                <option value="<%= item.key %>" <%= String(item.key) === String(activeTrack) ? 'selected' : '' %>>
+                  <%= item.label %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12 col-xl-2 align-self-end d-grid">
+            <button type="submit" class="btn btn-primary btn-pill">Apply scope</button>
+          </div>
+          <% if (selectedProgramValue > 0) { %>
+            <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+          <% } %>
+          <% if (selectedAdmissionValue > 0) { %>
+            <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+          <% } %>
+        </form>
+      </section>
+
+      <section class="glass section mb-3">
+        <h2 class="section-title">Programs</h2>
+        <p class="section-subtitle">Створіть нову програму або оновіть існуючі параметри треку.</p>
+
+        <form method="POST" action="/admin/pathways/programs/add" class="soft-panel row g-2 mb-3">
+          <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+          <input type="hidden" name="track" value="<%= activeTrack %>" />
+          <div class="col-12 col-md-3">
+            <label class="form-label small">Track</label>
+            <select name="track_key" class="form-select compact-select" required>
+              <% (trackFilterOptions || []).filter((item) => item.key !== 'all').forEach((item) => { %>
+                <option value="<%= item.key %>" <%= String(item.key) === String(activeTrack) ? 'selected' : '' %>><%= item.label %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label small">Code</label>
+            <input class="form-control compact-input" type="text" name="code" maxlength="40" placeholder="BSC-AI" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label small">Program name</label>
+            <input class="form-control compact-input" type="text" name="name" maxlength="140" required placeholder="Bachelor AI" />
+          </div>
+          <div class="col-8 col-md-1">
+            <label class="form-label small">Sort</label>
+            <input class="form-control compact-input" type="number" name="sort_order" min="1" max="9999" value="100" />
+          </div>
+          <div class="col-4 col-md-1 align-self-end d-grid">
+            <button class="btn btn-primary btn-pill" type="submit">Add</button>
+          </div>
+        </form>
+
+        <div class="program-grid">
+          <% (filteredPrograms || []).forEach((program) => { %>
+            <form method="POST" action="/admin/pathways/programs/<%= program.id %>/update" class="soft-panel">
+              <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+              <input type="hidden" name="track" value="<%= activeTrack %>" />
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="row-label">#<%= program.id %> <%= program.name %></span>
+                <a class="btn btn-soft btn-sm btn-pill" href="<%= buildPathwaysUrl({ program_id: program.id, admission_id: null }) %>">Open</a>
+              </div>
+              <div class="row g-2">
+                <div class="col-12 col-sm-4">
+                  <label class="form-label small">Track</label>
+                  <select class="form-select compact-select" name="track_key" required>
+                    <% (trackFilterOptions || []).filter((item) => item.key !== 'all').forEach((item) => { %>
+                      <option value="<%= item.key %>" <%= item.key === program.track_key ? 'selected' : '' %>><%= item.label %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-3">
+                  <label class="form-label small">Code</label>
+                  <input class="form-control compact-input" type="text" name="code" maxlength="40" value="<%= program.code || '' %>" />
+                </div>
+                <div class="col-12 col-sm-5">
+                  <label class="form-label small">Name</label>
+                  <input class="form-control compact-input" type="text" name="name" maxlength="140" required value="<%= program.name %>" />
+                </div>
+                <div class="col-7 col-sm-3">
+                  <label class="form-label small">Sort</label>
+                  <input class="form-control compact-input" type="number" name="sort_order" min="1" max="9999" value="<%= program.sort_order %>" />
+                </div>
+                <div class="col-5 col-sm-4 align-self-end">
+                  <div class="form-check mt-1">
+                    <input class="form-check-input" type="checkbox" id="program_active_<%= program.id %>" name="is_active" value="1" <%= program.is_active ? 'checked' : '' %> />
+                    <label class="form-check-label" for="program_active_<%= program.id %>">Active</label>
+                  </div>
+                </div>
+                <div class="col-12 col-sm-5 align-self-end d-grid">
+                  <button class="btn btn-primary btn-pill" type="submit">Save</button>
+                </div>
+              </div>
+              <div class="muted mt-2">Admissions in program: <%= Number(program.admissions_count || 0) %></div>
+            </form>
+          <% }) %>
+          <% if (!(filteredPrograms || []).length) { %>
+            <div class="soft-panel">
+              <div class="muted">No programs in this filter yet.</div>
+            </div>
+          <% } %>
+        </div>
+      </section>
+
+      <section class="glass section mb-3">
+        <h2 class="section-title">Admission years</h2>
+        <p class="section-subtitle">Налаштуйте когорти для обраної програми. При створенні нового року дані копіюються з попереднього.</p>
+
+        <form method="POST" action="/admin/pathways/admissions/add" class="soft-panel row g-2 mb-3">
+          <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+          <input type="hidden" name="track" value="<%= activeTrack %>" />
+          <div class="col-12 col-md-4">
+            <label class="form-label small">Program</label>
+            <select class="form-select compact-select" name="program_id" required>
+              <option value="">Select program</option>
+              <% (filteredPrograms || []).forEach((program) => { %>
+                <option value="<%= program.id %>" <%= Number(program.id) === Number(selectedProgramValue) ? 'selected' : '' %>>
+                  <%= program.name %> (<%= program.track_key %>)
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label small">Admission year</label>
+            <input class="form-control compact-input" type="number" name="admission_year" min="2000" max="2100" value="<%= new Date().getUTCFullYear() %>" required />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label small">Label</label>
+            <input class="form-control compact-input" type="text" name="label" maxlength="120" placeholder="Cohort 2026" />
+          </div>
+          <div class="col-12 col-md-1 align-self-end d-grid">
+            <button class="btn btn-primary btn-pill" type="submit">Add</button>
+          </div>
+        </form>
+
+        <div class="d-grid gap-2">
+          <% (selectedProgramAdmissions || []).forEach((admission) => { %>
+            <form class="admission-row" method="POST" action="/admin/pathways/admissions/<%= admission.id %>/update">
+              <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+              <input type="hidden" name="track" value="<%= activeTrack %>" />
+              <input type="hidden" name="program_id" value="<%= admission.program_id %>" />
+              <div class="row g-2 flex-grow-1">
+                <div class="col-12 col-md-3">
+                  <label class="form-label small">Year</label>
+                  <input class="form-control compact-input" type="number" name="admission_year" min="2000" max="2100" value="<%= admission.admission_year %>" required />
+                </div>
+                <div class="col-12 col-md-5">
+                  <label class="form-label small">Label</label>
+                  <input class="form-control compact-input" type="text" name="label" maxlength="120" value="<%= admission.label || '' %>" />
+                </div>
+                <div class="col-6 col-md-2 align-self-end">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="adm_active_<%= admission.id %>" name="is_active" value="1" <%= admission.is_active ? 'checked' : '' %> />
+                    <label class="form-check-label" for="adm_active_<%= admission.id %>">Active</label>
+                  </div>
+                </div>
+                <div class="col-6 col-md-2 align-self-end d-grid">
+                  <button class="btn btn-primary btn-pill" type="submit">Save</button>
+                </div>
+              </div>
+              <a class="btn btn-soft btn-sm btn-pill" href="<%= buildPathwaysUrl({ program_id: admission.program_id, admission_id: admission.id }) %>">Focus</a>
+            </form>
+          <% }) %>
+          <% if (!(selectedProgramAdmissions || []).length) { %>
+            <div class="soft-panel muted">
+              Select program to manage its admission years.
+            </div>
+          <% } %>
+        </div>
+      </section>
+
+      <section class="row g-3">
+        <div class="col-12 col-xl-5">
+          <article class="glass section h-100">
+            <h2 class="section-title">Course mapping</h2>
+            <p class="section-subtitle">Курси, для яких admission доступний на етапі реєстрації.</p>
+            <% if (selectedAdmissionValue > 0) { %>
+              <form method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/courses/save">
+                <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                <input type="hidden" name="track" value="<%= activeTrack %>" />
+                <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                <div class="d-grid gap-2 mb-3">
+                  <% (courseMappings || []).forEach((item) => { %>
+                    <label class="subject-row">
+                      <span>
+                        <span class="row-label"><%= item.course_name %></span>
+                        <span class="muted d-block"><%= item.is_teacher_course ? 'Teacher course' : 'Regular course' %></span>
+                      </span>
+                      <input class="form-check-input" type="checkbox" name="course_<%= item.course_id %>" value="1" <%= item.is_visible ? 'checked' : '' %> />
+                    </label>
+                  <% }) %>
+                </div>
+                <button class="btn btn-primary btn-pill" type="submit">Save mapping</button>
+              </form>
+            <% } else { %>
+              <div class="soft-panel muted">Select admission year first.</div>
+            <% } %>
+          </article>
+        </div>
+        <div class="col-12 col-xl-7">
+          <article class="glass section h-100">
+            <h2 class="section-title">Subject visibility</h2>
+            <p class="section-subtitle">Предмети, які бачать студенти під час реєстрації для вибраної когорти.</p>
+            <% if (selectedAdmissionValue > 0) { %>
+              <% if (hiddenSubjectCount > 0) { %>
+                <div class="muted mb-2">Globally hidden in course scope: <%= hiddenSubjectCount %></div>
+              <% } %>
+              <form method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/subjects/save">
+                <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                <input type="hidden" name="track" value="<%= activeTrack %>" />
+                <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                <div class="subject-list d-grid gap-2 mb-3">
+                  <% (subjectVisibilityItems || []).forEach((subject) => { %>
+                    <label class="subject-row">
+                      <span>
+                        <span class="row-label"><%= subject.name %></span>
+                        <span class="muted d-block">Groups: <%= Number(subject.group_count || 1) %></span>
+                      </span>
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="subject_<%= subject.id %>"
+                        value="1"
+                        <%= subject.effective_visible ? 'checked' : '' %>
+                      />
+                    </label>
+                  <% }) %>
+                  <% if (!(subjectVisibilityItems || []).length) { %>
+                    <div class="soft-panel muted">No visible subjects in selected course.</div>
+                  <% } %>
+                </div>
+                <button class="btn btn-primary btn-pill" type="submit">Save visibility</button>
+              </form>
+            <% } else { %>
+              <div class="soft-panel muted">Select admission year first.</div>
+            <% } %>
+          </article>
+        </div>
+      </section>
+
+      <%- include('partials/app-footer') %>
+    </main>
+
+    <%- include('partials/changelog-modal') %>
+    <%- include('partials/mobile-menu-modal', {
+      role,
+      t,
+      activePage: 'admin-pathways',
+      settings: settings,
+      canManagePathways: true,
+      pathwaysPanelHref: '/admin/pathways',
+    }) %>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <%- include('partials/desktop-menu-drawer-script') %>
+    <script src="/js/design-system.js" defer></script>
+    <script>
+      (function applyTheme() {
+        const storedTheme = localStorage.getItem('ui-theme') || 'theme-dark';
+        document.body.classList.remove('theme-dark', 'theme-light');
+        document.body.classList.add(storedTheme);
+      })();
+    </script>
+  </body>
+</html>
