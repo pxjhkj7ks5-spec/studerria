@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.63",
+      "date": "2026-03-05",
+      "items": [
+        "feat(schedule-template-capture): added \"Save as template\" controls to teacher homework modal and custom-deadline modal",
+        "feat(teacher-homework-templates): teacher homework creation routes now support optional auto-save into `teacher_homework_templates` with normalized title/url/scope",
+        "ux(template-title): template title field is revealed only when capture is enabled and auto-prefills from description or selected template"
+      ]
+    },
+    {
       "version": "1.0.62",
       "date": "2026-03-05",
       "items": [

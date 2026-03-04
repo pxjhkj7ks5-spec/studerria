@@ -5715,6 +5715,96 @@ async function resolveTeacherTemplateScope(userId, requestedCourseIdRaw, request
   };
 }
 
+function normalizeHomeworkTemplateTitleInput(rawTitle, fallbackDescription, fallbackSubjectName) {
+  const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+  const explicitTitle = clean(rawTitle);
+  if (explicitTitle) {
+    return explicitTitle.slice(0, 160);
+  }
+  const fallbackLine = clean(String(fallbackDescription || '').split('\n')[0]);
+  if (fallbackLine) {
+    return fallbackLine.slice(0, 160);
+  }
+  const subjectLabel = clean(fallbackSubjectName);
+  if (subjectLabel) {
+    return `${subjectLabel} homework`.slice(0, 160);
+  }
+  return 'Homework template';
+}
+
+async function maybeCreateTeacherTemplateFromHomework(req, payload = {}) {
+  if (!req || !hasSessionRole(req, 'teacher')) {
+    return null;
+  }
+  const shouldSave = ['1', 'true', 'on', 'yes'].includes(String((req.body && req.body.save_as_template) || '').toLowerCase());
+  if (!shouldSave) {
+    return null;
+  }
+
+  const userId = Number(payload.userId || req.session?.user?.id);
+  const requestedCourseId = Number(payload.courseId);
+  const requestedSubjectId = Number(payload.subjectId);
+  const description = String(payload.description || '').trim();
+  if (!Number.isInteger(userId) || userId < 1 || !Number.isInteger(requestedSubjectId) || requestedSubjectId < 1 || !description) {
+    return null;
+  }
+
+  const title = normalizeHomeworkTemplateTitleInput(
+    payload.title || (req.body && req.body.template_title),
+    description,
+    payload.subjectName
+  );
+  const tags = normalizeTemplateTagsInput(payload.tags).join(', ');
+  const linkUrl = normalizeExternalUrl(payload.linkUrl) || null;
+  const meetingUrl = normalizeExternalUrl(payload.meetingUrl) || null;
+  const isControl = Number(payload.isControl) === 1 ? 1 : 0;
+  const isCredit = Number(payload.isCredit) === 1 ? 1 : 0;
+
+  try {
+    const resolvedScope = await resolveTeacherTemplateScope(userId, requestedCourseId, requestedSubjectId);
+    if (!resolvedScope.ok || !resolvedScope.subjectId) {
+      return null;
+    }
+    const courseId = resolvedScope.courseId || null;
+    const subjectId = resolvedScope.subjectId || null;
+    const inserted = await db.get(
+      `
+        INSERT INTO teacher_homework_templates
+          (course_id, subject_id, user_id, title, description, link_url, meeting_url, tags, is_control, is_credit, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        RETURNING id
+      `,
+      [
+        courseId,
+        subjectId,
+        userId,
+        title,
+        description,
+        linkUrl,
+        meetingUrl,
+        tags,
+        isControl,
+        isCredit,
+      ]
+    );
+    const templateId = inserted && inserted.id ? Number(inserted.id) : null;
+    logAction(db, req, 'teacher_homework_template_create', {
+      template_id: templateId,
+      title,
+      course_id: courseId,
+      subject_id: subjectId,
+      tags: tags ? tags.split(',').map((item) => item.trim()).filter(Boolean) : [],
+      is_control: isControl,
+      is_credit: isCredit,
+      source: String(payload.source || 'homework_form'),
+    });
+    return templateId;
+  } catch (err) {
+    console.error('Teacher homework template auto-save failed', err);
+    return null;
+  }
+}
+
 async function saveTeacherSubjects(userId, body, options = {}) {
   const catalog = await getTeacherSubjectCatalog();
   const selections = [];
@@ -29322,6 +29412,22 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
       courseId || 1,
       activeSemester ? activeSemester.id : null
     );
+    if (isTeacher) {
+      await maybeCreateTeacherTemplateFromHomework(req, {
+        userId,
+        courseId: courseId || 1,
+        subjectId,
+        subjectName: subjectRow.name,
+        title: req.body.template_title,
+        description,
+        linkUrl: link_url,
+        meetingUrl: meeting_url,
+        tags,
+        isControl,
+        isCredit,
+        source: 'schedule_homework_add',
+      });
+    }
     const journalSynced = await trySyncJournalColumnsAfterHomeworkCreate({
       subjectId,
       courseId: courseId || 1,
@@ -29535,6 +29641,22 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
       courseId || 1,
       activeSemester ? activeSemester.id : null
     );
+    if (isTeacher) {
+      await maybeCreateTeacherTemplateFromHomework(req, {
+        userId,
+        courseId: courseId || 1,
+        subjectId,
+        subjectName: subjectRow.name,
+        title: req.body.template_title,
+        description,
+        linkUrl: link_url,
+        meetingUrl: meeting_url,
+        tags: '',
+        isControl: 0,
+        isCredit,
+        source: 'schedule_homework_custom_deadline',
+      });
+    }
     const journalSynced = await trySyncJournalColumnsAfterHomeworkCreate({
       subjectId,
       courseId: courseId || 1,

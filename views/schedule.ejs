@@ -2157,6 +2157,22 @@
                     </div>
                     <div class="form-text">Templates are filtered by current subject and course.</div>
                   </div>
+                  <div class="mb-3">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="hwSaveAsTemplate" name="save_as_template" value="1" />
+                      <label class="form-check-label" for="hwSaveAsTemplate">Save this homework as template</label>
+                    </div>
+                    <div class="mt-2 d-none" id="hwTemplateTitleWrap">
+                      <label for="hwTemplateTitleInput" class="form-label">Template title (optional)</label>
+                      <input
+                        id="hwTemplateTitleInput"
+                        name="template_title"
+                        class="form-control"
+                        maxlength="160"
+                        placeholder="Auto from description if empty"
+                      />
+                    </div>
+                  </div>
                 <% } %>
                 <div class="mb-3">
                   <label for="hwText" class="form-label">Description</label>
@@ -2370,7 +2386,7 @@
                 <% } %>
                 <div class="col-12">
                   <label class="form-label">Опис</label>
-                  <textarea class="form-control" name="description" rows="3" required></textarea>
+                  <textarea class="form-control" id="customHwDescription" name="description" rows="3" required></textarea>
                 </div>
                 <div class="col-12 col-md-6">
                   <label class="form-label">Посилання (опц.)</label>
@@ -2396,6 +2412,24 @@
                     autocomplete="off"
                   />
                 </div>
+                <% if (role === 'teacher') { %>
+                  <div class="col-12">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="customSaveAsTemplate" name="save_as_template" value="1" />
+                      <label class="form-check-label" for="customSaveAsTemplate">Save this deadline as template</label>
+                    </div>
+                  </div>
+                  <div class="col-12 d-none" id="customTemplateTitleWrap">
+                    <label for="customTemplateTitleInput" class="form-label">Template title (optional)</label>
+                    <input
+                      id="customTemplateTitleInput"
+                      name="template_title"
+                      class="form-control"
+                      maxlength="160"
+                      placeholder="Auto from description if empty"
+                    />
+                  </div>
+                <% } %>
                 <div class="col-12">
                   <label class="form-label">Файл (опц.)</label>
                   <div class="file-field">
@@ -2723,8 +2757,72 @@
       const hwLinkInput = document.getElementById('hwLink');
       const hwMeetingInput = document.getElementById('hwMeeting');
       const hwTagsInput = document.getElementById('hwTags');
+      const hwSaveAsTemplateToggle = document.getElementById('hwSaveAsTemplate');
+      const hwTemplateTitleWrap = document.getElementById('hwTemplateTitleWrap');
+      const hwTemplateTitleInput = document.getElementById('hwTemplateTitleInput');
+      const customSaveAsTemplateToggle = document.getElementById('customSaveAsTemplate');
+      const customTemplateTitleWrap = document.getElementById('customTemplateTitleWrap');
+      const customTemplateTitleInput = document.getElementById('customTemplateTitleInput');
+      const customHwDescription = document.getElementById('customHwDescription');
       const templateCache = new Map();
       let currentHomeworkItems = [];
+
+      function deriveTemplateTitle(rawValue) {
+        const normalized = String(rawValue || '').replace(/\s+/g, ' ').trim();
+        if (!normalized) return '';
+        return normalized.slice(0, 160);
+      }
+
+      function bindTemplateCaptureToggle(toggle, titleWrap, titleInput, descriptionInput) {
+        if (!toggle) return;
+        const sync = () => {
+          const enabled = Boolean(toggle.checked);
+          if (titleWrap) {
+            titleWrap.classList.toggle('d-none', !enabled);
+          }
+          if (!enabled && titleInput) {
+            titleInput.value = '';
+          } else if (enabled && titleInput && !titleInput.value.trim() && descriptionInput) {
+            titleInput.value = deriveTemplateTitle(descriptionInput.value);
+          }
+        };
+        toggle.addEventListener('change', sync);
+        if (descriptionInput && titleInput) {
+          descriptionInput.addEventListener('input', () => {
+            if (toggle.checked && !titleInput.value.trim()) {
+              titleInput.value = deriveTemplateTitle(descriptionInput.value);
+            }
+          });
+        }
+        sync();
+      }
+
+      bindTemplateCaptureToggle(
+        hwSaveAsTemplateToggle,
+        hwTemplateTitleWrap,
+        hwTemplateTitleInput,
+        hwTextInput
+      );
+      bindTemplateCaptureToggle(
+        customSaveAsTemplateToggle,
+        customTemplateTitleWrap,
+        customTemplateTitleInput,
+        customHwDescription
+      );
+      const customDeadlineCreateModalEl = document.getElementById('customDeadlineModal');
+      if (customDeadlineCreateModalEl) {
+        customDeadlineCreateModalEl.addEventListener('hidden.bs.modal', () => {
+          if (customSaveAsTemplateToggle) {
+            customSaveAsTemplateToggle.checked = false;
+          }
+          if (customTemplateTitleInput) {
+            customTemplateTitleInput.value = '';
+          }
+          if (customTemplateTitleWrap) {
+            customTemplateTitleWrap.classList.add('d-none');
+          }
+        });
+      }
 
       function updateReactionButtons(container, reactions, reacted) {
         const buttons = container.querySelectorAll('.react-btn');
@@ -3067,6 +3165,9 @@
         if (hwControlToggle) {
           hwControlToggle.checked = Number(template.is_control || 0) === 1;
         }
+        if (hwTemplateTitleInput && !hwTemplateTitleInput.value.trim()) {
+          hwTemplateTitleInput.value = deriveTemplateTitle(String(template.title || template.description || ''));
+        }
       }
 
       if (hwTemplateApplyBtn) {
@@ -3111,6 +3212,15 @@
         }
         if (hwTagsInput) {
           hwTagsInput.value = '';
+        }
+        if (hwTemplateTitleInput) {
+          hwTemplateTitleInput.value = '';
+        }
+        if (hwSaveAsTemplateToggle) {
+          hwSaveAsTemplateToggle.checked = false;
+          if (hwTemplateTitleWrap) {
+            hwTemplateTitleWrap.classList.add('d-none');
+          }
         }
         if (isTeacherView && hwTemplateSelect) {
           renderHomeworkTemplateOptions(subjectId, courseId);
@@ -3170,6 +3280,15 @@
           hwTemplateApplyBtn.disabled = true;
         }
         templateCache.clear();
+        if (hwTemplateTitleInput) {
+          hwTemplateTitleInput.value = '';
+        }
+        if (hwSaveAsTemplateToggle) {
+          hwSaveAsTemplateToggle.checked = false;
+        }
+        if (hwTemplateTitleWrap) {
+          hwTemplateTitleWrap.classList.add('d-none');
+        }
         if (location.hash.startsWith('#class=')) {
           history.replaceState(null, '', location.pathname + location.search);
         }
