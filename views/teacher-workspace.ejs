@@ -140,14 +140,52 @@
         padding: 14px;
         background: rgba(15, 23, 42, 0.34);
       }
+      .template-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .template-bulk-controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .template-bulk-count {
+        font-size: 0.76rem;
+        color: rgba(203, 213, 225, 0.74);
+      }
+      body.theme-light .template-bulk-count {
+        color: rgba(15, 23, 42, 0.58);
+      }
       body.theme-light .template-card {
         background: rgba(255, 255, 255, 0.82);
         border-color: rgba(15, 23, 42, 0.12);
+      }
+      .template-card-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
       }
       .template-title {
         margin: 0;
         font-size: 1rem;
         font-weight: 650;
+      }
+      .template-select-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.76rem;
+        color: rgba(203, 213, 225, 0.78);
+        cursor: pointer;
+        user-select: none;
+      }
+      body.theme-light .template-select-toggle {
+        color: rgba(15, 23, 42, 0.58);
       }
       .template-meta {
         margin-top: 2px;
@@ -263,6 +301,28 @@
       }
       body.theme-light .clone-subject-text small {
         color: rgba(15, 23, 42, 0.58);
+      }
+      .bulk-source-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        padding: 8px 10px;
+        max-height: 18vh;
+        overflow-y: auto;
+        background: rgba(15, 23, 42, 0.22);
+      }
+      body.theme-light .bulk-source-list {
+        background: rgba(255, 255, 255, 0.78);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .bulk-source-item {
+        font-size: 0.84rem;
+        color: rgba(226, 232, 240, 0.9);
+      }
+      body.theme-light .bulk-source-item {
+        color: rgba(15, 23, 42, 0.78);
       }
       .hint {
         font-size: 0.82rem;
@@ -413,16 +473,37 @@
 
         <div class="col-12 col-xl-7">
           <article class="glass workspace-panel h-100">
-            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
-              <h5 class="mb-0">Saved templates</h5>
-              <span class="badge bg-secondary"><%= (templates || []).length %></span>
+            <div class="template-toolbar mb-3">
+              <div class="d-flex align-items-center gap-2">
+                <h5 class="mb-0">Saved templates</h5>
+                <span class="badge bg-secondary"><%= (templates || []).length %></span>
+              </div>
+              <div class="template-bulk-controls">
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="templateSelectAllToggle">
+                  Select all
+                </button>
+                <button class="btn btn-outline-info btn-sm" type="button" id="templateBulkCloneBtn" disabled>
+                  Bulk clone
+                </button>
+                <span class="template-bulk-count" id="templateSelectedCount">0 selected</span>
+              </div>
             </div>
 
             <% if ((templates || []).length) { %>
               <div class="template-list">
                 <% templates.forEach(function(template) { %>
                   <div class="template-card">
-                    <h6 class="template-title"><%= template.title %></h6>
+                    <div class="template-card-head">
+                      <h6 class="template-title"><%= template.title %></h6>
+                      <label class="template-select-toggle">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          data-template-select="<%= template.id %>"
+                        />
+                        <span>Select</span>
+                      </label>
+                    </div>
                     <div class="template-meta">
                       <% if (template.course_name) { %><span><%= template.course_name %></span><% } %>
                       <% if (template.subject_name) { %><span> · <%= template.subject_name %></span><% } %>
@@ -643,6 +724,66 @@
         </div>
       </div>
 
+      <div class="modal fade" id="bulkCloneTemplateModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content">
+            <form method="POST" id="bulkCloneTemplateForm" action="/teacher/workspace/templates/bulk-clone" autocomplete="off">
+              <div class="modal-header">
+                <h5 class="modal-title">Bulk clone templates</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <input type="hidden" id="bulkCloneCourseContext" name="course_id_context" value="<%= selectedCourseId || '' %>" />
+                <div id="bulkCloneSourceInputs"></div>
+                <p class="mb-2 small text-muted">
+                  Sources:
+                  <strong id="bulkCloneSourceCount">0 selected</strong>
+                </p>
+                <div class="bulk-source-list mb-3" id="bulkCloneSourceList"></div>
+                <div class="mb-2">
+                  <label for="bulkCloneTemplateSearch" class="form-label">Find subject</label>
+                  <input
+                    id="bulkCloneTemplateSearch"
+                    class="form-control"
+                    type="search"
+                    placeholder="Type subject or course name"
+                    autocomplete="off"
+                  />
+                </div>
+                <div id="bulkCloneError" class="alert alert-warning py-2 d-none mb-2"></div>
+                <% if ((teacherSubjectsAll || []).length) { %>
+                  <div class="clone-subject-list" id="bulkCloneSubjectList">
+                    <% (teacherSubjectsAll || []).forEach(function(subject) { %>
+                      <label class="clone-subject-item" data-bulk-clone-subject-item>
+                        <input class="form-check-input" type="checkbox" name="target_subject_ids" value="<%= subject.id %>" />
+                        <span class="clone-subject-text">
+                          <strong><%= subject.name %></strong>
+                          <small><%= subject.course_name ? subject.course_name : `Course ${subject.course_id}` %></small>
+                        </span>
+                      </label>
+                    <% }) %>
+                  </div>
+                  <div id="bulkCloneSubjectEmpty" class="small text-muted mt-2 d-none">No subjects match this filter.</div>
+                <% } else { %>
+                  <div class="alert alert-warning mb-0">
+                    No subjects available yet. Configure your teaching subjects first.
+                  </div>
+                <% } %>
+                <p class="hint mt-2 mb-0">
+                  For each selected source template, one copy will be created per selected subject (duplicates skipped).
+                </p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary" <%= (teacherSubjectsAll || []).length ? '' : 'disabled' %>>
+                  Run bulk clone
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
       <%- include('partials/app-footer') %>
     </main>
 
@@ -733,6 +874,24 @@
       const cloneSubjectItems = cloneSubjectList
         ? Array.from(cloneSubjectList.querySelectorAll('[data-clone-subject-item]'))
         : [];
+      const templateSelectAllToggle = document.getElementById('templateSelectAllToggle');
+      const templateBulkCloneBtn = document.getElementById('templateBulkCloneBtn');
+      const templateSelectedCount = document.getElementById('templateSelectedCount');
+      const templateSelectToggles = Array.from(document.querySelectorAll('[data-template-select]'));
+      const bulkCloneModalEl = document.getElementById('bulkCloneTemplateModal');
+      const bulkCloneModal = bulkCloneModalEl && window.bootstrap ? new window.bootstrap.Modal(bulkCloneModalEl) : null;
+      const bulkCloneTemplateForm = document.getElementById('bulkCloneTemplateForm');
+      const bulkCloneCourseContext = document.getElementById('bulkCloneCourseContext');
+      const bulkCloneSourceInputs = document.getElementById('bulkCloneSourceInputs');
+      const bulkCloneSourceCount = document.getElementById('bulkCloneSourceCount');
+      const bulkCloneSourceList = document.getElementById('bulkCloneSourceList');
+      const bulkCloneTemplateSearch = document.getElementById('bulkCloneTemplateSearch');
+      const bulkCloneError = document.getElementById('bulkCloneError');
+      const bulkCloneSubjectList = document.getElementById('bulkCloneSubjectList');
+      const bulkCloneSubjectEmpty = document.getElementById('bulkCloneSubjectEmpty');
+      const bulkCloneSubjectItems = bulkCloneSubjectList
+        ? Array.from(bulkCloneSubjectList.querySelectorAll('[data-bulk-clone-subject-item]'))
+        : [];
 
       const templateById = new Map();
       (workspaceTemplates || []).forEach((template) => {
@@ -782,6 +941,118 @@
           cloneSubjectEmpty.classList.add('d-none');
         }
         hideCloneError();
+      }
+
+      function getSelectedTemplateIds() {
+        return templateSelectToggles
+          .filter((input) => input.checked)
+          .map((input) => Number(input.getAttribute('data-template-select')))
+          .filter((value) => Number.isInteger(value) && value > 0);
+      }
+
+      function syncTemplateSelectionState() {
+        const selectedIds = getSelectedTemplateIds();
+        if (templateSelectedCount) {
+          templateSelectedCount.textContent = `${selectedIds.length} selected`;
+        }
+        if (templateBulkCloneBtn) {
+          templateBulkCloneBtn.disabled = selectedIds.length < 1;
+        }
+        if (templateSelectAllToggle) {
+          if (!templateSelectToggles.length) {
+            templateSelectAllToggle.disabled = true;
+            templateSelectAllToggle.textContent = 'Select all';
+          } else if (selectedIds.length === templateSelectToggles.length) {
+            templateSelectAllToggle.disabled = false;
+            templateSelectAllToggle.textContent = 'Clear all';
+          } else {
+            templateSelectAllToggle.disabled = false;
+            templateSelectAllToggle.textContent = 'Select all';
+          }
+        }
+      }
+
+      function hideBulkCloneError() {
+        if (!bulkCloneError) return;
+        bulkCloneError.classList.add('d-none');
+        bulkCloneError.textContent = '';
+      }
+
+      function syncBulkCloneSubjectFilter() {
+        if (!bulkCloneSubjectItems.length) return;
+        const query = String(bulkCloneTemplateSearch && bulkCloneTemplateSearch.value ? bulkCloneTemplateSearch.value : '')
+          .trim()
+          .toLowerCase();
+        let visibleCount = 0;
+        bulkCloneSubjectItems.forEach((item) => {
+          const text = String(item.textContent || '').toLowerCase();
+          const visible = !query || text.includes(query);
+          item.hidden = !visible;
+          if (visible) {
+            visibleCount += 1;
+          }
+        });
+        if (bulkCloneSubjectEmpty) {
+          bulkCloneSubjectEmpty.classList.toggle('d-none', visibleCount > 0);
+        }
+      }
+
+      function resetBulkCloneSubjectSelection() {
+        bulkCloneSubjectItems.forEach((item) => {
+          const checkbox = item.querySelector('input[type="checkbox"][name="target_subject_ids"]');
+          if (checkbox) {
+            checkbox.checked = false;
+          }
+          item.hidden = false;
+        });
+        if (bulkCloneTemplateSearch) {
+          bulkCloneTemplateSearch.value = '';
+        }
+        if (bulkCloneSubjectEmpty) {
+          bulkCloneSubjectEmpty.classList.add('d-none');
+        }
+        hideBulkCloneError();
+      }
+
+      function openBulkCloneModal() {
+        if (!bulkCloneModal || !bulkCloneTemplateForm) return;
+        const selectedTemplateIds = getSelectedTemplateIds();
+        if (!selectedTemplateIds.length) {
+          syncTemplateSelectionState();
+          return;
+        }
+        if (bulkCloneSourceInputs) {
+          bulkCloneSourceInputs.innerHTML = '';
+          selectedTemplateIds.forEach((templateId) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'source_template_ids';
+            input.value = String(templateId);
+            bulkCloneSourceInputs.appendChild(input);
+          });
+        }
+        if (bulkCloneCourseContext) {
+          bulkCloneCourseContext.value = Number.isInteger(Number(selectedCourseContext)) && Number(selectedCourseContext) > 0
+            ? String(Number(selectedCourseContext))
+            : '';
+        }
+        if (bulkCloneSourceCount) {
+          bulkCloneSourceCount.textContent = `${selectedTemplateIds.length} selected`;
+        }
+        if (bulkCloneSourceList) {
+          bulkCloneSourceList.innerHTML = '';
+          selectedTemplateIds.forEach((templateId) => {
+            const template = templateById.get(templateId);
+            const item = document.createElement('div');
+            item.className = 'bulk-source-item';
+            item.textContent = template && template.title
+              ? String(template.title)
+              : `Template #${templateId}`;
+            bulkCloneSourceList.appendChild(item);
+          });
+        }
+        resetBulkCloneSubjectSelection();
+        bulkCloneModal.show();
       }
 
       function openTemplateEditor(templateIdRaw) {
@@ -885,6 +1156,62 @@
           }
         });
       }
+      if (bulkCloneTemplateSearch) {
+        bulkCloneTemplateSearch.addEventListener('input', syncBulkCloneSubjectFilter);
+      }
+      if (bulkCloneSubjectList) {
+        bulkCloneSubjectList.addEventListener('change', hideBulkCloneError);
+      }
+      if (bulkCloneModalEl) {
+        bulkCloneModalEl.addEventListener('hidden.bs.modal', () => {
+          resetBulkCloneSubjectSelection();
+          if (bulkCloneSourceInputs) {
+            bulkCloneSourceInputs.innerHTML = '';
+          }
+          if (bulkCloneSourceList) {
+            bulkCloneSourceList.innerHTML = '';
+          }
+          if (bulkCloneSourceCount) {
+            bulkCloneSourceCount.textContent = '0 selected';
+          }
+        });
+      }
+      if (bulkCloneTemplateForm) {
+        bulkCloneTemplateForm.addEventListener('submit', (event) => {
+          const sourceCount = bulkCloneSourceInputs
+            ? bulkCloneSourceInputs.querySelectorAll('input[name="source_template_ids"]').length
+            : 0;
+          const targetCount = bulkCloneSubjectList
+            ? bulkCloneSubjectList.querySelectorAll('input[name="target_subject_ids"]:checked').length
+            : 0;
+          if (sourceCount < 1 || targetCount < 1) {
+            event.preventDefault();
+            if (bulkCloneError) {
+              bulkCloneError.textContent = sourceCount < 1
+                ? 'Select at least one source template first.'
+                : 'Select at least one target subject.';
+              bulkCloneError.classList.remove('d-none');
+            }
+          }
+        });
+      }
+      templateSelectToggles.forEach((input) => {
+        input.addEventListener('change', syncTemplateSelectionState);
+      });
+      if (templateSelectAllToggle) {
+        templateSelectAllToggle.addEventListener('click', () => {
+          const selectedCount = getSelectedTemplateIds().length;
+          const shouldSelectAll = selectedCount !== templateSelectToggles.length;
+          templateSelectToggles.forEach((input) => {
+            input.checked = shouldSelectAll;
+          });
+          syncTemplateSelectionState();
+        });
+      }
+      if (templateBulkCloneBtn) {
+        templateBulkCloneBtn.addEventListener('click', openBulkCloneModal);
+      }
+      syncTemplateSelectionState();
 
       document.querySelectorAll('[data-template-edit]').forEach((button) => {
         button.addEventListener('click', () => {

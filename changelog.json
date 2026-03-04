@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.65",
+      "date": "2026-03-05",
+      "items": [
+        "feat(teacher-workspace-bulk-clone): added multi-select template workflow with \"Select all\" and bulk clone action in saved templates list",
+        "feat(teacher-homework-templates): introduced `POST /teacher/workspace/templates/bulk-clone` to clone multiple source templates to multiple target subjects with ownership/access checks",
+        "ux(teacher-workspace-bulk-clone): added dedicated bulk clone modal with source summary, target subject search, and inline validation for source/target selection"
+      ]
+    },
+    {
       "version": "1.0.64",
       "date": "2026-03-05",
       "items": [
