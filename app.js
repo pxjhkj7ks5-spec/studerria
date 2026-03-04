@@ -25460,6 +25460,8 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       ? new Date(`${labels[0]}T00:00:00.000Z`).toISOString()
       : new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
     const courseId = getAdminCourse(req);
+    const isSystemScope = hasSessionRole(req, 'admin');
+    const analyticsScope = isSystemScope ? 'system' : 'course';
     const userId = Number(req?.session?.user?.id || 0);
     const roleKeys = getSessionRoleList(req);
     const activeSemester = await getActiveSemester(courseId);
@@ -25467,6 +25469,11 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
     const excludeAdminClause = excludeAdmin
       ? "AND COALESCE(NULLIF(v.role_key, ''), 'guest') <> 'admin'"
       : '';
+    const scopedVisitWhereSql = isSystemScope
+      ? 'v.created_at >= ?'
+      : 'v.course_id = ? AND v.created_at >= ?';
+    const scopedVisitParams = isSystemScope ? [sinceIso] : [courseId, sinceIso];
+    const recentVisitParams = isSystemScope ? [sinceIso] : [sinceIso, courseId];
     const now = new Date();
 
     const recentSqlBase = `
@@ -25478,8 +25485,8 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
         v.route_path
       FROM site_visit_events v
       LEFT JOIN users u ON u.id = v.user_id
-      WHERE (v.course_id = ? OR v.course_id IS NULL)
-        AND v.created_at >= ?
+      WHERE v.created_at >= ?
+        ${isSystemScope ? '' : 'AND (v.course_id = ? OR v.course_id IS NULL)'}
     `;
     const recentFilteredSql = `
       ${recentSqlBase}
@@ -25502,11 +25509,10 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             COUNT(DISTINCT v.user_id)::int AS signed_users,
             COUNT(DISTINCT (v.created_at AT TIME ZONE 'UTC')::date)::int AS active_days
           FROM site_visit_events v
-          WHERE v.course_id = ?
-            AND v.created_at >= ?
+          WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
         `,
-        [courseId, sinceIso]
+        scopedVisitParams
       ),
       db.all(
         `
@@ -25515,13 +25521,12 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             COUNT(*)::int AS visits,
             COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
           FROM site_visit_events v
-          WHERE v.course_id = ?
-            AND v.created_at >= ?
+          WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
           GROUP BY (v.created_at AT TIME ZONE 'UTC')::date
           ORDER BY day ASC
         `,
-        [courseId, sinceIso]
+        scopedVisitParams
       ),
       db.all(
         `
@@ -25530,14 +25535,13 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             COUNT(*)::int AS visits,
             COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
           FROM site_visit_events v
-          WHERE v.course_id = ?
-            AND v.created_at >= ?
+          WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
           GROUP BY v.page_key
           ORDER BY visits DESC, v.page_key ASC
           LIMIT 8
         `,
-        [courseId, sinceIso]
+        scopedVisitParams
       ),
       db.all(
         `
@@ -25545,20 +25549,19 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             COALESCE(NULLIF(v.role_key, ''), 'guest') AS role_key,
             COUNT(*)::int AS visits
           FROM site_visit_events v
-          WHERE v.course_id = ?
-            AND v.created_at >= ?
+          WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
           GROUP BY COALESCE(NULLIF(v.role_key, ''), 'guest')
           ORDER BY visits DESC, role_key ASC
         `,
-        [courseId, sinceIso]
+        scopedVisitParams
       ),
       db.all(
         recentFilteredSql,
-        [courseId, sinceIso]
+        recentVisitParams
       ),
       excludeAdmin
-        ? db.all(recentFallbackSql, [courseId, sinceIso])
+        ? db.all(recentFallbackSql, recentVisitParams)
         : Promise.resolve([]),
     ]);
     const normalizeSummary = (row) => ({
@@ -25629,10 +25632,9 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
               COUNT(DISTINCT v.user_id)::int AS signed_users,
               COUNT(DISTINCT (v.created_at AT TIME ZONE 'UTC')::date)::int AS active_days
             FROM site_visit_events v
-            WHERE v.course_id = ?
-              AND v.created_at >= ?
+            WHERE ${scopedVisitWhereSql}
           `,
-          [courseId, sinceIso]
+          scopedVisitParams
         ),
         db.all(
           `
@@ -25641,12 +25643,11 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
               COUNT(*)::int AS visits,
               COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
             FROM site_visit_events v
-            WHERE v.course_id = ?
-              AND v.created_at >= ?
+            WHERE ${scopedVisitWhereSql}
             GROUP BY (v.created_at AT TIME ZONE 'UTC')::date
             ORDER BY day ASC
           `,
-          [courseId, sinceIso]
+          scopedVisitParams
         ),
         db.all(
           `
@@ -25655,13 +25656,12 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
               COUNT(*)::int AS visits,
               COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
             FROM site_visit_events v
-            WHERE v.course_id = ?
-              AND v.created_at >= ?
+            WHERE ${scopedVisitWhereSql}
             GROUP BY v.page_key
             ORDER BY visits DESC, v.page_key ASC
             LIMIT 8
           `,
-          [courseId, sinceIso]
+          scopedVisitParams
         ),
         db.all(
           `
@@ -25669,12 +25669,11 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
               COALESCE(NULLIF(v.role_key, ''), 'guest') AS role_key,
               COUNT(*)::int AS visits
             FROM site_visit_events v
-            WHERE v.course_id = ?
-              AND v.created_at >= ?
+            WHERE ${scopedVisitWhereSql}
             GROUP BY COALESCE(NULLIF(v.role_key, ''), 'guest')
             ORDER BY visits DESC, role_key ASC
           `,
-          [courseId, sinceIso]
+          scopedVisitParams
         ),
       ]);
       summaryFallback = normalizeSummary(summaryFallbackRow);
@@ -25721,6 +25720,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
     return res.json({
       ok: true,
       days,
+      scope: analyticsScope,
       course_id: courseId,
       exclude_admin: excludeAdmin,
       summary,
@@ -25802,6 +25802,16 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
   }
   try {
     const courseId = getAdminCourse(req);
+    const isSystemScope = hasSessionRole(req, 'admin');
+    const dashboardScope = isSystemScope ? 'system' : 'course';
+    const userScopeSql = isSystemScope ? '' : 'WHERE u.course_id = ?';
+    const userScopeParams = isSystemScope ? [] : [courseId];
+    const alertScopeSql = isSystemScope ? '' : 'AND (sae.course_id = ? OR sae.course_id IS NULL)';
+    const alertScopeParams = isSystemScope ? [] : [courseId];
+    const ipScopeSql = isSystemScope ? '' : 'AND (course_id = ? OR course_id IS NULL)';
+    const ipScopeParams = isSystemScope ? [] : [courseId, courseId, courseId];
+    const deviceScopeSql = isSystemScope ? '' : 'AND (course_id = ? OR course_id IS NULL)';
+    const deviceScopeParams = isSystemScope ? [] : [courseId, courseId];
     const adminAllowlist = parseSecurityAdminIpAllowlist(settingsCache.security_admin_ip_allowlist);
     const [summaryRow, riskyRows, alertsRows, ipRows, deviceRows] = await Promise.all([
       db.get(
@@ -25824,9 +25834,9 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
             )::int AS overdue_72h
           FROM user_security_cases usc
           JOIN users u ON u.id = usc.user_id
-          WHERE u.course_id = ?
+          ${userScopeSql}
         `,
-        [courseId]
+        userScopeParams
       ),
       db.all(
         `
@@ -25841,7 +25851,7 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
             usc.updated_at
           FROM user_security_cases usc
           JOIN users u ON u.id = usc.user_id
-          WHERE u.course_id = ?
+          ${userScopeSql}
           ORDER BY
             CASE usc.risk_level
               WHEN 'high-risk' THEN 3
@@ -25852,7 +25862,7 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
             usc.updated_at DESC
           LIMIT 16
         `,
-        [courseId]
+        userScopeParams
       ),
       db.all(
         `
@@ -25867,13 +25877,13 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
             sae.created_at
           FROM security_alert_events sae
           LEFT JOIN users u ON u.id = sae.user_id
-          WHERE (sae.course_id = ? OR sae.course_id IS NULL)
-            AND sae.resolved_at IS NULL
+          WHERE sae.resolved_at IS NULL
             AND sae.created_at::timestamptz >= NOW() - INTERVAL '14 days'
+            ${alertScopeSql}
           ORDER BY sae.created_at::timestamptz DESC
           LIMIT 24
         `,
-        [courseId]
+        alertScopeParams
       ),
       db.all(
         `
@@ -25882,19 +25892,19 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
             FROM login_history
             WHERE ip IS NOT NULL
               AND created_at::timestamp >= NOW() - INTERVAL '14 days'
-              AND (course_id = ? OR course_id IS NULL)
+              ${ipScopeSql}
             UNION ALL
             SELECT ip, user_id, created_at::timestamp AS created_at
             FROM user_registration_events
             WHERE ip IS NOT NULL
               AND created_at::timestamptz >= NOW() - INTERVAL '14 days'
-              AND (course_id = ? OR course_id IS NULL)
+              ${ipScopeSql}
             UNION ALL
             SELECT ip, user_id, created_at::timestamp AS created_at
             FROM auth_failure_events
             WHERE ip IS NOT NULL
               AND created_at::timestamptz >= NOW() - INTERVAL '14 days'
-              AND (course_id = ? OR course_id IS NULL)
+              ${ipScopeSql}
           )
           SELECT
             ip,
@@ -25906,7 +25916,7 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
           ORDER BY users_count DESC, events_count DESC, last_seen_at DESC
           LIMIT 16
         `,
-        [courseId, courseId, courseId]
+        ipScopeParams
       ),
       db.all(
         `
@@ -25919,7 +25929,7 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
             FROM user_registration_events
             WHERE device_fingerprint IS NOT NULL
               AND created_at::timestamptz >= NOW() - INTERVAL '21 days'
-              AND (course_id = ? OR course_id IS NULL)
+              ${deviceScopeSql}
             UNION ALL
             SELECT
               md5(lower(user_agent)) AS device_key,
@@ -25929,7 +25939,7 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
             FROM login_history
             WHERE user_agent IS NOT NULL
               AND created_at::timestamp >= NOW() - INTERVAL '21 days'
-              AND (course_id = ? OR course_id IS NULL)
+              ${deviceScopeSql}
           )
           SELECT
             device_key,
@@ -25942,7 +25952,7 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
           ORDER BY users_count DESC, events_count DESC, last_seen_at DESC
           LIMIT 16
         `,
-        [courseId, courseId]
+        deviceScopeParams
       ),
     ]);
 
@@ -25966,6 +25976,7 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
 
     return res.json({
       ok: true,
+      scope: dashboardScope,
       generated_at: new Date().toISOString(),
       summary: {
         total_cases: Number(summaryRow && summaryRow.total_cases ? summaryRow.total_cases : 0),
@@ -26026,6 +26037,8 @@ app.post('/admin/security-dashboard/recompute', requireVisitAnalyticsSectionAcce
   }
   try {
     const courseId = getAdminCourse(req);
+    const isSystemScope = hasSessionRole(req, 'admin');
+    const recomputeScope = isSystemScope ? 'system' : 'course';
     const requestedLimit = Number(req.body && req.body.limit ? req.body.limit : SECURITY_DASHBOARD_RECOMPUTE_LIMIT_DEFAULT);
     const recomputeLimit = Number.isFinite(requestedLimit)
       ? Math.max(1, Math.min(SECURITY_DASHBOARD_RECOMPUTE_LIMIT_MAX, Math.floor(requestedLimit)))
@@ -26034,12 +26047,12 @@ app.post('/admin/security-dashboard/recompute', requireVisitAnalyticsSectionAcce
       `
         SELECT id
         FROM users
-        WHERE course_id = ?
-          AND is_active = 1
+        WHERE is_active = 1
+          ${isSystemScope ? '' : 'AND course_id = ?'}
         ORDER BY id DESC
         LIMIT ?
       `,
-      [courseId, recomputeLimit]
+      isSystemScope ? [recomputeLimit] : [courseId, recomputeLimit]
     );
     const userIds = (userRows || [])
       .map((row) => Number(row.id || 0))
@@ -26078,7 +26091,7 @@ app.post('/admin/security-dashboard/recompute', requireVisitAnalyticsSectionAcce
     for (const userId of userIds) {
       try {
         const recomputed = await recomputeUserSecurityCase(userId, {
-          courseId,
+          courseId: isSystemScope ? null : courseId,
           allowAutoQuarantine: false,
         });
         processed += 1;
@@ -26110,7 +26123,8 @@ app.post('/admin/security-dashboard/recompute', requireVisitAnalyticsSectionAcce
 
     summary.suspicious_total = summary.high_risk_total + summary.watch_total;
     logAction(db, req, 'security_dashboard_recompute', {
-      course_id: courseId,
+      course_id: isSystemScope ? null : courseId,
+      scope: recomputeScope,
       limit: recomputeLimit,
       processed,
       changed,
@@ -26120,7 +26134,8 @@ app.post('/admin/security-dashboard/recompute', requireVisitAnalyticsSectionAcce
 
     return res.json({
       ok: true,
-      course_id: courseId,
+      scope: recomputeScope,
+      course_id: isSystemScope ? null : courseId,
       limit: recomputeLimit,
       processed,
       changed,

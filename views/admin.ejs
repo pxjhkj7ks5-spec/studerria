@@ -5437,7 +5437,7 @@
         if (securityRiskyBody) {
           const rows = Array.isArray(data.risky_accounts) ? data.risky_accounts.slice(0, 10) : [];
           if (!rows.length) {
-            securityRiskyBody.innerHTML = '<tr><td colspan="4" class="text-muted">Ризикових кейсів за курсом немає.</td></tr>';
+            securityRiskyBody.innerHTML = '<tr><td colspan="4" class="text-muted">Ризикових кейсів немає.</td></tr>';
           } else {
             securityRiskyBody.innerHTML = rows.map((row) => {
               const level = String(row && row.risk_level ? row.risk_level : '').trim().toLowerCase();

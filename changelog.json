@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.58",
+      "date": "2026-03-04",
+      "items": [
+        "fix(admin-security-analytics): switched visit analytics and security dashboard to system scope for admin role, so data is aggregated across all courses",
+        "fix(admin-recent-visits): eliminated cross-course \"Guest\" misclassification effect caused by selected-course filtering in security analytics recent visits",
+        "fix(admin-security-recompute): risk recompute in security analytics now processes all active users for admin scope instead of only selected course"
+      ]
+    },
+    {
       "version": "1.0.57",
       "date": "2026-03-04",
       "items": [
