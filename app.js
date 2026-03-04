@@ -5169,6 +5169,26 @@ function buildAdminPathwaysUrl(params = {}) {
   return `/admin/pathways${queryString ? `?${queryString}` : ''}`;
 }
 
+function buildJournalInsightsUrl(params = {}) {
+  const query = new URLSearchParams();
+  const courseId = parsePositiveIntStrict(params.courseId);
+  if (courseId) query.set('course_id', String(courseId));
+  const subjectId = parsePositiveIntStrict(params.subjectId);
+  if (subjectId) query.set('subject_id', String(subjectId));
+  const scopeType = String(params.scopeType || '').trim().toLowerCase();
+  if (scopeType) query.set('scope_type', scopeType);
+  const groupNumber = parsePositiveIntStrict(params.groupNumber);
+  if (groupNumber) query.set('group_number', String(groupNumber));
+  const studentId = parsePositiveIntStrict(params.studentId);
+  if (studentId) query.set('student_id', String(studentId));
+  const period = String(params.period || '').trim().toLowerCase();
+  if (period) query.set('period', period);
+  if (params.error) query.set('error', String(params.error));
+  if (params.ok) query.set('ok', String(params.ok));
+  const queryString = query.toString();
+  return `/journal/insights${queryString ? `?${queryString}` : ''}`;
+}
+
 function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[key]) {
   if (
     key === 'allow_homework_creation'
@@ -13093,6 +13113,127 @@ const canUseTeacherJournalMode = (req, journalScope) => {
   );
 };
 
+const JOURNAL_INSIGHTS_PERIOD_OPTIONS = [
+  { key: 'month', label: '30 days' },
+  { key: 'semester', label: 'Semester' },
+  { key: 'year', label: 'Year' },
+  { key: 'all', label: 'All time' },
+];
+const JOURNAL_INSIGHTS_PERIOD_KEYS = new Set(JOURNAL_INSIGHTS_PERIOD_OPTIONS.map((item) => item.key));
+
+const JOURNAL_INSIGHTS_SCOPE_OPTIONS = [
+  { key: 'subject', label: 'Subject' },
+  { key: 'group', label: 'Group' },
+  { key: 'student', label: 'Student' },
+  { key: 'course', label: 'Course' },
+];
+const JOURNAL_INSIGHTS_SCOPE_KEYS = new Set(JOURNAL_INSIGHTS_SCOPE_OPTIONS.map((item) => item.key));
+
+const normalizeJournalInsightsPeriod = (rawValue, fallback = 'semester') => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  if (JOURNAL_INSIGHTS_PERIOD_KEYS.has(normalized)) {
+    return normalized;
+  }
+  return JOURNAL_INSIGHTS_PERIOD_KEYS.has(fallback) ? fallback : 'semester';
+};
+
+const normalizeJournalInsightsScope = (rawValue, fallback = 'subject') => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  if (JOURNAL_INSIGHTS_SCOPE_KEYS.has(normalized)) {
+    return normalized;
+  }
+  return JOURNAL_INSIGHTS_SCOPE_KEYS.has(fallback) ? fallback : 'subject';
+};
+
+const buildJournalMixedSemesterCondition = (alias, semesterId) => {
+  if (semesterId) {
+    return {
+      clause: `AND (${alias}.semester_id = ? OR ${alias}.semester_id IS NULL)`,
+      params: [semesterId],
+    };
+  }
+  return {
+    clause: `AND ${alias}.semester_id IS NULL`,
+    params: [],
+  };
+};
+
+const resolveJournalInsightsSince = (periodKey, semesterStartDate = '', now = new Date()) => {
+  const normalizedPeriod = normalizeJournalInsightsPeriod(periodKey, 'semester');
+  if (normalizedPeriod === 'all') {
+    return { period: normalizedPeriod, sinceDate: '', sinceIso: '' };
+  }
+
+  let sinceDate = '';
+  if (normalizedPeriod === 'month') {
+    sinceDate = formatLocalDate(addDays(now, -30));
+  } else if (normalizedPeriod === 'year') {
+    sinceDate = formatLocalDate(addDays(now, -365));
+  } else if (isValidDateString(String(semesterStartDate || ''))) {
+    sinceDate = String(semesterStartDate);
+  } else {
+    sinceDate = formatLocalDate(addDays(now, -180));
+  }
+  if (!isValidDateString(sinceDate)) {
+    return { period: normalizedPeriod, sinceDate: '', sinceIso: '' };
+  }
+  const sinceIso = new Date(`${sinceDate}T00:00:00.000Z`).toISOString();
+  return { period: normalizedPeriod, sinceDate, sinceIso };
+};
+
+const roundToPrecision = (rawValue, digits = 2) => {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return 0;
+  const scale = 10 ** Math.max(0, Number(digits) || 0);
+  return Math.round(parsed * scale) / scale;
+};
+
+const computeMedianScore = (values = []) => {
+  const list = (Array.isArray(values) ? values : [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  if (!list.length) return 0;
+  const middle = Math.floor(list.length / 2);
+  if (list.length % 2 === 1) {
+    return roundToPrecision(list[middle], 2);
+  }
+  return roundToPrecision((list[middle - 1] + list[middle]) / 2, 2);
+};
+
+const getJournalInsightsBucketMode = (periodKey) => (
+  normalizeJournalInsightsPeriod(periodKey, 'semester') === 'month' ? 'day' : 'month'
+);
+
+const buildJournalInsightsGradeBucketSql = (periodKey) => (
+  getJournalInsightsBucketMode(periodKey) === 'day'
+    ? "TO_CHAR(DATE_TRUNC('day', jg.graded_at), 'YYYY-MM-DD')"
+    : "TO_CHAR(DATE_TRUNC('month', jg.graded_at), 'YYYY-MM')"
+);
+
+const buildJournalInsightsAttendanceBucketSql = (periodKey) => (
+  getJournalInsightsBucketMode(periodKey) === 'day'
+    ? "TO_CHAR(DATE_TRUNC('day', ar.class_date::timestamp), 'YYYY-MM-DD')"
+    : "TO_CHAR(DATE_TRUNC('month', ar.class_date::timestamp), 'YYYY-MM')"
+);
+
+const buildRankingFromRows = (rows = []) => {
+  const sorted = (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      ...row,
+      final_score: roundToPrecision(row.final_score, 2),
+    }))
+    .sort((a, b) => {
+      const scoreDiff = Number(b.final_score || 0) - Number(a.final_score || 0);
+      if (scoreDiff !== 0) return scoreDiff;
+      return String(a.full_name || '').localeCompare(String(b.full_name || ''));
+    });
+  return sorted.map((row, index) => ({
+    ...row,
+    rank: index + 1,
+  }));
+};
+
 async function ensureSubjectGradingSettings(subjectId, courseId, semesterId, userId) {
   try {
     await db.run(
@@ -14942,6 +15083,737 @@ async function buildJournalMatrix({
     rows,
   };
 }
+
+async function buildJournalInsightsContext({
+  req,
+  journalScope,
+  teacherJournalMode,
+  payloadSource = {},
+}) {
+  const payload = payloadSource && typeof payloadSource === 'object' ? payloadSource : {};
+  const subjectOptions = await getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode);
+  const courseMap = new Map();
+  (subjectOptions || []).forEach((item) => {
+    const courseId = Number(item.course_id || 0);
+    if (!Number.isFinite(courseId) || courseId < 1) return;
+    if (!courseMap.has(courseId)) {
+      courseMap.set(courseId, {
+        course_id: courseId,
+        course_name: String(item.course_name || `Course ${courseId}`),
+      });
+    }
+  });
+  const courseOptions = Array.from(courseMap.values()).sort((a, b) => Number(a.course_id) - Number(b.course_id));
+  const fallbackCourseId = parsePositiveIntStrict(
+    req?.session?.user?.course_id,
+    courseOptions.length ? Number(courseOptions[0].course_id) : null
+  );
+  let selectedCourseId = parsePositiveIntStrict(payload.course_id, fallbackCourseId);
+  if (!courseOptions.some((item) => Number(item.course_id) === Number(selectedCourseId))) {
+    selectedCourseId = courseOptions.length ? Number(courseOptions[0].course_id) : null;
+  }
+  const selectedCourse = (courseOptions || []).find((item) => Number(item.course_id) === Number(selectedCourseId)) || null;
+
+  const subjectsInCourse = (subjectOptions || []).filter(
+    (item) => Number(item.course_id) === Number(selectedCourseId)
+  );
+  const requestedSubjectId = parsePositiveIntStrict(payload.subject_id);
+  let selectedSubject = requestedSubjectId
+    ? ((subjectsInCourse || []).find((item) => Number(item.subject_id) === Number(requestedSubjectId)) || null)
+    : null;
+  if (!selectedSubject && subjectsInCourse.length) {
+    selectedSubject = subjectsInCourse[0];
+  }
+
+  const scopeOptionSet = teacherJournalMode
+    ? JOURNAL_INSIGHTS_SCOPE_OPTIONS
+    : JOURNAL_INSIGHTS_SCOPE_OPTIONS.filter((item) => item.key === 'student');
+  const allowedScopeKeys = new Set((scopeOptionSet || []).map((item) => item.key));
+  let scopeType = normalizeJournalInsightsScope(
+    payload.scope_type,
+    teacherJournalMode ? 'subject' : 'student'
+  );
+  if (!allowedScopeKeys.has(scopeType)) {
+    scopeType = scopeOptionSet.length ? scopeOptionSet[0].key : 'student';
+  }
+  if (scopeType !== 'course' && !selectedSubject && subjectsInCourse.length) {
+    selectedSubject = subjectsInCourse[0];
+  }
+  if (scopeType !== 'course' && !selectedSubject) {
+    scopeType = allowedScopeKeys.has('course') ? 'course' : 'student';
+  }
+  if (!teacherJournalMode) {
+    scopeType = 'student';
+  }
+
+  const period = normalizeJournalInsightsPeriod(payload.period, 'semester');
+  const selectedSemester = selectedCourseId ? await getActiveSemester(selectedCourseId) : null;
+  const selectedSemesterId = selectedSemester ? Number(selectedSemester.id) : null;
+  const periodWindow = resolveJournalInsightsSince(period, selectedSemester?.start_date || '');
+  const sinceIso = periodWindow.sinceIso || '';
+  const sinceDate = periodWindow.sinceDate || '';
+
+  let selectedGroupNumber = parsePositiveIntStrict(payload.group_number);
+  let selectedStudentId = parsePositiveIntStrict(payload.student_id);
+
+  const groupOptionSet = new Set();
+  let studentOptions = [];
+  let scopeRows = [];
+  let rankingRows = [];
+  let courseSubjectSummaries = [];
+  let selectedStudentProfile = null;
+  let activeColumnsCount = 0;
+
+  const stripLeadingAnd = (clause) => String(clause || '').replace(/^\s*AND\s+/i, '').trim();
+
+  const mapRowsToRankingRows = (rows = []) => (
+    (rows || []).map((row) => ({
+      student_id: Number(row?.student?.id || 0),
+      full_name: String(row?.student?.full_name || '').trim() || `Student ${Number(row?.student?.id || 0)}`,
+      group_number: Number(row?.student?.group_number || 0),
+      final_score: roundToPrecision(row?.final_score, 2),
+      weighted_earned: roundToPrecision(row?.weighted_earned, 2),
+      raw_earned: roundToPrecision(row?.raw_earned, 2),
+      raw_max: roundToPrecision(row?.raw_max, 2),
+      subjects_count: 1,
+    }))
+      .filter((row) => Number.isFinite(row.student_id) && row.student_id > 0)
+  );
+
+  if (scopeType === 'course') {
+    const subjects = subjectsInCourse || [];
+    const studentsById = new Map();
+    for (const subject of subjects) {
+      const restrictedGroups = (!journalScope.fullAccess && !subject.has_all_groups)
+        ? new Set(
+          (subject.group_numbers || [])
+            .map((value) => Number(value))
+            .filter((value) => Number.isInteger(value) && value > 0)
+        )
+        : null;
+      const matrix = await buildJournalMatrix({
+        subjectId: Number(subject.subject_id),
+        courseId: Number(subject.course_id),
+        semesterId: selectedSemesterId,
+        actorUserId: Number(req.session.user.id),
+        groupFilterSet: restrictedGroups,
+        studentFilterIds: !teacherJournalMode ? [Number(req.session.user.id)] : [],
+      });
+      const rows = Array.isArray(matrix.rows) ? matrix.rows : [];
+      rows.forEach((row) => {
+        const groupNumber = Number(row?.student?.group_number || 0);
+        if (Number.isInteger(groupNumber) && groupNumber > 0) {
+          groupOptionSet.add(groupNumber);
+        }
+      });
+      const scoreList = rows
+        .map((row) => Number(row.final_score))
+        .filter((value) => Number.isFinite(value));
+      courseSubjectSummaries.push({
+        subject_id: Number(subject.subject_id),
+        subject_name: String(subject.subject_name || ''),
+        students_count: rows.length,
+        average_final_score: scoreList.length ? roundToPrecision(scoreList.reduce((sum, value) => sum + value, 0) / scoreList.length, 2) : 0,
+        at_risk_students: scoreList.filter((value) => value < 60).length,
+      });
+      rows.forEach((row) => {
+        const studentId = Number(row?.student?.id || 0);
+        if (!Number.isFinite(studentId) || studentId < 1) return;
+        if (!studentsById.has(studentId)) {
+          studentsById.set(studentId, {
+            student_id: studentId,
+            full_name: String(row?.student?.full_name || '').trim() || `Student ${studentId}`,
+            group_number: Number(row?.student?.group_number || 0),
+            total_score: 0,
+            subjects_count: 0,
+          });
+        }
+        const target = studentsById.get(studentId);
+        target.total_score += Number(row.final_score || 0);
+        target.subjects_count += 1;
+      });
+    }
+    studentOptions = Array.from(studentsById.values())
+      .map((item) => ({
+        id: Number(item.student_id),
+        full_name: item.full_name,
+        group_number: Number(item.group_number || 0),
+      }))
+      .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || '')));
+    rankingRows = Array.from(studentsById.values())
+      .map((item) => ({
+        student_id: Number(item.student_id),
+        full_name: item.full_name,
+        group_number: Number(item.group_number || 0),
+        final_score: item.subjects_count > 0 ? roundToPrecision(item.total_score / item.subjects_count, 2) : 0,
+        weighted_earned: 0,
+        raw_earned: 0,
+        raw_max: 0,
+        subjects_count: Number(item.subjects_count || 0),
+      }))
+      .filter((item) => item.subjects_count > 0);
+    scopeRows = rankingRows.map((row) => ({
+      final_score: row.final_score,
+      student: {
+        id: row.student_id,
+        full_name: row.full_name,
+        group_number: row.group_number,
+      },
+    }));
+  } else if (selectedSubject) {
+    const restrictedGroups = (!journalScope.fullAccess && !selectedSubject.has_all_groups)
+      ? new Set(
+        (selectedSubject.group_numbers || [])
+          .map((value) => Number(value))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      )
+      : null;
+
+    const matrix = await buildJournalMatrix({
+      subjectId: Number(selectedSubject.subject_id),
+      courseId: Number(selectedSubject.course_id),
+      semesterId: selectedSemesterId,
+      actorUserId: Number(req.session.user.id),
+      groupFilterSet: restrictedGroups,
+      studentFilterIds: !teacherJournalMode ? [Number(req.session.user.id)] : [],
+    });
+    const baseRows = Array.isArray(matrix.rows) ? matrix.rows : [];
+    activeColumnsCount = Array.isArray(matrix.columns) ? matrix.columns.length : 0;
+    baseRows.forEach((row) => {
+      const groupNumber = Number(row?.student?.group_number || 0);
+      if (Number.isInteger(groupNumber) && groupNumber > 0) {
+        groupOptionSet.add(groupNumber);
+      }
+    });
+
+    if (scopeType === 'group') {
+      if (!groupOptionSet.has(Number(selectedGroupNumber))) {
+        selectedGroupNumber = groupOptionSet.size ? Math.min(...Array.from(groupOptionSet.values())) : null;
+      }
+      if (!selectedGroupNumber) {
+        scopeType = 'subject';
+      }
+    }
+
+    const rankingBaseRows = (scopeType === 'group' && selectedGroupNumber)
+      ? baseRows.filter((row) => Number(row?.student?.group_number || 0) === Number(selectedGroupNumber))
+      : baseRows;
+
+    const studentMap = new Map();
+    rankingBaseRows.forEach((row) => {
+      const studentId = Number(row?.student?.id || 0);
+      if (!Number.isFinite(studentId) || studentId < 1) return;
+      if (!studentMap.has(studentId)) {
+        studentMap.set(studentId, {
+          id: studentId,
+          full_name: String(row?.student?.full_name || '').trim() || `Student ${studentId}`,
+          group_number: Number(row?.student?.group_number || 0),
+        });
+      }
+    });
+    studentOptions = Array.from(studentMap.values()).sort((a, b) =>
+      String(a.full_name || '').localeCompare(String(b.full_name || ''))
+    );
+
+    if (scopeType === 'student') {
+      if (!teacherJournalMode) {
+        selectedStudentId = Number(req.session.user.id);
+      }
+      if (!studentOptions.some((item) => Number(item.id) === Number(selectedStudentId))) {
+        selectedStudentId = studentOptions.length ? Number(studentOptions[0].id) : null;
+      }
+      scopeRows = rankingBaseRows.filter((row) => Number(row?.student?.id || 0) === Number(selectedStudentId));
+      selectedStudentProfile = studentOptions.find((item) => Number(item.id) === Number(selectedStudentId)) || null;
+    } else {
+      scopeRows = rankingBaseRows;
+    }
+
+    rankingRows = mapRowsToRankingRows(rankingBaseRows);
+    const scopeScoreList = scopeRows
+      .map((row) => Number(row.final_score))
+      .filter((value) => Number.isFinite(value));
+    courseSubjectSummaries = [{
+      subject_id: Number(selectedSubject.subject_id),
+      subject_name: String(selectedSubject.subject_name || ''),
+      students_count: scopeRows.length,
+      average_final_score: scopeScoreList.length ? roundToPrecision(scopeScoreList.reduce((sum, value) => sum + value, 0) / scopeScoreList.length, 2) : 0,
+      at_risk_students: scopeScoreList.filter((value) => value < 60).length,
+    }];
+  }
+
+  const groupOptions = Array.from(groupOptionSet.values())
+    .filter((value) => Number.isInteger(value) && value > 0)
+    .sort((a, b) => a - b);
+
+  const ranking = buildRankingFromRows(rankingRows);
+  if (!selectedStudentProfile && selectedStudentId) {
+    const matchedRankingRow = ranking.find((item) => Number(item.student_id) === Number(selectedStudentId));
+    if (matchedRankingRow) {
+      selectedStudentProfile = {
+        id: Number(matchedRankingRow.student_id),
+        full_name: String(matchedRankingRow.full_name || ''),
+        group_number: Number(matchedRankingRow.group_number || 0),
+      };
+    }
+  }
+
+  const scopeScoreValues = scopeRows
+    .map((row) => Number(row.final_score))
+    .filter((value) => Number.isFinite(value));
+  const participantsCount = scopeRows.length;
+  const averageScore = scopeScoreValues.length
+    ? roundToPrecision(scopeScoreValues.reduce((sum, value) => sum + value, 0) / scopeScoreValues.length, 2)
+    : 0;
+  const medianScore = computeMedianScore(scopeScoreValues);
+  const topScore = scopeScoreValues.length
+    ? roundToPrecision(Math.max(...scopeScoreValues), 2)
+    : 0;
+  const atRiskCount = scopeScoreValues.filter((value) => value < 60).length;
+  const excellentCount = scopeScoreValues.filter((value) => value >= 90).length;
+
+  const trendSubjectIds = (() => {
+    if (scopeType === 'course') {
+      return Array.from(
+        new Set(
+          (courseSubjectSummaries || [])
+            .map((item) => Number(item.subject_id || 0))
+            .filter((value) => Number.isInteger(value) && value > 0)
+        )
+      );
+    }
+    if (selectedSubject && Number(selectedSubject.subject_id) > 0) {
+      return [Number(selectedSubject.subject_id)];
+    }
+    return [];
+  })();
+
+  let gradeTrend = [];
+  let attendanceTrend = [];
+  if (trendSubjectIds.length && selectedCourseId) {
+    const gradeBucketExpr = buildJournalInsightsGradeBucketSql(period);
+    const gradeWhere = [
+      'jc.course_id = ?',
+      'COALESCE(jc.is_archived, 0) = 0',
+      'jg.deleted_at IS NULL',
+      'jg.graded_at IS NOT NULL',
+    ];
+    const gradeParams = [selectedCourseId];
+    const gradeSemesterFilter = buildJournalMixedSemesterCondition('jc', selectedSemesterId);
+    const gradeSemesterClause = stripLeadingAnd(gradeSemesterFilter.clause);
+    if (gradeSemesterClause) gradeWhere.push(gradeSemesterClause);
+    if (Array.isArray(gradeSemesterFilter.params) && gradeSemesterFilter.params.length) {
+      gradeParams.push(...gradeSemesterFilter.params);
+    }
+    if (trendSubjectIds.length === 1) {
+      gradeWhere.push('jc.subject_id = ?');
+      gradeParams.push(Number(trendSubjectIds[0]));
+    } else {
+      gradeWhere.push('jc.subject_id = ANY(?::int[])');
+      gradeParams.push(trendSubjectIds);
+    }
+    if (sinceIso) {
+      gradeWhere.push('jg.graded_at >= ?');
+      gradeParams.push(sinceIso);
+    }
+    if (scopeType === 'student' && selectedStudentId) {
+      gradeWhere.push('jg.student_id = ?');
+      gradeParams.push(Number(selectedStudentId));
+    }
+    const gradeNeedsGroupJoin = scopeType === 'group' && selectedGroupNumber;
+    const gradeRows = await db.all(
+      `
+        SELECT
+          ${gradeBucketExpr} AS bucket,
+          AVG(
+            CASE
+              WHEN COALESCE(jgm.status, '') IN ('approved', 'adjusted')
+                AND jgm.moderated_score IS NOT NULL
+                THEN (jgm.moderated_score / NULLIF(jc.max_points, 0)) * 100
+              ELSE (jg.score / NULLIF(jc.max_points, 0)) * 100
+            END
+          ) AS avg_score_percent,
+          COUNT(*)::int AS events_count
+        FROM journal_grades jg
+        JOIN journal_columns jc ON jc.id = jg.column_id
+        ${gradeNeedsGroupJoin
+    ? 'JOIN student_groups sg ON sg.student_id = jg.student_id AND sg.subject_id = jc.subject_id'
+    : ''}
+        LEFT JOIN journal_grade_moderations jgm
+          ON jgm.column_id = jg.column_id
+         AND jgm.student_id = jg.student_id
+        WHERE ${gradeWhere.join(' AND ')}
+          ${gradeNeedsGroupJoin ? 'AND sg.group_number = ?' : ''}
+        GROUP BY bucket
+        ORDER BY bucket ASC
+      `,
+      gradeNeedsGroupJoin
+        ? [...gradeParams, Number(selectedGroupNumber)]
+        : gradeParams
+    );
+    gradeTrend = (gradeRows || []).map((row) => ({
+      bucket: String(row.bucket || ''),
+      avg_score_percent: roundToPrecision(row.avg_score_percent, 2),
+      events_count: Number(row.events_count || 0),
+    }));
+
+    const attendanceBucketExpr = buildJournalInsightsAttendanceBucketSql(period);
+    const attendanceWhere = [
+      'ar.course_id = ?',
+    ];
+    const attendanceParams = [selectedCourseId];
+    const attendanceSemesterFilter = buildJournalMixedSemesterCondition('ar', selectedSemesterId);
+    const attendanceSemesterClause = stripLeadingAnd(attendanceSemesterFilter.clause);
+    if (attendanceSemesterClause) attendanceWhere.push(attendanceSemesterClause);
+    if (Array.isArray(attendanceSemesterFilter.params) && attendanceSemesterFilter.params.length) {
+      attendanceParams.push(...attendanceSemesterFilter.params);
+    }
+    if (trendSubjectIds.length === 1) {
+      attendanceWhere.push('ar.subject_id = ?');
+      attendanceParams.push(Number(trendSubjectIds[0]));
+    } else {
+      attendanceWhere.push('ar.subject_id = ANY(?::int[])');
+      attendanceParams.push(trendSubjectIds);
+    }
+    if (sinceDate) {
+      attendanceWhere.push('ar.class_date >= ?');
+      attendanceParams.push(sinceDate);
+    }
+    if (scopeType === 'group' && selectedGroupNumber) {
+      attendanceWhere.push('ar.group_number = ?');
+      attendanceParams.push(Number(selectedGroupNumber));
+    }
+    if (scopeType === 'student' && selectedStudentId) {
+      attendanceWhere.push('ar.student_id = ?');
+      attendanceParams.push(Number(selectedStudentId));
+    }
+    const attendanceRows = await db.all(
+      `
+        SELECT
+          ${attendanceBucketExpr} AS bucket,
+          COUNT(*) FILTER (WHERE ar.status = 'present')::int AS present_count,
+          COUNT(*) FILTER (WHERE ar.status = 'late')::int AS late_count,
+          COUNT(*) FILTER (WHERE ar.status = 'absent')::int AS absent_count,
+          COUNT(*) FILTER (WHERE ar.status = 'excused')::int AS excused_count,
+          COUNT(*)::int AS total_count
+        FROM attendance_records ar
+        WHERE ${attendanceWhere.join(' AND ')}
+        GROUP BY bucket
+        ORDER BY bucket ASC
+      `,
+      attendanceParams
+    );
+    attendanceTrend = (attendanceRows || []).map((row) => ({
+      bucket: String(row.bucket || ''),
+      present_count: Number(row.present_count || 0),
+      late_count: Number(row.late_count || 0),
+      absent_count: Number(row.absent_count || 0),
+      excused_count: Number(row.excused_count || 0),
+      total_count: Number(row.total_count || 0),
+    }));
+  }
+
+  const gradeEventsTotal = gradeTrend.reduce((sum, item) => sum + Number(item.events_count || 0), 0);
+  const attendanceTotal = attendanceTrend.reduce((sum, item) => sum + Number(item.total_count || 0), 0);
+  const attendanceAbsent = attendanceTrend.reduce((sum, item) => sum + Number(item.absent_count || 0), 0);
+  const attendanceLate = attendanceTrend.reduce((sum, item) => sum + Number(item.late_count || 0), 0);
+  const absentShare = attendanceTotal > 0
+    ? roundToPrecision((attendanceAbsent / attendanceTotal) * 100, 2)
+    : 0;
+  const lateShare = attendanceTotal > 0
+    ? roundToPrecision((attendanceLate / attendanceTotal) * 100, 2)
+    : 0;
+  const gradeDelta = gradeTrend.length >= 2
+    ? roundToPrecision(
+      Number(gradeTrend[gradeTrend.length - 1].avg_score_percent || 0)
+      - Number(gradeTrend[0].avg_score_percent || 0),
+      2
+    )
+    : 0;
+
+  const periodLabel = (
+    JOURNAL_INSIGHTS_PERIOD_OPTIONS.find((item) => item.key === period)
+    || JOURNAL_INSIGHTS_PERIOD_OPTIONS[1]
+  ).label;
+
+  const scopeLabel = (() => {
+    if (scopeType === 'course') {
+      return selectedCourse ? `Course ${selectedCourse.course_name}` : 'Course scope';
+    }
+    if (scopeType === 'group') {
+      return `${selectedSubject ? selectedSubject.subject_name : 'Subject'} • Group ${selectedGroupNumber || '-'}`;
+    }
+    if (scopeType === 'student') {
+      return selectedStudentProfile
+        ? `${selectedStudentProfile.full_name} • ${selectedSubject ? selectedSubject.subject_name : 'Subject'}`
+        : (selectedSubject ? selectedSubject.subject_name : 'Student scope');
+    }
+    return selectedSubject ? selectedSubject.subject_name : 'Subject scope';
+  })();
+
+  let canPublishRating = false;
+  let publishDisabledReason = '';
+  let publishTarget = null;
+  if (!teacherJournalMode) {
+    publishDisabledReason = 'Rating publishing is available only in teacher/deanery mode.';
+  } else if (!settingsCache.allow_messages) {
+    publishDisabledReason = 'Messages are disabled in system settings.';
+  } else if (!ranking.length) {
+    publishDisabledReason = 'No ranking data to publish.';
+  } else if (scopeType === 'student') {
+    publishDisabledReason = 'Student scope is personal and cannot be published.';
+  } else if (scopeType === 'course') {
+    canPublishRating = true;
+    publishTarget = {
+      kind: 'course',
+      course_id: Number(selectedCourseId || 0),
+      semester_id: selectedSemesterId || null,
+    };
+  } else if (scopeType === 'group' && selectedSubject && selectedGroupNumber) {
+    canPublishRating = true;
+    publishTarget = {
+      kind: 'group',
+      course_id: Number(selectedCourseId || 0),
+      semester_id: selectedSemesterId || null,
+      subject_id: Number(selectedSubject.subject_id || 0),
+      group_number: Number(selectedGroupNumber || 0),
+    };
+  } else if (scopeType === 'subject' && selectedSubject && groupOptions.length === 1) {
+    canPublishRating = true;
+    publishTarget = {
+      kind: 'group',
+      course_id: Number(selectedCourseId || 0),
+      semester_id: selectedSemesterId || null,
+      subject_id: Number(selectedSubject.subject_id || 0),
+      group_number: Number(groupOptions[0]),
+    };
+  } else {
+    publishDisabledReason = 'Select group scope to publish a ranking for a specific audience.';
+  }
+
+  return {
+    subjectOptions,
+    courseOptions,
+    selectedCourseId,
+    selectedCourse,
+    selectedSubject,
+    selectedSemester,
+    period,
+    periodLabel,
+    periodOptions: JOURNAL_INSIGHTS_PERIOD_OPTIONS,
+    scopeType,
+    scopeOptions: scopeOptionSet,
+    groupOptions,
+    selectedGroupNumber,
+    studentOptions,
+    selectedStudentId,
+    selectedStudentProfile,
+    ranking,
+    rankingTop: ranking.slice(0, 30),
+    scopeRows,
+    courseSubjectSummaries,
+    activeColumnsCount,
+    summary: {
+      participants_count: participantsCount,
+      average_score: averageScore,
+      median_score: medianScore,
+      top_score: topScore,
+      at_risk_count: atRiskCount,
+      excellent_count: excellentCount,
+      grade_events_total: gradeEventsTotal,
+      attendance_records_total: attendanceTotal,
+      attendance_absent_share: absentShare,
+      attendance_late_share: lateShare,
+      grade_delta: gradeDelta,
+    },
+    trends: {
+      bucket_mode: getJournalInsightsBucketMode(period),
+      since_date: sinceDate,
+      grade: gradeTrend,
+      attendance: attendanceTrend,
+    },
+    scopeLabel,
+    canPublishRating,
+    publishDisabledReason,
+    publishTarget,
+    canManageAllSubjects: Boolean(journalScope.fullAccess),
+  };
+}
+
+app.get('/journal/insights', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'journal.insights.init');
+  }
+
+  try {
+    const journalScope = await getJournalAccessScope(req);
+    if (!journalScope.canUseJournal) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    const context = await buildJournalInsightsContext({
+      req,
+      journalScope,
+      teacherJournalMode,
+      payloadSource: req.query || {},
+    });
+
+    const decodeMessage = (rawValue) => {
+      if (!rawValue) return '';
+      try {
+        return decodeURIComponent(String(rawValue));
+      } catch (err) {
+        return String(rawValue);
+      }
+    };
+
+    return res.render('journal-insights', {
+      username: req.session.user.username,
+      role: req.session.role,
+      settings: settingsCache,
+      teacherJournalMode,
+      ...context,
+      error: decodeMessage(req.query.error),
+      success: decodeMessage(req.query.ok),
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'journal.insights.page');
+  }
+});
+
+app.post('/journal/insights/publish-rating', requireLogin, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return res.redirect(buildJournalInsightsUrl({
+      courseId: parsePositiveIntStrict(req.body.course_id, req.session?.user?.course_id),
+      subjectId: parsePositiveIntStrict(req.body.subject_id),
+      scopeType: req.body.scope_type || 'subject',
+      groupNumber: parsePositiveIntStrict(req.body.group_number),
+      studentId: parsePositiveIntStrict(req.body.student_id),
+      period: req.body.period || 'semester',
+      error: 'Database error',
+    }));
+  }
+
+  try {
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const context = await buildJournalInsightsContext({
+      req,
+      journalScope,
+      teacherJournalMode,
+      payloadSource: req.body || {},
+    });
+
+    const baseRedirect = {
+      courseId: Number(context.selectedCourseId || 0),
+      subjectId: Number(context.selectedSubject?.subject_id || 0),
+      scopeType: context.scopeType,
+      groupNumber: Number(context.selectedGroupNumber || 0),
+      studentId: Number(context.selectedStudentId || 0),
+      period: context.period,
+    };
+
+    if (!context.canPublishRating || !context.publishTarget) {
+      return res.redirect(buildJournalInsightsUrl({
+        ...baseRedirect,
+        error: context.publishDisabledReason || 'Rating cannot be published for current scope',
+      }));
+    }
+
+    const topNRaw = Number(req.body.top_n);
+    const topN = Number.isFinite(topNRaw)
+      ? Math.max(3, Math.min(30, Math.round(topNRaw)))
+      : 10;
+    const ratingRows = (context.ranking || []).slice(0, topN);
+    if (!ratingRows.length) {
+      return res.redirect(buildJournalInsightsUrl({
+        ...baseRedirect,
+        error: 'No ranking data to publish',
+      }));
+    }
+
+    const createdAtIso = new Date().toISOString();
+    const createdAtLabel = new Date().toLocaleString('uk-UA');
+    const leaderboardLines = ratingRows.map((row, index) => {
+      const scoreLabel = roundToPrecision(row.final_score, 2).toFixed(2).replace(/\.00$/, '');
+      const subjectsSuffix = Number(row.subjects_count || 0) > 1
+        ? ` (${Number(row.subjects_count)} предмети)`
+        : '';
+      return `${index + 1}. ${row.full_name} — ${scoreLabel}${subjectsSuffix}`;
+    });
+    const messageBody = [
+      `Рейтинг студентів: ${context.scopeLabel}`,
+      `Період: ${context.periodLabel}`,
+      '',
+      ...leaderboardLines,
+      '',
+      `Оновлено: ${createdAtLabel}`,
+    ].join('\n').slice(0, 8000);
+
+    if (context.publishTarget.kind === 'course') {
+      await db.run(
+        `
+          INSERT INTO messages
+            (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
+          VALUES
+            (NULL, NULL, 1, ?, ?, ?, ?, ?, 'published', NULL, ?)
+        `,
+        [
+          messageBody,
+          Number(req.session.user.id),
+          createdAtIso,
+          Number(context.publishTarget.course_id || context.selectedCourseId || req.session.user.course_id || 1),
+          context.publishTarget.semester_id ? Number(context.publishTarget.semester_id) : null,
+          createdAtIso,
+        ]
+      );
+    } else {
+      await db.run(
+        `
+          INSERT INTO messages
+            (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
+          VALUES
+            (?, ?, 0, ?, ?, ?, ?, ?, 'published', NULL, ?)
+        `,
+        [
+          Number(context.publishTarget.subject_id || context.selectedSubject?.subject_id || 0),
+          Number(context.publishTarget.group_number || context.selectedGroupNumber || 0),
+          messageBody,
+          Number(req.session.user.id),
+          createdAtIso,
+          Number(context.publishTarget.course_id || context.selectedCourseId || req.session.user.course_id || 1),
+          context.publishTarget.semester_id ? Number(context.publishTarget.semester_id) : null,
+          createdAtIso,
+        ]
+      );
+    }
+
+    logAction(db, req, 'journal_insights_publish_rating', {
+      scope_type: context.scopeType,
+      scope_label: context.scopeLabel,
+      period: context.period,
+      rating_size: ratingRows.length,
+      target_kind: context.publishTarget.kind,
+      target_subject_id: context.publishTarget.subject_id || null,
+      target_group_number: context.publishTarget.group_number || null,
+      target_course_id: context.publishTarget.course_id || context.selectedCourseId || null,
+    });
+
+    return res.redirect(buildJournalInsightsUrl({
+      ...baseRedirect,
+      ok: 'Rating published',
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'journal.insights.publish');
+  }
+});
 
 app.get('/journal', requireLogin, async (req, res) => {
   try {

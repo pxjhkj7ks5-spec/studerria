@@ -1,6 +1,7 @@
 <%
   const drawerIsSchedule = activePage === 'schedule';
   const drawerIsMyDay = activePage === 'my-day';
+  const drawerIsJournalInsights = activePage === 'journal-insights';
   const drawerIsAdminPathways = activePage === 'admin-pathways';
   const drawerFirstHref = drawerIsMyDay ? '/schedule' : '/home';
   const drawerFirstLabel = drawerIsMyDay ? '📅 Розклад' : '🏠 Головна';
@@ -49,6 +50,9 @@
 
     <a class="drawer-action" href="<%= drawerFirstHref %>"><%= drawerFirstLabel %></a>
     <a class="drawer-action" href="/journal">📘 Журнал</a>
+    <% if (!drawerIsJournalInsights) { %>
+      <a class="drawer-action" href="/journal/insights">📊 Journal insights</a>
+    <% } %>
     <a class="drawer-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
     <a class="drawer-action" href="/subjects">📚 Предмети</a>
     <% if (role === 'teacher') { %>
@@ -91,4 +95,3 @@
     </form>
   </div>
 </aside>
-

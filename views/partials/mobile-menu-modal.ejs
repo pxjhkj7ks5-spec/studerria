@@ -4,6 +4,7 @@
   const isTeamwork = activePage === 'teamwork';
   const isSubjects = activePage === 'subjects';
   const isJournal = activePage === 'journal';
+  const isJournalInsights = activePage === 'journal-insights';
   const isTeacherHub = activePage === 'teacher-hub';
   const isTeacherWorkspace = activePage === 'teacher-workspace';
   const isAdminPathways = activePage === 'admin-pathways';
@@ -53,6 +54,9 @@
           <% } %>
           <% if (!isJournal) { %>
             <a class="btn w-100 glass mobile-menu-action" href="/journal">📘 Журнал</a>
+          <% } %>
+          <% if (!isJournalInsights) { %>
+            <a class="btn w-100 glass mobile-menu-action" href="/journal/insights">Journal insights</a>
           <% } %>
           <% if (!isTeamwork) { %>
             <a class="btn w-100 glass mobile-menu-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>

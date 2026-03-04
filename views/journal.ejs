@@ -77,6 +77,14 @@
                   <span class="status-chip status-chip--success">Повний доступ</span>
                 <% } %>
               </div>
+              <div class="d-flex justify-content-lg-end mt-2">
+                <a
+                  class="btn btn-sm btn-outline-secondary"
+                  href="/journal/insights?course_id=<%= Number(selectedSubject.course_id || 0) %>&subject_id=<%= Number(selectedSubject.subject_id || 0) %>&scope_type=subject&period=semester"
+                >
+                  📊 Journal insights
+                </a>
+              </div>
             <% } %>
           </div>
         </form>

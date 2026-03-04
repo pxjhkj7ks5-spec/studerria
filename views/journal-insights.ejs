@@ -1,0 +1,520 @@
+<%
+  const selectedCourseValue = Number(selectedCourseId || 0);
+  const selectedSubjectValue = selectedSubject ? Number(selectedSubject.subject_id || 0) : 0;
+  const selectedGroupValue = Number(selectedGroupNumber || 0);
+  const selectedStudentValue = Number(selectedStudentId || 0);
+  const periodValue = period || 'semester';
+  const scopeValue = scopeType || 'subject';
+  const scopeLabelValue = scopeLabel || 'Scope';
+  const gradeTrend = (trends && Array.isArray(trends.grade)) ? trends.grade : [];
+  const attendanceTrend = (trends && Array.isArray(trends.attendance)) ? trends.attendance : [];
+  const gradeMax = Math.max(100, ...gradeTrend.map((item) => Number(item.avg_score_percent || 0)));
+%>
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Journal insights</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/css/design-system.css" />
+    <style>
+      :root {
+        --insights-border-dark: rgba(255, 255, 255, 0.14);
+        --insights-border-light: rgba(15, 23, 42, 0.12);
+        --insights-bg-dark: rgba(255, 255, 255, 0.06);
+        --insights-bg-light: rgba(255, 255, 255, 0.74);
+      }
+      body {
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+      }
+      body.theme-dark {
+        background:
+          radial-gradient(1200px 740px at 10% 6%, rgba(56, 189, 248, 0.18), transparent 64%),
+          radial-gradient(1000px 700px at 84% 20%, rgba(99, 102, 241, 0.18), transparent 62%),
+          linear-gradient(150deg, #071024 0%, #101a33 52%, #14253f 100%);
+        color: #f8fafc;
+      }
+      body.theme-light {
+        background:
+          radial-gradient(1200px 740px at 12% 8%, rgba(186, 230, 253, 0.55), transparent 64%),
+          radial-gradient(1000px 700px at 84% 20%, rgba(221, 214, 254, 0.56), transparent 62%),
+          linear-gradient(126deg, #e8eff9 0%, #eef5ff 52%, #f6f9ff 100%);
+        color: #0f172a;
+      }
+      .shell {
+        padding-top: 24px;
+        padding-bottom: 48px;
+      }
+      .glass {
+        border-radius: 22px;
+        backdrop-filter: blur(18px);
+      }
+      body.theme-dark .glass {
+        border: 1px solid var(--insights-border-dark);
+        background: var(--insights-bg-dark);
+        box-shadow: 0 18px 46px rgba(2, 6, 23, 0.5);
+      }
+      body.theme-light .glass {
+        border: 1px solid var(--insights-border-light);
+        background: var(--insights-bg-light);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+      }
+      .hero {
+        padding: 24px;
+      }
+      .hero-title {
+        margin: 0;
+        font-size: clamp(1.8rem, 2.9vw, 2.5rem);
+        font-weight: 700;
+      }
+      .hero-subtitle {
+        margin-top: 10px;
+        max-width: 900px;
+        color: rgba(226, 232, 240, 0.82);
+      }
+      body.theme-light .hero-subtitle {
+        color: rgba(15, 23, 42, 0.62);
+      }
+      .chip-row {
+        margin-top: 14px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .chip {
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.32);
+        background: rgba(15, 23, 42, 0.3);
+        padding: 5px 12px;
+        font-size: 0.82rem;
+      }
+      body.theme-light .chip {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.88);
+      }
+      .section {
+        padding: 20px;
+      }
+      .section-title {
+        margin: 0;
+        font-size: 1.08rem;
+        font-weight: 650;
+      }
+      .soft-panel {
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        background: rgba(15, 23, 42, 0.26);
+        padding: 14px;
+      }
+      body.theme-light .soft-panel {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.88);
+      }
+      .compact-select,
+      .compact-input {
+        min-height: 40px;
+        border-radius: 11px;
+        border: 1px solid rgba(148, 163, 184, 0.34);
+      }
+      body.theme-dark .compact-select,
+      body.theme-dark .compact-input {
+        background: rgba(255, 255, 255, 0.06);
+        color: #f8fafc;
+        border-color: rgba(148, 163, 184, 0.28);
+      }
+      body.theme-light .compact-select,
+      body.theme-light .compact-input {
+        background: rgba(255, 255, 255, 0.92);
+      }
+      .summary-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      }
+      .summary-card {
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        background: rgba(15, 23, 42, 0.28);
+        padding: 12px;
+      }
+      body.theme-light .summary-card {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.9);
+      }
+      .summary-label {
+        font-size: 0.78rem;
+        color: rgba(203, 213, 225, 0.74);
+      }
+      body.theme-light .summary-label {
+        color: rgba(15, 23, 42, 0.6);
+      }
+      .summary-value {
+        margin-top: 4px;
+        font-size: 1.42rem;
+        font-weight: 700;
+      }
+      .table-shell {
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      .table-shell .table {
+        margin-bottom: 0;
+      }
+      .trend-grid {
+        display: grid;
+        gap: 8px;
+      }
+      .trend-row {
+        display: grid;
+        grid-template-columns: 120px 1fr auto;
+        gap: 10px;
+        align-items: center;
+      }
+      .trend-label {
+        font-size: 0.82rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .trend-bar-track {
+        border-radius: 999px;
+        height: 10px;
+        background: rgba(148, 163, 184, 0.24);
+        overflow: hidden;
+      }
+      .trend-bar {
+        height: 10px;
+        width: var(--w, 0%);
+        border-radius: 999px;
+        background: linear-gradient(90deg, #38bdf8 0%, #818cf8 100%);
+      }
+      .trend-value {
+        font-weight: 600;
+        font-size: 0.82rem;
+      }
+    </style>
+  </head>
+  <body class="theme-dark">
+    <%- include('partials/topbar', { role, username, t, activePage: 'journal-insights', pageTitle: 'Journal insights', settings: settings }) %>
+    <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'journal-insights', settings: settings }) %>
+
+    <main class="container shell">
+      <% if (error) { %>
+        <div class="alert alert-danger glass mb-3"><%= error %></div>
+      <% } %>
+      <% if (success) { %>
+        <div class="alert alert-success glass mb-3"><%= success %></div>
+      <% } %>
+
+      <section class="glass hero mb-3">
+        <h1 class="hero-title">Journal insights</h1>
+        <p class="hero-subtitle">
+          Динаміка оцінок і відвідуваності за періоди, з гнучкими зрізами: студент, група, предмет або курс. Підтримано швидку публікацію рейтингу за семестр/період.
+        </p>
+        <div class="chip-row">
+          <span class="chip"><%= scopeLabelValue %></span>
+          <span class="chip">Period: <%= periodLabel %></span>
+          <span class="chip">Participants: <%= Number(summary && summary.participants_count ? summary.participants_count : 0) %></span>
+          <% if (selectedSemester && selectedSemester.title) { %>
+            <span class="chip"><%= selectedSemester.title %></span>
+          <% } %>
+        </div>
+      </section>
+
+      <section class="glass section mb-3">
+        <h2 class="section-title">Filters</h2>
+        <form method="GET" action="/journal/insights" class="row g-2 mt-1">
+          <div class="col-12 col-md-3">
+            <label class="form-label small" for="insightsCourse">Course</label>
+            <select id="insightsCourse" class="form-select compact-select" name="course_id">
+              <% (courseOptions || []).forEach((course) => { %>
+                <option value="<%= course.course_id %>" <%= Number(course.course_id) === selectedCourseValue ? 'selected' : '' %>><%= course.course_name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label small" for="insightsScope">Scope</label>
+            <select id="insightsScope" class="form-select compact-select" name="scope_type">
+              <% (scopeOptions || []).forEach((scope) => { %>
+                <option value="<%= scope.key %>" <%= scope.key === scopeValue ? 'selected' : '' %>><%= scope.label %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label small" for="insightsPeriod">Period</label>
+            <select id="insightsPeriod" class="form-select compact-select" name="period">
+              <% (periodOptions || []).forEach((item) => { %>
+                <option value="<%= item.key %>" <%= item.key === periodValue ? 'selected' : '' %>><%= item.label %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12 col-md-3 align-self-end d-grid">
+            <button class="btn btn-primary" type="submit">Apply</button>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label small" for="insightsSubject">Subject</label>
+            <select id="insightsSubject" class="form-select compact-select" name="subject_id" <%= scopeValue === 'course' ? 'disabled' : '' %>>
+              <% if (!(subjectOptions || []).length) { %>
+                <option value="">No subject access</option>
+              <% } else { %>
+                <% (subjectOptions || []).filter((subject) => Number(subject.course_id) === selectedCourseValue).forEach((subject) => { %>
+                  <option value="<%= subject.subject_id %>" <%= Number(subject.subject_id) === selectedSubjectValue ? 'selected' : '' %>>
+                    <%= subject.subject_name %> · <%= subject.group_label %>
+                  </option>
+                <% }) %>
+              <% } %>
+            </select>
+            <% if (scopeValue === 'course') { %>
+              <input type="hidden" name="subject_id" value="<%= selectedSubjectValue %>" />
+            <% } %>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label small" for="insightsGroup">Group</label>
+            <select id="insightsGroup" class="form-select compact-select" name="group_number" <%= scopeValue === 'group' ? '' : 'disabled' %>>
+              <option value="">All groups</option>
+              <% (groupOptions || []).forEach((groupNumber) => { %>
+                <option value="<%= groupNumber %>" <%= Number(groupNumber) === selectedGroupValue ? 'selected' : '' %>>
+                  Group <%= groupNumber %>
+                </option>
+              <% }) %>
+            </select>
+            <% if (scopeValue !== 'group') { %>
+              <input type="hidden" name="group_number" value="<%= selectedGroupValue || '' %>" />
+            <% } %>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label small" for="insightsStudent">Student</label>
+            <select id="insightsStudent" class="form-select compact-select" name="student_id" <%= scopeValue === 'student' ? '' : 'disabled' %>>
+              <option value="">Select student</option>
+              <% (studentOptions || []).forEach((student) => { %>
+                <option value="<%= student.id %>" <%= Number(student.id) === selectedStudentValue ? 'selected' : '' %>>
+                  <%= student.full_name %> · Група <%= Number(student.group_number || 0) %>
+                </option>
+              <% }) %>
+            </select>
+            <% if (scopeValue !== 'student') { %>
+              <input type="hidden" name="student_id" value="<%= selectedStudentValue || '' %>" />
+            <% } %>
+          </div>
+
+          <div class="col-12 d-flex gap-2 flex-wrap mt-1">
+            <a class="btn btn-outline-secondary" href="/journal<%= selectedSubjectValue ? `?subject_id=${selectedSubjectValue}` : '' %>">Back to journal</a>
+          </div>
+        </form>
+      </section>
+
+      <% if (teacherJournalMode) { %>
+        <section class="glass section mb-3">
+          <h2 class="section-title">Publish rating</h2>
+          <% if (canPublishRating) { %>
+            <form method="POST" action="/journal/insights/publish-rating" class="soft-panel row g-2 align-items-end">
+              <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+              <input type="hidden" name="subject_id" value="<%= selectedSubjectValue %>" />
+              <input type="hidden" name="scope_type" value="<%= scopeValue %>" />
+              <input type="hidden" name="group_number" value="<%= selectedGroupValue || '' %>" />
+              <input type="hidden" name="student_id" value="<%= selectedStudentValue || '' %>" />
+              <input type="hidden" name="period" value="<%= periodValue %>" />
+              <div class="col-12 col-md-3">
+                <label class="form-label small" for="publishTopN">Top N</label>
+                <input id="publishTopN" class="form-control compact-input" type="number" min="3" max="30" name="top_n" value="10" />
+              </div>
+              <div class="col-12 col-md-9 d-grid">
+                <button class="btn btn-primary" type="submit">Publish ranking to messages</button>
+              </div>
+            </form>
+          <% } else { %>
+            <div class="soft-panel">
+              <span class="text-muted"><%= publishDisabledReason || 'Select a valid scope to publish rating.' %></span>
+            </div>
+          <% } %>
+        </section>
+      <% } %>
+
+      <section class="glass section mb-3">
+        <h2 class="section-title">Summary</h2>
+        <div class="summary-grid mt-2">
+          <div class="summary-card">
+            <div class="summary-label">Average score</div>
+            <div class="summary-value"><%= Number(summary && summary.average_score ? summary.average_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Median</div>
+            <div class="summary-value"><%= Number(summary && summary.median_score ? summary.median_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Top score</div>
+            <div class="summary-value"><%= Number(summary && summary.top_score ? summary.top_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">At risk (&lt;60)</div>
+            <div class="summary-value"><%= Number(summary && summary.at_risk_count ? summary.at_risk_count : 0) %></div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Excellent (90+)</div>
+            <div class="summary-value"><%= Number(summary && summary.excellent_count ? summary.excellent_count : 0) %></div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Grade trend delta</div>
+            <div class="summary-value"><%= Number(summary && summary.grade_delta ? summary.grade_delta : 0).toFixed(2).replace(/\.00$/, '') %></div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Attendance absent share</div>
+            <div class="summary-value"><%= Number(summary && summary.attendance_absent_share ? summary.attendance_absent_share : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Attendance late share</div>
+            <div class="summary-value"><%= Number(summary && summary.attendance_late_share ? summary.attendance_late_share : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="row g-3 mb-3">
+        <div class="col-12 col-xl-7">
+          <article class="glass section h-100">
+            <h2 class="section-title">Ranking</h2>
+            <div class="table-shell mt-2">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Student</th>
+                      <th>Group</th>
+                      <th>Score</th>
+                      <th>Subjects</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% if (!(rankingTop || []).length) { %>
+                      <tr>
+                        <td colspan="5" class="text-muted">No ranking data in selected scope.</td>
+                      </tr>
+                    <% } %>
+                    <% (rankingTop || []).forEach((row) => { %>
+                      <tr>
+                        <td><%= row.rank %></td>
+                        <td><%= row.full_name %></td>
+                        <td><%= Number(row.group_number || 0) || '-' %></td>
+                        <td><strong><%= Number(row.final_score || 0).toFixed(2).replace(/\.00$/, '') %></strong></td>
+                        <td><%= Number(row.subjects_count || 1) %></td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="col-12 col-xl-5">
+          <article class="glass section h-100">
+            <h2 class="section-title">Subject mix</h2>
+            <div class="table-shell mt-2">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Subject</th>
+                      <th>Students</th>
+                      <th>Avg</th>
+                      <th>Risk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% if (!(courseSubjectSummaries || []).length) { %>
+                      <tr>
+                        <td colspan="4" class="text-muted">No subject summaries.</td>
+                      </tr>
+                    <% } %>
+                    <% (courseSubjectSummaries || []).forEach((item) => { %>
+                      <tr>
+                        <td><%= item.subject_name %></td>
+                        <td><%= Number(item.students_count || 0) %></td>
+                        <td><%= Number(item.average_final_score || 0).toFixed(2).replace(/\.00$/, '') %></td>
+                        <td><%= Number(item.at_risk_students || 0) %></td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="row g-3">
+        <div class="col-12 col-xl-6">
+          <article class="glass section h-100">
+            <h2 class="section-title">Grades trend</h2>
+            <div class="trend-grid mt-2">
+              <% if (!gradeTrend.length) { %>
+                <div class="text-muted">No grade trend data for selected filters.</div>
+              <% } %>
+              <% gradeTrend.forEach((item) => { %>
+                <% const value = Number(item.avg_score_percent || 0); %>
+                <div class="trend-row">
+                  <div class="trend-label"><%= item.bucket %></div>
+                  <div class="trend-bar-track">
+                    <div class="trend-bar" style="--w: <%= Math.max(0, Math.min(100, (value / gradeMax) * 100)) %>%"></div>
+                  </div>
+                  <div class="trend-value"><%= value.toFixed(2).replace(/\.00$/, '') %>%</div>
+                </div>
+              <% }) %>
+            </div>
+          </article>
+        </div>
+        <div class="col-12 col-xl-6">
+          <article class="glass section h-100">
+            <h2 class="section-title">Attendance trend</h2>
+            <div class="trend-grid mt-2">
+              <% if (!attendanceTrend.length) { %>
+                <div class="text-muted">No attendance trend data for selected filters.</div>
+              <% } %>
+              <% attendanceTrend.forEach((item) => { %>
+                <% const total = Number(item.total_count || 0); %>
+                <% const absentShare = total > 0 ? (Number(item.absent_count || 0) / total) * 100 : 0; %>
+                <div class="trend-row">
+                  <div class="trend-label"><%= item.bucket %></div>
+                  <div class="trend-bar-track">
+                    <div class="trend-bar" style="--w: <%= Math.max(0, Math.min(100, absentShare)) %>%"></div>
+                  </div>
+                  <div class="trend-value"><%= absentShare.toFixed(2).replace(/\.00$/, '') %>% absent</div>
+                </div>
+              <% }) %>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <%- include('partials/app-footer') %>
+    </main>
+
+    <%- include('partials/changelog-modal') %>
+    <%- include('partials/mobile-menu-modal', { role, t, activePage: 'journal-insights', settings: settings }) %>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <%- include('partials/desktop-menu-drawer-script') %>
+    <script src="/js/design-system.js" defer></script>
+    <script>
+      (function applyTheme() {
+        const storedTheme = localStorage.getItem('ui-theme') || 'theme-dark';
+        document.body.classList.remove('theme-dark', 'theme-light');
+        document.body.classList.add(storedTheme);
+      })();
+    </script>
+  </body>
+</html>
