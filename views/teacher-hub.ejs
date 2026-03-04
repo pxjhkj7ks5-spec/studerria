@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Teacher hub</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/css/design-system.css" />
+    <style>
+      :root {
+        --hub-border-dark: rgba(255, 255, 255, 0.14);
+        --hub-border-light: rgba(15, 23, 42, 0.12);
+        --hub-bg-dark: rgba(255, 255, 255, 0.06);
+        --hub-bg-light: rgba(255, 255, 255, 0.7);
+      }
+      body {
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+          "Helvetica Neue", "Inter", Arial, sans-serif;
+      }
+      body.theme-dark {
+        background:
+          radial-gradient(1200px 800px at 12% 6%, rgba(56, 189, 248, 0.16), transparent 62%),
+          radial-gradient(1000px 720px at 84% 16%, rgba(129, 140, 248, 0.2), transparent 64%),
+          linear-gradient(150deg, #070c18 0%, #101b31 48%, #15263f 100%);
+        color: #f8fafc;
+      }
+      body.theme-light {
+        background:
+          radial-gradient(1200px 800px at 15% 8%, rgba(125, 211, 252, 0.2), transparent 62%),
+          radial-gradient(1000px 720px at 84% 16%, rgba(167, 139, 250, 0.2), transparent 64%),
+          linear-gradient(130deg, #e8eff9 0%, #eef4ff 48%, #f6f8ff 100%);
+        color: #0f172a;
+      }
+      .hub-shell {
+        padding-top: 24px;
+        padding-bottom: 48px;
+      }
+      .glass {
+        border-radius: 22px;
+        backdrop-filter: blur(18px);
+      }
+      body.theme-dark .glass {
+        border: 1px solid var(--hub-border-dark);
+        background: var(--hub-bg-dark);
+        box-shadow: 0 18px 44px rgba(2, 6, 23, 0.5);
+      }
+      body.theme-light .glass {
+        border: 1px solid var(--hub-border-light);
+        background: var(--hub-bg-light);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+      }
+      .hub-hero {
+        padding: 24px;
+      }
+      .hub-title {
+        margin: 0;
+        font-size: clamp(1.8rem, 2.8vw, 2.4rem);
+        font-weight: 700;
+      }
+      .hub-subtitle {
+        margin: 10px 0 0;
+        max-width: 760px;
+        color: rgba(226, 232, 240, 0.82);
+      }
+      body.theme-light .hub-subtitle {
+        color: rgba(15, 23, 42, 0.66);
+      }
+      .hub-actions {
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .btn-hub {
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(248, 250, 252, 0.94);
+        font-weight: 600;
+      }
+      .btn-hub:hover {
+        background: rgba(255, 255, 255, 0.18);
+        color: rgba(248, 250, 252, 1);
+      }
+      body.theme-light .btn-hub {
+        border-color: rgba(15, 23, 42, 0.16);
+        background: rgba(255, 255, 255, 0.9);
+        color: #0f172a;
+      }
+      body.theme-light .btn-hub:hover {
+        background: #ffffff;
+      }
+      .hub-panel {
+        padding: 20px;
+      }
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+      }
+      .stat-card {
+        border-radius: 14px;
+        padding: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        background: rgba(15, 23, 42, 0.28);
+      }
+      body.theme-light .stat-card {
+        background: rgba(255, 255, 255, 0.86);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .stat-label {
+        font-size: 0.78rem;
+        color: rgba(203, 213, 225, 0.72);
+      }
+      body.theme-light .stat-label {
+        color: rgba(15, 23, 42, 0.58);
+      }
+      .stat-value {
+        margin-top: 4px;
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+      .quick-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+      }
+      .quick-card {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        text-decoration: none;
+        border-radius: 14px;
+        padding: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        background: rgba(15, 23, 42, 0.3);
+        color: inherit;
+      }
+      .quick-card:hover {
+        border-color: rgba(125, 211, 252, 0.44);
+        transform: translateY(-1px);
+      }
+      body.theme-light .quick-card {
+        background: rgba(255, 255, 255, 0.88);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .quick-title {
+        font-size: 1rem;
+        font-weight: 650;
+      }
+      .quick-desc {
+        font-size: 0.84rem;
+        color: rgba(203, 213, 225, 0.76);
+      }
+      body.theme-light .quick-desc {
+        color: rgba(15, 23, 42, 0.6);
+      }
+      .course-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 10px;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        background: rgba(15, 23, 42, 0.28);
+        font-size: 0.8rem;
+      }
+      body.theme-light .course-chip {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.88);
+      }
+    </style>
+  </head>
+  <body class="theme-dark">
+    <%- include('partials/topbar', { role, username, t, activePage: 'teacher-hub', pageTitle: 'Teacher hub' }) %>
+    <%- include('partials/desktop-menu-drawer', {
+      role,
+      t,
+      activePage: 'teacher-hub',
+      settings: (typeof settings !== 'undefined') ? settings : null,
+    }) %>
+
+    <main class="container hub-shell">
+      <% if (error) { %>
+        <div class="alert alert-danger glass mb-3"><%= error %></div>
+      <% } %>
+      <% if (success) { %>
+        <div class="alert alert-success glass mb-3"><%= success %></div>
+      <% } %>
+
+      <section class="glass hub-hero mb-3">
+        <h1 class="hub-title">Teacher hub</h1>
+        <p class="hub-subtitle">
+          Centralized workspace for teaching flow: subjects, reusable templates, schedule operations, and journal.
+        </p>
+        <div class="hub-actions">
+          <a class="btn btn-hub" href="/schedule">Schedule</a>
+          <a class="btn btn-hub" href="/teacher/workspace">Template workspace</a>
+          <a class="btn btn-hub" href="/teacher/subjects">Teacher subjects</a>
+          <a class="btn btn-hub" href="/journal">Journal</a>
+        </div>
+      </section>
+
+      <section class="row g-3">
+        <div class="col-12 col-xl-5">
+          <article class="glass hub-panel h-100">
+            <h5 class="mb-3">Snapshot</h5>
+            <div class="stat-grid">
+              <div class="stat-card">
+                <div class="stat-label">Assigned subjects</div>
+                <div class="stat-value"><%= Number(stats && stats.subjects ? stats.subjects : 0) %></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Courses</div>
+                <div class="stat-value"><%= Number(stats && stats.courses ? stats.courses : 0) %></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Saved templates</div>
+                <div class="stat-value"><%= Number(stats && stats.templates ? stats.templates : 0) %></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Homework created</div>
+                <div class="stat-value"><%= Number(stats && stats.created_homework ? stats.created_homework : 0) %></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Last 30 days</div>
+                <div class="stat-value"><%= Number(stats && stats.recent_homework ? stats.recent_homework : 0) %></div>
+              </div>
+            </div>
+          </article>
+        </div>
+        <div class="col-12 col-xl-7">
+          <article class="glass hub-panel h-100">
+            <h5 class="mb-3">Quick actions</h5>
+            <div class="quick-grid">
+              <a class="quick-card" href="/teacher/workspace">
+                <span class="quick-title">Manage templates</span>
+                <span class="quick-desc">Create, edit, clone, and bulk-manage homework templates.</span>
+              </a>
+              <a class="quick-card" href="/teacher/subjects">
+                <span class="quick-title">Update teaching scope</span>
+                <span class="quick-desc">Adjust subject and group mapping for your teaching load.</span>
+              </a>
+              <a class="quick-card" href="/schedule">
+                <span class="quick-title">Open schedule flow</span>
+                <span class="quick-desc">Create homework from class cards and apply templates instantly.</span>
+              </a>
+              <a class="quick-card" href="/journal">
+                <span class="quick-title">Go to journal</span>
+                <span class="quick-desc">Review grading dynamics and progress by subject and group.</span>
+              </a>
+            </div>
+            <% if ((teacherCourses || []).length) { %>
+              <div class="mt-3 d-flex flex-wrap gap-2">
+                <% (teacherCourses || []).forEach(function(course) { %>
+                  <span class="course-chip"><%= course.name %></span>
+                <% }) %>
+              </div>
+            <% } %>
+          </article>
+        </div>
+      </section>
+
+      <%- include('partials/app-footer') %>
+    </main>
+
+    <%- include('partials/changelog-modal') %>
+    <%- include('partials/mobile-menu-modal', {
+      role,
+      t,
+      activePage: 'teacher-hub',
+      settings: (typeof settings !== 'undefined') ? settings : null,
+    }) %>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <%- include('partials/desktop-menu-drawer-script') %>
+    <script src="/js/design-system.js" defer></script>
+    <script>
+      (function applyTheme() {
+        const storedTheme = localStorage.getItem('ui-theme') || 'theme-dark';
+        document.body.classList.remove('theme-dark', 'theme-light');
+        document.body.classList.add(storedTheme);
+      })();
+    </script>
+  </body>
+</html>

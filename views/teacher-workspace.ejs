@@ -345,6 +345,12 @@
   </head>
   <body class="theme-dark">
     <%- include('partials/topbar', { role, username, t, activePage: 'teacher-workspace', pageTitle: 'Teacher workspace' }) %>
+    <%- include('partials/desktop-menu-drawer', {
+      role,
+      t,
+      activePage: 'teacher-workspace',
+      settings: (typeof settings !== 'undefined') ? settings : null,
+    }) %>
 
     <main class="container workspace-shell">
       <% if (error) { %>
@@ -360,6 +366,7 @@
           Build reusable homework templates and apply them in one click from class cards in schedule modal.
         </p>
         <div class="hero-actions">
+          <a class="btn btn-glass" href="/teacher">Teacher hub</a>
           <a class="btn btn-glass" href="/schedule">Schedule</a>
           <a class="btn btn-glass" href="/teacher/subjects">My subjects</a>
           <a class="btn btn-glass" href="/journal">Journal</a>
@@ -828,6 +835,7 @@
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
+    <%- include('partials/desktop-menu-drawer-script') %>
     <script>
       (function applyTheme() {
         const storedTheme = localStorage.getItem('ui-theme') || 'theme-dark';

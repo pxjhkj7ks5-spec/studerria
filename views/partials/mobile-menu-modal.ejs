@@ -4,6 +4,7 @@
   const isTeamwork = activePage === 'teamwork';
   const isSubjects = activePage === 'subjects';
   const isJournal = activePage === 'journal';
+  const isTeacherHub = activePage === 'teacher-hub';
   const isTeacherWorkspace = activePage === 'teacher-workspace';
   const mobileSettings = (typeof settings !== 'undefined') ? settings : null;
   const mobileHasCustomAdminPanelAccess = (typeof hasCustomAdminPanelAccess !== 'undefined')
@@ -47,6 +48,9 @@
             <a class="btn w-100 glass mobile-menu-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
           <% } else { %>
             <a class="btn w-100 glass mobile-menu-action" href="/schedule">📅 Повернутись до розкладу</a>
+          <% } %>
+          <% if (role === 'teacher' && !isTeacherHub) { %>
+            <a class="btn w-100 glass mobile-menu-action" href="/teacher">Teacher hub</a>
           <% } %>
           <% if (role === 'teacher' && !isTeacherWorkspace) { %>
             <a class="btn w-100 glass mobile-menu-action" href="/teacher/workspace">Teacher workspace</a>

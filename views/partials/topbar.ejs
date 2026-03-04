@@ -5,6 +5,7 @@
   const isTeamwork = activePage === 'teamwork';
   const isSubjects = activePage === 'subjects';
   const isJournal = activePage === 'journal';
+  const isTeacherHub = activePage === 'teacher-hub';
   const isTeacherWorkspace = activePage === 'teacher-workspace';
   const brandTitle = isSchedule ? 'Studerria' : (pageTitle || 'Studerria');
 %>
@@ -80,7 +81,7 @@
         >
           ☰
         </button>
-      <% } else if (isSubjects || isJournal || isTeamwork || isProfile) { %>
+      <% } else if (isSubjects || isJournal || isTeamwork || isProfile || isTeacherHub || isTeacherWorkspace) { %>
         <span class="me-2 muted desktop-only text-nowrap">
           <% if (role === 'admin') { %>
             <%= t('role.admin') %>: <%= username %>
@@ -161,6 +162,9 @@
         <% } %>
         <% if (!isMyDay && !isTeamwork) { %>
           <a class="btn btn-glass me-1 desktop-only" href="/teamwork"><%= t('menu.teamwork') %></a>
+        <% } %>
+        <% if (role === 'teacher' && !isMyDay && !isTeacherHub) { %>
+          <a class="btn btn-glass me-1 desktop-only" href="/teacher">Teacher hub</a>
         <% } %>
         <% if (role === 'teacher' && !isMyDay && !isTeacherWorkspace) { %>
           <a class="btn btn-glass me-1 desktop-only" href="/teacher/workspace">Teacher workspace</a>

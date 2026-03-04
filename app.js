@@ -6574,6 +6574,70 @@ app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
   }
 });
 
+app.get('/teacher', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.hub.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
+  }
+  const { id: userId, username } = req.session.user;
+  const decodeMessage = (value) => {
+    if (!value) return '';
+    try {
+      return decodeURIComponent(String(value));
+    } catch (err) {
+      return String(value);
+    }
+  };
+  try {
+    const teacherSubjects = await getTeacherAssignedSubjects(userId);
+    const teacherCourses = buildTeacherCourseList(teacherSubjects);
+    const uniqueSubjectIds = new Set(
+      (teacherSubjects || [])
+        .map((row) => Number(row.subject_id))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
+    const templatesCountRow = await db.get(
+      'SELECT COUNT(*) AS count FROM teacher_homework_templates WHERE user_id = ?',
+      [userId]
+    );
+    const createdHomeworkCountRow = await db.get(
+      'SELECT COUNT(*) AS count FROM homework WHERE created_by_id = ? AND is_teacher_homework = 1',
+      [userId]
+    );
+    const recentHomeworkCountRow = await db.get(
+      `
+        SELECT COUNT(*) AS count
+        FROM homework
+        WHERE created_by_id = ?
+          AND is_teacher_homework = 1
+          AND created_at >= NOW() - INTERVAL '30 days'
+      `,
+      [userId]
+    );
+
+    return res.render('teacher-hub', {
+      role: 'teacher',
+      username,
+      stats: {
+        subjects: uniqueSubjectIds.size,
+        courses: teacherCourses.length,
+        templates: Number(templatesCountRow && templatesCountRow.count ? templatesCountRow.count : 0),
+        created_homework: Number(createdHomeworkCountRow && createdHomeworkCountRow.count ? createdHomeworkCountRow.count : 0),
+        recent_homework: Number(recentHomeworkCountRow && recentHomeworkCountRow.count ? recentHomeworkCountRow.count : 0),
+      },
+      teacherCourses,
+      error: decodeMessage(req.query.error),
+      success: decodeMessage(req.query.ok),
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.hub');
+  }
+});
+
 app.get('/teacher/subjects', requireLogin, async (req, res) => {
   try {
     await ensureDbReady();

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.67",
+      "date": "2026-03-05",
+      "items": [
+        "feat(teacher-hub): added dedicated `/teacher` hub page with teacher snapshot metrics and quick actions for schedule/workspace/subjects/journal",
+        "ux(teacher-navigation): wired Teacher Hub into topbar, desktop drawer, and mobile menu to separate teacher flow from admin-centric navigation",
+        "ux(teacher-workspace-navigation): connected teacher workspace to shared drawer navigation and added direct Teacher Hub shortcut in workspace hero"
+      ]
+    },
+    {
       "version": "1.0.66",
       "date": "2026-03-05",
       "items": [

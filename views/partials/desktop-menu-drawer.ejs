@@ -40,6 +40,11 @@
     <a class="drawer-action" href="/journal">📘 Журнал</a>
     <a class="drawer-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
     <a class="drawer-action" href="/subjects">📚 Предмети</a>
+    <% if (role === 'teacher') { %>
+      <a class="drawer-action" href="/teacher">🎛️ Teacher hub</a>
+      <a class="drawer-action" href="/teacher/workspace">🧩 Teacher workspace</a>
+      <a class="drawer-action" href="/teacher/subjects">🗂️ Teacher subjects</a>
+    <% } %>
 
     <% if (canShowCustomDeadlines) { %>
       <% if (drawerIsSchedule) { %>
