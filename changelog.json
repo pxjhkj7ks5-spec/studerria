@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.66",
+      "date": "2026-03-05",
+      "items": [
+        "feat(teacher-workspace-bulk-delete): added multi-select bulk delete flow for template list with explicit confirmation modal",
+        "feat(teacher-homework-templates): introduced `POST /teacher/workspace/templates/bulk-delete` with ownership enforcement and aggregated deletion report",
+        "ux(teacher-workspace-toolbar): template bulk actions now include separate bulk clone and bulk delete buttons with live selected-count state"
+      ]
+    },
+    {
       "version": "1.0.65",
       "date": "2026-03-05",
       "items": [

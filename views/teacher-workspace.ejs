@@ -485,6 +485,9 @@
                 <button class="btn btn-outline-info btn-sm" type="button" id="templateBulkCloneBtn" disabled>
                   Bulk clone
                 </button>
+                <button class="btn btn-outline-danger btn-sm" type="button" id="templateBulkDeleteBtn" disabled>
+                  Bulk delete
+                </button>
                 <span class="template-bulk-count" id="templateSelectedCount">0 selected</span>
               </div>
             </div>
@@ -784,6 +787,36 @@
         </div>
       </div>
 
+      <div class="modal fade" id="bulkDeleteTemplateModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content">
+            <form method="POST" id="bulkDeleteTemplateForm" action="/teacher/workspace/templates/bulk-delete" autocomplete="off">
+              <div class="modal-header">
+                <h5 class="modal-title">Bulk delete templates</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <input type="hidden" id="bulkDeleteCourseContext" name="course_id_context" value="<%= selectedCourseId || '' %>" />
+                <div id="bulkDeleteSourceInputs"></div>
+                <p class="mb-2 small text-muted">
+                  Templates selected for deletion:
+                  <strong id="bulkDeleteSourceCount">0 selected</strong>
+                </p>
+                <div id="bulkDeleteSourceList" class="bulk-source-list"></div>
+                <div id="bulkDeleteError" class="alert alert-warning py-2 d-none mt-2 mb-0"></div>
+                <div class="alert alert-danger mt-3 mb-0">
+                  This action permanently deletes selected templates.
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-danger">Delete selected templates</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
       <%- include('partials/app-footer') %>
     </main>
 
@@ -876,6 +909,7 @@
         : [];
       const templateSelectAllToggle = document.getElementById('templateSelectAllToggle');
       const templateBulkCloneBtn = document.getElementById('templateBulkCloneBtn');
+      const templateBulkDeleteBtn = document.getElementById('templateBulkDeleteBtn');
       const templateSelectedCount = document.getElementById('templateSelectedCount');
       const templateSelectToggles = Array.from(document.querySelectorAll('[data-template-select]'));
       const bulkCloneModalEl = document.getElementById('bulkCloneTemplateModal');
@@ -892,6 +926,14 @@
       const bulkCloneSubjectItems = bulkCloneSubjectList
         ? Array.from(bulkCloneSubjectList.querySelectorAll('[data-bulk-clone-subject-item]'))
         : [];
+      const bulkDeleteModalEl = document.getElementById('bulkDeleteTemplateModal');
+      const bulkDeleteModal = bulkDeleteModalEl && window.bootstrap ? new window.bootstrap.Modal(bulkDeleteModalEl) : null;
+      const bulkDeleteTemplateForm = document.getElementById('bulkDeleteTemplateForm');
+      const bulkDeleteCourseContext = document.getElementById('bulkDeleteCourseContext');
+      const bulkDeleteSourceInputs = document.getElementById('bulkDeleteSourceInputs');
+      const bulkDeleteSourceCount = document.getElementById('bulkDeleteSourceCount');
+      const bulkDeleteSourceList = document.getElementById('bulkDeleteSourceList');
+      const bulkDeleteError = document.getElementById('bulkDeleteError');
 
       const templateById = new Map();
       (workspaceTemplates || []).forEach((template) => {
@@ -958,6 +1000,9 @@
         if (templateBulkCloneBtn) {
           templateBulkCloneBtn.disabled = selectedIds.length < 1;
         }
+        if (templateBulkDeleteBtn) {
+          templateBulkDeleteBtn.disabled = selectedIds.length < 1;
+        }
         if (templateSelectAllToggle) {
           if (!templateSelectToggles.length) {
             templateSelectAllToggle.disabled = true;
@@ -976,6 +1021,12 @@
         if (!bulkCloneError) return;
         bulkCloneError.classList.add('d-none');
         bulkCloneError.textContent = '';
+      }
+
+      function hideBulkDeleteError() {
+        if (!bulkDeleteError) return;
+        bulkDeleteError.classList.add('d-none');
+        bulkDeleteError.textContent = '';
       }
 
       function syncBulkCloneSubjectFilter() {
@@ -1053,6 +1104,58 @@
         }
         resetBulkCloneSubjectSelection();
         bulkCloneModal.show();
+      }
+
+      function resetBulkDeleteSelection() {
+        if (bulkDeleteSourceInputs) {
+          bulkDeleteSourceInputs.innerHTML = '';
+        }
+        if (bulkDeleteSourceList) {
+          bulkDeleteSourceList.innerHTML = '';
+        }
+        if (bulkDeleteSourceCount) {
+          bulkDeleteSourceCount.textContent = '0 selected';
+        }
+        hideBulkDeleteError();
+      }
+
+      function openBulkDeleteModal() {
+        if (!bulkDeleteModal || !bulkDeleteTemplateForm) return;
+        const selectedTemplateIds = getSelectedTemplateIds();
+        if (!selectedTemplateIds.length) {
+          syncTemplateSelectionState();
+          return;
+        }
+        resetBulkDeleteSelection();
+        if (bulkDeleteSourceInputs) {
+          selectedTemplateIds.forEach((templateId) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'source_template_ids';
+            input.value = String(templateId);
+            bulkDeleteSourceInputs.appendChild(input);
+          });
+        }
+        if (bulkDeleteCourseContext) {
+          bulkDeleteCourseContext.value = Number.isInteger(Number(selectedCourseContext)) && Number(selectedCourseContext) > 0
+            ? String(Number(selectedCourseContext))
+            : '';
+        }
+        if (bulkDeleteSourceCount) {
+          bulkDeleteSourceCount.textContent = `${selectedTemplateIds.length} selected`;
+        }
+        if (bulkDeleteSourceList) {
+          selectedTemplateIds.forEach((templateId) => {
+            const template = templateById.get(templateId);
+            const item = document.createElement('div');
+            item.className = 'bulk-source-item';
+            item.textContent = template && template.title
+              ? String(template.title)
+              : `Template #${templateId}`;
+            bulkDeleteSourceList.appendChild(item);
+          });
+        }
+        bulkDeleteModal.show();
       }
 
       function openTemplateEditor(templateIdRaw) {
@@ -1210,6 +1313,26 @@
       }
       if (templateBulkCloneBtn) {
         templateBulkCloneBtn.addEventListener('click', openBulkCloneModal);
+      }
+      if (templateBulkDeleteBtn) {
+        templateBulkDeleteBtn.addEventListener('click', openBulkDeleteModal);
+      }
+      if (bulkDeleteModalEl) {
+        bulkDeleteModalEl.addEventListener('hidden.bs.modal', resetBulkDeleteSelection);
+      }
+      if (bulkDeleteTemplateForm) {
+        bulkDeleteTemplateForm.addEventListener('submit', (event) => {
+          const sourceCount = bulkDeleteSourceInputs
+            ? bulkDeleteSourceInputs.querySelectorAll('input[name="source_template_ids"]').length
+            : 0;
+          if (sourceCount < 1) {
+            event.preventDefault();
+            if (bulkDeleteError) {
+              bulkDeleteError.textContent = 'Select at least one source template first.';
+              bulkDeleteError.classList.remove('d-none');
+            }
+          }
+        });
       }
       syncTemplateSelectionState();
 

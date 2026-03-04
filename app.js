@@ -7272,6 +7272,88 @@ app.post('/teacher/workspace/templates/bulk-clone', requireLogin, async (req, re
   }
 });
 
+app.post('/teacher/workspace/templates/bulk-delete', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.workspace.templates.bulkDelete.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
+  }
+  const { id: userId } = req.session.user;
+  const contextCourseId = Number(req.body.course_id_context);
+  const fallbackCourseId = Number.isInteger(contextCourseId) && contextCourseId > 0 ? contextCourseId : null;
+  const fallbackCourseQuery = fallbackCourseId ? `&course=${fallbackCourseId}` : '';
+  const rawSourceTemplateIds = req.body.source_template_ids;
+  const sourceTemplateIds = Array.from(
+    new Set(
+      (Array.isArray(rawSourceTemplateIds) ? rawSourceTemplateIds : [rawSourceTemplateIds])
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    )
+  ).slice(0, 300);
+  if (!sourceTemplateIds.length) {
+    return res.redirect(`/teacher/workspace?error=Select%20templates%20for%20bulk%20delete${fallbackCourseQuery}`);
+  }
+
+  try {
+    const sourcePlaceholders = sourceTemplateIds.map(() => '?').join(', ');
+    const sourceRows = await db.all(
+      `
+        SELECT id, title, course_id, subject_id
+        FROM teacher_homework_templates
+        WHERE user_id = ?
+          AND id IN (${sourcePlaceholders})
+      `,
+      [userId, ...sourceTemplateIds]
+    );
+    if (!sourceRows.length) {
+      return res.redirect(`/teacher/workspace?error=No%20templates%20found%20for%20bulk%20delete${fallbackCourseQuery}`);
+    }
+
+    let deletedCount = 0;
+    const deletedIds = [];
+    const deletedTitles = [];
+    for (const row of sourceRows) {
+      const templateId = Number(row.id);
+      if (!Number.isInteger(templateId) || templateId < 1) {
+        continue;
+      }
+      await db.run(
+        'DELETE FROM teacher_homework_templates WHERE user_id = ? AND id = ?',
+        [userId, templateId]
+      );
+      deletedCount += 1;
+      deletedIds.push(templateId);
+      deletedTitles.push(String(row.title || '').trim());
+    }
+
+    const invalidSourceCount = Math.max(0, sourceTemplateIds.length - sourceRows.length);
+    logAction(db, req, 'teacher_homework_template_bulk_delete', {
+      deleted_template_ids: deletedIds,
+      deleted_titles: deletedTitles.slice(0, 80),
+      deleted_count: deletedCount,
+      invalid_source_count: invalidSourceCount,
+    });
+
+    const suffixes = [];
+    if (invalidSourceCount > 0) {
+      suffixes.push(`${invalidSourceCount} missing templates skipped`);
+    }
+    const baseMessage = deletedCount > 0
+      ? `Bulk delete removed ${deletedCount} template${deletedCount === 1 ? '' : 's'}`
+      : 'Bulk delete removed no templates';
+    const fullMessage = suffixes.length
+      ? `${baseMessage} (${suffixes.join(', ')})`
+      : baseMessage;
+    return res.redirect(`/teacher/workspace?ok=${encodeURIComponent(fullMessage)}${fallbackCourseQuery}`);
+  } catch (err) {
+    console.error('Teacher workspace template bulk delete failed', err);
+    return res.redirect(`/teacher/workspace?error=Database%20error${fallbackCourseQuery}`);
+  }
+});
+
 app.post('/teacher/workspace/templates/:id/delete', requireLogin, async (req, res) => {
   try {
     await ensureDbReady();
