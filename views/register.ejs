@@ -586,38 +586,63 @@
         }
       }
 
-      function markInvalid(el, message) {
+      function markInvalid(el, message, options = {}) {
+        const shouldFocus = options.focusField !== false;
         clearInvalidState();
         el.classList.add('field-invalid');
         if (el === agreeInput && consentError) {
-          consentError.textContent = message || 'Поставте прапорець згоди';
+          consentError.textContent = message || 'Please check consent';
           consentError.classList.add('is-visible');
         } else {
           showCustomTooltip(el, message);
         }
-        el.focus({ preventScroll: true });
+        if (shouldFocus) {
+          el.focus({ preventScroll: true });
+        }
+      }
+
+      function getFieldValidationMessage(el) {
+        if (el === nameInput && !nameInput.value.trim()) {
+          return nameInput.validationMessage || 'Enter your full name';
+        }
+        if (el === passwordInput && !passwordInput.value) {
+          return passwordInput.validationMessage || 'Enter password';
+        }
+        if (el === confirmInput && !confirmInput.value) {
+          return confirmInput.validationMessage || 'Confirm password';
+        }
+        if (el === confirmInput && passwordInput && confirmInput.value !== passwordInput.value) {
+          return 'Passwords do not match';
+        }
+        if (el === agreeInput && !agreeInput.checked) {
+          return 'Please check consent';
+        }
+        return '';
+      }
+
+      function validateField(el, showTip = false, options = {}) {
+        if (!el) return true;
+        const message = getFieldValidationMessage(el);
+        if (message) {
+          if (showTip) {
+            markInvalid(el, message, options);
+          }
+          return false;
+        }
+        el.classList.remove('field-invalid');
+        if (el === agreeInput && consentError) {
+          consentError.textContent = '';
+          consentError.classList.remove('is-visible');
+        }
+        return true;
       }
 
       function validateRegister(showTip = false) {
-        if (nameInput && !nameInput.value.trim()) {
-          if (showTip) markInvalid(nameInput, nameInput.validationMessage || 'Заповніть імʼя');
-          return false;
-        }
-        if (passwordInput && !passwordInput.value) {
-          if (showTip) markInvalid(passwordInput, passwordInput.validationMessage || 'Вкажіть пароль');
-          return false;
-        }
-        if (confirmInput && !confirmInput.value) {
-          if (showTip) markInvalid(confirmInput, confirmInput.validationMessage || 'Підтвердіть пароль');
-          return false;
-        }
-        if (confirmInput && passwordInput && confirmInput.value !== passwordInput.value) {
-          if (showTip) markInvalid(confirmInput, 'Паролі не співпадають');
-          return false;
-        }
-        if (agreeInput && !agreeInput.checked) {
-          if (showTip) markInvalid(agreeInput, 'Поставте прапорець згоди');
-          return false;
+        const fields = [nameInput, passwordInput, confirmInput, agreeInput];
+        for (const field of fields) {
+          if (!validateField(field, showTip, { focusField: true })) {
+            return false;
+          }
         }
         clearInvalidState();
         return true;
@@ -626,7 +651,7 @@
       [nameInput, passwordInput, confirmInput, agreeInput].forEach((el) => {
         if (!el) return;
         el.addEventListener('blur', () => {
-          validateRegister(true);
+          validateField(el, true, { focusField: false });
         });
         el.addEventListener('input', () => {
           el.classList.remove('field-invalid');
