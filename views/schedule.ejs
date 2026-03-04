@@ -1695,6 +1695,9 @@
         <a class="drawer-action" href="/journal">📘 Журнал</a>
         <a class="drawer-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
         <a class="drawer-action" href="/subjects">📚 Предмети</a>
+        <% if (role === 'teacher') { %>
+          <a class="drawer-action" href="/teacher/workspace">Teacher workspace</a>
+        <% } %>
         <% if ((role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') && settings && settings.allow_custom_deadlines) { %>
           <button class="drawer-action" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
             🌀 Дивні дедлайни
@@ -2140,6 +2143,21 @@
             <% if (canCreateHomeworkInSchedule) { %>
               <h6>Add homework</h6>
               <form method="POST" action="/homework/add" enctype="multipart/form-data" autocomplete="off">
+                <% if (role === 'teacher') { %>
+                  <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                      <label for="hwTemplateSelect" class="form-label mb-0">Template quick apply</label>
+                      <a class="small text-decoration-none" href="/teacher/workspace">Manage templates</a>
+                    </div>
+                    <div class="input-group">
+                      <select id="hwTemplateSelect" class="form-select">
+                        <option value="">Select template...</option>
+                      </select>
+                      <button class="btn btn-outline-secondary" type="button" id="hwTemplateApply">Apply template</button>
+                    </div>
+                    <div class="form-text">Templates are filtered by current subject and course.</div>
+                  </div>
+                <% } %>
                 <div class="mb-3">
                   <label for="hwText" class="form-label">Description</label>
                   <textarea id="hwText" name="description" class="form-control" rows="3" required></textarea>
@@ -2212,6 +2230,7 @@
                 <input type="hidden" id="hwClassNum" name="class_number" />
                 <input type="hidden" id="hwDate" name="class_date" />
                 <input type="hidden" id="hwCourseId" name="course_id" />
+                <input type="hidden" id="hwTags" name="tags" />
                 <button type="submit" class="btn btn-primary glass">Save homework</button>
               </form>
             <% } else { %>
@@ -2681,6 +2700,7 @@
       const allowCrossGroupHomeworkFallback = <%- JSON.stringify(role === 'admin' || viewAs === 'student') %>;
       const homeworkModal = document.getElementById('homeworkModal');
       const homeworkData = <%- JSON.stringify(homework || []) %>;
+      const teacherHomeworkTemplates = <%- JSON.stringify(teacherHomeworkTemplates || []) %>;
       const customDeadlineItems = <%- JSON.stringify(customDeadlineItems || []) %>;
       const listEl = document.getElementById('homeworkList');
       const homeworkSubmitForm = document.getElementById('homeworkSubmitForm');
@@ -2697,6 +2717,13 @@
       const joinSubgroupId = document.getElementById('joinSubgroupId');
       const currentUser = <%- JSON.stringify(username) %>;
       const hwControlToggle = document.getElementById('hwControl');
+      const hwTemplateSelect = document.getElementById('hwTemplateSelect');
+      const hwTemplateApplyBtn = document.getElementById('hwTemplateApply');
+      const hwTextInput = document.getElementById('hwText');
+      const hwLinkInput = document.getElementById('hwLink');
+      const hwMeetingInput = document.getElementById('hwMeeting');
+      const hwTagsInput = document.getElementById('hwTags');
+      const templateCache = new Map();
       let currentHomeworkItems = [];
 
       function updateReactionButtons(container, reactions, reacted) {
@@ -2980,6 +3007,72 @@
         });
       }
 
+      function filterHomeworkTemplates(subjectId, courseId) {
+        const normalizedSubjectId = Number(subjectId);
+        const normalizedCourseId = Number(courseId);
+        return (teacherHomeworkTemplates || []).filter((template) => {
+          const templateSubjectId = Number(template.subject_id);
+          const templateCourseId = Number(template.course_id);
+          const subjectMatch = Number.isNaN(templateSubjectId) || templateSubjectId < 1 || templateSubjectId === normalizedSubjectId;
+          const courseMatch = Number.isNaN(templateCourseId) || templateCourseId < 1 || templateCourseId === normalizedCourseId;
+          return subjectMatch && courseMatch;
+        });
+      }
+
+      function renderHomeworkTemplateOptions(subjectId, courseId) {
+        if (!hwTemplateSelect) return;
+        templateCache.clear();
+        hwTemplateSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select template...';
+        hwTemplateSelect.appendChild(placeholder);
+        const filtered = filterHomeworkTemplates(subjectId, courseId);
+        filtered.forEach((template) => {
+          const templateId = Number(template.id);
+          if (!Number.isInteger(templateId) || templateId < 1) return;
+          templateCache.set(templateId, template);
+          const option = document.createElement('option');
+          option.value = String(templateId);
+          const parts = [String(template.title || '').trim()].filter(Boolean);
+          if (template.subject_name) parts.push(String(template.subject_name));
+          if (template.course_name) parts.push(String(template.course_name));
+          option.textContent = parts.join(' · ');
+          hwTemplateSelect.appendChild(option);
+        });
+        hwTemplateSelect.disabled = filtered.length === 0;
+        if (hwTemplateApplyBtn) {
+          hwTemplateApplyBtn.disabled = filtered.length === 0;
+        }
+      }
+
+      function applySelectedHomeworkTemplate() {
+        if (!hwTemplateSelect) return;
+        const templateId = Number(hwTemplateSelect.value);
+        if (!Number.isInteger(templateId) || templateId < 1) return;
+        const template = templateCache.get(templateId);
+        if (!template) return;
+        if (hwTextInput) {
+          hwTextInput.value = String(template.description || '');
+        }
+        if (hwLinkInput) {
+          hwLinkInput.value = String(template.link_url || '');
+        }
+        if (hwMeetingInput) {
+          hwMeetingInput.value = String(template.meeting_url || '');
+        }
+        if (hwTagsInput) {
+          hwTagsInput.value = String(template.tags || '');
+        }
+        if (hwControlToggle) {
+          hwControlToggle.checked = Number(template.is_control || 0) === 1;
+        }
+      }
+
+      if (hwTemplateApplyBtn) {
+        hwTemplateApplyBtn.addEventListener('click', applySelectedHomeworkTemplate);
+      }
+
       homeworkModal.addEventListener('show.bs.modal', (event) => {
         const button = event.relatedTarget;
         const subject = button.getAttribute('data-class');
@@ -3015,6 +3108,13 @@
         }
         if (hwControlToggle) {
           hwControlToggle.checked = false;
+        }
+        if (hwTagsInput) {
+          hwTagsInput.value = '';
+        }
+        if (isTeacherView && hwTemplateSelect) {
+          renderHomeworkTemplateOptions(subjectId, courseId);
+          hwTemplateSelect.value = '';
         }
 
         const normalizedCardDay = String(day || '').trim().toLowerCase();
@@ -3062,6 +3162,14 @@
       });
 
       homeworkModal.addEventListener('hidden.bs.modal', () => {
+        if (hwTemplateSelect) {
+          hwTemplateSelect.innerHTML = '<option value="">Select template...</option>';
+          hwTemplateSelect.disabled = true;
+        }
+        if (hwTemplateApplyBtn) {
+          hwTemplateApplyBtn.disabled = true;
+        }
+        templateCache.clear();
         if (location.hash.startsWith('#class=')) {
           history.replaceState(null, '', location.pathname + location.search);
         }

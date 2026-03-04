@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.60",
+      "date": "2026-03-04",
+      "items": [
+        "feat(teacher-workspace): added a dedicated teacher workspace page with liquid-glass UI for managing reusable homework templates",
+        "feat(teacher-homework-templates): introduced DB-backed teacher homework templates (`teacher_homework_templates`) with migration, create, and delete flows",
+        "feat(schedule-template-apply): added template quick-apply in class homework modal (auto-filters by subject/course and pre-fills description/links/control/tags)",
+        "ux(teacher-navigation): added \"Teacher workspace\" entry to desktop topbar, schedule drawer, and mobile menu for teacher role"
+      ]
+    },
+    {
       "version": "1.0.59",
       "date": "2026-03-04",
       "items": [

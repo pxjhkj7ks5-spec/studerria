@@ -5562,6 +5562,101 @@ async function getTeacherSelections(userId) {
   return map;
 }
 
+function normalizeTemplateTagsInput(rawValue) {
+  const unique = new Set();
+  const list = String(rawValue || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  list.forEach((item) => unique.add(item));
+  return Array.from(unique).slice(0, 20);
+}
+
+async function getTeacherAssignedSubjects(userId) {
+  if (!Number.isFinite(Number(userId))) return [];
+  return db.all(
+    `
+      SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count, s.is_general,
+             s.course_id, c.name AS course_name
+      FROM teacher_subjects ts
+      JOIN subjects s ON s.id = ts.subject_id
+      JOIN courses c ON c.id = s.course_id
+      WHERE ts.user_id = ? AND s.visible = 1
+      ORDER BY c.id, s.name, ts.group_number NULLS FIRST
+    `,
+    [userId]
+  );
+}
+
+function buildTeacherCourseList(subjectRows = []) {
+  const map = new Map();
+  (subjectRows || []).forEach((row) => {
+    const courseId = Number(row.course_id);
+    if (!Number.isFinite(courseId) || courseId < 1 || map.has(courseId)) {
+      return;
+    }
+    map.set(courseId, {
+      id: courseId,
+      name: String(row.course_name || `Course ${courseId}`),
+    });
+  });
+  return Array.from(map.values()).sort((a, b) => Number(a.id) - Number(b.id));
+}
+
+async function getTeacherHomeworkTemplates(userId, options = {}) {
+  if (!Number.isFinite(Number(userId))) return [];
+  const requestedCourseId = Number(options.courseId);
+  const scopedCourseId = Number.isInteger(requestedCourseId) && requestedCourseId > 0
+    ? requestedCourseId
+    : null;
+  const requestedLimit = Number(options.limit);
+  const limit = Number.isInteger(requestedLimit)
+    ? Math.max(1, Math.min(requestedLimit, 500))
+    : 200;
+  const params = [Number(userId)];
+  let where = 'WHERE t.user_id = ?';
+  if (scopedCourseId) {
+    where += ' AND (t.course_id IS NULL OR t.course_id = ?)';
+    params.push(scopedCourseId);
+  }
+  const rows = await db.all(
+    `
+      SELECT
+        t.*,
+        s.name AS subject_name,
+        c.name AS course_name
+      FROM teacher_homework_templates t
+      LEFT JOIN subjects s ON s.id = t.subject_id
+      LEFT JOIN courses c ON c.id = COALESCE(t.course_id, s.course_id)
+      ${where}
+      ORDER BY t.updated_at DESC, t.id DESC
+      LIMIT ${limit}
+    `,
+    params
+  );
+  return (rows || []).map((row) => {
+    const tagItems = normalizeTemplateTagsInput(row.tags);
+    return {
+      id: Number(row.id),
+      user_id: Number(row.user_id),
+      course_id: Number.isFinite(Number(row.course_id)) ? Number(row.course_id) : null,
+      subject_id: Number.isFinite(Number(row.subject_id)) ? Number(row.subject_id) : null,
+      title: String(row.title || ''),
+      description: String(row.description || ''),
+      link_url: row.link_url ? String(row.link_url) : '',
+      meeting_url: row.meeting_url ? String(row.meeting_url) : '',
+      tags: tagItems.join(', '),
+      tags_list: tagItems,
+      is_control: row.is_control === true || Number(row.is_control) === 1 ? 1 : 0,
+      is_credit: row.is_credit === true || Number(row.is_credit) === 1 ? 1 : 0,
+      subject_name: row.subject_name ? String(row.subject_name) : '',
+      course_name: row.course_name ? String(row.course_name) : '',
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  });
+}
+
 async function saveTeacherSubjects(userId, body, options = {}) {
   const catalog = await getTeacherSubjectCatalog();
   const selections = [];
@@ -6378,6 +6473,242 @@ app.post('/teacher/subjects', requireLogin, async (req, res) => {
   } catch (err) {
     console.error('Failed to save teacher subjects', err);
     return res.redirect('/teacher/subjects?error=Database%20error');
+  }
+});
+
+app.get('/teacher/workspace', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.workspace.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
+  }
+  const { id: userId, username } = req.session.user;
+  const decodeMessage = (value) => {
+    if (!value) return '';
+    try {
+      return decodeURIComponent(String(value));
+    } catch (err) {
+      return String(value);
+    }
+  };
+  try {
+    const teacherSubjects = await getTeacherAssignedSubjects(userId);
+    const teacherCourses = buildTeacherCourseList(teacherSubjects);
+    const requestedCourseId = Number(req.query.course);
+    const selectedCourse = teacherCourses.find((course) => Number(course.id) === requestedCourseId) || null;
+    const selectedCourseId = selectedCourse
+      ? Number(selectedCourse.id)
+      : (teacherCourses.length === 1 ? Number(teacherCourses[0].id) : null);
+
+    const templates = await getTeacherHomeworkTemplates(userId, {
+      courseId: selectedCourseId,
+      limit: 300,
+    });
+
+    const subjectMap = new Map();
+    teacherSubjects.forEach((subject) => {
+      const courseId = Number(subject.course_id);
+      if (selectedCourseId && courseId !== selectedCourseId) return;
+      const subjectId = Number(subject.subject_id);
+      if (!Number.isFinite(subjectId) || subjectId < 1 || subjectMap.has(subjectId)) return;
+      subjectMap.set(subjectId, {
+        id: subjectId,
+        name: String(subject.subject_name || ''),
+        course_id: courseId,
+        course_name: String(subject.course_name || ''),
+      });
+    });
+
+    return res.render('teacher-workspace', {
+      role: 'teacher',
+      username,
+      teacherCourses,
+      selectedCourseId,
+      teacherSubjects: Array.from(subjectMap.values()),
+      templates,
+      error: decodeMessage(req.query.error),
+      success: decodeMessage(req.query.ok),
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.workspace');
+  }
+});
+
+app.post('/teacher/workspace/templates', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.workspace.templates.create.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
+  }
+  const { id: userId, course_id: fallbackCourseId } = req.session.user;
+  const title = String(req.body.title || '').trim();
+  const description = String(req.body.description || '').trim();
+  const requestedCourseId = Number(req.body.course_id);
+  const requestedSubjectId = Number(req.body.subject_id);
+  const isControl = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_control || '').toLowerCase()) ? 1 : 0;
+  const isCredit = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_credit || '').toLowerCase()) ? 1 : 0;
+  const tags = normalizeTemplateTagsInput(req.body.tags).join(', ');
+  const linkUrl = normalizeExternalUrl(req.body.link_url) || null;
+  const meetingUrl = normalizeExternalUrl(req.body.meeting_url) || null;
+
+  if (!title || !description) {
+    return res.redirect('/teacher/workspace?error=Title%20and%20description%20are%20required');
+  }
+
+  try {
+    let resolvedSubject = null;
+    if (Number.isInteger(requestedSubjectId) && requestedSubjectId > 0) {
+      resolvedSubject = await db.get(
+        `
+          SELECT s.id, s.course_id
+          FROM teacher_subjects ts
+          JOIN subjects s ON s.id = ts.subject_id
+          WHERE ts.user_id = ? AND ts.subject_id = ?
+          LIMIT 1
+        `,
+        [userId, requestedSubjectId]
+      );
+      if (!resolvedSubject) {
+        return res.redirect('/teacher/workspace?error=Invalid%20subject');
+      }
+    }
+
+    let validatedCourseId = null;
+    if (Number.isInteger(requestedCourseId) && requestedCourseId > 0) {
+      const hasCourseAccess = await db.get(
+        `
+          SELECT 1
+          FROM teacher_subjects ts
+          JOIN subjects s ON s.id = ts.subject_id
+          WHERE ts.user_id = ? AND s.course_id = ?
+          LIMIT 1
+        `,
+        [userId, requestedCourseId]
+      );
+      if (!hasCourseAccess) {
+        return res.redirect('/teacher/workspace?error=Invalid%20course');
+      }
+      validatedCourseId = requestedCourseId;
+    }
+
+    if (
+      resolvedSubject
+      && validatedCourseId
+      && Number(resolvedSubject.course_id) !== Number(validatedCourseId)
+    ) {
+      return res.redirect('/teacher/workspace?error=Subject%20does%20not%20match%20course');
+    }
+
+    const courseId = resolvedSubject
+      ? Number(resolvedSubject.course_id)
+      : (validatedCourseId || null);
+    const subjectId = resolvedSubject ? Number(resolvedSubject.id) : null;
+
+    const inserted = await db.get(
+      `
+        INSERT INTO teacher_homework_templates
+          (
+            user_id,
+            course_id,
+            subject_id,
+            title,
+            description,
+            link_url,
+            meeting_url,
+            tags,
+            is_control,
+            is_credit,
+            created_at,
+            updated_at
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        RETURNING id
+      `,
+      [
+        userId,
+        courseId,
+        subjectId,
+        title,
+        description,
+        linkUrl,
+        meetingUrl,
+        tags,
+        isControl,
+        isCredit,
+      ]
+    );
+
+    logAction(db, req, 'teacher_homework_template_create', {
+      template_id: inserted && inserted.id ? Number(inserted.id) : null,
+      course_id: courseId,
+      subject_id: subjectId,
+      title,
+      tags: tags ? tags.split(',').map((item) => item.trim()).filter(Boolean) : [],
+      is_control: isControl,
+      is_credit: isCredit,
+    });
+
+    const redirectCourseId = courseId || (validatedCourseId || null);
+    const courseQuery = Number.isInteger(redirectCourseId) && redirectCourseId > 0
+      ? `&course=${redirectCourseId}`
+      : '';
+    return res.redirect(`/teacher/workspace?ok=Template%20saved${courseQuery}`);
+  } catch (err) {
+    console.error('Teacher workspace template create failed', err);
+    const fallbackCourseQuery = Number.isInteger(requestedCourseId) && requestedCourseId > 0
+      ? `&course=${requestedCourseId}`
+      : (Number.isInteger(fallbackCourseId) && fallbackCourseId > 0 ? `&course=${fallbackCourseId}` : '');
+    return res.redirect(`/teacher/workspace?error=Database%20error${fallbackCourseQuery}`);
+  }
+});
+
+app.post('/teacher/workspace/templates/:id/delete', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.workspace.templates.delete.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
+  }
+  const { id: userId } = req.session.user;
+  const templateId = Number(req.params.id);
+  if (!Number.isInteger(templateId) || templateId < 1) {
+    return res.redirect('/teacher/workspace?error=Invalid%20template');
+  }
+  try {
+    const row = await db.get(
+      'SELECT id, user_id, course_id, subject_id, title FROM teacher_homework_templates WHERE id = ?',
+      [templateId]
+    );
+    if (!row) {
+      return res.redirect('/teacher/workspace?error=Template%20not%20found');
+    }
+    if (Number(row.user_id) !== Number(userId)) {
+      return res.status(403).send('Forbidden');
+    }
+    await db.run('DELETE FROM teacher_homework_templates WHERE id = ?', [templateId]);
+    logAction(db, req, 'teacher_homework_template_delete', {
+      template_id: templateId,
+      course_id: row.course_id ? Number(row.course_id) : null,
+      subject_id: row.subject_id ? Number(row.subject_id) : null,
+      title: row.title ? String(row.title) : '',
+    });
+    const requestedCourseId = Number(req.body.course_id);
+    const redirectCourseId = Number.isInteger(requestedCourseId) && requestedCourseId > 0
+      ? requestedCourseId
+      : (Number.isInteger(Number(row.course_id)) && Number(row.course_id) > 0 ? Number(row.course_id) : null);
+    const courseQuery = redirectCourseId ? `&course=${redirectCourseId}` : '';
+    return res.redirect(`/teacher/workspace?ok=Template%20deleted${courseQuery}`);
+  } catch (err) {
+    console.error('Teacher workspace template delete failed', err);
+    return res.redirect('/teacher/workspace?error=Database%20error');
   }
 });
 
@@ -9697,25 +10028,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
   if (hasSessionRole(req, 'teacher')) {
     try {
       await ensureDbReady();
-      const teacherSubjects = await db.all(
-        `
-          SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count, s.is_general,
-                 s.course_id, c.name AS course_name
-          FROM teacher_subjects ts
-          JOIN subjects s ON s.id = ts.subject_id
-          JOIN courses c ON c.id = s.course_id
-          WHERE ts.user_id = ? AND s.visible = 1
-          ORDER BY c.id, s.name
-        `,
-        [userId]
-      );
-      const teacherCourseMap = new Map();
-      teacherSubjects.forEach((row) => {
-        if (!teacherCourseMap.has(row.course_id)) {
-          teacherCourseMap.set(row.course_id, { id: row.course_id, name: row.course_name });
-        }
-      });
-      const teacherCourses = Array.from(teacherCourseMap.values());
+      const teacherSubjects = await getTeacherAssignedSubjects(userId);
+      const teacherCourses = buildTeacherCourseList(teacherSubjects);
+      const teacherHomeworkTemplates = await getTeacherHomeworkTemplates(userId, { limit: 300 });
       const courseFilter = req.query.course ? Number(req.query.course) : null;
       const selectedCourse = teacherCourses.find((c) => Number(c.id) === Number(courseFilter)) || null;
       const courseIds = selectedCourse ? [selectedCourse.id] : teacherCourses.map((c) => c.id);
@@ -10227,7 +10542,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         customDeadlineItems,
         customDeadlineSubjects,
         subgroupError: req.query.sg || null,
-        role: req.session.role,
+        role: 'teacher',
         viewAs: req.session.viewAs || null,
         viewAsCourse: null,
         viewAsGroupNumber: null,
@@ -10235,6 +10550,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         userId,
         teacherCourses,
         selectedCourseId: selectedCourse ? selectedCourse.id : null,
+        teacherHomeworkTemplates,
         canCreateHomework,
       });
     } catch (err) {
@@ -10636,6 +10952,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               messageSubjects: studentGroups || [],
               userId,
               selectedCourseId: scheduleCourseId,
+              teacherHomeworkTemplates: [],
               canCreateHomework,
             })
           );
@@ -10832,6 +11149,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 messageSubjects: studentGroups || [],
                 userId,
                 selectedCourseId: scheduleCourseId,
+                teacherHomeworkTemplates: [],
                 canCreateHomework,
               });
             };

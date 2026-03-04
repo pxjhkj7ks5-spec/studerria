@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Teacher workspace</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <style>
+      :root {
+        --surface-border-dark: rgba(255, 255, 255, 0.14);
+        --surface-border-light: rgba(15, 23, 42, 0.12);
+        --surface-bg-dark: rgba(255, 255, 255, 0.06);
+        --surface-bg-light: rgba(255, 255, 255, 0.64);
+        --surface-shadow-dark: 0 16px 42px rgba(2, 6, 23, 0.5);
+        --surface-shadow-light: 0 16px 40px rgba(15, 23, 42, 0.12);
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+          "Helvetica Neue", "Inter", Arial, sans-serif;
+        min-height: 100vh;
+        transition: background 220ms ease, color 220ms ease;
+      }
+      body.theme-dark {
+        background:
+          radial-gradient(1100px 760px at 12% 8%, rgba(56, 189, 248, 0.18), transparent 62%),
+          radial-gradient(900px 680px at 84% 18%, rgba(129, 140, 248, 0.2), transparent 64%),
+          linear-gradient(150deg, #080d19 0%, #111b2f 48%, #15253f 100%);
+        color: #f8fafc;
+      }
+      body.theme-light {
+        background:
+          radial-gradient(1100px 760px at 16% 10%, rgba(125, 211, 252, 0.2), transparent 62%),
+          radial-gradient(900px 680px at 84% 18%, rgba(167, 139, 250, 0.2), transparent 64%),
+          linear-gradient(130deg, #e8eff9 0%, #eff5ff 48%, #f6f8ff 100%);
+        color: #0f172a;
+      }
+      .workspace-shell {
+        padding-top: 24px;
+        padding-bottom: 48px;
+      }
+      .glass {
+        position: relative;
+        isolation: isolate;
+        border-radius: 22px;
+        backdrop-filter: blur(18px);
+      }
+      body.theme-dark .glass {
+        border: 1px solid var(--surface-border-dark);
+        background: var(--surface-bg-dark);
+        box-shadow: var(--surface-shadow-dark);
+      }
+      body.theme-light .glass {
+        border: 1px solid var(--surface-border-light);
+        background: var(--surface-bg-light);
+        box-shadow: var(--surface-shadow-light);
+      }
+      .workspace-hero {
+        padding: 24px;
+      }
+      .workspace-title {
+        margin: 0;
+        font-size: clamp(1.7rem, 2.8vw, 2.25rem);
+        font-weight: 700;
+      }
+      .workspace-subtitle {
+        margin: 10px 0 0;
+        max-width: 760px;
+        color: rgba(226, 232, 240, 0.8);
+      }
+      body.theme-light .workspace-subtitle {
+        color: rgba(15, 23, 42, 0.7);
+      }
+      .hero-actions {
+        margin-top: 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .btn-glass {
+        border-radius: 999px;
+        padding: 0.45rem 0.95rem;
+        font-weight: 600;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(248, 250, 252, 0.92);
+      }
+      .btn-glass:hover {
+        background: rgba(255, 255, 255, 0.16);
+        color: rgba(248, 250, 252, 0.98);
+      }
+      body.theme-light .btn-glass {
+        border-color: rgba(15, 23, 42, 0.16);
+        background: rgba(255, 255, 255, 0.86);
+        color: #0f172a;
+      }
+      body.theme-light .btn-glass:hover {
+        background: #ffffff;
+        color: #0f172a;
+      }
+      .workspace-panel {
+        padding: 20px;
+      }
+      .workspace-panel h5 {
+        margin-bottom: 14px;
+      }
+      .form-control,
+      .form-select {
+        border-radius: 12px;
+      }
+      body.theme-dark .form-control,
+      body.theme-dark .form-select {
+        background: rgba(15, 23, 42, 0.44);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        color: #f8fafc;
+      }
+      body.theme-dark .form-control::placeholder {
+        color: rgba(203, 213, 225, 0.6);
+      }
+      body.theme-dark .form-select option {
+        background: #0f172a;
+        color: #f8fafc;
+      }
+      .template-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 76vh;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+      .template-card {
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.26);
+        padding: 14px;
+        background: rgba(15, 23, 42, 0.34);
+      }
+      body.theme-light .template-card {
+        background: rgba(255, 255, 255, 0.82);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .template-title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 650;
+      }
+      .template-meta {
+        margin-top: 2px;
+        font-size: 0.78rem;
+        color: rgba(203, 213, 225, 0.72);
+      }
+      body.theme-light .template-meta {
+        color: rgba(15, 23, 42, 0.58);
+      }
+      .template-description {
+        margin: 10px 0 0;
+        font-size: 0.92rem;
+        white-space: pre-wrap;
+      }
+      .template-chips {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .template-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.34);
+        padding: 2px 8px;
+        font-size: 0.72rem;
+        color: rgba(226, 232, 240, 0.88);
+        background: rgba(15, 23, 42, 0.5);
+      }
+      body.theme-light .template-chip {
+        color: rgba(15, 23, 42, 0.78);
+        background: rgba(255, 255, 255, 0.86);
+        border-color: rgba(15, 23, 42, 0.16);
+      }
+      .template-footer {
+        margin-top: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .template-links {
+        display: inline-flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .template-link {
+        font-size: 0.8rem;
+        color: #93c5fd;
+        text-decoration: none;
+      }
+      .template-link:hover {
+        text-decoration: underline;
+      }
+      body.theme-light .template-link {
+        color: #1d4ed8;
+      }
+      .hint {
+        font-size: 0.82rem;
+        color: rgba(203, 213, 225, 0.78);
+      }
+      body.theme-light .hint {
+        color: rgba(15, 23, 42, 0.6);
+      }
+      .app-footer {
+        font-size: 0.85rem;
+      }
+      body.theme-dark .app-footer {
+        color: rgba(203, 213, 225, 0.7);
+      }
+      body.theme-light .app-footer {
+        color: rgba(15, 23, 42, 0.6);
+      }
+    </style>
+    <link rel="stylesheet" href="/css/design-system.css" />
+  </head>
+  <body class="theme-dark">
+    <%- include('partials/topbar', { role, username, t, activePage: 'teacher-workspace', pageTitle: 'Teacher workspace' }) %>
+
+    <main class="container workspace-shell">
+      <% if (error) { %>
+        <div class="alert alert-danger glass mb-3"><%= error %></div>
+      <% } %>
+      <% if (success) { %>
+        <div class="alert alert-success glass mb-3"><%= success %></div>
+      <% } %>
+
+      <section class="glass workspace-hero mb-3">
+        <h1 class="workspace-title">Teacher workspace</h1>
+        <p class="workspace-subtitle">
+          Build reusable homework templates and apply them in one click from class cards in schedule modal.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-glass" href="/schedule">Schedule</a>
+          <a class="btn btn-glass" href="/teacher/subjects">My subjects</a>
+          <a class="btn btn-glass" href="/journal">Journal</a>
+        </div>
+      </section>
+
+      <section class="row g-3">
+        <div class="col-12 col-xl-5">
+          <article class="glass workspace-panel h-100">
+            <h5 class="mb-3">New template</h5>
+            <form method="POST" action="/teacher/workspace/templates" autocomplete="off">
+              <div class="row g-2">
+                <div class="col-12 col-md-6">
+                  <label for="templateCourseId" class="form-label">Course scope</label>
+                  <select class="form-select" id="templateCourseId" name="course_id">
+                    <option value="">All my courses</option>
+                    <% (teacherCourses || []).forEach(function(course) { %>
+                      <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>>
+                        <%= course.name %>
+                      </option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label for="templateSubjectId" class="form-label">Subject (optional)</label>
+                  <select class="form-select" id="templateSubjectId" name="subject_id" <%= (teacherSubjects || []).length ? '' : 'disabled' %>>
+                    <option value="">Any subject</option>
+                    <% (teacherSubjects || []).forEach(function(subject) { %>
+                      <option value="<%= subject.id %>" data-course-id="<%= subject.course_id %>">
+                        <%= subject.name %><%= subject.course_name ? ` (${subject.course_name})` : '' %>
+                      </option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label for="templateTitle" class="form-label">Title</label>
+                  <input id="templateTitle" name="title" class="form-control" maxlength="160" required />
+                </div>
+                <div class="col-12">
+                  <label for="templateDescription" class="form-label">Description</label>
+                  <textarea
+                    id="templateDescription"
+                    name="description"
+                    class="form-control"
+                    rows="4"
+                    maxlength="4000"
+                    required
+                  ></textarea>
+                </div>
+                <div class="col-12">
+                  <label for="templateTags" class="form-label">Tags (comma separated)</label>
+                  <input
+                    id="templateTags"
+                    name="tags"
+                    class="form-control"
+                    maxlength="240"
+                    placeholder="quiz, seminar, revision"
+                  />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label for="templateLinkUrl" class="form-label">Link (optional)</label>
+                  <input
+                    id="templateLinkUrl"
+                    name="link_url"
+                    class="form-control"
+                    type="text"
+                    inputmode="url"
+                    autocapitalize="none"
+                    autocomplete="off"
+                    placeholder="https://example.com"
+                  />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label for="templateMeetingUrl" class="form-label">Meeting URL (optional)</label>
+                  <input
+                    id="templateMeetingUrl"
+                    name="meeting_url"
+                    class="form-control"
+                    type="text"
+                    inputmode="url"
+                    autocapitalize="none"
+                    autocomplete="off"
+                    placeholder="https://zoom.us/j/..."
+                  />
+                </div>
+                <div class="col-12">
+                  <div class="d-flex flex-wrap gap-3">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="templateControl" name="is_control" value="1" />
+                      <label class="form-check-label" for="templateControl">Control</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="templateCredit" name="is_credit" value="1" />
+                      <label class="form-check-label" for="templateCredit">Credit</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-primary mt-3" type="submit">Save template</button>
+            </form>
+            <p class="hint mt-3 mb-0">
+              Tip: after saving, open any class card in schedule and use "Apply template" in homework modal.
+            </p>
+            <% if (!(teacherSubjects || []).length) { %>
+              <div class="alert alert-warning mt-3 mb-0">
+                Choose your teaching subjects first in <a href="/teacher/subjects">teacher subjects</a>.
+              </div>
+            <% } %>
+          </article>
+        </div>
+
+        <div class="col-12 col-xl-7">
+          <article class="glass workspace-panel h-100">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+              <h5 class="mb-0">Saved templates</h5>
+              <span class="badge bg-secondary"><%= (templates || []).length %></span>
+            </div>
+
+            <% if ((templates || []).length) { %>
+              <div class="template-list">
+                <% templates.forEach(function(template) { %>
+                  <div class="template-card">
+                    <h6 class="template-title"><%= template.title %></h6>
+                    <div class="template-meta">
+                      <% if (template.course_name) { %><span><%= template.course_name %></span><% } %>
+                      <% if (template.subject_name) { %><span> · <%= template.subject_name %></span><% } %>
+                      <% if (template.updated_at) { %><span> · <%= String(template.updated_at).slice(0, 10) %></span><% } %>
+                    </div>
+                    <p class="template-description"><%= template.description %></p>
+                    <div class="template-chips">
+                      <% if (Number(template.is_control || 0) === 1) { %>
+                        <span class="template-chip">Control</span>
+                      <% } %>
+                      <% if (Number(template.is_credit || 0) === 1) { %>
+                        <span class="template-chip">Credit</span>
+                      <% } %>
+                      <% (template.tags_list || []).forEach(function(tag) { %>
+                        <span class="template-chip">#<%= tag %></span>
+                      <% }) %>
+                    </div>
+                    <div class="template-footer">
+                      <div class="template-links">
+                        <% if (template.link_url) { %>
+                          <a class="template-link" href="<%= template.link_url %>" target="_blank" rel="noopener noreferrer">Link</a>
+                        <% } %>
+                        <% if (template.meeting_url) { %>
+                          <a class="template-link" href="<%= template.meeting_url %>" target="_blank" rel="noopener noreferrer">Meeting</a>
+                        <% } %>
+                      </div>
+                      <form method="POST" action="/teacher/workspace/templates/<%= template.id %>/delete">
+                        <input type="hidden" name="course_id" value="<%= selectedCourseId || '' %>" />
+                        <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
+                      </form>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <div class="alert alert-info mb-0">No templates yet. Create your first template on the left.</div>
+            <% } %>
+          </article>
+        </div>
+      </section>
+
+      <%- include('partials/app-footer') %>
+    </main>
+
+    <%- include('partials/changelog-modal') %>
+    <%- include('partials/mobile-menu-modal', { role, t, activePage: 'teacher-workspace' }) %>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      (function applyTheme() {
+        const storedTheme = localStorage.getItem('ui-theme') || 'theme-dark';
+        document.body.classList.remove('theme-dark', 'theme-light');
+        document.body.classList.add(storedTheme);
+        const themeToggle = document.getElementById('themeToggle');
+        if (!themeToggle) return;
+        themeToggle.textContent = storedTheme === 'theme-dark' ? '☀️' : '🌙';
+        themeToggle.addEventListener('click', () => {
+          const isDark = document.body.classList.contains('theme-dark');
+          const next = isDark ? 'theme-light' : 'theme-dark';
+          document.body.classList.remove('theme-dark', 'theme-light');
+          document.body.classList.add(next);
+          localStorage.setItem('ui-theme', next);
+          themeToggle.textContent = next === 'theme-dark' ? '☀️' : '🌙';
+        });
+      })();
+
+      (function bindCourseSubjectFilter() {
+        const courseSelect = document.getElementById('templateCourseId');
+        const subjectSelect = document.getElementById('templateSubjectId');
+        if (!courseSelect || !subjectSelect) return;
+        const syncSubjects = () => {
+          const selectedCourseId = Number(courseSelect.value || 0);
+          let visibleCount = 0;
+          Array.from(subjectSelect.options).forEach((option) => {
+            if (!option.value) return;
+            const optionCourseId = Number(option.dataset.courseId || 0);
+            const visible = !selectedCourseId || selectedCourseId === optionCourseId;
+            option.hidden = !visible;
+            option.disabled = !visible;
+            if (visible) visibleCount += 1;
+          });
+          if (subjectSelect.value) {
+            const current = subjectSelect.selectedOptions[0];
+            if (current && current.hidden) {
+              subjectSelect.value = '';
+            }
+          }
+          subjectSelect.disabled = visibleCount === 0;
+        };
+        courseSelect.addEventListener('change', syncSubjects);
+        syncSubjects();
+      })();
+    </script>
+    <script src="/js/design-system.js" defer></script>
+  </body>
+</html>
