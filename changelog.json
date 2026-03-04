@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.61",
+      "date": "2026-03-05",
+      "items": [
+        "feat(homework-journal-sync): teacher homework creation routes (`/homework/add`, `/homework/custom`) now trigger immediate journal column sync without waiting for journal page open",
+        "feat(homework-journal-sync): added safe post-create sync helper with grading settings bootstrap and closed-subject guard",
+        "chore(homework-journal-observability): when teacher sync is skipped or fails, activity log now records `homework_journal_sync_skipped` with context"
+      ]
+    },
+    {
       "version": "1.0.60",
       "date": "2026-03-04",
       "items": [

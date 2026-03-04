@@ -12957,6 +12957,56 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
   }
 }
 
+async function trySyncJournalColumnsAfterHomeworkCreate({
+  subjectId,
+  courseId,
+  semesterId,
+  actorUserId,
+  isTeacherHomework,
+}) {
+  if (!isTeacherHomework) {
+    return false;
+  }
+  const safeSubjectId = Number(subjectId);
+  const safeCourseId = Number(courseId);
+  if (!Number.isFinite(safeSubjectId) || safeSubjectId < 1) {
+    return false;
+  }
+  if (!Number.isFinite(safeCourseId) || safeCourseId < 1) {
+    return false;
+  }
+  try {
+    const gradingSettings = await ensureSubjectGradingSettings(
+      safeSubjectId,
+      safeCourseId,
+      semesterId || null,
+      actorUserId || null
+    );
+    if (Number(gradingSettings?.is_closed || 0) === 1) {
+      return false;
+    }
+    await syncJournalColumnsFromHomework(
+      safeSubjectId,
+      safeCourseId,
+      semesterId || null,
+      gradingSettings,
+      actorUserId || null
+    );
+    return true;
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      console.error('Homework journal sync failed', {
+        subject_id: safeSubjectId,
+        course_id: safeCourseId,
+        semester_id: semesterId || null,
+        actor_user_id: actorUserId || null,
+        error: err && err.message ? err.message : err,
+      });
+    }
+    return false;
+  }
+}
+
 async function getTeacherJournalSubjectAccess(userId, subjectId) {
   const rows = await db.all(
     `
@@ -29149,6 +29199,28 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
       courseId || 1,
       activeSemester ? activeSemester.id : null
     );
+    const journalSynced = await trySyncJournalColumnsAfterHomeworkCreate({
+      subjectId,
+      courseId: courseId || 1,
+      semesterId: activeSemester ? activeSemester.id : null,
+      actorUserId: userId,
+      isTeacherHomework: isTeacher,
+    });
+    if (!journalSynced && isTeacher) {
+      logActivity(
+        db,
+        req,
+        'homework_journal_sync_skipped',
+        'homework',
+        createdIds[0] || null,
+        {
+          subject_id: subjectId,
+          reason: 'sync_failed_or_subject_closed',
+        },
+        courseId || 1,
+        activeSemester ? activeSemester.id : null
+      );
+    }
     return res.redirect('/schedule');
   } catch (err) {
     if (req.file) {
@@ -29340,6 +29412,29 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
       courseId || 1,
       activeSemester ? activeSemester.id : null
     );
+    const journalSynced = await trySyncJournalColumnsAfterHomeworkCreate({
+      subjectId,
+      courseId: courseId || 1,
+      semesterId: activeSemester ? activeSemester.id : null,
+      actorUserId: userId,
+      isTeacherHomework: isTeacher,
+    });
+    if (!journalSynced && isTeacher) {
+      logActivity(
+        db,
+        req,
+        'homework_journal_sync_skipped',
+        'homework',
+        createdId,
+        {
+          subject_id: subjectId,
+          reason: 'sync_failed_or_subject_closed',
+          is_custom_deadline: true,
+        },
+        courseId || 1,
+        activeSemester ? activeSemester.id : null
+      );
+    }
     return res.redirect('/schedule');
   } catch (err) {
     if (req.file) {
