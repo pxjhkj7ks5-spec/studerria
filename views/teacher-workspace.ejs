@@ -191,6 +191,14 @@
         gap: 10px;
         flex-wrap: wrap;
       }
+      .template-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .template-actions form {
+        margin: 0;
+      }
       .template-links {
         display: inline-flex;
         gap: 8px;
@@ -392,10 +400,19 @@
                           <a class="template-link" href="<%= template.meeting_url %>" target="_blank" rel="noopener noreferrer">Meeting</a>
                         <% } %>
                       </div>
-                      <form method="POST" action="/teacher/workspace/templates/<%= template.id %>/delete">
-                        <input type="hidden" name="course_id" value="<%= selectedCourseId || '' %>" />
-                        <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
-                      </form>
+                      <div class="template-actions">
+                        <button
+                          class="btn btn-outline-secondary btn-sm"
+                          type="button"
+                          data-template-edit="<%= template.id %>"
+                        >
+                          Edit
+                        </button>
+                        <form method="POST" action="/teacher/workspace/templates/<%= template.id %>/delete">
+                          <input type="hidden" name="course_id" value="<%= selectedCourseId || '' %>" />
+                          <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
+                        </form>
+                      </div>
                     </div>
                   </div>
                 <% }) %>
@@ -406,6 +423,111 @@
           </article>
         </div>
       </section>
+
+      <div class="modal fade" id="editTemplateModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content">
+            <form method="POST" id="editTemplateForm" action="/teacher/workspace/templates/0/update" autocomplete="off">
+              <div class="modal-header">
+                <h5 class="modal-title">Edit template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <input type="hidden" id="editTemplateCourseContext" name="course_id_context" value="<%= selectedCourseId || '' %>" />
+                <div class="row g-2">
+                  <div class="col-12 col-md-6">
+                    <label for="editTemplateCourseId" class="form-label">Course scope</label>
+                    <select class="form-select" id="editTemplateCourseId" name="course_id">
+                      <option value="">All my courses</option>
+                      <% (teacherCourses || []).forEach(function(course) { %>
+                        <option value="<%= course.id %>"><%= course.name %></option>
+                      <% }) %>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label for="editTemplateSubjectId" class="form-label">Subject (optional)</label>
+                    <select class="form-select" id="editTemplateSubjectId" name="subject_id" <%= (teacherSubjects || []).length ? '' : 'disabled' %>>
+                      <option value="">Any subject</option>
+                      <% (teacherSubjects || []).forEach(function(subject) { %>
+                        <option value="<%= subject.id %>" data-course-id="<%= subject.course_id %>">
+                          <%= subject.name %><%= subject.course_name ? ` (${subject.course_name})` : '' %>
+                        </option>
+                      <% }) %>
+                    </select>
+                  </div>
+                  <div class="col-12">
+                    <label for="editTemplateTitle" class="form-label">Title</label>
+                    <input id="editTemplateTitle" name="title" class="form-control" maxlength="160" required />
+                  </div>
+                  <div class="col-12">
+                    <label for="editTemplateDescription" class="form-label">Description</label>
+                    <textarea
+                      id="editTemplateDescription"
+                      name="description"
+                      class="form-control"
+                      rows="4"
+                      maxlength="4000"
+                      required
+                    ></textarea>
+                  </div>
+                  <div class="col-12">
+                    <label for="editTemplateTags" class="form-label">Tags (comma separated)</label>
+                    <input
+                      id="editTemplateTags"
+                      name="tags"
+                      class="form-control"
+                      maxlength="240"
+                      placeholder="quiz, seminar, revision"
+                    />
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label for="editTemplateLinkUrl" class="form-label">Link (optional)</label>
+                    <input
+                      id="editTemplateLinkUrl"
+                      name="link_url"
+                      class="form-control"
+                      type="text"
+                      inputmode="url"
+                      autocapitalize="none"
+                      autocomplete="off"
+                      placeholder="https://example.com"
+                    />
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label for="editTemplateMeetingUrl" class="form-label">Meeting URL (optional)</label>
+                    <input
+                      id="editTemplateMeetingUrl"
+                      name="meeting_url"
+                      class="form-control"
+                      type="text"
+                      inputmode="url"
+                      autocapitalize="none"
+                      autocomplete="off"
+                      placeholder="https://zoom.us/j/..."
+                    />
+                  </div>
+                  <div class="col-12">
+                    <div class="d-flex flex-wrap gap-3">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="editTemplateControl" name="is_control" value="1" />
+                        <label class="form-check-label" for="editTemplateControl">Control</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="editTemplateCredit" name="is_credit" value="1" />
+                        <label class="form-check-label" for="editTemplateCredit">Credit</label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
 
       <%- include('partials/app-footer') %>
     </main>
@@ -436,10 +558,13 @@
         });
       })();
 
-      (function bindCourseSubjectFilter() {
-        const courseSelect = document.getElementById('templateCourseId');
-        const subjectSelect = document.getElementById('templateSubjectId');
-        if (!courseSelect || !subjectSelect) return;
+      const workspaceTemplates = <%- JSON.stringify(templates || []) %>;
+      const selectedCourseContext = <%- JSON.stringify(selectedCourseId || null) %>;
+
+      function bindCourseSubjectFilter(courseSelect, subjectSelect) {
+        if (!courseSelect || !subjectSelect) {
+          return () => {};
+        }
         const syncSubjects = () => {
           const selectedCourseId = Number(courseSelect.value || 0);
           let visibleCount = 0;
@@ -461,7 +586,96 @@
         };
         courseSelect.addEventListener('change', syncSubjects);
         syncSubjects();
-      })();
+        return syncSubjects;
+      }
+
+      const createCourseSelect = document.getElementById('templateCourseId');
+      const createSubjectSelect = document.getElementById('templateSubjectId');
+      bindCourseSubjectFilter(createCourseSelect, createSubjectSelect);
+
+      const editModalEl = document.getElementById('editTemplateModal');
+      const editModal = editModalEl && window.bootstrap ? new window.bootstrap.Modal(editModalEl) : null;
+      const editTemplateForm = document.getElementById('editTemplateForm');
+      const editCourseSelect = document.getElementById('editTemplateCourseId');
+      const editSubjectSelect = document.getElementById('editTemplateSubjectId');
+      const editCourseContextInput = document.getElementById('editTemplateCourseContext');
+      const editTitleInput = document.getElementById('editTemplateTitle');
+      const editDescriptionInput = document.getElementById('editTemplateDescription');
+      const editTagsInput = document.getElementById('editTemplateTags');
+      const editLinkInput = document.getElementById('editTemplateLinkUrl');
+      const editMeetingInput = document.getElementById('editTemplateMeetingUrl');
+      const editControlInput = document.getElementById('editTemplateControl');
+      const editCreditInput = document.getElementById('editTemplateCredit');
+      const syncEditSubjects = bindCourseSubjectFilter(editCourseSelect, editSubjectSelect);
+
+      const templateById = new Map();
+      (workspaceTemplates || []).forEach((template) => {
+        const templateId = Number(template.id);
+        if (Number.isInteger(templateId) && templateId > 0) {
+          templateById.set(templateId, template);
+        }
+      });
+
+      function openTemplateEditor(templateIdRaw) {
+        const templateId = Number(templateIdRaw);
+        if (!Number.isInteger(templateId) || templateId < 1 || !editModal || !editTemplateForm) {
+          return;
+        }
+        const template = templateById.get(templateId);
+        if (!template) {
+          return;
+        }
+
+        editTemplateForm.setAttribute('action', `/teacher/workspace/templates/${templateId}/update`);
+        if (editCourseContextInput) {
+          editCourseContextInput.value = Number.isInteger(Number(selectedCourseContext)) && Number(selectedCourseContext) > 0
+            ? String(Number(selectedCourseContext))
+            : '';
+        }
+        if (editCourseSelect) {
+          editCourseSelect.value = Number.isInteger(Number(template.course_id)) && Number(template.course_id) > 0
+            ? String(Number(template.course_id))
+            : '';
+          syncEditSubjects();
+        }
+        if (editSubjectSelect) {
+          editSubjectSelect.value = Number.isInteger(Number(template.subject_id)) && Number(template.subject_id) > 0
+            ? String(Number(template.subject_id))
+            : '';
+          const selectedOption = editSubjectSelect.selectedOptions && editSubjectSelect.selectedOptions[0];
+          if (selectedOption && selectedOption.hidden) {
+            editSubjectSelect.value = '';
+          }
+        }
+        if (editTitleInput) {
+          editTitleInput.value = String(template.title || '');
+        }
+        if (editDescriptionInput) {
+          editDescriptionInput.value = String(template.description || '');
+        }
+        if (editTagsInput) {
+          editTagsInput.value = String(template.tags || '');
+        }
+        if (editLinkInput) {
+          editLinkInput.value = String(template.link_url || '');
+        }
+        if (editMeetingInput) {
+          editMeetingInput.value = String(template.meeting_url || '');
+        }
+        if (editControlInput) {
+          editControlInput.checked = Number(template.is_control || 0) === 1;
+        }
+        if (editCreditInput) {
+          editCreditInput.checked = Number(template.is_credit || 0) === 1;
+        }
+        editModal.show();
+      }
+
+      document.querySelectorAll('[data-template-edit]').forEach((button) => {
+        button.addEventListener('click', () => {
+          openTemplateEditor(button.getAttribute('data-template-edit'));
+        });
+      });
     </script>
     <script src="/js/design-system.js" defer></script>
   </body>

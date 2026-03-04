@@ -5657,6 +5657,64 @@ async function getTeacherHomeworkTemplates(userId, options = {}) {
   });
 }
 
+async function resolveTeacherTemplateScope(userId, requestedCourseIdRaw, requestedSubjectIdRaw) {
+  const requestedCourseId = Number(requestedCourseIdRaw);
+  const requestedSubjectId = Number(requestedSubjectIdRaw);
+  let resolvedSubject = null;
+  if (Number.isInteger(requestedSubjectId) && requestedSubjectId > 0) {
+    resolvedSubject = await db.get(
+      `
+        SELECT s.id, s.course_id
+        FROM teacher_subjects ts
+        JOIN subjects s ON s.id = ts.subject_id
+        WHERE ts.user_id = ? AND ts.subject_id = ?
+        LIMIT 1
+      `,
+      [userId, requestedSubjectId]
+    );
+    if (!resolvedSubject) {
+      return { ok: false, error: 'Invalid%20subject' };
+    }
+  }
+
+  let validatedCourseId = null;
+  if (Number.isInteger(requestedCourseId) && requestedCourseId > 0) {
+    const hasCourseAccess = await db.get(
+      `
+        SELECT 1
+        FROM teacher_subjects ts
+        JOIN subjects s ON s.id = ts.subject_id
+        WHERE ts.user_id = ? AND s.course_id = ?
+        LIMIT 1
+      `,
+      [userId, requestedCourseId]
+    );
+    if (!hasCourseAccess) {
+      return { ok: false, error: 'Invalid%20course' };
+    }
+    validatedCourseId = requestedCourseId;
+  }
+
+  if (
+    resolvedSubject
+    && validatedCourseId
+    && Number(resolvedSubject.course_id) !== Number(validatedCourseId)
+  ) {
+    return { ok: false, error: 'Subject%20does%20not%20match%20course' };
+  }
+
+  const courseId = resolvedSubject
+    ? Number(resolvedSubject.course_id)
+    : (validatedCourseId || null);
+  const subjectId = resolvedSubject ? Number(resolvedSubject.id) : null;
+  return {
+    ok: true,
+    courseId,
+    subjectId,
+    validatedCourseId,
+  };
+}
+
 async function saveTeacherSubjects(userId, body, options = {}) {
   const catalog = await getTeacherSubjectCatalog();
   const selections = [];
@@ -6562,53 +6620,11 @@ app.post('/teacher/workspace/templates', requireLogin, async (req, res) => {
   }
 
   try {
-    let resolvedSubject = null;
-    if (Number.isInteger(requestedSubjectId) && requestedSubjectId > 0) {
-      resolvedSubject = await db.get(
-        `
-          SELECT s.id, s.course_id
-          FROM teacher_subjects ts
-          JOIN subjects s ON s.id = ts.subject_id
-          WHERE ts.user_id = ? AND ts.subject_id = ?
-          LIMIT 1
-        `,
-        [userId, requestedSubjectId]
-      );
-      if (!resolvedSubject) {
-        return res.redirect('/teacher/workspace?error=Invalid%20subject');
-      }
+    const resolvedScope = await resolveTeacherTemplateScope(userId, requestedCourseId, requestedSubjectId);
+    if (!resolvedScope.ok) {
+      return res.redirect(`/teacher/workspace?error=${resolvedScope.error || 'Invalid%20template%20scope'}`);
     }
-
-    let validatedCourseId = null;
-    if (Number.isInteger(requestedCourseId) && requestedCourseId > 0) {
-      const hasCourseAccess = await db.get(
-        `
-          SELECT 1
-          FROM teacher_subjects ts
-          JOIN subjects s ON s.id = ts.subject_id
-          WHERE ts.user_id = ? AND s.course_id = ?
-          LIMIT 1
-        `,
-        [userId, requestedCourseId]
-      );
-      if (!hasCourseAccess) {
-        return res.redirect('/teacher/workspace?error=Invalid%20course');
-      }
-      validatedCourseId = requestedCourseId;
-    }
-
-    if (
-      resolvedSubject
-      && validatedCourseId
-      && Number(resolvedSubject.course_id) !== Number(validatedCourseId)
-    ) {
-      return res.redirect('/teacher/workspace?error=Subject%20does%20not%20match%20course');
-    }
-
-    const courseId = resolvedSubject
-      ? Number(resolvedSubject.course_id)
-      : (validatedCourseId || null);
-    const subjectId = resolvedSubject ? Number(resolvedSubject.id) : null;
+    const { courseId, subjectId, validatedCourseId } = resolvedScope;
 
     const inserted = await db.get(
       `
@@ -6664,6 +6680,113 @@ app.post('/teacher/workspace/templates', requireLogin, async (req, res) => {
     const fallbackCourseQuery = Number.isInteger(requestedCourseId) && requestedCourseId > 0
       ? `&course=${requestedCourseId}`
       : (Number.isInteger(fallbackCourseId) && fallbackCourseId > 0 ? `&course=${fallbackCourseId}` : '');
+    return res.redirect(`/teacher/workspace?error=Database%20error${fallbackCourseQuery}`);
+  }
+});
+
+app.post('/teacher/workspace/templates/:id/update', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.workspace.templates.update.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
+  }
+  const { id: userId } = req.session.user;
+  const templateId = Number(req.params.id);
+  if (!Number.isInteger(templateId) || templateId < 1) {
+    return res.redirect('/teacher/workspace?error=Invalid%20template');
+  }
+
+  const requestedCourseId = Number(req.body.course_id);
+  const requestedSubjectId = Number(req.body.subject_id);
+  const contextCourseId = Number(req.body.course_id_context);
+  const fallbackCourseId = Number.isInteger(contextCourseId) && contextCourseId > 0
+    ? contextCourseId
+    : (Number.isInteger(requestedCourseId) && requestedCourseId > 0 ? requestedCourseId : null);
+  const title = String(req.body.title || '').trim();
+  const description = String(req.body.description || '').trim();
+  const tags = normalizeTemplateTagsInput(req.body.tags).join(', ');
+  const linkUrl = normalizeExternalUrl(req.body.link_url) || null;
+  const meetingUrl = normalizeExternalUrl(req.body.meeting_url) || null;
+  const isControl = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_control || '').toLowerCase()) ? 1 : 0;
+  const isCredit = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_credit || '').toLowerCase()) ? 1 : 0;
+  const fallbackCourseQuery = fallbackCourseId ? `&course=${fallbackCourseId}` : '';
+
+  if (!title || !description) {
+    return res.redirect(`/teacher/workspace?error=Title%20and%20description%20are%20required${fallbackCourseQuery}`);
+  }
+
+  try {
+    const existing = await db.get(
+      `
+        SELECT id, user_id, course_id, subject_id, title
+        FROM teacher_homework_templates
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [templateId]
+    );
+    if (!existing) {
+      return res.redirect(`/teacher/workspace?error=Template%20not%20found${fallbackCourseQuery}`);
+    }
+    if (Number(existing.user_id) !== Number(userId)) {
+      return res.status(403).send('Forbidden');
+    }
+
+    const resolvedScope = await resolveTeacherTemplateScope(userId, requestedCourseId, requestedSubjectId);
+    if (!resolvedScope.ok) {
+      return res.redirect(`/teacher/workspace?error=${resolvedScope.error || 'Invalid%20template%20scope'}${fallbackCourseQuery}`);
+    }
+    const { courseId, subjectId, validatedCourseId } = resolvedScope;
+
+    await db.run(
+      `
+        UPDATE teacher_homework_templates
+        SET
+          course_id = ?,
+          subject_id = ?,
+          title = ?,
+          description = ?,
+          link_url = ?,
+          meeting_url = ?,
+          tags = ?,
+          is_control = ?,
+          is_credit = ?,
+          updated_at = NOW()
+        WHERE id = ?
+      `,
+      [
+        courseId,
+        subjectId,
+        title,
+        description,
+        linkUrl,
+        meetingUrl,
+        tags,
+        isControl,
+        isCredit,
+        templateId,
+      ]
+    );
+
+    logAction(db, req, 'teacher_homework_template_update', {
+      template_id: templateId,
+      previous_title: existing.title ? String(existing.title) : '',
+      title,
+      course_id: courseId,
+      subject_id: subjectId,
+      tags: tags ? tags.split(',').map((item) => item.trim()).filter(Boolean) : [],
+      is_control: isControl,
+      is_credit: isCredit,
+    });
+
+    const redirectCourseId = courseId || validatedCourseId || fallbackCourseId || null;
+    const courseQuery = redirectCourseId ? `&course=${redirectCourseId}` : '';
+    return res.redirect(`/teacher/workspace?ok=Template%20updated${courseQuery}`);
+  } catch (err) {
+    console.error('Teacher workspace template update failed', err);
     return res.redirect(`/teacher/workspace?error=Database%20error${fallbackCourseQuery}`);
   }
 });

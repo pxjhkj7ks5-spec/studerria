@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.62",
+      "date": "2026-03-05",
+      "items": [
+        "feat(teacher-workspace): added template edit flow with inline modal and prefilled fields for fast updates in teacher workspace",
+        "feat(teacher-homework-templates): introduced template update endpoint (`POST /teacher/workspace/templates/:id/update`) with ownership checks and scoped access validation",
+        "refactor(teacher-template-scope): extracted reusable scope resolver for template create/update to enforce consistent course-subject validation"
+      ]
+    },
+    {
       "version": "1.0.61",
       "date": "2026-03-05",
       "items": [
