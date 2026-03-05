@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.97",
+      "date": "2026-03-05",
+      "items": [
+        "fix(auth-parallax-follow): disabled pointer-driven background parallax on auth pages (`page-auth`) to remove residual cursor-follow motion while preserving soft blob drift and symbol trail"
+      ]
+    },
+    {
       "version": "1.0.96",
       "date": "2026-03-05",
       "items": [
