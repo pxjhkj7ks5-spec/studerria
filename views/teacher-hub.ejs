@@ -176,8 +176,10 @@
         background: rgba(255, 255, 255, 0.88);
       }
     </style>
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-dark page-teacher-hub page-journal">
+    <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'teacher-hub', pageTitle: 'Teacher hub', settings: settings }) %>
     <%- include('partials/desktop-menu-drawer', {
       role,
@@ -291,5 +293,6 @@
         document.body.classList.add(storedTheme);
       })();
     </script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>

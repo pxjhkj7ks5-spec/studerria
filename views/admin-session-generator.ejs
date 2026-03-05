@@ -665,8 +665,10 @@
         }
       }
     </style>
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-light schedule-generator-page session-generator-page">
+    <%- include('partials/dynamic-bg') %>
     <nav class="navbar navbar-expand-lg admin-nav">
       <div class="container">
         <span class="navbar-brand">Генератор сесій</span>
@@ -1821,5 +1823,6 @@
       })();
     </script>
     <script src="/js/design-system.js" defer></script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>

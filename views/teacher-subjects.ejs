@@ -180,8 +180,10 @@
         font-size: 0.82rem;
       }
     </style>
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-dark page-teacher-subjects page-journal">
+    <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'teacher-subjects', pageTitle: 'Teacher subjects', settings: settings }) %>
     <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'teacher-subjects', settings: settings }) %>
 
@@ -323,6 +325,7 @@
         });
       })();
     </script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>
 

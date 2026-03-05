@@ -77,8 +77,10 @@
       <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-dark">
+    <%- include('partials/dynamic-bg') %>
     <div class="container">
       <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
         <div class="col-11 col-md-6 col-lg-5">
@@ -119,5 +121,6 @@
       });
     </script>
       <script src="/js/design-system.js" defer></script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>

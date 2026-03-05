@@ -13,8 +13,10 @@
     />
     <link rel="stylesheet" href="/css/design-system.css" />
     <link rel="stylesheet" href="/css/pages/my-day.css" />
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-dark page-my-day">
+    <%- include('partials/dynamic-bg') %>
     <%
       const cockpit = myDay || {};
       const brief = cockpit.brief || {};
@@ -1476,5 +1478,6 @@
       }
     </script>
     <script src="/js/design-system.js" defer></script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>

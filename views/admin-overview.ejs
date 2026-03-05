@@ -302,8 +302,10 @@
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/admin.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-light">
+    <%- include('partials/dynamic-bg') %>
     <nav class="navbar admin-nav py-3">
       <div class="container">
         <span class="navbar-brand"><%= t('admin.overview') %></span>
@@ -749,5 +751,6 @@
       renderAdminCharts();
     </script>
       <script src="/js/design-system.js" defer></script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>

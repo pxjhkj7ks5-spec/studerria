@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.75",
+      "date": "2026-03-05",
+      "items": [
+        "feat(dynamic-bg-global): added global dynamic background partial with Codex-style layered blobs, grain overlay, edge dot-grid, and glass-friendly depth composition",
+        "feat(dynamic-bg-parallax): added one-RAF mouse-follow/parallax engine with lerp inertia, subtle multi-depth movement, and mobile auto-drift fallback",
+        "feat(dynamic-bg-accessibility): added prefers-reduced-motion support that disables drift/parallax and keeps a static readable gradient state",
+        "chore(dynamic-bg-wiring): connected `/css/dynamic-bg.css`, `partials/dynamic-bg`, and `/js/dynamic-bg.js` across all top-level EJS pages for full-project coverage"
+      ]
+    },
+    {
       "version": "1.0.74",
       "date": "2026-03-05",
       "items": [

@@ -516,8 +516,10 @@
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/profile.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-light page-profile">
+    <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'profile', pageTitle: t('schedule.profile') }) %>
     <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'profile' }) %>
     <div class="container py-4">
@@ -707,5 +709,6 @@
     </script>
     <%- include('partials/desktop-menu-drawer-script') %>
       <script src="/js/design-system.js" defer></script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>

@@ -730,8 +730,10 @@
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/admin.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-light">
+    <%- include('partials/dynamic-bg') %>
     <% const isLimitedView = typeof limitedStaffView !== 'undefined' && limitedStaffView; %>
     <% const allowedSectionsRaw = typeof locals !== 'undefined' && typeof locals.allowedSections !== 'undefined' ? locals.allowedSections : (typeof allowedSections !== 'undefined' ? allowedSections : null); %>
     <% const allowedSectionsList = role === 'admin' ? null : (Array.isArray(allowedSectionsRaw) ? allowedSectionsRaw : null); %>
@@ -8401,5 +8403,6 @@
       })();
     </script>
       <script src="/js/design-system.js" defer></script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>

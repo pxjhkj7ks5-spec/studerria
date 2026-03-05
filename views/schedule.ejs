@@ -1669,8 +1669,10 @@
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/schedule.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-dark page-schedule">
+    <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'schedule' }) %>
     <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
       <div class="drawer-head">
@@ -4395,5 +4397,6 @@
       });
     </script>
       <script src="/js/design-system.js" defer></script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>

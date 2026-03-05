@@ -255,8 +255,10 @@
         border-color: rgba(125, 211, 252, 0.52);
       }
     </style>
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-dark page-admin-pathways page-journal">
+    <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', {
       role,
       username,
@@ -652,5 +654,6 @@
         document.body.classList.add(storedTheme);
       })();
     </script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>

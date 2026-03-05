@@ -226,8 +226,10 @@
         font-size: 0.82rem;
       }
     </style>
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-dark page-journal-insights page-journal">
+    <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'journal-insights', pageTitle: 'Journal insights', settings: settings }) %>
     <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'journal-insights', settings: settings }) %>
 
@@ -621,5 +623,6 @@
         document.body.classList.add(storedTheme);
       })();
     </script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>

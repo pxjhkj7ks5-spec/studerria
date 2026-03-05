@@ -618,8 +618,10 @@
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/teamwork.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
+      <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="theme-dark page-teamwork">
+    <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'teamwork', pageTitle: t('menu.teamwork') }) %>
     <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'teamwork' }) %>
 
@@ -1211,5 +1213,6 @@
     </script>
     <%- include('partials/desktop-menu-drawer-script') %>
       <script src="/js/design-system.js" defer></script>
+      <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>
