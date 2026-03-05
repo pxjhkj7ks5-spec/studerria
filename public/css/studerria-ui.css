@@ -335,15 +335,24 @@ body.page-local-topbar .topbar-title-spotlight::after {
   z-index: 1080 !important;
 }
 
-.studerria-theme .modal-backdrop {
+body.studerria-theme .modal-backdrop {
   z-index: 1070 !important;
-}
-
-.studerria-theme .modal-backdrop.show {
-  opacity: 1;
-  background: rgba(7, 11, 24, 0.24);
+  --bs-backdrop-bg: rgba(7, 11, 24, 0.24);
+  --bs-backdrop-opacity: 0.48;
+  background-color: var(--bs-backdrop-bg);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+  transition: opacity 220ms ease;
+}
+
+body.studerria-theme .modal-backdrop.show {
+  opacity: var(--bs-backdrop-opacity);
+  background-color: var(--bs-backdrop-bg);
+}
+
+body.theme-light.studerria-theme .modal-backdrop {
+  --bs-backdrop-bg: rgba(15, 23, 42, 0.18);
+  --bs-backdrop-opacity: 0.42;
 }
 
 .studerria-theme .modal-dialog {

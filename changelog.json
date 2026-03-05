@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.17",
+      "date": "2026-03-05",
+      "items": [
+        "fix(modal-backdrop-close-flash): kept the backdrop color consistent between base and `show` states so closing a modal no longer flashes a gray overlay before the backdrop fades out"
+      ]
+    },
+    {
       "version": "1.1.16",
       "date": "2026-03-05",
       "items": [
