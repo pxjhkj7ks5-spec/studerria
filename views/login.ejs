@@ -315,14 +315,14 @@
         padding-right: 38px;
       }
 </style>
-      <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/auth.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
-      <link rel="stylesheet" href="/css/dynamic-bg.css" />
+    <link rel="stylesheet" href="/css/login-bg.css" />
   </head>
-  <body class="theme-light">
-    <%- include('partials/dynamic-bg') %>
+  <body class="theme-light page-login">
+    <%- include('partials/dynamic-login-bg') %>
     <div class="theme-toggle-floating">
       <button
         class="theme-toggle-min"
@@ -478,19 +478,30 @@
         });
       }
       const themeToggle = document.getElementById('themeToggle');
+      const applyThemeAttr = () => {
+        if (document.body.classList.contains('theme-dark')) {
+          document.body.setAttribute('data-theme', 'dark');
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.body.setAttribute('data-theme', 'light');
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      };
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
       document.body.classList.remove('theme-light', 'theme-dark');
       document.body.classList.add(savedTheme);
+      applyThemeAttr();
       themeToggle.textContent = savedTheme === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
       themeToggle.addEventListener('click', () => {
         const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
         document.body.classList.remove('theme-light', 'theme-dark');
         document.body.classList.add(next);
+        applyThemeAttr();
         localStorage.setItem('ui-theme', next);
         themeToggle.textContent = next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
       });
     </script>
       <script src="/js/design-system.js" defer></script>
-      <script src="/js/dynamic-bg.js" defer></script>
+    <script src="/js/login-bg.js" defer></script>
   </body>
 </html>

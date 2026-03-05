@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.79",
+      "date": "2026-03-05",
+      "items": [
+        "feat(login-bg): added dedicated dynamic login background partial with layered gradient, 4 blobs, grain overlay, side dot-patterns, and cursor highlight",
+        "feat(login-bg-parallax): implemented login-only pointer-follow and blob parallax with inertial lerp, coarse-pointer fallback drift, hidden-tab pause, and reduced-motion safeguards",
+        "ux(login-theme-sync): synchronized `data-theme` attribute with login theme toggle so background variables render correctly in light and dark modes",
+        "chore(login-wiring): switched login page from global dynamic-bg assets to dedicated `/css/login-bg.css` and `/js/login-bg.js` without altering form behavior"
+      ]
+    },
+    {
       "version": "1.0.78",
       "date": "2026-03-05",
       "items": [
