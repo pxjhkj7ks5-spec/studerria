@@ -11,6 +11,10 @@
   --btn-primary-text: #f8fafc;
   --btn-secondary-bg: rgba(255, 255, 255, 0.8);
   --btn-secondary-text: #0f172a;
+  --gpt-accent-start: #4f46e5;
+  --gpt-accent-end: #a855f7;
+  --gpt-accent-glow: rgba(99, 102, 241, 0.34);
+  --gpt-accent-border: rgba(99, 102, 241, 0.6);
 
   --vision-base-gradient: linear-gradient(135deg, #eef2ff 0%, #e8edff 50%, #e0e7ff 100%);
   --vision-side-left: rgba(99, 102, 241, 0.24);
@@ -46,6 +50,10 @@ body.theme-dark {
   --btn-primary-text: #0f172a;
   --btn-secondary-bg: rgba(15, 23, 42, 0.8);
   --btn-secondary-text: #e2e8f0;
+  --gpt-accent-start: #6366f1;
+  --gpt-accent-end: #a855f7;
+  --gpt-accent-glow: rgba(139, 92, 246, 0.36);
+  --gpt-accent-border: rgba(167, 139, 250, 0.64);
 
   --vision-base-gradient: linear-gradient(135deg, #1e1b4b 0%, #221a5a 50%, #251b67 100%);
   --vision-side-left: rgba(67, 56, 202, 0.32);
@@ -308,8 +316,10 @@ body.page-vision {
 }
 
 .signup-btn {
-  background: var(--btn-primary);
-  color: var(--btn-primary-text);
+  background: linear-gradient(135deg, var(--gpt-accent-start), var(--gpt-accent-end));
+  color: #f8fafc;
+  border-color: var(--gpt-accent-border);
+  box-shadow: 0 12px 26px var(--gpt-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .theme-toggle:hover,
@@ -388,8 +398,10 @@ body.page-vision {
 }
 
 .btn-primary {
-  background: var(--btn-primary);
-  color: var(--btn-primary-text);
+  background: linear-gradient(135deg, var(--gpt-accent-start), var(--gpt-accent-end));
+  color: #f8fafc;
+  border-color: var(--gpt-accent-border);
+  box-shadow: 0 12px 24px var(--gpt-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .btn-secondary {
@@ -401,6 +413,12 @@ body.page-vision {
 .btn-primary:hover,
 .btn-secondary:hover {
   transform: translateY(-1px);
+}
+
+.btn-primary:hover,
+.signup-btn:hover,
+.conversation-compose button:hover {
+  filter: brightness(1.05) saturate(1.05);
 }
 
 .code-diff-card {
@@ -551,6 +569,13 @@ body.theme-dark .thread-card {
   font-size: 0.84rem;
   padding: 6px 12px;
   cursor: pointer;
+  transition: background 170ms ease, border-color 170ms ease, transform 170ms ease;
+}
+
+.thread-action:hover {
+  border-color: var(--gpt-accent-border);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(168, 85, 247, 0.16));
+  transform: translateY(-1px);
 }
 
 .conversation-panel {
@@ -639,11 +664,12 @@ body.theme-dark .conversation-compose input {
 
 .conversation-compose button {
   border-radius: 12px;
-  border: 1px solid var(--panel-border);
-  background: var(--btn-primary);
-  color: var(--btn-primary-text);
+  border: 1px solid var(--gpt-accent-border);
+  background: linear-gradient(135deg, var(--gpt-accent-start), var(--gpt-accent-end));
+  color: #f8fafc;
   padding: 10px 14px;
   cursor: pointer;
+  box-shadow: 0 10px 22px var(--gpt-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .conversation-panel footer {

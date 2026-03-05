@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.84",
+      "date": "2026-03-05",
+      "items": [
+        "style(vision-buttons): recolored key CTA buttons (Sign up, Hero primary, Conversation submit) to GPT icon palette with indigo?violet gradient fill",
+        "ux(vision-buttons-hover): added soft brightness/saturation hover and glow for accent buttons while keeping existing spacing and proportions unchanged",
+        "style(vision-thread-actions): added subtle GPT-tinted hover state for thread action pills to align micro-interactions with new accent system",
+        "refactor(vision-theme-vars): introduced dedicated accent CSS variables (`--gpt-accent-*`) for easy future button palette tuning in light/dark themes"
+      ]
+    },
+    {
       "version": "1.0.83",
       "date": "2026-03-05",
       "items": [
