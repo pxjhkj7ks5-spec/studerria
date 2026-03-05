@@ -4,11 +4,41 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><%= pageTitle || 'Studerria' %></title>
+    <script>
+      (function bootstrapStuderriaTheme() {
+        var root = document.documentElement;
+        var defaultTheme = (root.getAttribute('data-theme') || 'light').toLowerCase() === 'dark' ? 'dark' : 'light';
+        var theme = defaultTheme;
+        try {
+          var stored = localStorage.getItem('ui-theme');
+          if (stored === 'theme-dark' || stored === 'dark') {
+            theme = 'dark';
+          } else if (stored === 'theme-light' || stored === 'light') {
+            theme = 'light';
+          }
+          localStorage.setItem('ui-theme', theme === 'dark' ? 'theme-dark' : 'theme-light');
+        } catch (_error) {
+          theme = defaultTheme;
+        }
+        root.setAttribute('data-theme', theme);
+        window.__studerriaThemeBoot = theme;
+      })();
+    </script>
     <%- pageHead || '' %>
     <link rel="stylesheet" href="/css/studerria-background.css" />
     <link rel="stylesheet" href="/css/studerria-ui.css" />
   </head>
   <body class="studerria-theme <%= pageBodyClass || '' %>">
+    <script>
+      (function applyStuderriaThemeToBody() {
+        var body = document.body;
+        if (!body) return;
+        var theme = window.__studerriaThemeBoot === 'dark' ? 'dark' : 'light';
+        body.classList.remove('theme-dark', 'theme-light', 'dark', 'light');
+        body.classList.add(theme === 'dark' ? 'theme-dark' : 'theme-light');
+        body.setAttribute('data-theme', theme);
+      })();
+    </script>
     <%- include('../partials/studerria-background') %>
     <%- include('../partials/navbar', { showGlobalNavbar, role, username, t }) %>
 

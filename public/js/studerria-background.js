@@ -15,7 +15,7 @@
     const cursorGlow = root.querySelector('.studerria-cursor-glow');
     const particleHost = root.querySelector('#studerriaBgParticles');
     const parallaxLayers = Array.from(root.querySelectorAll('[data-depth]'));
-    const themeToggle = document.getElementById('studerriaThemeToggle');
+    const THEME_CONTROL_SELECTOR = '.theme-toggle, .studerria-theme-toggle, .theme-toggle-btn, [data-theme-toggle]';
 
     const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
     const coarsePointerMedia = window.matchMedia('(pointer: coarse)');
@@ -107,21 +107,45 @@
       return `${Math.round(x / TRAIL_GRID_SIZE)}:${Math.round(y / TRAIL_GRID_SIZE)}`;
     }
 
+    function normalizeThemeValue(rawValue) {
+      const value = String(rawValue || '').trim().toLowerCase();
+      if (value === 'dark' || value === 'theme-dark') return 'dark';
+      if (value === 'light' || value === 'theme-light') return 'light';
+      return '';
+    }
+
+    function readStoredTheme() {
+      try {
+        return normalizeThemeValue(localStorage.getItem('ui-theme'));
+      } catch (_error) {
+        return '';
+      }
+    }
+
+    function writeStoredTheme(theme) {
+      try {
+        localStorage.setItem('ui-theme', theme === 'dark' ? 'theme-dark' : 'theme-light');
+      } catch (_error) {
+        // Ignore storage failures.
+      }
+    }
+
     function resolveTheme() {
-      if (body.classList.contains('theme-dark')) return 'dark';
-      if (body.classList.contains('theme-light')) return 'light';
+      if (body.classList.contains('theme-dark') || body.classList.contains('dark')) return 'dark';
+      if (body.classList.contains('theme-light') || body.classList.contains('light')) return 'light';
       const bodyTheme = body.getAttribute('data-theme');
       if (bodyTheme === 'dark' || bodyTheme === 'light') return bodyTheme;
       const htmlTheme = html.getAttribute('data-theme');
       if (htmlTheme === 'dark' || htmlTheme === 'light') return htmlTheme;
 
-      const stored = localStorage.getItem('ui-theme');
-      if (stored === 'theme-dark') return 'dark';
-      return 'light';
+      const stored = readStoredTheme();
+      if (stored) return stored;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
 
     function applyTheme(theme, setClasses = false, persist = false) {
       const next = theme === 'dark' ? 'dark' : 'light';
+      const nextClass = next === 'dark' ? 'theme-dark' : 'theme-light';
       state.themeSyncGuard = true;
 
       if (html.getAttribute('data-theme') !== next) {
@@ -131,41 +155,62 @@
         body.setAttribute('data-theme', next);
       }
 
-      if (setClasses) {
-        if (next === 'dark') {
-          body.classList.add('theme-dark');
-          body.classList.remove('theme-light');
-        } else {
-          body.classList.add('theme-light');
-          body.classList.remove('theme-dark');
-        }
+      if (
+        setClasses
+        || !body.classList.contains(nextClass)
+        || body.classList.contains('dark')
+        || body.classList.contains('light')
+      ) {
+        body.classList.remove('theme-dark', 'theme-light', 'dark', 'light');
+        body.classList.add(nextClass);
       }
 
       if (persist) {
-        localStorage.setItem('ui-theme', next === 'dark' ? 'theme-dark' : 'theme-light');
+        writeStoredTheme(next);
       }
 
       state.themeSyncGuard = false;
       return next;
     }
 
+    function getThemeControls() {
+      return Array.from(document.querySelectorAll(THEME_CONTROL_SELECTOR));
+    }
+
+    function getThemeToggleLabel(control, theme) {
+      const fallbackLight = control.classList.contains('studerria-theme-toggle') ? 'Light' : '☀️';
+      const fallbackDark = control.classList.contains('studerria-theme-toggle') ? 'Dark' : '🌙';
+      return theme === 'dark'
+        ? (control.dataset.lightLabel || fallbackLight)
+        : (control.dataset.darkLabel || fallbackDark);
+    }
+
     function updateToggleLabel() {
-      if (!themeToggle) return;
       const theme = resolveTheme();
-      themeToggle.textContent = theme === 'dark'
-        ? (themeToggle.dataset.lightLabel || 'Light')
-        : (themeToggle.dataset.darkLabel || 'Dark');
+      getThemeControls().forEach((control) => {
+        if (!(control instanceof HTMLElement)) return;
+        control.textContent = getThemeToggleLabel(control, theme);
+      });
     }
 
     function initThemeToggle() {
-      if (!themeToggle) return;
       updateToggleLabel();
-      themeToggle.addEventListener('click', () => {
+      document.addEventListener('click', (event) => {
+        const control = event.target instanceof Element
+          ? event.target.closest(THEME_CONTROL_SELECTOR)
+          : null;
+        if (!(control instanceof HTMLElement)) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
         const current = resolveTheme();
         const next = current === 'dark' ? 'light' : 'dark';
         applyTheme(next, true, true);
         updateToggleLabel();
-      });
+      }, true);
     }
 
     const morphStates = Array.from(root.querySelectorAll('[data-blob-path]')).map((pathEl, index) => {
@@ -541,6 +586,16 @@
       updateToggleLabel();
     });
     themeObserver.observe(body, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+    themeObserver.observe(html, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+
+    window.addEventListener('storage', (event) => {
+      if (event.key !== 'ui-theme') {
+        return;
+      }
+      const nextTheme = normalizeThemeValue(event.newValue) || resolveTheme();
+      applyTheme(nextTheme, true, false);
+      updateToggleLabel();
+    });
 
     document.addEventListener('pointermove', onPointerMove, { passive: true });
     document.addEventListener('pointerleave', onPointerLeave, { passive: true });
@@ -549,6 +604,7 @@
     document.addEventListener('visibilitychange', onVisibilityChange, { passive: true });
 
     applyTheme(resolveTheme(), true, false);
+    writeStoredTheme(resolveTheme());
     initThemeToggle();
     resetState();
     applyMotionMode();

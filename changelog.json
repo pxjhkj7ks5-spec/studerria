@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.20",
+      "date": "2026-03-05",
+      "items": [
+        "fix(theme-sync): added an early shared theme bootstrap in the global layout so all layout-driven pages start with the same canonical dark or light state before page scripts run",
+        "fix(theme-storage-canonical): normalized `ui-theme` handling in the shared background manager so both `dark/light` and `theme-dark/theme-light` are read safely and persisted back in one canonical format",
+        "fix(theme-toggle-unification): moved shared theme toggles onto one global click handler so topbar, drawer, mobile menu, and shell toggles stop diverging across pages like admin pathways and other local-topbar screens"
+      ]
+    },
+    {
       "version": "1.1.19",
       "date": "2026-03-05",
       "items": [
