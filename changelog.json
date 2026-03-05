@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.78",
+      "date": "2026-03-05",
+      "items": [
+        "feat(dynamic-bg-structure): rebuilt global background partial to Codex-like layer stack (`gradient-layer`, `blob1..3`, `noise-overlay`, edge `dot-pattern`, `mouse-highlight`)",
+        "feat(dynamic-bg-style): replaced dynamic background stylesheet with light/dark theme variables (`--bg-base`, blob colors, noise/dot/highlight opacity), smooth blob drift, and reduced-motion fallback",
+        "feat(dynamic-bg-runtime): rewrote global mouse-follow/parallax script with one RAF loop, pointer-aware behavior (coarse pointer auto-drift), visibility pause/resume, and safe theme fallback",
+        "chore(dynamic-bg-assets): added reusable grain texture asset at `/public/assets/grain.png` for subtle noise overlay across all pages"
+      ]
+    },
+    {
       "version": "1.0.77",
       "date": "2026-03-05",
       "items": [
