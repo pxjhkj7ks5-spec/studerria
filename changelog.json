@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.14",
+      "date": "2026-03-05",
+      "items": [
+        "fix(local-topbar-alignment): tightened the gap between local topbars and page content, and narrowed local topbar capsules so they align with the same content frame as schedule and other shell blocks"
+      ]
+    },
+    {
       "version": "1.1.13",
       "date": "2026-03-05",
       "items": [

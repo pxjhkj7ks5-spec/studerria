@@ -299,11 +299,13 @@ body.theme-light.studerria-theme {
 }
 
 body.page-local-topbar .page-container {
-  padding-top: 22px;
+  padding-top: 14px;
 }
 
 body.page-local-topbar .topbar {
-  margin: 0 0 18px;
+  width: calc(100% - 24px);
+  max-width: calc(100% - 24px);
+  margin: 0 auto 12px;
   padding: 8px 12px;
   border-radius: 28px;
   box-shadow: 0 22px 52px rgba(2, 6, 23, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.14);
@@ -710,10 +712,12 @@ body.page-profile .auth-card .form-select:focus {
   }
 
   body.page-local-topbar .page-container {
-    padding-top: 12px;
+    padding-top: 8px;
   }
 
   body.page-local-topbar .topbar {
+    width: calc(100% - 16px);
+    max-width: calc(100% - 16px);
     border-radius: 22px;
   }
 
