@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.03",
+      "date": "2026-03-05",
+      "items": [
+        "style(global-vision-polish): aligned shared UI tokens with the `vision` draft by introducing richer glass variables for text, panels, pill surfaces, and CTA gradients",
+        "style(navbar-topbar): upgraded global navbar and in-app topbars with stronger liquid-glass backgrounds, highlight sheen, deeper shadows, and cleaner spacing closer to the showcase page",
+        "style(cards-buttons): refreshed shared cards and button surfaces with larger radii, heavier blur, softer inset highlights, and vision-like pill CTA/outline treatments across the app shell"
+      ]
+    },
+    {
       "version": "1.1.02",
       "date": "2026-03-05",
       "items": [
