@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.19",
+      "date": "2026-03-05",
+      "items": [
+        "ux(admin-students): removed the collapsible students filters block from the admin students panel so the table opens immediately without the extra filter accordion"
+      ]
+    },
+    {
       "version": "1.1.18",
       "date": "2026-03-05",
       "items": [

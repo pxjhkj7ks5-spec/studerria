@@ -2303,67 +2303,6 @@
 
         <% if (sectionAllowed('admin-students')) { %>
         <div id="admin-students" class="admin-panel" data-admin-title="People / Students">
-          <% const hasStudentsFilters = filters && (filters.users_q || filters.users_group || usersStatus); %>
-          <div class="accordion admin-filter-accordion mb-3" id="studentsFilterAccordion">
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="studentsFilterHeading">
-                <button
-                  class="accordion-button <%= hasStudentsFilters ? '' : 'collapsed' %>"
-                  type="button"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#studentsFilterCollapse"
-                  aria-expanded="<%= hasStudentsFilters ? 'true' : 'false' %>"
-                  aria-controls="studentsFilterCollapse"
-                >
-                  Фільтри students
-                </button>
-              </h2>
-              <div
-                id="studentsFilterCollapse"
-                class="accordion-collapse collapse <%= hasStudentsFilters ? 'show' : '' %>"
-                data-bs-parent="#studentsFilterAccordion"
-              >
-                <div class="accordion-body">
-                  <form method="GET" action="/admin">
-                    <input type="hidden" name="tab" value="admin-students" />
-                    <div class="row g-2 align-items-end">
-                      <div class="col-12 col-md-4">
-                        <label class="form-label"><%= t('admin.searchByName') %></label>
-                        <input
-                          class="form-control"
-                          name="users_q"
-                          placeholder="<%= t('admin.searchByNamePlaceholder') %>"
-                          value="<%= (filters && filters.users_q) || '' %>"
-                        />
-                      </div>
-                      <div class="col-12 col-md-3">
-                        <label class="form-label"><%= t('admin.scheduleGroup') %></label>
-                        <input
-                          class="form-control"
-                          name="users_group"
-                          placeholder="<%= t('admin.scheduleGroupPlaceholder') %>"
-                          value="<%= (filters && filters.users_group) || '' %>"
-                        />
-                      </div>
-                      <div class="col-12 col-md-3">
-                        <label class="form-label">Статус</label>
-                        <select class="form-select" name="users_status">
-                          <% const studentsStatusValue = usersStatus || 'all'; %>
-                          <option value="active" <%= studentsStatusValue === 'active' ? 'selected' : '' %>><%= t('admin.active') %></option>
-                          <option value="inactive" <%= studentsStatusValue === 'inactive' ? 'selected' : '' %>><%= t('admin.inactive') %></option>
-                          <option value="all" <%= studentsStatusValue === 'all' ? 'selected' : '' %>><%= t('admin.all') %></option>
-                        </select>
-                      </div>
-                      <div class="col-12 col-md-2 d-grid">
-                        <button class="btn btn-outline-primary" type="submit"><%= t('admin.filter') %></button>
-                      </div>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <% const studentRows = (users || []).filter(function(u) {
             const roleKeys = Array.isArray(u.role_keys) && u.role_keys.length
               ? u.role_keys
