@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.88",
+      "date": "2026-03-05",
+      "items": [
+        "fix(vision-trail-continuity): added segment interpolation between pointer positions so fast mouse jerks no longer create broken/gapped trails",
+        "perf(vision-trail-sampling): increased particle pool and switched to multi-stamp path sampling (capped per event) for stable continuous brush rendering under high cursor speed",
+        "tune(vision-trail-density): reduced stamp interval threshold and minimum movement gate while keeping grid spacing/cell cooldown anti-overlap safeguards",
+        "ux(vision-trail-pointer-reset): reset pointer sample anchors on leave/reduced-motion state switches to avoid accidental trail jumps at re-entry"
+      ]
+    },
+    {
       "version": "1.0.87",
       "date": "2026-03-05",
       "items": [

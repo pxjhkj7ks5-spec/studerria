@@ -24,12 +24,13 @@
     { symbol: '_', variant: 'outer', lane: 2, ttl: 1400, scale: 0.8, opacity: 0.22, forwardOffset: -1.2 }
   ];
 
-  const MAX_TRAIL_PARTICLES = 220;
-  const STAMP_INTERVAL_MS = 96;
+  const MAX_TRAIL_PARTICLES = 320;
+  const STAMP_INTERVAL_MS = 44;
   const TRAIL_GRID_SIZE = 12;
-  const CELL_COOLDOWN_MS = 520;
-  const MIN_STAMP_DISTANCE = 10;
+  const CELL_COOLDOWN_MS = 320;
+  const MIN_STAMP_DISTANCE = 4;
   const CELL_MEMORY_MS = 4200;
+  const PATH_STAMP_STEP = 8;
 
   class TrailParticle {
     constructor(host) {
@@ -130,6 +131,9 @@
   let lastStampAt = 0;
   let lastStampX = centerX;
   let lastStampY = centerY;
+  let lastPointerSampleX = centerX;
+  let lastPointerSampleY = centerY;
+  let hasPointerSample = false;
 
   let stableZone = '';
   let stableZoneSince = 0;
@@ -250,6 +254,9 @@
       smoothY = centerY;
       lastStampX = centerX;
       lastStampY = centerY;
+      lastPointerSampleX = centerX;
+      lastPointerSampleY = centerY;
+      hasPointerSample = false;
       clearFocus();
       clearTrailParticles();
       recentStampCells.clear();
@@ -360,7 +367,29 @@
     const now = performance.now();
     lastMoveAt = now;
 
-    if (now - lastStampAt >= STAMP_INTERVAL_MS) {
+    if (!hasPointerSample) {
+      lastPointerSampleX = event.clientX;
+      lastPointerSampleY = event.clientY;
+      hasPointerSample = true;
+    }
+
+    const dx = event.clientX - lastPointerSampleX;
+    const dy = event.clientY - lastPointerSampleY;
+    const segmentDistance = Math.hypot(dx, dy);
+    const spacing = Math.max(6, PATH_STAMP_STEP);
+
+    if (segmentDistance > 0) {
+      const steps = Math.min(30, Math.max(1, Math.ceil(segmentDistance / spacing)));
+      for (let i = 1; i <= steps; i += 1) {
+        const t = i / steps;
+        const sx = lastPointerSampleX + (dx * t);
+        const sy = lastPointerSampleY + (dy * t);
+        spawnBrushStamp(now + i, sx, sy, dx, dy);
+      }
+      lastStampAt = now;
+      lastPointerSampleX = event.clientX;
+      lastPointerSampleY = event.clientY;
+    } else if (now - lastStampAt >= STAMP_INTERVAL_MS) {
       const movementX = Number.isFinite(event.movementX) ? event.movementX : 0;
       const movementY = Number.isFinite(event.movementY) ? event.movementY : 0;
       spawnBrushStamp(now, event.clientX, event.clientY, movementX, movementY);
@@ -379,6 +408,7 @@
     pointerInside = false;
     pointerX = centerX;
     pointerY = centerY;
+    hasPointerSample = false;
     stableZone = '';
     stableZoneSince = 0;
     clearFocus();
