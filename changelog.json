@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "1.0.95",
+      "date": "2026-03-05",
+      "items": [
+        "fix(layout-auth-shell): global render wrapper now marks `login/register*` as auth pages, appends stable `page-auth/page-register` body classes, and disables global navbar there",
+        "fix(auth-background-glow): disabled global cursor glow on auth pages to remove distant white circle artifact while keeping the ambient gradient/morph layers",
+        "feat(trail-grid-global): replaced generic mouse trail with grid-based brush stamps (`o`, `>`, `_`) using per-cell cooldown and path interpolation for readable non-overlapping symbols",
+        "perf(trail-continuity): added interpolated stamping between pointer samples and throttled resize handling so fast cursor jerks keep a continuous trail without UI stalls",
+        "style(light-balance): tuned light theme background/particle contrast and increased trail symbol size/weight for better visibility across pages"
+      ]
+    },
+    {
       "version": "1.0.94",
       "date": "2026-03-05",
       "items": [

@@ -20,6 +20,7 @@
     const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
     const coarsePointerMedia = window.matchMedia('(pointer: coarse)');
 
+    const isAuthPage = body.classList.contains('page-auth');
     const isLowPowerPage = [
       'page-schedule',
       'page-journal',
@@ -45,14 +46,22 @@
     };
 
     const TRAIL_PATTERN = [
-      { symbol: 'o', offset: 0, lane: 0, ttl: 1200, opacity: 0.24, scale: 0.84 },
-      { symbol: '>', offset: 8, lane: 1, ttl: 980, opacity: 0.2, scale: 0.78 },
-      { symbol: '_', offset: 14, lane: 2, ttl: 800, opacity: 0.17, scale: 0.74 }
+      { symbol: '_', variant: 'outer', lane: -2, ttl: 1600, scale: 0.8, opacity: 0.2, forwardOffset: -1.1 },
+      { symbol: '>', variant: 'mid', lane: -1, ttl: 2400, scale: 0.86, opacity: 0.28, forwardOffset: -0.45 },
+      { symbol: 'o', variant: 'center', lane: 0, ttl: 3200, scale: 0.92, opacity: 0.36, forwardOffset: 0 },
+      { symbol: '>', variant: 'mid', lane: 1, ttl: 2400, scale: 0.86, opacity: 0.28, forwardOffset: -0.45 },
+      { symbol: '_', variant: 'outer', lane: 2, ttl: 1600, scale: 0.8, opacity: 0.2, forwardOffset: -1.1 }
     ];
 
     const MORPH_FRAME_MS = isLowPowerPage ? 90 : 48;
-    const TRAIL_FRAME_MS = isLowPowerPage ? 110 : 56;
-    const MAX_PARTICLES = isLowPowerPage ? 8 : 20;
+    const STAMP_INTERVAL_MS = isLowPowerPage ? 58 : 44;
+    const TRAIL_GRID_SIZE = isLowPowerPage ? 14 : 12;
+    const CELL_COOLDOWN_MS = isLowPowerPage ? 340 : 280;
+    const CELL_MEMORY_MS = 4200;
+    const PATH_STAMP_STEP = isLowPowerPage ? 9 : 8;
+    const MIN_STAMP_DISTANCE = 4;
+    const MAX_PARTICLES = isLowPowerPage ? 120 : 180;
+    const LERP_FACTOR = isLowPowerPage ? 0.08 : 0.09;
 
     const state = {
       width: Math.max(window.innerWidth, 1),
@@ -64,10 +73,21 @@
       reducedMotion: Boolean(reducedMotionMedia.matches),
       coarsePointer: Boolean(coarsePointerMedia.matches),
       lastMorphAt: 0,
-      lastTrailAt: 0,
       rafId: 0,
       themeSyncGuard: false,
+      lastMoveAt: 0,
+      lastStampAt: 0,
+      lastStampX: Math.max(window.innerWidth, 1) / 2,
+      lastStampY: Math.max(window.innerHeight, 1) / 2,
+      lastPointerSampleX: Math.max(window.innerWidth, 1) / 2,
+      lastPointerSampleY: Math.max(window.innerHeight, 1) / 2,
+      hasPointerSample: false,
+      cleanupCellsAt: 0,
+      lastDirection: 0,
+      resizeTimerId: 0,
     };
+
+    const recentStampCells = new Map();
 
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -77,6 +97,14 @@
 
     function smoothstep(value) {
       return value * value * (3 - (2 * value));
+    }
+
+    function toGrid(value) {
+      return Math.round(value / TRAIL_GRID_SIZE) * TRAIL_GRID_SIZE;
+    }
+
+    function cellKey(x, y) {
+      return `${Math.round(x / TRAIL_GRID_SIZE)}:${Math.round(y / TRAIL_GRID_SIZE)}`;
     }
 
     function resolveTheme() {
@@ -148,7 +176,7 @@
         pathEl,
         frames,
         duration: kind === 'secondary' ? 45000 : 30000,
-        offset: index * 6200
+        offset: index * 6200,
       };
     });
 
@@ -173,6 +201,7 @@
 
       spawn(config) {
         this.active = true;
+        this.el.className = `studerria-bg-particle ${config.variant || ''}`.trim();
         this.el.textContent = config.symbol;
         this.originX = config.x;
         this.originY = config.y;
@@ -201,10 +230,10 @@
           return;
         }
 
-        const fade = Math.pow(1 - progress, 1.2);
+        const fade = Math.pow(1 - progress, 1.26);
         const x = this.originX + (this.driftX * progress);
         const y = this.originY + (this.driftY * progress);
-        const scale = this.baseScale + (progress * 0.07);
+        const scale = this.baseScale + (progress * 0.05);
         const rotation = this.rotation + (this.spin * progress);
 
         this.el.style.opacity = (this.baseOpacity * fade).toFixed(3);
@@ -217,8 +246,12 @@
       : [];
     let particleCursor = 0;
 
+    function hideParticles() {
+      particles.forEach((particle) => particle.hide());
+    }
+
     function applyCursorGlow() {
-      if (!cursorGlow) return;
+      if (!cursorGlow || isAuthPage) return;
       cursorGlow.style.transform = `translate3d(${state.currentX.toFixed(2)}px, ${state.currentY.toFixed(2)}px, 0) translate3d(-50%, -50%, 0)`;
     }
 
@@ -259,46 +292,124 @@
       });
     }
 
-    function spawnParticles(now) {
+    function cleanupRecentCells(now) {
+      if (now < state.cleanupCellsAt) return;
+      state.cleanupCellsAt = now + 640;
+      recentStampCells.forEach((timestamp, key) => {
+        if (now - timestamp > CELL_MEMORY_MS) {
+          recentStampCells.delete(key);
+        }
+      });
+    }
+
+    function spawnBrushStamp(now, x, y, movementX, movementY) {
       if (!particles.length || state.reducedMotion || state.coarsePointer) return;
-      if (now - state.lastTrailAt < TRAIL_FRAME_MS) return;
 
-      const movementX = state.targetX - state.currentX;
-      const movementY = state.targetY - state.currentY;
-      const speed = Math.hypot(movementX, movementY);
-      if (speed < 0.8) return;
+      const magnitude = Math.hypot(movementX, movementY);
+      if (magnitude > 0.22) {
+        state.lastDirection = Math.atan2(movementY, movementX);
+      }
 
-      state.lastTrailAt = now;
+      const distanceFromLast = Math.hypot(x - state.lastStampX, y - state.lastStampY);
+      if (distanceFromLast < MIN_STAMP_DISTANCE) {
+        return;
+      }
 
-      const angle = Math.atan2(movementY, movementX);
-      const forwardX = Math.cos(angle);
-      const forwardY = Math.sin(angle);
+      const quantizedX = toGrid(x);
+      const quantizedY = toGrid(y);
+      state.lastStampX = quantizedX;
+      state.lastStampY = quantizedY;
+
+      cleanupRecentCells(now);
+
+      const forwardX = Math.cos(state.lastDirection);
+      const forwardY = Math.sin(state.lastDirection);
       const normalX = -forwardY;
       const normalY = forwardX;
+      const laneStep = TRAIL_GRID_SIZE - 2;
+      const thisStampCells = new Set();
 
       TRAIL_PATTERN.forEach((node) => {
-        const side = node.lane === 0 ? 0 : (Math.random() < 0.5 ? -1 : 1);
-        const lateral = node.lane * 4.2 * side;
-        const px = state.currentX - (forwardX * node.offset) + (normalX * lateral);
-        const py = state.currentY - (forwardY * node.offset) + (normalY * lateral);
+        const rawX = quantizedX
+          + (normalX * node.lane * laneStep)
+          + (forwardX * node.forwardOffset * laneStep);
+        const rawY = quantizedY
+          + (normalY * node.lane * laneStep)
+          + (forwardY * node.forwardOffset * laneStep);
+
+        const px = toGrid(rawX);
+        const py = toGrid(rawY);
+        const key = cellKey(px, py);
+
+        if (thisStampCells.has(key)) {
+          return;
+        }
+
+        const lastCellTime = recentStampCells.get(key) || 0;
+        if (now - lastCellTime < CELL_COOLDOWN_MS) {
+          return;
+        }
+
+        thisStampCells.add(key);
+        recentStampCells.set(key, now);
 
         const particle = particles[particleCursor];
         particleCursor = (particleCursor + 1) % particles.length;
 
         particle.spawn({
+          variant: node.variant,
           symbol: node.symbol,
           x: px,
           y: py,
-          driftX: (forwardX * (3.6 + (node.lane * 1.2))) + ((Math.random() - 0.5) * 1.8),
-          driftY: (forwardY * (3.6 + (node.lane * 1.2))) + ((Math.random() - 0.5) * 1.8),
-          rotation: (Math.random() - 0.5) * 4,
-          spin: (Math.random() - 0.5) * 8,
-          ttl: node.ttl + (Math.random() * 120),
+          driftX: forwardX * 0.06,
+          driftY: forwardY * 0.06,
+          rotation: (Math.random() - 0.5) * 1.2,
+          spin: (Math.random() - 0.5) * 1.8,
+          ttl: node.ttl,
           scale: node.scale,
           opacity: node.opacity,
-          now
+          now,
         });
       });
+
+      state.lastStampAt = now;
+    }
+
+    function spawnTrail(now, x, y) {
+      if (state.reducedMotion || state.coarsePointer || !particles.length) {
+        return;
+      }
+
+      if (!state.hasPointerSample) {
+        state.lastPointerSampleX = x;
+        state.lastPointerSampleY = y;
+        state.lastStampX = x;
+        state.lastStampY = y;
+        state.hasPointerSample = true;
+        return;
+      }
+
+      const dx = x - state.lastPointerSampleX;
+      const dy = y - state.lastPointerSampleY;
+      const distance = Math.hypot(dx, dy);
+
+      if (distance <= 0.01) {
+        if (now - state.lastStampAt >= STAMP_INTERVAL_MS) {
+          spawnBrushStamp(now, x, y, 0, 0);
+        }
+        return;
+      }
+
+      const steps = Math.min(32, Math.max(1, Math.ceil(distance / PATH_STAMP_STEP)));
+      for (let i = 1; i <= steps; i += 1) {
+        const t = i / steps;
+        const sampleX = state.lastPointerSampleX + (dx * t);
+        const sampleY = state.lastPointerSampleY + (dy * t);
+        spawnBrushStamp(now + i, sampleX, sampleY, dx, dy);
+      }
+
+      state.lastPointerSampleX = x;
+      state.lastPointerSampleY = y;
     }
 
     function updateParticles(now) {
@@ -310,6 +421,11 @@
       state.targetY = state.height / 2;
       state.currentX = state.targetX;
       state.currentY = state.targetY;
+      state.lastStampX = state.targetX;
+      state.lastStampY = state.targetY;
+      state.lastPointerSampleX = state.targetX;
+      state.lastPointerSampleY = state.targetY;
+      state.hasPointerSample = false;
       applyCursorGlow();
       applyParallax();
     }
@@ -326,13 +442,12 @@
         state.targetY = state.height * (0.5 + (Math.cos(wave * 0.82) * 0.04));
       }
 
-      state.currentX += (state.targetX - state.currentX) * 0.085;
-      state.currentY += (state.targetY - state.currentY) * 0.085;
+      state.currentX += (state.targetX - state.currentX) * LERP_FACTOR;
+      state.currentY += (state.targetY - state.currentY) * LERP_FACTOR;
 
       applyCursorGlow();
       applyParallax();
       updateMorph(now);
-      spawnParticles(now);
       updateParticles(now);
 
       state.rafId = window.requestAnimationFrame(tick);
@@ -354,7 +469,9 @@
       body.classList.toggle('studerria-bg-coarse', state.coarsePointer);
       if (state.reducedMotion) {
         stopLoop();
+        hideParticles();
         resetState();
+        recentStampCells.clear();
         return;
       }
       startLoop();
@@ -362,17 +479,34 @@
 
     function onPointerMove(event) {
       if (state.reducedMotion || state.coarsePointer) return;
-      state.targetX = clamp(Number(event.clientX || 0), 0, state.width);
-      state.targetY = clamp(Number(event.clientY || 0), 0, state.height);
+      const x = clamp(Number(event.clientX || 0), 0, state.width);
+      const y = clamp(Number(event.clientY || 0), 0, state.height);
+      const now = performance.now();
+
+      state.targetX = x;
+      state.targetY = y;
+      state.lastMoveAt = now;
+
+      spawnTrail(now, x, y);
+    }
+
+    function onPointerLeave() {
+      state.targetX = state.width / 2;
+      state.targetY = state.height / 2;
+      state.hasPointerSample = false;
     }
 
     function onResize() {
-      state.width = Math.max(window.innerWidth, 1);
-      state.height = Math.max(window.innerHeight, 1);
-      state.targetX = clamp(state.targetX, 0, state.width);
-      state.targetY = clamp(state.targetY, 0, state.height);
-      state.currentX = clamp(state.currentX, 0, state.width);
-      state.currentY = clamp(state.currentY, 0, state.height);
+      if (state.resizeTimerId) return;
+      state.resizeTimerId = window.setTimeout(() => {
+        state.resizeTimerId = 0;
+        state.width = Math.max(window.innerWidth, 1);
+        state.height = Math.max(window.innerHeight, 1);
+        state.targetX = clamp(state.targetX, 0, state.width);
+        state.targetY = clamp(state.targetY, 0, state.height);
+        state.currentX = clamp(state.currentX, 0, state.width);
+        state.currentY = clamp(state.currentY, 0, state.height);
+      }, 140);
     }
 
     function onVisibilityChange() {
@@ -413,6 +547,8 @@
     themeObserver.observe(body, { attributes: true, attributeFilter: ['class', 'data-theme'] });
 
     document.addEventListener('pointermove', onPointerMove, { passive: true });
+    document.addEventListener('pointerleave', onPointerLeave, { passive: true });
+    window.addEventListener('blur', onPointerLeave, { passive: true });
     window.addEventListener('resize', onResize, { passive: true });
     document.addEventListener('visibilitychange', onVisibilityChange, { passive: true });
 

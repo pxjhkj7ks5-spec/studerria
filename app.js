@@ -604,6 +604,10 @@ app.use((req, res, next) => {
     }
     const normalizedOptions = viewOptions && typeof viewOptions === 'object' ? viewOptions : {};
     const viewName = String(view || '').trim();
+    const isAuthView = viewName === 'login'
+      || viewName === 'register'
+      || viewName.startsWith('register-')
+      || viewName.startsWith('register/');
     const shouldUseGlobalLayout = normalizedOptions.layout !== false
       && !viewName.startsWith('layouts/')
       && !viewName.startsWith('partials/')
@@ -623,15 +627,26 @@ app.use((req, res, next) => {
       const parsed = splitRenderedDocument(renderedHtml);
       const sessionUser = req.session && req.session.user ? req.session.user : null;
       const sessionRole = req.session && req.session.role ? req.session.role : '';
+      const mergedBodyClass = [
+        String(parsed.bodyClass || '').trim(),
+        isAuthView ? 'page-auth' : '',
+        viewName === 'login' ? 'page-login' : '',
+        isAuthView && viewName !== 'login' ? 'page-register' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const hideGlobalNavbar = /\bpage-auth\b/.test(mergedBodyClass) || parsed.hasTopbar;
       const layoutLocals = {
         ...baseOptions,
         layout: false,
         pageLang: parsed.pageLang || res.locals.lang || 'uk',
         pageTitle: parsed.pageTitle || baseOptions.pageTitle || 'Studerria',
         pageHead: parsed.headContent,
-        pageBodyClass: parsed.bodyClass,
-        pageTheme: parsed.bodyTheme || (/\btheme-dark\b/.test(parsed.bodyClass) ? 'dark' : 'light'),
-        showGlobalNavbar: !parsed.hasTopbar,
+        pageBodyClass: mergedBodyClass,
+        pageTheme: parsed.bodyTheme || (/\btheme-dark\b/.test(mergedBodyClass) ? 'dark' : 'light'),
+        showGlobalNavbar: !hideGlobalNavbar,
         role: baseOptions.role || res.locals.role || sessionRole || '',
         username: baseOptions.username || res.locals.username || (sessionUser && sessionUser.username ? sessionUser.username : ''),
         body: parsed.bodyContent,
