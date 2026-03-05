@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.18",
+      "date": "2026-03-05",
+      "items": [
+        "fix(modal-surface-clarity): removed backdrop blur from the shared modal surface and sticky modal bars so dialogs read as solid foreground panels instead of feeling like they sit under the page blur"
+      ]
+    },
+    {
       "version": "1.1.17",
       "date": "2026-03-05",
       "items": [
