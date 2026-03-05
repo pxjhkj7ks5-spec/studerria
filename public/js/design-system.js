@@ -86,6 +86,9 @@
   }
 
   function ensureAmbientLayer() {
+    if (document.getElementById('studerriaBg') || document.body?.classList.contains('studerria-theme')) {
+      return null;
+    }
     if (!document.body) {
       return null;
     }
@@ -451,7 +454,14 @@
   function init() {
     syncThemeAttribute();
     const ambientLayer = ensureAmbientLayer();
-    initAmbientMotion(ambientLayer);
+    if (ambientLayer) {
+      initAmbientMotion(ambientLayer);
+    } else {
+      const staleAmbientLayer = document.querySelector('.ambient-layer');
+      if (staleAmbientLayer) {
+        staleAmbientLayer.remove();
+      }
+    }
     applySemanticBadges(document);
     applyGlassDock(document);
     applyFocusHalo(document);

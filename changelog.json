@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.96",
+      "date": "2026-03-05",
+      "items": [
+        "fix(auth-mouse-follow-duplicate): disabled legacy `design-system` ambient pointer layer on pages rendered with global `studerriaBg` to remove secondary cursor-follow effect on login/register",
+        "fix(ambient-compat): added safe cleanup for stale `.ambient-layer` nodes when switching to global layout pages with native studerria background runtime"
+      ]
+    },
+    {
       "version": "1.0.95",
       "date": "2026-03-05",
       "items": [
