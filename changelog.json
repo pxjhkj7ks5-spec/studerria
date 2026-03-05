@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.21",
+      "date": "2026-03-05",
+      "items": [
+        "style(topbar-color-unification): aligned shared `topbar` and `admin-nav` surfaces to one consistent indigo glass tone across light and dark theme contexts instead of letting light-mode pages drift into separate white capsules",
+        "style(topbar-control-unification): matched topbar action controls, theme toggles, and admin session chips to the same shared topbar tint so header controls no longer change color family from page to page"
+      ]
+    },
+    {
       "version": "1.1.20",
       "date": "2026-03-05",
       "items": [

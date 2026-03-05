@@ -18,6 +18,13 @@ body.studerria-theme {
   --studerria-cta-end: #a855f7;
   --studerria-cta-border: rgba(167, 139, 250, 0.64);
   --studerria-cta-shadow: 0 14px 28px rgba(99, 102, 241, 0.32);
+  --studerria-topbar-bg: rgba(10, 16, 34, 0.74);
+  --studerria-topbar-border: rgba(148, 163, 184, 0.22);
+  --studerria-topbar-shadow: 0 24px 60px rgba(2, 6, 23, 0.24);
+  --studerria-topbar-text: #f8fafc;
+  --studerria-topbar-muted: rgba(226, 232, 240, 0.78);
+  --studerria-topbar-pill-bg: rgba(255, 255, 255, 0.08);
+  --studerria-topbar-pill-hover: rgba(255, 255, 255, 0.14);
 }
 
 html[data-theme='light'] body.studerria-theme,
@@ -260,11 +267,11 @@ body.theme-light.studerria-theme {
   margin: 0 0 22px;
   padding: 10px 12px;
   border-radius: 999px;
-  border: 1px solid var(--studerria-panel-border);
-  background: var(--studerria-panel-bg-strong);
+  border: 1px solid var(--studerria-topbar-border);
+  background: var(--studerria-topbar-bg);
   -webkit-backdrop-filter: blur(18px) saturate(1.14);
   backdrop-filter: blur(18px) saturate(1.14);
-  box-shadow: var(--studerria-panel-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  box-shadow: var(--studerria-topbar-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .studerria-theme .topbar .container,
@@ -282,12 +289,34 @@ body.theme-light.studerria-theme {
 
 .studerria-theme .topbar .navbar-brand,
 .studerria-theme .topbar .text-white {
-  color: var(--studerria-text-primary) !important;
+  color: var(--studerria-topbar-text) !important;
 }
 
 .studerria-theme .topbar .muted,
 .studerria-theme .topbar .text-muted {
-  color: var(--studerria-text-muted) !important;
+  color: var(--studerria-topbar-muted) !important;
+}
+
+.studerria-theme .topbar .btn-glass,
+.studerria-theme .topbar .theme-toggle-min,
+.studerria-theme .topbar .mobile-menu-btn,
+.studerria-theme .topbar .drawer-menu-btn,
+.studerria-theme .topbar .msg-btn,
+.studerria-theme .topbar .sync-pill {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--studerria-topbar-pill-bg);
+  color: var(--studerria-topbar-text);
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.studerria-theme .topbar .btn-glass:hover,
+.studerria-theme .topbar .theme-toggle-min:hover,
+.studerria-theme .topbar .mobile-menu-btn:hover,
+.studerria-theme .topbar .drawer-menu-btn:hover,
+.studerria-theme .topbar .msg-btn:hover,
+.studerria-theme .topbar .sync-pill:hover {
+  background: var(--studerria-topbar-pill-hover);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .studerria-theme .container,

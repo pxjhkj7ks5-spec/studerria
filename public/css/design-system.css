@@ -579,20 +579,21 @@ button.btn:active,
 .schedule-drawer,
 .mobile-menu .modal-content,
 #mobileMenuModal .modal-content {
-  background: var(--glass-bg);
-  border-color: var(--glass-border);
+  background: rgba(10, 16, 34, 0.74);
+  border-color: rgba(148, 163, 184, 0.22);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
 }
 
 .topbar,
 .admin-nav {
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.24);
 }
 
 .topbar .navbar-brand,
 .admin-nav .navbar-brand {
-  color: var(--ds-text0) !important;
+  color: #f8fafc !important;
   font-size: var(--t-h1);
   font-weight: var(--w-semibold);
   letter-spacing: var(--trk-tight);
@@ -616,7 +617,7 @@ button.btn:active,
 
 .topbar .muted,
 .admin-nav .muted {
-  color: var(--ds-text2) !important;
+  color: rgba(226, 232, 240, 0.78) !important;
   font-size: var(--t-meta);
   font-weight: var(--w-medium);
 }
