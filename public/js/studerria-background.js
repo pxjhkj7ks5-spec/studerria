@@ -21,7 +21,6 @@
     const coarsePointerMedia = window.matchMedia('(pointer: coarse)');
 
     const isAuthPage = body.classList.contains('page-auth');
-    const disablePointerParallax = isAuthPage;
     const isLowPowerPage = [
       'page-schedule',
       'page-journal',
@@ -257,25 +256,8 @@
     }
 
     function applyParallax() {
-      if (disablePointerParallax) {
-        parallaxLayers.forEach((layer) => {
-          layer.style.transform = 'translate3d(0px, 0px, 0)';
-        });
-        return;
-      }
-
-      const centerX = state.width / 2;
-      const centerY = state.height / 2;
-
       parallaxLayers.forEach((layer) => {
-        if (layer.classList && layer.classList.contains('studerria-morph-blob')) {
-          layer.style.transform = 'translate3d(0px, 0px, 0)';
-          return;
-        }
-        const depth = Number.parseFloat(layer.getAttribute('data-depth') || '0') || 0;
-        const xOffset = (state.currentX - centerX) * depth;
-        const yOffset = (state.currentY - centerY) * depth;
-        layer.style.transform = `translate3d(${xOffset.toFixed(2)}px, ${yOffset.toFixed(2)}px, 0)`;
+        layer.style.transform = 'translate3d(0px, 0px, 0)';
       });
     }
 

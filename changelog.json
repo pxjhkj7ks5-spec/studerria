@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.01",
+      "date": "2026-03-05",
+      "items": [
+        "fix(global-bg-follow-residual): disabled pointer-driven parallax transforms for all background layers to eliminate remaining distant mouse-follow artifacts (including moving dot-pattern clusters)"
+      ]
+    },
+    {
       "version": "1.1.00",
       "date": "2026-03-05",
       "items": [
