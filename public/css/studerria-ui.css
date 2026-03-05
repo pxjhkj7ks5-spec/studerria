@@ -167,8 +167,8 @@ body.theme-light.studerria-theme {
 .studerria-theme .surface--elevated:hover,
 .studerria-theme .auth-card:hover,
 .studerria-theme .welcome-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 30px 84px rgba(2, 6, 23, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transform: none;
+  box-shadow: var(--studerria-panel-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(15, 23, 42, 0.08);
 }
 
 .studerria-theme .btn,
@@ -209,6 +209,14 @@ body.theme-light.studerria-theme {
   border-color: var(--studerria-cta-border);
   color: #f8fafc;
   box-shadow: var(--studerria-cta-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.studerria-theme .btn-primary::before,
+.studerria-theme .btn-primary::after,
+.studerria-theme .btn.btn-primary::before,
+.studerria-theme .btn.btn-primary::after {
+  content: none;
+  display: none;
 }
 
 .studerria-theme .btn-outline-primary,
@@ -270,6 +278,199 @@ body.theme-light.studerria-theme {
 .studerria-theme .dropdown-menu {
   position: relative;
   z-index: 2;
+}
+
+.studerria-theme .liquid-card:hover,
+.studerria-theme .day-card:hover,
+.studerria-theme .schedule-card:hover,
+.studerria-theme .schedule-panel:hover,
+.studerria-theme .week-hero:hover,
+.studerria-theme .cockpit-card:hover,
+.studerria-theme .section-card:hover,
+.studerria-theme .brief-card:hover,
+.studerria-theme .dual-focus-pane:hover,
+.studerria-theme .summary-pill:hover,
+.studerria-theme .inbox-item:hover,
+.studerria-theme .item-row:hover,
+.studerria-theme .reminder-item:hover,
+.studerria-theme .competency-item:hover,
+.studerria-theme .stat-tile:hover,
+.studerria-theme .review-row:hover {
+  transform: none !important;
+}
+
+body.page-schedule .week-hero,
+body.page-schedule .schedule-panel,
+body.page-schedule .day-card,
+body.page-schedule .schedule-card,
+body.page-schedule .density-summary,
+body.page-schedule .week-rail,
+body.page-schedule .schedule-modal .modal-content {
+  border-color: color-mix(in srgb, var(--studerria-panel-border) 74%, rgba(255, 255, 255, 0.08));
+  background: color-mix(in srgb, var(--studerria-panel-bg) 88%, rgba(255, 255, 255, 0.04));
+  -webkit-backdrop-filter: blur(22px) saturate(1.12);
+  backdrop-filter: blur(22px) saturate(1.12);
+  box-shadow: 0 26px 72px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+body.page-schedule .week-hero,
+body.page-schedule .schedule-panel {
+  border-radius: 30px;
+}
+
+body.page-schedule .day-card,
+body.page-schedule .density-summary,
+body.page-schedule .week-rail {
+  border-radius: 26px;
+}
+
+body.page-schedule .schedule-card {
+  border-radius: 22px;
+}
+
+body.page-schedule .week-hero {
+  padding: 1.35rem 1.5rem;
+}
+
+body.page-schedule .hero-title,
+body.page-schedule .day-name {
+  letter-spacing: -0.03em;
+}
+
+body.page-schedule .hero-sub,
+body.page-schedule .day-date,
+body.page-schedule .schedule-meta {
+  color: var(--studerria-text-muted) !important;
+}
+
+body.page-schedule .week-nav-btn,
+body.page-schedule .week-rail .btn,
+body.page-schedule .drawer-action,
+body.page-schedule .control-toggle,
+body.page-schedule .chip {
+  border-radius: 999px;
+}
+
+body.page-schedule .badge-glow,
+body.page-schedule .sync-pill,
+body.page-schedule .density-chip {
+  border: 1px solid color-mix(in srgb, var(--studerria-cta-start) 22%, var(--studerria-panel-border));
+  background: color-mix(in srgb, var(--studerria-pill-bg) 88%, rgba(255, 255, 255, 0.05));
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.12);
+}
+
+body.page-my-day .cockpit-card,
+body.page-my-day .dual-focus-pane,
+body.page-my-day .summary-pill,
+body.page-my-day .inbox-item,
+body.page-my-day .reminder-item,
+body.page-my-day .competency-item,
+body.page-my-day .review-row,
+body.page-my-day .whatif-block,
+body.page-my-day .item-row {
+  border: 1px solid color-mix(in srgb, var(--studerria-panel-border) 76%, rgba(255, 255, 255, 0.08));
+  background: color-mix(in srgb, var(--studerria-panel-bg) 86%, rgba(255, 255, 255, 0.05));
+  -webkit-backdrop-filter: blur(20px) saturate(1.12);
+  backdrop-filter: blur(20px) saturate(1.12);
+  box-shadow: 0 24px 68px rgba(2, 6, 23, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.page-my-day .cockpit-card,
+body.page-my-day .brief-card,
+body.page-my-day .section-card,
+body.page-my-day .dual-focus-card {
+  border-radius: 30px;
+}
+
+body.page-my-day .dual-focus-pane,
+body.page-my-day .summary-pill,
+body.page-my-day .inbox-item,
+body.page-my-day .reminder-item,
+body.page-my-day .competency-item,
+body.page-my-day .item-row,
+body.page-my-day .whatif-block {
+  border-radius: 24px;
+}
+
+body.page-my-day .brief-card {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 48%),
+    color-mix(in srgb, var(--studerria-panel-bg-strong) 88%, rgba(255, 255, 255, 0.04));
+  box-shadow: 0 32px 82px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+body.page-my-day .brief-title,
+body.page-my-day .section-title,
+body.page-my-day .dual-focus-pane-title {
+  letter-spacing: -0.03em;
+}
+
+body.page-my-day .brief-message,
+body.page-my-day .section-subtitle,
+body.page-my-day .dual-focus-pane-subtitle,
+body.page-my-day .item-meta,
+body.page-my-day .reminder-meta,
+body.page-my-day .inbox-meta {
+  color: var(--studerria-text-muted) !important;
+}
+
+body.page-my-day .summary-pill strong,
+body.page-my-day .competency-score,
+body.page-my-day .status-chip {
+  color: var(--studerria-text-primary);
+}
+
+body.page-profile .auth-card,
+body.page-profile .stat-tile,
+body.page-profile .activity-badge,
+body.page-profile .custom-tooltip {
+  border-color: color-mix(in srgb, var(--studerria-panel-border) 76%, rgba(255, 255, 255, 0.08));
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+  backdrop-filter: blur(18px) saturate(1.12);
+}
+
+body.page-profile .auth-card {
+  border-radius: 30px;
+  background: color-mix(in srgb, var(--studerria-panel-bg) 88%, rgba(255, 255, 255, 0.05));
+  box-shadow: 0 28px 76px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+body.page-profile .stat-tile {
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--studerria-panel-bg) 84%, rgba(255, 255, 255, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.page-profile .activity-badge {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--studerria-cta-start) 36%, rgba(255, 255, 255, 0.18)), color-mix(in srgb, var(--studerria-cta-end) 42%, rgba(255, 255, 255, 0.12)));
+  color: #f8fafc;
+  box-shadow: 0 12px 28px rgba(99, 102, 241, 0.22);
+}
+
+body.page-profile .auth-card h1,
+body.page-profile .auth-card .h4 {
+  letter-spacing: -0.03em;
+}
+
+body.page-profile .auth-card .text-muted,
+body.page-profile .auth-card .small,
+body.page-profile .stat-tile .text-muted {
+  color: var(--studerria-text-muted) !important;
+}
+
+body.page-profile .auth-card .form-control,
+body.page-profile .auth-card .form-select {
+  border-radius: 16px;
+  border-color: color-mix(in srgb, var(--studerria-panel-border) 82%, rgba(255, 255, 255, 0.1));
+  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 86%, rgba(255, 255, 255, 0.08));
+  color: var(--studerria-text-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+body.page-profile .auth-card .form-control:focus,
+body.page-profile .auth-card .form-select:focus {
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 58%, var(--studerria-panel-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--studerria-cta-start) 18%, transparent);
 }
 
 @media (max-width: 960px) {

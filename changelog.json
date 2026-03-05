@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.04",
+      "date": "2026-03-05",
+      "items": [
+        "fix(button-hover-sheen): disabled legacy `btn-primary` pseudo-element glare that produced a left-edge color stripe on gradient buttons during hover",
+        "fix(card-hover-lift): removed translate-based hover lift from shared cards, schedule entries, cockpit panels, stat tiles, and other glass blocks so surfaces stay stable across the app",
+        "style(page-polish): refined `schedule`, `my-day`, and `profile` with cleaner liquid-glass surfaces, larger radii, softer panel contrast, and typography/alignment closer to the `vision` draft"
+      ]
+    },
+    {
       "version": "1.1.03",
       "date": "2026-03-05",
       "items": [
