@@ -17,18 +17,19 @@
   const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
 
   const BRUSH_PATTERN = [
-    { symbol: '_', variant: 'outer', lane: -2, ttl: 1400, scale: 0.8, opacity: 0.22, forwardOffset: -0.6 },
-    { symbol: '>', variant: 'mid', lane: -1, ttl: 2200, scale: 0.86, opacity: 0.34, forwardOffset: -0.2 },
+    { symbol: '_', variant: 'outer', lane: -2, ttl: 1400, scale: 0.8, opacity: 0.22, forwardOffset: -1.2 },
+    { symbol: '>', variant: 'mid', lane: -1, ttl: 2200, scale: 0.86, opacity: 0.34, forwardOffset: -0.45 },
     { symbol: 'o', variant: 'center', lane: 0, ttl: 3000, scale: 0.92, opacity: 0.44, forwardOffset: 0 },
-    { symbol: '>', variant: 'mid', lane: 1, ttl: 2200, scale: 0.86, opacity: 0.34, forwardOffset: -0.2 },
-    { symbol: '_', variant: 'outer', lane: 2, ttl: 1400, scale: 0.8, opacity: 0.22, forwardOffset: -0.6 }
+    { symbol: '>', variant: 'mid', lane: 1, ttl: 2200, scale: 0.86, opacity: 0.34, forwardOffset: -0.45 },
+    { symbol: '_', variant: 'outer', lane: 2, ttl: 1400, scale: 0.8, opacity: 0.22, forwardOffset: -1.2 }
   ];
 
   const MAX_TRAIL_PARTICLES = 220;
-  const STAMP_INTERVAL_MS = 72;
-  const TRAIL_GRID_SIZE = 8;
-  const CELL_COOLDOWN_MS = 140;
-  const MIN_STAMP_DISTANCE = 6;
+  const STAMP_INTERVAL_MS = 96;
+  const TRAIL_GRID_SIZE = 12;
+  const CELL_COOLDOWN_MS = 520;
+  const MIN_STAMP_DISTANCE = 10;
+  const CELL_MEMORY_MS = 4200;
 
   class TrailParticle {
     constructor(host) {
@@ -88,7 +89,7 @@
       const opacity = this.baseOpacity * fade;
       const x = this.originX + this.driftX * progress;
       const y = this.originY + this.driftY * progress;
-      const scale = this.baseScale + progress * 0.08;
+      const scale = this.baseScale + progress * 0.05;
       const rotation = this.rotation + this.spin * progress;
 
       this.el.style.opacity = opacity.toFixed(3);
@@ -262,6 +263,14 @@
     lastMoveAt = performance.now();
   }
 
+  function toGrid(value) {
+    return Math.round(value / TRAIL_GRID_SIZE) * TRAIL_GRID_SIZE;
+  }
+
+  function cellKey(x, y) {
+    return `${Math.round(x / TRAIL_GRID_SIZE)}:${Math.round(y / TRAIL_GRID_SIZE)}`;
+  }
+
   function spawnBrushStamp(now, x, y, movementX, movementY) {
     const magnitude = Math.hypot(movementX, movementY);
     if (magnitude > 0.2) {
@@ -273,22 +282,15 @@
       return;
     }
 
-    const quantizedX = Math.round(x / TRAIL_GRID_SIZE) * TRAIL_GRID_SIZE;
-    const quantizedY = Math.round(y / TRAIL_GRID_SIZE) * TRAIL_GRID_SIZE;
-    const cellKey = `${Math.round(quantizedX / TRAIL_GRID_SIZE)}:${Math.round(quantizedY / TRAIL_GRID_SIZE)}`;
-    const lastCellStamp = recentStampCells.get(cellKey) || 0;
-    if (now - lastCellStamp < CELL_COOLDOWN_MS) {
-      return;
-    }
-
-    recentStampCells.set(cellKey, now);
+    const quantizedX = toGrid(x);
+    const quantizedY = toGrid(y);
     lastStampX = quantizedX;
     lastStampY = quantizedY;
 
     if (now >= cleanupCellsAt) {
       cleanupCellsAt = now + 600;
       recentStampCells.forEach((timestamp, key) => {
-        if (now - timestamp > 1200) {
+        if (now - timestamp > CELL_MEMORY_MS) {
           recentStampCells.delete(key);
         }
       });
@@ -298,30 +300,52 @@
     const forwardY = Math.sin(lastDirection);
     const normalX = -forwardY;
     const normalY = forwardX;
-    const laneStep = 6;
+    const laneStep = 10;
+    const thisStampCells = new Set();
+    let hasSpawned = false;
 
     BRUSH_PATTERN.forEach((node) => {
+      const rawX = quantizedX + (normalX * node.lane * laneStep) + (forwardX * node.forwardOffset * laneStep);
+      const rawY = quantizedY + (normalY * node.lane * laneStep) + (forwardY * node.forwardOffset * laneStep);
+      const px = toGrid(rawX);
+      const py = toGrid(rawY);
+      const key = cellKey(px, py);
+
+      if (thisStampCells.has(key)) {
+        return;
+      }
+
+      const lastSymbolAt = recentStampCells.get(key) || 0;
+      if (now - lastSymbolAt < CELL_COOLDOWN_MS) {
+        return;
+      }
+
+      thisStampCells.add(key);
+      recentStampCells.set(key, now);
+
       const particle = trailParticles[trailCursor];
       trailCursor = (trailCursor + 1) % trailParticles.length;
-
-      const px = quantizedX + (normalX * node.lane * laneStep) + (forwardX * node.forwardOffset * laneStep);
-      const py = quantizedY + (normalY * node.lane * laneStep) + (forwardY * node.forwardOffset * laneStep);
+      hasSpawned = true;
 
       particle.spawn({
         variant: node.variant,
         symbol: node.symbol,
         x: px,
         y: py,
-        driftX: forwardX * 0.28,
-        driftY: forwardY * 0.28,
-        rotation: (Math.random() - 0.5) * 4,
-        spin: (Math.random() - 0.5) * 6,
+        driftX: forwardX * 0.06,
+        driftY: forwardY * 0.06,
+        rotation: (Math.random() - 0.5) * 1.5,
+        spin: (Math.random() - 0.5) * 2.2,
         ttl: node.ttl,
         scale: node.scale,
         opacity: node.opacity,
         now
       });
     });
+
+    if (!hasSpawned) {
+      return;
+    }
   }
 
   function onPointerMove(event) {

@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.87",
+      "date": "2026-03-05",
+      "items": [
+        "fix(vision-trail-grid-lock): bound each trail symbol to discrete grid cells and added per-cell cooldown so symbols do not render on top of each other",
+        "ux(vision-trail-spacing): increased brush lane offsets and stamp spacing for clearer readable rows closer to reference style",
+        "perf(vision-trail-density): reduced stamp frequency and required minimum cursor travel distance before placing a new symbol stamp",
+        "motion(vision-trail-cleanup): extended stamp cell memory cleanup window and softened residual drift/rotation to keep traces tidy"
+      ]
+    },
+    {
       "version": "1.0.86",
       "date": "2026-03-05",
       "items": [
