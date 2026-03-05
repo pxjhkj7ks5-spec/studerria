@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.12",
+      "date": "2026-03-05",
+      "items": [
+        "fix(homework-modal-actions): moved the `Save homework` primary action into the sticky modal footer next to `Close`, keeping the form fields focused and making the final action row less confusing"
+      ]
+    },
+    {
       "version": "1.1.11",
       "date": "2026-03-05",
       "items": [

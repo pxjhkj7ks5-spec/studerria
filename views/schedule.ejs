@@ -2082,7 +2082,7 @@
             <% const canCreateHomeworkInSchedule = typeof canCreateHomework === 'boolean' ? canCreateHomework : true; %>
             <% if (canCreateHomeworkInSchedule) { %>
               <h6>Add homework</h6>
-              <form method="POST" action="/homework/add" enctype="multipart/form-data" autocomplete="off">
+              <form id="homeworkCreateForm" method="POST" action="/homework/add" enctype="multipart/form-data" autocomplete="off">
                 <% if (role === 'teacher') { %>
                   <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
@@ -2187,7 +2187,6 @@
                 <input type="hidden" id="hwDate" name="class_date" />
                 <input type="hidden" id="hwCourseId" name="course_id" />
                 <input type="hidden" id="hwTags" name="tags" />
-                <button type="submit" class="btn btn-primary glass">Save homework</button>
               </form>
             <% } else { %>
               <div class="alert alert-info mb-0">
@@ -2197,6 +2196,9 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
+            <% if (canCreateHomeworkInSchedule) { %>
+              <button type="submit" class="btn btn-primary glass" form="homeworkCreateForm">Save homework</button>
+            <% } %>
           </div>
         </div>
       </div>
