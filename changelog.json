@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.83",
+      "date": "2026-03-05",
+      "items": [
+        "ux(vision-trail): cursor symbols now persist for several seconds after pointer stops (hold + smooth fade-out), instead of disappearing almost immediately",
+        "motion(vision-burst): changed under-cursor burst behavior from scatter to near-stationary fade pulse, so symbols dissolve cleanly without flying away",
+        "fix(vision-left-shape): reduced sharp clipping on the left organic blob by expanding SVG filter bounds and allowing visible overflow for softened edges",
+        "style(vision-light-contrast): darkened light-theme background accents and trail symbol blending to improve visibility/contrast on bright surfaces"
+      ]
+    },
+    {
       "version": "1.0.82",
       "date": "2026-03-05",
       "items": [

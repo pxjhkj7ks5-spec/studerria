@@ -13,20 +13,21 @@
   --btn-secondary-text: #0f172a;
 
   --vision-base-gradient: linear-gradient(135deg, #eef2ff 0%, #e8edff 50%, #e0e7ff 100%);
-  --vision-side-left: rgba(147, 197, 253, 0.22);
-  --vision-side-right: rgba(192, 132, 252, 0.2);
-  --vision-center-soft: rgba(244, 114, 182, 0.11);
+  --vision-side-left: rgba(99, 102, 241, 0.24);
+  --vision-side-right: rgba(168, 85, 247, 0.22);
+  --vision-center-soft: rgba(236, 72, 153, 0.14);
 
-  --shape-left-a: rgba(129, 140, 248, 0.56);
-  --shape-left-b: rgba(186, 230, 253, 0.5);
-  --shape-right-a: rgba(244, 114, 182, 0.54);
-  --shape-right-b: rgba(196, 181, 253, 0.46);
-  --shape-center-a: rgba(129, 140, 248, 0.36);
-  --shape-center-b: rgba(244, 114, 182, 0.32);
+  --shape-left-a: rgba(99, 102, 241, 0.64);
+  --shape-left-b: rgba(147, 197, 253, 0.56);
+  --shape-right-a: rgba(236, 72, 153, 0.6);
+  --shape-right-b: rgba(167, 139, 250, 0.52);
+  --shape-center-a: rgba(79, 70, 229, 0.46);
+  --shape-center-b: rgba(236, 72, 153, 0.4);
 
-  --trail-char-color: rgba(79, 70, 229, 0.5);
-  --trail-char-shadow: rgba(129, 140, 248, 0.4);
-  --noise-opacity: 0.05;
+  --trail-char-color: rgba(55, 48, 163, 0.68);
+  --trail-char-shadow: rgba(79, 70, 229, 0.5);
+  --trail-blend-mode: multiply;
+  --noise-opacity: 0.04;
   --dot-opacity: 0.045;
   --dot-color: #cbd5e1;
 }
@@ -60,6 +61,7 @@ body.theme-dark {
 
   --trail-char-color: rgba(165, 180, 252, 0.58);
   --trail-char-shadow: rgba(129, 140, 248, 0.5);
+  --trail-blend-mode: screen;
   --noise-opacity: 0.045;
   --dot-opacity: 0.04;
   --dot-color: #6366f1;
@@ -116,11 +118,12 @@ body.page-vision {
   opacity: 0.42;
   transition: opacity 420ms ease, filter 420ms ease, transform 420ms ease;
   will-change: transform, opacity, filter;
+  overflow: visible;
 }
 
 .shape-left {
-  left: -8%;
-  top: 4%;
+  left: -4%;
+  top: 2%;
 }
 
 .shape-right {
@@ -140,6 +143,7 @@ body.page-vision {
   width: 100%;
   height: 100%;
   display: block;
+  overflow: visible;
   transform-origin: center;
   animation: shape-breathe 56s ease-in-out infinite alternate;
 }
@@ -191,14 +195,14 @@ body.page-vision {
   font-weight: 620;
   line-height: 1;
   color: var(--trail-char-color);
-  text-shadow: 0 0 12px var(--trail-char-shadow);
+  text-shadow: 0 0 14px var(--trail-char-shadow);
   opacity: 0;
   transform: translate3d(-50%, -50%, 0) scale(0.6);
   transform-origin: center;
   will-change: transform, opacity, color;
   pointer-events: none;
   user-select: none;
-  mix-blend-mode: overlay;
+  mix-blend-mode: var(--trail-blend-mode);
 }
 
 .trail-char.burst {
@@ -747,7 +751,7 @@ body.vision-reduced-motion .bg-shape {
   }
 
   .shape-left {
-    left: -14%;
+    left: -8%;
     top: 8%;
   }
 

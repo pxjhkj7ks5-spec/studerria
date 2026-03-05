@@ -67,13 +67,13 @@
       this.active = true;
       this.originX = x;
       this.originY = y;
-      this.vx = (Math.random() - 0.5) * 68;
-      this.vy = (Math.random() - 0.5) * 68;
-      this.spin = (Math.random() - 0.5) * 140;
+      this.vx = (Math.random() - 0.5) * 10;
+      this.vy = (Math.random() - 0.5) * 10;
+      this.spin = (Math.random() - 0.5) * 40;
       this.rotation = Math.random() * 360;
       this.startAt = now;
-      this.duration = 320 + Math.random() * 200;
-      this.scale = 0.15;
+      this.duration = 460 + Math.random() * 260;
+      this.scale = 0.4;
       this.opacity = 0;
     }
 
@@ -106,12 +106,13 @@
         return;
       }
 
-      const eased = progress < 0.5 ? progress * 2 : (1 - progress) * 2;
-      this.x = this.originX + this.vx * progress;
-      this.y = this.originY + this.vy * progress;
-      this.opacity = Math.max(0, eased * 0.55);
-      this.scale = 0.2 + progress * 1.0;
-      this.rotation += this.spin * 0.016;
+      const fadeIn = Math.min(1, progress / 0.18);
+      const fadeOut = 1 - progress;
+      this.x = this.originX + this.vx * progress * 0.45;
+      this.y = this.originY + this.vy * progress * 0.45;
+      this.opacity = Math.max(0, fadeIn * fadeOut * 0.72);
+      this.scale = 0.55 + progress * 0.55;
+      this.rotation += this.spin * 0.01;
       this.apply();
     }
 
@@ -154,6 +155,8 @@
 
   let pointerX = centerX;
   let pointerY = centerY;
+  let anchorX = centerX;
+  let anchorY = centerY;
   let smoothX = centerX;
   let smoothY = centerY;
 
@@ -207,6 +210,8 @@
     if (!pointerInside) {
       pointerX = centerX;
       pointerY = centerY;
+      anchorX = centerX;
+      anchorY = centerY;
     }
   }
 
@@ -269,6 +274,8 @@
       pointerInside = false;
       pointerX = centerX;
       pointerY = centerY;
+      anchorX = centerX;
+      anchorY = centerY;
       smoothX = centerX;
       smoothY = centerY;
       clearFocus();
@@ -308,6 +315,8 @@
     pointerInside = true;
     pointerX = event.clientX;
     pointerY = event.clientY;
+    anchorX = event.clientX;
+    anchorY = event.clientY;
 
     const now = performance.now();
     lastMoveAt = now;
@@ -362,7 +371,13 @@
 
   function updateRingTargets(now) {
     const idleMs = now - lastMoveAt;
-    const activeTrail = pointerInside && idleMs < 720;
+    const holdMs = 2300;
+    const fadeMs = 1800;
+    const lifeMs = holdMs + fadeMs;
+    const activeTrail = idleMs < lifeMs;
+    const fadeFactor = idleMs <= holdMs
+      ? 1
+      : Math.max(0, 1 - ((idleMs - holdMs) / fadeMs));
 
     ringParticles.forEach((particle, index) => {
       if (now >= particle.nextGlyphAt) {
@@ -377,17 +392,17 @@
       let scale;
 
       if (activeTrail) {
-        const radius = 54 + Math.sin(now * 0.0022 + index * 0.7) * 14;
-        targetX = smoothX + Math.cos(phase) * radius;
-        targetY = smoothY + Math.sin(phase * 1.12) * radius * 0.74;
-        opacity = 0.32 + Math.sin(now * 0.0028 + index) * 0.08;
-        scale = 0.82 + Math.cos(now * 0.0022 + index) * 0.2;
+        const motionBoost = pointerInside && idleMs < 360 ? 1 : 0.82;
+        const radius = (50 + Math.sin(now * 0.0022 + index * 0.7) * 12) * motionBoost;
+        targetX = anchorX + Math.cos(phase) * radius;
+        targetY = anchorY + Math.sin(phase * 1.12) * radius * 0.74;
+        opacity = (0.36 + Math.sin(now * 0.0028 + index) * 0.08) * fadeFactor;
+        scale = 0.82 + Math.cos(now * 0.0022 + index) * 0.18;
       } else {
-        const homePhase = particle.homeAngle + now * 0.00018;
-        targetX = centerX + Math.cos(homePhase) * particle.homeRadius;
-        targetY = centerY + Math.sin(homePhase * 1.07) * particle.homeRadius * 0.45;
-        opacity = 0.1;
-        scale = 0.74;
+        targetX = centerX;
+        targetY = centerY;
+        opacity = 0;
+        scale = 0.68;
       }
 
       particle.setTarget(targetX, targetY, Math.max(0, opacity), scale, phase * 80);
