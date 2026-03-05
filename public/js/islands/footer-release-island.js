@@ -10,7 +10,9 @@
     }
 
     const latestVersion = String(props && props.latestVersion ? props.latestVersion : '').trim();
-    if (!latestVersion) {
+    const appVersion = String(props && props.appVersion ? props.appVersion : '').trim();
+    const displayVersion = latestVersion || appVersion;
+    if (!displayVersion) {
       return null;
     }
 
@@ -24,7 +26,7 @@
         title: latestLabel,
       },
       React.createElement('span', { className: 'footer-release-pill__dot', 'aria-hidden': 'true' }),
-      React.createElement('span', { className: 'footer-release-pill__text' }, `v${latestVersion}`)
+      React.createElement('span', { className: 'footer-release-pill__text' }, `v${displayVersion}`)
     );
   });
 })();

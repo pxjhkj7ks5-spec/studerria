@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.77",
+      "date": "2026-03-05",
+      "items": [
+        "ux(footer-release): removed duplicate plain version label in footer and kept only the new release pill style",
+        "feat(footer-release-pill): added fallback to `appVersion` so the pill still renders even if changelog latest version is missing",
+        "motion(footer-dot): added subtle pulse animation for release dot with `prefers-reduced-motion` fallback"
+      ]
+    },
+    {
       "version": "1.0.76",
       "date": "2026-03-05",
       "items": [
