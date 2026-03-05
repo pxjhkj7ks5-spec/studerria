@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.07",
+      "date": "2026-03-05",
+      "items": [
+        "style(shell-width): increased the shared app shell width from 1240px to 1560px so content blocks, local topbars, and the global navbar have 20-30% more breathing room on large screens",
+        "style(container-width): widened desktop `.container` usage inside the shared shell so pages like `schedule`, `my-day`, and other Bootstrap-based screens no longer feel overly narrow within the new layout"
+      ]
+    },
+    {
       "version": "1.1.06",
       "date": "2026-03-05",
       "items": [
