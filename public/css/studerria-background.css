@@ -123,6 +123,16 @@ body.studerria-theme {
   animation-delay: -12s;
 }
 
+body.studerria-bg-low-power .studerria-bg-blob {
+  filter: blur(70px);
+  animation-duration: 62s;
+}
+
+body.studerria-bg-low-power .studerria-morph-secondary .studerria-bg-blob {
+  filter: blur(78px);
+  animation-duration: 74s;
+}
+
 @keyframes studerriaBlobFloat {
   0% {
     transform: translate3d(-1.5%, 0.6%, 0) scale(1) rotate(0deg);

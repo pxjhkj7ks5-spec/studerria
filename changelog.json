@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.94",
+      "date": "2026-03-05",
+      "items": [
+        "fix(studerria-bg-freeze): hardened global background runtime with one-time init guard (`window.__studerriaBackgroundInitialized`) to prevent duplicate RAF/observer setup on heavy pages",
+        "fix(studerria-theme-sync): reworked theme synchronization with guarded apply flow to avoid recursive attribute churn and reduce risk of browser \"page not responding\" after auth redirects",
+        "perf(studerria-bg-low-power): introduced low-power mode for data-heavy pages (schedule/journal/admin/teamwork) with slower morph cadence, reduced particle pool, and lighter effect budget",
+        "style(studerria-bg-optimization): lowered trail density/velocity and added low-power blur overrides for morph blobs to keep UI responsive while preserving visual identity"
+      ]
+    },
+    {
       "version": "1.0.93",
       "date": "2026-03-05",
       "items": [
