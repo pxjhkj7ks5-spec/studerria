@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.80",
+      "date": "2026-03-05",
+      "items": [
+        "feat(schedule-bg): added dedicated schedule background partial with layered gradient, 4 animated blobs, grain overlay, side dot-patterns, and mouse trail container",
+        "feat(schedule-bg-motion): added schedule-only interactive engine with one RAF loop for inertial pointer parallax, 16 pooled trail particles (circle/cross/star), and lightweight fade lifecycle",
+        "feat(schedule-bg-focus): nearest blob now receives temporary focus state (scale + tint boost) on pointer activity and auto-defocus after 3s idle",
+        "a11y(schedule-bg): added reduced-motion and coarse-pointer safeguards that disable trail/focus interactions while preserving readable static gradient and schedule content layering"
+      ]
+    },
+    {
       "version": "1.0.79",
       "date": "2026-03-05",
       "items": [
