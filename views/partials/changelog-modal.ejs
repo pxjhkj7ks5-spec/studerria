@@ -8,20 +8,47 @@
       </div>
       <div class="modal-body">
         <% if (changelog && changelog.length) { %>
-          <% changelog.forEach(function(entry) { %>
-            <div class="mb-3 changelog-release">
-              <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                <span class="fw-semibold">v<%= entry.version %></span>
-                <% if (entry.date) { %>
-                  <span class="text-muted small"><%= entry.date %></span>
-                <% } %>
-              </div>
-              <ul class="mb-0">
-                <% (entry.items || []).forEach(function(item) { %>
-                  <li><%= item %></li>
+          <%
+            const changelogSeriesMap = new Map();
+            changelog.forEach(function(entry) {
+              const versionParts = String(entry.version || '').split('.');
+              const seriesKey = versionParts.length >= 2 ? `${versionParts[0]}.${versionParts[1]}` : String(entry.version || 'other');
+              if (!changelogSeriesMap.has(seriesKey)) {
+                changelogSeriesMap.set(seriesKey, []);
+              }
+              changelogSeriesMap.get(seriesKey).push(entry);
+            });
+            const changelogSeries = Array.from(changelogSeriesMap.entries());
+          %>
+          <% changelogSeries.forEach(function(seriesEntry, seriesIndex) { %>
+            <% const seriesKey = seriesEntry[0]; %>
+            <% const seriesItems = seriesEntry[1] || []; %>
+            <details class="changelog-series" <%= seriesIndex === 0 ? 'open' : '' %>>
+              <summary class="changelog-series__summary">
+                <span class="changelog-series__title">
+                  <span>v<%= seriesKey %>.x</span>
+                  <span class="changelog-series__count"><%= seriesItems.length %> releases</span>
+                </span>
+                <span class="changelog-series__chevron" aria-hidden="true">›</span>
+              </summary>
+              <div class="changelog-series__body">
+                <% seriesItems.forEach(function(entry) { %>
+                  <div class="changelog-release">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                      <span class="fw-semibold">v<%= entry.version %></span>
+                      <% if (entry.date) { %>
+                        <span class="text-muted small"><%= entry.date %></span>
+                      <% } %>
+                    </div>
+                    <ul>
+                      <% (entry.items || []).forEach(function(item) { %>
+                        <li><%= item %></li>
+                      <% }); %>
+                    </ul>
+                  </div>
                 <% }); %>
-              </ul>
-            </div>
+              </div>
+            </details>
           <% }); %>
         <% } else { %>
           <p class="text-muted mb-0">Немає оновлень.</p>

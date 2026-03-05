@@ -274,10 +274,191 @@ body.theme-light.studerria-theme {
 .studerria-theme .container,
 .studerria-theme .container-fluid,
 .studerria-theme .topbar,
-.studerria-theme .modal,
-.studerria-theme .dropdown-menu {
+ .studerria-theme .dropdown-menu {
   position: relative;
   z-index: 2;
+}
+
+body.page-local-topbar .page-container {
+  padding-top: 22px;
+}
+
+body.page-local-topbar .topbar {
+  margin: 0 0 18px;
+  padding: 8px 12px;
+  border-radius: 28px;
+  box-shadow: 0 22px 52px rgba(2, 6, 23, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.page-local-topbar .topbar.topbar--title-spotlight {
+  overflow: hidden;
+}
+
+body.page-local-topbar .topbar.topbar--title-spotlight::before {
+  inset: 0;
+  border-radius: inherit;
+}
+
+body.page-local-topbar .topbar-title-spotlight {
+  padding-bottom: 0;
+}
+
+body.page-local-topbar .topbar-title-spotlight::before,
+body.page-local-topbar .topbar-title-spotlight::after {
+  display: none;
+}
+
+.studerria-theme .modal {
+  position: fixed !important;
+  inset: 0;
+  z-index: 1080 !important;
+}
+
+.studerria-theme .modal-backdrop {
+  z-index: 1070 !important;
+}
+
+.studerria-theme .modal-backdrop.show {
+  opacity: 1;
+  background: rgba(7, 11, 24, 0.58);
+  -webkit-backdrop-filter: blur(12px) saturate(1.02);
+  backdrop-filter: blur(12px) saturate(1.02);
+}
+
+.studerria-theme .modal-dialog {
+  position: relative;
+  z-index: 1085;
+  pointer-events: none;
+  margin: min(4vh, 2rem) auto;
+}
+
+.studerria-theme .modal-dialog-scrollable {
+  height: calc(100% - min(8vh, 4rem));
+}
+
+.studerria-theme .modal-dialog-scrollable .modal-content {
+  max-height: 100%;
+}
+
+.studerria-theme .modal-content,
+.studerria-theme .modal-header,
+.studerria-theme .modal-body,
+.studerria-theme .modal-footer {
+  pointer-events: auto;
+}
+
+.studerria-theme .modal-content {
+  border-radius: 28px;
+  border-color: color-mix(in srgb, var(--studerria-panel-border) 74%, rgba(255, 255, 255, 0.16));
+  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 88%, rgba(255, 255, 255, 0.08));
+  -webkit-backdrop-filter: blur(24px) saturate(1.12);
+  backdrop-filter: blur(24px) saturate(1.12);
+  box-shadow: 0 34px 88px rgba(2, 6, 23, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.studerria-theme .modal.show {
+  display: block;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.studerria-theme.modal-open,
+body.modal-open {
+  overflow: hidden !important;
+  padding-right: 0 !important;
+}
+
+body.modal-open .page-container,
+body.modal-open .topbar {
+  pointer-events: none;
+}
+
+.studerria-theme .modal.show .modal-dialog,
+.studerria-theme .modal.show .modal-content {
+  pointer-events: auto;
+}
+
+.changelog-liquid-modal .modal-dialog {
+  max-width: min(860px, calc(100vw - 1.5rem));
+}
+
+.changelog-liquid-modal .modal-body {
+  max-height: min(72vh, 680px);
+  overflow-y: auto;
+  padding-top: 1rem;
+}
+
+.changelog-series + .changelog-series {
+  margin-top: 14px;
+}
+
+.changelog-series {
+  border: 1px solid color-mix(in srgb, var(--studerria-panel-border) 76%, rgba(255, 255, 255, 0.1));
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--studerria-panel-bg) 90%, rgba(255, 255, 255, 0.04));
+  overflow: clip;
+}
+
+.changelog-series[open] {
+  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.16);
+}
+
+.changelog-series__summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  user-select: none;
+}
+
+.changelog-series__summary::-webkit-details-marker {
+  display: none;
+}
+
+.changelog-series__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.changelog-series__count {
+  color: var(--studerria-text-muted);
+  font-size: 0.86rem;
+}
+
+.changelog-series__chevron {
+  color: var(--studerria-text-muted);
+  transition: transform 180ms ease;
+}
+
+.changelog-series[open] .changelog-series__chevron {
+  transform: rotate(90deg);
+}
+
+.changelog-series__body {
+  padding: 0 16px 14px;
+}
+
+.changelog-release {
+  padding: 14px 0;
+}
+
+.changelog-release + .changelog-release {
+  border-top: 1px solid color-mix(in srgb, var(--studerria-panel-border) 72%, transparent);
+}
+
+.changelog-release ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.changelog-release li + li {
+  margin-top: 0.45rem;
 }
 
 .studerria-theme .liquid-card:hover,
@@ -476,6 +657,14 @@ body.page-profile .auth-card .form-select:focus {
 @media (max-width: 960px) {
   .page-container {
     padding: 76px 14px 104px;
+  }
+
+  body.page-local-topbar .page-container {
+    padding-top: 12px;
+  }
+
+  body.page-local-topbar .topbar {
+    border-radius: 22px;
   }
 
   .studerria-navbar {

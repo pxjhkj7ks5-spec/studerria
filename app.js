@@ -629,6 +629,7 @@ app.use((req, res, next) => {
       const sessionRole = req.session && req.session.role ? req.session.role : '';
       const mergedBodyClass = [
         String(parsed.bodyClass || '').trim(),
+        parsed.hasTopbar ? 'page-local-topbar' : '',
         isAuthView ? 'page-auth' : '',
         viewName === 'login' ? 'page-login' : '',
         isAuthView && viewName !== 'login' ? 'page-register' : '',
