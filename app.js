@@ -6247,7 +6247,7 @@ app.get('/login', (req, res) => {
 });
 
 app.get('/vision', (req, res) => {
-  res.render('studerria-codex');
+  res.render('vision');
 });
 
 app.get('/_health', (req, res) => {

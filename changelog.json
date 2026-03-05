@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.82",
+      "date": "2026-03-05",
+      "items": [
+        "feat(vision-layout): switched `/vision` to new `vision.ejs` scaffold with dedicated background partial and isolated content partials for schedule/profile/settings cards",
+        "feat(vision-bg-balance): rebuilt ambient background with cleaner symmetric gradient distribution, mirrored organic SVG blobs, reduced noise intensity, and edge dot-patterns for less visual \"mud\"",
+        "feat(vision-trail-symbols): replaced dot particles with 18 symbol particles (`?`, `?`, `?`, `0`, `?`) driven by `TrailParticle` engine: rotating wave ring around cursor plus burst symbols appearing/fading directly under pointer",
+        "feat(vision-focus-accessibility): added nearest-shape focus/defocus behavior with 10-20% scale emphasis, dimmed neighbors, single-RAF parallax loop, and fallback mode for coarse pointers/reduced-motion users"
+      ]
+    },
+    {
       "version": "1.0.81",
       "date": "2026-03-05",
       "items": [

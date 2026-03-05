@@ -1,0 +1,141 @@
+﻿<!doctype html>
+<html lang="<%= lang || 'uk' %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Studerria Vision</title>
+    <link rel="stylesheet" href="/css/vision-bg.css" />
+  </head>
+  <body class="theme-light page-vision" data-theme="light">
+    <%- include('partials/vision-bg') %>
+
+    <div class="vision-shell">
+      <header class="vision-header">
+        <a href="/" class="vision-logo" aria-label="Studerria home">Studerria</a>
+        <nav class="vision-nav" aria-label="Primary navigation">
+          <a href="#hero">Огляд</a>
+          <a href="#threads">Threads</a>
+          <a href="#conversation">Conversation</a>
+          <a href="#contacts">Контакти</a>
+        </nav>
+        <div class="vision-header-actions">
+          <button
+            type="button"
+            class="theme-toggle"
+            id="visionThemeToggle"
+            data-light-label="Світла"
+            data-dark-label="Темна"
+            aria-label="Toggle theme"
+          >
+            Темна
+          </button>
+          <a class="signup-btn" href="/register">Sign up</a>
+        </div>
+      </header>
+
+      <main class="vision-main">
+        <section class="hero-section" id="hero">
+          <div class="hero-copy">
+            <p class="hero-kicker">Studerria interface lab</p>
+            <h1>Открий нову еру кодування</h1>
+            <p>
+              Платформа для розкладу, курсів і щоденної комунікації, де викладачі та студенти працюють в
+              одній зрозумілій системі з фокусом на швидкість і прозорість процесів.
+            </p>
+            <div class="hero-actions">
+              <a href="/login" class="btn-primary">Почати</a>
+              <a href="#threads" class="btn-secondary">Вивчити більше</a>
+            </div>
+          </div>
+
+          <article class="code-diff-card" aria-label="Code diff preview">
+            <header>
+              <div class="diff-badge">GPT</div>
+              <div>
+                <strong>Code diff</strong>
+                <p>Автоматизація змін у навчальних сценаріях</p>
+              </div>
+            </header>
+            <div class="diff-columns">
+              <div class="diff-column before" aria-label="Before snippet">
+                <h3>Before</h3>
+                <pre><code><span>- export const semester = [];</span>
+<span>- const route = "manual-sync";</span>
+<span>- function assignHomework() {}</span>
+<span>- // no template reuse</span></code></pre>
+              </div>
+              <div class="diff-column after" aria-label="After snippet">
+                <h3>After</h3>
+                <pre><code><span>+ export const semester = buildSemesterPlan();</span>
+<span>+ const route = "template-sync";</span>
+<span>+ assignHomework({ reuseTemplate: true });</span>
+<span>+ pushJournalColumns();</span></code></pre>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="workspace-section" id="threads">
+          <aside class="threads-panel" aria-label="Threads list">
+            <div class="panel-head">
+              <h2>Threads</h2>
+              <p>Модулі, які можна замінювати без зміни візуального каркасу.</p>
+            </div>
+            <div class="threads-list">
+              <%- include('partials/vision/thread-schedule') %>
+              <%- include('partials/vision/thread-profile') %>
+              <%- include('partials/vision/thread-settings') %>
+            </div>
+          </aside>
+
+          <section class="conversation-panel" id="conversation" aria-label="Conversation preview">
+            <header class="conversation-head">
+              <div class="avatar" aria-hidden="true">S</div>
+              <div>
+                <h2>Conversation</h2>
+                <p>Панель швидкої взаємодії для запитів по курсах і контактах</p>
+              </div>
+            </header>
+
+            <div class="conversation-stream" role="log" aria-live="polite">
+              <article class="message from-user">
+                <h3>Куратор</h3>
+                <p>Склади короткий огляд розкладу на наступний тиждень і покажи конфлікти аудиторій.</p>
+              </article>
+              <article class="message from-assistant">
+                <h3>Studerria Assistant</h3>
+                <p>
+                  Знайшов 3 перетини в магістратурі. Можу застосувати шаблон перестановки та зберегти
+                  зміни в чернетку до затвердження.
+                </p>
+              </article>
+              <article class="message from-user">
+                <h3>Деканат</h3>
+                <p>Після узгодження опублікуй рейтинг відвідуваності по групах і додай контакти кураторів.</p>
+              </article>
+            </div>
+
+            <form class="conversation-compose" action="#" method="post" onsubmit="return false;">
+              <label for="visionConversationInput" class="sr-only">Message</label>
+              <input
+                id="visionConversationInput"
+                type="text"
+                placeholder="Напишіть запит про розклад, курси або контактні дані..."
+              />
+              <button type="submit">Надіслати</button>
+            </form>
+
+            <footer id="contacts">
+              <span>+380 44 000 00 00</span>
+              <span>support@studerria.edu</span>
+              <strong>Powered by OpenAI</strong>
+            </footer>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="/js/vision-bg.js" defer></script>
+  </body>
+</html>
