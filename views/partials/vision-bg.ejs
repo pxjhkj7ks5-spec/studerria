@@ -1,61 +1,42 @@
-﻿<div id="visionBg" class="vision-bg" aria-hidden="true">
+<div id="visionBg" class="vision-bg" aria-hidden="true">
   <div class="vision-gradient"></div>
 
-  <div class="bg-shape-wrap shape-left" data-depth="0.028">
-    <svg class="bg-shape" viewBox="0 0 640 430" preserveAspectRatio="none" role="presentation">
-      <defs>
-        <linearGradient id="visionShapeGradientLeft" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color: var(--shape-left-a)" />
-          <stop offset="100%" style="stop-color: var(--shape-left-b)" />
-        </linearGradient>
-        <filter id="visionShapeBlurLeft" x="-55%" y="-55%" width="210%" height="210%">
-          <feGaussianBlur stdDeviation="16" />
-        </filter>
-      </defs>
-      <path
-        d="M320 20 Q440 24 518 74 T594 214 Q590 338 502 390 Q430 426 320 416 Q202 404 134 352 T60 214 Q68 102 150 58 Q212 20 320 20 Z"
-        fill="url(#visionShapeGradientLeft)"
-        filter="url(#visionShapeBlurLeft)"
-      />
-    </svg>
-  </div>
+  <div class="bg-morph-layer">
+    <div class="bg-shape-wrap morph-blob morph-primary" data-depth="0.022">
+      <svg class="bg-blob" viewBox="0 0 600 600" role="presentation" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="visionBlobGradientPrimary" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color: var(--morph-primary-a)" />
+            <stop offset="50%" style="stop-color: var(--morph-primary-b)" />
+            <stop offset="100%" style="stop-color: var(--morph-primary-c)" />
+          </linearGradient>
+        </defs>
+        <path
+          id="blob-path"
+          data-blob-path="primary"
+          d="M300 80 C380 60 460 140 480 240 C500 340 420 420 320 440 C220 460 140 400 120 300 C100 200 180 100 300 80 Z"
+          fill="url(#visionBlobGradientPrimary)"
+        />
+      </svg>
+    </div>
 
-  <div class="bg-shape-wrap shape-right" data-depth="0.031">
-    <svg class="bg-shape" viewBox="0 0 640 430" preserveAspectRatio="none" role="presentation">
-      <defs>
-        <linearGradient id="visionShapeGradientRight" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color: var(--shape-right-a)" />
-          <stop offset="100%" style="stop-color: var(--shape-right-b)" />
-        </linearGradient>
-        <filter id="visionShapeBlurRight" x="-45%" y="-45%" width="190%" height="190%">
-          <feGaussianBlur stdDeviation="16" />
-        </filter>
-      </defs>
-      <path
-        d="M320 14 Q438 18 514 66 T590 210 Q584 328 500 382 Q430 422 320 414 Q210 406 140 354 T56 210 Q64 104 146 60 Q212 18 320 14 Z"
-        fill="url(#visionShapeGradientRight)"
-        filter="url(#visionShapeBlurRight)"
-      />
-    </svg>
-  </div>
-
-  <div class="bg-shape-wrap shape-center" data-depth="0.017">
-    <svg class="bg-shape" viewBox="0 0 480 320" preserveAspectRatio="none" role="presentation">
-      <defs>
-        <linearGradient id="visionShapeGradientCenter" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color: var(--shape-center-a)" />
-          <stop offset="100%" style="stop-color: var(--shape-center-b)" />
-        </linearGradient>
-        <filter id="visionShapeBlurCenter" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="14" />
-        </filter>
-      </defs>
-      <path
-        d="M240 14 Q330 20 386 60 T436 160 Q430 246 372 284 Q322 312 240 306 Q154 300 108 256 T54 160 Q60 86 114 54 Q162 18 240 14 Z"
-        fill="url(#visionShapeGradientCenter)"
-        filter="url(#visionShapeBlurCenter)"
-      />
-    </svg>
+    <div class="bg-shape-wrap morph-blob morph-secondary" data-depth="0.016">
+      <svg class="bg-blob" viewBox="0 0 600 600" role="presentation" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="visionBlobGradientSecondary" x1="100%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color: var(--morph-secondary-a)" />
+            <stop offset="50%" style="stop-color: var(--morph-secondary-b)" />
+            <stop offset="100%" style="stop-color: var(--morph-secondary-c)" />
+          </linearGradient>
+        </defs>
+        <path
+          id="blob-path-secondary"
+          data-blob-path="secondary"
+          d="M306 96 C404 84 482 166 500 258 C518 346 444 436 346 456 C236 478 146 414 126 314 C108 220 184 108 306 96 Z"
+          fill="url(#visionBlobGradientSecondary)"
+        />
+      </svg>
+    </div>
   </div>
 
   <div class="mouse-trail" id="visionMouseTrail"></div>

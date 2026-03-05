@@ -31,6 +31,28 @@
   const MIN_STAMP_DISTANCE = 4;
   const CELL_MEMORY_MS = 4200;
   const PATH_STAMP_STEP = 8;
+  const MORPH_FRAME_MS = 42;
+
+  const BLOB_MORPH_SHAPES = {
+    primary: [
+      [300, 80, 380, 60, 460, 140, 480, 240, 500, 340, 420, 420, 320, 440, 220, 460, 140, 400, 120, 300, 100, 200, 180, 100, 300, 80],
+      [300, 70, 395, 58, 490, 132, 510, 232, 530, 340, 438, 448, 330, 468, 214, 488, 118, 412, 98, 308, 80, 198, 170, 96, 300, 70],
+      [300, 92, 368, 78, 444, 156, 460, 254, 476, 350, 406, 414, 312, 432, 230, 448, 162, 390, 142, 296, 126, 210, 198, 114, 300, 92]
+    ],
+    secondary: [
+      [306, 96, 404, 84, 482, 166, 500, 258, 518, 346, 444, 436, 346, 456, 236, 478, 146, 414, 126, 314, 108, 220, 184, 108, 306, 96],
+      [304, 84, 420, 72, 508, 158, 522, 258, 538, 360, 454, 462, 350, 484, 226, 502, 132, 430, 112, 320, 94, 212, 180, 98, 304, 84],
+      [310, 108, 392, 96, 466, 176, 486, 266, 504, 352, 430, 420, 338, 440, 250, 458, 170, 404, 150, 312, 132, 234, 204, 122, 310, 108]
+    ]
+  };
+
+  function toBlobPath(values) {
+    return `M${values[0].toFixed(2)} ${values[1].toFixed(2)} C${values[2].toFixed(2)} ${values[3].toFixed(2)} ${values[4].toFixed(2)} ${values[5].toFixed(2)} ${values[6].toFixed(2)} ${values[7].toFixed(2)} C${values[8].toFixed(2)} ${values[9].toFixed(2)} ${values[10].toFixed(2)} ${values[11].toFixed(2)} ${values[12].toFixed(2)} ${values[13].toFixed(2)} C${values[14].toFixed(2)} ${values[15].toFixed(2)} ${values[16].toFixed(2)} ${values[17].toFixed(2)} ${values[18].toFixed(2)} ${values[19].toFixed(2)} C${values[20].toFixed(2)} ${values[21].toFixed(2)} ${values[22].toFixed(2)} ${values[23].toFixed(2)} ${values[24].toFixed(2)} ${values[25].toFixed(2)} Z`;
+  }
+
+  function smoothstep(value) {
+    return value * value * (3 - (2 * value));
+  }
 
   class TrailParticle {
     constructor(host) {
@@ -115,6 +137,18 @@
     targetScale: 1
   }));
 
+  const morphStates = Array.from(bgRoot.querySelectorAll('[data-blob-path]')).map((pathEl, index) => {
+    const kind = pathEl.dataset.blobPath === 'secondary' ? 'secondary' : 'primary';
+    const frames = BLOB_MORPH_SHAPES[kind] || BLOB_MORPH_SHAPES.primary;
+    pathEl.setAttribute('d', toBlobPath(frames[0]));
+    return {
+      pathEl,
+      frames,
+      duration: kind === 'secondary' ? 45000 : 30000,
+      offset: index * 6200
+    };
+  });
+
   let viewportWidth = window.innerWidth;
   let viewportHeight = window.innerHeight;
   let centerX = viewportWidth / 2;
@@ -139,6 +173,7 @@
   let stableZoneSince = 0;
   let focusedShape = null;
   let cleanupCellsAt = 0;
+  let lastMorphAt = 0;
 
   let isReducedMotion = reducedMotionQuery.matches;
   let isCoarsePointer = coarsePointerQuery.matches;
@@ -429,18 +464,49 @@
   }
 
   function updateShapeParallax() {
-    const offsetX = (smoothX - centerX) / Math.max(1, centerX);
-    const offsetY = (smoothY - centerY) / Math.max(1, centerY);
+    const offsetX = smoothX - centerX;
+    const offsetY = smoothY - centerY;
 
     shapeStates.forEach((shapeState) => {
-      const tx = offsetX * shapeState.depth * viewportWidth;
-      const ty = offsetY * shapeState.depth * viewportHeight * 0.8;
+      const tx = offsetX * shapeState.depth;
+      const ty = offsetY * shapeState.depth;
 
       shapeState.x += (tx - shapeState.x) * 0.09;
       shapeState.y += (ty - shapeState.y) * 0.09;
       shapeState.scale += (shapeState.targetScale - shapeState.scale) * 0.08;
 
       shapeState.el.style.transform = `translate3d(${shapeState.x.toFixed(2)}px, ${shapeState.y.toFixed(2)}px, 0) scale(${shapeState.scale.toFixed(3)})`;
+    });
+  }
+
+  function updateBlobMorph(now) {
+    if (now - lastMorphAt < MORPH_FRAME_MS) {
+      return;
+    }
+
+    lastMorphAt = now;
+
+    morphStates.forEach((state) => {
+      const frames = state.frames;
+      const frameCount = frames.length;
+      if (frameCount < 2) {
+        return;
+      }
+
+      const cycle = ((now + state.offset) % state.duration) / state.duration;
+      const progress = cycle * frameCount;
+      const fromIndex = Math.floor(progress) % frameCount;
+      const toIndex = (fromIndex + 1) % frameCount;
+      const localT = smoothstep(progress - Math.floor(progress));
+
+      const from = frames[fromIndex];
+      const to = frames[toIndex];
+      const mixed = new Array(from.length);
+      for (let i = 0; i < from.length; i += 1) {
+        mixed[i] = from[i] + ((to[i] - from[i]) * localT);
+      }
+
+      state.pathEl.setAttribute('d', toBlobPath(mixed));
     });
   }
 
@@ -471,6 +537,10 @@
       smoothX = centerX;
       smoothY = centerY;
       fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.88)`;
+    }
+
+    if (!isReducedMotion) {
+      updateBlobMorph(now);
     }
 
     updateShapeParallax();

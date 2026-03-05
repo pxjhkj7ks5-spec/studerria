@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.90",
+      "date": "2026-03-05",
+      "items": [
+        "feat(vision-morph-layer): rebuilt `/vision` ambient background shapes into dedicated `bg-morph-layer` with primary/secondary SVG blobs behind UI",
+        "feat(vision-blob-morph): added smooth path morphing between 3 organic states per blob using a throttled single-RAF interpolation engine (`toBlobPath` + `smoothstep`)",
+        "motion(vision-blob-float): introduced subtle long-cycle breathing transforms (scale/rotate/translate) with separate timings for primary (30s) and secondary (45s) blobs",
+        "tune(vision-parallax-theme): updated cursor parallax to depth-based pointer delta mapping and added light/dark morph gradient variables with lower light opacity for readability"
+      ]
+    },
+    {
       "version": "1.0.89",
       "date": "2026-03-05",
       "items": [
