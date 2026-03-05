@@ -23,6 +23,12 @@
     <span class="navbar-brand text-white me-auto topbar-title-spotlight"><%= brandTitle %></span>
     <div class="d-flex align-items-center gap-2 topbar-actions flex-wrap justify-content-end">
       <% if (isSchedule) { %>
+        <div class="sync-pill topbar-sync-pill desktop-only" aria-live="polite">
+          <span class="sync-dot" id="syncDot"></span>
+          <span id="syncStatusLabel">Онлайн</span>
+          <span class="sync-sep">•</span>
+          <span id="syncStatusMeta">Щойно</span>
+        </div>
         <span class="me-2 muted desktop-only text-nowrap">
           <% if (role === 'admin') { %>
             <%= t('role.admin') %>: <%= username %>

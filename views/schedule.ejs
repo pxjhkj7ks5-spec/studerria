@@ -1062,23 +1062,6 @@
         background: #f97316;
         box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
       }
-      .test-view-banner {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 14px;
-        border-radius: 999px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: var(--text-primary);
-        background: rgba(59, 130, 246, 0.16);
-        border: 1px solid rgba(59, 130, 246, 0.35);
-        margin-bottom: 16px;
-      }
-      body.theme-light .test-view-banner {
-        background: rgba(59, 130, 246, 0.12);
-        border-color: rgba(59, 130, 246, 0.25);
-      }
       .day-card {
         padding: 0;
       }
@@ -1736,68 +1719,23 @@
         </div>
 
         <% const hasCourseFilters = role === 'teacher' && teacherCourses && teacherCourses.length > 1; %>
-        <div class="glass schedule-panel liquid-card mb-4 <%= hasCourseFilters ? '' : 'single-panel' %>">
-          <% if (hasCourseFilters) { %>
-            <div class="panel-section">
-              <div class="panel-title">Фільтри</div>
-              <div class="panel-body">
-                <form method="GET" action="/schedule" class="d-inline">
-                  <input type="hidden" name="week" value="<%= currentWeek %>" />
-                  <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
-                    <option value="">Усі курси</option>
-                    <% teacherCourses.forEach(function(c) { %>
-                      <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
-                    <% }); %>
-                  </select>
-                </form>
-              </div>
-            </div>
-            <div class="panel-divider"></div>
-          <% } %>
-          <div class="panel-section panel-sync">
+        <% if (hasCourseFilters) { %>
+        <div class="glass schedule-panel liquid-card mb-4">
+          <div class="panel-section">
+            <div class="panel-title">Filters</div>
             <div class="panel-body">
-              <div class="sync-pill">
-                <span class="sync-dot" id="syncDot"></span>
-                <span id="syncStatusLabel">Онлайн</span>
-                <span class="sync-sep">•</span>
-                <span id="syncStatusMeta">Щойно</span>
-              </div>
-              <label class="control-toggle focus-toggle panel-focus-inline" for="focusWeekToggle">
-                <input class="toggle-input" type="checkbox" id="focusWeekToggle" />
-                <span class="toggle">
-                  <span class="toggle-knob"></span>
-                </span>
-                <span class="toggle-text">Focus week</span>
-              </label>
+              <form method="GET" action="/schedule" class="d-inline">
+                <input type="hidden" name="week" value="<%= currentWeek %>" />
+                <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
+                  <option value="">All courses</option>
+                  <% teacherCourses.forEach(function(c) { %>
+                    <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
+                  <% }); %>
+                </select>
+              </form>
             </div>
           </div>
         </div>
-
-        <section class="status-stack mb-4" id="densityBlock">
-          <details class="density-summary" id="densitySummary">
-            <summary>
-              <span>Week pulse</span>
-              <span class="density-summary-hint">Hover chips for details</span>
-            </summary>
-            <div class="density-summary-copy">
-              <span>Calm view of the week density without aggressive warning colors.</span>
-            </div>
-            <div class="density-chip-row">
-              <span class="density-chip chip" id="densityChipBalance" data-bs-toggle="tooltip" data-bs-placement="top">Day balance</span>
-              <span class="density-chip chip" id="densityChipEvening" data-bs-toggle="tooltip" data-bs-placement="top">Evening intensity</span>
-              <span class="density-chip chip" id="densityChipPeak" data-bs-toggle="tooltip" data-bs-placement="top">Most intense day</span>
-            </div>
-          </details>
-        </section>
-
-        <% if (viewAs === 'student') { %>
-          <div class="test-view-banner">
-            Тестовий перегляд: <%= viewAsCourse && viewAsCourse.name ? viewAsCourse.name : 'Курс' %> · <%= viewAsLabel || (`Група ${viewAsGroupNumber || 1}`) %>
-          </div>
-        <% } else if (role === 'admin') { %>
-          <div class="test-view-banner">
-            <%= t('schedule.adminViewNotice') %>
-          </div>
         <% } %>
 
         <% if (subgroupError === 'exists') { %>
@@ -3329,7 +3267,6 @@
       const scheduleDrawer = document.getElementById('scheduleActionDrawer');
       const scheduleDrawerToggle = document.getElementById('scheduleDrawerToggle');
       const scheduleDrawerClose = document.getElementById('scheduleDrawerClose');
-      const focusWeekToggle = document.getElementById('focusWeekToggle');
       const densityChipBalance = document.getElementById('densityChipBalance');
       const densityChipEvening = document.getElementById('densityChipEvening');
       const densityChipPeak = document.getElementById('densityChipPeak');
@@ -3554,21 +3491,9 @@
       }
 
       bindCustomDeadlineCards();
+      localStorage.removeItem('schedule-focus-week');
+      document.body.classList.remove('focus-week');
 
-      function applyFocusMode(enabled) {
-        document.body.classList.toggle('focus-week', enabled);
-      }
-
-      if (focusWeekToggle) {
-        const storedFocus = localStorage.getItem('schedule-focus-week') === '1';
-        focusWeekToggle.checked = storedFocus;
-        applyFocusMode(storedFocus);
-        focusWeekToggle.addEventListener('change', () => {
-          const enabled = focusWeekToggle.checked;
-          localStorage.setItem('schedule-focus-week', enabled ? '1' : '0');
-          applyFocusMode(enabled);
-        });
-      }
 
       const weekGrid = document.getElementById('scheduleWeekGrid');
       const scheduleModes = ['week'];
@@ -3576,7 +3501,6 @@
       const scheduleModeIndicator = document.getElementById('scheduleModeIndicator');
       const scheduleModeButtons = scheduleModeTabs ? Array.from(scheduleModeTabs.querySelectorAll('.glass-tab[data-mode]')) : [];
       const monthSummary = document.getElementById('scheduleMonthSummary');
-      const densityBlock = document.getElementById('densityBlock');
       let currentScheduleMode = 'week';
 
       function getPreferredDayCard(dayCards) {
@@ -3650,9 +3574,6 @@
 
         const dayCards = Array.from(weekGrid.querySelectorAll('.day-card'));
         dayCards.forEach((card) => card.classList.remove('d-none'));
-        if (densityBlock) {
-          densityBlock.classList.toggle('d-none', mode !== 'week');
-        }
 
         if (mode === 'month') {
           weekGrid.classList.add('d-none');

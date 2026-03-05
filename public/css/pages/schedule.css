@@ -684,29 +684,6 @@ body.theme-light .density-summary .density-chip-row {
   opacity: 0.9;
 }
 
-.test-view-banner {
-  margin-bottom: var(--space-3);
-  border-radius: 999px;
-  border: 1px solid rgba(147, 197, 253, 0.62);
-  background: rgba(219, 234, 254, 0.82);
-  padding: 8px 14px;
-  font-size: 0.84rem;
-  color: #16213b;
-  box-shadow: 0 8px 18px rgba(100, 116, 139, 0.08);
-}
-
-body.theme-dark .test-view-banner {
-  border-color: rgba(147, 197, 253, 0.64);
-  background: rgba(219, 234, 254, 0.84);
-  color: #16213b;
-}
-
-body.theme-light .test-view-banner {
-  border-color: rgba(147, 197, 253, 0.58);
-  background: rgba(219, 234, 254, 0.76);
-  color: #16213b;
-}
-
 #scheduleWeekGrid {
   display: flex;
   flex-direction: column;
@@ -1619,21 +1596,6 @@ body.theme-light .week-dot {
 .week-dot.is-enter-active {
   opacity: 0.42 !important;
   transform: translateX(0) scale(1) !important;
-}
-
-body.focus-week #densityBlock,
-body.focus-week .density-chip-row,
-body.focus-week .day-indicators,
-body.focus-week .test-view-banner {
-  display: none !important;
-}
-
-body.focus-week .schedule-card.is-now {
-  box-shadow: inset 0 0 0 999px rgba(34, 197, 94, 0.1), 0 14px 28px rgba(34, 197, 94, 0.14);
-}
-
-body.focus-week .schedule-card.is-next {
-  box-shadow: inset 0 0 0 999px rgba(16, 185, 129, 0.08), 0 12px 24px rgba(16, 185, 129, 0.12);
 }
 
 body.is-scrolling .schedule-card,

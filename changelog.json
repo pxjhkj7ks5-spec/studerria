@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.08",
+      "date": "2026-03-05",
+      "items": [
+        "style(schedule-cleanup): removed the standalone `Focus week`, `Week pulse`, and `test view` utility blocks from the schedule header area to keep the page focused on the actual timetable",
+        "style(schedule-status-topbar): moved the online/cache sync status into the schedule topbar so operational state stays visible without consuming a separate content panel",
+        "refactor(schedule-focus-retire): removed the old `focus-week` toggle hookup and cleared its stored state so the schedule no longer carries inactive focus-mode UI logic"
+      ]
+    },
+    {
       "version": "1.1.07",
       "date": "2026-03-05",
       "items": [
