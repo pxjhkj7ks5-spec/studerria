@@ -3,7 +3,7 @@
   --page-text: #0f172a;
   --page-muted: #334155;
   --panel-border: rgba(15, 23, 42, 0.14);
-  --panel-bg: rgba(255, 255, 255, 0.72);
+  --panel-bg: rgba(255, 255, 255, 0.56);
   --panel-shadow: 0 24px 70px rgba(15, 23, 42, 0.14);
   --line-soft: rgba(15, 23, 42, 0.1);
 
@@ -42,7 +42,7 @@ body.theme-dark {
   --page-text: #f8fafc;
   --page-muted: rgba(226, 232, 240, 0.82);
   --panel-border: rgba(148, 163, 184, 0.26);
-  --panel-bg: rgba(15, 23, 42, 0.56);
+  --panel-bg: rgba(15, 23, 42, 0.44);
   --panel-shadow: 0 30px 88px rgba(2, 6, 23, 0.58);
   --line-soft: rgba(148, 163, 184, 0.22);
 
@@ -434,12 +434,12 @@ body.page-vision {
   display: grid;
   gap: 14px;
   color: #e2e8f0;
-  background: linear-gradient(164deg, rgba(6, 10, 24, 0.92), rgba(2, 6, 23, 0.78));
+  background: linear-gradient(164deg, rgba(6, 10, 24, 0.84), rgba(2, 6, 23, 0.64));
 }
 
 [data-theme='light'] .code-diff-card,
 body.theme-light .code-diff-card {
-  background: linear-gradient(164deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.82));
+  background: linear-gradient(164deg, rgba(15, 23, 42, 0.84), rgba(30, 41, 59, 0.66));
 }
 
 .code-diff-card header {
@@ -540,14 +540,14 @@ body.theme-light .code-diff-card {
   border: 1px solid var(--line-soft);
   border-radius: 18px;
   padding: 14px;
-  background: rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.36);
   display: grid;
   gap: 8px;
 }
 
 [data-theme='dark'] .thread-card,
 body.theme-dark .thread-card {
-  background: rgba(30, 41, 59, 0.54);
+  background: rgba(30, 41, 59, 0.4);
 }
 
 .thread-meta {
@@ -617,12 +617,12 @@ body.theme-dark .thread-card {
   padding: 12px;
   display: grid;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.44);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 [data-theme='dark'] .conversation-stream,
 body.theme-dark .conversation-stream {
-  background: rgba(30, 41, 59, 0.46);
+  background: rgba(30, 41, 59, 0.34);
 }
 
 .message {
@@ -660,14 +660,14 @@ body.theme-dark .conversation-stream {
   width: 100%;
   border-radius: 12px;
   border: 1px solid var(--panel-border);
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.52);
   color: var(--page-text);
   padding: 10px 12px;
 }
 
 [data-theme='dark'] .conversation-compose input,
 body.theme-dark .conversation-compose input {
-  background: rgba(15, 23, 42, 0.65);
+  background: rgba(15, 23, 42, 0.5);
 }
 
 .conversation-compose button {

@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.89",
+      "date": "2026-03-05",
+      "items": [
+        "style(vision-glass): made core `/vision` glass surfaces more transparent by lowering global panel alpha for both light and dark themes",
+        "style(vision-cards): reduced opacity of nested thread and conversation cards so background depth reads cleaner through content blocks",
+        "style(vision-code-diff): softened code-diff card gradient opacity to align with lighter liquid-glass layering",
+        "style(vision-compose): lowered input field fill opacity in both themes to keep controls visually consistent with updated transparent panels"
+      ]
+    },
+    {
       "version": "1.0.88",
       "date": "2026-03-05",
       "items": [
