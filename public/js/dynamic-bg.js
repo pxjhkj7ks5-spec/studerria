@@ -25,6 +25,7 @@
     currentHx: Math.max(window.innerWidth, 1) * 0.5,
     currentHy: Math.max(window.innerHeight, 1) * 0.34,
     reduced: Boolean(reduceMotionMedia.matches),
+    safeMode: false,
     hasFinePointer: Boolean(pointerFineMedia.matches),
     frameId: 0,
     resizeScheduled: false,
@@ -33,14 +34,17 @@
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
   const syncTheme = () => {
-    const explicit = (body.getAttribute('data-theme') || '').trim().toLowerCase();
+    const explicitRaw = (body.getAttribute('data-theme') || '').trim().toLowerCase();
     const byClass = body.classList.contains('theme-light')
       ? 'light'
       : (body.classList.contains('theme-dark') ? 'dark' : '');
-    const nextTheme = explicit === 'light' || explicit === 'dark'
+    const explicit = explicitRaw === 'light' || explicitRaw === 'dark' ? explicitRaw : '';
+    const nextTheme = explicit
       ? explicit
       : (byClass || 'dark');
-    body.setAttribute('data-theme', nextTheme);
+    if (body.getAttribute('data-theme') !== nextTheme) {
+      body.setAttribute('data-theme', nextTheme);
+    }
   };
 
   const applyHighlight = (x, y) => {
@@ -96,11 +100,13 @@
     }
 
     if (!state.hasFinePointer) {
-      const wave = timestamp * 0.00008;
-      state.targetX = Math.sin(wave) * 0.26;
-      state.targetY = Math.cos(wave * 0.82) * 0.22;
-      state.targetHx = state.width * (0.5 + (Math.sin(wave * 0.9) * 0.08));
-      state.targetHy = state.height * (0.36 + (Math.cos(wave * 0.74) * 0.06));
+      const wave = timestamp * (state.safeMode ? 0.00005 : 0.00008);
+      const ampX = state.safeMode ? 0.16 : 0.26;
+      const ampY = state.safeMode ? 0.14 : 0.22;
+      state.targetX = Math.sin(wave) * ampX;
+      state.targetY = Math.cos(wave * 0.82) * ampY;
+      state.targetHx = state.width * (0.5 + (Math.sin(wave * 0.9) * (state.safeMode ? 0.05 : 0.08)));
+      state.targetHy = state.height * (0.36 + (Math.cos(wave * 0.74) * (state.safeMode ? 0.04 : 0.06)));
     }
 
     state.currentX += (state.targetX - state.currentX) * 0.075;
@@ -109,8 +115,9 @@
     state.currentHy += (state.targetHy - state.currentHy) * 0.09;
 
     layers.forEach(({ node, depth }) => {
-      const x = state.currentX * depth * 46;
-      const y = state.currentY * depth * 34;
+      const scale = state.safeMode ? 0.55 : 1;
+      const x = state.currentX * depth * 46 * scale;
+      const y = state.currentY * depth * 34 * scale;
       node.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0px)`;
     });
     applyHighlight(state.currentHx, state.currentHy);
@@ -130,7 +137,7 @@
   };
 
   const applyMotionMode = () => {
-    if (state.reduced) {
+    if (state.reduced || document.hidden) {
       body.classList.add('dynamic-bg-reduced');
       stopAnimation();
       resetStaticState();
@@ -142,6 +149,13 @@
 
   syncTheme();
   resetStaticState();
+  state.safeMode = Boolean(
+    (typeof navigator !== 'undefined' && navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4)
+    || (typeof navigator !== 'undefined' && Number.isFinite(Number(navigator.deviceMemory)) && Number(navigator.deviceMemory) <= 4)
+  );
+  if (state.safeMode) {
+    body.classList.add('dynamic-bg-safe');
+  }
 
   const themeObserver = new MutationObserver(syncTheme);
   themeObserver.observe(body, {
@@ -151,6 +165,7 @@
 
   window.addEventListener('pointermove', onPointerMove, { passive: true });
   window.addEventListener('resize', onResize, { passive: true });
+  document.addEventListener('visibilitychange', applyMotionMode, { passive: true });
 
   const onReduceMotionChange = (event) => {
     state.reduced = Boolean(event.matches);

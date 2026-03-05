@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.76",
+      "date": "2026-03-05",
+      "items": [
+        "fix(dynamic-bg-stability): prevented `data-theme` mutation observer feedback loop by syncing body theme attribute only when value actually changes",
+        "perf(dynamic-bg-runtime): pause RAF animation when tab is hidden and resume only when visible to reduce CPU spikes and avoid unresponsive-page risk",
+        "perf(dynamic-bg-safemode): added low-end device safe mode (reduced parallax amplitude + lighter grain/dot layers) for smoother rendering under weak hardware"
+      ]
+    },
+    {
       "version": "1.0.75",
       "date": "2026-03-05",
       "items": [

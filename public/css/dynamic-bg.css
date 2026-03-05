@@ -166,6 +166,15 @@ body.dynamic-bg-ready {
   background-size: 3px 3px, 4px 4px, 100% 4px;
 }
 
+body.dynamic-bg-safe .dynamic-bg__grain {
+  mix-blend-mode: normal;
+  opacity: calc(var(--noise-opacity) * 0.7);
+}
+
+body.dynamic-bg-safe .dynamic-bg__dots {
+  opacity: calc(var(--dot-opacity) * 0.7);
+}
+
 @keyframes dynamic-bg-drift {
   0% {
     transform: translate3d(-1%, -1.5%, 0) scale(1);
