@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.16",
+      "date": "2026-03-05",
+      "items": [
+        "style(schedule-card-hover): replaced the flat gray class-card hover with a richer blue-indigo liquid-glass hover state and removed the remaining hover lift so timetable cards feel calmer and more premium"
+      ]
+    },
+    {
       "version": "1.1.15",
       "date": "2026-03-05",
       "items": [
