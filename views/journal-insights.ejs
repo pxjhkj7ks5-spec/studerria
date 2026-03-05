@@ -93,20 +93,86 @@
         box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
       }
       .hero {
-        padding: 24px;
+        position: relative;
+        overflow: hidden;
+        padding: 28px;
+      }
+      .hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(520px 220px at 0% 0%, rgba(125, 211, 252, 0.12), transparent 65%),
+          radial-gradient(420px 260px at 100% 100%, rgba(167, 139, 250, 0.14), transparent 68%);
+        pointer-events: none;
+      }
+      .hero-grid {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
+        gap: 18px;
+        align-items: start;
+      }
+      .hero-main {
+        min-width: 0;
+      }
+      .hero-side {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
       }
       .hero-title {
         margin: 0;
-        font-size: clamp(1.8rem, 2.9vw, 2.5rem);
-        font-weight: 700;
+        font-size: clamp(2.1rem, 3.3vw, 3.1rem);
+        line-height: 0.98;
+        letter-spacing: -0.04em;
+        font-weight: 760;
       }
       .hero-subtitle {
         margin-top: 10px;
-        max-width: 900px;
+        max-width: 760px;
+        font-size: 1rem;
+        line-height: 1.62;
         color: rgba(226, 232, 240, 0.82);
       }
       body.theme-light .hero-subtitle {
         color: rgba(15, 23, 42, 0.62);
+      }
+      .hero-stat {
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(8, 15, 34, 0.34);
+        padding: 14px 15px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+      body.theme-light .hero-stat {
+        background: rgba(255, 255, 255, 0.68);
+        border-color: rgba(15, 23, 42, 0.1);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+      }
+      .hero-stat-label {
+        font-size: 0.76rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(226, 232, 240, 0.54);
+      }
+      body.theme-light .hero-stat-label {
+        color: rgba(15, 23, 42, 0.46);
+      }
+      .hero-stat-value {
+        margin-top: 8px;
+        font-size: 1.5rem;
+        font-weight: 720;
+        line-height: 1.05;
+      }
+      .hero-stat-meta {
+        margin-top: 4px;
+        font-size: 0.82rem;
+        color: rgba(226, 232, 240, 0.66);
+      }
+      body.theme-light .hero-stat-meta {
+        color: rgba(15, 23, 42, 0.56);
       }
       .chip-row {
         margin-top: 14px;
@@ -128,10 +194,26 @@
       .section {
         padding: 20px;
       }
+      .section-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
       .section-title {
         margin: 0;
         font-size: 1.08rem;
         font-weight: 650;
+      }
+      .section-subtitle {
+        margin: 5px 0 0;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        color: rgba(226, 232, 240, 0.68);
+      }
+      body.theme-light .section-subtitle {
+        color: rgba(15, 23, 42, 0.54);
       }
       .soft-panel {
         border-radius: 14px;
@@ -165,10 +247,20 @@
         grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
       }
       .summary-card {
+        position: relative;
+        overflow: hidden;
         border-radius: 14px;
         border: 1px solid rgba(148, 163, 184, 0.24);
         background: rgba(15, 23, 42, 0.28);
         padding: 12px;
+      }
+      .summary-card::before {
+        content: '';
+        position: absolute;
+        inset: 0 auto auto 0;
+        width: 100%;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(125, 211, 252, 0.5), rgba(167, 139, 250, 0.2), transparent 90%);
       }
       body.theme-light .summary-card {
         border-color: rgba(15, 23, 42, 0.12);
@@ -187,11 +279,63 @@
         font-weight: 700;
       }
       .table-shell {
+        border: 1px solid rgba(148, 163, 184, 0.2);
         border-radius: 14px;
         overflow: hidden;
+        background: rgba(8, 15, 34, 0.24);
+      }
+      body.theme-light .table-shell {
+        border-color: rgba(15, 23, 42, 0.1);
+        background: rgba(255, 255, 255, 0.86);
       }
       .table-shell .table {
         margin-bottom: 0;
+        --bs-table-bg: transparent;
+        --bs-table-accent-bg: transparent;
+        --bs-table-color: inherit;
+        --bs-table-border-color: rgba(148, 163, 184, 0.16);
+        color: inherit;
+      }
+      body.theme-light .table-shell .table {
+        --bs-table-border-color: rgba(15, 23, 42, 0.08);
+      }
+      .insights-table thead th {
+        padding: 0.9rem 1rem;
+        font-size: 0.76rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(226, 232, 240, 0.6);
+        background: rgba(255, 255, 255, 0.04);
+        border-bottom-width: 1px;
+      }
+      body.theme-light .insights-table thead th {
+        color: rgba(15, 23, 42, 0.56);
+        background: rgba(248, 250, 252, 0.92);
+      }
+      .insights-table tbody td {
+        padding: 0.88rem 1rem;
+        vertical-align: middle;
+        background: transparent;
+      }
+      .insights-table tbody tr:nth-child(odd) td {
+        background: rgba(255, 255, 255, 0.028);
+      }
+      body.theme-light .insights-table tbody tr:nth-child(odd) td {
+        background: rgba(248, 250, 252, 0.72);
+      }
+      .insights-table tbody tr:hover td {
+        background: rgba(99, 102, 241, 0.12);
+      }
+      body.theme-light .insights-table tbody tr:hover td {
+        background: rgba(99, 102, 241, 0.08);
+      }
+      .empty-state {
+        padding: 18px;
+        color: rgba(226, 232, 240, 0.66);
+      }
+      body.theme-light .empty-state {
+        color: rgba(15, 23, 42, 0.58);
       }
       .trend-grid {
         display: grid;
@@ -225,6 +369,28 @@
         font-weight: 600;
         font-size: 0.82rem;
       }
+      .filters-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 4px;
+      }
+      @media (max-width: 991px) {
+        .hero-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 640px) {
+        .hero {
+          padding: 22px 20px;
+        }
+        .hero-side {
+          grid-template-columns: 1fr;
+        }
+        .section-head {
+          flex-direction: column;
+        }
+      }
     </style>
       <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
@@ -242,26 +408,57 @@
       <% } %>
 
       <section class="glass hero mb-3">
-        <h1 class="hero-title">Journal insights</h1>
-        <p class="hero-subtitle">
-          Динаміка оцінок і відвідуваності за періоди, з гнучкими зрізами: студент, група, предмет або курс. Підтримано швидку публікацію рейтингу за семестр/період.
-        </p>
-        <div class="chip-row">
-          <span class="chip"><%= scopeLabelValue %></span>
-          <span class="chip">Period: <%= periodLabel %></span>
-          <span class="chip">Compare: <%= compareLabel %></span>
-          <span class="chip">Participants: <%= Number(summary && summary.participants_count ? summary.participants_count : 0) %></span>
-          <% if (isAllCoursesScope && scopeCourseCountValue > 0) { %>
-            <span class="chip">Courses: <%= scopeCourseCountValue %></span>
-          <% } %>
-          <% if (selectedSemester && selectedSemester.title) { %>
-            <span class="chip"><%= selectedSemester.title %></span>
-          <% } %>
+        <div class="hero-grid">
+          <div class="hero-main">
+            <h1 class="hero-title">Journal insights</h1>
+            <p class="hero-subtitle">
+              Performance and attendance insights across flexible scopes: student, group, subject, or whole course. Built for quick ranking review, comparison, export, and publication workflows.
+            </p>
+            <div class="chip-row">
+              <span class="chip"><%= scopeLabelValue %></span>
+              <span class="chip">Period: <%= periodLabel %></span>
+              <span class="chip">Compare: <%= compareLabel %></span>
+              <span class="chip">Participants: <%= Number(summary && summary.participants_count ? summary.participants_count : 0) %></span>
+              <% if (isAllCoursesScope && scopeCourseCountValue > 0) { %>
+                <span class="chip">Courses: <%= scopeCourseCountValue %></span>
+              <% } %>
+              <% if (selectedSemester && selectedSemester.title) { %>
+                <span class="chip"><%= selectedSemester.title %></span>
+              <% } %>
+            </div>
+          </div>
+          <div class="hero-side">
+            <div class="hero-stat">
+              <div class="hero-stat-label">Average</div>
+              <div class="hero-stat-value"><%= Number(summary && summary.average_score ? summary.average_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
+              <div class="hero-stat-meta">median <%= Number(summary && summary.median_score ? summary.median_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
+            </div>
+            <div class="hero-stat">
+              <div class="hero-stat-label">Attendance reliability</div>
+              <div class="hero-stat-value"><%= Number(summary && summary.attendance_reliability ? summary.attendance_reliability : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
+              <div class="hero-stat-meta">absence share <%= Number(summary && summary.attendance_absent_share ? summary.attendance_absent_share : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
+            </div>
+            <div class="hero-stat">
+              <div class="hero-stat-label">At risk</div>
+              <div class="hero-stat-value"><%= Number(summary && summary.at_risk_count ? summary.at_risk_count : 0) %></div>
+              <div class="hero-stat-meta">excellent <%= Number(summary && summary.excellent_count ? summary.excellent_count : 0) %></div>
+            </div>
+            <div class="hero-stat">
+              <div class="hero-stat-label">Momentum</div>
+              <div class="hero-stat-value"><%= Number(summary && summary.momentum_score ? summary.momentum_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
+              <div class="hero-stat-meta">trend delta <%= Number(summary && summary.grade_delta ? summary.grade_delta : 0).toFixed(2).replace(/\.00$/, '') %></div>
+            </div>
+          </div>
         </div>
       </section>
 
       <section class="glass section mb-3">
-        <h2 class="section-title">Filters</h2>
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Filters</h2>
+            <p class="section-subtitle">Refine scope, period, and compare mode before exporting or publishing insights.</p>
+          </div>
+        </div>
         <form id="journalInsightsFiltersForm" method="GET" action="/journal/insights" class="row g-2 mt-1">
           <div class="col-12 col-md-3">
             <label class="form-label small" for="insightsCourse">Course</label>
@@ -309,7 +506,7 @@
               <% } else { %>
                 <% (subjectOptions || []).filter((subject) => Number(subject.course_id) === selectedCourseValue).forEach((subject) => { %>
                   <option value="<%= subject.subject_id %>" <%= Number(subject.subject_id) === selectedSubjectValue ? 'selected' : '' %>>
-                    <%= subject.subject_name %> · <%= subject.group_label %>
+                    <%= subject.subject_name %> - <%= subject.group_label %>
                   </option>
                 <% }) %>
               <% } %>
@@ -340,7 +537,7 @@
               <option value="">Select student</option>
               <% (studentOptions || []).forEach((student) => { %>
                 <option value="<%= student.id %>" <%= Number(student.id) === selectedStudentValue ? 'selected' : '' %>>
-                  <%= student.full_name %> · Група <%= Number(student.group_number || 0) %>
+                  <%= student.full_name %> - Group <%= Number(student.group_number || 0) %>
                 </option>
               <% }) %>
             </select>
@@ -358,7 +555,7 @@
             </select>
           </div>
 
-          <div class="col-12 d-flex gap-2 flex-wrap mt-1">
+          <div class="col-12 filters-actions">
             <a class="btn btn-outline-primary" href="<%= exportCsvHref %>">Export CSV</a>
             <a class="btn btn-outline-secondary" href="/journal<%= selectedSubjectValue ? `?subject_id=${selectedSubjectValue}` : '' %>">Back to journal</a>
           </div>
@@ -367,7 +564,12 @@
 
       <% if (teacherJournalMode) { %>
         <section class="glass section mb-3">
-          <h2 class="section-title">Publish rating</h2>
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">Publish rating</h2>
+              <p class="section-subtitle">Generate a lightweight leaderboard snapshot for the current selection and send it to messages.</p>
+            </div>
+          </div>
           <% if (canPublishRating) { %>
             <form method="POST" action="/journal/insights/publish-rating" class="soft-panel row g-2 align-items-end">
               <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
@@ -394,7 +596,12 @@
       <% } %>
 
       <section class="glass section mb-3">
-        <h2 class="section-title">Summary</h2>
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Summary</h2>
+            <p class="section-subtitle">Core performance, attendance, and risk metrics for the active scope.</p>
+          </div>
+        </div>
         <div class="summary-grid mt-2">
           <div class="summary-card">
             <div class="summary-label">Average score</div>
@@ -452,10 +659,15 @@
       </section>
 
       <section class="glass section mb-3">
-        <h2 class="section-title">Comparison</h2>
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Comparison</h2>
+            <p class="section-subtitle">Cross-segment snapshot for the selected compare mode.</p>
+          </div>
+        </div>
         <div class="table-shell mt-2">
           <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
+            <table class="table table-sm align-middle mb-0 insights-table">
               <thead>
                 <tr>
                   <th>Segment</th>
@@ -468,7 +680,7 @@
               <tbody>
                 <% if (!comparisonRowsValue.length || compareValue === 'none') { %>
                   <tr>
-                    <td colspan="5" class="text-muted">Select compare mode to see cross-segment metrics.</td>
+                    <td colspan="5" class="empty-state">Select compare mode to see cross-segment metrics.</td>
                   </tr>
                 <% } %>
                 <% comparisonRowsValue.forEach((row) => { %>
@@ -489,10 +701,15 @@
       <section class="row g-3 mb-3">
         <div class="col-12 col-xl-7">
           <article class="glass section h-100">
-            <h2 class="section-title">Ranking</h2>
+            <div class="section-head">
+              <div>
+                <h2 class="section-title">Ranking</h2>
+                <p class="section-subtitle">Top students inside the current scope, sorted by final score.</p>
+              </div>
+            </div>
             <div class="table-shell mt-2">
               <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
+                <table class="table table-sm align-middle mb-0 insights-table">
                   <thead>
                     <tr>
                       <th>#</th>
@@ -505,7 +722,7 @@
                   <tbody>
                     <% if (!(rankingTop || []).length) { %>
                       <tr>
-                        <td colspan="5" class="text-muted">No ranking data in selected scope.</td>
+                        <td colspan="5" class="empty-state">No ranking data in selected scope.</td>
                       </tr>
                     <% } %>
                     <% (rankingTop || []).forEach((row) => { %>
@@ -525,11 +742,16 @@
         </div>
 
         <div class="col-12 col-xl-5">
-          <article class="glass section h-100">
-            <h2 class="section-title">Subject mix</h2>
+          <article class="glass section">
+            <div class="section-head">
+              <div>
+                <h2 class="section-title">Subject mix</h2>
+                <p class="section-subtitle">Subject-level distribution for the selected course or aggregate scope.</p>
+              </div>
+            </div>
             <div class="table-shell mt-2">
               <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
+                <table class="table table-sm align-middle mb-0 insights-table">
                   <thead>
                     <tr>
                       <th>Subject</th>
@@ -541,7 +763,7 @@
                   <tbody>
                     <% if (!(courseSubjectSummaries || []).length) { %>
                       <tr>
-                        <td colspan="4" class="text-muted">No subject summaries.</td>
+                        <td colspan="4" class="empty-state">No subject summaries.</td>
                       </tr>
                     <% } %>
                     <% (courseSubjectSummaries || []).forEach((item) => { %>
@@ -563,10 +785,15 @@
       <section class="row g-3">
         <div class="col-12 col-xl-6">
           <article class="glass section h-100">
-            <h2 class="section-title">Grades trend</h2>
+            <div class="section-head">
+              <div>
+                <h2 class="section-title">Grades trend</h2>
+                <p class="section-subtitle">Average grade change across the selected period buckets.</p>
+              </div>
+            </div>
             <div class="trend-grid mt-2">
               <% if (!gradeTrend.length) { %>
-                <div class="text-muted">No grade trend data for selected filters.</div>
+                <div class="empty-state">No grade trend data for selected filters.</div>
               <% } %>
               <% gradeTrend.forEach((item) => { %>
                 <% const value = Number(item.avg_score_percent || 0); %>
@@ -583,10 +810,15 @@
         </div>
         <div class="col-12 col-xl-6">
           <article class="glass section h-100">
-            <h2 class="section-title">Attendance trend</h2>
+            <div class="section-head">
+              <div>
+                <h2 class="section-title">Attendance trend</h2>
+                <p class="section-subtitle">Absent-share drift across the same buckets used for grades.</p>
+              </div>
+            </div>
             <div class="trend-grid mt-2">
               <% if (!attendanceTrend.length) { %>
-                <div class="text-muted">No attendance trend data for selected filters.</div>
+                <div class="empty-state">No attendance trend data for selected filters.</div>
               <% } %>
               <% attendanceTrend.forEach((item) => { %>
                 <% const total = Number(item.total_count || 0); %>

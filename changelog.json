@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.13",
+      "date": "2026-03-05",
+      "items": [
+        "style(journal-insights-hero): rebuilt the `Journal insights` hero into a two-column glass header with live KPI tiles so the page opens with a stronger summary instead of a flat text block",
+        "style(journal-insights-tables): replaced the default bright Bootstrap tables with themed glass tables, softer headers, striped body rows, and consistent empty states across comparison, ranking, and subject mix",
+        "fix(journal-insights-copy): normalized the page encoding/copy and replaced the broken subtitle and selector separators so the screen no longer shows garbled text in the hero and filter dropdowns"
+      ]
+    },
+    {
       "version": "1.1.12",
       "date": "2026-03-05",
       "items": [
