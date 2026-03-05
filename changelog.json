@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.00",
+      "date": "2026-03-05",
+      "items": [
+        "fix(global-bg-diagonal-follow): disabled pointer parallax for large morph blobs on all global-layout pages so distant circular shapes no longer chase the cursor diagonally",
+        "tune(global-bg-motion): kept ambient drift and trail behavior while limiting pointer reaction to non-blob decorative layers for cleaner visual focus"
+      ]
+    },
+    {
       "version": "1.0.99",
       "date": "2026-03-05",
       "items": [
