@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.91",
+      "date": "2026-03-05",
+      "items": [
+        "feat(global-vision-bg): upgraded shared `dynamic-bg` to vision-style ambient engine with layered gradient, dual morphing SVG blobs, noise, edge dot-patterns, and subtle mouse highlight",
+        "feat(global-vision-motion): added single-RAF morph interpolation (`primary/secondary` blob shape sets) with smoothstep easing plus depth-based parallax and coarse-pointer auto-drift",
+        "refactor(page-bg-unification): switched `login.ejs` and `schedule.ejs` from dedicated `login-bg/schedule-bg` assets to shared `dynamic-bg` partial/CSS/JS so visual language matches across site",
+        "ux(theme-sync-bg): added dynamic background theme sync via body class observation to keep light/dark morph palette consistent during runtime theme toggles"
+      ]
+    },
+    {
       "version": "1.0.90",
       "date": "2026-03-05",
       "items": [
