@@ -180,6 +180,7 @@ body.studerria-bg-low-power .studerria-morph-secondary .studerria-bg-blob {
 }
 
 .studerria-cursor-glow {
+  display: none;
   top: 50%;
   left: 50%;
   width: min(46vw, 780px);

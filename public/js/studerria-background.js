@@ -251,8 +251,10 @@
     }
 
     function applyCursorGlow() {
-      if (!cursorGlow || isAuthPage) return;
-      cursorGlow.style.transform = `translate3d(${state.currentX.toFixed(2)}px, ${state.currentY.toFixed(2)}px, 0) translate3d(-50%, -50%, 0)`;
+      if (!cursorGlow) return;
+      cursorGlow.style.left = `${state.currentX.toFixed(2)}px`;
+      cursorGlow.style.top = `${state.currentY.toFixed(2)}px`;
+      cursorGlow.style.transform = 'translate3d(-50%, -50%, 0)';
     }
 
     function applyParallax() {

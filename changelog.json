@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.02",
+      "date": "2026-03-05",
+      "items": [
+        "fix(global-cursor-bloom): removed the global `studerria-cursor-glow` layer from shared background markup and disabled its CSS so the old white semi-transparent mouse-follow bloom no longer renders",
+        "fix(glow-positioning): corrected runtime glow positioning logic to use absolute `left/top` anchoring instead of viewport-center offset math, preventing displaced right-bottom cursor glow if the layer is ever reintroduced"
+      ]
+    },
+    {
       "version": "1.1.01",
       "date": "2026-03-05",
       "items": [
