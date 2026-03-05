@@ -4,6 +4,7 @@ body.studerria-theme {
   font-family: "SF Pro Display", "Avenir Next", "Segoe UI", "Inter", sans-serif;
   color: var(--studerria-text-primary);
   --studerria-shell-max-width: 1560px;
+  --studerria-shell-gutter: 64px;
   --studerria-text-primary: #f8fafc;
   --studerria-text-muted: rgba(226, 232, 240, 0.78);
   --studerria-panel-border: rgba(148, 163, 184, 0.24);
@@ -48,7 +49,7 @@ body.theme-light.studerria-theme {
   position: sticky;
   top: 16px;
   z-index: 12;
-  width: min(var(--studerria-shell-max-width), calc(100vw - 48px));
+  width: min(var(--studerria-shell-max-width), calc(100vw - var(--studerria-shell-gutter)));
   margin: 16px auto 0;
   padding: 12px 14px;
   display: flex;
@@ -275,7 +276,7 @@ body.theme-light.studerria-theme {
 
 @media (min-width: 1400px) {
   .studerria-theme .container:not(.container-fluid) {
-    max-width: min(var(--studerria-shell-max-width), calc(100vw - 48px));
+    max-width: min(var(--studerria-shell-max-width), calc(100vw - var(--studerria-shell-gutter)));
   }
 }
 
@@ -717,7 +718,7 @@ body.page-profile .auth-card .form-select:focus {
   }
 
   .studerria-navbar {
-    width: calc(100vw - 24px);
+    width: calc(100vw - 32px);
     border-radius: 18px;
     flex-wrap: wrap;
     justify-content: center;
