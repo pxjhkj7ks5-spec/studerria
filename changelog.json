@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.10",
+      "date": "2026-03-05",
+      "items": [
+        "style(admin-topbar): rebuilt the admin topbar into a rounded liquid-glass capsule with tighter spacing, better shell alignment, and more polished course/session/action grouping",
+        "style(admin-controls): refined admin topbar controls (`course chip`, `session status`, `preview/schedule/logout`) with softer glass backgrounds, stronger pill geometry, and improved light-theme surfaces",
+        "style(shared-toggle-roundness): restored circular geometry for shared `theme-toggle`, drawer, and mobile action buttons so toolbar controls no longer feel squared off"
+      ]
+    },
+    {
       "version": "1.1.09",
       "date": "2026-03-05",
       "items": [

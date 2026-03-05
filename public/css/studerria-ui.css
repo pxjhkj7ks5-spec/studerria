@@ -178,7 +178,7 @@ body.theme-light.studerria-theme {
 .studerria-theme .theme-toggle-min,
 .studerria-theme .mobile-menu-btn,
 .studerria-theme .drawer-menu-btn {
-  border-radius: 14px;
+  border-radius: 999px;
   transition: transform 140ms ease, box-shadow 170ms ease, filter 170ms ease;
 }
 
@@ -201,6 +201,17 @@ body.theme-light.studerria-theme {
   box-shadow: 0 12px 28px rgba(2, 6, 23, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   -webkit-backdrop-filter: blur(14px) saturate(1.08);
   backdrop-filter: blur(14px) saturate(1.08);
+}
+
+.studerria-theme .theme-toggle-min,
+.studerria-theme .mobile-menu-btn,
+.studerria-theme .drawer-menu-btn {
+  min-width: 42px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  flex: 0 0 42px;
+  justify-content: center;
 }
 
 .studerria-theme .btn-primary,
