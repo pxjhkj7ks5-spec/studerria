@@ -11,133 +11,95 @@
     return;
   }
 
-  const symbols = ['→', '↗', '↘', '0', '×'];
   const shapeWraps = Array.from(bgRoot.querySelectorAll('.bg-shape-wrap'));
 
   const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
 
+  const BRUSH_PATTERN = [
+    { symbol: 'o', variant: 'center', radius: 0, angleOffset: 0, ttl: 3000, scale: 0.98, opacity: 0.7 },
+    { symbol: '>', variant: 'mid', radius: 8, angleOffset: -0.72, ttl: 2300, scale: 0.88, opacity: 0.58 },
+    { symbol: '>', variant: 'mid', radius: 8, angleOffset: 0.72, ttl: 2300, scale: 0.88, opacity: 0.58 },
+    { symbol: '_', variant: 'outer', radius: 14, angleOffset: -1.3, ttl: 1600, scale: 0.82, opacity: 0.46 },
+    { symbol: '_', variant: 'outer', radius: 14, angleOffset: 1.3, ttl: 1600, scale: 0.82, opacity: 0.46 }
+  ];
+
+  const MAX_TRAIL_PARTICLES = 220;
+  const STAMP_INTERVAL_MS = 34;
+
   class TrailParticle {
-    constructor(host, mode, symbolsPool) {
-      this.mode = mode;
-      this.symbolsPool = symbolsPool;
+    constructor(host) {
       this.el = document.createElement('span');
-      this.el.className = `trail-char ${mode}`;
-      this.assignSymbol();
+      this.el.className = 'trail-char';
       host.appendChild(this.el);
 
-      this.x = 0;
-      this.y = 0;
-      this.targetX = 0;
-      this.targetY = 0;
-      this.opacity = 0;
-      this.targetOpacity = 0;
-      this.scale = 0.8;
-      this.targetScale = 0.8;
-      this.rotation = 0;
-      this.targetRotation = 0;
-      this.active = mode === 'ring';
+      this.active = false;
       this.originX = 0;
       this.originY = 0;
-      this.vx = 0;
-      this.vy = 0;
+      this.driftX = 0;
+      this.driftY = 0;
+      this.rotation = 0;
       this.spin = 0;
-      this.startAt = 0;
-      this.duration = 0;
-      this.nextGlyphAt = 0;
-      this.homeAngle = 0;
-      this.homeRadius = 0;
+      this.birth = 0;
+      this.ttl = 0;
+      this.baseScale = 1;
+      this.baseOpacity = 0.6;
     }
 
-    assignSymbol() {
-      const glyph = this.symbolsPool[Math.floor(Math.random() * this.symbolsPool.length)] || '0';
-      this.el.textContent = glyph;
-    }
-
-    setTarget(x, y, opacity, scale, rotation) {
-      this.targetX = x;
-      this.targetY = y;
-      this.targetOpacity = opacity;
-      this.targetScale = scale;
-      this.targetRotation = rotation;
-    }
-
-    spawn(x, y, now) {
-      this.assignSymbol();
+    spawn(config) {
       this.active = true;
-      this.originX = x;
-      this.originY = y;
-      this.vx = (Math.random() - 0.5) * 10;
-      this.vy = (Math.random() - 0.5) * 10;
-      this.spin = (Math.random() - 0.5) * 40;
-      this.rotation = Math.random() * 360;
-      this.startAt = now;
-      this.duration = 460 + Math.random() * 260;
-      this.scale = 0.4;
-      this.opacity = 0;
+      this.el.className = `trail-char ${config.variant}`;
+      this.el.textContent = config.symbol;
+
+      this.originX = config.x;
+      this.originY = config.y;
+      this.driftX = config.driftX;
+      this.driftY = config.driftY;
+      this.rotation = config.rotation;
+      this.spin = config.spin;
+      this.birth = config.now;
+      this.ttl = config.ttl;
+      this.baseScale = config.scale;
+      this.baseOpacity = config.opacity;
+      this.el.style.opacity = '0';
     }
 
     hide() {
       this.active = false;
-      this.opacity = 0;
-      this.targetOpacity = 0;
       this.el.style.opacity = '0';
     }
 
     update(now) {
-      if (this.mode === 'ring') {
-        this.x += (this.targetX - this.x) * 0.11;
-        this.y += (this.targetY - this.y) * 0.11;
-        this.opacity += (this.targetOpacity - this.opacity) * 0.1;
-        this.scale += (this.targetScale - this.scale) * 0.12;
-        this.rotation += (this.targetRotation - this.rotation) * 0.08;
-        this.apply();
-        return;
-      }
-
       if (!this.active) {
-        this.el.style.opacity = '0';
         return;
       }
 
-      const progress = (now - this.startAt) / this.duration;
+      const life = now - this.birth;
+      const progress = life / this.ttl;
       if (progress >= 1) {
         this.hide();
         return;
       }
 
-      const fadeIn = Math.min(1, progress / 0.18);
-      const fadeOut = 1 - progress;
-      this.x = this.originX + this.vx * progress * 0.45;
-      this.y = this.originY + this.vy * progress * 0.45;
-      this.opacity = Math.max(0, fadeIn * fadeOut * 0.72);
-      this.scale = 0.55 + progress * 0.55;
-      this.rotation += this.spin * 0.01;
-      this.apply();
-    }
+      const fade = Math.pow(1 - progress, 1.26);
+      const opacity = this.baseOpacity * fade;
+      const x = this.originX + this.driftX * progress;
+      const y = this.originY + this.driftY * progress;
+      const scale = this.baseScale + progress * 0.08;
+      const rotation = this.rotation + this.spin * progress;
 
-    apply() {
-      this.el.style.opacity = this.opacity.toFixed(3);
-      this.el.style.transform = `translate3d(${this.x.toFixed(2)}px, ${this.y.toFixed(2)}px, 0) translate(-50%, -50%) scale(${this.scale.toFixed(3)}) rotate(${this.rotation.toFixed(2)}deg)`;
+      this.el.style.opacity = opacity.toFixed(3);
+      this.el.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) translate(-50%, -50%) scale(${scale.toFixed(3)}) rotate(${rotation.toFixed(2)}deg)`;
     }
   }
 
-  const ringCount = 10;
-  const burstCount = 8;
-
-  const ringParticles = Array.from({ length: ringCount }, () => new TrailParticle(trailHost, 'ring', symbols));
-  const burstParticles = Array.from({ length: burstCount }, () => new TrailParticle(trailHost, 'burst', symbols));
+  const trailParticles = Array.from({ length: MAX_TRAIL_PARTICLES }, () => new TrailParticle(trailHost));
+  let trailCursor = 0;
 
   const fallbackParticle = document.createElement('span');
   fallbackParticle.className = 'trail-char fallback';
-  fallbackParticle.textContent = '0';
+  fallbackParticle.textContent = 'o';
   trailHost.appendChild(fallbackParticle);
-
-  ringParticles.forEach((particle, index) => {
-    particle.homeAngle = (Math.PI * 2 * index) / ringCount;
-    particle.homeRadius = 70 + (index % 3) * 12;
-    particle.nextGlyphAt = performance.now() + 900 + index * 80;
-  });
 
   const shapeStates = shapeWraps.map((el) => ({
     el,
@@ -155,15 +117,13 @@
 
   let pointerX = centerX;
   let pointerY = centerY;
-  let anchorX = centerX;
-  let anchorY = centerY;
   let smoothX = centerX;
   let smoothY = centerY;
+  let lastDirection = 0;
 
   let pointerInside = false;
   let lastMoveAt = 0;
-  let lastBurstAt = 0;
-  let burstCursor = 0;
+  let lastStampAt = 0;
 
   let stableZone = '';
   let stableZoneSince = 0;
@@ -210,8 +170,6 @@
     if (!pointerInside) {
       pointerX = centerX;
       pointerY = centerY;
-      anchorX = centerX;
-      anchorY = centerY;
     }
   }
 
@@ -263,6 +221,12 @@
     return `${row}:${column}`;
   }
 
+  function clearTrailParticles() {
+    trailParticles.forEach((particle) => {
+      particle.hide();
+    });
+  }
+
   function updateMotionMode() {
     isReducedMotion = reducedMotionQuery.matches;
     isCoarsePointer = coarsePointerQuery.matches;
@@ -274,21 +238,13 @@
       pointerInside = false;
       pointerX = centerX;
       pointerY = centerY;
-      anchorX = centerX;
-      anchorY = centerY;
       smoothX = centerX;
       smoothY = centerY;
       clearFocus();
+      clearTrailParticles();
 
-      ringParticles.forEach((particle) => {
-        particle.hide();
-      });
-      burstParticles.forEach((particle) => {
-        particle.hide();
-      });
-
-      fallbackParticle.style.opacity = '0.28';
-      fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.86)`;
+      fallbackParticle.style.opacity = '0.3';
+      fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.88)`;
       return;
     }
 
@@ -296,15 +252,36 @@
     lastMoveAt = performance.now();
   }
 
-  function spawnBurst(now, x, y) {
-    if (now - lastBurstAt < 56) {
-      return;
+  function spawnBrushStamp(now, x, y, movementX, movementY) {
+    const magnitude = Math.hypot(movementX, movementY);
+    if (magnitude > 0.2) {
+      lastDirection = Math.atan2(movementY, movementX);
     }
 
-    lastBurstAt = now;
-    const particle = burstParticles[burstCursor];
-    burstCursor = (burstCursor + 1) % burstParticles.length;
-    particle.spawn(x, y, now);
+    BRUSH_PATTERN.forEach((node) => {
+      const particle = trailParticles[trailCursor];
+      trailCursor = (trailCursor + 1) % trailParticles.length;
+
+      const angle = lastDirection + node.angleOffset;
+      const jitter = (Math.random() - 0.5) * 1.2;
+      const px = x + Math.cos(angle) * node.radius + jitter;
+      const py = y + Math.sin(angle) * node.radius + jitter;
+
+      particle.spawn({
+        variant: node.variant,
+        symbol: node.symbol,
+        x: px,
+        y: py,
+        driftX: Math.cos(lastDirection) * (1.6 + node.radius * 0.05),
+        driftY: Math.sin(lastDirection) * (1.6 + node.radius * 0.05),
+        rotation: (Math.random() - 0.5) * 8,
+        spin: (Math.random() - 0.5) * 16,
+        ttl: node.ttl,
+        scale: node.scale,
+        opacity: node.opacity,
+        now
+      });
+    });
   }
 
   function onPointerMove(event) {
@@ -315,12 +292,16 @@
     pointerInside = true;
     pointerX = event.clientX;
     pointerY = event.clientY;
-    anchorX = event.clientX;
-    anchorY = event.clientY;
 
     const now = performance.now();
     lastMoveAt = now;
-    spawnBurst(now, event.clientX, event.clientY);
+
+    if (now - lastStampAt >= STAMP_INTERVAL_MS) {
+      const movementX = Number.isFinite(event.movementX) ? event.movementX : 0;
+      const movementY = Number.isFinite(event.movementY) ? event.movementY : 0;
+      spawnBrushStamp(now, event.clientX, event.clientY, movementX, movementY);
+      lastStampAt = now;
+    }
 
     const zone = pointerZone(event.clientX, event.clientY);
     if (zone !== stableZone) {
@@ -348,7 +329,7 @@
       resizeTimer = null;
       updateViewportMetrics();
       if (!interactive) {
-        fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.86)`;
+        fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.88)`;
       }
     }, 140);
   }
@@ -369,47 +350,8 @@
     });
   }
 
-  function updateRingTargets(now) {
-    const idleMs = now - lastMoveAt;
-    const holdMs = 2300;
-    const fadeMs = 1800;
-    const lifeMs = holdMs + fadeMs;
-    const activeTrail = idleMs < lifeMs;
-    const fadeFactor = idleMs <= holdMs
-      ? 1
-      : Math.max(0, 1 - ((idleMs - holdMs) / fadeMs));
-
-    ringParticles.forEach((particle, index) => {
-      if (now >= particle.nextGlyphAt) {
-        particle.assignSymbol();
-        particle.nextGlyphAt = now + 850 + Math.random() * 700;
-      }
-
-      const phase = now * 0.0011 + index * 0.62;
-      let targetX;
-      let targetY;
-      let opacity;
-      let scale;
-
-      if (activeTrail) {
-        const motionBoost = pointerInside && idleMs < 360 ? 1 : 0.82;
-        const radius = (50 + Math.sin(now * 0.0022 + index * 0.7) * 12) * motionBoost;
-        targetX = anchorX + Math.cos(phase) * radius;
-        targetY = anchorY + Math.sin(phase * 1.12) * radius * 0.74;
-        opacity = (0.36 + Math.sin(now * 0.0028 + index) * 0.08) * fadeFactor;
-        scale = 0.82 + Math.cos(now * 0.0022 + index) * 0.18;
-      } else {
-        targetX = centerX;
-        targetY = centerY;
-        opacity = 0;
-        scale = 0.68;
-      }
-
-      particle.setTarget(targetX, targetY, Math.max(0, opacity), scale, phase * 80);
-      particle.update(now);
-    });
-
-    burstParticles.forEach((particle) => {
+  function updateTrail(now) {
+    trailParticles.forEach((particle) => {
       particle.update(now);
     });
   }
@@ -430,11 +372,11 @@
         clearFocus();
       }
 
-      updateRingTargets(now);
+      updateTrail(now);
     } else {
       smoothX = centerX;
       smoothY = centerY;
-      fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.86)`;
+      fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.88)`;
     }
 
     updateShapeParallax();

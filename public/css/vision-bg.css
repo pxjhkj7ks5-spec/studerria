@@ -199,11 +199,11 @@ body.page-vision {
   position: absolute;
   left: 0;
   top: 0;
-  font-size: clamp(12px, 1.1vw, 16px);
-  font-weight: 620;
+  font-size: clamp(9px, 0.9vw, 12px);
+  font-weight: 640;
   line-height: 1;
   color: var(--trail-char-color);
-  text-shadow: 0 0 14px var(--trail-char-shadow);
+  text-shadow: 0 0 10px var(--trail-char-shadow);
   opacity: 0;
   transform: translate3d(-50%, -50%, 0) scale(0.6);
   transform-origin: center;
@@ -213,7 +213,15 @@ body.page-vision {
   mix-blend-mode: var(--trail-blend-mode);
 }
 
-.trail-char.burst {
+.trail-char.center {
+  font-weight: 700;
+}
+
+.trail-char.mid {
+  letter-spacing: 0.01em;
+}
+
+.trail-char.outer {
   font-weight: 700;
 }
 
@@ -798,7 +806,7 @@ body.vision-reduced-motion .bg-shape {
   }
 
   .trail-char {
-    font-size: 12px;
+    font-size: 10px;
   }
 }
 

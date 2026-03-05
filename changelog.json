@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.85",
+      "date": "2026-03-05",
+      "items": [
+        "feat(vision-trail-brush): replaced orbit trail with brush-like stamps that draw near cursor using ordered symbols `o > > _ _` (center + 2 middle + 2 outer)",
+        "motion(vision-trail-fade): implemented layered lifetime so outer symbols fade first, then middle, then center, creating progressive fade toward cursor after pointer stop",
+        "style(vision-trail-size): reduced trail glyph size and glow for cleaner micro-detail while preserving visibility on both themes",
+        "refactor(vision-trail-engine): rewrote trail runtime to pooled stamp particles with movement-direction offsets and light drift, while keeping existing background parallax/focus logic"
+      ]
+    },
+    {
       "version": "1.0.84",
       "date": "2026-03-05",
       "items": [
