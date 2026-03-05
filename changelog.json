@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.09",
+      "date": "2026-03-05",
+      "items": [
+        "tune(modal-overlay-feel): removed the heavy backdrop blur from shared modals and reduced overlay opacity so the underlying page stays visible again while dialogs are open",
+        "tune(modal-scroll-behavior): restored page scrolling under `modal-open` so long pages can still reveal lower content behind the translucent modal layer without breaking dialog interaction"
+      ]
+    },
+    {
       "version": "1.1.08",
       "date": "2026-03-05",
       "items": [
