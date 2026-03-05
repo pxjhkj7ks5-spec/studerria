@@ -5,6 +5,35 @@
   const selectedAdmissionValue = Number(selectedAdmissionId || 0);
   const selectedProgram = (programs || []).find((item) => Number(item.id) === selectedProgramValue) || null;
   const selectedAdmission = (admissions || []).find((item) => Number(item.id) === selectedAdmissionValue) || null;
+  const copyAdmissions = Array.isArray(admissionCopyOptions) ? admissionCopyOptions : [];
+  const courseChecklistPropsJson = JSON.stringify({
+    targetSelector: '#pathwayCourseMappingForm',
+    checkboxSelector: 'input[type="checkbox"][name^="course_"]',
+    rowSelector: '[data-checklist-row]',
+    rowTextSelector: '[data-checklist-text]',
+    searchEnabled: true,
+    searchPlaceholder: 'Find course',
+    labels: {
+      all: 'All',
+      none: 'None',
+      invert: 'Invert',
+      selected: 'Selected',
+    },
+  }).replace(/'/g, '&#39;');
+  const subjectChecklistPropsJson = JSON.stringify({
+    targetSelector: '#pathwaySubjectVisibilityForm',
+    checkboxSelector: 'input[type="checkbox"][name^="subject_"]',
+    rowSelector: '[data-checklist-row]',
+    rowTextSelector: '[data-checklist-text]',
+    searchEnabled: true,
+    searchPlaceholder: 'Find subject',
+    labels: {
+      all: 'All visible',
+      none: 'Hide all',
+      invert: 'Invert',
+      selected: 'Selected',
+    },
+  }).replace(/'/g, '&#39;');
 
   const buildPathwaysUrl = (overrides) => {
     const params = new URLSearchParams();
@@ -227,7 +256,7 @@
       }
     </style>
   </head>
-  <body class="theme-dark">
+  <body class="theme-dark page-admin-pathways page-journal">
     <%- include('partials/topbar', {
       role,
       username,
@@ -460,13 +489,24 @@
             <h2 class="section-title">Course mapping</h2>
             <p class="section-subtitle"> урси, дл€ €ких admission доступний на етап≥ реЇстрац≥њ.</p>
             <% if (selectedAdmissionValue > 0) { %>
-              <form method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/courses/save">
+              <form id="pathwayCourseMappingForm" method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/courses/save">
                 <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
                 <input type="hidden" name="track" value="<%= activeTrack %>" />
                 <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                <div class="d-grid gap-2 mb-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                  <span class="muted">Bulk actions</span>
+                  <span
+                    data-react-island="checklist-toolbar"
+                    data-island-props='<%- courseChecklistPropsJson %>'
+                  ></span>
+                </div>
+                <div id="pathwayCourseMappingList" class="d-grid gap-2 mb-3">
                   <% (courseMappings || []).forEach((item) => { %>
-                    <label class="subject-row">
+                    <label
+                      class="subject-row"
+                      data-checklist-row
+                      data-checklist-text="<%= `${item.course_name} ${item.is_teacher_course ? 'teacher' : 'regular'}` %>"
+                    >
                       <span>
                         <span class="row-label"><%= item.course_name %></span>
                         <span class="muted d-block"><%= item.is_teacher_course ? 'Teacher course' : 'Regular course' %></span>
@@ -475,8 +515,34 @@
                     </label>
                   <% }) %>
                 </div>
-                <button class="btn btn-primary btn-pill" type="submit">Save mapping</button>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <button class="btn btn-primary btn-pill" type="submit">Save mapping</button>
+                  <span class="muted">Visible: <%= Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) %>/<%= Number(mappingSummary && mappingSummary.total ? mappingSummary.total : 0) %></span>
+                </div>
               </form>
+              <% if ((copyAdmissions || []).length) { %>
+                <form class="soft-panel mt-3" method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/courses/copy">
+                  <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                  <input type="hidden" name="track" value="<%= activeTrack %>" />
+                  <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                  <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-8">
+                      <label class="form-label small">Copy mapping from admission</label>
+                      <select class="form-select compact-select" name="source_admission_id" required>
+                        <option value="">Select source admission</option>
+                        <% (copyAdmissions || []).forEach((option) => { %>
+                          <option value="<%= option.id %>">
+                            <%= option.admission_year %><%= option.label ? (' Х ' + option.label) : '' %> Ј <%= Number(option.course_visible_count || 0) %>/<%= Number(option.course_total_count || 0) %> courses
+                          </option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-4 d-grid">
+                      <button class="btn btn-soft btn-pill" type="submit">Copy mapping</button>
+                    </div>
+                  </div>
+                </form>
+              <% } %>
             <% } else { %>
               <div class="soft-panel muted">Select admission year first.</div>
             <% } %>
@@ -490,13 +556,24 @@
               <% if (hiddenSubjectCount > 0) { %>
                 <div class="muted mb-2">Globally hidden in course scope: <%= hiddenSubjectCount %></div>
               <% } %>
-              <form method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/subjects/save">
+              <form id="pathwaySubjectVisibilityForm" method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/subjects/save">
                 <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
                 <input type="hidden" name="track" value="<%= activeTrack %>" />
                 <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                <div class="subject-list d-grid gap-2 mb-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                  <span class="muted">Bulk actions</span>
+                  <span
+                    data-react-island="checklist-toolbar"
+                    data-island-props='<%- subjectChecklistPropsJson %>'
+                  ></span>
+                </div>
+                <div id="pathwaySubjectVisibilityList" class="subject-list d-grid gap-2 mb-3">
                   <% (subjectVisibilityItems || []).forEach((subject) => { %>
-                    <label class="subject-row">
+                    <label
+                      class="subject-row"
+                      data-checklist-row
+                      data-checklist-text="<%= `${subject.name} groups ${Number(subject.group_count || 1)}` %>"
+                    >
                       <span>
                         <span class="row-label"><%= subject.name %></span>
                         <span class="muted d-block">Groups: <%= Number(subject.group_count || 1) %></span>
@@ -514,8 +591,34 @@
                     <div class="soft-panel muted">No visible subjects in selected course.</div>
                   <% } %>
                 </div>
-                <button class="btn btn-primary btn-pill" type="submit">Save visibility</button>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <button class="btn btn-primary btn-pill" type="submit">Save visibility</button>
+                  <span class="muted">Visible: <%= Number(visibilitySummary && visibilitySummary.visible ? visibilitySummary.visible : 0) %>/<%= Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) %></span>
+                </div>
               </form>
+              <% if ((copyAdmissions || []).length) { %>
+                <form class="soft-panel mt-3" method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/subjects/copy">
+                  <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                  <input type="hidden" name="track" value="<%= activeTrack %>" />
+                  <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                  <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-8">
+                      <label class="form-label small">Copy visibility from admission</label>
+                      <select class="form-select compact-select" name="source_admission_id" required>
+                        <option value="">Select source admission</option>
+                        <% (copyAdmissions || []).forEach((option) => { %>
+                          <option value="<%= option.id %>">
+                            <%= option.admission_year %><%= option.label ? (' Х ' + option.label) : '' %> Ј <%= Number(option.subject_visible_count || 0) %>/<%= Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) %> visible
+                          </option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-4 d-grid">
+                      <button class="btn btn-soft btn-pill" type="submit">Copy visibility</button>
+                    </div>
+                  </div>
+                </form>
+              <% } %>
             <% } else { %>
               <div class="soft-panel muted">Select admission year first.</div>
             <% } %>

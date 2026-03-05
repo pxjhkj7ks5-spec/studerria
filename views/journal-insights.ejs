@@ -8,6 +8,16 @@
   const isAllCoursesScope = scopeValue === 'all-courses';
   const isCourseAggregateScope = scopeValue === 'course' || isAllCoursesScope || scopeValue === 'student-course';
   const scopeCourseCountValue = Number(scopeCourseCount || 0);
+  const periodPresetPropsJson = JSON.stringify({
+    formSelector: '#journalInsightsFiltersForm',
+    selectSelector: '#insightsPeriod',
+    options: (periodOptions || []).map((item) => ({
+      key: String(item.key || ''),
+      label: String(item.label || item.key || ''),
+    })),
+    active: periodValue,
+    submitOnPick: true,
+  }).replace(/'/g, '&#39;');
   const scopeLabelValue = scopeLabel || 'Scope';
   const gradeTrend = (trends && Array.isArray(trends.grade)) ? trends.grade : [];
   const attendanceTrend = (trends && Array.isArray(trends.attendance)) ? trends.attendance : [];
@@ -205,7 +215,7 @@
       }
     </style>
   </head>
-  <body class="theme-dark">
+  <body class="theme-dark page-journal-insights page-journal">
     <%- include('partials/topbar', { role, username, t, activePage: 'journal-insights', pageTitle: 'Journal insights', settings: settings }) %>
     <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'journal-insights', settings: settings }) %>
 
@@ -237,7 +247,7 @@
 
       <section class="glass section mb-3">
         <h2 class="section-title">Filters</h2>
-        <form method="GET" action="/journal/insights" class="row g-2 mt-1">
+        <form id="journalInsightsFiltersForm" method="GET" action="/journal/insights" class="row g-2 mt-1">
           <div class="col-12 col-md-3">
             <label class="form-label small" for="insightsCourse">Course</label>
             <select id="insightsCourse" class="form-select compact-select" name="course_id" <%= isAllCoursesScope ? 'disabled' : '' %>>
@@ -267,6 +277,13 @@
           </div>
           <div class="col-12 col-md-3 align-self-end d-grid">
             <button class="btn btn-primary" type="submit">Apply</button>
+          </div>
+
+          <div class="col-12">
+            <span
+              data-react-island="insights-period-preset"
+              data-island-props='<%- periodPresetPropsJson %>'
+            ></span>
           </div>
 
           <div class="col-12 col-md-4">

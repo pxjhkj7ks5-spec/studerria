@@ -932,6 +932,105 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
   text-underline-offset: 2px;
 }
 
+.island-toolbar-shell {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, rgba(255, 255, 255, 0.28));
+  background: color-mix(in srgb, var(--surface-soft) 86%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.island-toolbar-search {
+  min-width: min(220px, 62vw);
+  max-width: 100%;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 88%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 84%, transparent);
+  color: var(--ds-text0);
+}
+
+.island-toolbar-search:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--surface-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--focus-ring) 24%, transparent);
+}
+
+.island-toolbar-btn {
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 82%, transparent);
+  background: color-mix(in srgb, var(--surface-soft) 92%, transparent);
+  color: var(--ds-text1);
+  line-height: 1;
+}
+
+.island-toolbar-btn:disabled {
+  opacity: 0.48;
+}
+
+.island-toolbar-counter {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--surface-border));
+  background: color-mix(in srgb, var(--surface-elevated) 86%, rgba(125, 211, 252, 0.12));
+  color: var(--ds-text1);
+  font-size: var(--t-meta);
+  font-weight: var(--w-medium);
+}
+
+.insights-period-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.island-period-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
+  background: color-mix(in srgb, var(--surface-soft) 92%, transparent);
+  color: var(--ds-text1);
+  font-size: var(--t-meta);
+}
+
+.island-period-btn.is-active {
+  border-color: color-mix(in srgb, var(--accent) 46%, rgba(255, 255, 255, 0.22));
+  background: linear-gradient(
+    130deg,
+    color-mix(in srgb, var(--accent) 52%, rgba(59, 130, 246, 0.28)),
+    color-mix(in srgb, var(--accent-3) 48%, rgba(147, 197, 253, 0.22))
+  );
+  color: #fff;
+  box-shadow:
+    0 8px 18px color-mix(in srgb, var(--accent) 22%, rgba(2, 6, 23, 0.22)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+
+@media (max-width: 575.98px) {
+  .island-toolbar-shell {
+    width: 100%;
+  }
+
+  .island-toolbar-search {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+}
+
 .ambient-layer {
   --ambient-pointer-x: 50%;
   --ambient-pointer-y: 36%;

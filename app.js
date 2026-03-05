@@ -22799,6 +22799,9 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     const selectedProgramAdmissions = admissions.filter(
       (admission) => Number(admission.program_id) === Number(selectedProgramId)
     );
+    const selectedProgramAdmissionIds = selectedProgramAdmissions
+      .map((item) => Number(item.id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0);
 
     let selectedAdmissionId = parsePositiveIntStrict(req.query.admission_id);
     if (!selectedProgramAdmissions.some((item) => Number(item.id) === Number(selectedAdmissionId))) {
@@ -22873,6 +22876,74 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     const configurableSubjectVisibility = subjectVisibilityItems.filter((item) => item.base_visible);
     const hiddenSubjectCount = subjectVisibilityItems.length - configurableSubjectVisibility.length;
 
+    const courseMappingStatsByAdmission = new Map();
+    if (selectedProgramAdmissionIds.length) {
+      const mappingStatRows = await db.all(
+        `
+          SELECT
+            pac.admission_id,
+            COUNT(*) FILTER (WHERE pac.is_visible = true)::int AS visible_count,
+            COUNT(*)::int AS total_count
+          FROM program_admission_courses pac
+          WHERE pac.admission_id = ANY(?::int[])
+          GROUP BY pac.admission_id
+        `,
+        [selectedProgramAdmissionIds]
+      );
+      (mappingStatRows || []).forEach((row) => {
+        const admissionId = Number(row.admission_id || 0);
+        if (!Number.isInteger(admissionId) || admissionId < 1) return;
+        courseMappingStatsByAdmission.set(admissionId, {
+          visible_count: Number(row.visible_count || 0),
+          total_count: Number(row.total_count || 0),
+        });
+      });
+    }
+
+    const subjectVisibilityStatsByAdmission = new Map();
+    if (selectedProgramAdmissionIds.length && selectedCourseId) {
+      const subjectStatRows = await db.all(
+        `
+          SELECT
+            sva.admission_id,
+            COUNT(*) FILTER (WHERE sva.is_visible = true)::int AS visible_count,
+            COUNT(*)::int AS explicit_count
+          FROM subject_visibility_by_admission sva
+          JOIN subjects s ON s.id = sva.subject_id
+          WHERE sva.admission_id = ANY(?::int[])
+            AND s.course_id = ?
+            AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
+          GROUP BY sva.admission_id
+        `,
+        [selectedProgramAdmissionIds, selectedCourseId]
+      );
+      (subjectStatRows || []).forEach((row) => {
+        const admissionId = Number(row.admission_id || 0);
+        if (!Number.isInteger(admissionId) || admissionId < 1) return;
+        subjectVisibilityStatsByAdmission.set(admissionId, {
+          visible_count: Number(row.visible_count || 0),
+          explicit_count: Number(row.explicit_count || 0),
+        });
+      });
+    }
+
+    const admissionCopyOptions = selectedProgramAdmissions
+      .filter((admission) => Number(admission.id || 0) !== Number(selectedAdmissionId || 0))
+      .map((admission) => {
+        const admissionId = Number(admission.id || 0);
+        const mappingStats = courseMappingStatsByAdmission.get(admissionId) || { visible_count: 0, total_count: 0 };
+        const subjectStats = subjectVisibilityStatsByAdmission.get(admissionId) || { visible_count: 0, explicit_count: 0 };
+        return {
+          id: admissionId,
+          admission_year: Number(admission.admission_year || 0),
+          label: sanitizeCompactText(admission.label || '', 120),
+          course_visible_count: Number(mappingStats.visible_count || 0),
+          course_total_count: Number(mappingStats.total_count || 0),
+          subject_visible_count: Number(subjectStats.visible_count || 0),
+          subject_explicit_count: Number(subjectStats.explicit_count || 0),
+        };
+      });
+
     const mappingSummary = {
       total: courseMappings.length,
       visible: courseMappings.filter((row) => row.is_visible).length,
@@ -22905,6 +22976,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       admissions,
       selectedProgramAdmissions,
       selectedAdmissionId,
+      admissionCopyOptions,
       courseMappings,
       mappingSummary,
       subjectVisibilityItems: configurableSubjectVisibility,
@@ -23203,6 +23275,97 @@ app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAc
   }
 });
 
+app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const admissionId = parsePositiveIntStrict(req.params.id);
+  const sourceAdmissionId = parsePositiveIntStrict(req.body.source_admission_id);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+
+  if (!admissionId || !sourceAdmissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: 'Select source and target admission years',
+    }));
+  }
+  if (admissionId === sourceAdmissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: 'Source and target admission years must be different',
+    }));
+  }
+
+  try {
+    const pair = await db.all(
+      `
+        SELECT id, program_id
+        FROM program_admissions
+        WHERE id = ANY(?::int[])
+      `,
+      [[admissionId, sourceAdmissionId]]
+    );
+    const targetRow = (pair || []).find((row) => Number(row.id || 0) === Number(admissionId)) || null;
+    const sourceRow = (pair || []).find((row) => Number(row.id || 0) === Number(sourceAdmissionId)) || null;
+    if (!targetRow || !sourceRow) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        error: 'Admission year not found',
+      }));
+    }
+    if (Number(targetRow.program_id || 0) !== Number(sourceRow.program_id || 0)) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        error: 'Source admission must belong to the same program',
+      }));
+    }
+
+    await db.run(
+      `
+        INSERT INTO program_admission_courses
+          (admission_id, course_id, is_visible, created_at, updated_at)
+        SELECT
+          ?,
+          c.id,
+          COALESCE(src.is_visible, false),
+          NOW(),
+          NOW()
+        FROM courses c
+        LEFT JOIN program_admission_courses src
+          ON src.course_id = c.id
+         AND src.admission_id = ?
+        ON CONFLICT (admission_id, course_id)
+        DO UPDATE SET
+          is_visible = EXCLUDED.is_visible,
+          updated_at = NOW()
+      `,
+      [admissionId, sourceAdmissionId]
+    );
+
+    invalidateRegistrationPathwaysCache();
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      ok: 'Course mapping copied',
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.courses.copy');
+  }
+});
+
 app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const admissionId = parsePositiveIntStrict(req.params.id);
   const selectedCourseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
@@ -23264,6 +23427,120 @@ app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionA
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.subjects.save');
+  }
+});
+
+app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const admissionId = parsePositiveIntStrict(req.params.id);
+  const sourceAdmissionId = parsePositiveIntStrict(req.body.source_admission_id);
+  const selectedCourseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+
+  if (!admissionId || !sourceAdmissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId: selectedCourseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: 'Select source and target admission years',
+    }));
+  }
+  if (admissionId === sourceAdmissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId: selectedCourseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: 'Source and target admission years must be different',
+    }));
+  }
+  if (!selectedCourseId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: 'Invalid course',
+    }));
+  }
+
+  try {
+    const pair = await db.all(
+      `
+        SELECT id, program_id
+        FROM program_admissions
+        WHERE id = ANY(?::int[])
+      `,
+      [[admissionId, sourceAdmissionId]]
+    );
+    const targetRow = (pair || []).find((row) => Number(row.id || 0) === Number(admissionId)) || null;
+    const sourceRow = (pair || []).find((row) => Number(row.id || 0) === Number(sourceAdmissionId)) || null;
+    if (!targetRow || !sourceRow) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId: selectedCourseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        error: 'Admission year not found',
+      }));
+    }
+    if (Number(targetRow.program_id || 0) !== Number(sourceRow.program_id || 0)) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId: selectedCourseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        error: 'Source admission must belong to the same program',
+      }));
+    }
+
+    await db.run(
+      `
+        DELETE FROM subject_visibility_by_admission
+        WHERE admission_id = ?
+          AND subject_id IN (
+            SELECT id
+            FROM subjects
+            WHERE course_id = ?
+          )
+      `,
+      [admissionId, selectedCourseId]
+    );
+
+    await db.run(
+      `
+        INSERT INTO subject_visibility_by_admission
+          (admission_id, subject_id, is_visible, created_at, updated_at)
+        SELECT
+          ?,
+          sva.subject_id,
+          sva.is_visible,
+          NOW(),
+          NOW()
+        FROM subject_visibility_by_admission sva
+        JOIN subjects s ON s.id = sva.subject_id
+        WHERE sva.admission_id = ?
+          AND s.course_id = ?
+          AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
+        ON CONFLICT (admission_id, subject_id)
+        DO UPDATE SET
+          is_visible = EXCLUDED.is_visible,
+          updated_at = NOW()
+      `,
+      [admissionId, sourceAdmissionId, selectedCourseId]
+    );
+
+    invalidateRegistrationPathwaysCache();
+    invalidateSubjectsCache(selectedCourseId);
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId: selectedCourseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      ok: 'Subject visibility copied',
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.subjects.copy');
   }
 });
 
