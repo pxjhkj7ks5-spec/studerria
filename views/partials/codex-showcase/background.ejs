@@ -1,0 +1,71 @@
+﻿<div id="showcaseBg" class="showcase-bg" aria-hidden="true">
+  <svg class="organic-canvas" viewBox="0 0 1600 950" preserveAspectRatio="xMidYMid slice" role="presentation">
+    <defs>
+      <linearGradient id="showcaseMainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="var(--showcase-main-start)" />
+        <stop offset="100%" stop-color="var(--showcase-main-end)" />
+      </linearGradient>
+      <linearGradient id="showcaseSideGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="var(--showcase-side-start)" />
+        <stop offset="100%" stop-color="var(--showcase-side-end)" />
+      </linearGradient>
+      <linearGradient id="showcaseAccentGradient" x1="30%" y1="0%" x2="70%" y2="100%">
+        <stop offset="0%" stop-color="var(--showcase-accent-start)" />
+        <stop offset="100%" stop-color="var(--showcase-accent-end)" />
+      </linearGradient>
+      <filter id="showcaseSoftBlur" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="44" />
+      </filter>
+    </defs>
+
+    <g class="shape-layer shape-layer-main" data-depth="0.024">
+      <path
+        class="organic-shape"
+        d="M204.8,214.2C289.9,117.3,460.1,85.4,625.4,127.4C790.7,169.3,951.1,285.2,967.8,438.6C984.5,592,857.6,783,693.4,848.4C529.3,913.8,327.9,853.4,223,720.3C118,587.1,109.8,377.6,204.8,214.2Z"
+        transform="translate(280 80)"
+        fill="url(#showcaseMainGradient)"
+        filter="url(#showcaseSoftBlur)"
+      />
+    </g>
+
+    <g class="shape-layer shape-layer-side" data-depth="0.035">
+      <path
+        class="organic-shape"
+        d="M194.2,139.3C283.5,75.2,445.2,79.7,538.4,159.6C631.7,239.5,656.5,394.9,601.2,512.3C546,629.7,410.8,709.2,282.8,681.9C154.8,654.6,34.1,520.4,31.3,374.4C28.6,228.4,143.6,203.3,194.2,139.3Z"
+        transform="translate(980 170)"
+        fill="url(#showcaseSideGradient)"
+        filter="url(#showcaseSoftBlur)"
+      />
+    </g>
+
+    <g class="shape-layer shape-layer-accent" data-depth="0.018">
+      <path
+        class="organic-shape"
+        d="M156.6,97.7C239.2,62.9,375.8,74.9,438.6,158.3C501.5,241.7,490.6,396.7,414.9,481.1C339.2,565.6,198.8,579.4,107.9,506.5C17.1,433.6,-24.2,274,27.7,172.4C79.7,70.9,74,132.4,156.6,97.7Z"
+        transform="translate(112 470)"
+        fill="url(#showcaseAccentGradient)"
+        filter="url(#showcaseSoftBlur)"
+      />
+    </g>
+
+    <g class="shape-layer shape-layer-mini" data-depth="0.04">
+      <path
+        class="organic-shape"
+        d="M120.7,73.1C174.2,46.5,263.6,53.3,305.8,109.6C348,165.9,343,271.6,294.1,330C245.2,388.3,152.4,399.4,93.6,350.2C34.8,301,-20,191.6,14.7,119.8C49.5,48.1,67.2,99.7,120.7,73.1Z"
+        transform="translate(1230 560)"
+        fill="url(#showcaseAccentGradient)"
+        filter="url(#showcaseSoftBlur)"
+      />
+    </g>
+  </svg>
+
+  <div class="particle-layer" id="showcaseParticleLayer">
+    <% for (let i = 0; i < 12; i += 1) { %>
+      <span class="bg-particle" data-index="<%= i %>"></span>
+    <% } %>
+  </div>
+
+  <div class="noise-overlay"></div>
+  <div class="dot-pattern dot-left"></div>
+  <div class="dot-pattern dot-right"></div>
+</div>

@@ -6246,6 +6246,10 @@ app.get('/login', (req, res) => {
   res.render('login', { error: req.query.error === '1' });
 });
 
+app.get('/vision', (req, res) => {
+  res.render('studerria-codex');
+});
+
 app.get('/_health', (req, res) => {
   const dbStatus = initStatus === 'ok' ? 'ok' : (initStatus === 'error' ? 'fail' : 'starting');
   const sessionStatus = sessionHealthState.ok ? 'ok' : 'fail';

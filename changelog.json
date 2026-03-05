@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.81",
+      "date": "2026-03-05",
+      "items": [
+        "feat(vision-page): added new `/vision` page with Codex-inspired layout (header nav + sign-up CTA, hero copy, dual-action buttons, and right-side code diff module)",
+        "feat(vision-background): introduced dedicated layered SVG ambient background with organic gradient clouds, slow morph-like drift, grain texture, side dot-patterns, and mouse-reactive particle field",
+        "feat(vision-interaction): implemented pointer parallax, focus/defocus for nearest shape, particle follow-and-return behavior, and one-RAF animation loop with reduced-motion/coarse-pointer fallbacks",
+        "refactor(vision-partials): extracted reusable Studerria content partials for threads blocks (`schedule`, `profile`, `settings`) to simplify future content swaps without touching visual engine"
+      ]
+    },
+    {
       "version": "1.0.80",
       "date": "2026-03-05",
       "items": [
