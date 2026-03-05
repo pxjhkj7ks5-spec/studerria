@@ -5,9 +5,21 @@
   const selectedStudentValue = Number(selectedStudentId || 0);
   const periodValue = period || 'semester';
   const scopeValue = scopeType || 'subject';
+  const compareValue = compareMode || 'none';
+  const compareLabel = ((compareOptions || []).find((item) => item.key === compareValue) || { label: 'No compare' }).label;
+  const comparisonRowsValue = Array.isArray(comparisonRows) ? comparisonRows : [];
   const isAllCoursesScope = scopeValue === 'all-courses';
   const isCourseAggregateScope = scopeValue === 'course' || isAllCoursesScope || scopeValue === 'student-course';
   const scopeCourseCountValue = Number(scopeCourseCount || 0);
+  const exportQuery = new URLSearchParams();
+  if (selectedCourseValue) exportQuery.set('course_id', String(selectedCourseValue));
+  if (selectedSubjectValue) exportQuery.set('subject_id', String(selectedSubjectValue));
+  if (scopeValue) exportQuery.set('scope_type', scopeValue);
+  if (selectedGroupValue) exportQuery.set('group_number', String(selectedGroupValue));
+  if (selectedStudentValue) exportQuery.set('student_id', String(selectedStudentValue));
+  if (periodValue) exportQuery.set('period', periodValue);
+  if (compareValue) exportQuery.set('compare_mode', compareValue);
+  const exportCsvHref = `/journal/insights/export.csv${exportQuery.toString() ? `?${exportQuery.toString()}` : ''}`;
   const periodPresetPropsJson = JSON.stringify({
     formSelector: '#journalInsightsFiltersForm',
     selectSelector: '#insightsPeriod',
@@ -235,6 +247,7 @@
         <div class="chip-row">
           <span class="chip"><%= scopeLabelValue %></span>
           <span class="chip">Period: <%= periodLabel %></span>
+          <span class="chip">Compare: <%= compareLabel %></span>
           <span class="chip">Participants: <%= Number(summary && summary.participants_count ? summary.participants_count : 0) %></span>
           <% if (isAllCoursesScope && scopeCourseCountValue > 0) { %>
             <span class="chip">Courses: <%= scopeCourseCountValue %></span>
@@ -286,7 +299,7 @@
             ></span>
           </div>
 
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-3">
             <label class="form-label small" for="insightsSubject">Subject</label>
             <select id="insightsSubject" class="form-select compact-select" name="subject_id" <%= isCourseAggregateScope ? 'disabled' : '' %>>
               <% if (!(subjectOptions || []).length) { %>
@@ -304,7 +317,7 @@
             <% } %>
           </div>
 
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-3">
             <label class="form-label small" for="insightsGroup">Group</label>
             <select id="insightsGroup" class="form-select compact-select" name="group_number" <%= scopeValue === 'group' ? '' : 'disabled' %>>
               <option value="">All groups</option>
@@ -319,7 +332,7 @@
             <% } %>
           </div>
 
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-3">
             <label class="form-label small" for="insightsStudent">Student</label>
             <select id="insightsStudent" class="form-select compact-select" name="student_id" <%= (scopeValue === 'student' || scopeValue === 'student-course') ? '' : 'disabled' %>>
               <option value="">Select student</option>
@@ -334,7 +347,17 @@
             <% } %>
           </div>
 
+          <div class="col-12 col-md-3">
+            <label class="form-label small" for="insightsCompare">Compare</label>
+            <select id="insightsCompare" class="form-select compact-select" name="compare_mode">
+              <% (compareOptions || []).forEach((item) => { %>
+                <option value="<%= item.key %>" <%= item.key === compareValue ? 'selected' : '' %>><%= item.label %></option>
+              <% }) %>
+            </select>
+          </div>
+
           <div class="col-12 d-flex gap-2 flex-wrap mt-1">
+            <a class="btn btn-outline-primary" href="<%= exportCsvHref %>">Export CSV</a>
             <a class="btn btn-outline-secondary" href="/journal<%= selectedSubjectValue ? `?subject_id=${selectedSubjectValue}` : '' %>">Back to journal</a>
           </div>
         </form>
@@ -351,6 +374,7 @@
               <input type="hidden" name="group_number" value="<%= selectedGroupValue || '' %>" />
               <input type="hidden" name="student_id" value="<%= selectedStudentValue || '' %>" />
               <input type="hidden" name="period" value="<%= periodValue %>" />
+              <input type="hidden" name="compare_mode" value="<%= compareValue %>" />
               <div class="col-12 col-md-3">
                 <label class="form-label small" for="publishTopN">Top N</label>
                 <input id="publishTopN" class="form-control compact-input" type="number" min="3" max="30" name="top_n" value="10" />
@@ -401,6 +425,61 @@
           <div class="summary-card">
             <div class="summary-label">Attendance late share</div>
             <div class="summary-value"><%= Number(summary && summary.attendance_late_share ? summary.attendance_late_share : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Risk rate</div>
+            <div class="summary-value"><%= Number(summary && summary.risk_rate ? summary.risk_rate : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Excellence rate</div>
+            <div class="summary-value"><%= Number(summary && summary.excellence_rate ? summary.excellence_rate : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Score consistency</div>
+            <div class="summary-value"><%= Number(summary && summary.score_consistency ? summary.score_consistency : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Attendance reliability</div>
+            <div class="summary-value"><%= Number(summary && summary.attendance_reliability ? summary.attendance_reliability : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Momentum score</div>
+            <div class="summary-value"><%= Number(summary && summary.momentum_score ? summary.momentum_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass section mb-3">
+        <h2 class="section-title">Comparison</h2>
+        <div class="table-shell mt-2">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Segment</th>
+                  <th>Participants</th>
+                  <th>Average</th>
+                  <th>At risk</th>
+                  <th>Excellent</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!comparisonRowsValue.length || compareValue === 'none') { %>
+                  <tr>
+                    <td colspan="5" class="text-muted">Select compare mode to see cross-segment metrics.</td>
+                  </tr>
+                <% } %>
+                <% comparisonRowsValue.forEach((row) => { %>
+                  <tr>
+                    <td><%= row.label %></td>
+                    <td><%= Number(row.participants_count || 0) %></td>
+                    <td><%= Number(row.average_score || 0).toFixed(2).replace(/\.00$/, '') %></td>
+                    <td><%= Number(row.at_risk_count || 0) %></td>
+                    <td><%= Number(row.excellent_count || 0) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>

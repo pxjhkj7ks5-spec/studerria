@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.74",
+      "date": "2026-03-05",
+      "items": [
+        "feat(journal-insights-compare): added compare mode filter (groups/courses), comparison table, and extended summary KPIs (risk/excellence/consistency/reliability/momentum)",
+        "feat(journal-insights-export): added `GET /journal/insights/export.csv` with scope metadata, summary, ranking, comparison, subject mix, and trend sections",
+        "feat(admin-subjects-bulk-assign): added upsert mode for existing target subjects and optional admission-level pathways visibility sync from source subject",
+        "perf(pathways-insights): added migration `034_pathways_bulk_assign_and_insights_indexes` with indexes for normalized subject lookup, pathways mapping, and insights-heavy grade queries"
+      ]
+    },
+    {
       "version": "1.0.73",
       "date": "2026-03-05",
       "items": [

@@ -5183,10 +5183,144 @@ function buildJournalInsightsUrl(params = {}) {
   if (studentId) query.set('student_id', String(studentId));
   const period = String(params.period || '').trim().toLowerCase();
   if (period) query.set('period', period);
+  const compareMode = String(params.compareMode || '').trim().toLowerCase();
+  if (compareMode) query.set('compare_mode', compareMode);
   if (params.error) query.set('error', String(params.error));
   if (params.ok) query.set('ok', String(params.ok));
   const queryString = query.toString();
   return `/journal/insights${queryString ? `?${queryString}` : ''}`;
+}
+
+function formatJournalInsightsCsvNumber(rawValue, digits = 2) {
+  const value = Number(rawValue);
+  if (!Number.isFinite(value)) return '';
+  return roundToPrecision(value, digits).toFixed(digits).replace(/(?:\.0+|(\.\d*?[1-9])0+)$/, '$1');
+}
+
+function buildJournalInsightsCsv({ context, teacherJournalMode = false }) {
+  const safeContext = context && typeof context === 'object' ? context : {};
+  const summary = safeContext.summary && typeof safeContext.summary === 'object'
+    ? safeContext.summary
+    : {};
+  const rankingRows = Array.isArray(safeContext.ranking) ? safeContext.ranking : [];
+  const subjectMixRows = Array.isArray(safeContext.courseSubjectSummaries) ? safeContext.courseSubjectSummaries : [];
+  const comparisonRows = Array.isArray(safeContext.comparisonRows) ? safeContext.comparisonRows : [];
+  const gradeTrendRows = Array.isArray(safeContext?.trends?.grade) ? safeContext.trends.grade : [];
+  const attendanceTrendRows = Array.isArray(safeContext?.trends?.attendance) ? safeContext.trends.attendance : [];
+  const lines = [];
+  const pushLine = (values) => {
+    lines.push((values || []).map((value) => escapeCsvValue(value)).join(','));
+  };
+
+  pushLine(['Section', 'Field', 'Value']);
+  pushLine(['Meta', 'generated_at', new Date().toISOString()]);
+  pushLine(['Meta', 'scope_label', safeContext.scopeLabel || '']);
+  pushLine(['Meta', 'scope_type', safeContext.scopeType || '']);
+  pushLine(['Meta', 'period', safeContext.periodLabel || safeContext.period || '']);
+  pushLine(['Meta', 'compare_mode', safeContext.compareMode || 'none']);
+  pushLine(['Meta', 'teacher_mode', teacherJournalMode ? '1' : '0']);
+  pushLine(['Meta', 'course', safeContext.selectedCourse ? String(safeContext.selectedCourse.course_name || '') : '']);
+  pushLine(['Meta', 'subject', safeContext.selectedSubject ? String(safeContext.selectedSubject.subject_name || '') : '']);
+  pushLine([]);
+
+  pushLine(['Summary', 'Metric', 'Value']);
+  pushLine(['Summary', 'participants_count', Number(summary.participants_count || 0)]);
+  pushLine(['Summary', 'average_score', formatJournalInsightsCsvNumber(summary.average_score)]);
+  pushLine(['Summary', 'median_score', formatJournalInsightsCsvNumber(summary.median_score)]);
+  pushLine(['Summary', 'top_score', formatJournalInsightsCsvNumber(summary.top_score)]);
+  pushLine(['Summary', 'at_risk_count', Number(summary.at_risk_count || 0)]);
+  pushLine(['Summary', 'excellent_count', Number(summary.excellent_count || 0)]);
+  pushLine(['Summary', 'grade_delta', formatJournalInsightsCsvNumber(summary.grade_delta)]);
+  pushLine(['Summary', 'attendance_absent_share', formatJournalInsightsCsvNumber(summary.attendance_absent_share)]);
+  pushLine(['Summary', 'attendance_late_share', formatJournalInsightsCsvNumber(summary.attendance_late_share)]);
+  pushLine(['Summary', 'risk_rate', formatJournalInsightsCsvNumber(summary.risk_rate)]);
+  pushLine(['Summary', 'excellence_rate', formatJournalInsightsCsvNumber(summary.excellence_rate)]);
+  pushLine(['Summary', 'score_consistency', formatJournalInsightsCsvNumber(summary.score_consistency)]);
+  pushLine(['Summary', 'attendance_reliability', formatJournalInsightsCsvNumber(summary.attendance_reliability)]);
+  pushLine(['Summary', 'momentum_score', formatJournalInsightsCsvNumber(summary.momentum_score)]);
+  pushLine([]);
+
+  pushLine(['Ranking', 'rank', 'student_id', 'student', 'group', 'score', 'subjects']);
+  if (!rankingRows.length) {
+    pushLine(['Ranking', '', '', '', '', '', '']);
+  }
+  rankingRows.forEach((row) => {
+    pushLine([
+      'Ranking',
+      Number(row.rank || 0),
+      Number(row.student_id || 0),
+      row.full_name || '',
+      Number(row.group_number || 0) || '',
+      formatJournalInsightsCsvNumber(row.final_score),
+      Number(row.subjects_count || 0),
+    ]);
+  });
+  pushLine([]);
+
+  pushLine(['Comparison', 'label', 'participants', 'average_score', 'at_risk', 'excellent']);
+  if (!comparisonRows.length) {
+    pushLine(['Comparison', '', '', '', '', '']);
+  }
+  comparisonRows.forEach((row) => {
+    pushLine([
+      'Comparison',
+      row.label || '',
+      Number(row.participants_count || 0),
+      formatJournalInsightsCsvNumber(row.average_score),
+      Number(row.at_risk_count || 0),
+      Number(row.excellent_count || 0),
+    ]);
+  });
+  pushLine([]);
+
+  pushLine(['Subject mix', 'course_id', 'subject_id', 'subject', 'students', 'avg_score', 'at_risk']);
+  if (!subjectMixRows.length) {
+    pushLine(['Subject mix', '', '', '', '', '', '']);
+  }
+  subjectMixRows.forEach((row) => {
+    pushLine([
+      'Subject mix',
+      Number(row.course_id || 0),
+      Number(row.subject_id || 0),
+      row.subject_name || '',
+      Number(row.students_count || 0),
+      formatJournalInsightsCsvNumber(row.average_final_score),
+      Number(row.at_risk_students || 0),
+    ]);
+  });
+  pushLine([]);
+
+  pushLine(['Grade trend', 'bucket', 'avg_score_percent', 'events']);
+  if (!gradeTrendRows.length) {
+    pushLine(['Grade trend', '', '', '']);
+  }
+  gradeTrendRows.forEach((row) => {
+    pushLine([
+      'Grade trend',
+      row.bucket || '',
+      formatJournalInsightsCsvNumber(row.avg_score_percent),
+      Number(row.events_count || 0),
+    ]);
+  });
+  pushLine([]);
+
+  pushLine(['Attendance trend', 'bucket', 'present', 'late', 'absent', 'excused', 'total']);
+  if (!attendanceTrendRows.length) {
+    pushLine(['Attendance trend', '', '', '', '', '', '']);
+  }
+  attendanceTrendRows.forEach((row) => {
+    pushLine([
+      'Attendance trend',
+      row.bucket || '',
+      Number(row.present_count || 0),
+      Number(row.late_count || 0),
+      Number(row.absent_count || 0),
+      Number(row.excused_count || 0),
+      Number(row.total_count || 0),
+    ]);
+  });
+
+  return lines.join('\n');
 }
 
 function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[key]) {
@@ -13149,6 +13283,12 @@ const JOURNAL_INSIGHTS_SCOPE_OPTIONS = [
   { key: 'all-courses', label: 'All courses' },
 ];
 const JOURNAL_INSIGHTS_SCOPE_KEYS = new Set(JOURNAL_INSIGHTS_SCOPE_OPTIONS.map((item) => item.key));
+const JOURNAL_INSIGHTS_COMPARE_OPTIONS = [
+  { key: 'none', label: 'No compare' },
+  { key: 'group', label: 'Compare groups' },
+  { key: 'course', label: 'Compare courses' },
+];
+const JOURNAL_INSIGHTS_COMPARE_KEYS = new Set(JOURNAL_INSIGHTS_COMPARE_OPTIONS.map((item) => item.key));
 
 const normalizeJournalInsightsPeriod = (rawValue, fallback = 'semester') => {
   const normalized = String(rawValue || '').trim().toLowerCase();
@@ -13164,6 +13304,14 @@ const normalizeJournalInsightsScope = (rawValue, fallback = 'subject') => {
     return normalized;
   }
   return JOURNAL_INSIGHTS_SCOPE_KEYS.has(fallback) ? fallback : 'subject';
+};
+
+const normalizeJournalInsightsCompare = (rawValue, fallback = 'none') => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  if (JOURNAL_INSIGHTS_COMPARE_KEYS.has(normalized)) {
+    return normalized;
+  }
+  return JOURNAL_INSIGHTS_COMPARE_KEYS.has(fallback) ? fallback : 'none';
 };
 
 const buildJournalMixedSemesterCondition = (alias, semesterId) => {
@@ -15467,6 +15615,101 @@ async function buildJournalInsightsContext({
     }
   }
 
+  const compareOptions = [{ key: 'none', label: 'No compare' }];
+  const supportsGroupCompare = ['subject', 'group'].includes(scopeType)
+    && rankingRows.some((row) => Number(row.group_number || 0) > 0);
+  const supportsCourseCompare = ['course', 'all-courses', 'student-course'].includes(scopeType)
+    && rankingRows.some((row) => Number(row.course_id || 0) > 0);
+  if (supportsGroupCompare) {
+    compareOptions.push({ key: 'group', label: 'Compare groups' });
+  }
+  if (supportsCourseCompare) {
+    compareOptions.push({ key: 'course', label: 'Compare courses' });
+  }
+  let compareMode = normalizeJournalInsightsCompare(
+    payload.compare_mode,
+    supportsGroupCompare ? 'group' : (supportsCourseCompare ? 'course' : 'none')
+  );
+  if (!compareOptions.some((item) => item.key === compareMode)) {
+    compareMode = 'none';
+  }
+  let comparisonRows = [];
+  if (compareMode === 'group') {
+    const byGroup = new Map();
+    rankingRows.forEach((row) => {
+      const groupNumber = Number(row.group_number || 0);
+      const score = Number(row.final_score || 0);
+      if (!Number.isInteger(groupNumber) || groupNumber < 1 || !Number.isFinite(score)) return;
+      if (!byGroup.has(groupNumber)) {
+        byGroup.set(groupNumber, {
+          key: `group_${groupNumber}`,
+          label: `Group ${groupNumber}`,
+          participants_count: 0,
+          score_sum: 0,
+          at_risk_count: 0,
+          excellent_count: 0,
+        });
+      }
+      const bucket = byGroup.get(groupNumber);
+      bucket.participants_count += 1;
+      bucket.score_sum += score;
+      if (score < 60) bucket.at_risk_count += 1;
+      if (score >= 90) bucket.excellent_count += 1;
+    });
+    comparisonRows = Array.from(byGroup.values())
+      .map((item) => ({
+        key: item.key,
+        label: item.label,
+        participants_count: Number(item.participants_count || 0),
+        average_score: Number(item.participants_count || 0) > 0
+          ? roundToPrecision(item.score_sum / item.participants_count, 2)
+          : 0,
+        at_risk_count: Number(item.at_risk_count || 0),
+        excellent_count: Number(item.excellent_count || 0),
+      }))
+      .sort((a, b) => Number(b.average_score || 0) - Number(a.average_score || 0));
+  } else if (compareMode === 'course') {
+    const courseNameById = new Map();
+    (courseOptions || []).forEach((item) => {
+      const courseId = Number(item.course_id || 0);
+      if (!Number.isInteger(courseId) || courseId < 1) return;
+      courseNameById.set(courseId, String(item.course_name || `Course ${courseId}`));
+    });
+    const byCourse = new Map();
+    rankingRows.forEach((row) => {
+      const courseId = Number(row.course_id || 0);
+      const score = Number(row.final_score || 0);
+      if (!Number.isInteger(courseId) || courseId < 1 || !Number.isFinite(score)) return;
+      if (!byCourse.has(courseId)) {
+        byCourse.set(courseId, {
+          key: `course_${courseId}`,
+          label: String(row.course_name || courseNameById.get(courseId) || `Course ${courseId}`),
+          participants_count: 0,
+          score_sum: 0,
+          at_risk_count: 0,
+          excellent_count: 0,
+        });
+      }
+      const bucket = byCourse.get(courseId);
+      bucket.participants_count += 1;
+      bucket.score_sum += score;
+      if (score < 60) bucket.at_risk_count += 1;
+      if (score >= 90) bucket.excellent_count += 1;
+    });
+    comparisonRows = Array.from(byCourse.values())
+      .map((item) => ({
+        key: item.key,
+        label: item.label,
+        participants_count: Number(item.participants_count || 0),
+        average_score: Number(item.participants_count || 0) > 0
+          ? roundToPrecision(item.score_sum / item.participants_count, 2)
+          : 0,
+        at_risk_count: Number(item.at_risk_count || 0),
+        excellent_count: Number(item.excellent_count || 0),
+      }))
+      .sort((a, b) => Number(b.average_score || 0) - Number(a.average_score || 0));
+  }
+
   const scopeScoreValues = scopeRows
     .map((row) => Number(row.final_score))
     .filter((value) => Number.isFinite(value));
@@ -15667,6 +15910,31 @@ async function buildJournalInsightsContext({
       2
     )
     : 0;
+  const riskRate = participantsCount > 0
+    ? roundToPrecision((atRiskCount / participantsCount) * 100, 2)
+    : 0;
+  const excellenceRate = participantsCount > 0
+    ? roundToPrecision((excellentCount / participantsCount) * 100, 2)
+    : 0;
+  const scoreConsistency = (() => {
+    if (scopeScoreValues.length < 2) {
+      return scopeScoreValues.length ? 100 : 0;
+    }
+    const mean = averageScore;
+    if (!Number.isFinite(mean) || mean <= 0) return 0;
+    const variance = scopeScoreValues.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / scopeScoreValues.length;
+    const stdDev = Math.sqrt(Math.max(0, variance));
+    const normalized = 100 - ((stdDev / mean) * 100);
+    return roundToPrecision(Math.max(0, Math.min(100, normalized)), 2);
+  })();
+  const attendanceReliability = roundToPrecision(
+    Math.max(0, Math.min(100, 100 - absentShare - (lateShare * 0.5))),
+    2
+  );
+  const momentumScore = roundToPrecision(
+    Math.max(0, Math.min(100, 50 + gradeDelta - (absentShare * 0.1))),
+    2
+  );
 
   const periodLabel = (
     JOURNAL_INSIGHTS_PERIOD_OPTIONS.find((item) => item.key === period)
@@ -15754,6 +16022,9 @@ async function buildJournalInsightsContext({
     periodOptions: JOURNAL_INSIGHTS_PERIOD_OPTIONS,
     scopeType,
     scopeOptions: scopeOptionSet,
+    compareMode,
+    compareOptions,
+    comparisonRows,
     groupOptions,
     selectedGroupNumber,
     studentOptions,
@@ -15776,6 +16047,11 @@ async function buildJournalInsightsContext({
       attendance_absent_share: absentShare,
       attendance_late_share: lateShare,
       grade_delta: gradeDelta,
+      risk_rate: riskRate,
+      excellence_rate: excellenceRate,
+      score_consistency: scoreConsistency,
+      attendance_reliability: attendanceReliability,
+      momentum_score: momentumScore,
     },
     trends: {
       bucket_mode: getJournalInsightsBucketMode(period),
@@ -15834,6 +16110,49 @@ app.get('/journal/insights', requireLogin, async (req, res) => {
   }
 });
 
+app.get('/journal/insights/export.csv', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'journal.insights.export.init');
+  }
+
+  try {
+    const journalScope = await getJournalAccessScope(req);
+    if (!journalScope.canUseJournal) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    const context = await buildJournalInsightsContext({
+      req,
+      journalScope,
+      teacherJournalMode,
+      payloadSource: req.query || {},
+    });
+
+    const csv = buildJournalInsightsCsv({
+      context,
+      teacherJournalMode,
+    });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `journal-insights-${timestamp}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    logAction(db, req, 'journal_insights_export_csv', {
+      scope_type: context.scopeType,
+      compare_mode: context.compareMode || 'none',
+      period: context.period,
+      participants_count: Number(context?.summary?.participants_count || 0),
+      ranking_count: Array.isArray(context.ranking) ? context.ranking.length : 0,
+    });
+
+    return res.send(csv);
+  } catch (err) {
+    return handleDbError(res, err, 'journal.insights.export');
+  }
+});
+
 app.post('/journal/insights/publish-rating', requireLogin, writeLimiter, async (req, res) => {
   try {
     await ensureDbReady();
@@ -15845,6 +16164,7 @@ app.post('/journal/insights/publish-rating', requireLogin, writeLimiter, async (
       groupNumber: parsePositiveIntStrict(req.body.group_number),
       studentId: parsePositiveIntStrict(req.body.student_id),
       period: req.body.period || 'semester',
+      compareMode: req.body.compare_mode || 'none',
       error: 'Database error',
     }));
   }
@@ -15870,6 +16190,7 @@ app.post('/journal/insights/publish-rating', requireLogin, writeLimiter, async (
       groupNumber: Number(context.selectedGroupNumber || 0),
       studentId: Number(context.selectedStudentId || 0),
       period: context.period,
+      compareMode: context.compareMode || 'none',
     };
 
     if (!context.canPublishRating || !context.publishTarget) {
@@ -15951,6 +16272,7 @@ app.post('/journal/insights/publish-rating', requireLogin, writeLimiter, async (
       scope_type: context.scopeType,
       scope_label: context.scopeLabel,
       period: context.period,
+      compare_mode: context.compareMode || 'none',
       rating_size: ratingRows.length,
       target_kind: context.publishTarget.kind,
       target_subject_id: context.publishTarget.subject_id || null,
@@ -33396,6 +33718,8 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
     )
   );
   const copySettings = parseBooleanFlag(req.body.copy_settings, true);
+  const upsertExisting = parseBooleanFlag(req.body.upsert_existing, false);
+  const syncPathways = parseBooleanFlag(req.body.sync_pathways, true);
 
   if (!sourceSubjectId) {
     return res.redirect('/admin?err=Select%20source%20subject');
@@ -33437,6 +33761,7 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
       [targetCourseIds]
     );
     const validTargetSet = new Set((targetRows || []).map((row) => Number(row.id || 0)).filter((id) => id > 0));
+    const validTargetCourseIds = targetCourseIds.filter((id) => validTargetSet.has(Number(id)));
 
     const sourceGroupCount = Number.isFinite(Number(sourceSubject.group_count))
       ? Math.max(1, Math.min(3, Math.round(Number(sourceSubject.group_count))))
@@ -33450,10 +33775,58 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
     const sourceRequired = sourceSubject.is_required === false || Number(sourceSubject.is_required) === 0 ? 0 : 1;
     const sourceGeneral = sourceSubject.is_general === false || Number(sourceSubject.is_general) === 0 ? 0 : 1;
 
+    const admissionsByCourse = new Map();
+    const sourceVisibilityByAdmission = new Map();
+    if (syncPathways && validTargetCourseIds.length) {
+      const admissionRows = await db.all(
+        `
+          SELECT course_id, admission_id
+          FROM program_admission_courses
+          WHERE course_id = ANY(?::int[])
+        `,
+        [validTargetCourseIds]
+      );
+      const admissionSet = new Set();
+      (admissionRows || []).forEach((row) => {
+        const courseId = Number(row.course_id || 0);
+        const admissionId = Number(row.admission_id || 0);
+        if (!Number.isInteger(courseId) || courseId < 1) return;
+        if (!Number.isInteger(admissionId) || admissionId < 1) return;
+        if (!admissionsByCourse.has(courseId)) {
+          admissionsByCourse.set(courseId, []);
+        }
+        admissionsByCourse.get(courseId).push(admissionId);
+        admissionSet.add(admissionId);
+      });
+      const admissionIds = Array.from(admissionSet.values());
+      if (admissionIds.length) {
+        const sourceVisibilityRows = await db.all(
+          `
+            SELECT admission_id, is_visible
+            FROM subject_visibility_by_admission
+            WHERE subject_id = ?
+              AND admission_id = ANY(?::int[])
+          `,
+          [sourceSubjectId, admissionIds]
+        );
+        (sourceVisibilityRows || []).forEach((row) => {
+          const admissionId = Number(row.admission_id || 0);
+          if (!Number.isInteger(admissionId) || admissionId < 1) return;
+          sourceVisibilityByAdmission.set(
+            admissionId,
+            row.is_visible === true || Number(row.is_visible) === 1
+          );
+        });
+      }
+    }
+
     const insertedCourseIds = new Set();
     let createdCount = 0;
+    let updatedCount = 0;
     let skippedExistingCount = 0;
     let skippedMissingCourses = 0;
+    let pathwaysSyncedCount = 0;
+    let pathwaysResetCount = 0;
 
     for (const targetCourseId of targetCourseIds) {
       if (!validTargetSet.has(Number(targetCourseId))) {
@@ -33470,7 +33843,9 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
         `,
         [targetCourseId, targetName]
       );
-      if (existing) {
+      const existingSubjectId = parsePositiveIntStrict(existing && existing.id);
+      let targetSubjectId = existingSubjectId || null;
+      if (existingSubjectId && !upsertExisting) {
         skippedExistingCount += 1;
         continue;
       }
@@ -33482,29 +33857,109 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
       const required = copySettings ? sourceRequired : 1;
       const general = sourceGeneral;
 
-      await db.run(
-        `
-          INSERT INTO subjects
-            (name, group_count, default_group, show_in_teamwork, visible, is_required, is_general, course_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        [targetName, groupCount, defaultGroup, showInTeamwork, visible, required, general, targetCourseId]
-      );
+      if (existingSubjectId) {
+        if (copySettings) {
+          await db.run(
+            `
+              UPDATE subjects
+              SET
+                name = ?,
+                group_count = ?,
+                default_group = ?,
+                show_in_teamwork = ?,
+                visible = ?,
+                is_required = ?,
+                is_general = ?
+              WHERE id = ? AND course_id = ?
+            `,
+            [
+              targetName,
+              groupCount,
+              defaultGroup,
+              showInTeamwork,
+              visible,
+              required,
+              general,
+              existingSubjectId,
+              targetCourseId,
+            ]
+          );
+        } else {
+          await db.run(
+            'UPDATE subjects SET name = ? WHERE id = ? AND course_id = ?',
+            [targetName, existingSubjectId, targetCourseId]
+          );
+        }
+        updatedCount += 1;
+      } else {
+        const inserted = await db.get(
+          `
+            INSERT INTO subjects
+              (name, group_count, default_group, show_in_teamwork, visible, is_required, is_general, course_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
+          `,
+          [targetName, groupCount, defaultGroup, showInTeamwork, visible, required, general, targetCourseId]
+        );
+        targetSubjectId = parsePositiveIntStrict(inserted && inserted.id);
+        createdCount += 1;
+      }
+
+      if (!targetSubjectId) {
+        skippedExistingCount += 1;
+        continue;
+      }
+
+      if (syncPathways) {
+        const admissions = admissionsByCourse.get(Number(targetCourseId)) || [];
+        for (const admissionId of admissions) {
+          if (sourceVisibilityByAdmission.has(Number(admissionId))) {
+            const visibilityFlag = sourceVisibilityByAdmission.get(Number(admissionId)) ? 1 : 0;
+            await db.run(
+              `
+                INSERT INTO subject_visibility_by_admission
+                  (admission_id, subject_id, is_visible, created_at, updated_at)
+                VALUES (?, ?, ?, NOW(), NOW())
+                ON CONFLICT (admission_id, subject_id)
+                DO UPDATE SET
+                  is_visible = EXCLUDED.is_visible,
+                  updated_at = NOW()
+              `,
+              [admissionId, targetSubjectId, visibilityFlag]
+            );
+            pathwaysSyncedCount += 1;
+          } else {
+            await db.run(
+              'DELETE FROM subject_visibility_by_admission WHERE admission_id = ? AND subject_id = ?',
+              [admissionId, targetSubjectId]
+            );
+            pathwaysResetCount += 1;
+          }
+        }
+      }
+
       insertedCourseIds.add(Number(targetCourseId));
-      createdCount += 1;
     }
 
     insertedCourseIds.forEach((courseId) => invalidateSubjectsCache(courseId));
+    if (syncPathways && (pathwaysSyncedCount > 0 || pathwaysResetCount > 0)) {
+      invalidateRegistrationPathwaysCache();
+    }
 
     logAction(db, req, 'subject_bulk_assign', {
       source_subject_id: sourceSubjectId,
       source_course_id: Number(sourceCourseId || 0),
       target_name: targetName,
       copy_settings: copySettings ? 1 : 0,
+      upsert_existing: upsertExisting ? 1 : 0,
+      sync_pathways: syncPathways ? 1 : 0,
       target_courses: targetCourseIds,
       created_count: createdCount,
+      updated_count: updatedCount,
       skipped_existing_count: skippedExistingCount,
       skipped_missing_course_count: skippedMissingCourses,
+      pathways_synced_count: pathwaysSyncedCount,
+      pathways_reset_count: pathwaysResetCount,
     });
     logActivity(
       db,
@@ -33515,15 +33970,20 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
       {
         target_name: targetName,
         copy_settings: copySettings ? 1 : 0,
+        upsert_existing: upsertExisting ? 1 : 0,
+        sync_pathways: syncPathways ? 1 : 0,
         target_courses: targetCourseIds,
         created_count: createdCount,
+        updated_count: updatedCount,
         skipped_existing_count: skippedExistingCount,
         skipped_missing_course_count: skippedMissingCourses,
+        pathways_synced_count: pathwaysSyncedCount,
+        pathways_reset_count: pathwaysResetCount,
       },
       sourceCourseId
     );
 
-    const summary = `Bulk assign complete: created ${createdCount}, skipped existing ${skippedExistingCount}, invalid courses ${skippedMissingCourses}`;
+    const summary = `Bulk assign complete: created ${createdCount}, updated ${updatedCount}, skipped existing ${skippedExistingCount}, invalid courses ${skippedMissingCourses}`;
     return res.redirect(`/admin?ok=${encodeURIComponent(summary)}`);
   } catch (err) {
     return res.redirect('/admin?err=Database%20error');

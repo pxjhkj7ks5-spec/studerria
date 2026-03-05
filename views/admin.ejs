@@ -2633,10 +2633,18 @@
                     <label class="form-label">Target subject name (optional)</label>
                     <input class="form-control" name="target_name" maxlength="140" placeholder="Default: source subject name" />
                   </div>
-                  <div class="col-12 col-md-4 d-flex align-items-end">
+                  <div class="col-12 col-md-6 d-grid gap-2">
                     <div class="form-check">
                       <input class="form-check-input" type="checkbox" id="subjectBulkCopySettings" name="copy_settings" value="1" checked />
                       <label class="form-check-label" for="subjectBulkCopySettings">Copy source settings (groups/flags)</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="subjectBulkUpsertExisting" name="upsert_existing" value="1" />
+                      <label class="form-check-label" for="subjectBulkUpsertExisting">Update existing subjects with same name</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="subjectBulkSyncPathways" name="sync_pathways" value="1" checked />
+                      <label class="form-check-label" for="subjectBulkSyncPathways">Sync admission visibility from source subject (pathways)</label>
                     </div>
                   </div>
 
