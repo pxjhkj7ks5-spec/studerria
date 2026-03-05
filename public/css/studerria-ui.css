@@ -1,0 +1,207 @@
+.studerria-theme {
+  position: relative;
+  min-height: 100vh;
+}
+
+.page-container {
+  position: relative;
+  z-index: 2;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 80px 24px 120px;
+}
+
+.studerria-navbar {
+  position: sticky;
+  top: 16px;
+  z-index: 12;
+  width: min(1200px, calc(100vw - 48px));
+  margin: 16px auto 0;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-radius: 999px;
+  backdrop-filter: blur(16px);
+  background: rgba(10, 10, 20, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 44px rgba(2, 6, 23, 0.35);
+}
+
+html[data-theme='light'] .studerria-navbar,
+body.theme-light .studerria-navbar {
+  background: rgba(255, 255, 255, 0.74);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+}
+
+.studerria-brand {
+  color: inherit;
+  text-decoration: none;
+  font-size: 1.12rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.studerria-nav-links,
+.studerria-nav-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.studerria-nav-link,
+.studerria-theme-toggle,
+.studerria-signup,
+.studerria-user-pill {
+  border-radius: 999px;
+  padding: 7px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.84rem;
+  line-height: 1;
+}
+
+.studerria-nav-link,
+.studerria-theme-toggle,
+.studerria-user-pill {
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.studerria-signup {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #f8fafc;
+  border-color: rgba(167, 139, 250, 0.64);
+  box-shadow: 0 12px 24px rgba(99, 102, 241, 0.3);
+}
+
+html[data-theme='light'] .studerria-nav-link,
+html[data-theme='light'] .studerria-theme-toggle,
+html[data-theme='light'] .studerria-user-pill,
+body.theme-light .studerria-nav-link,
+body.theme-light .studerria-theme-toggle,
+body.theme-light .studerria-user-pill {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.studerria-theme-toggle {
+  cursor: pointer;
+}
+
+.studerria-card,
+.studerria-theme .card,
+.studerria-theme .glass,
+.studerria-theme .glass-card,
+.studerria-theme .glass-panel,
+.studerria-theme .surface,
+.studerria-theme .surface--elevated,
+.studerria-theme .auth-card,
+.studerria-theme .welcome-card {
+  background: rgba(15, 20, 40, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+html[data-theme='light'] .studerria-card,
+html[data-theme='light'] .studerria-theme .card,
+html[data-theme='light'] .studerria-theme .glass,
+html[data-theme='light'] .studerria-theme .glass-card,
+html[data-theme='light'] .studerria-theme .glass-panel,
+html[data-theme='light'] .studerria-theme .surface,
+html[data-theme='light'] .studerria-theme .surface--elevated,
+html[data-theme='light'] .studerria-theme .auth-card,
+html[data-theme='light'] .studerria-theme .welcome-card,
+body.theme-light .studerria-card,
+body.theme-light .studerria-theme .card,
+body.theme-light .studerria-theme .glass,
+body.theme-light .studerria-theme .glass-card,
+body.theme-light .studerria-theme .glass-panel,
+body.theme-light .studerria-theme .surface,
+body.theme-light .studerria-theme .surface--elevated,
+body.theme-light .studerria-theme .auth-card,
+body.theme-light .studerria-theme .welcome-card {
+  background: rgba(255, 255, 255, 0.74);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+.studerria-card:hover,
+.studerria-theme .card:hover,
+.studerria-theme .glass:hover,
+.studerria-theme .glass-card:hover,
+.studerria-theme .glass-panel:hover,
+.studerria-theme .surface:hover,
+.studerria-theme .surface--elevated:hover,
+.studerria-theme .auth-card:hover,
+.studerria-theme .welcome-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.studerria-theme .btn,
+.studerria-theme button,
+.studerria-theme .btn-glass,
+.studerria-theme .theme-toggle-min {
+  border-radius: 12px;
+  transition: transform 140ms ease, box-shadow 170ms ease, filter 170ms ease;
+}
+
+.studerria-theme .btn:hover,
+.studerria-theme button:hover,
+.studerria-theme .btn-glass:hover,
+.studerria-theme .theme-toggle-min:hover {
+  transform: translateY(-1px);
+}
+
+.studerria-theme .btn-primary,
+.studerria-theme .btn.btn-primary {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  border-color: rgba(167, 139, 250, 0.64);
+  box-shadow: 0 12px 24px rgba(99, 102, 241, 0.3);
+}
+
+.studerria-theme .topbar {
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  background: rgba(10, 10, 20, 0.6);
+}
+
+html[data-theme='light'] .studerria-theme .topbar,
+body.theme-light .studerria-theme .topbar {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+.studerria-theme .container,
+.studerria-theme .container-fluid,
+.studerria-theme .topbar,
+.studerria-theme .modal,
+.studerria-theme .dropdown-menu {
+  position: relative;
+  z-index: 2;
+}
+
+@media (max-width: 960px) {
+  .page-container {
+    padding: 72px 14px 96px;
+  }
+
+  .studerria-navbar {
+    width: calc(100vw - 24px);
+    border-radius: 18px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .studerria-nav-links {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+}

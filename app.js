@@ -515,6 +515,142 @@ const bellSchedule = {
 
 app.set('view engine', 'ejs');
 
+const GLOBAL_LAYOUT_EXCLUDED_VIEWS = new Set(['vision', 'studerria-codex']);
+const BACKGROUND_STYLE_TAG_RE = /<link[^>]+href=["']\/css\/(?:dynamic-bg|login-bg|schedule-bg|vision-bg|studerria-background|studerria-ui)\.css["'][^>]*>\s*/gi;
+const BACKGROUND_SCRIPT_TAG_RE = /<script[^>]+src=["']\/js\/(?:dynamic-bg|login-bg|schedule-bg|vision-bg|studerria-background)\.js["'][^>]*><\/script>\s*/gi;
+const BACKGROUND_ELEMENT_IDS = ['dynamic-bg', 'dynamic-login-bg', 'schedule-bg', 'visionBg', 'showcaseBg', 'studerriaBg'];
+
+function extractHtmlAttribute(rawAttributes, attributeName) {
+  const source = String(rawAttributes || '');
+  const attr = String(attributeName || '').trim();
+  if (!attr) return '';
+  const pattern = new RegExp(`\\b${attr}\\s*=\\s*(["'])(.*?)\\1`, 'i');
+  const match = source.match(pattern);
+  return match ? String(match[2] || '') : '';
+}
+
+function stripRootElementById(html, elementId) {
+  const source = String(html || '');
+  const id = String(elementId || '').trim();
+  if (!source || !id) return source;
+  const openPattern = new RegExp(`<div\\b[^>]*\\bid=(["'])${id}\\1[^>]*>`, 'i');
+  const opening = openPattern.exec(source);
+  if (!opening) return source;
+  const start = opening.index;
+  let depth = 1;
+  const tokenPattern = /<\/?div\b[^>]*>/gi;
+  tokenPattern.lastIndex = start + opening[0].length;
+  let endIndex = source.length;
+  while (depth > 0) {
+    const token = tokenPattern.exec(source);
+    if (!token) break;
+    const isClose = token[0].startsWith('</');
+    depth += isClose ? -1 : 1;
+    if (depth === 0) {
+      endIndex = tokenPattern.lastIndex;
+      break;
+    }
+  }
+  return `${source.slice(0, start)}${source.slice(endIndex)}`;
+}
+
+function splitRenderedDocument(renderedHtml) {
+  const source = String(renderedHtml || '');
+  const htmlTagMatch = source.match(/<html\b([^>]*)>/i);
+  const pageLang = extractHtmlAttribute(htmlTagMatch ? htmlTagMatch[1] : '', 'lang');
+
+  const headMatch = source.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i);
+  let headContent = headMatch ? String(headMatch[1] || '') : '';
+  const titleMatch = headContent.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
+  const pageTitle = titleMatch ? String(titleMatch[1] || '').replace(/\s+/g, ' ').trim() : '';
+  headContent = headContent.replace(/<title\b[^>]*>[\s\S]*?<\/title>/i, '');
+  headContent = headContent.replace(BACKGROUND_STYLE_TAG_RE, '');
+  headContent = headContent.replace(BACKGROUND_SCRIPT_TAG_RE, '');
+  headContent = headContent.trim();
+
+  const bodyMatch = source.match(/<body\b([^>]*)>([\s\S]*?)<\/body>/i);
+  const bodyAttributes = bodyMatch ? String(bodyMatch[1] || '') : '';
+  let bodyContent = bodyMatch ? String(bodyMatch[2] || '') : source;
+  const bodyClass = extractHtmlAttribute(bodyAttributes, 'class');
+  const bodyTheme = extractHtmlAttribute(bodyAttributes, 'data-theme');
+
+  BACKGROUND_ELEMENT_IDS.forEach((elementId) => {
+    bodyContent = stripRootElementById(bodyContent, elementId);
+  });
+  bodyContent = bodyContent.replace(BACKGROUND_SCRIPT_TAG_RE, '').trim();
+
+  const hasLegacyTopbar = /class=["'][^"']*\btopbar\b[^"']*["']/i.test(bodyContent);
+  const hasStuderriaNavbar = /class=["'][^"']*\bstuderria-navbar\b[^"']*["']/i.test(bodyContent);
+
+  return {
+    pageLang,
+    pageTitle,
+    headContent,
+    bodyContent,
+    bodyClass,
+    bodyTheme,
+    hasTopbar: hasLegacyTopbar || hasStuderriaNavbar,
+  };
+}
+
+app.use((req, res, next) => {
+  const rawRender = res.render.bind(res);
+  res.render = (view, options, callback) => {
+    let viewOptions = options;
+    let done = callback;
+    if (typeof viewOptions === 'function') {
+      done = viewOptions;
+      viewOptions = {};
+    }
+    const normalizedOptions = viewOptions && typeof viewOptions === 'object' ? viewOptions : {};
+    const viewName = String(view || '').trim();
+    const shouldUseGlobalLayout = normalizedOptions.layout !== false
+      && !viewName.startsWith('layouts/')
+      && !viewName.startsWith('partials/')
+      && !GLOBAL_LAYOUT_EXCLUDED_VIEWS.has(viewName);
+
+    if (!shouldUseGlobalLayout) {
+      return rawRender(view, normalizedOptions, done);
+    }
+
+    const baseOptions = { ...normalizedOptions, layout: false };
+    return rawRender(view, baseOptions, (renderErr, renderedHtml) => {
+      if (renderErr) {
+        if (typeof done === 'function') return done(renderErr);
+        return next(renderErr);
+      }
+
+      const parsed = splitRenderedDocument(renderedHtml);
+      const sessionUser = req.session && req.session.user ? req.session.user : null;
+      const sessionRole = req.session && req.session.role ? req.session.role : '';
+      const layoutLocals = {
+        ...baseOptions,
+        layout: false,
+        pageLang: parsed.pageLang || res.locals.lang || 'uk',
+        pageTitle: parsed.pageTitle || baseOptions.pageTitle || 'Studerria',
+        pageHead: parsed.headContent,
+        pageBodyClass: parsed.bodyClass,
+        pageTheme: parsed.bodyTheme || (/\btheme-dark\b/.test(parsed.bodyClass) ? 'dark' : 'light'),
+        showGlobalNavbar: !parsed.hasTopbar,
+        role: baseOptions.role || res.locals.role || sessionRole || '',
+        username: baseOptions.username || res.locals.username || (sessionUser && sessionUser.username ? sessionUser.username : ''),
+        body: parsed.bodyContent,
+      };
+
+      return rawRender('layouts/main', layoutLocals, (layoutErr, layoutHtml) => {
+        if (layoutErr) {
+          if (typeof done === 'function') return done(layoutErr);
+          return next(layoutErr);
+        }
+        if (typeof done === 'function') return done(null, layoutHtml);
+        if (!res.headersSent) res.send(layoutHtml);
+        return null;
+      });
+    });
+  };
+  next();
+});
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public'));

@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "1.0.93",
+      "date": "2026-03-05",
+      "items": [
+        "feat(layout-main): introduced global `views/layouts/main.ejs` shell with unified app frame (`studerria-theme` body, shared background layer, optional global navbar, and universal `page-container`)",
+        "feat(render-wrapper): added server-side render wrapper in `app.js` that applies `layouts/main` to all EJS pages by default (except explicitly excluded views), preserving existing route logic without per-route duplication",
+        "feat(global-background-system): added namespaced background stack (`studerria-bg`, morph blobs, cursor glow, particles, grain, dot-pattern) via `studerria-background.ejs` + `public/css/studerria-background.css` + `public/js/studerria-background.js`",
+        "feat(global-ui-system): added `public/css/studerria-ui.css` with namespaced visual system (`studerria-navbar`, `studerria-card`) and scoped adaptation rules for existing buttons/topbars/cards to align all pages with one product style",
+        "fix(background-collision): layout parser now strips legacy page-level background markup/assets (`dynamic/login/schedule/vision`) before composing final HTML so effects do not overlap or block UI"
+      ]
+    },
+    {
       "version": "1.0.92",
       "date": "2026-03-05",
       "items": [

@@ -1,0 +1,47 @@
+<%
+  const shouldRenderNavbar = showGlobalNavbar !== false;
+  const currentRole = String(role || '').trim();
+  const isAuthed = Boolean(currentRole);
+  const displayName = String(username || '').trim();
+%>
+<% if (shouldRenderNavbar) { %>
+  <nav class="studerria-navbar" aria-label="Global Navigation">
+    <a class="studerria-brand" href="<%= isAuthed ? '/home' : '/' %>">Studerria</a>
+
+    <div class="studerria-nav-links">
+      <% if (isAuthed) { %>
+        <a class="studerria-nav-link" href="/schedule">Schedule</a>
+        <a class="studerria-nav-link" href="/subjects">Subjects</a>
+        <a class="studerria-nav-link" href="/teamwork">Teamwork</a>
+        <a class="studerria-nav-link" href="/profile">Profile</a>
+        <% if (currentRole === 'admin') { %>
+          <a class="studerria-nav-link" href="/admin">Admin</a>
+        <% } %>
+      <% } else { %>
+        <a class="studerria-nav-link" href="/">Overview</a>
+        <a class="studerria-nav-link" href="/login">Login</a>
+      <% } %>
+    </div>
+
+    <div class="studerria-nav-actions">
+      <% if (displayName) { %>
+        <span class="studerria-user-pill" title="Signed in"><%= displayName %></span>
+      <% } %>
+      <button
+        type="button"
+        class="studerria-theme-toggle"
+        id="studerriaThemeToggle"
+        aria-label="Toggle theme"
+        data-light-label="Світла"
+        data-dark-label="Темна"
+      >
+        Темна
+      </button>
+      <% if (isAuthed) { %>
+        <a class="studerria-signup" href="/home">Open App</a>
+      <% } else { %>
+        <a class="studerria-signup" href="/register">Sign up</a>
+      <% } %>
+    </div>
+  </nav>
+<% } %>

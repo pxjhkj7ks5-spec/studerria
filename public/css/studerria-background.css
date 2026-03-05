@@ -1,0 +1,242 @@
+:root {
+  --studerria-bg-base: linear-gradient(135deg, #eef2ff 0%, #e8edff 52%, #e0e7ff 100%);
+  --studerria-bg-left: rgba(99, 102, 241, 0.24);
+  --studerria-bg-right: rgba(168, 85, 247, 0.22);
+  --studerria-bg-center: rgba(236, 72, 153, 0.12);
+
+  --studerria-morph-primary-a: rgba(129, 140, 248, 0.58);
+  --studerria-morph-primary-b: rgba(139, 92, 246, 0.54);
+  --studerria-morph-primary-c: rgba(168, 85, 247, 0.5);
+  --studerria-morph-secondary-a: rgba(56, 189, 248, 0.42);
+  --studerria-morph-secondary-b: rgba(99, 102, 241, 0.5);
+  --studerria-morph-secondary-c: rgba(147, 197, 253, 0.38);
+  --studerria-morph-opacity-primary: 0.2;
+  --studerria-morph-opacity-secondary: 0.17;
+
+  --studerria-highlight-opacity: 0.3;
+  --studerria-noise-opacity: 0.04;
+  --studerria-dot-opacity: 0.045;
+  --studerria-dot-color: #cbd5e1;
+
+  --studerria-particle-color: rgba(55, 48, 163, 0.38);
+  --studerria-particle-shadow: rgba(79, 70, 229, 0.22);
+  --studerria-particle-blend: multiply;
+}
+
+html[data-theme='dark'],
+body[data-theme='dark'],
+body.theme-dark {
+  --studerria-bg-base: linear-gradient(135deg, #1e1b4b 0%, #221a5a 52%, #251b67 100%);
+  --studerria-bg-left: rgba(67, 56, 202, 0.32);
+  --studerria-bg-right: rgba(124, 58, 237, 0.3);
+  --studerria-bg-center: rgba(59, 130, 246, 0.16);
+
+  --studerria-morph-primary-a: rgba(99, 102, 241, 0.7);
+  --studerria-morph-primary-b: rgba(139, 92, 246, 0.64);
+  --studerria-morph-primary-c: rgba(168, 85, 247, 0.6);
+  --studerria-morph-secondary-a: rgba(59, 130, 246, 0.5);
+  --studerria-morph-secondary-b: rgba(99, 102, 241, 0.56);
+  --studerria-morph-secondary-c: rgba(124, 58, 237, 0.48);
+  --studerria-morph-opacity-primary: 0.35;
+  --studerria-morph-opacity-secondary: 0.3;
+
+  --studerria-highlight-opacity: 0.25;
+  --studerria-noise-opacity: 0.045;
+  --studerria-dot-opacity: 0.04;
+  --studerria-dot-color: #6366f1;
+
+  --studerria-particle-color: rgba(165, 180, 252, 0.44);
+  --studerria-particle-shadow: rgba(129, 140, 248, 0.24);
+  --studerria-particle-blend: screen;
+}
+
+body.studerria-theme {
+  background: transparent !important;
+}
+
+.studerria-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateZ(0);
+}
+
+.studerria-bg-gradient,
+.studerria-bg-morph-layer,
+.studerria-morph-blob,
+.studerria-bg-blob,
+.studerria-bg-particles,
+.studerria-bg-particle,
+.studerria-cursor-glow,
+.studerria-grain-overlay,
+.studerria-dot-pattern {
+  position: absolute;
+  will-change: transform, opacity;
+}
+
+.studerria-bg-gradient {
+  inset: 0;
+  background:
+    radial-gradient(55% 72% at 10% 16%, var(--studerria-bg-left), transparent 72%),
+    radial-gradient(55% 72% at 90% 16%, var(--studerria-bg-right), transparent 72%),
+    radial-gradient(40% 52% at 50% 84%, var(--studerria-bg-center), transparent 78%),
+    var(--studerria-bg-base);
+}
+
+.studerria-bg-morph-layer {
+  inset: 0;
+  overflow: hidden;
+}
+
+.studerria-morph-blob {
+  width: min(70vw, 1200px);
+  height: min(84vh, 1200px);
+  overflow: visible;
+}
+
+.studerria-morph-primary {
+  top: -23vh;
+  left: -23vw;
+  opacity: var(--studerria-morph-opacity-primary);
+}
+
+.studerria-morph-secondary {
+  top: -15vh;
+  right: -25vw;
+  opacity: var(--studerria-morph-opacity-secondary);
+}
+
+.studerria-bg-blob {
+  width: 100%;
+  height: 100%;
+  display: block;
+  transform-origin: center;
+  filter: blur(86px);
+  animation: studerriaBlobFloat 30s ease-in-out infinite;
+}
+
+.studerria-morph-secondary .studerria-bg-blob {
+  filter: blur(98px);
+  animation-duration: 45s;
+  animation-delay: -12s;
+}
+
+@keyframes studerriaBlobFloat {
+  0% {
+    transform: translate3d(-1.5%, 0.6%, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(2.2%, -1.4%, 0) scale(1.2) rotate(10deg);
+  }
+  100% {
+    transform: translate3d(-1.1%, 1.1%, 0) scale(1) rotate(0deg);
+  }
+}
+
+.studerria-bg-particles {
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.studerria-bg-particle {
+  left: 0;
+  top: 0;
+  font-size: clamp(8px, 0.75vw, 10px);
+  font-weight: 620;
+  line-height: 1;
+  color: var(--studerria-particle-color);
+  text-shadow: 0 0 5px var(--studerria-particle-shadow);
+  opacity: 0;
+  transform: translate3d(-50%, -50%, 0) scale(0.64);
+  transform-origin: center;
+  pointer-events: none;
+  user-select: none;
+  mix-blend-mode: var(--studerria-particle-blend);
+}
+
+.studerria-cursor-glow {
+  top: 50%;
+  left: 50%;
+  width: min(46vw, 780px);
+  height: min(46vh, 540px);
+  border-radius: 50%;
+  transform: translate3d(-50%, -50%, 0);
+  background: radial-gradient(circle, rgba(255, 255, 255, var(--studerria-highlight-opacity)), transparent 62%);
+  transition: opacity 260ms ease;
+}
+
+.studerria-grain-overlay {
+  inset: 0;
+  background-image: url('/assets/grain.png');
+  background-repeat: repeat;
+  background-size: 190px 190px;
+  opacity: var(--studerria-noise-opacity);
+  mix-blend-mode: soft-light;
+}
+
+.studerria-dot-pattern {
+  top: 0;
+  width: 108px;
+  height: 100%;
+  color: var(--studerria-dot-color);
+  background-image: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 7px 7px;
+  opacity: var(--studerria-dot-opacity);
+}
+
+.studerria-dot-left {
+  left: 0;
+  mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0));
+}
+
+.studerria-dot-right {
+  right: 0;
+  mask-image: linear-gradient(to left, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0));
+}
+
+body.studerria-bg-reduced .studerria-bg-blob,
+body.studerria-bg-reduced .studerria-bg-particle {
+  animation: none !important;
+}
+
+body.studerria-bg-reduced .studerria-cursor-glow,
+body.studerria-bg-reduced .studerria-bg-particle {
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  .studerria-dot-pattern {
+    width: 68px;
+    background-size: 8px 8px;
+  }
+
+  .studerria-morph-blob {
+    width: min(92vw, 700px);
+    height: min(56vh, 560px);
+  }
+
+  .studerria-morph-primary {
+    top: -18vh;
+    left: -36vw;
+  }
+
+  .studerria-morph-secondary {
+    top: -12vh;
+    right: -42vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studerria-bg-blob,
+  .studerria-bg-particle {
+    animation: none !important;
+  }
+
+  .studerria-cursor-glow,
+  .studerria-bg-particle {
+    display: none !important;
+  }
+}

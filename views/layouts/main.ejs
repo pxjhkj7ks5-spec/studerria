@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="<%= pageLang || lang || 'uk' %>" data-theme="<%= pageTheme || 'light' %>">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= pageTitle || 'Studerria' %></title>
+    <%- pageHead || '' %>
+    <link rel="stylesheet" href="/css/studerria-background.css" />
+    <link rel="stylesheet" href="/css/studerria-ui.css" />
+  </head>
+  <body class="studerria-theme <%= pageBodyClass || '' %>">
+    <%- include('../partials/studerria-background') %>
+    <%- include('../partials/navbar', { showGlobalNavbar, role, username, t }) %>
+
+    <main class="page-container">
+      <%- body %>
+    </main>
+
+    <script src="/js/studerria-background.js" defer></script>
+  </body>
+</html>
