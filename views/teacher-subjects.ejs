@@ -1,0 +1,328 @@
+<%
+  const teacherSubjects = Array.isArray(subjects) ? subjects : [];
+  const selectedMap = selections && typeof selections.get === 'function' ? selections : new Map();
+  const selectedCount = teacherSubjects.reduce((total, item) => (selectedMap.has(Number(item.id)) ? total + 1 : total), 0);
+  const checklistPropsJson = JSON.stringify({
+    targetSelector: '#teacherSubjectsForm',
+    checkboxSelector: 'input[type="checkbox"][name^="subject_"]',
+    rowSelector: '[data-checklist-row]',
+    rowTextSelector: '[data-checklist-text]',
+    searchEnabled: true,
+    searchPlaceholder: 'Find subject or course',
+    labels: {
+      all: 'All',
+      none: 'None',
+      invert: 'Invert',
+      selected: 'Selected',
+    },
+  }).replace(/'/g, '&#39;');
+%>
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Teacher subjects</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/css/design-system.css" />
+    <style>
+      :root {
+        --teacher-subjects-border-dark: rgba(255, 255, 255, 0.14);
+        --teacher-subjects-border-light: rgba(15, 23, 42, 0.12);
+        --teacher-subjects-bg-dark: rgba(255, 255, 255, 0.06);
+        --teacher-subjects-bg-light: rgba(255, 255, 255, 0.72);
+      }
+      body {
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+      }
+      body.theme-dark {
+        background:
+          radial-gradient(1150px 760px at 12% 6%, rgba(56, 189, 248, 0.16), transparent 64%),
+          radial-gradient(980px 700px at 84% 18%, rgba(129, 140, 248, 0.2), transparent 62%),
+          linear-gradient(148deg, #070f1f 0%, #101a31 52%, #162741 100%);
+        color: #f8fafc;
+      }
+      body.theme-light {
+        background:
+          radial-gradient(1150px 760px at 14% 6%, rgba(186, 230, 253, 0.5), transparent 64%),
+          radial-gradient(980px 700px at 84% 18%, rgba(221, 214, 254, 0.55), transparent 62%),
+          linear-gradient(128deg, #e9eff8 0%, #eff5ff 52%, #f7f9ff 100%);
+        color: #0f172a;
+      }
+      .shell {
+        padding-top: 24px;
+        padding-bottom: 48px;
+      }
+      .glass {
+        border-radius: 22px;
+        backdrop-filter: blur(18px);
+      }
+      body.theme-dark .glass {
+        border: 1px solid var(--teacher-subjects-border-dark);
+        background: var(--teacher-subjects-bg-dark);
+        box-shadow: 0 18px 46px rgba(2, 6, 23, 0.5);
+      }
+      body.theme-light .glass {
+        border: 1px solid var(--teacher-subjects-border-light);
+        background: var(--teacher-subjects-bg-light);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+      }
+      .hero {
+        padding: 24px;
+      }
+      .hero-title {
+        margin: 0;
+        font-size: clamp(1.75rem, 2.8vw, 2.35rem);
+        font-weight: 700;
+      }
+      .hero-subtitle {
+        margin-top: 10px;
+        max-width: 880px;
+        color: rgba(226, 232, 240, 0.82);
+      }
+      body.theme-light .hero-subtitle {
+        color: rgba(15, 23, 42, 0.64);
+      }
+      .chip-row {
+        margin-top: 14px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .chip {
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.34);
+        background: rgba(15, 23, 42, 0.3);
+        padding: 5px 12px;
+        font-size: 0.82rem;
+      }
+      body.theme-light .chip {
+        border-color: rgba(15, 23, 42, 0.14);
+        background: rgba(255, 255, 255, 0.9);
+      }
+      .section {
+        padding: 20px;
+      }
+      .section-title {
+        margin: 0;
+        font-size: 1.08rem;
+        font-weight: 650;
+      }
+      .section-subtitle {
+        margin: 8px 0 0;
+        font-size: 0.84rem;
+        color: rgba(203, 213, 225, 0.76);
+      }
+      body.theme-light .section-subtitle {
+        color: rgba(15, 23, 42, 0.62);
+      }
+      .subject-list {
+        max-height: min(66vh, 720px);
+        overflow: auto;
+        padding-right: 4px;
+      }
+      .subject-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        background: rgba(15, 23, 42, 0.28);
+      }
+      body.theme-light .subject-row {
+        background: rgba(255, 255, 255, 0.92);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .subject-main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .subject-title {
+        font-weight: 600;
+      }
+      .subject-meta {
+        font-size: 0.8rem;
+        color: rgba(203, 213, 225, 0.76);
+      }
+      body.theme-light .subject-meta {
+        color: rgba(15, 23, 42, 0.6);
+      }
+      .subject-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .subject-group-select {
+        min-width: 132px;
+        border-radius: 10px;
+      }
+      body.theme-dark .subject-group-select {
+        background: rgba(255, 255, 255, 0.06);
+        color: #f8fafc;
+        border-color: rgba(148, 163, 184, 0.3);
+      }
+      body.theme-light .subject-group-select {
+        background: rgba(255, 255, 255, 0.92);
+      }
+      .subject-toggle-label {
+        white-space: nowrap;
+        font-size: 0.82rem;
+      }
+    </style>
+  </head>
+  <body class="theme-dark page-teacher-subjects page-journal">
+    <%- include('partials/topbar', { role, username, t, activePage: 'teacher-subjects', pageTitle: 'Teacher subjects', settings: settings }) %>
+    <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'teacher-subjects', settings: settings }) %>
+
+    <main class="container shell">
+      <% if (error) { %>
+        <div class="alert alert-danger glass mb-3"><%= error %></div>
+      <% } %>
+      <% if (success) { %>
+        <div class="alert alert-success glass mb-3"><%= success %></div>
+      <% } %>
+
+      <section class="glass hero mb-3">
+        <h1 class="hero-title">Teacher subjects</h1>
+        <p class="hero-subtitle">
+          Dedicated teacher flow: choose subjects and seminar groups for teaching scope without using admin panels.
+        </p>
+        <div class="chip-row">
+          <span class="chip">Catalog: <%= teacherSubjects.length %></span>
+          <span class="chip">Selected: <%= selectedCount %></span>
+          <span class="chip">Profile scope: teacher</span>
+        </div>
+      </section>
+
+      <section class="glass section mb-3">
+        <h2 class="section-title">Teaching scope</h2>
+        <p class="section-subtitle">
+          Select every subject you teach. For non-general subjects, choose exactly one seminar group.
+        </p>
+
+        <form id="teacherSubjectsForm" method="POST" action="/teacher/subjects" class="mt-3">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <span class="small text-muted">Bulk actions</span>
+            <span
+              data-react-island="checklist-toolbar"
+              data-island-props='<%- checklistPropsJson %>'
+            ></span>
+          </div>
+
+          <div class="subject-list d-grid gap-2 mb-3">
+            <% (teacherSubjects || []).forEach((item) => { %>
+              <% const selectedGroup = selectedMap.get(Number(item.id)); %>
+              <% const checked = selectedMap.has(Number(item.id)); %>
+              <% const isGeneral = item.is_general === true || Number(item.is_general) === 1; %>
+              <label
+                class="subject-row"
+                data-checklist-row
+                data-checklist-text="<%= `${item.name || ''} ${item.course_name || ''} ${item.pathway_labels || ''}` %>"
+              >
+                <span class="subject-main" data-checklist-text>
+                  <span class="subject-title"><%= item.name %></span>
+                  <span class="subject-meta">
+                    <%= item.course_name || 'Course' %>
+                    <% if (item.pathway_labels) { %>
+                      | <%= item.pathway_labels %>
+                    <% } %>
+                    | <%= isGeneral ? 'General subject' : `Groups 1-${Number(item.group_count || 1)}` %>
+                  </span>
+                </span>
+                <span class="subject-controls">
+                  <% if (!isGeneral) { %>
+                    <select
+                      class="form-select form-select-sm subject-group-select"
+                      name="group_<%= item.id %>"
+                      data-subject-group="<%= item.id %>"
+                    >
+                      <option value="">Group</option>
+                      <% for (let g = 1; g <= Number(item.group_count || 1); g += 1) { %>
+                        <option value="<%= g %>" <%= Number(selectedGroup) === g ? 'selected' : '' %>><%= g %></option>
+                      <% } %>
+                    </select>
+                  <% } %>
+                  <span class="form-check subject-toggle-label">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="teacher_subject_<%= item.id %>"
+                      name="subject_<%= item.id %>"
+                      value="1"
+                      data-subject-toggle="<%= item.id %>"
+                      <%= checked ? 'checked' : '' %>
+                    />
+                    <label class="form-check-label" for="teacher_subject_<%= item.id %>">Teach</label>
+                  </span>
+                </span>
+              </label>
+            <% }) %>
+            <% if (!teacherSubjects.length) { %>
+              <div class="subject-row">
+                <span class="subject-main">
+                  <span class="subject-title">No visible subjects in catalog</span>
+                  <span class="subject-meta">Check subject visibility in pathways and subject settings.</span>
+                </span>
+              </div>
+            <% } %>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-primary" type="submit">Save teacher subjects</button>
+            <a class="btn btn-outline-secondary" href="/teacher">Back to teacher hub</a>
+          </div>
+        </form>
+      </section>
+
+      <%- include('partials/app-footer') %>
+    </main>
+
+    <%- include('partials/changelog-modal') %>
+    <%- include('partials/mobile-menu-modal', { role, t, activePage: 'teacher-subjects', settings: settings }) %>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <%- include('partials/desktop-menu-drawer-script') %>
+    <script src="/js/design-system.js" defer></script>
+    <script>
+      (function applyTheme() {
+        const storedTheme = localStorage.getItem('ui-theme') || 'theme-dark';
+        document.body.classList.remove('theme-dark', 'theme-light');
+        document.body.classList.add(storedTheme);
+      })();
+
+      (function bindTeacherSubjectGroups() {
+        const toggles = Array.from(document.querySelectorAll('[data-subject-toggle]'));
+        const syncOne = (toggle) => {
+          if (!(toggle instanceof HTMLInputElement)) return;
+          const subjectId = String(toggle.dataset.subjectToggle || '');
+          if (!subjectId) return;
+          const select = document.querySelector(`[data-subject-group="${subjectId}"]`);
+          if (!(select instanceof HTMLSelectElement)) return;
+          select.disabled = !toggle.checked;
+          if (!toggle.checked) {
+            select.value = '';
+          }
+        };
+        toggles.forEach((toggle) => {
+          syncOne(toggle);
+          toggle.addEventListener('change', () => syncOne(toggle));
+        });
+      })();
+    </script>
+  </body>
+</html>
+

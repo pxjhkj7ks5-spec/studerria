@@ -2540,6 +2540,25 @@
 
         <% if (sectionAllowed('admin-subjects')) { %>
         <div id="admin-subjects" class="admin-panel" data-admin-title="Academics / Subjects">
+          <%
+            const bulkTargetCourses = (courses || []).filter(function(courseRow) {
+              return Number(courseRow.id) !== Number(selectedCourseId || 0);
+            });
+            const bulkAssignCourseChecklistPropsJson = JSON.stringify({
+              targetSelector: '#subjectBulkAssignForm',
+              checkboxSelector: 'input[type="checkbox"][name="target_course_ids"]',
+              rowSelector: '[data-checklist-row]',
+              rowTextSelector: '[data-checklist-text]',
+              searchEnabled: true,
+              searchPlaceholder: 'Find course',
+              labels: {
+                all: 'All',
+                none: 'None',
+                invert: 'Invert',
+                selected: 'Selected',
+              },
+            }).replace(/'/g, '&#39;');
+          %>
           <div class="card mb-4">
             <div class="card-body">
               <h5 class="card-title mb-3">Add subject</h5>
@@ -2589,6 +2608,68 @@
                   </div>
                   <div class="col-12 col-md-3 d-grid">
                     <button class="btn btn-primary" type="submit">Add</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="card-body">
+              <h5 class="card-title mb-2">Assign subject to multiple courses</h5>
+              <div class="small text-muted mb-3">Create one subject across selected courses in one action.</div>
+              <form id="subjectBulkAssignForm" method="POST" action="/admin/subjects/bulk-assign" novalidate>
+                <div class="row g-2">
+                  <div class="col-12 col-md-4">
+                    <label class="form-label">Source subject</label>
+                    <select class="form-select" name="source_subject_id" required>
+                      <option value="">Select source subject</option>
+                      <% (subjects || []).forEach(function(s) { %>
+                        <option value="<%= s.id %>"><%= s.name %> (groups: <%= s.group_count %>)</option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label class="form-label">Target subject name (optional)</label>
+                    <input class="form-control" name="target_name" maxlength="140" placeholder="Default: source subject name" />
+                  </div>
+                  <div class="col-12 col-md-4 d-flex align-items-end">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="subjectBulkCopySettings" name="copy_settings" value="1" checked />
+                      <label class="form-check-label" for="subjectBulkCopySettings">Copy source settings (groups/flags)</label>
+                    </div>
+                  </div>
+
+                  <div class="col-12 d-flex flex-wrap align-items-center justify-content-between gap-2 mt-1">
+                    <div class="small text-muted">Target courses</div>
+                    <span
+                      data-react-island="checklist-toolbar"
+                      data-island-props='<%- bulkAssignCourseChecklistPropsJson %>'
+                    ></span>
+                  </div>
+                  <div id="subjectBulkTargetCourses" class="col-12 d-grid gap-2">
+                    <% if (bulkTargetCourses.length) { %>
+                      <% bulkTargetCourses.forEach(function(courseRow) { %>
+                        <label
+                          class="d-flex align-items-center justify-content-between gap-2 border rounded px-3 py-2"
+                          data-checklist-row
+                          data-checklist-text="<%= `${courseRow.name || ''} ${courseRow.id || ''}` %>"
+                        >
+                          <span data-checklist-text><%= courseRow.name %> <span class="text-muted">(#<%= courseRow.id %>)</span></span>
+                          <input class="form-check-input" type="checkbox" name="target_course_ids" value="<%= courseRow.id %>" />
+                        </label>
+                      <% }); %>
+                    <% } else { %>
+                      <div class="small text-muted border rounded px-3 py-2">
+                        No additional courses available. Create more courses first.
+                      </div>
+                    <% } %>
+                  </div>
+
+                  <div class="col-12 col-md-4 d-grid mt-1">
+                    <button class="btn btn-outline-primary" type="submit" <%= (subjects || []).length && bulkTargetCourses.length ? '' : 'disabled' %>>
+                      Assign to selected courses
+                    </button>
                   </div>
                 </div>
               </form>

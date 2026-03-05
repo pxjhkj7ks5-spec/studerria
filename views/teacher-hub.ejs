@@ -177,8 +177,8 @@
       }
     </style>
   </head>
-  <body class="theme-dark">
-    <%- include('partials/topbar', { role, username, t, activePage: 'teacher-hub', pageTitle: 'Teacher hub' }) %>
+  <body class="theme-dark page-teacher-hub page-journal">
+    <%- include('partials/topbar', { role, username, t, activePage: 'teacher-hub', pageTitle: 'Teacher hub', settings: settings }) %>
     <%- include('partials/desktop-menu-drawer', {
       role,
       t,

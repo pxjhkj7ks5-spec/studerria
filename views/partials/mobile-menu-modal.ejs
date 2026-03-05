@@ -7,6 +7,7 @@
   const isJournalInsights = activePage === 'journal-insights';
   const isTeacherHub = activePage === 'teacher-hub';
   const isTeacherWorkspace = activePage === 'teacher-workspace';
+  const isTeacherSubjects = activePage === 'teacher-subjects';
   const isAdminPathways = activePage === 'admin-pathways';
   const mobileSettings = (typeof settings !== 'undefined') ? settings : null;
   const mobileHasCustomAdminPanelAccess = (typeof hasCustomAdminPanelAccess !== 'undefined')
@@ -68,6 +69,9 @@
           <% } %>
           <% if (role === 'teacher' && !isTeacherWorkspace) { %>
             <a class="btn w-100 glass mobile-menu-action" href="/teacher/workspace">Teacher workspace</a>
+          <% } %>
+          <% if (role === 'teacher' && !isTeacherSubjects) { %>
+            <a class="btn w-100 glass mobile-menu-action" href="/teacher/subjects">Teacher subjects</a>
           <% } %>
           <% if (!isSubjects) { %>
             <a class="btn w-100 glass mobile-menu-action" href="/subjects">📚 Предмети</a>

@@ -343,8 +343,8 @@
     </style>
     <link rel="stylesheet" href="/css/design-system.css" />
   </head>
-  <body class="theme-dark">
-    <%- include('partials/topbar', { role, username, t, activePage: 'teacher-workspace', pageTitle: 'Teacher workspace' }) %>
+  <body class="theme-dark page-teacher-workspace page-journal">
+    <%- include('partials/topbar', { role, username, t, activePage: 'teacher-workspace', pageTitle: 'Teacher workspace', settings: settings }) %>
     <%- include('partials/desktop-menu-drawer', {
       role,
       t,

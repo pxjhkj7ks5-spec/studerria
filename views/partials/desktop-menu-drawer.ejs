@@ -2,6 +2,9 @@
   const drawerIsSchedule = activePage === 'schedule';
   const drawerIsMyDay = activePage === 'my-day';
   const drawerIsJournalInsights = activePage === 'journal-insights';
+  const drawerIsTeacherHub = activePage === 'teacher-hub';
+  const drawerIsTeacherWorkspace = activePage === 'teacher-workspace';
+  const drawerIsTeacherSubjects = activePage === 'teacher-subjects';
   const drawerIsAdminPathways = activePage === 'admin-pathways';
   const drawerFirstHref = drawerIsMyDay ? '/schedule' : '/home';
   const drawerFirstLabel = drawerIsMyDay ? '📅 Розклад' : '🏠 Головна';
@@ -55,12 +58,15 @@
     <% } %>
     <a class="drawer-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
     <a class="drawer-action" href="/subjects">📚 Предмети</a>
-    <% if (role === 'teacher') { %>
-      <a class="drawer-action" href="/teacher">🎛️ Teacher hub</a>
-      <a class="drawer-action" href="/teacher/workspace">🧩 Teacher workspace</a>
-      <a class="drawer-action" href="/teacher/subjects">🗂️ Teacher subjects</a>
+    <% if (role === 'teacher' && !drawerIsTeacherHub) { %>
+      <a class="drawer-action" href="/teacher">Teacher hub</a>
     <% } %>
-
+    <% if (role === 'teacher' && !drawerIsTeacherWorkspace) { %>
+      <a class="drawer-action" href="/teacher/workspace">Teacher workspace</a>
+    <% } %>
+    <% if (role === 'teacher' && !drawerIsTeacherSubjects) { %>
+      <a class="drawer-action" href="/teacher/subjects">Teacher subjects</a>
+    <% } %>
     <% if (canShowCustomDeadlines) { %>
       <% if (drawerIsSchedule) { %>
         <button class="drawer-action" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">

@@ -6818,6 +6818,7 @@ app.get('/teacher', requireLogin, async (req, res) => {
     return res.render('teacher-hub', {
       role: 'teacher',
       username,
+      settings: settingsCache,
       stats: {
         subjects: uniqueSubjectIds.size,
         courses: teacherCourses.length,
@@ -6840,7 +6841,18 @@ app.get('/teacher/subjects', requireLogin, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'teacher.subjects.init');
   }
-  const { id: userId, course_id: courseId } = req.session.user;
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
+  }
+  const { id: userId, course_id: courseId, username } = req.session.user;
+  const decodeMessage = (value) => {
+    if (!value) return '';
+    try {
+      return decodeURIComponent(String(value));
+    } catch (err) {
+      return String(value);
+    }
+  };
   try {
     const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [courseId]);
     if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
@@ -6848,11 +6860,14 @@ app.get('/teacher/subjects', requireLogin, async (req, res) => {
     }
     const subjects = await getTeacherSubjectCatalog();
     const selections = await getTeacherSelections(userId);
-    return res.render('register-teacher-subjects', {
+    return res.render('teacher-subjects', {
+      role: 'teacher',
+      username,
+      settings: settingsCache,
       subjects,
       selections,
-      error: req.query.error || '',
-      isProfileEdit: true,
+      error: decodeMessage(req.query.error),
+      success: decodeMessage(req.query.ok),
     });
   } catch (err) {
     return handleDbError(res, err, 'teacher.subjects');
@@ -6864,6 +6879,9 @@ app.post('/teacher/subjects', requireLogin, async (req, res) => {
     await ensureDbReady();
   } catch (err) {
     return handleDbError(res, err, 'teacher.subjects.save.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
   }
   const { id: userId, course_id: courseId } = req.session.user;
   try {
@@ -6877,7 +6895,7 @@ app.post('/teacher/subjects', requireLogin, async (req, res) => {
     }
     logAction(db, req, 'teacher_subjects_update', { user_id: userId });
     broadcast('users_updated');
-    return res.redirect('/profile?ok=Subjects%20updated');
+    return res.redirect('/teacher/subjects?ok=Subjects%20updated');
   } catch (err) {
     console.error('Failed to save teacher subjects', err);
     return res.redirect('/teacher/subjects?error=Database%20error');
@@ -6939,6 +6957,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     return res.render('teacher-workspace', {
       role: 'teacher',
       username,
+      settings: settingsCache,
       teacherCourses,
       selectedCourseId,
       teacherSubjects: scopedTeacherSubjects,
@@ -33361,6 +33380,154 @@ app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
     return res.redirect('/admin?ok=Subject%20added');
     }
   );
+});
+
+app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimiter, async (req, res) => {
+  const sourceCourseId = getAdminCourse(req);
+  const sourceSubjectId = parsePositiveIntStrict(req.body.source_subject_id);
+  const rawTargetCourseIds = Array.isArray(req.body.target_course_ids)
+    ? req.body.target_course_ids
+    : (req.body.target_course_ids ? [req.body.target_course_ids] : []);
+  const targetCourseIds = Array.from(
+    new Set(
+      rawTargetCourseIds
+        .map((value) => parsePositiveIntStrict(value))
+        .filter((courseId) => Number.isInteger(courseId) && courseId > 0 && courseId !== Number(sourceCourseId))
+    )
+  );
+  const copySettings = parseBooleanFlag(req.body.copy_settings, true);
+
+  if (!sourceSubjectId) {
+    return res.redirect('/admin?err=Select%20source%20subject');
+  }
+  if (!targetCourseIds.length) {
+    return res.redirect('/admin?err=Select%20target%20courses');
+  }
+
+  try {
+    const sourceSubject = await db.get(
+      `
+        SELECT
+          id,
+          name,
+          group_count,
+          default_group,
+          show_in_teamwork,
+          visible,
+          is_required,
+          is_general
+        FROM subjects
+        WHERE id = ? AND course_id = ?
+      `,
+      [sourceSubjectId, sourceCourseId]
+    );
+    if (!sourceSubject) {
+      return res.redirect('/admin?err=Source%20subject%20not%20found');
+    }
+
+    const requestedName = sanitizeCompactText(req.body.target_name || '', 140);
+    const sourceName = sanitizeCompactText(sourceSubject.name || '', 140);
+    const targetName = requestedName || sourceName;
+    if (!targetName) {
+      return res.redirect('/admin?err=Target%20name%20is%20required');
+    }
+
+    const targetRows = await db.all(
+      'SELECT id FROM courses WHERE id = ANY(?::int[])',
+      [targetCourseIds]
+    );
+    const validTargetSet = new Set((targetRows || []).map((row) => Number(row.id || 0)).filter((id) => id > 0));
+
+    const sourceGroupCount = Number.isFinite(Number(sourceSubject.group_count))
+      ? Math.max(1, Math.min(3, Math.round(Number(sourceSubject.group_count))))
+      : 1;
+    const sourceDefaultGroupRaw = Number(sourceSubject.default_group);
+    const sourceDefaultGroup = Number.isFinite(sourceDefaultGroupRaw)
+      ? Math.max(1, Math.min(sourceGroupCount, Math.round(sourceDefaultGroupRaw)))
+      : 1;
+    const sourceShowInTeamwork = sourceSubject.show_in_teamwork === true || Number(sourceSubject.show_in_teamwork) === 1 ? 1 : 0;
+    const sourceVisible = sourceSubject.visible === false || Number(sourceSubject.visible) === 0 ? 0 : 1;
+    const sourceRequired = sourceSubject.is_required === false || Number(sourceSubject.is_required) === 0 ? 0 : 1;
+    const sourceGeneral = sourceSubject.is_general === false || Number(sourceSubject.is_general) === 0 ? 0 : 1;
+
+    const insertedCourseIds = new Set();
+    let createdCount = 0;
+    let skippedExistingCount = 0;
+    let skippedMissingCourses = 0;
+
+    for (const targetCourseId of targetCourseIds) {
+      if (!validTargetSet.has(Number(targetCourseId))) {
+        skippedMissingCourses += 1;
+        continue;
+      }
+      const existing = await db.get(
+        `
+          SELECT id
+          FROM subjects
+          WHERE course_id = ?
+            AND LOWER(TRIM(name)) = LOWER(TRIM(?))
+          LIMIT 1
+        `,
+        [targetCourseId, targetName]
+      );
+      if (existing) {
+        skippedExistingCount += 1;
+        continue;
+      }
+
+      const groupCount = copySettings ? sourceGroupCount : 1;
+      const defaultGroup = copySettings ? sourceDefaultGroup : 1;
+      const showInTeamwork = copySettings ? sourceShowInTeamwork : 1;
+      const visible = copySettings ? sourceVisible : 1;
+      const required = copySettings ? sourceRequired : 1;
+      const general = sourceGeneral;
+
+      await db.run(
+        `
+          INSERT INTO subjects
+            (name, group_count, default_group, show_in_teamwork, visible, is_required, is_general, course_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [targetName, groupCount, defaultGroup, showInTeamwork, visible, required, general, targetCourseId]
+      );
+      insertedCourseIds.add(Number(targetCourseId));
+      createdCount += 1;
+    }
+
+    insertedCourseIds.forEach((courseId) => invalidateSubjectsCache(courseId));
+
+    logAction(db, req, 'subject_bulk_assign', {
+      source_subject_id: sourceSubjectId,
+      source_course_id: Number(sourceCourseId || 0),
+      target_name: targetName,
+      copy_settings: copySettings ? 1 : 0,
+      target_courses: targetCourseIds,
+      created_count: createdCount,
+      skipped_existing_count: skippedExistingCount,
+      skipped_missing_course_count: skippedMissingCourses,
+    });
+    logActivity(
+      db,
+      req,
+      'subject_bulk_assign',
+      'subject',
+      Number(sourceSubjectId) || null,
+      {
+        target_name: targetName,
+        copy_settings: copySettings ? 1 : 0,
+        target_courses: targetCourseIds,
+        created_count: createdCount,
+        skipped_existing_count: skippedExistingCount,
+        skipped_missing_course_count: skippedMissingCourses,
+      },
+      sourceCourseId
+    );
+
+    const summary = `Bulk assign complete: created ${createdCount}, skipped existing ${skippedExistingCount}, invalid courses ${skippedMissingCourses}`;
+    return res.redirect(`/admin?ok=${encodeURIComponent(summary)}`);
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
 });
 
 app.post('/admin/subjects/edit/:id', requireSubjectsSectionAccess, (req, res) => {

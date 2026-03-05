@@ -8,6 +8,7 @@
   const isJournalInsights = activePage === 'journal-insights';
   const isTeacherHub = activePage === 'teacher-hub';
   const isTeacherWorkspace = activePage === 'teacher-workspace';
+  const isTeacherSubjects = activePage === 'teacher-subjects';
   const isAdminPathways = activePage === 'admin-pathways';
   const topbarCanManagePathways = (typeof canManagePathways !== 'undefined')
     ? Boolean(canManagePathways)
@@ -89,7 +90,7 @@
         >
           ☰
         </button>
-      <% } else if (isSubjects || isJournal || isJournalInsights || isTeamwork || isProfile || isTeacherHub || isTeacherWorkspace || isAdminPathways) { %>
+      <% } else if (isSubjects || isJournal || isJournalInsights || isTeamwork || isProfile || isTeacherHub || isTeacherWorkspace || isTeacherSubjects || isAdminPathways) { %>
         <span class="me-2 muted desktop-only text-nowrap">
           <% if (role === 'admin') { %>
             <%= t('role.admin') %>: <%= username %>
@@ -179,6 +180,9 @@
         <% } %>
         <% if (role === 'teacher' && !isMyDay && !isTeacherWorkspace) { %>
           <a class="btn btn-glass me-1 desktop-only" href="/teacher/workspace">Teacher workspace</a>
+        <% } %>
+        <% if (role === 'teacher' && !isMyDay && !isTeacherSubjects) { %>
+          <a class="btn btn-glass me-1 desktop-only" href="/teacher/subjects">Teacher subjects</a>
         <% } %>
         <% if (isMyDay) { %>
           <a class="btn btn-glass me-1 desktop-only" href="/schedule">Повернутись до розкладу</a>
