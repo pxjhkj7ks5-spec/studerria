@@ -532,12 +532,31 @@ body.page-schedule .chip {
   border-radius: 999px;
 }
 
-body.page-schedule .badge-glow,
 body.page-schedule .sync-pill,
 body.page-schedule .density-chip {
   border: 1px solid color-mix(in srgb, var(--studerria-cta-start) 22%, var(--studerria-panel-border));
   background: color-mix(in srgb, var(--studerria-pill-bg) 88%, rgba(255, 255, 255, 0.05));
   box-shadow: 0 12px 28px rgba(2, 6, 23, 0.12);
+}
+
+body.page-schedule .badge-glow {
+  border: 1px solid rgba(147, 197, 253, 0.62);
+  background: linear-gradient(135deg, rgba(191, 219, 254, 0.92), rgba(196, 181, 253, 0.84));
+  color: #16213b;
+  font-weight: 600;
+  box-shadow: 0 12px 28px rgba(99, 102, 241, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+body.theme-dark.page-schedule .badge-glow {
+  border-color: rgba(147, 197, 253, 0.66);
+  background: linear-gradient(135deg, rgba(191, 219, 254, 0.94), rgba(196, 181, 253, 0.86));
+  color: #16213b;
+}
+
+body.theme-light.page-schedule .badge-glow {
+  border-color: rgba(147, 197, 253, 0.58);
+  background: linear-gradient(135deg, rgba(191, 219, 254, 0.88), rgba(196, 181, 253, 0.8));
+  color: #16213b;
 }
 
 body.page-my-day .cockpit-card,
