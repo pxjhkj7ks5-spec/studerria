@@ -233,10 +233,6 @@ body.page-auth .studerria-cursor-glow {
   display: none !important;
 }
 
-body.page-auth .studerria-bg-particle {
-  display: none !important;
-}
-
 @media (max-width: 900px) {
   .studerria-dot-pattern {
     width: 68px;

@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.0.99",
+      "date": "2026-03-05",
+      "items": [
+        "fix(auth-trail-restore): restored symbol trail rendering on `page-auth` while keeping cursor glow and pointer parallax disabled there",
+        "tune(auth-background): retained previous cleanup of duplicate ambient mouse-follow so auth pages keep the 1.0.97 feel without extra overlay effects"
+      ]
+    },
+    {
       "version": "1.0.98",
       "date": "2026-03-05",
       "items": [
