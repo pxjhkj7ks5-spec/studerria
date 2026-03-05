@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const body = document.body;
   const html = document.documentElement;
   const highlight = root.querySelector('.mouse-highlight');
+  const trailHost = root.querySelector('#dynamicBgTrail');
   const parallaxLayers = Array.from(root.querySelectorAll('[data-depth]'));
 
   const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -25,7 +26,15 @@ document.addEventListener('DOMContentLoaded', () => {
     ]
   };
 
+  const TRAIL_PATTERN = [
+    { symbol: 'o', offset: 0, lane: 0, ttl: 1500, opacity: 0.34, scale: 0.88 },
+    { symbol: '>', offset: 8, lane: 1, ttl: 1200, opacity: 0.27, scale: 0.82 },
+    { symbol: '_', offset: 14, lane: 2, ttl: 920, opacity: 0.23, scale: 0.78 }
+  ];
+
   const MORPH_FRAME_MS = 42;
+  const TRAIL_FRAME_MS = 34;
+  const MAX_TRAIL_PARTICLES = 72;
 
   const state = {
     width: Math.max(window.innerWidth, 1),
@@ -37,30 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
     reducedMotion: Boolean(reducedMotionMedia.matches),
     coarsePointer: Boolean(coarsePointerMedia.matches),
     rafId: 0,
-    lastMorphAt: 0
+    lastMorphAt: 0,
+    lastTrailAt: 0
   };
-
-  const morphStates = Array.from(root.querySelectorAll('[data-blob-path]')).map((pathEl, index) => {
-    const kind = pathEl.dataset.blobPath === 'secondary' ? 'secondary' : 'primary';
-    const frames = BLOB_MORPH_SHAPES[kind] || BLOB_MORPH_SHAPES.primary;
-    pathEl.setAttribute('d', toBlobPath(frames[0]));
-    return {
-      pathEl,
-      frames,
-      duration: kind === 'secondary' ? 45000 : 30000,
-      offset: index * 6200
-    };
-  });
-
-  body.classList.add('dynamic-bg-ready');
-
-  if (!html.getAttribute('data-theme') && !body.getAttribute('data-theme')) {
-    if (body.classList.contains('theme-dark')) {
-      html.setAttribute('data-theme', 'dark');
-    } else {
-      html.setAttribute('data-theme', 'light');
-    }
-  }
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -72,18 +60,117 @@ document.addEventListener('DOMContentLoaded', () => {
     return value * value * (3 - (2 * value));
   }
 
-  function syncThemeAttribute() {
+  function resolveTheme() {
     if (body.classList.contains('theme-dark')) {
-      html.setAttribute('data-theme', 'dark');
-      body.setAttribute('data-theme', 'dark');
-      return;
+      return 'dark';
     }
 
     if (body.classList.contains('theme-light')) {
-      html.setAttribute('data-theme', 'light');
-      body.setAttribute('data-theme', 'light');
+      return 'light';
+    }
+
+    const bodyTheme = body.getAttribute('data-theme');
+    if (bodyTheme === 'dark' || bodyTheme === 'light') {
+      return bodyTheme;
+    }
+
+    const htmlTheme = html.getAttribute('data-theme');
+    if (htmlTheme === 'dark' || htmlTheme === 'light') {
+      return htmlTheme;
+    }
+
+    return 'light';
+  }
+
+  function syncThemeAttribute() {
+    const nextTheme = resolveTheme();
+    if (html.getAttribute('data-theme') !== nextTheme) {
+      html.setAttribute('data-theme', nextTheme);
     }
   }
+
+  const morphStates = Array.from(root.querySelectorAll('[data-blob-path]')).map((pathEl, index) => {
+    const kind = pathEl.dataset.blobPath === 'secondary' ? 'secondary' : 'primary';
+    const frames = BLOB_MORPH_SHAPES[kind] || BLOB_MORPH_SHAPES.primary;
+    pathEl.setAttribute('d', toBlobPath(frames[0]));
+
+    return {
+      pathEl,
+      frames,
+      duration: kind === 'secondary' ? 45000 : 30000,
+      offset: index * 6200
+    };
+  });
+
+  class TrailParticle {
+    constructor(host) {
+      this.el = document.createElement('span');
+      this.el.className = 'trail-char';
+      host.appendChild(this.el);
+
+      this.active = false;
+      this.originX = 0;
+      this.originY = 0;
+      this.driftX = 0;
+      this.driftY = 0;
+      this.rotation = 0;
+      this.spin = 0;
+      this.birth = 0;
+      this.ttl = 0;
+      this.baseScale = 1;
+      this.baseOpacity = 0.3;
+    }
+
+    spawn(config) {
+      this.active = true;
+      this.el.textContent = config.symbol;
+      this.originX = config.x;
+      this.originY = config.y;
+      this.driftX = config.driftX;
+      this.driftY = config.driftY;
+      this.rotation = config.rotation;
+      this.spin = config.spin;
+      this.birth = config.now;
+      this.ttl = config.ttl;
+      this.baseScale = config.scale;
+      this.baseOpacity = config.opacity;
+      this.el.style.opacity = '0';
+    }
+
+    hide() {
+      this.active = false;
+      this.el.style.opacity = '0';
+    }
+
+    update(now) {
+      if (!this.active) {
+        return;
+      }
+
+      const progress = (now - this.birth) / this.ttl;
+      if (progress >= 1) {
+        this.hide();
+        return;
+      }
+
+      const fade = Math.pow(1 - progress, 1.18);
+      const x = this.originX + (this.driftX * progress);
+      const y = this.originY + (this.driftY * progress);
+      const scale = this.baseScale + (progress * 0.1);
+      const rotation = this.rotation + (this.spin * progress);
+
+      this.el.style.opacity = (this.baseOpacity * fade).toFixed(3);
+      this.el.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) translate(-50%, -50%) scale(${scale.toFixed(3)}) rotate(${rotation.toFixed(2)}deg)`;
+    }
+  }
+
+  const trailParticles = trailHost
+    ? Array.from({ length: MAX_TRAIL_PARTICLES }, () => new TrailParticle(trailHost))
+    : [];
+  let trailCursor = 0;
+
+  body.classList.add('dynamic-bg-ready');
+  syncThemeAttribute();
 
   function applyHighlight() {
     if (!highlight) {
@@ -137,6 +224,61 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function spawnTrail(now) {
+    if (!trailParticles.length || state.reducedMotion || state.coarsePointer) {
+      return;
+    }
+
+    if (now - state.lastTrailAt < TRAIL_FRAME_MS) {
+      return;
+    }
+
+    const movementX = state.targetX - state.currentX;
+    const movementY = state.targetY - state.currentY;
+    const speed = Math.hypot(movementX, movementY);
+    if (speed < 0.45) {
+      return;
+    }
+
+    state.lastTrailAt = now;
+
+    const angle = Math.atan2(movementY, movementX);
+    const forwardX = Math.cos(angle);
+    const forwardY = Math.sin(angle);
+    const normalX = -forwardY;
+    const normalY = forwardX;
+
+    TRAIL_PATTERN.forEach((node) => {
+      const side = node.lane === 0 ? 0 : (Math.random() < 0.5 ? -1 : 1);
+      const lateral = node.lane * 4.5 * side;
+      const px = state.currentX - (forwardX * node.offset) + (normalX * lateral);
+      const py = state.currentY - (forwardY * node.offset) + (normalY * lateral);
+
+      const particle = trailParticles[trailCursor];
+      trailCursor = (trailCursor + 1) % trailParticles.length;
+
+      particle.spawn({
+        symbol: node.symbol,
+        x: px,
+        y: py,
+        driftX: (forwardX * (5 + (node.lane * 2))) + ((Math.random() - 0.5) * 4),
+        driftY: (forwardY * (5 + (node.lane * 2))) + ((Math.random() - 0.5) * 4),
+        rotation: (Math.random() - 0.5) * 6,
+        spin: (Math.random() - 0.5) * 12,
+        ttl: node.ttl + Math.random() * 180,
+        scale: node.scale,
+        opacity: node.opacity,
+        now
+      });
+    });
+  }
+
+  function updateTrail(now) {
+    trailParticles.forEach((particle) => {
+      particle.update(now);
+    });
+  }
+
   function resetState() {
     state.targetX = state.width / 2;
     state.targetY = state.height / 2;
@@ -154,8 +296,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (state.coarsePointer) {
       const wave = now * 0.00025;
-      state.targetX = state.width * (0.5 + Math.sin(wave) * 0.06);
-      state.targetY = state.height * (0.5 + Math.cos(wave * 0.84) * 0.05);
+      state.targetX = state.width * (0.5 + (Math.sin(wave) * 0.06));
+      state.targetY = state.height * (0.5 + (Math.cos(wave * 0.84) * 0.05));
     }
 
     state.currentX += (state.targetX - state.currentX) * 0.09;
@@ -164,6 +306,8 @@ document.addEventListener('DOMContentLoaded', () => {
     applyHighlight();
     applyParallax();
     updateBlobMorph(now);
+    spawnTrail(now);
+    updateTrail(now);
 
     state.rafId = window.requestAnimationFrame(tick);
   }
@@ -253,7 +397,6 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('resize', onResize, { passive: true });
   document.addEventListener('visibilitychange', onVisibilityChange, { passive: true });
 
-  syncThemeAttribute();
   resetState();
   applyMotionMode();
 });
