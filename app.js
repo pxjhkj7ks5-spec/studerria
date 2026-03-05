@@ -13126,6 +13126,7 @@ const JOURNAL_INSIGHTS_SCOPE_OPTIONS = [
   { key: 'group', label: 'Group' },
   { key: 'student', label: 'Student' },
   { key: 'course', label: 'Course' },
+  { key: 'all-courses', label: 'All courses' },
 ];
 const JOURNAL_INSIGHTS_SCOPE_KEYS = new Set(JOURNAL_INSIGHTS_SCOPE_OPTIONS.map((item) => item.key));
 
@@ -15126,7 +15127,9 @@ async function buildJournalInsightsContext({
   }
 
   const scopeOptionSet = teacherJournalMode
-    ? JOURNAL_INSIGHTS_SCOPE_OPTIONS
+    ? JOURNAL_INSIGHTS_SCOPE_OPTIONS.filter((item) =>
+      item.key === 'all-courses' ? courseOptions.length > 1 : true
+    )
     : JOURNAL_INSIGHTS_SCOPE_OPTIONS.filter((item) => item.key === 'student');
   const allowedScopeKeys = new Set((scopeOptionSet || []).map((item) => item.key));
   let scopeType = normalizeJournalInsightsScope(
@@ -15136,11 +15139,18 @@ async function buildJournalInsightsContext({
   if (!allowedScopeKeys.has(scopeType)) {
     scopeType = scopeOptionSet.length ? scopeOptionSet[0].key : 'student';
   }
-  if (scopeType !== 'course' && !selectedSubject && subjectsInCourse.length) {
+  const isCourseAggregateScope = () => scopeType === 'course' || scopeType === 'all-courses';
+  if (!isCourseAggregateScope() && !selectedSubject && subjectsInCourse.length) {
     selectedSubject = subjectsInCourse[0];
   }
-  if (scopeType !== 'course' && !selectedSubject) {
-    scopeType = allowedScopeKeys.has('course') ? 'course' : 'student';
+  if (!isCourseAggregateScope() && !selectedSubject) {
+    if (allowedScopeKeys.has('course')) {
+      scopeType = 'course';
+    } else if (allowedScopeKeys.has('all-courses')) {
+      scopeType = 'all-courses';
+    } else {
+      scopeType = 'student';
+    }
   }
   if (!teacherJournalMode) {
     scopeType = 'student';
@@ -15149,7 +15159,34 @@ async function buildJournalInsightsContext({
   const period = normalizeJournalInsightsPeriod(payload.period, 'semester');
   const selectedSemester = selectedCourseId ? await getActiveSemester(selectedCourseId) : null;
   const selectedSemesterId = selectedSemester ? Number(selectedSemester.id) : null;
-  const periodWindow = resolveJournalInsightsSince(period, selectedSemester?.start_date || '');
+  const activeSemesterByCourseId = new Map();
+  if (scopeType === 'all-courses') {
+    const allSemesters = await Promise.all(
+      (courseOptions || []).map(async (course) => ([
+        Number(course.course_id || 0),
+        await getActiveSemester(Number(course.course_id || 0)),
+      ]))
+    );
+    (allSemesters || []).forEach(([courseId, semester]) => {
+      const safeCourseId = Number(courseId || 0);
+      if (Number.isInteger(safeCourseId) && safeCourseId > 0) {
+        activeSemesterByCourseId.set(safeCourseId, semester || null);
+      }
+    });
+  } else if (selectedCourseId) {
+    activeSemesterByCourseId.set(Number(selectedCourseId), selectedSemester || null);
+  }
+  const periodSemesterStartDate = (() => {
+    if (scopeType !== 'all-courses') {
+      return String(selectedSemester?.start_date || '');
+    }
+    const semesterStartDates = Array.from(activeSemesterByCourseId.values())
+      .map((semester) => String(semester?.start_date || '').trim())
+      .filter((value) => isValidDateString(value))
+      .sort();
+    return semesterStartDates.length ? semesterStartDates[0] : '';
+  })();
+  const periodWindow = resolveJournalInsightsSince(period, periodSemesterStartDate);
   const sinceIso = periodWindow.sinceIso || '';
   const sinceDate = periodWindow.sinceDate || '';
 
@@ -15180,8 +15217,8 @@ async function buildJournalInsightsContext({
       .filter((row) => Number.isFinite(row.student_id) && row.student_id > 0)
   );
 
-  if (scopeType === 'course') {
-    const subjects = subjectsInCourse || [];
+  if (scopeType === 'course' || scopeType === 'all-courses') {
+    const subjects = scopeType === 'all-courses' ? (subjectOptions || []) : (subjectsInCourse || []);
     const studentsById = new Map();
     for (const subject of subjects) {
       const restrictedGroups = (!journalScope.fullAccess && !subject.has_all_groups)
@@ -15191,10 +15228,13 @@ async function buildJournalInsightsContext({
             .filter((value) => Number.isInteger(value) && value > 0)
         )
         : null;
+      const matrixSemester = scopeType === 'all-courses'
+        ? activeSemesterByCourseId.get(Number(subject.course_id || 0))
+        : selectedSemester;
       const matrix = await buildJournalMatrix({
         subjectId: Number(subject.subject_id),
         courseId: Number(subject.course_id),
-        semesterId: selectedSemesterId,
+        semesterId: matrixSemester && Number(matrixSemester.id) > 0 ? Number(matrixSemester.id) : null,
         actorUserId: Number(req.session.user.id),
         groupFilterSet: restrictedGroups,
         studentFilterIds: !teacherJournalMode ? [Number(req.session.user.id)] : [],
@@ -15209,9 +15249,13 @@ async function buildJournalInsightsContext({
       const scoreList = rows
         .map((row) => Number(row.final_score))
         .filter((value) => Number.isFinite(value));
+      const subjectDisplayName = scopeType === 'all-courses'
+        ? `${String(subject.course_name || `Course ${Number(subject.course_id || 0)}`)} • ${String(subject.subject_name || '')}`
+        : String(subject.subject_name || '');
       courseSubjectSummaries.push({
+        course_id: Number(subject.course_id || 0),
         subject_id: Number(subject.subject_id),
-        subject_name: String(subject.subject_name || ''),
+        subject_name: subjectDisplayName,
         students_count: rows.length,
         average_final_score: scoreList.length ? roundToPrecision(scoreList.reduce((sum, value) => sum + value, 0) / scoreList.length, 2) : 0,
         at_risk_students: scoreList.filter((value) => value < 60).length,
@@ -15224,6 +15268,8 @@ async function buildJournalInsightsContext({
             student_id: studentId,
             full_name: String(row?.student?.full_name || '').trim() || `Student ${studentId}`,
             group_number: Number(row?.student?.group_number || 0),
+            course_id: Number(subject.course_id || 0),
+            course_name: String(subject.course_name || ''),
             total_score: 0,
             subjects_count: 0,
           });
@@ -15238,6 +15284,8 @@ async function buildJournalInsightsContext({
         id: Number(item.student_id),
         full_name: item.full_name,
         group_number: Number(item.group_number || 0),
+        course_id: Number(item.course_id || 0),
+        course_name: String(item.course_name || ''),
       }))
       .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || '')));
     rankingRows = Array.from(studentsById.values())
@@ -15245,6 +15293,8 @@ async function buildJournalInsightsContext({
         student_id: Number(item.student_id),
         full_name: item.full_name,
         group_number: Number(item.group_number || 0),
+        course_id: Number(item.course_id || 0),
+        course_name: String(item.course_name || ''),
         final_score: item.subjects_count > 0 ? roundToPrecision(item.total_score / item.subjects_count, 2) : 0,
         weighted_earned: 0,
         raw_earned: 0,
@@ -15333,6 +15383,7 @@ async function buildJournalInsightsContext({
       .map((row) => Number(row.final_score))
       .filter((value) => Number.isFinite(value));
     courseSubjectSummaries = [{
+      course_id: Number(selectedSubject.course_id || 0),
       subject_id: Number(selectedSubject.subject_id),
       subject_name: String(selectedSubject.subject_name || ''),
       students_count: scopeRows.length,
@@ -15372,7 +15423,7 @@ async function buildJournalInsightsContext({
   const excellentCount = scopeScoreValues.filter((value) => value >= 90).length;
 
   const trendSubjectIds = (() => {
-    if (scopeType === 'course') {
+    if (scopeType === 'course' || scopeType === 'all-courses') {
       return Array.from(
         new Set(
           (courseSubjectSummaries || [])
@@ -15386,23 +15437,44 @@ async function buildJournalInsightsContext({
     }
     return [];
   })();
+  const trendCourseIds = (() => {
+    if (scopeType === 'all-courses') {
+      return Array.from(
+        new Set(
+          (courseSubjectSummaries || [])
+            .map((item) => Number(item.course_id || 0))
+            .filter((value) => Number.isInteger(value) && value > 0)
+        )
+      );
+    }
+    const safeCourseId = Number(selectedCourseId || 0);
+    return Number.isInteger(safeCourseId) && safeCourseId > 0 ? [safeCourseId] : [];
+  })();
 
   let gradeTrend = [];
   let attendanceTrend = [];
-  if (trendSubjectIds.length && selectedCourseId) {
+  if (trendSubjectIds.length && trendCourseIds.length) {
     const gradeBucketExpr = buildJournalInsightsGradeBucketSql(period);
     const gradeWhere = [
-      'jc.course_id = ?',
       'COALESCE(jc.is_archived, 0) = 0',
       'jg.deleted_at IS NULL',
       'jg.graded_at IS NOT NULL',
     ];
-    const gradeParams = [selectedCourseId];
-    const gradeSemesterFilter = buildJournalMixedSemesterCondition('jc', selectedSemesterId);
-    const gradeSemesterClause = stripLeadingAnd(gradeSemesterFilter.clause);
-    if (gradeSemesterClause) gradeWhere.push(gradeSemesterClause);
-    if (Array.isArray(gradeSemesterFilter.params) && gradeSemesterFilter.params.length) {
-      gradeParams.push(...gradeSemesterFilter.params);
+    const gradeParams = [];
+    if (trendCourseIds.length === 1) {
+      gradeWhere.push('jc.course_id = ?');
+      gradeParams.push(Number(trendCourseIds[0]));
+    } else {
+      gradeWhere.push('jc.course_id = ANY(?::int[])');
+      gradeParams.push(trendCourseIds);
+    }
+    if (scopeType !== 'all-courses') {
+      const gradeSemesterFilter = buildJournalMixedSemesterCondition('jc', selectedSemesterId);
+      const gradeSemesterClause = stripLeadingAnd(gradeSemesterFilter.clause);
+      if (gradeSemesterClause) gradeWhere.push(gradeSemesterClause);
+      if (Array.isArray(gradeSemesterFilter.params) && gradeSemesterFilter.params.length) {
+        gradeParams.push(...gradeSemesterFilter.params);
+      }
     }
     if (trendSubjectIds.length === 1) {
       gradeWhere.push('jc.subject_id = ?');
@@ -15457,15 +15529,22 @@ async function buildJournalInsightsContext({
     }));
 
     const attendanceBucketExpr = buildJournalInsightsAttendanceBucketSql(period);
-    const attendanceWhere = [
-      'ar.course_id = ?',
-    ];
-    const attendanceParams = [selectedCourseId];
-    const attendanceSemesterFilter = buildJournalMixedSemesterCondition('ar', selectedSemesterId);
-    const attendanceSemesterClause = stripLeadingAnd(attendanceSemesterFilter.clause);
-    if (attendanceSemesterClause) attendanceWhere.push(attendanceSemesterClause);
-    if (Array.isArray(attendanceSemesterFilter.params) && attendanceSemesterFilter.params.length) {
-      attendanceParams.push(...attendanceSemesterFilter.params);
+    const attendanceWhere = [];
+    const attendanceParams = [];
+    if (trendCourseIds.length === 1) {
+      attendanceWhere.push('ar.course_id = ?');
+      attendanceParams.push(Number(trendCourseIds[0]));
+    } else {
+      attendanceWhere.push('ar.course_id = ANY(?::int[])');
+      attendanceParams.push(trendCourseIds);
+    }
+    if (scopeType !== 'all-courses') {
+      const attendanceSemesterFilter = buildJournalMixedSemesterCondition('ar', selectedSemesterId);
+      const attendanceSemesterClause = stripLeadingAnd(attendanceSemesterFilter.clause);
+      if (attendanceSemesterClause) attendanceWhere.push(attendanceSemesterClause);
+      if (Array.isArray(attendanceSemesterFilter.params) && attendanceSemesterFilter.params.length) {
+        attendanceParams.push(...attendanceSemesterFilter.params);
+      }
     }
     if (trendSubjectIds.length === 1) {
       attendanceWhere.push('ar.subject_id = ?');
@@ -15536,6 +15615,9 @@ async function buildJournalInsightsContext({
   ).label;
 
   const scopeLabel = (() => {
+    if (scopeType === 'all-courses') {
+      return 'All courses';
+    }
     if (scopeType === 'course') {
       return selectedCourse ? `Course ${selectedCourse.course_name}` : 'Course scope';
     }
@@ -15561,6 +15643,8 @@ async function buildJournalInsightsContext({
     publishDisabledReason = 'No ranking data to publish.';
   } else if (scopeType === 'student') {
     publishDisabledReason = 'Student scope is personal and cannot be published.';
+  } else if (scopeType === 'all-courses') {
+    publishDisabledReason = 'All-courses scope cannot be published as a single audience. Select a specific course or group.';
   } else if (scopeType === 'course') {
     canPublishRating = true;
     publishTarget = {
@@ -15596,7 +15680,8 @@ async function buildJournalInsightsContext({
     selectedCourseId,
     selectedCourse,
     selectedSubject,
-    selectedSemester,
+    selectedSemester: scopeType === 'all-courses' ? null : selectedSemester,
+    scopeCourseCount: trendCourseIds.length,
     period,
     periodLabel,
     periodOptions: JOURNAL_INSIGHTS_PERIOD_OPTIONS,

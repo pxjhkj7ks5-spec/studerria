@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.70",
+      "date": "2026-03-05",
+      "items": [
+        "feat(journal-insights-all-courses): added a new `all-courses` scope in `/journal/insights` to aggregate ranking and summary metrics across all accessible courses",
+        "feat(journal-insights-trends): grade and attendance trends now support multi-course aggregation with shared period filters for deanery/admin-style overview",
+        "ux(journal-insights-filters): in all-courses scope, course/subject selectors auto-lock to prevent invalid combinations and show active course count in the insights hero"
+      ]
+    },
+    {
       "version": "1.0.69",
       "date": "2026-03-05",
       "items": [

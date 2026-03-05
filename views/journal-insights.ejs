@@ -5,6 +5,9 @@
   const selectedStudentValue = Number(selectedStudentId || 0);
   const periodValue = period || 'semester';
   const scopeValue = scopeType || 'subject';
+  const isAllCoursesScope = scopeValue === 'all-courses';
+  const isCourseAggregateScope = scopeValue === 'course' || isAllCoursesScope;
+  const scopeCourseCountValue = Number(scopeCourseCount || 0);
   const scopeLabelValue = scopeLabel || 'Scope';
   const gradeTrend = (trends && Array.isArray(trends.grade)) ? trends.grade : [];
   const attendanceTrend = (trends && Array.isArray(trends.attendance)) ? trends.attendance : [];
@@ -223,6 +226,9 @@
           <span class="chip"><%= scopeLabelValue %></span>
           <span class="chip">Period: <%= periodLabel %></span>
           <span class="chip">Participants: <%= Number(summary && summary.participants_count ? summary.participants_count : 0) %></span>
+          <% if (isAllCoursesScope && scopeCourseCountValue > 0) { %>
+            <span class="chip">Courses: <%= scopeCourseCountValue %></span>
+          <% } %>
           <% if (selectedSemester && selectedSemester.title) { %>
             <span class="chip"><%= selectedSemester.title %></span>
           <% } %>
@@ -234,11 +240,14 @@
         <form method="GET" action="/journal/insights" class="row g-2 mt-1">
           <div class="col-12 col-md-3">
             <label class="form-label small" for="insightsCourse">Course</label>
-            <select id="insightsCourse" class="form-select compact-select" name="course_id">
+            <select id="insightsCourse" class="form-select compact-select" name="course_id" <%= isAllCoursesScope ? 'disabled' : '' %>>
               <% (courseOptions || []).forEach((course) => { %>
                 <option value="<%= course.course_id %>" <%= Number(course.course_id) === selectedCourseValue ? 'selected' : '' %>><%= course.course_name %></option>
               <% }) %>
             </select>
+            <% if (isAllCoursesScope) { %>
+              <input type="hidden" name="course_id" value="<%= selectedCourseValue || '' %>" />
+            <% } %>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label small" for="insightsScope">Scope</label>
@@ -262,7 +271,7 @@
 
           <div class="col-12 col-md-4">
             <label class="form-label small" for="insightsSubject">Subject</label>
-            <select id="insightsSubject" class="form-select compact-select" name="subject_id" <%= scopeValue === 'course' ? 'disabled' : '' %>>
+            <select id="insightsSubject" class="form-select compact-select" name="subject_id" <%= isCourseAggregateScope ? 'disabled' : '' %>>
               <% if (!(subjectOptions || []).length) { %>
                 <option value="">No subject access</option>
               <% } else { %>
@@ -273,7 +282,7 @@
                 <% }) %>
               <% } %>
             </select>
-            <% if (scopeValue === 'course') { %>
+            <% if (isCourseAggregateScope) { %>
               <input type="hidden" name="subject_id" value="<%= selectedSubjectValue %>" />
             <% } %>
           </div>
