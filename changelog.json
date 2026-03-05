@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.0.98",
+      "date": "2026-03-05",
+      "items": [
+        "fix(auth-cursor-quiet-mode): disabled symbol trail rendering and pointer-based trail spawning on `page-auth` to fully remove residual mouse-follow visuals on login/register"
+      ]
+    },
+    {
       "version": "1.0.97",
       "date": "2026-03-05",
       "items": [

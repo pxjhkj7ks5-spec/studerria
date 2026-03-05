@@ -22,6 +22,7 @@
 
     const isAuthPage = body.classList.contains('page-auth');
     const disablePointerParallax = isAuthPage;
+    const disablePointerTrail = isAuthPage;
     const isLowPowerPage = [
       'page-schedule',
       'page-journal',
@@ -384,7 +385,7 @@
     }
 
     function spawnTrail(now, x, y) {
-      if (state.reducedMotion || state.coarsePointer || !particles.length) {
+      if (disablePointerTrail || state.reducedMotion || state.coarsePointer || !particles.length) {
         return;
       }
 
