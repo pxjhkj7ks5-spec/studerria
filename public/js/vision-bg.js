@@ -17,15 +17,18 @@
   const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
 
   const BRUSH_PATTERN = [
-    { symbol: 'o', variant: 'center', radius: 0, angleOffset: 0, ttl: 3000, scale: 0.98, opacity: 0.7 },
-    { symbol: '>', variant: 'mid', radius: 8, angleOffset: -0.72, ttl: 2300, scale: 0.88, opacity: 0.58 },
-    { symbol: '>', variant: 'mid', radius: 8, angleOffset: 0.72, ttl: 2300, scale: 0.88, opacity: 0.58 },
-    { symbol: '_', variant: 'outer', radius: 14, angleOffset: -1.3, ttl: 1600, scale: 0.82, opacity: 0.46 },
-    { symbol: '_', variant: 'outer', radius: 14, angleOffset: 1.3, ttl: 1600, scale: 0.82, opacity: 0.46 }
+    { symbol: '_', variant: 'outer', lane: -2, ttl: 1400, scale: 0.8, opacity: 0.22, forwardOffset: -0.6 },
+    { symbol: '>', variant: 'mid', lane: -1, ttl: 2200, scale: 0.86, opacity: 0.34, forwardOffset: -0.2 },
+    { symbol: 'o', variant: 'center', lane: 0, ttl: 3000, scale: 0.92, opacity: 0.44, forwardOffset: 0 },
+    { symbol: '>', variant: 'mid', lane: 1, ttl: 2200, scale: 0.86, opacity: 0.34, forwardOffset: -0.2 },
+    { symbol: '_', variant: 'outer', lane: 2, ttl: 1400, scale: 0.8, opacity: 0.22, forwardOffset: -0.6 }
   ];
 
   const MAX_TRAIL_PARTICLES = 220;
-  const STAMP_INTERVAL_MS = 34;
+  const STAMP_INTERVAL_MS = 72;
+  const TRAIL_GRID_SIZE = 8;
+  const CELL_COOLDOWN_MS = 140;
+  const MIN_STAMP_DISTANCE = 6;
 
   class TrailParticle {
     constructor(host) {
@@ -124,10 +127,13 @@
   let pointerInside = false;
   let lastMoveAt = 0;
   let lastStampAt = 0;
+  let lastStampX = centerX;
+  let lastStampY = centerY;
 
   let stableZone = '';
   let stableZoneSince = 0;
   let focusedShape = null;
+  let cleanupCellsAt = 0;
 
   let isReducedMotion = reducedMotionQuery.matches;
   let isCoarsePointer = coarsePointerQuery.matches;
@@ -136,6 +142,7 @@
   let resizeTimer = null;
   let rafId = 0;
   let running = false;
+  const recentStampCells = new Map();
 
   function applyTheme(themeClass) {
     body.classList.remove('theme-light', 'theme-dark');
@@ -240,8 +247,11 @@
       pointerY = centerY;
       smoothX = centerX;
       smoothY = centerY;
+      lastStampX = centerX;
+      lastStampY = centerY;
       clearFocus();
       clearTrailParticles();
+      recentStampCells.clear();
 
       fallbackParticle.style.opacity = '0.3';
       fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.88)`;
@@ -258,24 +268,54 @@
       lastDirection = Math.atan2(movementY, movementX);
     }
 
+    const distanceFromLast = Math.hypot(x - lastStampX, y - lastStampY);
+    if (distanceFromLast < MIN_STAMP_DISTANCE) {
+      return;
+    }
+
+    const quantizedX = Math.round(x / TRAIL_GRID_SIZE) * TRAIL_GRID_SIZE;
+    const quantizedY = Math.round(y / TRAIL_GRID_SIZE) * TRAIL_GRID_SIZE;
+    const cellKey = `${Math.round(quantizedX / TRAIL_GRID_SIZE)}:${Math.round(quantizedY / TRAIL_GRID_SIZE)}`;
+    const lastCellStamp = recentStampCells.get(cellKey) || 0;
+    if (now - lastCellStamp < CELL_COOLDOWN_MS) {
+      return;
+    }
+
+    recentStampCells.set(cellKey, now);
+    lastStampX = quantizedX;
+    lastStampY = quantizedY;
+
+    if (now >= cleanupCellsAt) {
+      cleanupCellsAt = now + 600;
+      recentStampCells.forEach((timestamp, key) => {
+        if (now - timestamp > 1200) {
+          recentStampCells.delete(key);
+        }
+      });
+    }
+
+    const forwardX = Math.cos(lastDirection);
+    const forwardY = Math.sin(lastDirection);
+    const normalX = -forwardY;
+    const normalY = forwardX;
+    const laneStep = 6;
+
     BRUSH_PATTERN.forEach((node) => {
       const particle = trailParticles[trailCursor];
       trailCursor = (trailCursor + 1) % trailParticles.length;
 
-      const angle = lastDirection + node.angleOffset;
-      const jitter = (Math.random() - 0.5) * 1.2;
-      const px = x + Math.cos(angle) * node.radius + jitter;
-      const py = y + Math.sin(angle) * node.radius + jitter;
+      const px = quantizedX + (normalX * node.lane * laneStep) + (forwardX * node.forwardOffset * laneStep);
+      const py = quantizedY + (normalY * node.lane * laneStep) + (forwardY * node.forwardOffset * laneStep);
 
       particle.spawn({
         variant: node.variant,
         symbol: node.symbol,
         x: px,
         y: py,
-        driftX: Math.cos(lastDirection) * (1.6 + node.radius * 0.05),
-        driftY: Math.sin(lastDirection) * (1.6 + node.radius * 0.05),
-        rotation: (Math.random() - 0.5) * 8,
-        spin: (Math.random() - 0.5) * 16,
+        driftX: forwardX * 0.28,
+        driftY: forwardY * 0.28,
+        rotation: (Math.random() - 0.5) * 4,
+        spin: (Math.random() - 0.5) * 6,
         ttl: node.ttl,
         scale: node.scale,
         opacity: node.opacity,

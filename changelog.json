@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.0.86",
+      "date": "2026-03-05",
+      "items": [
+        "fix(vision-trail-overlap): added anti-overlap brush stamping with grid snapping, minimum movement distance, and per-cell cooldown to prevent unreadable symbol stacking",
+        "feat(vision-trail-pattern): switched brush offsets to ordered lanes (`_ > o > _`) around cursor direction for clearer stroke-like rows instead of dense random clusters",
+        "ux(vision-trail-fade-order): preserved layered fade timing so far symbols disappear first, then middle, then center, with softer micro-drift for cleaner traces",
+        "style(vision-trail-scale): reduced glyph size and shadow intensity for sharper legibility in dense cursor paths"
+      ]
+    },
+    {
       "version": "1.0.85",
       "date": "2026-03-05",
       "items": [

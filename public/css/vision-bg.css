@@ -199,11 +199,11 @@ body.page-vision {
   position: absolute;
   left: 0;
   top: 0;
-  font-size: clamp(9px, 0.9vw, 12px);
-  font-weight: 640;
+  font-size: clamp(8px, 0.75vw, 10px);
+  font-weight: 620;
   line-height: 1;
   color: var(--trail-char-color);
-  text-shadow: 0 0 10px var(--trail-char-shadow);
+  text-shadow: 0 0 6px var(--trail-char-shadow);
   opacity: 0;
   transform: translate3d(-50%, -50%, 0) scale(0.6);
   transform-origin: center;
@@ -222,7 +222,7 @@ body.page-vision {
 }
 
 .trail-char.outer {
-  font-weight: 700;
+  font-weight: 560;
 }
 
 .trail-char.fallback {
@@ -806,7 +806,7 @@ body.vision-reduced-motion .bg-shape {
   }
 
   .trail-char {
-    font-size: 10px;
+    font-size: 9px;
   }
 }
 
