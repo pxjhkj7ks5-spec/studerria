@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.0.71",
+      "date": "2026-03-05",
+      "items": [
+        "feat(journal-insights-student-course): added new `student-course` scope (`Student (all subjects)`) to analyze one student across all subjects in a selected course",
+        "feat(journal-insights-student-course-trends): grade and attendance trend queries now support personal course-wide dynamics with month/semester/year/all periods",
+        "ux(journal-insights-filters): student selector is now enabled for `student-course`, while subject selector is auto-locked for aggregate scopes"
+      ]
+    },
+    {
       "version": "1.0.70",
       "date": "2026-03-05",
       "items": [

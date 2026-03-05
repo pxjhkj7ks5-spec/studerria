@@ -13125,6 +13125,7 @@ const JOURNAL_INSIGHTS_SCOPE_OPTIONS = [
   { key: 'subject', label: 'Subject' },
   { key: 'group', label: 'Group' },
   { key: 'student', label: 'Student' },
+  { key: 'student-course', label: 'Student (all subjects)' },
   { key: 'course', label: 'Course' },
   { key: 'all-courses', label: 'All courses' },
 ];
@@ -15139,7 +15140,11 @@ async function buildJournalInsightsContext({
   if (!allowedScopeKeys.has(scopeType)) {
     scopeType = scopeOptionSet.length ? scopeOptionSet[0].key : 'student';
   }
-  const isCourseAggregateScope = () => scopeType === 'course' || scopeType === 'all-courses';
+  const isCourseAggregateScope = () => (
+    scopeType === 'course'
+    || scopeType === 'all-courses'
+    || scopeType === 'student-course'
+  );
   if (!isCourseAggregateScope() && !selectedSubject && subjectsInCourse.length) {
     selectedSubject = subjectsInCourse[0];
   }
@@ -15217,9 +15222,10 @@ async function buildJournalInsightsContext({
       .filter((row) => Number.isFinite(row.student_id) && row.student_id > 0)
   );
 
-  if (scopeType === 'course' || scopeType === 'all-courses') {
+  if (scopeType === 'course' || scopeType === 'all-courses' || scopeType === 'student-course') {
     const subjects = scopeType === 'all-courses' ? (subjectOptions || []) : (subjectsInCourse || []);
     const studentsById = new Map();
+    const subjectRowsBag = [];
     for (const subject of subjects) {
       const restrictedGroups = (!journalScope.fullAccess && !subject.has_all_groups)
         ? new Set(
@@ -15240,6 +15246,10 @@ async function buildJournalInsightsContext({
         studentFilterIds: !teacherJournalMode ? [Number(req.session.user.id)] : [],
       });
       const rows = Array.isArray(matrix.rows) ? matrix.rows : [];
+      subjectRowsBag.push({
+        subject,
+        rows,
+      });
       rows.forEach((row) => {
         const groupNumber = Number(row?.student?.group_number || 0);
         if (Number.isInteger(groupNumber) && groupNumber > 0) {
@@ -15302,14 +15312,44 @@ async function buildJournalInsightsContext({
         subjects_count: Number(item.subjects_count || 0),
       }))
       .filter((item) => item.subjects_count > 0);
-    scopeRows = rankingRows.map((row) => ({
-      final_score: row.final_score,
-      student: {
-        id: row.student_id,
-        full_name: row.full_name,
-        group_number: row.group_number,
-      },
-    }));
+    if (scopeType === 'student-course') {
+      if (!studentOptions.some((item) => Number(item.id) === Number(selectedStudentId))) {
+        selectedStudentId = studentOptions.length ? Number(studentOptions[0].id) : null;
+      }
+      selectedStudentProfile = studentOptions.find((item) => Number(item.id) === Number(selectedStudentId)) || null;
+      const selectedRankingRow = rankingRows.find((item) => Number(item.student_id) === Number(selectedStudentId)) || null;
+      scopeRows = selectedRankingRow
+        ? [{
+          final_score: roundToPrecision(selectedRankingRow.final_score, 2),
+          student: {
+            id: Number(selectedRankingRow.student_id),
+            full_name: String(selectedRankingRow.full_name || ''),
+            group_number: Number(selectedRankingRow.group_number || 0),
+          },
+        }]
+        : [];
+      courseSubjectSummaries = (subjectRowsBag || []).map(({ subject, rows }) => {
+        const matchedRow = (rows || []).find((row) => Number(row?.student?.id || 0) === Number(selectedStudentId)) || null;
+        const finalScore = matchedRow ? roundToPrecision(matchedRow.final_score, 2) : 0;
+        return {
+          course_id: Number(subject?.course_id || 0),
+          subject_id: Number(subject?.subject_id || 0),
+          subject_name: String(subject?.subject_name || ''),
+          students_count: matchedRow ? 1 : 0,
+          average_final_score: finalScore,
+          at_risk_students: matchedRow && finalScore < 60 ? 1 : 0,
+        };
+      });
+    } else {
+      scopeRows = rankingRows.map((row) => ({
+        final_score: row.final_score,
+        student: {
+          id: row.student_id,
+          full_name: row.full_name,
+          group_number: row.group_number,
+        },
+      }));
+    }
   } else if (selectedSubject) {
     const restrictedGroups = (!journalScope.fullAccess && !selectedSubject.has_all_groups)
       ? new Set(
@@ -15423,7 +15463,7 @@ async function buildJournalInsightsContext({
   const excellentCount = scopeScoreValues.filter((value) => value >= 90).length;
 
   const trendSubjectIds = (() => {
-    if (scopeType === 'course' || scopeType === 'all-courses') {
+    if (scopeType === 'course' || scopeType === 'all-courses' || scopeType === 'student-course') {
       return Array.from(
         new Set(
           (courseSubjectSummaries || [])
@@ -15487,7 +15527,7 @@ async function buildJournalInsightsContext({
       gradeWhere.push('jg.graded_at >= ?');
       gradeParams.push(sinceIso);
     }
-    if (scopeType === 'student' && selectedStudentId) {
+    if ((scopeType === 'student' || scopeType === 'student-course') && selectedStudentId) {
       gradeWhere.push('jg.student_id = ?');
       gradeParams.push(Number(selectedStudentId));
     }
@@ -15561,7 +15601,7 @@ async function buildJournalInsightsContext({
       attendanceWhere.push('ar.group_number = ?');
       attendanceParams.push(Number(selectedGroupNumber));
     }
-    if (scopeType === 'student' && selectedStudentId) {
+    if ((scopeType === 'student' || scopeType === 'student-course') && selectedStudentId) {
       attendanceWhere.push('ar.student_id = ?');
       attendanceParams.push(Number(selectedStudentId));
     }
@@ -15618,6 +15658,14 @@ async function buildJournalInsightsContext({
     if (scopeType === 'all-courses') {
       return 'All courses';
     }
+    if (scopeType === 'student-course') {
+      if (selectedStudentProfile) {
+        return selectedCourse
+          ? `${selectedStudentProfile.full_name} • ${selectedCourse.course_name}`
+          : `${selectedStudentProfile.full_name} • Course`;
+      }
+      return selectedCourse ? `Student • ${selectedCourse.course_name}` : 'Student course scope';
+    }
     if (scopeType === 'course') {
       return selectedCourse ? `Course ${selectedCourse.course_name}` : 'Course scope';
     }
@@ -15641,7 +15689,7 @@ async function buildJournalInsightsContext({
     publishDisabledReason = 'Messages are disabled in system settings.';
   } else if (!ranking.length) {
     publishDisabledReason = 'No ranking data to publish.';
-  } else if (scopeType === 'student') {
+  } else if (scopeType === 'student' || scopeType === 'student-course') {
     publishDisabledReason = 'Student scope is personal and cannot be published.';
   } else if (scopeType === 'all-courses') {
     publishDisabledReason = 'All-courses scope cannot be published as a single audience. Select a specific course or group.';

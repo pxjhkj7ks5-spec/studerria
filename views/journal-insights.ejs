@@ -6,7 +6,7 @@
   const periodValue = period || 'semester';
   const scopeValue = scopeType || 'subject';
   const isAllCoursesScope = scopeValue === 'all-courses';
-  const isCourseAggregateScope = scopeValue === 'course' || isAllCoursesScope;
+  const isCourseAggregateScope = scopeValue === 'course' || isAllCoursesScope || scopeValue === 'student-course';
   const scopeCourseCountValue = Number(scopeCourseCount || 0);
   const scopeLabelValue = scopeLabel || 'Scope';
   const gradeTrend = (trends && Array.isArray(trends.grade)) ? trends.grade : [];
@@ -304,7 +304,7 @@
 
           <div class="col-12 col-md-4">
             <label class="form-label small" for="insightsStudent">Student</label>
-            <select id="insightsStudent" class="form-select compact-select" name="student_id" <%= scopeValue === 'student' ? '' : 'disabled' %>>
+            <select id="insightsStudent" class="form-select compact-select" name="student_id" <%= (scopeValue === 'student' || scopeValue === 'student-course') ? '' : 'disabled' %>>
               <option value="">Select student</option>
               <% (studentOptions || []).forEach((student) => { %>
                 <option value="<%= student.id %>" <%= Number(student.id) === selectedStudentValue ? 'selected' : '' %>>
@@ -312,7 +312,7 @@
                 </option>
               <% }) %>
             </select>
-            <% if (scopeValue !== 'student') { %>
+            <% if (scopeValue !== 'student' && scopeValue !== 'student-course') { %>
               <input type="hidden" name="student_id" value="<%= selectedStudentValue || '' %>" />
             <% } %>
           </div>
