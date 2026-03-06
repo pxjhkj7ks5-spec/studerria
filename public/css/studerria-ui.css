@@ -55,11 +55,11 @@ html[data-theme='light'] body.studerria-theme,
 body.theme-light.studerria-theme {
   --studerria-text-primary: #0f172a;
   --studerria-text-muted: rgba(15, 23, 42, 0.68);
-  --studerria-panel-border: rgba(71, 85, 105, 0.18);
-  --studerria-panel-bg: linear-gradient(180deg, rgba(248, 250, 255, 0.76), rgba(236, 242, 252, 0.68));
-  --studerria-panel-bg-strong: linear-gradient(180deg, rgba(246, 249, 255, 0.84), rgba(232, 239, 252, 0.78));
+  --studerria-panel-border: rgba(71, 85, 105, 0.22);
+  --studerria-panel-bg: linear-gradient(180deg, rgba(248, 250, 255, 0.84), rgba(236, 242, 252, 0.78));
+  --studerria-panel-bg-strong: linear-gradient(180deg, rgba(249, 251, 255, 0.92), rgba(235, 241, 252, 0.88));
   --studerria-panel-shadow: 0 20px 52px rgba(15, 23, 42, 0.08), 0 10px 24px rgba(99, 102, 241, 0.05);
-  --studerria-pill-bg: linear-gradient(180deg, rgba(248, 250, 255, 0.72), rgba(237, 242, 250, 0.66));
+  --studerria-pill-bg: linear-gradient(180deg, rgba(248, 250, 255, 0.8), rgba(237, 242, 250, 0.74));
   --studerria-pill-hover: linear-gradient(180deg, rgba(244, 247, 255, 0.78), rgba(232, 239, 250, 0.72));
   --studerria-outline-hover: rgba(15, 23, 42, 0.06);
   --studerria-cta-start: #4f46e5;
@@ -928,6 +928,27 @@ body.theme-light.studerria-theme .modal-backdrop {
   --bs-backdrop-opacity: 0.42;
 }
 
+/* Hard-stop any modal blur so page-level glass rules cannot leak into dialogs or backdrops. */
+body.studerria-theme .modal,
+body.studerria-theme .modal-dialog,
+body.studerria-theme .modal-content,
+body.studerria-theme .modal-header,
+body.studerria-theme .modal-body,
+body.studerria-theme .modal-footer,
+body.studerria-theme .modal-backdrop,
+body.studerria-theme .modal-backdrop.show,
+body.studerria-theme .modal .glass,
+body.studerria-theme .modal .glass-card,
+body.studerria-theme .modal .glass-panel,
+body.studerria-theme .modal .glass-inset,
+body.studerria-theme .modal .glass-dock,
+body.studerria-theme .modal button.glass,
+body.studerria-theme .modal .btn-glass {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+}
+
 .studerria-theme .modal-dialog {
   position: relative;
   z-index: 1085;
@@ -1121,9 +1142,9 @@ body.theme-light.page-schedule .day-card,
 body.theme-light.page-schedule .density-summary,
 body.theme-light.page-schedule .week-rail,
 body.theme-light.page-schedule .schedule-modal .modal-content {
-  border-color: color-mix(in srgb, rgba(100, 116, 139, 0.22) 58%, var(--studerria-panel-border));
-  background: color-mix(in srgb, var(--studerria-panel-bg) 94%, rgba(221, 231, 246, 0.32));
-  box-shadow: 0 20px 52px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+  border-color: color-mix(in srgb, rgba(100, 116, 139, 0.28) 62%, var(--studerria-panel-border));
+  background: linear-gradient(180deg, rgba(248, 250, 255, 0.94), rgba(236, 242, 251, 0.9));
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.44);
 }
 
 body.page-schedule .schedule-card {
@@ -1133,9 +1154,9 @@ body.page-schedule .schedule-card {
 }
 
 body.theme-light.page-schedule .schedule-card {
-  border-color: rgba(125, 140, 170, 0.32);
-  background: linear-gradient(180deg, rgba(250, 252, 255, 0.9), rgba(240, 245, 253, 0.84));
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  border-color: rgba(118, 133, 165, 0.4);
+  background: linear-gradient(180deg, rgba(253, 254, 255, 0.97), rgba(242, 247, 254, 0.94));
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.62);
 }
 
 body.page-schedule .week-hero:hover,

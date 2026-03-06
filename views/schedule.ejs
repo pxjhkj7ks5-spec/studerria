@@ -291,7 +291,8 @@
         overflow: hidden;
       }
       .modal-backdrop {
-        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
         background-color: rgba(0, 0, 0, 0.3);
         transition: opacity 0.3s ease-in-out;
         opacity: 0;
@@ -329,7 +330,7 @@
         color: #f8fafc;
       }
       body.theme-light .modal-content {
-        background: rgba(255, 255, 255, 0.75);
+        background: rgba(248, 250, 255, 0.94);
         color: #0f172a;
         border-color: rgba(15, 23, 42, 0.12);
         box-shadow: 0 0 24px rgba(15, 23, 42, 0.18);
@@ -1600,8 +1601,8 @@
         backdrop-filter: none;
       }
       body.theme-light .modal-content {
-        background: var(--glass-bg-light);
-        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: rgba(248, 250, 255, 0.94);
+        border: 1px solid rgba(15, 23, 42, 0.1);
       }
       .modal-header,
       .modal-footer {

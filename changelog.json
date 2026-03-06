@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.66",
+      "date": "2026-03-06",
+      "items": [
+        "fix(modal-no-blur-hard-stop): added a shared no-blur override for modal backdrops, dialog surfaces, and glass controls inside dialogs so page-level glass styles can no longer blur the screen when a modal opens",
+        "fix(schedule-light-surface-contrast): slightly increased the opacity and border contrast of schedule containers and lesson cards in the light theme so blocks separate more clearly from the page background"
+      ]
+    },
+    {
       "version": "1.1.65",
       "date": "2026-03-06",
       "items": [
