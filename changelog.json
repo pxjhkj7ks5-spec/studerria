@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.41",
+      "date": "2026-03-06",
+      "items": [
+        "style(navbar-logout-icon-shape): swapped the navbar logout glyph for a slimmer door-and-arrow silhouette closer to the requested reference while keeping the plain text-colored treatment"
+      ]
+    },
+    {
       "version": "1.1.40",
       "date": "2026-03-06",
       "items": [
