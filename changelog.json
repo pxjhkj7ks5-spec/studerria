@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.72",
+      "date": "2026-03-07",
+      "items": [
+        "fix(modal-layering-and-scroll-lock): aligned every Bootstrap modal with the changelog modal layering model so dialogs now render above the backdrop, background scrolling stays locked, and modal content is no longer glazed by the overlay",
+        "fix(global-no-blur-coverage): expanded the modal-open no-blur guard for admin glass surfaces and added a computed-style fallback that disables remaining page blur layers while a modal is open",
+        "fix(week-pager-hover-shift): blocked the global button lift rule from moving week navigation controls so the week carousel no longer jumps on hover"
+      ]
+    },
+    {
       "version": "1.1.71",
       "date": "2026-03-07",
       "items": [

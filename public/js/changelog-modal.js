@@ -9,6 +9,9 @@
   const BODY_OPEN_CLASS = 'studerria-changelog-open';
   const BOOTSTRAP_OPEN_CLASS = 'modal-open';
   const GLOBAL_SYNC_BOOT_FLAG = '__studerriaGlobalModalSyncBoot';
+  const BASE_BACKDROP_Z_INDEX = 1070;
+  const BASE_MODAL_Z_INDEX = 1080;
+  const MODAL_LAYER_STEP = 20;
   const SCROLL_LOCK_STATE_ATTR = 'data-studerria-scroll-lock';
   const SCROLL_LOCK_VALUE_ATTR = 'data-studerria-scroll-lock-overflow-value';
   const SCROLL_LOCK_PRIORITY_ATTR = 'data-studerria-scroll-lock-overflow-priority';
@@ -35,7 +38,21 @@
     '.day-card',
     '.density-summary',
     '.week-rail',
-    '.schedule-card'
+    '.schedule-card',
+    '.admin-nav',
+    '.admin-viewas-form',
+    '.admin-sidebar',
+    '.admin-sidebar-inner',
+    '.admin-header-rail',
+    '.admin-course-chip',
+    '.admin-topbar-btn',
+    '.session-health-chip',
+    '.bulk-bar',
+    '.flash-alert',
+    '.admin-toast',
+    '.admin-preview-form',
+    '.role-studio-role-card',
+    '.dropdown-menu'
   ].join(', ');
   const NO_BLUR_STYLE_FIELDS = [
     ['-webkit-backdrop-filter', 'studerriaNoBlurWebkitBackdropValue', 'studerriaNoBlurWebkitBackdropPriority'],
@@ -69,22 +86,33 @@
     });
   }
 
-  function syncBackdrop() {
+  function syncModalLayers() {
     cleanupBackdrop();
 
+    const visibleModals = Array.from(document.querySelectorAll('.modal.show')).filter(
+      (modal) => modal instanceof HTMLElement
+    );
+    visibleModals.forEach((modal, index) => {
+      modal.style.zIndex = String(BASE_MODAL_Z_INDEX + (index * MODAL_LAYER_STEP));
+    });
+
     const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+    backdrops.forEach((backdrop, index) => {
+      if (!(backdrop instanceof HTMLElement)) {
+        return;
+      }
+
+      backdrop.style.pointerEvents = index === backdrops.length - 1 ? 'auto' : 'none';
+      backdrop.style.opacity = 'var(--bs-backdrop-opacity, 0.42)';
+      backdrop.style.zIndex = String(BASE_BACKDROP_Z_INDEX + (index * MODAL_LAYER_STEP));
+      backdrop.style.webkitBackdropFilter = 'none';
+      backdrop.style.backdropFilter = 'none';
+    });
+
     const activeBackdrop = backdrops.length ? backdrops[backdrops.length - 1] : null;
-
-    if (!(activeBackdrop instanceof HTMLElement)) {
-      return;
+    if (activeBackdrop instanceof HTMLElement) {
+      activeBackdrop.classList.add(BACKDROP_CLASS);
     }
-
-    activeBackdrop.classList.add(BACKDROP_CLASS);
-    activeBackdrop.style.pointerEvents = 'auto';
-    activeBackdrop.style.opacity = 'var(--bs-backdrop-opacity, 0.42)';
-    activeBackdrop.style.zIndex = '1075';
-    activeBackdrop.style.webkitBackdropFilter = 'none';
-    activeBackdrop.style.backdropFilter = 'none';
   }
 
   function portalModal(modal) {
@@ -93,6 +121,12 @@
     }
 
     document.body.appendChild(modal);
+  }
+
+  function primeStaticModals() {
+    document.querySelectorAll('.modal').forEach((modal) => {
+      portalModal(modal);
+    });
   }
 
   function applyInlineNoBlur(target) {
@@ -139,12 +173,37 @@
 
   function syncNoBlurTargets(forceOpen) {
     if (forceOpen) {
+      const targets = new Set();
+
       document.querySelectorAll(NO_BLUR_SELECTOR).forEach((target) => {
+        targets.add(target);
+      });
+
+      document.body?.querySelectorAll('*').forEach((target) => {
         if (!(target instanceof HTMLElement)) {
           return;
         }
 
         if (target.classList.contains('modal-backdrop') || target.closest('.modal')) {
+          return;
+        }
+
+        const computedStyles = window.getComputedStyle(target);
+        const computedBackdrop =
+          computedStyles.getPropertyValue('backdrop-filter') ||
+          computedStyles.getPropertyValue('-webkit-backdrop-filter');
+        const computedFilter = computedStyles.getPropertyValue('filter');
+
+        if (
+          (computedBackdrop && computedBackdrop !== 'none') ||
+          (computedFilter && computedFilter.includes('blur('))
+        ) {
+          targets.add(target);
+        }
+      });
+
+      targets.forEach((target) => {
+        if (!(target instanceof HTMLElement)) {
           return;
         }
 
@@ -236,13 +295,10 @@
           return;
         }
 
+        portalModal(event.target);
         const isChangelogModal = isChangelogModalElement(event.target);
         syncBodyOpenClasses(true, isChangelogModal);
-        if (isChangelogModal) {
-          requestAnimationFrame(syncBackdrop);
-          return;
-        }
-        cleanupBackdrop();
+        requestAnimationFrame(syncModalLayers);
       },
       true
     );
@@ -256,11 +312,7 @@
 
         const isChangelogModal = isChangelogModalElement(event.target);
         syncBodyOpenClasses(true, isChangelogModal);
-        if (isChangelogModal) {
-          syncBackdrop();
-          return;
-        }
-        cleanupBackdrop();
+        syncModalLayers();
       },
       true
     );
@@ -274,6 +326,7 @@
 
         requestAnimationFrame(() => {
           syncBodyOpenClasses();
+          syncModalLayers();
         });
       },
       true
@@ -287,12 +340,7 @@
         }
 
         syncBodyOpenClasses();
-        if (hasVisibleChangelogModal()) {
-          requestAnimationFrame(syncBackdrop);
-          return;
-        }
-
-        cleanupBackdrop();
+        requestAnimationFrame(syncModalLayers);
       },
       true
     );
@@ -305,7 +353,6 @@
 
     modal.dataset.studerriaChangelogReady = '1';
     portalModal(modal);
-    modal.style.zIndex = '1080';
     modal.style.overscrollBehavior = 'contain';
     modal.style.touchAction = 'pan-y';
 
@@ -330,21 +377,17 @@
     modal.addEventListener('show.bs.modal', () => {
       portalModal(modal);
       syncBodyOpenClasses(true, true);
-      requestAnimationFrame(syncBackdrop);
+      requestAnimationFrame(syncModalLayers);
     });
 
     modal.addEventListener('shown.bs.modal', () => {
       syncBodyOpenClasses(true, true);
-      syncBackdrop();
+      syncModalLayers();
     });
 
     modal.addEventListener('hidden.bs.modal', () => {
       syncBodyOpenClasses();
-      if (hasVisibleChangelogModal()) {
-        requestAnimationFrame(syncBackdrop);
-        return;
-      }
-      cleanupBackdrop();
+      requestAnimationFrame(syncModalLayers);
     });
 
     modal.addEventListener('pointerdown', (event) => {
@@ -365,6 +408,7 @@
 
   function init() {
     bindGlobalModalSync();
+    primeStaticModals();
 
     const modal = getModal();
     if (!(modal instanceof HTMLElement)) {

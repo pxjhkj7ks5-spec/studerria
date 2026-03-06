@@ -1012,7 +1012,7 @@ body.theme-light.studerria-theme .modal-content {
 .studerria-theme.modal-open,
 body.modal-open {
   overflow-x: hidden !important;
-  overflow-y: auto !important;
+  overflow-y: hidden !important;
   padding-right: 0 !important;
 }
 
@@ -1231,6 +1231,12 @@ body.page-schedule .drawer-action,
 body.page-schedule .control-toggle,
 body.page-schedule .chip {
   border-radius: 999px;
+}
+
+body.page-schedule button.week-nav-btn:hover,
+body.page-schedule button.week-nav-btn:active,
+body.page-schedule button.week-nav-btn:focus-visible {
+  transform: none !important;
 }
 
 body.page-schedule .sync-pill,
