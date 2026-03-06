@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.37",
+      "date": "2026-03-06",
+      "items": [
+        "style(navbar-logout-icon): replaced the circular `Вийти` text pill with a compact icon-only logout control that keeps the glass feel but reads as a flatter, more intentional exit action"
+      ]
+    },
+    {
       "version": "1.1.36",
       "date": "2026-03-06",
       "items": [
