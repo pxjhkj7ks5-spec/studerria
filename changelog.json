@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.47",
+      "date": "2026-03-06",
+      "items": [
+        "fix(navbar-shell-consistency): normalized the shared `studerria-nav-shell` against page-level `.topbar` overrides so the navbar now keeps the same glass background, border, shadow, and text colors on the home page and the rest of the app screens",
+        "fix(navbar-shell-width): locked the authenticated navbar to one shared width model with matching desktop and mobile gutters, removing page-specific drift in shell size between home, schedule, profile, journal, teamwork, and related views",
+        "fix(navbar-shell-overflow): disabled the legacy title-spotlight overlays for the new shared navbar shell and forced visible overflow on the shell container so dropdown positioning and overall tint stay identical across pages"
+      ]
+    },
+    {
       "version": "1.1.46",
       "date": "2026-03-06",
       "items": [

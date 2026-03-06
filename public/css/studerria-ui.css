@@ -1278,3 +1278,77 @@ body.page-profile .auth-card .form-select:focus {
     justify-content: center;
   }
 }
+
+/* Keep the shared app navbar shell visually identical across all page-specific stylesheets. */
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+  position: relative;
+  z-index: 32;
+  width: min(var(--studerria-shell-max-width), calc(100vw - 24px));
+  max-width: min(var(--studerria-shell-max-width), calc(100vw - 24px));
+  margin: 0 auto 12px;
+  padding: 8px 12px !important;
+  border-radius: 28px;
+  border: 1px solid var(--studerria-topbar-border) !important;
+  border-bottom: 1px solid var(--studerria-topbar-border) !important;
+  background: var(--studerria-topbar-bg) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.14) !important;
+  backdrop-filter: blur(18px) saturate(1.14) !important;
+  box-shadow: var(--studerria-topbar-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+  overflow: visible !important;
+}
+
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell::before,
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .topbar-title-spotlight::before,
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .topbar-title-spotlight::after {
+  display: none !important;
+}
+
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .container {
+  position: relative;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 14px 18px;
+  width: 100%;
+  max-width: none;
+  min-height: 44px;
+  padding-inline: 1.35rem !important;
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .navbar-brand.topbar-title-spotlight {
+  margin-right: 0 !important;
+  padding: 0 !important;
+  flex: 0 0 auto !important;
+  height: auto !important;
+  font-size: 1.16rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .navbar-brand,
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .text-white,
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .snav-link,
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .snav-menu-link,
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .snav-logout-btn,
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .snav-user-meta {
+  color: var(--studerria-topbar-text) !important;
+}
+
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .muted,
+body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .text-muted {
+  color: var(--studerria-topbar-muted) !important;
+}
+
+@media (max-width: 960px) {
+  body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    border-radius: 22px;
+  }
+
+  body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .container {
+    padding-inline: 1rem !important;
+  }
+}
