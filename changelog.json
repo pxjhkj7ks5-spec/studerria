@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.63",
+      "date": "2026-03-06",
+      "items": [
+        "fix(schedule-card-hover-scope): restored a dedicated hover state only for clickable lesson cards while keeping non-interactive day and panel shells visually stable on pointer hover",
+        "fix(schedule-light-contrast): slightly separated lesson cards from their parent day containers in the light theme with denser fills, clearer borders, and a softer interactive hover contrast"
+      ]
+    },
+    {
       "version": "1.1.62",
       "date": "2026-03-06",
       "items": [

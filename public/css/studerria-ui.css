@@ -1040,7 +1040,6 @@ body.modal-open {
 body.page-schedule .week-hero,
 body.page-schedule .schedule-panel,
 body.page-schedule .day-card,
-body.page-schedule .schedule-card,
 body.page-schedule .density-summary,
 body.page-schedule .week-rail,
 body.page-schedule .schedule-modal .modal-content {
@@ -1054,7 +1053,6 @@ body.page-schedule .schedule-modal .modal-content {
 body.theme-light.page-schedule .week-hero,
 body.theme-light.page-schedule .schedule-panel,
 body.theme-light.page-schedule .day-card,
-body.theme-light.page-schedule .schedule-card,
 body.theme-light.page-schedule .density-summary,
 body.theme-light.page-schedule .week-rail,
 body.theme-light.page-schedule .schedule-modal .modal-content {
@@ -1063,10 +1061,21 @@ body.theme-light.page-schedule .schedule-modal .modal-content {
   box-shadow: 0 20px 52px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.36);
 }
 
+body.page-schedule .schedule-card {
+  border-color: color-mix(in srgb, var(--studerria-panel-border) 88%, rgba(255, 255, 255, 0.14));
+  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 92%, rgba(255, 255, 255, 0.06));
+  box-shadow: 0 14px 30px rgba(2, 6, 23, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.theme-light.page-schedule .schedule-card {
+  border-color: rgba(125, 140, 170, 0.32);
+  background: linear-gradient(180deg, rgba(250, 252, 255, 0.9), rgba(240, 245, 253, 0.84));
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
 body.page-schedule .week-hero:hover,
 body.page-schedule .schedule-panel:hover,
 body.page-schedule .day-card:hover,
-body.page-schedule .schedule-card:hover,
 body.page-schedule .density-summary:hover,
 body.page-schedule .week-rail:hover {
   border-color: color-mix(in srgb, var(--studerria-panel-border) 74%, rgba(255, 255, 255, 0.08)) !important;
@@ -1077,12 +1086,24 @@ body.page-schedule .week-rail:hover {
 body.theme-light.page-schedule .week-hero:hover,
 body.theme-light.page-schedule .schedule-panel:hover,
 body.theme-light.page-schedule .day-card:hover,
-body.theme-light.page-schedule .schedule-card:hover,
 body.theme-light.page-schedule .density-summary:hover,
 body.theme-light.page-schedule .week-rail:hover {
   border-color: color-mix(in srgb, rgba(100, 116, 139, 0.22) 58%, var(--studerria-panel-border)) !important;
   background: color-mix(in srgb, var(--studerria-panel-bg) 94%, rgba(221, 231, 246, 0.32)) !important;
   box-shadow: 0 20px 52px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.36) !important;
+}
+
+body.page-schedule .schedule-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 24%, var(--studerria-panel-border)) !important;
+  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 96%, rgba(255, 255, 255, 0.08)) !important;
+  box-shadow: 0 18px 34px rgba(2, 6, 23, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+}
+
+body.theme-light.page-schedule .schedule-card:hover {
+  border-color: rgba(129, 140, 248, 0.3) !important;
+  background: linear-gradient(180deg, rgba(252, 254, 255, 0.96), rgba(244, 248, 255, 0.9)) !important;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.58) !important;
 }
 
 body.page-schedule .week-hero,
