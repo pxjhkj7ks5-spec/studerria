@@ -145,6 +145,41 @@ body.theme-light .studerria-nav-shell .snav-link::after {
   min-width: 0;
 }
 
+.snav-unread-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.58rem;
+  height: 0.58rem;
+  min-width: 0.58rem;
+  border-radius: 999px;
+  margin-left: 0.42rem;
+  background: linear-gradient(135deg, rgba(147, 197, 253, 0.96), rgba(168, 85, 247, 0.96));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.34), 0 0 0 5px rgba(99, 102, 241, 0.12);
+  opacity: 0;
+  transform: scale(0.78);
+  transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  flex: 0 0 auto;
+}
+
+.snav-unread-chip:not([hidden]) {
+  opacity: 1;
+  transform: scale(1);
+}
+
+body.theme-light .snav-unread-chip {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.84), 0 0 0 5px rgba(129, 140, 248, 0.14);
+}
+
+.studerria-nav-shell .snav-item.is-open > .snav-link .snav-unread-chip,
+.studerria-nav-shell .snav-link:hover .snav-unread-chip,
+.studerria-nav-shell .snav-link:focus-visible .snav-unread-chip,
+.studerria-nav-shell .snav-menu-link:hover .snav-unread-chip,
+.studerria-nav-shell .snav-menu-link:focus-visible .snav-unread-chip,
+.studerria-nav-shell .snav-item.is-subopen > .snav-menu-link .snav-unread-chip {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.46), 0 0 0 6px rgba(129, 140, 248, 0.18);
+}
+
 .snav-indicator {
   display: inline-flex;
   align-items: center;

@@ -13,6 +13,7 @@
   const displayName = String((safeUserNav && safeUserNav.name) || username || '').trim();
   const visibleNavItems = safeNavItems.filter((item) => !item.hidden && String(item.section || 'main') === 'main');
   const shouldRenderAppNav = safeForceAppNavbar || (isAuthed && visibleNavItems.length > 0);
+  const allowMessages = Boolean(safeUserNav && safeUserNav.flags && safeUserNav.flags.allowMessages);
   const personalLabel = String((safeNavMeta && safeNavMeta.personalLabel) || (safeUserNav && safeUserNav.personalLabel) || 'Особисте').trim() || 'Особисте';
   const roleLabelMap = {
     admin: (translate ? translate('role.admin') : 'Адмін'),
@@ -49,11 +50,14 @@
 
   const renderTriggerLabel = (item, level) => {
     const label = escapeHtml(item.label || '');
+    const unreadMarker = allowMessages && (item.id === 'personal' || item.id === 'messages')
+      ? `<span class="snav-unread-chip" data-message-indicator="${item.id}" hidden aria-hidden="true"></span>`
+      : '';
     let indicator = '';
     if (Array.isArray(item.children) && item.children.length && level > 0) {
       indicator = '<span class="snav-indicator snav-indicator--submenu" aria-hidden="true">&rsaquo;</span>';
     }
-    return `<span class="snav-label">${label}</span>${indicator}`;
+    return `<span class="snav-label">${label}${unreadMarker}</span>${indicator}`;
   };
 
   const renderTrigger = (item, level) => {

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.45",
+      "date": "2026-03-06",
+      "items": [
+        "feat(navbar-unread-marker): added an unread message marker beside `Особисте` in the shared navbar whenever the current user has unread messages and messaging is enabled",
+        "feat(navbar-messages-marker): mirrored the same unread chip beside the `Повідомлення` item inside the `Особисте` dropdown so the marker stays visible on hover/open states",
+        "fix(navbar-unread-sync): wired the shared navbar to `/messages.json` and the schedule unread updates so the new markers react to message reads without waiting for a full page reload"
+      ]
+    },
+    {
       "version": "1.1.44",
       "date": "2026-03-06",
       "items": [

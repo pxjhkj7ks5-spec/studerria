@@ -3642,6 +3642,9 @@
 
       function updateUnreadBadges(count) {
         const targets = [messagesBadge, mobileMenuBadge].filter(Boolean);
+        window.dispatchEvent(new CustomEvent('studerria:messages-unread', {
+          detail: { count: Number(count) || 0 },
+        }));
         if (!targets.length) return;
         if (count > 0) {
           const value = count > 99 ? '99+' : String(count);

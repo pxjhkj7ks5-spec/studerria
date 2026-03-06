@@ -197,11 +197,82 @@
     window.history.replaceState({}, '', nextUrl);
   }
 
+  function initUnreadIndicators(root) {
+    if (!(root instanceof HTMLElement)) {
+      return;
+    }
+
+    const indicators = Array.from(root.querySelectorAll('[data-message-indicator]'));
+    if (!indicators.length) {
+      return;
+    }
+
+    let requestToken = 0;
+
+    const applyUnreadState = (count) => {
+      const unreadCount = Number.isFinite(Number(count)) ? Number(count) : 0;
+      const hasUnread = unreadCount > 0;
+
+      indicators.forEach((indicator) => {
+        if (!(indicator instanceof HTMLElement)) {
+          return;
+        }
+        indicator.hidden = !hasUnread;
+        indicator.toggleAttribute('data-has-unread', hasUnread);
+      });
+    };
+
+    const fetchUnreadState = async () => {
+      const token = ++requestToken;
+      try {
+        const response = await fetch('/messages.json', {
+          credentials: 'same-origin',
+          headers: {
+            Accept: 'application/json',
+          },
+        });
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json();
+        if (token !== requestToken) {
+          return;
+        }
+
+        applyUnreadState(Number(payload && payload.unread_count) || 0);
+      } catch (_error) {
+        // Keep the last known state on transient failures.
+      }
+    };
+
+    window.addEventListener('studerria:messages-unread', (event) => {
+      const count = Number(event && event.detail && event.detail.count);
+      if (!Number.isFinite(count)) {
+        return;
+      }
+      applyUnreadState(count);
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        fetchUnreadState();
+      }
+    });
+
+    window.addEventListener('focus', fetchUnreadState);
+
+    fetchUnreadState();
+    window.setInterval(fetchUnreadState, 60000);
+  }
+
   function initNav(root) {
     if (!(root instanceof HTMLElement) || root.dataset.navReady === '1') {
       return;
     }
     root.dataset.navReady = '1';
+
+    initUnreadIndicators(root);
 
     const hoverMatcher = getHoverMatcher();
     let hoverEnabled = hoverMatcher ? hoverMatcher.matches : false;
