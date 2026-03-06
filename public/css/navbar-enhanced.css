@@ -8,7 +8,7 @@ body.page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell .cont
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start !important;
   gap: 14px 18px;
   flex-wrap: nowrap;
   overflow: visible;
@@ -20,8 +20,9 @@ body.page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell .topb
 }
 
 body.page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell .navbar-brand.topbar-title-spotlight {
-  margin-right: 0;
-  padding-right: 0;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+  flex: 0 0 auto !important;
 }
 
 .snav-main {
@@ -29,7 +30,7 @@ body.page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell .navb
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: visible;
 }
@@ -206,6 +207,7 @@ body.theme-light .snav-menu {
 
 .snav-actions {
   flex: 0 0 auto;
+  margin-left: auto;
   overflow: visible;
 }
 
