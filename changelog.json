@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.71",
+      "date": "2026-03-07",
+      "items": [
+        "fix(modal-interaction-regression): limited custom backdrop z-index syncing to `changelog` modal only so regular Bootstrap modals no longer get covered by an elevated backdrop layer",
+        "fix(global-modal-sync-scope): kept global `modal-open`/scroll-lock/no-blur synchronization for all modals while preventing non-changelog dialogs from inheriting changelog-specific backdrop overrides"
+      ]
+    },
+    {
       "version": "1.1.70",
       "date": "2026-03-07",
       "items": [

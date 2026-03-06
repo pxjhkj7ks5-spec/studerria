@@ -51,6 +51,10 @@
     return document.querySelector('.modal.show') instanceof HTMLElement;
   }
 
+  function hasVisibleChangelogModal() {
+    return document.querySelector(`${MODAL_SELECTOR}.show`) instanceof HTMLElement;
+  }
+
   function cleanupBackdrop() {
     document.querySelectorAll(`.${BACKDROP_CLASS}`).forEach((backdrop) => {
       if (!(backdrop instanceof HTMLElement)) {
@@ -161,7 +165,7 @@
     }
 
     const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : hasVisibleModal();
-    const changelogIsVisible = document.querySelector(`${MODAL_SELECTOR}.show`) instanceof HTMLElement;
+    const changelogIsVisible = hasVisibleChangelogModal();
 
     if (shouldOpen) {
       body.classList.add(BOOTSTRAP_OPEN_CLASS);
@@ -215,6 +219,10 @@
     return node instanceof HTMLElement && node.classList.contains('modal');
   }
 
+  function isChangelogModalElement(node) {
+    return node instanceof HTMLElement && node.matches(MODAL_SELECTOR);
+  }
+
   function bindGlobalModalSync() {
     if (window[GLOBAL_SYNC_BOOT_FLAG] === true) {
       return;
@@ -228,8 +236,13 @@
           return;
         }
 
-        syncBodyOpenClasses(true);
-        requestAnimationFrame(syncBackdrop);
+        const isChangelogModal = isChangelogModalElement(event.target);
+        syncBodyOpenClasses(true, isChangelogModal);
+        if (isChangelogModal) {
+          requestAnimationFrame(syncBackdrop);
+          return;
+        }
+        cleanupBackdrop();
       },
       true
     );
@@ -241,8 +254,13 @@
           return;
         }
 
-        syncBodyOpenClasses(true);
-        syncBackdrop();
+        const isChangelogModal = isChangelogModalElement(event.target);
+        syncBodyOpenClasses(true, isChangelogModal);
+        if (isChangelogModal) {
+          syncBackdrop();
+          return;
+        }
+        cleanupBackdrop();
       },
       true
     );
@@ -269,7 +287,7 @@
         }
 
         syncBodyOpenClasses();
-        if (hasVisibleModal()) {
+        if (hasVisibleChangelogModal()) {
           requestAnimationFrame(syncBackdrop);
           return;
         }
@@ -322,7 +340,7 @@
 
     modal.addEventListener('hidden.bs.modal', () => {
       syncBodyOpenClasses();
-      if (hasVisibleModal()) {
+      if (hasVisibleChangelogModal()) {
         requestAnimationFrame(syncBackdrop);
         return;
       }
