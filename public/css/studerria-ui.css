@@ -1104,9 +1104,8 @@ body.modal-open {
   margin-top: 0.45rem;
 }
 
-.studerria-theme .liquid-card:hover,
+.studerria-theme .liquid-card:not(.schedule-card):hover,
 .studerria-theme .day-card:hover,
-.studerria-theme .schedule-card:hover,
 .studerria-theme .schedule-panel:hover,
 .studerria-theme .week-hero:hover,
 .studerria-theme .cockpit-card:hover,
@@ -1127,12 +1126,11 @@ body.page-schedule .week-hero,
 body.page-schedule .schedule-panel,
 body.page-schedule .day-card,
 body.page-schedule .density-summary,
-body.page-schedule .week-rail,
-body.page-schedule .schedule-modal .modal-content {
+body.page-schedule .week-rail {
   border-color: color-mix(in srgb, var(--studerria-panel-border) 74%, rgba(255, 255, 255, 0.08));
   background: color-mix(in srgb, var(--studerria-panel-bg) 88%, rgba(255, 255, 255, 0.04));
-  -webkit-backdrop-filter: blur(22px) saturate(1.12);
-  backdrop-filter: blur(22px) saturate(1.12);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow: 0 26px 72px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
@@ -1140,8 +1138,7 @@ body.theme-light.page-schedule .week-hero,
 body.theme-light.page-schedule .schedule-panel,
 body.theme-light.page-schedule .day-card,
 body.theme-light.page-schedule .density-summary,
-body.theme-light.page-schedule .week-rail,
-body.theme-light.page-schedule .schedule-modal .modal-content {
+body.theme-light.page-schedule .week-rail {
   border-color: color-mix(in srgb, rgba(100, 116, 139, 0.28) 62%, var(--studerria-panel-border));
   background: linear-gradient(180deg, rgba(248, 250, 255, 0.94), rgba(236, 242, 251, 0.9));
   box-shadow: 0 22px 56px rgba(15, 23, 42, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.44);
@@ -1164,6 +1161,7 @@ body.page-schedule .schedule-panel:hover,
 body.page-schedule .day-card:hover,
 body.page-schedule .density-summary:hover,
 body.page-schedule .week-rail:hover {
+  transform: none !important;
   border-color: color-mix(in srgb, var(--studerria-panel-border) 74%, rgba(255, 255, 255, 0.08)) !important;
   background: color-mix(in srgb, var(--studerria-panel-bg) 88%, rgba(255, 255, 255, 0.04)) !important;
   box-shadow: 0 26px 72px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
@@ -1174,13 +1172,14 @@ body.theme-light.page-schedule .schedule-panel:hover,
 body.theme-light.page-schedule .day-card:hover,
 body.theme-light.page-schedule .density-summary:hover,
 body.theme-light.page-schedule .week-rail:hover {
-  border-color: color-mix(in srgb, rgba(100, 116, 139, 0.22) 58%, var(--studerria-panel-border)) !important;
-  background: color-mix(in srgb, var(--studerria-panel-bg) 94%, rgba(221, 231, 246, 0.32)) !important;
-  box-shadow: 0 20px 52px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.36) !important;
+  transform: none !important;
+  border-color: color-mix(in srgb, rgba(100, 116, 139, 0.28) 62%, var(--studerria-panel-border)) !important;
+  background: linear-gradient(180deg, rgba(248, 250, 255, 0.94), rgba(236, 242, 251, 0.9)) !important;
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.44) !important;
 }
 
 body.page-schedule .schedule-card:hover {
-  transform: translateY(-1px);
+  transform: translateY(-1px) !important;
   border-color: color-mix(in srgb, var(--studerria-cta-start) 24%, var(--studerria-panel-border)) !important;
   background: color-mix(in srgb, var(--studerria-panel-bg-strong) 96%, rgba(255, 255, 255, 0.08)) !important;
   box-shadow: 0 18px 34px rgba(2, 6, 23, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
