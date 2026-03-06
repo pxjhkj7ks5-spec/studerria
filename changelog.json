@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.33",
+      "date": "2026-03-06",
+      "items": [
+        "fix(page-text-encoding): restored the `my-day` and `schedule` EJS sources from the last good revision so Ukrainian copy and labels no longer render as mojibake on page surfaces",
+        "fix(navbar-text-layout): rebuilt the shared app navbar so `Адмінка`, `Головна`, `Навчання`, and `Особисте` sit as left-aligned text navigation beside the Studerria brand instead of reading like a row of glass pills",
+        "fix(navbar-dropdown-positioning): moved the shared dropdown behavior to open directly under top-level nav items, kept nested flyouts for deeper entries, and removed topbar clipping so hover menus are no longer cut off"
+      ]
+    },
+    {
       "version": "1.1.32",
       "date": "2026-03-06",
       "items": [

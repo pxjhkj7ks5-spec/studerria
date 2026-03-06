@@ -1,19 +1,20 @@
-.studerria-nav-shell {
+body.page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell {
   position: relative;
   z-index: 32;
+  overflow: visible;
 }
 
-.studerria-nav-shell .container {
+body.page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell .container {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px 18px;
-  flex-wrap: wrap;
+  gap: 14px 18px;
+  flex-wrap: nowrap;
   overflow: visible;
 }
 
-.studerria-nav-shell .topbar-title-spotlight {
+body.page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell .topbar-title-spotlight {
   margin-right: 0;
   flex: 0 0 auto;
 }
@@ -21,17 +22,18 @@
 .snav-main {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex: 1 1 0;
+  justify-content: flex-start;
+  gap: 14px;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: visible;
 }
 
 .snav-brand-spacer {
-  width: 12px;
-  min-width: 12px;
+  width: 8px;
+  min-width: 8px;
   height: 1px;
-  flex: 0 0 12px;
+  flex: 0 0 8px;
 }
 
 .snav-list,
@@ -44,29 +46,90 @@
 .snav-list {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 24px;
+  flex-wrap: nowrap;
   overflow: visible;
 }
 
 .snav-item {
   position: relative;
   display: flex;
-  align-items: stretch;
+  align-items: center;
 }
 
 .studerria-nav-shell .snav-link,
 .studerria-nav-shell .snav-menu-link {
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  text-decoration: none;
+  font: inherit;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   white-space: nowrap;
+  transition: opacity 160ms ease, transform 160ms ease, color 160ms ease;
 }
 
-.studerria-nav-shell .snav-link.snav-trigger,
-.studerria-nav-shell .snav-menu-link.snav-trigger {
-  min-width: 100%;
+.studerria-nav-shell .snav-link {
+  font-size: 0.95rem;
+  font-weight: 500;
+  opacity: 0.88;
+}
+
+.studerria-nav-shell .snav-link:hover,
+.studerria-nav-shell .snav-link:focus-visible,
+.studerria-nav-shell .snav-item.is-open > .snav-link,
+.studerria-nav-shell .snav-item.is-current > .snav-link {
+  opacity: 1;
+}
+
+.studerria-nav-shell .snav-link:focus-visible,
+.studerria-nav-shell .snav-menu-link:focus-visible {
+  outline: none;
+}
+
+.studerria-nav-shell .snav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 1px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 180ms ease;
+}
+
+body.theme-light .studerria-nav-shell .snav-link::after {
+  background: rgba(15, 23, 42, 0.44);
+}
+
+.studerria-nav-shell .snav-item.is-open > .snav-link::after,
+.studerria-nav-shell .snav-link:hover::after,
+.studerria-nav-shell .snav-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.studerria-nav-shell .snav-menu-link {
+  width: 100%;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.studerria-nav-shell .snav-menu-link:hover,
+.studerria-nav-shell .snav-menu-link:focus-visible,
+.studerria-nav-shell .snav-item.is-subopen > .snav-menu-link {
+  opacity: 1;
+  transform: translateX(2px);
 }
 
 .snav-label {
@@ -79,43 +142,43 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.64;
+  font-size: 0.9em;
+  opacity: 0.58;
   transition: transform 180ms ease, opacity 180ms ease;
 }
 
-.snav-item.is-open > .snav-link .snav-indicator,
-.snav-item.is-open > .snav-menu-link .snav-indicator,
-.snav-item.is-subopen > .snav-link .snav-indicator,
-.snav-item.is-subopen > .snav-menu-link .snav-indicator {
+.snav-item.is-subopen > .snav-menu-link .snav-indicator,
+.snav-menu-link:hover .snav-indicator,
+.snav-menu-link:focus-visible .snav-indicator {
   opacity: 0.92;
   transform: translateX(2px);
 }
 
 .snav-menu {
   position: absolute;
-  left: 0;
-  top: calc(100% + 10px);
-  min-width: 220px;
-  padding: 10px;
-  border-radius: 24px;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 18px 45px rgba(8, 8, 20, 0.32);
+  top: calc(100% + 16px);
+  left: -18px;
+  min-width: 232px;
+  padding: 14px 16px;
+  border-radius: 22px;
+  backdrop-filter: blur(20px) saturate(1.08);
+  -webkit-backdrop-filter: blur(20px) saturate(1.08);
+  box-shadow: 0 18px 45px rgba(8, 8, 20, 0.28);
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateY(8px);
   pointer-events: none;
   transition: opacity 180ms ease, transform 180ms ease;
   z-index: 48;
 }
 
 body.theme-dark .snav-menu {
-  background: rgba(10, 14, 24, 0.82);
+  background: rgba(12, 16, 30, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 body.theme-light .snav-menu {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(15, 23, 42, 0.1);
 }
 
 .snav-item.is-open > .snav-menu,
@@ -128,17 +191,12 @@ body.theme-light .snav-menu {
 .snav-menu-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.snav-menu-link {
-  width: 100%;
-  text-align: left;
+  gap: 12px;
 }
 
 .snav-menu--flyout {
-  top: -10px;
-  left: calc(100% + 10px);
+  top: -14px;
+  left: calc(100% + 16px);
 }
 
 .snav-actions {
@@ -164,6 +222,7 @@ body.theme-light .snav-menu {
 @media (max-width: 991px) {
   .studerria-nav-shell .container {
     align-items: flex-start;
+    flex-wrap: wrap;
   }
 
   .snav-main {
@@ -179,7 +238,7 @@ body.theme-light .snav-menu {
 
   .snav-list {
     width: 100%;
-    flex-wrap: nowrap;
+    gap: 20px;
     overflow-x: auto;
     padding-bottom: 4px;
     scrollbar-width: none;
@@ -187,10 +246,6 @@ body.theme-light .snav-menu {
 
   .snav-list::-webkit-scrollbar {
     display: none;
-  }
-
-  .snav-item {
-    flex: 0 0 auto;
   }
 
   .snav-actions {
@@ -207,12 +262,13 @@ body.theme-light .snav-menu {
     position: static;
     min-width: min(280px, calc(100vw - 48px));
     width: 100%;
-    margin-top: 8px;
+    margin-top: 10px;
+    margin-left: 0;
     transform: translateY(0);
   }
 
   .snav-menu--flyout {
-    margin-left: 12px;
+    padding-left: 18px;
   }
 
   .snav-menu[hidden] {

@@ -77,43 +77,86 @@
       };
       const getDeadlineStatus = (item) => {
         if (item && item.submission_status === 'submitted_on_time') {
-          return { label: 'Р’С‡Р°СЃРЅРѕ', className: 'status-on-time' };
+          return { label: 'Вчасно', className: 'status-on-time' };
         }
         if (item && item.submission_status === 'submitted_late') {
-          return { label: 'Р†Р· Р·Р°РїС–Р·РЅРµРЅРЅСЏРј', className: 'status-late' };
+          return { label: 'Із запізненням', className: 'status-late' };
         }
         if (item && item.submission_status === 'overdue') {
-          return { label: 'РџСЂРѕСЃС‚СЂРѕС‡РµРЅРѕ', className: 'status-overdue' };
+          return { label: 'Прострочено', className: 'status-overdue' };
         }
-        return { label: 'Р’С–РґРєСЂРёС‚Рѕ', className: 'status-open' };
+        return { label: 'Відкрито', className: 'status-open' };
       };
-      const getDayContext = (item) => (item && item.day_context === 'tomorrow' ? 'Р—Р°РІС‚СЂР°' : 'РЎСЊРѕРіРѕРґРЅС–');
+      const getDayContext = (item) => (item && item.day_context === 'tomorrow' ? 'Завтра' : 'Сьогодні');
       const getReviewQueueTypeMeta = (item) => {
         const queueType = String(item && item.queue_type ? item.queue_type : 'new');
         if (queueType === 'overdue') {
-          return { label: 'РџСЂРѕСЃС‚СЂРѕС‡РµРЅС–', className: 'status-overdue' };
+          return { label: 'Прострочені', className: 'status-overdue' };
         }
         if (queueType === 'no_comment') {
-          return { label: 'Р‘РµР· РєРѕРјРµРЅС‚Р°СЂСЏ', className: 'status-late' };
+          return { label: 'Без коментаря', className: 'status-late' };
         }
-        return { label: 'РќРѕРІС–', className: 'status-open' };
+        return { label: 'Нові', className: 'status-open' };
       };
       const getSubmissionStatusMeta = (item) => {
         const status = String(item && item.submission_status ? item.submission_status : '');
-        if (status === 'late') return { label: 'Р—РґР°РЅРѕ РїС–Р·РЅРѕ', className: 'type-chip type-chip-warning' };
-        if (status === 'on_time') return { label: 'Р’С‡Р°СЃРЅРѕ', className: 'type-chip type-chip-success' };
-        if (status === 'manual') return { label: 'Р СѓС‡РЅР° РєРѕР»РѕРЅРєР°', className: 'type-chip' };
+        if (status === 'late') return { label: 'Здано пізно', className: 'type-chip type-chip-warning' };
+        if (status === 'on_time') return { label: 'Вчасно', className: 'type-chip type-chip-success' };
+        if (status === 'manual') return { label: 'Ручна колонка', className: 'type-chip' };
         return null;
       };
       const getProgressRiskMeta = (item) => {
         const level = String(item && item.risk_level ? item.risk_level : 'low');
-        if (level === 'high') return { label: 'Р’РёСЃРѕРєРёР№ СЂРёР·РёРє', className: 'progress-risk-high' };
-        if (level === 'medium') return { label: 'РџРѕРјС–СЂРЅРёР№ СЂРёР·РёРє', className: 'progress-risk-medium' };
-        return { label: 'РЎС‚Р°Р±С–Р»СЊРЅРѕ', className: 'progress-risk-low' };
+        if (level === 'high') return { label: 'Високий ризик', className: 'progress-risk-high' };
+        if (level === 'medium') return { label: 'Помірний ризик', className: 'progress-risk-medium' };
+        return { label: 'Стабільно', className: 'progress-risk-low' };
       };
     %>
 
-    <%- include('partials/topbar', { role, username, t, activePage: 'my-day', pageTitle: 'Р“РѕР»РѕРІРЅР°' }) %>
+    <%- include('partials/topbar', { role, username, t, activePage: 'my-day', pageTitle: 'Головна' }) %>
+    <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
+      <div class="drawer-head">
+        <div class="drawer-title">Меню</div>
+        <button class="drawer-close" type="button" id="scheduleDrawerClose" aria-label="Close menu">✕</button>
+      </div>
+      <div class="drawer-actions">
+        <% if (role === 'admin') { %>
+          <form method="POST" action="/admin/switch-to-admin" class="drawer-action-wrap">
+            <button class="drawer-action" type="submit">🛠️ <%= t('schedule.backToAdmin') %></button>
+          </form>
+        <% } else if (hasCustomAdminPanelAccess) { %>
+          <a class="drawer-action" href="<%= customAdminPanelHref || '/admin' %>">🛠️ <%= t('schedule.backToAdmin') %></a>
+        <% } %>
+        <% if (role === 'starosta') { %>
+          <a class="drawer-action" href="/starosta">🧑‍🏫 <%= t('menu.starosta') %></a>
+        <% } %>
+        <% if (role === 'deanery') { %>
+          <a class="drawer-action" href="/deanery">🏛️ <%= t('menu.deanery') %></a>
+        <% } %>
+        <a class="drawer-action" href="/schedule">📅 Розклад</a>
+        <a class="drawer-action" href="/journal">📘 Журнал</a>
+        <a class="drawer-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
+        <a class="drawer-action" href="/subjects">📚 Предмети</a>
+        <% if ((role === 'student' || role === 'starosta' || role === 'teacher') && settings && settings.allow_custom_deadlines) { %>
+          <a class="drawer-action" href="/schedule">🌀 Дивні дедлайни</a>
+        <% } %>
+        <% if (settings && settings.allow_messages) { %>
+          <a class="drawer-action" href="/schedule">💬 Повідомлення</a>
+        <% } %>
+        <a class="drawer-action" href="/profile">👤 <%= t('schedule.profile') %></a>
+        <button
+          class="drawer-action theme-toggle"
+          type="button"
+          data-light-label="☀️ Зміна теми"
+          data-dark-label="🌙 Зміна теми"
+        >
+          🌙 Зміна теми
+        </button>
+        <form method="POST" action="/logout" class="drawer-action-wrap">
+          <button class="drawer-action" type="submit">🚪 <%= t('schedule.logout') %></button>
+        </form>
+      </div>
+    </aside>
 
     <main class="container cockpit-page py-4">
       <% if (okMessage) { %>
@@ -126,13 +169,13 @@
       <section class="cockpit-card brief-card <%= briefToneClass %>">
         <div class="brief-head">
           <span class="brief-kicker">Leadership Brief</span>
-          <span class="brief-meta">РўРёР¶РґРµРЅСЊ <%= cockpit.week_number || '-' %></span>
+          <span class="brief-meta">Тиждень <%= cockpit.week_number || '-' %></span>
         </div>
-        <h1 class="brief-title"><%= brief.title || 'РўРІС–Р№ РґРµРЅСЊ РїС–Рґ РєРѕРЅС‚СЂРѕР»РµРј' %></h1>
-        <p class="brief-message"><%= brief.message || 'РљСЂРёС‚РёС‡РЅРёС… СЃРёРіРЅР°Р»С–РІ РЅРµ Р·РЅР°Р№РґРµРЅРѕ, С‚СЂРёРјР°Р№ С‚РµРјРї.' %></p>
+        <h1 class="brief-title"><%= brief.title || 'Твій день під контролем' %></h1>
+        <p class="brief-message"><%= brief.message || 'Критичних сигналів не знайдено, тримай темп.' %></p>
         <div class="brief-actions">
-          <a class="btn btn-glass" href="<%= brief.action_href || '/schedule' %>"><%= brief.action_label || 'Р’С–РґРєСЂРёС‚Рё СЂРѕР·РєР»Р°Рґ' %></a>
-          <button type="button" class="btn btn-soft" id="briefWhyToggle">Р§РѕРјСѓ СЏ С†Рµ Р±Р°С‡Сѓ?</button>
+          <a class="btn btn-glass" href="<%= brief.action_href || '/schedule' %>"><%= brief.action_label || 'Відкрити розклад' %></a>
+          <button type="button" class="btn btn-soft" id="briefWhyToggle">Чому я це бачу?</button>
         </div>
         <div class="brief-reasons d-none" id="briefWhyPanel">
           <% if (briefReasons.length) { %>
@@ -140,7 +183,7 @@
               <div class="brief-reason-row"><%= reason %></div>
             <% }) %>
           <% } else { %>
-            <div class="brief-reason-row">РЎРёРіРЅР°Р»Рё С‰Рµ РЅР°РєРѕРїРёС‡СѓСЋС‚СЊСЃСЏ.</div>
+            <div class="brief-reason-row">Сигнали ще накопичуються.</div>
           <% } %>
         </div>
       </section>
@@ -149,20 +192,20 @@
         <% if (isStudentLikeMyDayView) { %>
           <article class="cockpit-card section-card order-1 dual-focus-card" id="deadlinesClassesBlock">
             <div class="section-head">
-              <h2 class="section-title">РќР°Р№Р±Р»РёР¶С‡С– РґРµРґР»Р°Р№РЅРё С‚Р° РїР°СЂРё</h2>
-              <span class="section-subtitle">РљР»СЋС‡РѕРІС– Р·Р°РґР°С‡С– С‚Р° РЅР°Р№Р±Р»РёР¶С‡С– Р·Р°РЅСЏС‚С‚СЏ</span>
+              <h2 class="section-title">Найближчі дедлайни та пари</h2>
+              <span class="section-subtitle">Ключові задачі та найближчі заняття</span>
             </div>
 
             <div class="dual-focus-grid">
               <section class="dual-focus-pane" aria-labelledby="deadlinesPaneTitle">
                 <div class="dual-focus-pane-head">
-                  <h3 class="dual-focus-pane-title" id="deadlinesPaneTitle">РќР°Р№Р±Р»РёР¶С‡С– РґРµРґР»Р°Р№РЅРё</h3>
-                  <span class="dual-focus-pane-subtitle">2-3 Р·Р°РґР°С‡С– Р· РїСЂС–РѕСЂРёС‚РµС‚РѕРј</span>
+                  <h3 class="dual-focus-pane-title" id="deadlinesPaneTitle">Найближчі дедлайни</h3>
+                  <span class="dual-focus-pane-subtitle">2-3 задачі з пріоритетом</span>
                 </div>
                 <% if (!deadlineItems.length) { %>
                   <div class="empty-state compact">
-                    <div class="empty-state-title">РљСЂРёС‚РёС‡РЅРёС… РґРµРґР»Р°Р№РЅС–РІ РЅРµ Р·РЅР°Р№РґРµРЅРѕ</div>
-                    <div class="empty-state-subtitle">РЎРёСЃС‚РµРјР° РЅРµ Р±Р°С‡РёС‚СЊ РІС–РґРєСЂРёС‚РёС… СЂРёР·РёРєС–РІ РЅР° РЅР°Р№Р±Р»РёР¶С‡РёР№ РїРµСЂС–РѕРґ.</div>
+                    <div class="empty-state-title">Критичних дедлайнів не знайдено</div>
+                    <div class="empty-state-subtitle">Система не бачить відкритих ризиків на найближчий період.</div>
                   </div>
                 <% } else { %>
                   <div class="item-list">
@@ -175,13 +218,13 @@
                     %>
                       <div class="item-row deadline-row">
                         <div class="item-main">
-                          <div class="item-title"><%= item.description || 'Р—Р°РІРґР°РЅРЅСЏ' %></div>
+                          <div class="item-title"><%= item.description || 'Завдання' %></div>
                           <div class="item-meta">
-                            <span><%= item.subject_name || 'РџСЂРµРґРјРµС‚' %></span>
-                            <span>РґРѕ <%= formatShortDate(item.deadline_date) %></span>
-                            <% if (creatorName) { %><span>РґРѕРґР°РІ: <%= creatorName %></span><% } %>
-                            <% if (item.is_control) { %><span class="type-chip">РљРѕРЅС‚СЂРѕР»СЊ</span><% } %>
-                            <% if (item.is_credit) { %><span class="type-chip">Р—Р°Р»С–Рє</span><% } %>
+                            <span><%= item.subject_name || 'Предмет' %></span>
+                            <span>до <%= formatShortDate(item.deadline_date) %></span>
+                            <% if (creatorName) { %><span>додав: <%= creatorName %></span><% } %>
+                            <% if (item.is_control) { %><span class="type-chip">Контроль</span><% } %>
+                            <% if (item.is_credit) { %><span class="type-chip">Залік</span><% } %>
                           </div>
                         </div>
                         <div class="item-side">
@@ -191,19 +234,19 @@
                               type="button"
                               class="btn btn-submit-now"
                               data-submit-homework-id="<%= item.id %>"
-                              data-submit-title="<%= item.description || 'Р—Р°РІРґР°РЅРЅСЏ' %>"
+                              data-submit-title="<%= item.description || 'Завдання' %>"
                               data-submit-mode="<%= hasSubmission ? 'update' : 'create' %>"
                             >
-                              <%= hasSubmission ? 'РћРЅРѕРІРёС‚Рё Р·РґР°С‡Сѓ' : 'Р—РґР°С‚Рё' %>
+                              <%= hasSubmission ? 'Оновити здачу' : 'Здати' %>
                             </button>
                           <% } else if (isHomework && hasSubmission && item.submission_status === 'submitted_on_time') { %>
-                            <span class="item-note">Р—РґР°РЅРѕ <%= item.submitted_date || '' %></span>
+                            <span class="item-note">Здано <%= item.submitted_date || '' %></span>
                           <% } else if (isHomework && hasSubmission && item.submission_status === 'submitted_late') { %>
-                            <span class="item-note">Р—РґР°РЅРѕ С–Р· Р·Р°РїС–Р·РЅРµРЅРЅСЏРј</span>
+                            <span class="item-note">Здано із запізненням</span>
                           <% } else if (item.type === 'teamwork') { %>
-                            <a href="/teamwork" class="btn btn-inline-link">Р’С–РґРєСЂРёС‚Рё</a>
+                            <a href="/teamwork" class="btn btn-inline-link">Відкрити</a>
                           <% } else { %>
-                            <a href="/schedule" class="btn btn-inline-link">Р’С–РґРєСЂРёС‚Рё</a>
+                            <a href="/schedule" class="btn btn-inline-link">Відкрити</a>
                           <% } %>
                         </div>
                       </div>
@@ -211,35 +254,35 @@
                   </div>
                 <% } %>
                 <div class="section-footer-link dual-focus-footer">
-                  <a href="/schedule">Р’С–РґРєСЂРёС‚Рё РїРѕРІРЅРёР№ СЃРїРёСЃРѕРє Сѓ СЂРѕР·РєР»Р°РґС–</a>
+                  <a href="/schedule">Відкрити повний список у розкладі</a>
                 </div>
               </section>
 
               <section class="dual-focus-pane" aria-labelledby="nextClassesPaneTitle">
                 <div class="dual-focus-pane-head">
-                  <h3 class="dual-focus-pane-title" id="nextClassesPaneTitle">РџР°СЂРё РЅР°Р№Р±Р»РёР¶С‡РёРј С‡Р°СЃРѕРј</h3>
-                  <span class="dual-focus-pane-subtitle">РЎСЊРѕРіРѕРґРЅС– С‚Р° Р·Р°РІС‚СЂР°</span>
+                  <h3 class="dual-focus-pane-title" id="nextClassesPaneTitle">Пари найближчим часом</h3>
+                  <span class="dual-focus-pane-subtitle">Сьогодні та завтра</span>
                 </div>
                 <% if (!classItems.length) { %>
                   <div class="empty-state compact">
-                    <div class="empty-state-title">РќР°Р№Р±Р»РёР¶С‡РёС… РїР°СЂ РЅРµРјР°С”</div>
-                    <div class="empty-state-subtitle">РџРµСЂРµРІС–СЂ СЂРѕР·РєР»Р°Рґ, СЏРєС‰Рѕ РѕС‡С–РєСѓС”С€ Р·РјС–РЅРё.</div>
+                    <div class="empty-state-title">Найближчих пар немає</div>
+                    <div class="empty-state-subtitle">Перевір розклад, якщо очікуєш зміни.</div>
                   </div>
                 <% } else { %>
                   <div class="item-list">
                     <% classItems.forEach((item) => { %>
                       <div class="item-row class-row">
                         <div class="item-main">
-                          <div class="item-title"><%= item.subject_name || 'РџСЂРµРґРјРµС‚' %></div>
+                          <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
                           <div class="item-meta">
                             <span class="type-chip"><%= getDayContext(item) %></span>
-                            <span>РџР°СЂР° <%= item.class_number || '-' %></span>
+                            <span>Пара <%= item.class_number || '-' %></span>
                             <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
-                            <% if (item.group_number) { %><span>Р“СЂСѓРїР° <%= item.group_number %></span><% } %>
+                            <% if (item.group_number) { %><span>Група <%= item.group_number %></span><% } %>
                           </div>
                         </div>
                         <div class="item-side">
-                          <a href="/schedule" class="btn btn-inline-link">Р”Рѕ СЂРѕР·РєР»Р°РґСѓ</a>
+                          <a href="/schedule" class="btn btn-inline-link">До розкладу</a>
                         </div>
                       </div>
                     <% }) %>
@@ -253,36 +296,36 @@
         <% if (isTeacherMyDayView) { %>
           <article class="cockpit-card section-card order-1 dual-focus-card teacher-focus-card" id="teacherClassesRemindersBlock">
             <div class="section-head">
-              <h2 class="section-title">РџР°СЂРё РЅР°Р№Р±Р»РёР¶С‡РёРј С‡Р°СЃРѕРј</h2>
-              <span class="section-subtitle">РЎСЊРѕРіРѕРґРЅС– С‚Р° Р·Р°РІС‚СЂР° + РѕСЃРѕР±РёСЃС‚С– РЅР°РіР°РґСѓРІР°РЅРЅСЏ</span>
+              <h2 class="section-title">Пари найближчим часом</h2>
+              <span class="section-subtitle">Сьогодні та завтра + особисті нагадування</span>
             </div>
 
             <div class="dual-focus-grid dual-focus-grid-single">
               <section class="dual-focus-pane" aria-labelledby="teacherNextClassesPaneTitle">
                 <div class="dual-focus-pane-head">
-                  <h3 class="dual-focus-pane-title" id="teacherNextClassesPaneTitle">РџР°СЂРё РЅР°Р№Р±Р»РёР¶С‡РёРј С‡Р°СЃРѕРј</h3>
-                  <span class="dual-focus-pane-subtitle">РЎСЊРѕРіРѕРґРЅС– С‚Р° Р·Р°РІС‚СЂР°</span>
+                  <h3 class="dual-focus-pane-title" id="teacherNextClassesPaneTitle">Пари найближчим часом</h3>
+                  <span class="dual-focus-pane-subtitle">Сьогодні та завтра</span>
                 </div>
                 <% if (!classItems.length) { %>
                   <div class="empty-state compact">
-                    <div class="empty-state-title">РќР°Р№Р±Р»РёР¶С‡РёС… РїР°СЂ РЅРµРјР°С”</div>
-                    <div class="empty-state-subtitle">РџРµСЂРµРІС–СЂ СЂРѕР·РєР»Р°Рґ, СЏРєС‰Рѕ РѕС‡С–РєСѓС”С€ Р·РјС–РЅРё.</div>
+                    <div class="empty-state-title">Найближчих пар немає</div>
+                    <div class="empty-state-subtitle">Перевір розклад, якщо очікуєш зміни.</div>
                   </div>
                 <% } else { %>
                   <div class="item-list">
                     <% classItems.forEach((item) => { %>
                       <div class="item-row class-row">
                         <div class="item-main">
-                          <div class="item-title"><%= item.subject_name || 'РџСЂРµРґРјРµС‚' %></div>
+                          <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
                           <div class="item-meta">
                             <span class="type-chip"><%= getDayContext(item) %></span>
-                            <span>РџР°СЂР° <%= item.class_number || '-' %></span>
+                            <span>Пара <%= item.class_number || '-' %></span>
                             <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
-                            <% if (item.group_number) { %><span>Р“СЂСѓРїР° <%= item.group_number %></span><% } %>
+                            <% if (item.group_number) { %><span>Група <%= item.group_number %></span><% } %>
                           </div>
                         </div>
                         <div class="item-side">
-                          <a href="/schedule" class="btn btn-inline-link">Р”Рѕ СЂРѕР·РєР»Р°РґСѓ</a>
+                          <a href="/schedule" class="btn btn-inline-link">До розкладу</a>
                         </div>
                       </div>
                     <% }) %>
@@ -293,38 +336,38 @@
 
             <div class="reminder-block teacher-inline-reminders">
               <div class="reminder-header">
-                <h3>РќР°РіР°РґСѓРІР°РЅРЅСЏ</h3>
-                <button type="button" class="btn btn-soft btn-sm" id="toggleReminderForm">Р”РѕРґР°С‚Рё</button>
+                <h3>Нагадування</h3>
+                <button type="button" class="btn btn-soft btn-sm" id="toggleReminderForm">Додати</button>
               </div>
               <form id="reminderForm" class="reminder-form d-none">
                 <input type="hidden" id="reminderEditId" value="" />
                 <div class="reminder-row">
-                  <input type="text" id="reminderTitle" class="form-control reminder-input" maxlength="160" placeholder="РќР°Р·РІР° РЅР°РіР°РґСѓРІР°РЅРЅСЏ" required />
+                  <input type="text" id="reminderTitle" class="form-control reminder-input" maxlength="160" placeholder="Назва нагадування" required />
                 </div>
                 <div class="reminder-row">
-                  <textarea id="reminderNote" class="form-control reminder-input" rows="2" maxlength="500" placeholder="РќРѕС‚Р°С‚РєР° (РѕРїС†С–Р№РЅРѕ)"></textarea>
+                  <textarea id="reminderNote" class="form-control reminder-input" rows="2" maxlength="500" placeholder="Нотатка (опційно)"></textarea>
                 </div>
                 <div class="reminder-row reminder-row-split">
                   <input type="date" id="reminderDate" class="form-control reminder-input" required />
                   <input type="time" id="reminderTime" class="form-control reminder-input" />
                 </div>
                 <div class="reminder-actions">
-                  <button type="submit" class="btn btn-glass btn-sm" id="reminderSubmit">Р”РѕРґР°С‚Рё</button>
-                  <button type="button" class="btn btn-soft btn-sm" id="reminderCancel">РЎРєР°СЃСѓРІР°С‚Рё</button>
+                  <button type="submit" class="btn btn-glass btn-sm" id="reminderSubmit">Додати</button>
+                  <button type="button" class="btn btn-soft btn-sm" id="reminderCancel">Скасувати</button>
                 </div>
               </form>
               <div id="reminderList" class="reminder-list">
                 <% if (!reminders.length) { %>
                   <div class="empty-state compact">
-                    <div class="empty-state-title">РќР°РіР°РґСѓРІР°РЅСЊ РЅРµРјР°С”</div>
-                    <div class="empty-state-subtitle">Р”РѕРґР°Р№ РїРµСЂС€Рµ РЅР° РЅР°Р№Р±Р»РёР¶С‡РёР№ С‚РёР¶РґРµРЅСЊ.</div>
+                    <div class="empty-state-title">Нагадувань немає</div>
+                    <div class="empty-state-subtitle">Додай перше на найближчий тиждень.</div>
                   </div>
                 <% } else { %>
                   <% reminders.forEach((reminder) => { %>
                     <div class="reminder-item">
                       <div class="reminder-main">
                         <div class="reminder-title <%= reminder.is_done ? 'done' : '' %>"><%= reminder.title %></div>
-                        <div class="reminder-meta"><%= formatReminderDate(reminder.remind_date) %><%= reminder.remind_time ? ` В· ${reminder.remind_time}` : '' %></div>
+                        <div class="reminder-meta"><%= formatReminderDate(reminder.remind_date) %><%= reminder.remind_time ? ` · ${reminder.remind_time}` : '' %></div>
                       </div>
                     </div>
                   <% }) %>
@@ -337,13 +380,13 @@
         <% if (isDefaultStaffMyDayView) { %>
         <article class="cockpit-card section-card<%= isStudentLikeMyDayView ? ' order-1' : '' %>" id="deadlinesBlock">
           <div class="section-head">
-            <h2 class="section-title">РќР°Р№Р±Р»РёР¶С‡С– РґРµРґР»Р°Р№РЅРё</h2>
-            <span class="section-subtitle">2-3 Р·Р°РґР°С‡С– Р· РЅР°Р№РІРёС‰РёРј РїСЂС–РѕСЂРёС‚РµС‚РѕРј</span>
+            <h2 class="section-title">Найближчі дедлайни</h2>
+            <span class="section-subtitle">2-3 задачі з найвищим пріоритетом</span>
           </div>
           <% if (!deadlineItems.length) { %>
             <div class="empty-state">
-              <div class="empty-state-title">РљСЂРёС‚РёС‡РЅРёС… РґРµРґР»Р°Р№РЅС–РІ РЅРµ Р·РЅР°Р№РґРµРЅРѕ</div>
-              <div class="empty-state-subtitle">РЎРёСЃС‚РµРјР° РЅРµ Р±Р°С‡РёС‚СЊ РІС–РґРєСЂРёС‚РёС… СЂРёР·РёРєС–РІ РЅР° РЅР°Р№Р±Р»РёР¶С‡РёР№ РїРµСЂС–РѕРґ.</div>
+              <div class="empty-state-title">Критичних дедлайнів не знайдено</div>
+              <div class="empty-state-subtitle">Система не бачить відкритих ризиків на найближчий період.</div>
             </div>
           <% } else { %>
             <div class="item-list">
@@ -356,13 +399,13 @@
               %>
                 <div class="item-row deadline-row">
                   <div class="item-main">
-                    <div class="item-title"><%= item.description || 'Р—Р°РІРґР°РЅРЅСЏ' %></div>
+                    <div class="item-title"><%= item.description || 'Завдання' %></div>
                     <div class="item-meta">
-                      <span><%= item.subject_name || 'РџСЂРµРґРјРµС‚' %></span>
-                      <span>РґРѕ <%= formatShortDate(item.deadline_date) %></span>
-                      <% if (creatorName) { %><span>РґРѕРґР°РІ: <%= creatorName %></span><% } %>
-                      <% if (item.is_control) { %><span class="type-chip">РљРѕРЅС‚СЂРѕР»СЊ</span><% } %>
-                      <% if (item.is_credit) { %><span class="type-chip">Р—Р°Р»С–Рє</span><% } %>
+                      <span><%= item.subject_name || 'Предмет' %></span>
+                      <span>до <%= formatShortDate(item.deadline_date) %></span>
+                      <% if (creatorName) { %><span>додав: <%= creatorName %></span><% } %>
+                      <% if (item.is_control) { %><span class="type-chip">Контроль</span><% } %>
+                      <% if (item.is_credit) { %><span class="type-chip">Залік</span><% } %>
                     </div>
                   </div>
                   <div class="item-side">
@@ -372,19 +415,19 @@
                         type="button"
                         class="btn btn-submit-now"
                         data-submit-homework-id="<%= item.id %>"
-                        data-submit-title="<%= item.description || 'Р—Р°РІРґР°РЅРЅСЏ' %>"
+                        data-submit-title="<%= item.description || 'Завдання' %>"
                         data-submit-mode="<%= hasSubmission ? 'update' : 'create' %>"
                       >
-                        <%= hasSubmission ? 'РћРЅРѕРІРёС‚Рё Р·РґР°С‡Сѓ' : 'Р—РґР°С‚Рё' %>
+                        <%= hasSubmission ? 'Оновити здачу' : 'Здати' %>
                       </button>
                     <% } else if (isHomework && hasSubmission && item.submission_status === 'submitted_on_time') { %>
-                      <span class="item-note">Р—РґР°РЅРѕ <%= item.submitted_date || '' %></span>
+                      <span class="item-note">Здано <%= item.submitted_date || '' %></span>
                     <% } else if (isHomework && hasSubmission && item.submission_status === 'submitted_late') { %>
-                      <span class="item-note">Р—РґР°РЅРѕ С–Р· Р·Р°РїС–Р·РЅРµРЅРЅСЏРј</span>
+                      <span class="item-note">Здано із запізненням</span>
                     <% } else if (item.type === 'teamwork') { %>
-                      <a href="/teamwork" class="btn btn-inline-link">Р’С–РґРєСЂРёС‚Рё</a>
+                      <a href="/teamwork" class="btn btn-inline-link">Відкрити</a>
                     <% } else { %>
-                      <a href="/schedule" class="btn btn-inline-link">Р’С–РґРєСЂРёС‚Рё</a>
+                      <a href="/schedule" class="btn btn-inline-link">Відкрити</a>
                     <% } %>
                   </div>
                 </div>
@@ -392,35 +435,35 @@
             </div>
           <% } %>
           <div class="section-footer-link">
-            <a href="/schedule">Р’С–РґРєСЂРёС‚Рё РїРѕРІРЅРёР№ СЃРїРёСЃРѕРє Сѓ СЂРѕР·РєР»Р°РґС–</a>
+            <a href="/schedule">Відкрити повний список у розкладі</a>
           </div>
         </article>
 
         <article class="cockpit-card section-card<%= isStudentLikeMyDayView ? ' order-4' : '' %>" id="nextClassesBlock">
           <div class="section-head">
-            <h2 class="section-title">РџР°СЂРё РЅР°Р№Р±Р»РёР¶С‡РёРј С‡Р°СЃРѕРј</h2>
-            <span class="section-subtitle">РЎСЊРѕРіРѕРґРЅС– С‚Р° Р·Р°РІС‚СЂР°</span>
+            <h2 class="section-title">Пари найближчим часом</h2>
+            <span class="section-subtitle">Сьогодні та завтра</span>
           </div>
           <% if (!classItems.length) { %>
             <div class="empty-state">
-              <div class="empty-state-title">РќР°Р№Р±Р»РёР¶С‡РёС… РїР°СЂ РЅРµРјР°С”</div>
-              <div class="empty-state-subtitle">РџРµСЂРµРІС–СЂ СЂРѕР·РєР»Р°Рґ, СЏРєС‰Рѕ РѕС‡С–РєСѓС”С€ Р·РјС–РЅРё.</div>
+              <div class="empty-state-title">Найближчих пар немає</div>
+              <div class="empty-state-subtitle">Перевір розклад, якщо очікуєш зміни.</div>
             </div>
           <% } else { %>
             <div class="item-list">
               <% classItems.forEach((item) => { %>
                 <div class="item-row class-row">
                   <div class="item-main">
-                    <div class="item-title"><%= item.subject_name || 'РџСЂРµРґРјРµС‚' %></div>
+                    <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
                     <div class="item-meta">
                       <span class="type-chip"><%= getDayContext(item) %></span>
-                      <span>РџР°СЂР° <%= item.class_number || '-' %></span>
+                      <span>Пара <%= item.class_number || '-' %></span>
                       <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
-                      <% if (item.group_number) { %><span>Р“СЂСѓРїР° <%= item.group_number %></span><% } %>
+                      <% if (item.group_number) { %><span>Група <%= item.group_number %></span><% } %>
                     </div>
                   </div>
                   <div class="item-side">
-                    <a href="/schedule" class="btn btn-inline-link">Р”Рѕ СЂРѕР·РєР»Р°РґСѓ</a>
+                    <a href="/schedule" class="btn btn-inline-link">До розкладу</a>
                   </div>
                 </div>
               <% }) %>
@@ -432,33 +475,33 @@
         <% if (hasProgressDashboard && isDefaultStaffMyDayView) { %>
           <article class="cockpit-card section-card" id="progressRiskBlock">
             <div class="section-head">
-              <h2 class="section-title">РџСЂРѕРіСЂРµСЃ С– СЂРёР·РёРє</h2>
-              <span class="section-subtitle">РџСЂРѕРіРЅРѕР· С„С–РЅР°Р»Сѓ С‚Р° СЂРёР·РёРє РЅРµРґРѕРїСѓСЃРєСѓ</span>
+              <h2 class="section-title">Прогрес і ризик</h2>
+              <span class="section-subtitle">Прогноз фіналу та ризик недопуску</span>
             </div>
 
             <div class="summary-grid progress-summary-grid">
               <div class="summary-pill">
-                <span>РЈ СЂРёР·РёРєСѓ</span>
+                <span>У ризику</span>
                 <strong><%= Number(progressDashboard.at_risk_count || 0) %></strong>
               </div>
               <div class="summary-pill">
-                <span>Р’РёСЃРѕРєРёР№</span>
+                <span>Високий</span>
                 <strong><%= Number(progressDashboard.high_risk_count || 0) %></strong>
               </div>
               <div class="summary-pill">
-                <span>Р¦С–Р»СЊ</span>
+                <span>Ціль</span>
                 <strong><%= Number(progressDashboard.admission_target || 60) %></strong>
               </div>
               <div class="summary-pill">
-                <span>Р’С‡Р°СЃРЅРѕ</span>
+                <span>Вчасно</span>
                 <strong><%= progressDashboard.overall_on_time_share === null || typeof progressDashboard.overall_on_time_share === 'undefined' ? '-' : `${progressDashboard.overall_on_time_share}%` %></strong>
               </div>
             </div>
 
             <% if (!progressSubjects.length) { %>
               <div class="empty-state compact">
-                <div class="empty-state-title">РџРѕРєРё РЅРµРјР°С” РґР°РЅРёС… РїСЂРѕРіСЂРµСЃСѓ</div>
-                <div class="empty-state-subtitle">РџРѕС‚СЂС–Р±РЅС– РѕС†С–РЅРµРЅС– Р°РєС‚РёРІРЅРѕСЃС‚С– РґР»СЏ РїРѕР±СѓРґРѕРІРё РїСЂРѕРіРЅРѕР·Сѓ.</div>
+                <div class="empty-state-title">Поки немає даних прогресу</div>
+                <div class="empty-state-subtitle">Потрібні оцінені активності для побудови прогнозу.</div>
               </div>
             <% } else { %>
               <div class="item-list progress-list">
@@ -467,12 +510,12 @@
                 %>
                   <div class="item-row progress-row">
                     <div class="item-main">
-                      <div class="item-title"><%= item.subject_name || 'РџСЂРµРґРјРµС‚' %></div>
+                      <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
                       <div class="item-meta">
-                        <span>Р¤С–РЅР°Р»: <strong><%= Number(item.current_final_score || 0) %></strong> / 100</span>
-                        <span>РЎС‚РµР»СЏ: <strong><%= Number(item.max_reachable_final_score || 0) %></strong></span>
-                        <span>РџСЂРѕСЃС‚СЂРѕС‡РѕРє: <%= Number(item.overdue_count || 0) %></span>
-                        <span>Р’С‡Р°СЃРЅРѕ: <%= item.on_time_share === null || typeof item.on_time_share === 'undefined' ? '-' : `${item.on_time_share}%` %></span>
+                        <span>Фінал: <strong><%= Number(item.current_final_score || 0) %></strong> / 100</span>
+                        <span>Стеля: <strong><%= Number(item.max_reachable_final_score || 0) %></strong></span>
+                        <span>Прострочок: <%= Number(item.overdue_count || 0) %></span>
+                        <span>Вчасно: <%= item.on_time_share === null || typeof item.on_time_share === 'undefined' ? '-' : `${item.on_time_share}%` %></span>
                       </div>
                       <div class="progress-track">
                         <span style="width: <%= Math.max(0, Math.min(100, Number(item.current_final_score || 0))) %>%"></span>
@@ -488,7 +531,7 @@
                       >
                         What-if
                       </button>
-                      <a class="btn btn-inline-link" href="<%= item.review_href || '/journal' %>">Р–СѓСЂРЅР°Р»</a>
+                      <a class="btn btn-inline-link" href="<%= item.review_href || '/journal' %>">Журнал</a>
                     </div>
                   </div>
                 <% }) %>
@@ -500,39 +543,39 @@
         <% if (hasReviewQueue && !isStudentLikeMyDayView) { %>
           <article class="cockpit-card section-card review-queue-card<%= isStudentLikeMyDayView ? ' order-last' : (isTeacherMyDayView ? ' order-3 teacher-review-queue-card' : '') %>" id="reviewQueueBlock">
             <div class="section-head">
-              <h2 class="section-title">Р§РµСЂРіР° РїРµСЂРµРІС–СЂРєРё</h2>
-              <span class="section-subtitle">РџСЂС–РѕСЂРёС‚РµС‚: РїСЂРѕСЃС‚СЂРѕС‡РµРЅС–, РЅРѕРІС–, Р±РµР· РєРѕРјРµРЅС‚Р°СЂСЏ</span>
+              <h2 class="section-title">Черга перевірки</h2>
+              <span class="section-subtitle">Пріоритет: прострочені, нові, без коментаря</span>
             </div>
 
             <div class="summary-grid review-summary-grid">
               <div class="summary-pill">
-                <span>Р’СЃСЊРѕРіРѕ</span>
+                <span>Всього</span>
                 <strong><%= Number(reviewQueue.total || reviewQueueItems.length || 0) %></strong>
               </div>
               <div class="summary-pill">
-                <span>РџСЂРѕСЃС‚СЂРѕС‡РµРЅС–</span>
+                <span>Прострочені</span>
                 <strong><%= Number(reviewQueueCounts.overdue || 0) %></strong>
               </div>
               <div class="summary-pill">
-                <span>РќРѕРІС–</span>
+                <span>Нові</span>
                 <strong><%= Number(reviewQueueCounts.new || 0) %></strong>
               </div>
               <div class="summary-pill">
-                <span>Р‘РµР· РєРѕРјРµРЅС‚Р°СЂСЏ</span>
+                <span>Без коментаря</span>
                 <strong><%= Number(reviewQueueCounts.no_comment || 0) %></strong>
               </div>
             </div>
 
             <div class="review-queue-toolbar">
               <div class="review-filter-group" id="reviewQueueFilters">
-                <button type="button" class="btn btn-soft btn-xs review-filter-btn is-active" data-review-filter="all">Р’СЃС–</button>
-                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="overdue">РџСЂРѕСЃС‚СЂРѕС‡РµРЅС–</button>
-                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="new">РќРѕРІС–</button>
-                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="no_comment">Р‘РµР· РєРѕРјРµРЅС‚Р°СЂСЏ</button>
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn is-active" data-review-filter="all">Всі</button>
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="overdue">Прострочені</button>
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="new">Нові</button>
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="no_comment">Без коментаря</button>
               </div>
               <% if (reviewQueueTemplates.length) { %>
                 <div class="review-template-group" id="reviewQueueTemplates">
-                  <span class="review-template-label">РЁР°Р±Р»РѕРЅ С„С–РґР±РµРєСѓ:</span>
+                  <span class="review-template-label">Шаблон фідбеку:</span>
                   <% reviewQueueTemplates.forEach((template, index) => { %>
                     <button
                       type="button"
@@ -542,15 +585,15 @@
                       <%= template.label %>
                     </button>
                   <% }) %>
-                  <button type="button" class="btn btn-soft btn-xs review-template-btn" data-template-clear="1">Р‘РµР· С€Р°Р±Р»РѕРЅСѓ</button>
+                  <button type="button" class="btn btn-soft btn-xs review-template-btn" data-template-clear="1">Без шаблону</button>
                 </div>
               <% } %>
             </div>
 
             <% if (!reviewQueueItems.length) { %>
               <div class="empty-state compact">
-                <div class="empty-state-title">Р§РµСЂРіР° РїРµСЂРµРІС–СЂРєРё РїРѕСЂРѕР¶РЅСЏ</div>
-                <div class="empty-state-subtitle">РЈСЃС– Р·РґР°РЅС– СЂРѕР±РѕС‚Рё Р· РєРѕРјРµРЅС‚Р°СЂСЏРјРё Р°Р±Рѕ Р±РµР· Р·Р°РґР°С‡ РЅР° СЂРµРІКјСЋ.</div>
+                <div class="empty-state-title">Черга перевірки порожня</div>
+                <div class="empty-state-subtitle">Усі здані роботи з коментарями або без задач на ревʼю.</div>
               </div>
             <% } else { %>
               <div class="item-list review-queue-list">
@@ -561,14 +604,14 @@
                 %>
                   <div class="item-row review-row" data-queue-type="<%= item.queue_type || 'new' %>">
                     <div class="item-main">
-                      <div class="item-title"><%= item.student_name || 'РЎС‚СѓРґРµРЅС‚' %></div>
+                      <div class="item-title"><%= item.student_name || 'Студент' %></div>
                       <div class="item-meta">
-                        <span><%= item.subject_name || 'РџСЂРµРґРјРµС‚' %></span>
-                        <% if (item.student_group) { %><span>Р“СЂСѓРїР° <%= item.student_group %></span><% } %>
-                        <span>РљРѕР»РѕРЅРєР°: <%= item.column_title || 'РљРѕР»РѕРЅРєР°' %></span>
-                        <span>Р—РґР°РЅРѕ: <%= formatDateTime(item.submitted_at) %></span>
-                        <% if (item.due_date) { %><span>Р”РµРґР»Р°Р№РЅ: <%= formatShortDate(item.due_date) %></span><% } %>
-                        <% if (hasScore) { %><span>Р‘Р°Р»: <%= String(item.score).replace(/\.00$/, '') %></span><% } %>
+                        <span><%= item.subject_name || 'Предмет' %></span>
+                        <% if (item.student_group) { %><span>Група <%= item.student_group %></span><% } %>
+                        <span>Колонка: <%= item.column_title || 'Колонка' %></span>
+                        <span>Здано: <%= formatDateTime(item.submitted_at) %></span>
+                        <% if (item.due_date) { %><span>Дедлайн: <%= formatShortDate(item.due_date) %></span><% } %>
+                        <% if (hasScore) { %><span>Бал: <%= String(item.score).replace(/\.00$/, '') %></span><% } %>
                       </div>
                     </div>
                     <div class="item-side">
@@ -576,7 +619,7 @@
                       <% if (submissionMeta) { %>
                         <span class="<%= submissionMeta.className %>"><%= submissionMeta.label %></span>
                       <% } %>
-                      <a class="btn btn-inline-link review-open-link" href="<%= item.review_href %>">РџРµСЂРµРІС–СЂРёС‚Рё</a>
+                      <a class="btn btn-inline-link review-open-link" href="<%= item.review_href %>">Перевірити</a>
                     </div>
                   </div>
                 <% }) %>
@@ -584,11 +627,11 @@
             <% } %>
             <% if (reviewQueue.truncated) { %>
               <div class="section-footer-link review-footer-note">
-                РџРѕРєР°Р·Р°РЅРѕ РїРµСЂС€С– <%= reviewQueueItems.length %> Р·Р°РїРёСЃС–РІ. РЈС‚РѕС‡РЅРё С„С–Р»СЊС‚СЂ Р°Р±Рѕ РїСЂРµРґРјРµС‚ Сѓ Р¶СѓСЂРЅР°Р»С–.
+                Показано перші <%= reviewQueueItems.length %> записів. Уточни фільтр або предмет у журналі.
               </div>
             <% } %>
             <div class="section-footer-link">
-              <a href="/journal">РџРµСЂРµР№С‚Рё РІ Р¶СѓСЂРЅР°Р»</a>
+              <a href="/journal">Перейти в журнал</a>
             </div>
           </article>
         <% } %>
@@ -596,25 +639,25 @@
         <% if (!isTeacherMyDayView) { %>
         <article class="cockpit-card section-card<%= isStudentLikeMyDayView ? ' order-3' : '' %>" id="inboxBlock">
           <div class="section-head">
-            <h2 class="section-title">РџСѓР»СЊСЃ С‚Р° С–РЅР±РѕРєСЃ</h2>
-            <span class="section-subtitle">РЁРІРёРґРєРёР№ Р·СЂС–Р· РїСЂРѕРіСЂРµСЃСѓ С– СЃРёРіРЅР°Р»С–РІ</span>
+            <h2 class="section-title">Пульс та інбокс</h2>
+            <span class="section-subtitle">Швидкий зріз прогресу і сигналів</span>
           </div>
 
           <div class="summary-grid">
             <div class="summary-pill">
-              <span>Р’С‡Р°СЃРЅРѕ</span>
+              <span>Вчасно</span>
               <strong><%= activity.on_time_share === null || typeof activity.on_time_share === 'undefined' ? '-' : `${activity.on_time_share}%` %></strong>
             </div>
             <div class="summary-pill">
-              <span>РџСЂРѕСЃС‚СЂРѕС‡РєРё</span>
+              <span>Прострочки</span>
               <strong><%= activity.overdue || 0 %></strong>
             </div>
             <div class="summary-pill">
-              <span>РЈ СЂРёР·РёРєСѓ</span>
+              <span>У ризику</span>
               <strong><%= activity.risky_subjects || 0 %></strong>
             </div>
             <div class="summary-pill">
-              <span>РќРѕРІРёР№ С„С–РґР±РµРє</span>
+              <span>Новий фідбек</span>
               <strong><%= activity.recent_feedback || 0 %></strong>
             </div>
           </div>
@@ -623,23 +666,23 @@
             <% inboxItems.forEach((item) => { %>
               <div class="inbox-item inbox-<%= item.kind || 'info' %>">
                 <div class="inbox-main">
-                  <div class="inbox-title"><%= item.title || 'РћРЅРѕРІР»РµРЅРЅСЏ' %></div>
+                  <div class="inbox-title"><%= item.title || 'Оновлення' %></div>
                   <div class="inbox-meta"><%= item.meta || '' %></div>
                 </div>
-                <a class="btn btn-inline-link" href="<%= item.action_href || '/schedule' %>"><%= item.action_label || 'Р’С–РґРєСЂРёС‚Рё' %></a>
+                <a class="btn btn-inline-link" href="<%= item.action_href || '/schedule' %>"><%= item.action_label || 'Відкрити' %></a>
               </div>
             <% }) %>
           </div>
 
           <div class="whatif-block" id="whatIfBlock">
             <div class="whatif-header">
-              <h3>What-if РєР°Р»СЊРєСѓР»СЏС‚РѕСЂ</h3>
-              <span>РЎРєС–Р»СЊРєРё РїРѕС‚СЂС–Р±РЅРѕ РЅР° РЅР°СЃС‚СѓРїРЅРёС… СЂРѕР±РѕС‚Р°С…</span>
+              <h3>What-if калькулятор</h3>
+              <span>Скільки потрібно на наступних роботах</span>
             </div>
             <% if (!whatIfSubjects.length) { %>
               <div class="empty-state compact">
-                <div class="empty-state-title">РќРµРјР°С” РґРѕСЃС‚СѓРїРЅРёС… РїСЂРµРґРјРµС‚С–РІ</div>
-                <div class="empty-state-subtitle">РљР°Р»СЊРєСѓР»СЏС‚РѕСЂ РїСЂР°С†СЋС” РґР»СЏ С‚РІРѕС—С… РїСЂРµРґРјРµС‚С–РІ Р· Р¶СѓСЂРЅР°Р»Сѓ.</div>
+                <div class="empty-state-title">Немає доступних предметів</div>
+                <div class="empty-state-subtitle">Калькулятор працює для твоїх предметів з журналу.</div>
               </div>
             <% } else { %>
               <div class="whatif-controls">
@@ -657,7 +700,7 @@
                 </div>
               </div>
               <div class="whatif-result" id="whatIfResult">
-                <div class="whatif-result-line">РћР±РµСЂРё С†С–Р»СЊ, С‰РѕР± РїРѕР±Р°С‡РёС‚Рё РїРѕС‚СЂС–Р±РЅРёР№ С‚РµРјРї.</div>
+                <div class="whatif-result-line">Обери ціль, щоб побачити потрібний темп.</div>
               </div>
             <% } %>
           </div>
@@ -667,44 +710,44 @@
         <% if (!isTeacherMyDayView) { %>
         <article class="cockpit-card section-card reminder-card<%= isStudentLikeMyDayView ? ' order-4' : '' %>" id="remindersBlock">
           <div class="section-head">
-            <h2 class="section-title">РќР°РіР°РґСѓРІР°РЅРЅСЏ</h2>
-            <span class="section-subtitle">РћСЃРѕР±РёСЃС‚С– Р·Р°РґР°С‡С– С‚Р° РєРѕСЂРѕС‚РєС– РЅРѕС‚Р°С‚РєРё</span>
+            <h2 class="section-title">Нагадування</h2>
+            <span class="section-subtitle">Особисті задачі та короткі нотатки</span>
           </div>
 
           <div class="reminder-block reminder-block-standalone">
             <div class="reminder-header">
-              <h3>РЎРїРёСЃРѕРє РЅР°РіР°РґСѓРІР°РЅСЊ</h3>
-              <button type="button" class="btn btn-soft btn-sm" id="toggleReminderForm">Р”РѕРґР°С‚Рё</button>
+              <h3>Список нагадувань</h3>
+              <button type="button" class="btn btn-soft btn-sm" id="toggleReminderForm">Додати</button>
             </div>
             <form id="reminderForm" class="reminder-form d-none">
               <input type="hidden" id="reminderEditId" value="" />
               <div class="reminder-row">
-                <input type="text" id="reminderTitle" class="form-control reminder-input" maxlength="160" placeholder="РќР°Р·РІР° РЅР°РіР°РґСѓРІР°РЅРЅСЏ" required />
+                <input type="text" id="reminderTitle" class="form-control reminder-input" maxlength="160" placeholder="Назва нагадування" required />
               </div>
               <div class="reminder-row">
-                <textarea id="reminderNote" class="form-control reminder-input" rows="2" maxlength="500" placeholder="РќРѕС‚Р°С‚РєР° (РѕРїС†С–Р№РЅРѕ)"></textarea>
+                <textarea id="reminderNote" class="form-control reminder-input" rows="2" maxlength="500" placeholder="Нотатка (опційно)"></textarea>
               </div>
               <div class="reminder-row reminder-row-split">
                 <input type="date" id="reminderDate" class="form-control reminder-input" required />
                 <input type="time" id="reminderTime" class="form-control reminder-input" />
               </div>
               <div class="reminder-actions">
-                <button type="submit" class="btn btn-glass btn-sm" id="reminderSubmit">Р”РѕРґР°С‚Рё</button>
-                <button type="button" class="btn btn-soft btn-sm" id="reminderCancel">РЎРєР°СЃСѓРІР°С‚Рё</button>
+                <button type="submit" class="btn btn-glass btn-sm" id="reminderSubmit">Додати</button>
+                <button type="button" class="btn btn-soft btn-sm" id="reminderCancel">Скасувати</button>
               </div>
             </form>
             <div id="reminderList" class="reminder-list">
               <% if (!reminders.length) { %>
                 <div class="empty-state compact">
-                  <div class="empty-state-title">РќР°РіР°РґСѓРІР°РЅСЊ РЅРµРјР°С”</div>
-                  <div class="empty-state-subtitle">Р”РѕРґР°Р№ РїРµСЂС€Рµ РЅР° РЅР°Р№Р±Р»РёР¶С‡РёР№ С‚РёР¶РґРµРЅСЊ.</div>
+                  <div class="empty-state-title">Нагадувань немає</div>
+                  <div class="empty-state-subtitle">Додай перше на найближчий тиждень.</div>
                 </div>
               <% } else { %>
                 <% reminders.forEach((reminder) => { %>
                   <div class="reminder-item">
                     <div class="reminder-main">
                       <div class="reminder-title <%= reminder.is_done ? 'done' : '' %>"><%= reminder.title %></div>
-                      <div class="reminder-meta"><%= formatReminderDate(reminder.remind_date) %><%= reminder.remind_time ? ` В· ${reminder.remind_time}` : '' %></div>
+                      <div class="reminder-meta"><%= formatReminderDate(reminder.remind_date) %><%= reminder.remind_time ? ` · ${reminder.remind_time}` : '' %></div>
                     </div>
                   </div>
                 <% }) %>
@@ -716,60 +759,60 @@
 
         <article class="cockpit-card section-card<%= isStudentLikeMyDayView || isTeacherMyDayView ? ' order-2 competency-card-compact' : '' %><%= isTeacherMyDayView ? ' teacher-competency-card' : '' %>" id="competencyBlock">
           <div class="section-head">
-            <h2 class="section-title">РљРѕРјРїР°СЃ РєРѕРјРїРµС‚РµРЅС‚РЅРѕСЃС‚РµР№</h2>
+            <h2 class="section-title">Компас компетентностей</h2>
             <% if (isTeacherMyDayView && teacherCompetencyPicker.enabled && teacherCompetencySubjects.length) { %>
               <form method="GET" action="/home" class="teacher-competency-picker" id="teacherCompetencyPickerForm">
                 <select
                   name="competency_subject_id"
                   id="teacherCompetencySubjectSelect"
                   class="form-select reminder-input teacher-competency-select"
-                  aria-label="РћР±СЂР°С‚Рё РїСЂРµРґРјРµС‚ РґР»СЏ РєРѕРјРїР°СЃР° РєРѕРјРїРµС‚РµРЅС‚РЅРѕСЃС‚РµР№"
+                  aria-label="Обрати предмет для компаса компетентностей"
                 >
                   <% teacherCompetencySubjects.forEach((subject) => { %>
                     <option value="<%= subject.subject_id %>" <%= Number(subject.subject_id) === teacherSelectedCompetencySubjectId ? 'selected' : '' %>>
-                      <%= subject.subject_name || 'РџСЂРµРґРјРµС‚' %>
+                      <%= subject.subject_name || 'Предмет' %>
                     </option>
                   <% }) %>
                 </select>
               </form>
             <% } else { %>
-              <span class="section-subtitle">РџРѕСЂС‚С„РѕР»С–Рѕ СЃРёР»СЊРЅРёС… СЃС‚РѕСЂС–РЅ С– С‚РѕС‡РѕРє СЂРѕСЃС‚Сѓ</span>
+              <span class="section-subtitle">Портфоліо сильних сторін і точок росту</span>
             <% } %>
           </div>
           <% if (isTeacherMyDayView && teacherCompetencyPicker.enabled && teacherCompetencyPicker.selected_subject_name) { %>
-            <div class="teacher-competency-subtitle">РџСЂРµРґРјРµС‚: <%= teacherCompetencyPicker.selected_subject_name %></div>
+            <div class="teacher-competency-subtitle">Предмет: <%= teacherCompetencyPicker.selected_subject_name %></div>
           <% } %>
           <div class="competency-source-summary">
-            <span>Р СѓС‡РЅС–: <strong><%= competencyManualTotalMarks %></strong></span>
-            <span>РђРІС‚Рѕ: <strong><%= competencyAutoTotalMarks %></strong></span>
+            <span>Ручні: <strong><%= competencyManualTotalMarks %></strong></span>
+            <span>Авто: <strong><%= competencyAutoTotalMarks %></strong></span>
           </div>
 
           <div class="competency-hero">
             <div class="competency-orb" id="competencyOrb">
               <div class="competency-orb-core">
                 <strong><%= cockpit.competency_total_marks || 0 %></strong>
-                <span>РІС–РґРјС–С‚РѕРє</span>
+                <span>відміток</span>
               </div>
             </div>
             <div class="competency-insights">
               <div class="competency-insight">
-                <span>РЎРёР»СЊРЅР°</span>
-                <strong><%= cockpit.competency_strongest ? cockpit.competency_strongest.label : 'РќР°РєРѕРїРёС‡СѓС”РјРѕ РґР°РЅС–' %></strong>
+                <span>Сильна</span>
+                <strong><%= cockpit.competency_strongest ? cockpit.competency_strongest.label : 'Накопичуємо дані' %></strong>
               </div>
               <div class="competency-insight">
-                <span>Р—СЂРѕСЃС‚Р°С”</span>
+                <span>Зростає</span>
                 <strong>
                   <% if (cockpit.competency_fastest_growth) { %>
                     <%= cockpit.competency_fastest_growth.label %>
                     <% if (cockpit.competency_fastest_growth.delta > 0) { %>+<%= cockpit.competency_fastest_growth.delta %><% } else { %><%= cockpit.competency_fastest_growth.delta %><% } %>
                   <% } else { %>
-                    РќР°РєРѕРїРёС‡СѓС”РјРѕ РґР°РЅС–
+                    Накопичуємо дані
                   <% } %>
                 </strong>
               </div>
               <div class="competency-insight">
-                <span>РџС–РґС‚СЏРіРЅСѓС‚Рё</span>
-                <strong><%= cockpit.competency_weakest ? cockpit.competency_weakest.label : 'РќР°РєРѕРїРёС‡СѓС”РјРѕ РґР°РЅС–' %></strong>
+                <span>Підтягнути</span>
+                <strong><%= cockpit.competency_weakest ? cockpit.competency_weakest.label : 'Накопичуємо дані' %></strong>
               </div>
             </div>
           </div>
@@ -777,8 +820,8 @@
           <div class="competency-list">
             <% if (!competencies.length) { %>
               <div class="empty-state compact">
-                <div class="empty-state-title">Р©Рµ РЅРµРјР°С” РґРѕСЃС‚Р°С‚РЅСЊРѕ РґР°РЅРёС…</div>
-                <div class="empty-state-subtitle">РџС–СЃР»СЏ РѕС†С–РЅРµРЅРёС… Р°РєС‚РёРІРЅРѕСЃС‚РµР№ Р·'СЏРІРёС‚СЊСЃСЏ РїРѕСЂС‚СЂРµС‚ РєРѕРјРїРµС‚РµРЅС‚РЅРѕСЃС‚РµР№.</div>
+                <div class="empty-state-title">Ще немає достатньо даних</div>
+                <div class="empty-state-subtitle">Після оцінених активностей з'явиться портрет компетентностей.</div>
               </div>
             <% } else { %>
               <% competencies.forEach((item, index) => { %>
@@ -788,8 +831,8 @@
                     <span class="competency-score"><%= item.count %></span>
                   </div>
                   <div class="competency-source-meta">
-                    <span>СЂСѓС‡РЅС– <%= Number(item.manual_count || 0) %></span>
-                    <span>Р°РІС‚Рѕ <%= Number(item.auto_count || 0) %></span>
+                    <span>ручні <%= Number(item.manual_count || 0) %></span>
+                    <span>авто <%= Number(item.auto_count || 0) %></span>
                   </div>
                   <div class="competency-bar">
                     <span style="width: <%= Math.max(0, Math.min(100, Number(item.bar_percent || 0))) %>%"></span>
@@ -809,16 +852,16 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-welcome-modal">
           <div class="modal-body text-center">
-            <div class="welcome-title mb-2">рџ‘‹ Р’С–С‚Р°С”РјРѕ Сѓ Studerria!</div>
+            <div class="welcome-title mb-2">👋 Вітаємо у Studerria!</div>
             <div class="welcome-subtitle mb-3">
-              <strong>Studerria</strong> вЂ” СѓРЅС–РєР°Р»СЊРЅР° РїР»Р°С‚С„РѕСЂРјР°, СЃС‚РІРѕСЂРµРЅР° <strong>СЃС‚СѓРґРµРЅС‚РѕРј РґР»СЏ СЃС‚СѓРґРµРЅС‚С–РІ</strong>, С‰РѕР± СѓСЃРµ РІР°Р¶Р»РёРІРµ РґР»СЏ РЅР°РІС‡Р°РЅРЅСЏ Р±СѓР»Рѕ РІ РѕРґРЅРѕРјСѓ РјС–СЃС†С–.
+              <strong>Studerria</strong> — унікальна платформа, створена <strong>студентом для студентів</strong>, щоб усе важливе для навчання було в одному місці.
             </div>
             <div class="small mb-4">
-              рџЋЇ РќР° <strong>Р“РѕР»РѕРІРЅС–Р№</strong> С‚Рё РѕРґСЂР°Р·Сѓ Р±Р°С‡РёС€ РїСЂС–РѕСЂРёС‚РµС‚Рё: РґРµРґР»Р°Р№РЅРё, РЅР°Р№Р±Р»РёР¶С‡С– РїР°СЂРё, РєРѕРјРїРµС‚РµРЅС‚РЅРѕСЃС‚С– С‚Р° РЅР°РіР°РґСѓРІР°РЅРЅСЏ.
+              🎯 На <strong>Головній</strong> ти одразу бачиш пріоритети: дедлайни, найближчі пари, компетентності та нагадування.
               <br />
-              рџ§­ Р’РёРєРѕСЂРёСЃС‚РѕРІСѓР№ С†Рµ СЏРє С‰РѕРґРµРЅРЅРёР№ С†РµРЅС‚СЂ РєРµСЂСѓРІР°РЅРЅСЏ РЅР°РІС‡Р°РЅРЅСЏРј С– С‚СЂРёРјР°Р№ С‚РµРјРї Р±РµР· С…Р°РѕСЃСѓ.
+              🧭 Використовуй це як щоденний центр керування навчанням і тримай темп без хаосу.
             </div>
-            <button type="button" class="btn btn-primary glass" data-bs-dismiss="modal">РџРѕС‡Р°С‚Рё СЂРѕР±РѕС‚Сѓ</button>
+            <button type="button" class="btn btn-primary glass" data-bs-dismiss="modal">Почати роботу</button>
           </div>
         </div>
       </div>
@@ -830,27 +873,27 @@
           <form id="homeworkSubmitForm" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="redirect_to" value="/home" />
             <div class="modal-header">
-              <h5 class="modal-title">Р—РґР°С‚Рё Р·Р°РІРґР°РЅРЅСЏ</h5>
+              <h5 class="modal-title">Здати завдання</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              <div class="submit-target" id="submitHomeworkTarget">Р—Р°РІРґР°РЅРЅСЏ</div>
+              <div class="submit-target" id="submitHomeworkTarget">Завдання</div>
               <div class="mb-3">
-                <label for="submissionText" class="form-label">РўРµРєСЃС‚</label>
-                <textarea id="submissionText" name="submission_text" class="form-control reminder-input" rows="4" maxlength="4000" placeholder="РћРїРёС€Рё РІС–РґРїРѕРІС–РґСЊ Р°Р±Рѕ РєРѕСЂРѕС‚РєРёР№ РїС–РґСЃСѓРјРѕРє"></textarea>
+                <label for="submissionText" class="form-label">Текст</label>
+                <textarea id="submissionText" name="submission_text" class="form-control reminder-input" rows="4" maxlength="4000" placeholder="Опиши відповідь або короткий підсумок"></textarea>
               </div>
               <div class="mb-3">
-                <label for="submissionLink" class="form-label">РџРѕСЃРёР»Р°РЅРЅСЏ</label>
+                <label for="submissionLink" class="form-label">Посилання</label>
                 <input id="submissionLink" name="link_url" class="form-control reminder-input" type="url" placeholder="https://..." />
               </div>
               <div>
-                <label for="submissionAttachment" class="form-label">Р¤Р°Р№Р»</label>
+                <label for="submissionAttachment" class="form-label">Файл</label>
                 <input id="submissionAttachment" name="submission_attachment" class="form-control reminder-input" type="file" />
               </div>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-soft" data-bs-dismiss="modal">РЎРєР°СЃСѓРІР°С‚Рё</button>
-              <button type="submit" class="btn btn-glass">Р—РґР°С‚Рё</button>
+              <button type="button" class="btn btn-soft" data-bs-dismiss="modal">Скасувати</button>
+              <button type="submit" class="btn btn-glass">Здати</button>
             </div>
           </form>
         </div>
@@ -875,6 +918,9 @@
           window.bootstrap.Tooltip.getOrCreateInstance(el);
         });
       }
+      const scheduleDrawer = document.getElementById('scheduleActionDrawer');
+      const scheduleDrawerToggle = document.getElementById('scheduleDrawerToggle');
+      const scheduleDrawerClose = document.getElementById('scheduleDrawerClose');
       const storedTheme = localStorage.getItem('ui-theme') || 'theme-dark';
       document.body.classList.remove('theme-dark', 'theme-light');
       document.body.classList.add(storedTheme);
@@ -919,6 +965,48 @@
         }
       }
 
+      function setDrawerOpen(open) {
+        if (!scheduleDrawer) return;
+        const isOpen = Boolean(open) && window.innerWidth > 991;
+        document.body.classList.toggle('schedule-drawer-open', isOpen);
+        scheduleDrawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+        if (scheduleDrawerToggle) {
+          scheduleDrawerToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        }
+      }
+
+      if (scheduleDrawerToggle && scheduleDrawer) {
+        scheduleDrawerToggle.addEventListener('click', () => {
+          const isOpen = document.body.classList.contains('schedule-drawer-open');
+          setDrawerOpen(!isOpen);
+        });
+      }
+
+      if (scheduleDrawerClose && scheduleDrawer) {
+        scheduleDrawerClose.addEventListener('click', () => setDrawerOpen(false));
+      }
+
+      document.addEventListener('click', (event) => {
+        if (!scheduleDrawer || !document.body.classList.contains('schedule-drawer-open')) return;
+        const insideDrawer = scheduleDrawer.contains(event.target);
+        const onToggle = scheduleDrawerToggle && scheduleDrawerToggle.contains(event.target);
+        if (!insideDrawer && !onToggle) {
+          setDrawerOpen(false);
+        }
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && document.body.classList.contains('schedule-drawer-open')) {
+          setDrawerOpen(false);
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        if (window.innerWidth <= 991) {
+          setDrawerOpen(false);
+        }
+      });
+
       const briefWhyToggle = document.getElementById('briefWhyToggle');
       const briefWhyPanel = document.getElementById('briefWhyPanel');
       if (briefWhyToggle && briefWhyPanel) {
@@ -947,16 +1035,16 @@
       document.querySelectorAll('[data-submit-homework-id]').forEach((button) => {
         button.addEventListener('click', () => {
           const homeworkId = Number(button.dataset.submitHomeworkId || 0);
-          const homeworkTitle = String(button.dataset.submitTitle || 'Р—Р°РІРґР°РЅРЅСЏ');
+          const homeworkTitle = String(button.dataset.submitTitle || 'Завдання');
           const submitMode = String(button.dataset.submitMode || 'create');
           const isUpdateMode = submitMode === 'update';
           if (!homeworkId || !submitForm) return;
           submitForm.action = `/homework/${homeworkId}/submit`;
           if (submitModalTitle) {
-            submitModalTitle.textContent = isUpdateMode ? 'РћРЅРѕРІРёС‚Рё Р·РґР°С‡Сѓ Р·Р°РІРґР°РЅРЅСЏ' : 'Р—РґР°С‚Рё Р·Р°РІРґР°РЅРЅСЏ';
+            submitModalTitle.textContent = isUpdateMode ? 'Оновити здачу завдання' : 'Здати завдання';
           }
           if (submitFormButton) {
-            submitFormButton.textContent = isUpdateMode ? 'РћРЅРѕРІРёС‚Рё Р·РґР°С‡Сѓ' : 'Р—РґР°С‚Рё';
+            submitFormButton.textContent = isUpdateMode ? 'Оновити здачу' : 'Здати';
           }
           if (submitTarget) submitTarget.textContent = homeworkTitle;
           if (submissionText) submissionText.value = '';
@@ -995,7 +1083,7 @@
           ? data.targets.find((item) => Number(item.target) === Number(target))
           : null;
         if (!targetEntry) {
-          whatIfResult.innerHTML = '<div class="whatif-result-line">Р”Р°РЅС– РґР»СЏ РѕР±СЂР°РЅРѕС— С†С–Р»С– РЅРµРґРѕСЃС‚СѓРїРЅС–.</div>';
+          whatIfResult.innerHTML = '<div class="whatif-result-line">Дані для обраної цілі недоступні.</div>';
           return;
         }
 
@@ -1004,15 +1092,15 @@
           const rawPoints = Number(targetEntry.required_raw_points || 0);
           whatIfResult.innerHTML = `
             <div class="whatif-result-line">
-              РџРѕС‚РѕС‡РЅРёР№ С„С–РЅР°Р»: <strong>${Number(data.current_final_score || 0)}</strong> / 100
+              Поточний фінал: <strong>${Number(data.current_final_score || 0)}</strong> / 100
             </div>
             <div class="whatif-result-line whatif-positive">
-              Р”Р»СЏ С†С–Р»С– <strong>${Number(targetEntry.target || target)}</strong> РїРѕС‚СЂС–Р±РЅРѕ РІ СЃРµСЂРµРґРЅСЊРѕРјСѓ
-              <strong>${average}%</strong> РЅР° Р·Р°Р»РёС€РєСѓ СЂРѕР±С–С‚
-              (${rawPoints} Р· ${Number(data.remaining_raw_max || 0)} СЃРёСЂРёС… Р±Р°Р»С–РІ).
+              Для цілі <strong>${Number(targetEntry.target || target)}</strong> потрібно в середньому
+              <strong>${average}%</strong> на залишку робіт
+              (${rawPoints} з ${Number(data.remaining_raw_max || 0)} сирих балів).
             </div>
             <div class="whatif-result-line muted-line">
-              РўРµРѕСЂРµС‚РёС‡РЅР° СЃС‚РµР»СЏ: ${Number(data.max_reachable_final_score || 0)} / 100.
+              Теоретична стеля: ${Number(data.max_reachable_final_score || 0)} / 100.
             </div>
           `;
           return;
@@ -1020,14 +1108,14 @@
 
         whatIfResult.innerHTML = `
           <div class="whatif-result-line">
-            РџРѕС‚РѕС‡РЅРёР№ С„С–РЅР°Р»: <strong>${Number(data.current_final_score || 0)}</strong> / 100
+            Поточний фінал: <strong>${Number(data.current_final_score || 0)}</strong> / 100
           </div>
           <div class="whatif-result-line whatif-negative">
-            Р¦С–Р»СЊ <strong>${Number(targetEntry.target || target)}</strong> Р·Р°СЂР°Р· РЅРµРґРѕСЃСЏР¶РЅР°
-            (Р±СЂР°РєСѓС” ${Number(targetEntry.needed_points || 0)} Р±Р°Р»С–РІ РІРЅРµСЃРєСѓ).
+            Ціль <strong>${Number(targetEntry.target || target)}</strong> зараз недосяжна
+            (бракує ${Number(targetEntry.needed_points || 0)} балів внеску).
           </div>
           <div class="whatif-result-line muted-line">
-            РўРµРѕСЂРµС‚РёС‡РЅР° СЃС‚РµР»СЏ: ${Number(data.max_reachable_final_score || 0)} / 100.
+            Теоретична стеля: ${Number(data.max_reachable_final_score || 0)} / 100.
           </div>
         `;
       }
@@ -1038,7 +1126,7 @@
         if (!subjectId) return;
         const target = Number(targetValue || selectedWhatIfTarget || 75);
         setActiveWhatIfTarget(target);
-        whatIfResult.innerHTML = '<div class="whatif-result-line">Р Р°С…СѓСЋ РїСЂРѕРіРЅРѕР·...</div>';
+        whatIfResult.innerHTML = '<div class="whatif-result-line">Рахую прогноз...</div>';
         try {
           const params = new URLSearchParams({
             subject_id: String(subjectId),
@@ -1046,14 +1134,14 @@
           });
           const response = await fetch(`/api/my-day/what-if?${params.toString()}`);
           if (!response.ok) {
-            whatIfResult.innerHTML = '<div class="whatif-result-line">РќРµ РІРґР°Р»РѕСЃСЏ РѕС‚СЂРёРјР°С‚Рё РїСЂРѕРіРЅРѕР·.</div>';
+            whatIfResult.innerHTML = '<div class="whatif-result-line">Не вдалося отримати прогноз.</div>';
             return;
           }
           const data = await response.json();
           renderWhatIfResult(data, target);
         } catch (err) {
           console.error(err);
-          whatIfResult.innerHTML = '<div class="whatif-result-line">РџРѕРјРёР»РєР° РїСЂРё СЂРѕР·СЂР°С…СѓРЅРєСѓ РїСЂРѕРіРЅРѕР·Сѓ.</div>';
+          whatIfResult.innerHTML = '<div class="whatif-result-line">Помилка при розрахунку прогнозу.</div>';
         }
       }
 
@@ -1090,7 +1178,7 @@
         reminderDate.value = myDay.today || '';
         reminderTime.value = '';
         reminderEditId.value = '';
-        reminderSubmit.textContent = 'Р”РѕРґР°С‚Рё';
+        reminderSubmit.textContent = 'Додати';
       }
 
       function renderReminders(list) {
@@ -1098,8 +1186,8 @@
         if (!Array.isArray(list) || !list.length) {
           reminderList.innerHTML = `
             <div class="empty-state compact">
-              <div class="empty-state-title">РќР°РіР°РґСѓРІР°РЅСЊ РЅРµРјР°С”</div>
-              <div class="empty-state-subtitle">Р”РѕРґР°Р№ РїРµСЂС€Рµ РЅР° РЅР°Р№Р±Р»РёР¶С‡РёР№ С‚РёР¶РґРµРЅСЊ.</div>
+              <div class="empty-state-title">Нагадувань немає</div>
+              <div class="empty-state-subtitle">Додай перше на найближчий тиждень.</div>
             </div>
           `;
           return;
@@ -1107,9 +1195,9 @@
 
         reminderList.innerHTML = list.map((reminder) => {
           const dateLabel = formatDate(reminder.remind_date);
-          const timeLabel = reminder.remind_time ? ` В· ${escapeHtml(reminder.remind_time)}` : '';
+          const timeLabel = reminder.remind_time ? ` · ${escapeHtml(reminder.remind_time)}` : '';
           const doneClass = reminder.is_done ? 'done' : '';
-          const toggleLabel = reminder.is_done ? 'Р’С–РґРЅРѕРІРёС‚Рё' : 'Р“РѕС‚РѕРІРѕ';
+          const toggleLabel = reminder.is_done ? 'Відновити' : 'Готово';
           return `
             <div class="reminder-item" data-reminder-id="${reminder.id}">
               <div class="reminder-main">
@@ -1119,8 +1207,8 @@
               </div>
               <div class="reminder-actions-inline">
                 <button type="button" class="btn btn-soft btn-xs reminder-toggle" data-id="${reminder.id}" data-done="${reminder.is_done ? '1' : '0'}">${toggleLabel}</button>
-                <button type="button" class="btn btn-soft btn-xs reminder-edit" data-id="${reminder.id}">Р РµРґР°РіСѓРІР°С‚Рё</button>
-                <button type="button" class="btn btn-soft btn-xs reminder-delete" data-id="${reminder.id}">Р’РёРґР°Р»РёС‚Рё</button>
+                <button type="button" class="btn btn-soft btn-xs reminder-edit" data-id="${reminder.id}">Редагувати</button>
+                <button type="button" class="btn btn-soft btn-xs reminder-delete" data-id="${reminder.id}">Видалити</button>
               </div>
             </div>
           `;
@@ -1212,7 +1300,7 @@
         reminderDate.value = reminder.remind_date || myDay.today || '';
         reminderTime.value = reminder.remind_time || '';
         reminderEditId.value = reminder.id;
-        reminderSubmit.textContent = 'РћРЅРѕРІРёС‚Рё';
+        reminderSubmit.textContent = 'Оновити';
         reminderTitle.focus();
       }
 
@@ -1220,7 +1308,7 @@
         const button = event.target.closest('.reminder-delete');
         if (!button) return;
         const reminderId = button.dataset.id;
-        if (!confirm('Р’РёРґР°Р»РёС‚Рё РЅР°РіР°РґСѓРІР°РЅРЅСЏ?')) return;
+        if (!confirm('Видалити нагадування?')) return;
         button.disabled = true;
         try {
           const response = await fetch(`/api/reminders/${reminderId}`, { method: 'DELETE' });

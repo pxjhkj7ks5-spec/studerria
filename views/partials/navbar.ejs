@@ -34,7 +34,7 @@
     .replace(/'/g, '&#39;');
 
   const buildTriggerClass = (level, item) => {
-    const classNames = [level === 0 ? 'btn btn-glass snav-link' : 'btn btn-glass snav-menu-link'];
+    const classNames = [level === 0 ? 'snav-link' : 'snav-menu-link'];
     if (Array.isArray(item.children) && item.children.length) {
       classNames.push('snav-trigger');
     }
@@ -47,11 +47,12 @@
     return classNames.join(' ');
   };
 
-  const renderTriggerLabel = (item) => {
+  const renderTriggerLabel = (item, level) => {
     const label = escapeHtml(item.label || '');
-    const indicator = Array.isArray(item.children) && item.children.length
-      ? '<span class="snav-indicator" aria-hidden="true">&gt;</span>'
-      : '';
+    let indicator = '';
+    if (Array.isArray(item.children) && item.children.length && level > 0) {
+      indicator = '<span class="snav-indicator snav-indicator--submenu" aria-hidden="true">&rsaquo;</span>';
+    }
     return `<span class="snav-label">${label}</span>${indicator}`;
   };
 
@@ -82,11 +83,11 @@
     }
 
     if (item.navAction === 'theme-toggle' || item.isDisabledLink) {
-      return `<button type="button" ${attrs.join(' ')}>${renderTriggerLabel(item)}</button>`;
+      return `<button type="button" ${attrs.join(' ')}>${renderTriggerLabel(item, level)}</button>`;
     }
 
     const href = item.href || '#';
-    return `<a href="${escapeHtml(href)}" ${attrs.join(' ')}>${renderTriggerLabel(item)}</a>`;
+    return `<a href="${escapeHtml(href)}" ${attrs.join(' ')}>${renderTriggerLabel(item, level)}</a>`;
   };
 
   const renderMenuItems = (items, level) => items.map((item) => {
@@ -121,7 +122,7 @@
     <nav class="navbar navbar-expand-lg topbar topbar--title-spotlight studerria-nav-shell" aria-label="Global Navigation" data-studerria-nav>
       <div class="container">
         <div class="snav-main">
-          <a class="navbar-brand text-white me-auto topbar-title-spotlight" href="<%= isAuthed ? '/home' : '/' %>">Studerria</a>
+          <a class="navbar-brand text-white topbar-title-spotlight" href="<%= isAuthed ? '/home' : '/' %>">Studerria</a>
           <span class="snav-brand-spacer" aria-hidden="true"></span>
           <ul class="snav-list" data-nav-level="0">
             <%- renderMenuItems(visibleNavItems, 0) %>
