@@ -64,8 +64,31 @@
         border: 1px solid var(--glass-border-light);
         box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
       }
+      body.page-register-course .auth-card {
+        border-radius: 28px;
+        border: 1px solid rgba(191, 219, 254, 0.16);
+        overflow: hidden;
+      }
+      body.theme-dark.page-register-course .auth-card {
+        background: linear-gradient(180deg, rgba(61, 70, 146, 0.9), rgba(44, 49, 126, 0.94)) !important;
+        border-color: rgba(191, 219, 254, 0.18);
+        box-shadow: 0 32px 72px rgba(5, 8, 24, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+      }
+      body.theme-light.page-register-course .auth-card {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 245, 255, 0.88)) !important;
+        border-color: rgba(148, 163, 184, 0.22);
+        box-shadow: 0 26px 54px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+      }
+      body.page-register-course .auth-card .card-body {
+        padding: 1.65rem 1.5rem !important;
+      }
       body.theme-dark .auth-card h1 {
         color: #f8fafc;
+      }
+      body.page-register-course .auth-card h1 {
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        margin-bottom: 1rem !important;
       }
       .course-option {
         position: relative;
@@ -139,8 +162,16 @@
       .pathway-label {
         display: block;
         font-size: 0.85rem;
-        opacity: 0.74;
+        opacity: 1;
         margin-bottom: 6px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      body.theme-light.page-register-course .pathway-label {
+        color: rgba(51, 65, 85, 0.78);
+      }
+      body.theme-dark.page-register-course .pathway-label {
+        color: rgba(226, 232, 240, 0.86);
       }
       body.theme-dark .track-option {
         border-color: rgba(255, 255, 255, 0.2);
@@ -154,6 +185,7 @@
         border-radius: 12px;
         border: 1px solid rgba(148, 163, 184, 0.42);
         min-height: 44px;
+        font-weight: 600;
       }
       body.theme-dark .pathway-select {
         border-color: rgba(255, 255, 255, 0.2);
@@ -162,7 +194,99 @@
       }
       .pathway-hint {
         font-size: 0.8rem;
-        opacity: 0.75;
+        opacity: 1;
+        line-height: 1.45;
+      }
+      body.theme-light.page-register-course .pathway-hint {
+        color: rgba(51, 65, 85, 0.72);
+      }
+      body.theme-dark.page-register-course .pathway-hint {
+        color: rgba(226, 232, 240, 0.74);
+      }
+      body.page-register-course .track-option span,
+      body.page-register-course .course-option span {
+        display: inline-block;
+        color: inherit;
+      }
+      body.theme-light.page-register-course .track-option,
+      body.theme-light.page-register-course .course-option {
+        background: rgba(255, 255, 255, 0.42);
+        border-color: rgba(148, 163, 184, 0.28);
+        color: #0f172a;
+      }
+      body.theme-light.page-register-course .track-option.is-selected,
+      body.theme-light.page-register-course .course-option.is-selected {
+        background: linear-gradient(135deg, rgba(79, 70, 229, 0.18), rgba(168, 85, 247, 0.16));
+        border-color: rgba(79, 70, 229, 0.46);
+        box-shadow: 0 14px 28px rgba(99, 102, 241, 0.16);
+      }
+      body.theme-dark.page-register-course .track-option,
+      body.theme-dark.page-register-course .course-option {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.05));
+        border-color: rgba(191, 219, 254, 0.14);
+        color: rgba(248, 250, 252, 0.94);
+      }
+      body.theme-dark.page-register-course .track-option:hover,
+      body.theme-dark.page-register-course .course-option:hover {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.07));
+        box-shadow: 0 14px 28px rgba(8, 12, 28, 0.24);
+      }
+      body.theme-dark.page-register-course .track-option.is-selected,
+      body.theme-dark.page-register-course .course-option.is-selected {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.24), rgba(139, 92, 246, 0.28));
+        border-color: rgba(96, 165, 250, 0.72);
+        box-shadow: 0 16px 32px rgba(37, 99, 235, 0.22);
+      }
+      body.theme-dark.page-register-course .track-option.is-selected span,
+      body.theme-dark.page-register-course .course-option.is-selected span {
+        color: #ffffff;
+      }
+      body.theme-light.page-register-course .pathway-select {
+        background: rgba(255, 255, 255, 0.76);
+        border-color: rgba(148, 163, 184, 0.26);
+        color: #0f172a;
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+      }
+      body.theme-dark.page-register-course .pathway-select {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.08));
+        border-color: rgba(191, 219, 254, 0.16);
+        color: #f8fafc;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 26px rgba(5, 8, 24, 0.18);
+      }
+      body.page-register-course .pathway-select option {
+        color: #0f172a;
+        background: #ffffff;
+      }
+      body.theme-dark.page-register-course .pathway-select option {
+        color: #f8fafc;
+        background: #1b2342;
+      }
+      body.page-register-course .btn-outline-secondary {
+        border-radius: 16px;
+        font-weight: 600;
+      }
+      body.theme-light.page-register-course .btn-outline-secondary {
+        border-color: rgba(148, 163, 184, 0.26);
+        background: rgba(255, 255, 255, 0.42);
+        color: #1e293b;
+      }
+      body.theme-dark.page-register-course .btn-outline-secondary {
+        border-color: rgba(191, 219, 254, 0.16);
+        background: linear-gradient(180deg, rgba(32, 41, 94, 0.82), rgba(21, 29, 72, 0.9));
+        color: rgba(248, 250, 252, 0.96);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+      body.theme-light.page-register-course .btn-outline-secondary:hover,
+      body.theme-light.page-register-course .btn-outline-secondary:focus-visible {
+        background: rgba(255, 255, 255, 0.7);
+        border-color: rgba(99, 102, 241, 0.32);
+        color: #0f172a;
+      }
+      body.theme-dark.page-register-course .btn-outline-secondary:hover,
+      body.theme-dark.page-register-course .btn-outline-secondary:focus-visible {
+        background: linear-gradient(180deg, rgba(42, 53, 116, 0.92), rgba(28, 37, 88, 0.96));
+        border-color: rgba(147, 197, 253, 0.24);
+        color: #ffffff;
       }
       .btn-primary {
         background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
@@ -220,7 +344,7 @@
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
-  <body class="studerria-theme theme-light">
+  <body class="studerria-theme theme-light page-register-course">
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
     <div class="theme-toggle-floating">
