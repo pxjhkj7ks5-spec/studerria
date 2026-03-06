@@ -2851,6 +2851,18 @@
                   </div>
                 </div>
               </form>
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+                <span class="text-muted small">Legacy names like 1 курс Мюнхен can be normalized into a clean course name plus the Campus field without changing IDs.</span>
+                <form method="POST" action="/admin/courses/normalize-legacy">
+                  <button
+                    class="btn btn-sm btn-outline-secondary"
+                    type="submit"
+                    data-confirm="Normalize legacy course names by moving campus suffixes into the Campus field?"
+                  >
+                    Normalize legacy names
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
 

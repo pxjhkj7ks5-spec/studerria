@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.64",
+      "date": "2026-03-06",
+      "items": [
+        "feat(course-legacy-normalization): added an admin bulk action that moves legacy campus suffixes like `Munich` out of course names into the dedicated Campus field without changing course IDs",
+        "fix(course-registration-clarity): refreshed the register-course selection cards so normalized course names stay clean while campus metadata is shown as a separate pill during track/program/admission selection"
+      ]
+    },
+    {
       "version": "1.1.63",
       "date": "2026-03-06",
       "items": [

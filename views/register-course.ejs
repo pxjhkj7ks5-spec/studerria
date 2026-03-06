@@ -3,6 +3,8 @@
   const selectedTrackValue = typeof selectedTrack === 'string' && selectedTrack ? selectedTrack : 'bachelor';
   const selectedProgramValue = Number.isFinite(Number(selectedProgramId)) ? Number(selectedProgramId) : null;
   const selectedAdmissionValue = Number.isFinite(Number(selectedAdmissionId)) ? Number(selectedAdmissionId) : null;
+  const isTeacherCourse = (course) => course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
+  const formatCampusLabel = (location) => String(location || 'kyiv').trim().toLowerCase() === 'munich' ? 'Munich' : 'Kyiv';
 %>
 <!doctype html>
 <html lang="<%= lang %>">
@@ -96,12 +98,43 @@
         border-radius: 14px;
         padding: 0.85rem 1rem;
         cursor: pointer;
+        justify-content: space-between;
+        gap: 0.85rem;
         transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
       }
       .course-option input {
         position: absolute;
         opacity: 0;
         pointer-events: none;
+      }
+      .course-option-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 0;
+      }
+      .course-option-title {
+        font-weight: 650;
+        line-height: 1.26;
+      }
+      .course-option-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+      }
+      .course-option-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 1.55rem;
+        padding: 0.18rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        background: rgba(255, 255, 255, 0.52);
+        color: rgba(30, 41, 59, 0.78);
       }
       .course-option span {
         font-weight: 600;
@@ -122,9 +155,18 @@
       body.theme-dark .course-option span {
         color: #f8fafc;
       }
+      body.theme-dark .course-option .course-option-pill {
+        border-color: rgba(191, 219, 254, 0.18);
+        background: rgba(15, 23, 42, 0.34);
+        color: rgba(226, 232, 240, 0.88);
+      }
       body.theme-dark .course-option.is-selected {
         background: rgba(59, 130, 246, 0.2);
         border-color: rgba(59, 130, 246, 0.9);
+      }
+      body.page-register-course .course-option.is-selected .course-option-pill {
+        border-color: rgba(99, 102, 241, 0.34);
+        background: rgba(255, 255, 255, 0.22);
       }
       .pathway-grid {
         display: grid;
@@ -204,7 +246,7 @@
         color: rgba(226, 232, 240, 0.74);
       }
       body.page-register-course .track-option span,
-      body.page-register-course .course-option span {
+      body.page-register-course .course-option .course-option-title {
         display: inline-block;
         color: inherit;
       }
@@ -429,7 +471,15 @@
                         <%= Number(selectedCourseId) === Number(course.id) ? 'checked' : '' %>
                         required
                       />
-                      <span><%= course.name %></span>
+                      <span class="course-option-content">
+                        <span class="course-option-title"><%= course.name %></span>
+                        <span class="course-option-meta">
+                          <span class="course-option-pill"><%= formatCampusLabel(course.location) %></span>
+                          <% if (isTeacherCourse(course)) { %>
+                            <span class="course-option-pill">Teacher</span>
+                          <% } %>
+                        </span>
+                      </span>
                     </label>
                   <% }) %>
                 </div>

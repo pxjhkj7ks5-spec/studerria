@@ -5319,6 +5319,44 @@ function sanitizeCompactText(rawValue, maxLength = 160) {
   return compact.slice(0, Math.max(1, Number(maxLength) || 160));
 }
 
+function normalizeCourseCampus(rawValue, fallback = 'kyiv') {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  if (normalized === 'munich') return 'munich';
+  if (normalized === 'kyiv') return 'kyiv';
+  return String(fallback || '').trim().toLowerCase() === 'munich' ? 'munich' : 'kyiv';
+}
+
+function inferCourseCampusFromName(rawName) {
+  const name = sanitizeCompactText(rawName, 160);
+  if (!name) return null;
+  if (/(?:^|[\s(/|,\-–—])(?:мюнхен|munich)(?=$|[\s)/|,\-–—])/iu.test(name)) {
+    return 'munich';
+  }
+  if (/(?:^|[\s(/|,\-–—])(?:київ|киев|kyiv|kiev)(?=$|[\s)/|,\-–—])/iu.test(name)) {
+    return 'kyiv';
+  }
+  return null;
+}
+
+function stripLegacyCourseCampusSuffix(rawName) {
+  const compact = sanitizeCompactText(rawName, 120);
+  if (!compact) return '';
+  const stripped = compact
+    .replace(/\s*(?:[-–—|/,]\s*|\(\s*)?(?:мюнхен|munich|київ|киев|kyiv|kiev)(?:\s*\))?\s*$/iu, '')
+    .replace(/[\s,()/|\-–—]+$/u, '')
+    .trim();
+  return stripped || compact;
+}
+
+function normalizeCourseDraft(rawName, rawLocation) {
+  const fallbackName = sanitizeCompactText(rawName, 120);
+  const inferredCampus = inferCourseCampusFromName(fallbackName);
+  return {
+    name: stripLegacyCourseCampusSuffix(fallbackName) || fallbackName,
+    location: normalizeCourseCampus(inferredCampus || rawLocation),
+  };
+}
+
 function normalizePathwayTrackFilter(rawFilter, fallback = 'all') {
   const normalized = String(rawFilter || '').trim().toLowerCase();
   if (PATHWAY_TRACK_FILTER_KEYS.has(normalized)) {
@@ -34446,19 +34484,25 @@ app.post('/admin/courses/add', requireCoursesSectionAccess, (req, res) => {
   const { id, name, is_teacher_course, location } = req.body;
   const courseId = Number(id);
   const teacherFlag = String(is_teacher_course) === '1' ? 1 : 0;
-  const campus = String(location || 'kyiv').toLowerCase() === 'munich' ? 'munich' : 'kyiv';
-  if (Number.isNaN(courseId) || courseId < 1 || !name || !name.trim()) {
+  const normalizedCourse = normalizeCourseDraft(name, location);
+  if (Number.isNaN(courseId) || courseId < 1 || !normalizedCourse.name) {
     return res.redirect('/admin?err=Invalid%20course');
   }
   db.run(
     'INSERT INTO courses (id, name, is_teacher_course, location) VALUES (?, ?, ?, ?)',
-    [courseId, name.trim(), teacherFlag, campus],
+    [courseId, normalizedCourse.name, teacherFlag, normalizedCourse.location],
     (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
-    logAction(db, req, 'course_add', { id: courseId, name: name.trim(), is_teacher_course: teacherFlag, location: campus });
+    logAction(db, req, 'course_add', {
+      id: courseId,
+      name: normalizedCourse.name,
+      is_teacher_course: teacherFlag,
+      location: normalizedCourse.location,
+    });
     invalidateCoursesCache();
+    invalidateRegistrationPathwaysCache();
     return res.redirect('/admin?ok=Course%20created');
     }
   );
@@ -34469,21 +34513,90 @@ app.post('/admin/courses/edit/:id', requireCoursesSectionAccess, (req, res) => {
   const { name, is_teacher_course, location } = req.body;
   const courseId = Number(id);
   const teacherFlag = String(is_teacher_course) === '1' ? 1 : 0;
-  const campus = String(location || 'kyiv').toLowerCase() === 'munich' ? 'munich' : 'kyiv';
-  if (Number.isNaN(courseId) || !name || !name.trim()) {
+  const normalizedCourse = normalizeCourseDraft(name, location);
+  if (Number.isNaN(courseId) || !normalizedCourse.name) {
     return res.redirect('/admin?err=Invalid%20course');
   }
   db.run(
     'UPDATE courses SET name = ?, is_teacher_course = ?, location = ? WHERE id = ?',
-    [name.trim(), teacherFlag, campus, courseId],
+    [normalizedCourse.name, teacherFlag, normalizedCourse.location, courseId],
     (err) => {
     if (err) {
       return res.redirect('/admin?err=Database%20error');
     }
-    logAction(db, req, 'course_edit', { id: courseId, name: name.trim(), is_teacher_course: teacherFlag, location: campus });
+    logAction(db, req, 'course_edit', {
+      id: courseId,
+      name: normalizedCourse.name,
+      is_teacher_course: teacherFlag,
+      location: normalizedCourse.location,
+    });
     invalidateCoursesCache();
+    invalidateRegistrationPathwaysCache();
     return res.redirect('/admin?ok=Course%20updated');
   });
+});
+
+app.post('/admin/courses/normalize-legacy', requireCoursesSectionAccess, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
+
+  let transactionOpen = false;
+  try {
+    const courses = await db.all('SELECT id, name, location FROM courses ORDER BY id');
+    const changes = [];
+
+    await db.run('BEGIN');
+    transactionOpen = true;
+
+    for (const course of courses || []) {
+      const normalizedCourse = normalizeCourseDraft(course.name, course.location);
+      const currentName = sanitizeCompactText(course.name, 120);
+      const currentCampus = normalizeCourseCampus(course.location);
+      if (normalizedCourse.name === currentName && normalizedCourse.location === currentCampus) {
+        continue;
+      }
+
+      await db.run(
+        'UPDATE courses SET name = ?, location = ? WHERE id = ?',
+        [normalizedCourse.name, normalizedCourse.location, Number(course.id)]
+      );
+      changes.push({
+        id: Number(course.id),
+        from_name: currentName,
+        to_name: normalizedCourse.name,
+        from_location: currentCampus,
+        to_location: normalizedCourse.location,
+      });
+    }
+
+    await db.run('COMMIT');
+    transactionOpen = false;
+
+    invalidateCoursesCache();
+    invalidateRegistrationPathwaysCache();
+    logAction(db, req, 'course_normalize_legacy', {
+      updated: changes.length,
+      changes: changes.slice(0, 25),
+    });
+
+    const message = changes.length
+      ? `Normalized ${changes.length} legacy course${changes.length === 1 ? '' : 's'}`
+      : 'Courses already normalized';
+    return res.redirect(`/admin?ok=${encodeURIComponent(message)}`);
+  } catch (err) {
+    if (transactionOpen) {
+      try {
+        await db.run('ROLLBACK');
+      } catch (_) {
+        // Ignore rollback errors and surface the original failure.
+      }
+    }
+    console.error('Legacy course normalization failed', err);
+    return res.redirect('/admin?err=Database%20error');
+  }
 });
 
 app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, (req, res) => {
@@ -34519,6 +34632,7 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, (req, res) =>
           }
           logAction(db, req, 'course_delete', { id: courseId });
           invalidateCoursesCache();
+          invalidateRegistrationPathwaysCache();
           invalidateSubjectsCache(courseId);
           invalidateSemestersCache(courseId);
           invalidateStudyDaysCache(courseId);
