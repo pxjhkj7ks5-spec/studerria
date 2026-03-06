@@ -299,11 +299,13 @@
       }
       body.theme-dark .modal-backdrop {
         background-color: rgba(20, 20, 20, 0.5);
-        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
       }
       body.theme-light .modal-backdrop {
         background-color: rgba(255, 255, 255, 0.4);
-        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
       }
       .modal.fade .modal-dialog {
         transform: scale(0.98);
@@ -317,7 +319,8 @@
       .modal-content {
         border-radius: 16px;
         box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
-        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
         border: 1px solid rgba(255, 255, 255, 0.12);
         animation: modalIn 260ms ease;
       }
@@ -1593,7 +1596,8 @@
         overflow: hidden;
         background: var(--glass-bg);
         border: var(--border-subtle);
-        backdrop-filter: blur(var(--glass-blur));
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
       }
       body.theme-light .modal-content {
         background: var(--glass-bg-light);
@@ -1604,7 +1608,8 @@
         position: sticky;
         z-index: 2;
         background: inherit;
-        backdrop-filter: blur(var(--glass-blur));
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
       }
       .modal-header {
         top: 0;

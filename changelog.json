@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.58",
+      "date": "2026-03-06",
+      "items": [
+        "fix(modal-blur-layer): moved the shared liquid blur off `modal-content` and onto a background layer on `modal-dialog`, so the blur now sits behind the sheet instead of inside it",
+        "fix(schedule-modal-glass): removed the remaining schedule-page modal/header/backdrop `backdrop-filter` rules that were still softening the homework modal content"
+      ]
+    },
+    {
       "version": "1.1.57",
       "date": "2026-03-06",
       "items": [
