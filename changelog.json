@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.48",
+      "date": "2026-03-06",
+      "items": [
+        "fix(modal-backdrop-readability): added a shared modal readability layer that strengthens the backdrop blur and dimming so underlying page content no longer competes with open dialogs",
+        "fix(modal-sheet-contrast): made Studerria modal sheets more opaque with denser glass gradients, cleaner borders, and stronger shadows so headers and body text stay readable over bright or busy screens",
+        "fix(modal-shared-includes): connected the new modal enhancement stylesheet through the shared head partials and the `/about` page so the same readability treatment applies across auth, dashboard, admin, journal, schedule, teamwork, and changelog modals"
+      ]
+    },
+    {
       "version": "1.1.47",
       "date": "2026-03-06",
       "items": [

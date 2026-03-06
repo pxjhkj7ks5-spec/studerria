@@ -1,0 +1,87 @@
+/* Shared modal readability layer for every Studerria screen. */
+html body.studerria-theme .modal-backdrop,
+html body.studerria-theme.modal-open .modal-backdrop {
+  z-index: 1070 !important;
+  background: rgba(4, 8, 20, 0.56) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(0.92) brightness(0.74) !important;
+  backdrop-filter: blur(18px) saturate(0.92) brightness(0.74) !important;
+  transition: opacity 220ms ease, -webkit-backdrop-filter 220ms ease !important;
+  transition: opacity 220ms ease, backdrop-filter 220ms ease !important;
+  transition: opacity 220ms ease, backdrop-filter 220ms ease, -webkit-backdrop-filter 220ms ease !important;
+}
+
+html body.theme-light.studerria-theme .modal-backdrop,
+html body.theme-light.studerria-theme.modal-open .modal-backdrop {
+  background: rgba(232, 238, 251, 0.42) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(0.94) brightness(0.98) !important;
+  backdrop-filter: blur(14px) saturate(0.94) brightness(0.98) !important;
+}
+
+html body.studerria-theme .modal-backdrop.show,
+html body.studerria-theme.modal-open .modal-backdrop.show,
+html body.studerria-theme.confirm-modal-open .modal-backdrop.show {
+  opacity: 1 !important;
+}
+
+html body.studerria-theme .modal.show .modal-dialog .modal-content,
+html body.studerria-theme #confirmActionModal.modal.show .modal-content,
+html body.studerria-theme #journalCellModal.modal.show .modal-content,
+html body.studerria-theme #mobileMenuModal.modal.show .modal-content,
+html body.studerria-theme .changelog-liquid-modal.modal.show .modal-content {
+  background: linear-gradient(180deg, rgba(19, 26, 48, 0.95), rgba(8, 13, 28, 0.985)) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(191, 219, 254, 0.16) !important;
+  border-radius: 28px !important;
+  background-clip: padding-box;
+  -webkit-backdrop-filter: blur(24px) saturate(1.06) !important;
+  backdrop-filter: blur(24px) saturate(1.06) !important;
+  box-shadow: 0 36px 110px rgba(2, 6, 23, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+}
+
+html body.theme-light.studerria-theme .modal.show .modal-dialog .modal-content,
+html body.theme-light.studerria-theme #confirmActionModal.modal.show .modal-content,
+html body.theme-light.studerria-theme #journalCellModal.modal.show .modal-content,
+html body.theme-light.studerria-theme #mobileMenuModal.modal.show .modal-content,
+html body.theme-light.studerria-theme .changelog-liquid-modal.modal.show .modal-content {
+  background: linear-gradient(180deg, rgba(249, 251, 255, 0.96), rgba(239, 244, 255, 0.985)) !important;
+  color: #0f172a !important;
+  border-color: rgba(148, 163, 184, 0.24) !important;
+  box-shadow: 0 30px 88px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.78) !important;
+}
+
+html body.studerria-theme .modal.show .modal-header,
+html body.studerria-theme .modal.show .modal-footer,
+html body.studerria-theme .modal.show .modal-body {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+html body.studerria-theme .modal.show .modal-header,
+html body.studerria-theme .modal.show .modal-footer {
+  border-color: rgba(191, 219, 254, 0.12) !important;
+}
+
+html body.theme-light.studerria-theme .modal.show .modal-header,
+html body.theme-light.studerria-theme .modal.show .modal-footer {
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+html body.studerria-theme .modal.show .modal-title,
+html body.studerria-theme .modal.show .modal-body,
+html body.studerria-theme .modal.show .modal-body p,
+html body.studerria-theme .modal.show .modal-body li,
+html body.studerria-theme .modal.show .modal-body label,
+html body.studerria-theme .modal.show .modal-body .text-muted,
+html body.studerria-theme .modal.show .modal-body .small {
+  color: inherit !important;
+}
+
+html body.theme-dark.studerria-theme .modal.show .modal-body .text-muted,
+html body.theme-dark.studerria-theme .modal.show .modal-body .small {
+  color: rgba(226, 232, 240, 0.82) !important;
+}
+
+html body.theme-light.studerria-theme .modal.show .modal-body .text-muted,
+html body.theme-light.studerria-theme .modal.show .modal-body .small {
+  color: rgba(51, 65, 85, 0.76) !important;
+}
