@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.59",
+      "date": "2026-03-06",
+      "items": [
+        "fix(modal-spotlight): replaced the in-sheet blur with a viewport spotlight layer that covers the page around the active modal while keeping the modal box itself outside the blur field",
+        "fix(modal-geometry-sync): modal spotlight bounds now follow the active dialog on show, resize, scroll, and stacked-modal changes so the blur cutout stays aligned to the visible sheet"
+      ]
+    },
+    {
       "version": "1.1.58",
       "date": "2026-03-06",
       "items": [
