@@ -232,9 +232,12 @@ body.theme-dark.page-journal .dropdown-item:focus {
 
 .page-journal .journal-attendance-table-wrap {
   overflow: auto;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-radius: 24px;
+  border: 1px solid var(--studerria-panel-border);
+  background: var(--studerria-table-shell-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  backdrop-filter: blur(18px) saturate(1.08);
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.12);
 }
 
 .page-journal .journal-attendance-table {
@@ -296,9 +299,12 @@ body.theme-dark.page-journal .liquid-card::after {
 
 .page-journal .journal-config-table-wrap {
   overflow: auto;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-radius: 24px;
+  border: 1px solid var(--studerria-panel-border);
+  background: var(--studerria-table-shell-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  backdrop-filter: blur(18px) saturate(1.08);
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.12);
 }
 
 .page-journal .journal-config-table th,
@@ -353,16 +359,19 @@ body.theme-light.page-journal .journal-attendance-table thead th {
 
 .page-journal .journal-table-wrap {
   overflow: auto;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-radius: 24px;
+  border: 1px solid var(--studerria-panel-border);
+  background: var(--studerria-table-shell-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  backdrop-filter: blur(18px) saturate(1.08);
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.12);
 }
 
 body.theme-light.page-journal .journal-table-wrap,
 body.theme-light.page-journal .journal-config-table-wrap,
 body.theme-light.page-journal .journal-attendance-table-wrap {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(148, 163, 184, 0.42);
+  background: var(--studerria-table-shell-bg);
+  border-color: var(--studerria-panel-border);
 }
 
 .page-journal .journal-table {

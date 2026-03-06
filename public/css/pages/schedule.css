@@ -586,6 +586,10 @@ body.theme-light .sync-pill {
   background: rgba(255, 255, 255, 0.88);
 }
 
+.app-footer .footer-sync-pill {
+  margin-right: 0.2rem;
+}
+
 @keyframes syncPulse {
   0%,
   100% {

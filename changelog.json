@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.29",
+      "date": "2026-03-06",
+      "items": [
+        "style(shared-table-shell): rebuilt the shared table geometry to use one continuous table surface instead of per-row floating pills, and added a canonical `.table-shell` wrapper so headers and body rows now align across analytics, admin, and journal screens",
+        "style(journal-table-wrappers): moved `journal`, `journal-config`, and `attendance` table wrappers onto the same radius, border, blur, and shell background used by the shared Studerria table system",
+        "refactor(schedule-sync-footer): moved the schedule online/offline sync indicator out of the topbar and into the footer dock so header actions stay cleaner while live cache status remains visible at the bottom of the page"
+      ]
+    },
+    {
       "version": "1.1.28",
       "date": "2026-03-06",
       "items": [

@@ -3,6 +3,7 @@
   if (typeof footerMetaClass === 'string' && footerMetaClass.trim()) {
     footerMetaClassList.push(footerMetaClass.trim());
   }
+  const showFooterSyncStatus = (typeof footerSyncStatus !== 'undefined') ? Boolean(footerSyncStatus) : false;
   const latestRelease = Array.isArray(changelog) && changelog.length ? changelog[0] : null;
   const footerReleaseProps = {
     appVersion: appVersion || '',
@@ -13,6 +14,14 @@
 %>
 <footer class="app-footer text-center py-4">
   <small class="<%= footerMetaClassList.join(' ') %>">
+    <% if (showFooterSyncStatus) { %>
+      <span class="sync-pill footer-sync-pill" aria-live="polite">
+        <span class="sync-dot" id="syncDot"></span>
+        <span id="syncStatusLabel">Онлайн</span>
+        <span class="sync-sep">•</span>
+        <span id="syncStatusMeta">Щойно</span>
+      </span>
+    <% } %>
     <span
       class="footer-release-slot"
       data-react-island="footer-release-pill"
