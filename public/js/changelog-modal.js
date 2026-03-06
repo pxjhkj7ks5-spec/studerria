@@ -1,0 +1,129 @@
+(() => {
+  if (window.__studerriaChangelogModalBoot === true) {
+    return;
+  }
+  window.__studerriaChangelogModalBoot = true;
+
+  const MODAL_SELECTOR = '[data-studerria-modal="changelog"]';
+  const BACKDROP_CLASS = 'studerria-changelog-backdrop';
+  const BODY_OPEN_CLASS = 'studerria-changelog-open';
+
+  function getModal() {
+    return document.querySelector(MODAL_SELECTOR);
+  }
+
+  function cleanupBackdrop() {
+    document.querySelectorAll(`.${BACKDROP_CLASS}`).forEach((backdrop) => {
+      if (!(backdrop instanceof HTMLElement)) {
+        return;
+      }
+      backdrop.classList.remove(BACKDROP_CLASS);
+      backdrop.style.pointerEvents = '';
+      backdrop.style.opacity = '';
+      backdrop.style.zIndex = '';
+      backdrop.style.webkitBackdropFilter = '';
+      backdrop.style.backdropFilter = '';
+    });
+  }
+
+  function syncBackdrop() {
+    cleanupBackdrop();
+
+    const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+    const activeBackdrop = backdrops.length ? backdrops[backdrops.length - 1] : null;
+
+    if (!(activeBackdrop instanceof HTMLElement)) {
+      return;
+    }
+
+    activeBackdrop.classList.add(BACKDROP_CLASS);
+    activeBackdrop.style.pointerEvents = 'auto';
+    activeBackdrop.style.opacity = 'var(--bs-backdrop-opacity, 0.42)';
+    activeBackdrop.style.zIndex = '1075';
+    activeBackdrop.style.webkitBackdropFilter = 'blur(16px)';
+    activeBackdrop.style.backdropFilter = 'blur(16px)';
+  }
+
+  function portalModal(modal) {
+    if (!(modal instanceof HTMLElement) || !document.body || modal.parentElement === document.body) {
+      return;
+    }
+
+    document.body.appendChild(modal);
+  }
+
+  function primeModal(modal) {
+    if (!(modal instanceof HTMLElement) || modal.dataset.studerriaChangelogReady === '1') {
+      return;
+    }
+
+    modal.dataset.studerriaChangelogReady = '1';
+    portalModal(modal);
+    modal.style.zIndex = '1080';
+    modal.style.overscrollBehavior = 'contain';
+    modal.style.touchAction = 'pan-y';
+
+    const dialog = modal.querySelector('.modal-dialog');
+    if (dialog instanceof HTMLElement) {
+      dialog.style.margin = 'min(1rem, 2vh) auto';
+    }
+
+    const content = modal.querySelector('.modal-content');
+    if (content instanceof HTMLElement) {
+      content.style.pointerEvents = 'auto';
+    }
+
+    const body = modal.querySelector('.modal-body');
+    if (body instanceof HTMLElement) {
+      body.style.overflowY = 'auto';
+      body.style.overscrollBehavior = 'contain';
+      body.style.touchAction = 'pan-y';
+      body.style.webkitOverflowScrolling = 'touch';
+    }
+
+    modal.addEventListener('show.bs.modal', () => {
+      portalModal(modal);
+      document.body?.classList.add(BODY_OPEN_CLASS);
+      requestAnimationFrame(syncBackdrop);
+    });
+
+    modal.addEventListener('shown.bs.modal', () => {
+      syncBackdrop();
+    });
+
+    modal.addEventListener('hidden.bs.modal', () => {
+      document.body?.classList.remove(BODY_OPEN_CLASS);
+      cleanupBackdrop();
+    });
+
+    modal.addEventListener('pointerdown', (event) => {
+      if (event.target !== modal) {
+        return;
+      }
+
+      if (modal.getAttribute('data-bs-backdrop') === 'static') {
+        return;
+      }
+
+      const instance = window.bootstrap?.Modal?.getInstance(modal);
+      if (instance) {
+        instance.hide();
+      }
+    });
+  }
+
+  function init() {
+    const modal = getModal();
+    if (!(modal instanceof HTMLElement)) {
+      return;
+    }
+
+    primeModal(modal);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
+})();

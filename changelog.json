@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.43",
+      "date": "2026-03-06",
+      "items": [
+        "fix(changelog-modal-interactions): moved the shared changelog modal into the document body at runtime so page-specific overflow, transform, and glass wrappers no longer break its backdrop hit area on schedule, teamwork, and other deep-shell screens",
+        "fix(changelog-modal-touch-scroll): added dedicated touch scrolling behavior for the changelog sheet body, restoring swipe and inertial scroll on pages where old modal overrides previously trapped the content",
+        "fix(changelog-backdrop-close): restored reliable tap and click closing for the changelog by syncing the active backdrop and closing the top-level changelog modal when the user presses outside the sheet"
+      ]
+    },
+    {
       "version": "1.1.42",
       "date": "2026-03-06",
       "items": [
