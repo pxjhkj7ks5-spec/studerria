@@ -178,6 +178,9 @@
     }
 
     function getThemeToggleLabel(control, theme) {
+      if (control.dataset.navAction === 'theme-toggle') {
+        return theme === 'dark' ? 'Світла' : 'Темна';
+      }
       const fallbackLight = control.classList.contains('studerria-theme-toggle') ? 'Light' : '☀️';
       const fallbackDark = control.classList.contains('studerria-theme-toggle') ? 'Dark' : '🌙';
       return theme === 'dark'
