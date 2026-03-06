@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.53",
+      "date": "2026-03-06",
+      "items": [
+        "fix(navbar-journal-student-visibility): returned the main `Журнал` item to students in the shared learning dropdown so the navbar matches the real journal access rules",
+        "fix(navbar-journal-insights-scope): kept `Insights` staff-only while separating it from the main journal visibility rule, preventing student nav from exposing the extra analytics entry"
+      ]
+    },
+    {
       "version": "1.1.52",
       "date": "2026-03-06",
       "items": [

@@ -2,7 +2,8 @@ const APP_ROLES = ['admin', 'deanery', 'starosta', 'teacher', 'student'];
 const PERSONAL_LABEL = 'Особисте';
 const ADMIN_PANEL_ROLES = ['admin', 'deanery', 'starosta', 'teacher'];
 const DEADLINE_ROLES = ['student', 'starosta', 'teacher'];
-const JOURNAL_ROLES = ['admin', 'deanery', 'starosta', 'teacher'];
+const JOURNAL_ROLES = ['admin', 'deanery', 'starosta', 'teacher', 'student'];
+const JOURNAL_INSIGHT_ROLES = ['admin', 'deanery', 'starosta', 'teacher'];
 
 const navConfig = {
   personalLabel: PERSONAL_LABEL,
@@ -55,7 +56,7 @@ const navConfig = {
               label: 'Insights',
               href: '/journal/insights',
               section: 'main',
-              rolesAllowed: JOURNAL_ROLES,
+              rolesAllowed: JOURNAL_INSIGHT_ROLES,
               matchPaths: ['/journal/insights'],
             },
           ],
