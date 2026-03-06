@@ -10,6 +10,7 @@ body.page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell .cont
   align-items: center;
   justify-content: flex-start !important;
   gap: 14px 18px;
+  padding-inline: 1.35rem !important;
   flex-wrap: nowrap;
   overflow: visible;
 }
@@ -230,6 +231,7 @@ body.theme-light .snav-menu {
   .studerria-nav-shell .container {
     align-items: flex-start;
     flex-wrap: wrap;
+    padding-inline: 1rem !important;
   }
 
   .snav-main {
