@@ -85,3 +85,42 @@ html body.theme-light.studerria-theme .modal.show .modal-body .text-muted,
 html body.theme-light.studerria-theme .modal.show .modal-body .small {
   color: rgba(51, 65, 85, 0.76) !important;
 }
+
+html body.studerria-theme #welcomeModal .modal-dialog,
+html body.studerria-theme #welcomeModal .modal-content,
+html body.studerria-theme #welcomeModal .modal-body,
+html body.studerria-theme #welcomeModal .modal-body > *,
+html body.studerria-theme #welcomeModal .welcome-cta {
+  pointer-events: auto !important;
+}
+
+html body.studerria-theme #welcomeModal .modal-content,
+html body.studerria-theme #welcomeModal .modal-body {
+  position: relative;
+}
+
+html body.studerria-theme #welcomeModal .modal-body > * {
+  position: relative;
+  z-index: 1;
+}
+
+html body.studerria-theme #welcomeModal .welcome-cta {
+  position: relative;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 10.5rem;
+  min-height: 2.8rem;
+  padding-inline: 1.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.42);
+  box-shadow: 0 16px 30px rgba(99, 102, 241, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+html body.theme-light.studerria-theme #welcomeModal .welcome-cta {
+  border-color: rgba(99, 102, 241, 0.24);
+  box-shadow: 0 14px 26px rgba(99, 102, 241, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.54);
+}

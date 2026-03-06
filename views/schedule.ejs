@@ -2469,7 +2469,7 @@
               <br />
               ⚙️ Усі зауваження, баги чи пропозиції — надсилайте напряму адміністратору системи.
             </div>
-            <button type="button" class="btn btn-primary glass" data-bs-dismiss="modal">Почати користування</button>
+            <button type="button" class="btn btn-primary welcome-cta" data-bs-dismiss="modal" data-welcome-dismiss>Почати користування</button>
           </div>
         </div>
       </div>
@@ -2656,11 +2656,17 @@
       const currentUserId = <%- JSON.stringify(userId || null) %>;
       const welcomeModalEl = document.getElementById('welcomeModal');
       if (welcomeModalEl) {
+        const welcomeModal = bootstrap.Modal.getOrCreateInstance(welcomeModalEl, { backdrop: true });
+        welcomeModalEl.querySelectorAll('[data-welcome-dismiss]').forEach((button) => {
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            welcomeModal.hide();
+          });
+        });
         const params = new URLSearchParams(window.location.search);
         const shouldWelcome = params.get('welcome') === '1';
         const welcomeKey = `studerria:welcome:registered:${currentUserId || 'guest'}`;
         if (shouldWelcome && !localStorage.getItem(welcomeKey)) {
-          const welcomeModal = new bootstrap.Modal(welcomeModalEl, { backdrop: true });
           welcomeModal.show();
           localStorage.setItem(welcomeKey, '1');
           document.body.classList.add('welcome-open');

@@ -861,7 +861,7 @@
               <br />
               🧭 Використовуй це як щоденний центр керування навчанням і тримай темп без хаосу.
             </div>
-            <button type="button" class="btn btn-primary glass" data-bs-dismiss="modal">Почати роботу</button>
+            <button type="button" class="btn btn-primary welcome-cta" data-bs-dismiss="modal" data-welcome-dismiss>Почати роботу</button>
           </div>
         </div>
       </div>
@@ -940,11 +940,17 @@
 
       const welcomeModalEl = document.getElementById('welcomeModal');
       if (welcomeModalEl && window.bootstrap && window.bootstrap.Modal) {
+        const welcomeModal = window.bootstrap.Modal.getOrCreateInstance(welcomeModalEl, { backdrop: true });
+        welcomeModalEl.querySelectorAll('[data-welcome-dismiss]').forEach((button) => {
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            welcomeModal.hide();
+          });
+        });
         const params = new URLSearchParams(window.location.search);
         const shouldWelcome = params.get('welcome') === '1';
         const welcomeKey = `studerria:welcome:registered:${currentUserId || 'guest'}`;
         if (shouldWelcome && !localStorage.getItem(welcomeKey)) {
-          const welcomeModal = new window.bootstrap.Modal(welcomeModalEl, { backdrop: true });
           welcomeModal.show();
           localStorage.setItem(welcomeKey, '1');
           document.body.classList.add('welcome-open');

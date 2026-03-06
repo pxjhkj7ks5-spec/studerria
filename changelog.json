@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.51",
+      "date": "2026-03-06",
+      "items": [
+        "fix(welcome-modal-cta): restored clickability for the welcome modal action on home and schedule by moving it off the generic `glass` button shell and giving it a dedicated CTA hit area",
+        "fix(welcome-modal-dismiss): added explicit dismiss handlers for the welcome modal buttons so they close reliably even when Bootstrap's attribute-based dismiss path is interrupted",
+        "fix(welcome-modal-pointer-events): forced the welcome modal content stack and CTA layer to keep pointer events and z-index priority above decorative modal surfaces"
+      ]
+    },
+    {
       "version": "1.1.50",
       "date": "2026-03-06",
       "items": [
