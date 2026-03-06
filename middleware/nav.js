@@ -63,6 +63,17 @@ function cloneNavItem(item, overrides = {}) {
   };
 }
 
+function canUseCustomDeadlines(userNav, settings) {
+  if (!settings || !settings.allow_custom_deadlines) {
+    return false;
+  }
+  const roles = Array.isArray(userNav && userNav.roles) ? userNav.roles : [];
+  if (roles.some((role) => ['admin', 'deanery', 'teacher'].includes(role))) {
+    return true;
+  }
+  return Boolean(settings && settings.allow_homework_creation);
+}
+
 function filterNavItems(items, context) {
   return items.reduce((result, item) => {
     if (!isItemAllowed(item, context.userNav) || item.hidden) {
@@ -116,6 +127,7 @@ function buildUserNav(req, res) {
       canManagePathways: Boolean(req && req.canManagePathways),
       allowMessages: Boolean(settings && settings.allow_messages),
       allowCustomDeadlines: Boolean(settings && settings.allow_custom_deadlines),
+      canUseCustomDeadlines: canUseCustomDeadlines({ roles }, settings),
     },
     personalLabel: navConfig.personalLabel,
   };

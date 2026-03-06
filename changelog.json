@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.52",
+      "date": "2026-03-06",
+      "items": [
+        "fix(custom-deadlines-student-visibility): hid `Дивні дедлайни` in the shared navbar, my-day drawer, and schedule shortcuts whenever student homework creation is disabled in system settings",
+        "fix(custom-deadlines-student-rendering): stopped rendering student-view custom deadline sections, subject pickers, and modals on schedule when the current view should follow the homework-creation ban",
+        "fix(custom-deadlines-permission-guard): aligned `/homework/custom` with the same permission rule so students and starostas cannot bypass the hidden UI and post custom deadlines while homework creation is turned off"
+      ]
+    },
+    {
       "version": "1.1.51",
       "date": "2026-03-06",
       "items": [

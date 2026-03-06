@@ -1686,7 +1686,7 @@
         <% if (role === 'teacher') { %>
           <a class="drawer-action" href="/teacher/workspace">Teacher workspace</a>
         <% } %>
-        <% if ((role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') && settings && settings.allow_custom_deadlines) { %>
+        <% if (canUseCustomDeadlinesUi) { %>
           <button class="drawer-action" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
             🌀 Дивні дедлайни
           </button>
@@ -1902,7 +1902,7 @@
             </div>
             <% const dateKey = dayDates && dayDates[day] ? dayDates[day] : null; %>
             <% const customItems = dateKey && customDeadlinesByDate ? customDeadlinesByDate[dateKey] : null; %>
-            <% if (settings && settings.allow_custom_deadlines && customItems && customItems.length) { %>
+            <% if (canUseCustomDeadlinesUi && customItems && customItems.length) { %>
               <details class="deadline-block">
                 <summary class="deadline-title">Дивні дедлайни</summary>
                 <div class="deadline-content">
@@ -1950,7 +1950,7 @@
           </div>
         <% }); %>
         <% const activeDaySet = new Set(daysOfWeek || []); %>
-        <% if (settings && settings.allow_custom_deadlines && weekendDeadlineCards && weekendDeadlineCards.length) { %>
+        <% if (canUseCustomDeadlinesUi && weekendDeadlineCards && weekendDeadlineCards.length) { %>
           <% weekendDeadlineCards.forEach(function(card) { %>
             <% if (activeDaySet.has(card.day)) { return; } %>
             <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
@@ -2256,7 +2256,7 @@
       </div>
     </div>
 
-    <% if (settings && settings.allow_custom_deadlines) { %>
+    <% if (canUseCustomDeadlinesUi) { %>
     <div class="modal fade" id="customDeadlineModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">

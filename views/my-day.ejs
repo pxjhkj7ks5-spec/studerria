@@ -137,7 +137,7 @@
         <a class="drawer-action" href="/journal">📘 Журнал</a>
         <a class="drawer-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
         <a class="drawer-action" href="/subjects">📚 Предмети</a>
-        <% if ((role === 'student' || role === 'starosta' || role === 'teacher') && settings && settings.allow_custom_deadlines) { %>
+        <% if (canUseCustomDeadlinesUi) { %>
           <a class="drawer-action" href="/schedule">🌀 Дивні дедлайни</a>
         <% } %>
         <% if (settings && settings.allow_messages) { %>

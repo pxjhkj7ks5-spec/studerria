@@ -74,7 +74,7 @@ const navConfig = {
           href: '/schedule?panel=deadlines',
           section: 'main',
           rolesAllowed: DEADLINE_ROLES,
-          requiredFlags: ['allowCustomDeadlines'],
+          requiredFlags: ['canUseCustomDeadlines'],
           navAction: 'custom-deadlines',
           matchPaths: ['/schedule/custom-deadlines'],
         },

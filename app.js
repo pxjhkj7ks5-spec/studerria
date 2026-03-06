@@ -1116,6 +1116,24 @@ function canSessionCreateHomework(req) {
   return Boolean(settingsCache.allow_homework_creation);
 }
 
+function canSessionUseCustomDeadlines(req) {
+  if (!settingsCache.allow_custom_deadlines) {
+    return hasSessionRole(req, 'admin');
+  }
+  return canSessionCreateHomework(req);
+}
+
+function canRenderCustomDeadlinesUi(req, roleKey = null) {
+  const currentRole = normalizeRoleKey(roleKey || '');
+  if (!['student', 'starosta', 'teacher'].includes(currentRole)) {
+    return false;
+  }
+  if (currentRole === 'teacher') {
+    return Boolean(settingsCache.allow_custom_deadlines);
+  }
+  return Boolean(settingsCache.allow_custom_deadlines) && Boolean(settingsCache.allow_homework_creation);
+}
+
 async function getUserRoleKeys(userId, fallbackRole = 'student') {
   const fallback = normalizeRoleKey(fallbackRole);
   if (!Number.isFinite(Number(userId))) {
@@ -10689,6 +10707,7 @@ const renderMyDayPage = async (req, res) => {
       roleKeys,
       { competencySubjectId }
     );
+    const canUseCustomDeadlinesUi = canRenderCustomDeadlinesUi(req, myDayRole);
     return res.render('my-day', {
       username: req.session.user.username,
       userId: req.session.user.id,
@@ -10698,6 +10717,7 @@ const renderMyDayPage = async (req, res) => {
       myDay,
       okMessage: String(req.query.ok || ''),
       errMessage: String(req.query.err || ''),
+      canUseCustomDeadlinesUi,
     });
   } catch (err) {
     return handleDbError(res, err, 'myday');
@@ -11327,6 +11347,10 @@ function applySessionMetaFlags(target, sessionType) {
 app.get('/schedule', requireLogin, async (req, res) => {
   const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
   const canCreateHomework = canSessionCreateHomework(req);
+  const scheduleViewRole = hasSessionRole(req, 'teacher')
+    ? 'teacher'
+    : (req.session.viewAs || req.session.role || '');
+  const canUseCustomDeadlinesUi = canRenderCustomDeadlinesUi(req, scheduleViewRole);
   if (hasSessionRole(req, 'teacher')) {
     try {
       await ensureDbReady();
@@ -11728,7 +11752,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
       let customDeadlinesByDate = {};
       let weekendDeadlineCards = [];
       let customDeadlineItems = [];
-      if (settingsCache.allow_custom_deadlines && teacherTargets.length && weekStartDate && weekEndDate) {
+      if (canUseCustomDeadlinesUi && teacherTargets.length && weekStartDate && weekEndDate) {
         const cdConditions = teacherTargets
           .map(() => '(h.subject_id = ? AND h.group_number = ? AND h.course_id = ? AND COALESCE(h.semester_id, 0) = ?)')
           .join(' OR ');
@@ -11806,7 +11830,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
       }
 
       let customDeadlineSubjects = [];
-      if (settingsCache.allow_custom_deadlines) {
+      if (canUseCustomDeadlinesUi) {
         const seenCustom = new Set();
         teacherSubjects.forEach((row) => {
           const key = `${row.subject_id}|${row.group_number || 'all'}`;
@@ -11854,6 +11878,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         selectedCourseId: selectedCourse ? selectedCourse.id : null,
         teacherHomeworkTemplates,
         canCreateHomework,
+        canUseCustomDeadlinesUi,
       });
     } catch (err) {
       return handleDbError(res, err, 'teacher.schedule');
@@ -12076,7 +12101,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         dayDates[day] = idx >= 0 ? weekDates[idx] : null;
       });
       const customDeadlineSubjects = [];
-      if (settingsCache.allow_custom_deadlines) {
+      if (canUseCustomDeadlinesUi) {
         const subjectSeen = new Set();
         studentGroups.forEach((sg) => {
           if (!subjectSeen.has(sg.subject_id)) {
@@ -12130,7 +12155,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
       };
 
       const loadCustomDeadlines = (homeworkTargets, cb) => {
-        if (!settingsCache.allow_custom_deadlines) {
+        if (!canUseCustomDeadlinesUi) {
           return cb({}, [], []);
         }
         if (!homeworkTargets.length || !weekStartDate || !weekEndDate) {
@@ -12256,6 +12281,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               selectedCourseId: scheduleCourseId,
               teacherHomeworkTemplates: [],
               canCreateHomework,
+              canUseCustomDeadlinesUi,
             })
           );
         }
@@ -12453,6 +12479,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 selectedCourseId: scheduleCourseId,
                 teacherHomeworkTemplates: [],
                 canCreateHomework,
+                canUseCustomDeadlinesUi,
               });
             };
 
@@ -32571,7 +32598,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
 });
 
 app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachment'), async (req, res) => {
-  if (!settingsCache.allow_custom_deadlines && !hasSessionRole(req, 'admin')) {
+  if (!canSessionUseCustomDeadlines(req)) {
     return res.status(403).send('Custom deadlines disabled');
   }
   const { description, link_url, meeting_url, subject_id, custom_due_date } = req.body;
