@@ -1,20 +1,25 @@
 <%
-  const shouldRenderNavbar = showGlobalNavbar !== false || forceAppNavbar;
-  const currentRole = String((userNav && userNav.role) || role || '').trim();
-  const userRoles = Array.isArray(userNav && userNav.roles) ? userNav.roles : (currentRole ? [currentRole] : []);
-  const isAuthed = Boolean(userNav && userNav.isAuthenticated) || Boolean(currentRole);
-  const displayName = String((userNav && userNav.name) || username || '').trim();
-  const visibleNavItems = Array.isArray(navItems)
-    ? navItems.filter((item) => !item.hidden && String(item.section || 'main') === 'main')
-    : [];
-  const shouldRenderAppNav = Boolean(forceAppNavbar) || (isAuthed && visibleNavItems.length > 0);
-  const personalLabel = String((navMeta && navMeta.personalLabel) || (userNav && userNav.personalLabel) || 'Особисте').trim() || 'Особисте';
+  const safeForceAppNavbar = (typeof forceAppNavbar !== 'undefined') && Boolean(forceAppNavbar);
+  const safeShowGlobalNavbar = (typeof showGlobalNavbar === 'undefined') ? true : showGlobalNavbar !== false;
+  const safeUserNav = (typeof userNav !== 'undefined' && userNav) ? userNav : null;
+  const safeNavItems = Array.isArray(typeof navItems !== 'undefined' ? navItems : null) ? navItems : [];
+  const safeNavMeta = (typeof navMeta !== 'undefined' && navMeta) ? navMeta : null;
+  const translate = (typeof t === 'function') ? t : null;
+
+  const shouldRenderNavbar = safeShowGlobalNavbar || safeForceAppNavbar;
+  const currentRole = String((safeUserNav && safeUserNav.role) || role || '').trim();
+  const userRoles = Array.isArray(safeUserNav && safeUserNav.roles) ? safeUserNav.roles : (currentRole ? [currentRole] : []);
+  const isAuthed = Boolean(safeUserNav && safeUserNav.isAuthenticated) || Boolean(currentRole);
+  const displayName = String((safeUserNav && safeUserNav.name) || username || '').trim();
+  const visibleNavItems = safeNavItems.filter((item) => !item.hidden && String(item.section || 'main') === 'main');
+  const shouldRenderAppNav = safeForceAppNavbar || (isAuthed && visibleNavItems.length > 0);
+  const personalLabel = String((safeNavMeta && safeNavMeta.personalLabel) || (safeUserNav && safeUserNav.personalLabel) || 'Особисте').trim() || 'Особисте';
   const roleLabelMap = {
-    admin: (typeof t === 'function' ? t('role.admin') : 'Адмін'),
-    starosta: (typeof t === 'function' ? t('role.starosta') : 'Староста'),
-    deanery: (typeof t === 'function' ? t('role.deanery') : 'Деканат'),
-    teacher: (typeof t === 'function' ? t('role.teacher') : 'Викладач'),
-    student: (typeof t === 'function' ? t('role.student') : 'Студент'),
+    admin: (translate ? translate('role.admin') : 'Адмін'),
+    starosta: (translate ? translate('role.starosta') : 'Староста'),
+    deanery: (translate ? translate('role.deanery') : 'Деканат'),
+    teacher: (translate ? translate('role.teacher') : 'Викладач'),
+    student: (translate ? translate('role.student') : 'Студент'),
   };
   const displayRoleLabel = roleLabelMap[currentRole] || currentRole || '';
   const displayRoleText = displayName

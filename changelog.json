@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.32",
+      "date": "2026-03-06",
+      "items": [
+        "fix(navbar-partial-locals): made the shared navbar partial tolerate missing optional include locals like `forceAppNavbar`, `userNav`, `navItems`, and `navMeta` so layout-rendered pages no longer crash with `ReferenceError`"
+      ]
+    },
+    {
       "version": "1.1.31",
       "date": "2026-03-06",
       "items": [
