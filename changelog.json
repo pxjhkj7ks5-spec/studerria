@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.30",
+      "date": "2026-03-06",
+      "items": [
+        "style(light-shell-panels-and-tables): brightened the shared light-theme card and table tokens with softer blue-tinted glass gradients, cleaner table head surfaces, and a more consistent table shell across the Studerria UI system",
+        "style(journal-light-polish): tightened the journal top spacing, improved light-theme table striping and hover states, refreshed journal cards and attendance surfaces, and replaced the broken details chevron glyph with a stable CSS arrow",
+        "style(subjects-and-pathways-polish): added dedicated page-level polish for `subjects`, `journal-insights`, and `admin-pathways` so their cards, chips, controls, and analytics surfaces now sit on the same liquid-glass shell in both dark and light themes"
+      ]
+    },
+    {
       "version": "1.1.29",
       "date": "2026-03-06",
       "items": [

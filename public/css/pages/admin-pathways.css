@@ -1,0 +1,129 @@
+.page-admin-pathways main.container.shell {
+  padding-top: 8px;
+  padding-bottom: 42px;
+}
+
+.page-admin-pathways .glass {
+  border-radius: 30px;
+  border: 1px solid var(--studerria-panel-border);
+  background: var(--studerria-panel-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(1.12);
+  backdrop-filter: blur(20px) saturate(1.12);
+  box-shadow:
+    var(--studerria-panel-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.08);
+}
+
+.page-admin-pathways .hero {
+  padding: 28px 28px 24px;
+  background:
+    radial-gradient(520px 220px at 0% 0%, rgba(125, 211, 252, 0.1), transparent 66%),
+    radial-gradient(420px 260px at 100% 100%, rgba(167, 139, 250, 0.12), transparent 70%),
+    var(--studerria-panel-bg-strong);
+}
+
+.page-admin-pathways .section {
+  padding: 22px;
+}
+
+.page-admin-pathways .hero-subtitle,
+.page-admin-pathways .section-subtitle,
+.page-admin-pathways .muted {
+  color: var(--studerria-text-muted) !important;
+}
+
+.page-admin-pathways .chip {
+  border-color: var(--studerria-panel-border);
+  background: var(--studerria-pill-bg);
+  color: var(--studerria-text-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.page-admin-pathways .soft-panel {
+  border-radius: 22px;
+  border: 1px solid var(--studerria-panel-border);
+  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 88%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  backdrop-filter: blur(16px) saturate(1.08);
+  box-shadow: 0 18px 34px rgba(2, 6, 23, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.page-admin-pathways .compact-input,
+.page-admin-pathways .compact-select {
+  min-height: 46px;
+  border-radius: 16px;
+  border-color: var(--studerria-control-border);
+  background: var(--studerria-control-bg);
+  color: var(--studerria-control-text);
+  box-shadow: var(--studerria-control-shadow);
+}
+
+.page-admin-pathways .compact-input:focus,
+.page-admin-pathways .compact-select:focus {
+  border-color: var(--studerria-control-border-strong);
+  background: var(--studerria-control-bg-focus);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--studerria-control-border-strong) 82%, transparent),
+    0 0 0 6px var(--studerria-control-ring),
+    var(--studerria-control-shadow);
+}
+
+.page-admin-pathways .program-grid {
+  gap: 16px;
+}
+
+.page-admin-pathways .subject-list {
+  max-height: 460px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--studerria-cta-start) 34%, transparent) transparent;
+}
+
+.page-admin-pathways .subject-row,
+.page-admin-pathways .admission-row {
+  border-radius: 20px;
+  border: 1px solid var(--studerria-table-cell-border);
+  background: var(--studerria-table-row-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.page-admin-pathways .subject-row:hover,
+.page-admin-pathways .admission-row:hover {
+  background: var(--studerria-table-row-hover);
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 24%, var(--studerria-table-cell-border));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.page-admin-pathways .btn-soft {
+  border-color: var(--studerria-panel-border);
+  background: var(--studerria-pill-bg);
+  color: var(--studerria-text-primary);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.page-admin-pathways .btn-soft:hover {
+  background: var(--studerria-pill-hover);
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 24%, var(--studerria-panel-border));
+}
+
+body.theme-light.page-admin-pathways .glass,
+body.theme-light.page-admin-pathways .soft-panel {
+  box-shadow: 0 22px 46px rgba(99, 102, 241, 0.08), 0 14px 28px rgba(15, 23, 42, 0.06);
+}
+
+body.theme-light.page-admin-pathways .subject-row,
+body.theme-light.page-admin-pathways .admission-row {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+@media (max-width: 991px) {
+  .page-admin-pathways main.container.shell {
+    padding-top: 6px;
+  }
+
+  .page-admin-pathways .hero,
+  .page-admin-pathways .section {
+    padding: 20px;
+  }
+}

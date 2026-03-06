@@ -4,6 +4,11 @@
   gap: 8px;
 }
 
+.page-journal main.container.py-4 {
+  padding-top: 0.5rem !important;
+  padding-bottom: 1.5rem !important;
+}
+
 body.theme-dark.page-journal .form-control,
 body.theme-dark.page-journal .form-select,
 body.theme-dark.page-journal input.form-control,
@@ -117,7 +122,7 @@ body.theme-dark.page-journal .dropdown-item:focus {
 }
 
 .page-journal .journal-grading-summary::after {
-  content: '▾';
+  content: "\25BE";
   position: absolute;
   right: 12px;
   top: 11px;
@@ -357,6 +362,18 @@ body.theme-light.page-journal .journal-attendance-table thead th {
   color: rgba(51, 65, 85, 0.92);
 }
 
+body.theme-light.page-journal .journal-config-table tbody tr:nth-child(odd) > *,
+body.theme-light.page-journal .journal-table tbody tr:nth-child(odd) > *,
+body.theme-light.page-journal .journal-attendance-table tbody tr:nth-child(odd) > * {
+  background: rgba(242, 246, 255, 0.74) !important;
+}
+
+body.theme-light.page-journal .journal-config-table tbody tr:hover > *,
+body.theme-light.page-journal .journal-table tbody tr:hover > *,
+body.theme-light.page-journal .journal-attendance-table tbody tr:hover > * {
+  background: rgba(231, 238, 255, 0.88) !important;
+}
+
 .page-journal .journal-table-wrap {
   overflow: auto;
   border-radius: 24px;
@@ -372,6 +389,7 @@ body.theme-light.page-journal .journal-config-table-wrap,
 body.theme-light.page-journal .journal-attendance-table-wrap {
   background: var(--studerria-table-shell-bg);
   border-color: var(--studerria-panel-border);
+  box-shadow: 0 18px 38px rgba(99, 102, 241, 0.08), 0 12px 24px rgba(15, 23, 42, 0.06);
 }
 
 .page-journal .journal-table {
@@ -452,6 +470,17 @@ body.theme-light.page-journal .status-chip--danger {
   background: rgba(239, 68, 68, 0.18);
   border-color: rgba(220, 38, 38, 0.44);
   color: #991b1b;
+}
+
+body.theme-light.page-journal .liquid-card,
+body.theme-light.page-journal .journal-grading-details,
+body.theme-light.page-journal .journal-attendance-details,
+body.theme-light.page-journal .journal-attendance-quick-panel,
+body.theme-light.page-journal .journal-student-attendance-card,
+body.theme-light.page-journal .journal-attendance-quick-student {
+  border-color: var(--studerria-panel-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(241, 246, 255, 0.82));
+  box-shadow: 0 16px 34px rgba(99, 102, 241, 0.08), 0 10px 20px rgba(15, 23, 42, 0.05);
 }
 
 .page-journal .journal-col-actions {
@@ -882,3 +911,4 @@ body.theme-light.page-journal .alert-success {
     min-width: 145px;
   }
 }
+
