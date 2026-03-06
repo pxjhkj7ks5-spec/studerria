@@ -14,3 +14,42 @@ body.theme-light .profile-reset-btn:hover {
   border-color: rgba(239, 68, 68, 0.6);
   color: #7f1d1d;
 }
+
+body.page-profile .studerria-profile-column {
+  max-width: 44rem;
+}
+
+body.page-profile .studerria-profile-card {
+  max-width: 41.5rem;
+  margin-inline: auto;
+}
+
+body.page-profile .studerria-profile-card-body {
+  padding: 1.7rem 1.7rem 1.8rem !important;
+}
+
+body.page-profile .studerria-profile-card .row.g-2 {
+  --bs-gutter-x: 0.7rem;
+  --bs-gutter-y: 0.7rem;
+}
+
+body.page-profile .studerria-profile-card .stat-tile {
+  padding: 0.55rem 0.65rem !important;
+}
+
+body.page-profile .studerria-profile-card .form-control,
+body.page-profile .studerria-profile-card .form-select,
+body.page-profile .studerria-profile-card .btn {
+  min-height: 3rem;
+}
+
+@media (max-width: 767.98px) {
+  body.page-profile .studerria-profile-column,
+  body.page-profile .studerria-profile-card {
+    max-width: 100%;
+  }
+
+  body.page-profile .studerria-profile-card-body {
+    padding: 1.35rem 1.1rem 1.45rem !important;
+  }
+}
