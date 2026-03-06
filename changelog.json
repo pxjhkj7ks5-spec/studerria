@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.68",
+      "date": "2026-03-06",
+      "items": [
+        "fix(modal-no-blur-final): added a late `modal-open` no-blur guard in the shared Studerria UI layer and removed the remaining welcome-state page blur in schedule so opening modals no longer softens the full viewport",
+        "fix(schedule-card-hover-color): strengthened lesson-card hover with visible color shift in both dark and light themes while keeping non-clickable schedule containers static on hover"
+      ]
+    },
+    {
       "version": "1.1.67",
       "date": "2026-03-06",
       "items": [
