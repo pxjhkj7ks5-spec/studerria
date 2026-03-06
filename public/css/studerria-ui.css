@@ -1206,6 +1206,15 @@ body.page-schedule .week-rail {
   border-radius: 26px;
 }
 
+body.page-schedule .week-rail {
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: max-content;
+  min-width: max-content;
+  transform: none !important;
+}
+
 body.page-schedule .schedule-card {
   border-radius: 22px;
 }
@@ -1237,6 +1246,10 @@ body.page-schedule button.week-nav-btn:hover,
 body.page-schedule button.week-nav-btn:active,
 body.page-schedule button.week-nav-btn:focus-visible {
   transform: none !important;
+}
+
+body.page-schedule .week-nav-btn:hover {
+  box-shadow: var(--week-glass-shadow) !important;
 }
 
 body.page-schedule .sync-pill,

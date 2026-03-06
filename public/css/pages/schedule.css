@@ -1199,10 +1199,13 @@ body.theme-light .deadline-meta {
 .week-rail {
   --week-apple-curve: cubic-bezier(0.22, 1, 0.36, 1);
   position: fixed;
-  left: 50%;
-  transform: translateX(calc(-50% + var(--week-rail-shift)));
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  transform: none;
   bottom: 16px;
-  width: fit-content;
+  width: max-content;
+  min-width: max-content;
   max-width: calc(100vw - 12px);
   padding: 16px 8px;
   z-index: 1050;
@@ -1492,6 +1495,7 @@ body.theme-light .week-slider {
 
 .week-nav-btn:hover {
   transform: none;
+  box-shadow: var(--week-glass-shadow);
   background: var(--week-glass-dark-bg) !important;
 }
 
@@ -1660,7 +1664,7 @@ body.is-scrolling .week-pager {
 
   .week-rail {
     max-width: calc(100vw - 16px);
-    transform: translateX(calc(-50% + 8px));
+    transform: none;
   }
 }
 
@@ -1676,7 +1680,7 @@ body.is-scrolling .week-pager {
   .week-rail {
     padding: 12px 4px;
     bottom: 12px;
-    transform: translateX(calc(-50% + 4px));
+    transform: none;
   }
 }
 

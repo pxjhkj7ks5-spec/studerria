@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.73",
+      "date": "2026-03-07",
+      "items": [
+        "fix(week-pager-layout-stability): recentered the floating week pager without transform-based horizontal offsets so the control no longer jitters or shifts when hovered",
+        "fix(week-nav-hover-shadow): normalized week navigation hover shadows to keep visual feedback color-based without changing the pager geometry"
+      ]
+    },
+    {
       "version": "1.1.72",
       "date": "2026-03-07",
       "items": [
