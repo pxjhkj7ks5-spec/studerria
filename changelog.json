@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.26",
+      "date": "2026-03-06",
+      "items": [
+        "style(design-system-controls): added a shared liquid-glass control system for inputs, selects, textareas, file pickers, checkboxes, radios, labels, and focus rings so forms now read as one coherent Studerria surface in both themes",
+        "style(design-system-data-surfaces): rebuilt shared table, table-shell, section subtitle, and empty-state styling so dense admin and analytics screens inherit cleaner hierarchy, softer data rows, and more intentional empty states",
+        "refactor(admin-form-overrides): trimmed legacy inline form/select visuals in `admin.ejs` and `admin-overview.ejs`, keeping only select arrow behavior and theme-safe option colors so the shared shell styles can stay in sync across admin views"
+      ]
+    },
+    {
       "version": "1.1.25",
       "date": "2026-03-06",
       "items": [
