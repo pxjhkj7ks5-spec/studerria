@@ -1,6 +1,6 @@
 /* Shared modal readability layer for every Studerria screen. */
 html body.studerria-theme .modal-backdrop,
-html body.studerria-theme.modal-open .modal-backdrop {
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
   z-index: 1070 !important;
   background: rgba(4, 8, 20, 0.56) !important;
   -webkit-backdrop-filter: none !important;
@@ -9,15 +9,14 @@ html body.studerria-theme.modal-open .modal-backdrop {
 }
 
 html body.theme-light.studerria-theme .modal-backdrop,
-html body.theme-light.studerria-theme.modal-open .modal-backdrop {
+html body.theme-light.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
   background: rgba(232, 238, 251, 0.42) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
 
 html body.studerria-theme .modal-backdrop.show,
-html body.studerria-theme.modal-open .modal-backdrop.show,
-html body.studerria-theme.confirm-modal-open .modal-backdrop.show {
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) .modal-backdrop.show {
   opacity: 1 !important;
 }
 
@@ -103,26 +102,28 @@ html body.studerria-theme .modal-footer::after {
 }
 
 /* While a modal is open, turn off page-level glass blur layers so the viewport stays sharp behind the overlay. */
-html body.studerria-theme.modal-open .glass,
-html body.studerria-theme.modal-open .glass-card,
-html body.studerria-theme.modal-open .glass-panel,
-html body.studerria-theme.modal-open .glass-inset,
-html body.studerria-theme.modal-open .glass-dock,
-html body.studerria-theme.modal-open .surface,
-html body.studerria-theme.modal-open .surface--elevated,
-html body.studerria-theme.modal-open .card,
-html body.studerria-theme.modal-open .topbar,
-html body.studerria-theme.modal-open .app-footer .footer-meta,
-html body.studerria-theme.modal-open .schedule-content,
-html body.studerria-theme.modal-open .schedule-shell,
-html body.studerria-theme.modal-open .week-pager,
-html body.studerria-theme.modal-open .cockpit-page,
-html body.studerria-theme.modal-open .week-hero,
-html body.studerria-theme.modal-open .schedule-panel,
-html body.studerria-theme.modal-open .day-card,
-html body.studerria-theme.modal-open .density-summary,
-html body.studerria-theme.modal-open .week-rail,
-html body.studerria-theme.modal-open .schedule-card {
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-card,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-panel,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-inset,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-dock,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .surface,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .surface--elevated,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .card,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .topbar,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .app-footer,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .app-footer .footer-meta,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-content,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-shell,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-pager,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .cockpit-page,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-hero,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-panel,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .day-card,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .density-summary,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-rail,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-card,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .topbar.topbar--title-spotlight.studerria-nav-shell {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   filter: none !important;

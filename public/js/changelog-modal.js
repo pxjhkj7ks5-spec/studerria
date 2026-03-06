@@ -7,6 +7,37 @@
   const MODAL_SELECTOR = '[data-studerria-modal="changelog"]';
   const BACKDROP_CLASS = 'studerria-changelog-backdrop';
   const BODY_OPEN_CLASS = 'studerria-changelog-open';
+  const BOOTSTRAP_OPEN_CLASS = 'modal-open';
+  const NO_BLUR_STATE_ATTR = 'data-studerria-no-blur-active';
+  const EMPTY_STYLE_TOKEN = '__studerria-empty-style__';
+  const NO_BLUR_SELECTOR = [
+    '.glass',
+    '.glass-card',
+    '.glass-panel',
+    '.glass-inset',
+    '.glass-dock',
+    '.surface',
+    '.surface--elevated',
+    '.card',
+    '.topbar',
+    '.app-footer',
+    '.app-footer .footer-meta',
+    '.schedule-content',
+    '.schedule-shell',
+    '.week-pager',
+    '.cockpit-page',
+    '.week-hero',
+    '.schedule-panel',
+    '.day-card',
+    '.density-summary',
+    '.week-rail',
+    '.schedule-card'
+  ].join(', ');
+  const NO_BLUR_STYLE_FIELDS = [
+    ['-webkit-backdrop-filter', 'studerriaNoBlurWebkitBackdropValue', 'studerriaNoBlurWebkitBackdropPriority'],
+    ['backdrop-filter', 'studerriaNoBlurBackdropValue', 'studerriaNoBlurBackdropPriority'],
+    ['filter', 'studerriaNoBlurFilterValue', 'studerriaNoBlurFilterPriority']
+  ];
 
   function getModal() {
     return document.querySelector(MODAL_SELECTOR);
@@ -52,6 +83,90 @@
     document.body.appendChild(modal);
   }
 
+  function applyInlineNoBlur(target) {
+    if (!(target instanceof HTMLElement) || target.getAttribute(NO_BLUR_STATE_ATTR) === '1') {
+      return;
+    }
+
+    NO_BLUR_STYLE_FIELDS.forEach(([cssProperty, valueKey, priorityKey]) => {
+      const inlineValue = target.style.getPropertyValue(cssProperty);
+      const inlinePriority = target.style.getPropertyPriority(cssProperty);
+      target.dataset[valueKey] = inlineValue || EMPTY_STYLE_TOKEN;
+      target.dataset[priorityKey] = inlinePriority || EMPTY_STYLE_TOKEN;
+      target.style.setProperty(cssProperty, 'none', 'important');
+    });
+
+    target.setAttribute(NO_BLUR_STATE_ATTR, '1');
+  }
+
+  function restoreInlineNoBlur(target) {
+    if (!(target instanceof HTMLElement) || target.getAttribute(NO_BLUR_STATE_ATTR) !== '1') {
+      return;
+    }
+
+    NO_BLUR_STYLE_FIELDS.forEach(([cssProperty, valueKey, priorityKey]) => {
+      const inlineValue = target.dataset[valueKey];
+      const inlinePriority = target.dataset[priorityKey];
+
+      if (inlineValue && inlineValue !== EMPTY_STYLE_TOKEN) {
+        target.style.setProperty(
+          cssProperty,
+          inlineValue,
+          inlinePriority && inlinePriority !== EMPTY_STYLE_TOKEN ? inlinePriority : ''
+        );
+      } else {
+        target.style.removeProperty(cssProperty);
+      }
+
+      delete target.dataset[valueKey];
+      delete target.dataset[priorityKey];
+    });
+
+    target.removeAttribute(NO_BLUR_STATE_ATTR);
+  }
+
+  function syncNoBlurTargets(forceOpen) {
+    if (forceOpen) {
+      document.querySelectorAll(NO_BLUR_SELECTOR).forEach((target) => {
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+
+        if (target.classList.contains('modal-backdrop') || target.closest('.modal')) {
+          return;
+        }
+
+        applyInlineNoBlur(target);
+      });
+      return;
+    }
+
+    document.querySelectorAll(`[${NO_BLUR_STATE_ATTR}="1"]`).forEach((target) => {
+      restoreInlineNoBlur(target);
+    });
+  }
+
+  function syncBodyOpenClasses(forceOpen) {
+    const body = document.body;
+    if (!(body instanceof HTMLElement)) {
+      return;
+    }
+
+    const hasVisibleModal = document.querySelector('.modal.show') instanceof HTMLElement;
+    const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : hasVisibleModal;
+
+    if (shouldOpen) {
+      body.classList.add(BODY_OPEN_CLASS);
+      body.classList.add(BOOTSTRAP_OPEN_CLASS);
+      syncNoBlurTargets(true);
+      return;
+    }
+
+    body.classList.remove(BODY_OPEN_CLASS);
+    body.classList.remove(BOOTSTRAP_OPEN_CLASS);
+    syncNoBlurTargets(false);
+  }
+
   function primeModal(modal) {
     if (!(modal instanceof HTMLElement) || modal.dataset.studerriaChangelogReady === '1') {
       return;
@@ -83,16 +198,17 @@
 
     modal.addEventListener('show.bs.modal', () => {
       portalModal(modal);
-      document.body?.classList.add(BODY_OPEN_CLASS);
+      syncBodyOpenClasses(true);
       requestAnimationFrame(syncBackdrop);
     });
 
     modal.addEventListener('shown.bs.modal', () => {
+      syncBodyOpenClasses(true);
       syncBackdrop();
     });
 
     modal.addEventListener('hidden.bs.modal', () => {
-      document.body?.classList.remove(BODY_OPEN_CLASS);
+      syncBodyOpenClasses();
       cleanupBackdrop();
     });
 

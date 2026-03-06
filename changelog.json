@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.69",
+      "date": "2026-03-06",
+      "items": [
+        "fix(changelog-modal-no-blur): synchronized changelog modal body-open state with both `studerria-changelog-open` and `modal-open`, extended shared no-blur guards for both states, and added an inline fallback that force-disables backdrop filters on global glass layers while the changelog modal is open",
+        "fix(schedule-card-hover-color-tune): strengthened clickable lesson-card hover color shift in both themes so hover feedback is visible as color change, not only lift animation"
+      ]
+    },
+    {
       "version": "1.1.68",
       "date": "2026-03-06",
       "items": [

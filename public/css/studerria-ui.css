@@ -1180,19 +1180,19 @@ body.theme-light.page-schedule .week-rail:hover {
 
 body.page-schedule .schedule-card:hover {
   transform: translateY(-1px) !important;
-  border-color: color-mix(in srgb, var(--studerria-cta-start) 42%, var(--studerria-panel-border)) !important;
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 56%, var(--studerria-panel-border)) !important;
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--studerria-panel-bg-strong) 86%, rgba(129, 140, 248, 0.22)),
-    color-mix(in srgb, var(--studerria-panel-bg-strong) 82%, rgba(96, 165, 250, 0.18))
+    color-mix(in srgb, var(--studerria-panel-bg-strong) 82%, rgba(129, 140, 248, 0.3)),
+    color-mix(in srgb, var(--studerria-panel-bg-strong) 78%, rgba(96, 165, 250, 0.24))
   ) !important;
-  box-shadow: 0 20px 38px rgba(2, 6, 23, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 22px 40px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.24) !important;
 }
 
 body.theme-light.page-schedule .schedule-card:hover {
-  border-color: rgba(99, 102, 241, 0.46) !important;
-  background: linear-gradient(180deg, rgba(238, 244, 255, 0.98), rgba(224, 236, 252, 0.95)) !important;
-  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+  border-color: rgba(79, 90, 232, 0.56) !important;
+  background: linear-gradient(180deg, rgba(232, 241, 255, 0.98), rgba(210, 225, 250, 0.96)) !important;
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.78) !important;
 }
 
 body.page-schedule .week-hero,
@@ -1540,30 +1540,31 @@ body.page-schedule .modal.show .modal-footer {
 }
 
 /* Late no-blur guard: wins over page-specific blur rules whenever any modal is open. */
-body.studerria-theme.modal-open .page-container,
-body.studerria-theme.modal-open .topbar,
-body.studerria-theme.modal-open .app-footer,
-body.studerria-theme.modal-open .app-footer .footer-meta,
-body.studerria-theme.modal-open .schedule-content,
-body.studerria-theme.modal-open .schedule-shell,
-body.studerria-theme.modal-open .week-pager,
-body.studerria-theme.modal-open .week-hero,
-body.studerria-theme.modal-open .schedule-panel,
-body.studerria-theme.modal-open .day-card,
-body.studerria-theme.modal-open .density-summary,
-body.studerria-theme.modal-open .week-rail,
-body.studerria-theme.modal-open .schedule-card,
-body.studerria-theme.modal-open .glass,
-body.studerria-theme.modal-open .glass-card,
-body.studerria-theme.modal-open .glass-panel,
-body.studerria-theme.modal-open .glass-inset,
-body.studerria-theme.modal-open .surface,
-body.studerria-theme.modal-open .surface--elevated,
-body.studerria-theme.modal-open .modal-backdrop,
-body.studerria-theme.modal-open .modal-backdrop.show,
-body.studerria-theme.modal-open .modal.show .modal-dialog .modal-content,
-body.studerria-theme.modal-open .modal.show .modal-header,
-body.studerria-theme.modal-open .modal.show .modal-footer {
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .page-container,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .topbar,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .topbar.topbar--title-spotlight.studerria-nav-shell,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .app-footer,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .app-footer .footer-meta,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-content,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-shell,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-pager,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-hero,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-panel,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .day-card,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .density-summary,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-rail,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-card,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-card,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-panel,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-inset,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .surface,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .surface--elevated,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop.show,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal.show .modal-dialog .modal-content,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal.show .modal-header,
+body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal.show .modal-footer {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   filter: none !important;
