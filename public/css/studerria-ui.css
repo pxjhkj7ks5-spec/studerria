@@ -1400,3 +1400,51 @@ body.page-local-topbar.studerria-theme .topbar.topbar--title-spotlight.studerria
     margin: 0 0 12px;
   }
 }
+
+/* Schedule uses opaque surfaces for now, so disable every remaining glass blur there. */
+body.page-schedule.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell,
+body.page-schedule.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .snav-link,
+body.page-schedule.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .snav-menu-link,
+body.page-schedule.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .snav-logout-btn,
+body.page-schedule .topbar,
+body.page-schedule .topbar .btn-glass,
+body.page-schedule .topbar .theme-toggle-min,
+body.page-schedule .topbar .mobile-menu-btn,
+body.page-schedule .topbar .drawer-menu-btn,
+body.page-schedule .topbar .msg-btn,
+body.page-schedule .topbar .sync-pill,
+body.page-schedule .app-footer .footer-meta,
+body.page-schedule .app-footer .footer-meta.glass-dock,
+body.page-schedule .glass,
+body.page-schedule .glass-card,
+body.page-schedule .glass-panel,
+body.page-schedule .glass-inset,
+body.page-schedule button.glass,
+body.page-schedule .btn-glass,
+body.page-schedule .glass-tabs,
+body.page-schedule .week-hero,
+body.page-schedule .schedule-panel,
+body.page-schedule .day-card,
+body.page-schedule .schedule-card,
+body.page-schedule .density-summary,
+body.page-schedule .week-rail,
+body.page-schedule .week-pager,
+body.page-schedule .week-slider,
+body.page-schedule .week-nav-btn,
+body.page-schedule .list-group-item,
+body.page-schedule .form-control,
+body.page-schedule .form-select,
+body.page-schedule input.form-control,
+body.page-schedule textarea.form-control,
+body.page-schedule .schedule-drawer,
+body.page-schedule .topbar-sync-pill,
+body.page-schedule .footer-sync-pill,
+body.page-schedule .sync-pill,
+body.page-schedule .density-chip,
+body.page-schedule .modal-backdrop,
+body.page-schedule .modal.show .modal-dialog .modal-content,
+body.page-schedule .modal.show .modal-header,
+body.page-schedule .modal.show .modal-footer {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}

@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.62",
+      "date": "2026-03-06",
+      "items": [
+        "fix(schedule-no-blur): added a page-level no-blur override for schedule so cards, rails, footer dock, controls, drawer, and modal shells no longer reintroduce `backdrop-filter` through older glass rules",
+        "fix(schedule-modal-controls): removed the remaining schedule-page blur from modal form controls and list items, so the homework modal now renders with solid surfaces instead of frosted inputs"
+      ]
+    },
+    {
       "version": "1.1.61",
       "date": "2026-03-06",
       "items": [
