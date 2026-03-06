@@ -406,17 +406,7 @@ body.page-local-topbar .topbar-title-spotlight::after {
 
 .studerria-theme .app-footer .footer-meta::before,
 .studerria-theme .app-footer .footer-meta.glass-dock::before {
-  content: "";
-  position: absolute;
-  left: 20px;
-  right: 20px;
-  top: 2px;
-  height: 26%;
-  border-radius: 999px 999px 14px 14px / 100% 100% 24% 24%;
-  background: linear-gradient(180deg, var(--studerria-footer-sheen), transparent);
-  opacity: 0.22;
-  pointer-events: none;
-  display: block;
+  display: none;
 }
 
 .studerria-theme .app-footer .footer-release-slot {
