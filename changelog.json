@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.61",
+      "date": "2026-03-06",
+      "items": [
+        "fix(schedule-hover): removed the remaining schedule block hover lift and hover recoloring so day panels and class cards now keep a stable appearance instead of flashing brighter on pointer hover",
+        "fix(light-theme-surfaces): rebalanced the shared light-theme panel, footer dock, control, and schedule surface tones away from near-white fills to cooler slate-blue glass so cards and navigation controls keep clearer contrast"
+      ]
+    },
+    {
       "version": "1.1.60",
       "date": "2026-03-06",
       "items": [

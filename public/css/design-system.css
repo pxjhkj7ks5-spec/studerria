@@ -352,7 +352,7 @@ hr,
   .panel:hover,
   .list-card:hover {
     transform: none;
-    box-shadow: 0 14px 30px rgba(2, 6, 23, 0.2);
+    box-shadow: var(--shadow-soft);
   }
 }
 
