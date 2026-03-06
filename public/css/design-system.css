@@ -251,7 +251,6 @@ strong,
 .profile-stat,
 .stat-tile,
 .admin-sidebar,
-.modal-content,
 .dropdown-menu {
   border-radius: var(--radius-18);
   border: 1px solid var(--surface-border);
@@ -259,6 +258,35 @@ strong,
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--shadow-soft);
+}
+
+.modal-content {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--radius-18);
+  border: 1px solid var(--surface-border);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  --modal-pane-blur: var(--glass-blur);
+  --modal-pane-saturate: 1.08;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.modal-content::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(var(--modal-pane-blur)) saturate(var(--modal-pane-saturate));
+  backdrop-filter: blur(var(--modal-pane-blur)) saturate(var(--modal-pane-saturate));
+}
+
+.modal-content > * {
+  position: relative;
+  z-index: 1;
 }
 
 .surface--elevated,
@@ -1469,8 +1497,8 @@ body.theme-light .glass-float {
   border-radius: 24px;
   border: 1px solid color-mix(in srgb, var(--glass-border) 76%, rgba(255, 255, 255, 0.34));
   background: color-mix(in srgb, var(--surface-elevated) 82%, rgba(255, 255, 255, 0.2));
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 14px)) saturate(1.18);
-  backdrop-filter: blur(calc(var(--glass-blur) + 14px)) saturate(1.18);
+  --modal-pane-blur: calc(var(--glass-blur) + 14px);
+  --modal-pane-saturate: 1.18;
   box-shadow: 0 38px 92px rgba(2, 6, 23, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 

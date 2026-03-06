@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.56",
+      "date": "2026-03-06",
+      "items": [
+        "fix(modal-layering): moved the shared modal glass blur into a dedicated background layer in `design-system.css` so dialog text and controls stay sharp on the base modal sheets too",
+        "fix(changelog-sheet): routed the changelog liquid modal through the same layered blur variables so the stronger glass effect stays behind the content instead of over it"
+      ]
+    },
+    {
       "version": "1.1.55",
       "date": "2026-03-06",
       "items": [
