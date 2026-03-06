@@ -363,130 +363,12 @@
     return visibleModals.length ? visibleModals[visibleModals.length - 1] : null;
   }
 
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-  }
-
-  function ensureModalSpotlight(modal) {
-    if (!(modal instanceof HTMLElement)) {
-      return null;
-    }
-
-    let spotlight = Array.from(modal.children).find((node) => (
-      node instanceof HTMLElement && node.classList.contains('modal-spotlight-backdrop')
-    ));
-
-    if (spotlight instanceof HTMLElement) {
-      return spotlight;
-    }
-
-    spotlight = document.createElement('div');
-    spotlight.className = 'modal-spotlight-backdrop';
-    spotlight.hidden = true;
-
-    ['top', 'left', 'right', 'bottom'].forEach((edge) => {
-      const panel = document.createElement('div');
-      panel.className = `modal-spotlight-panel modal-spotlight-panel--${edge}`;
-      panel.dataset.edge = edge;
-      spotlight.appendChild(panel);
-    });
-
-    modal.insertBefore(spotlight, modal.firstChild);
-    return spotlight;
-  }
-
-  function setSpotlightPanelFrame(panel, left, top, width, height) {
-    if (!(panel instanceof HTMLElement)) {
-      return;
-    }
-
-    const safeWidth = Math.max(0, Math.round(width));
-    const safeHeight = Math.max(0, Math.round(height));
-
-    panel.style.display = safeWidth > 0 && safeHeight > 0 ? 'block' : 'none';
-    panel.style.left = `${Math.round(left)}px`;
-    panel.style.top = `${Math.round(top)}px`;
-    panel.style.width = `${safeWidth}px`;
-    panel.style.height = `${safeHeight}px`;
-  }
-
-  function updateModalSpotlight(modal) {
-    if (!(modal instanceof HTMLElement) || !modal.classList.contains('show')) {
-      return;
-    }
-
-    const spotlight = ensureModalSpotlight(modal);
-    const dialog = modal.querySelector('.modal-dialog');
-
-    if (!(spotlight instanceof HTMLElement) || !(dialog instanceof HTMLElement)) {
-      return;
-    }
-
-    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-    const rect = dialog.getBoundingClientRect();
-    const modalStyles = window.getComputedStyle(modal);
-    const gapValue = parseFloat(modalStyles.getPropertyValue('--modal-spotlight-gap'));
-    const gap = Number.isFinite(gapValue) ? gapValue : 18;
-
-    const left = clamp(rect.left - gap, 0, viewportWidth);
-    const top = clamp(rect.top - gap, 0, viewportHeight);
-    const right = clamp(rect.right + gap, 0, viewportWidth);
-    const bottom = clamp(rect.bottom + gap, 0, viewportHeight);
-    const middleHeight = Math.max(0, bottom - top);
-
-    const panels = Array.from(spotlight.children);
-    const topPanel = panels.find((panel) => panel instanceof HTMLElement && panel.dataset.edge === 'top');
-    const leftPanel = panels.find((panel) => panel instanceof HTMLElement && panel.dataset.edge === 'left');
-    const rightPanel = panels.find((panel) => panel instanceof HTMLElement && panel.dataset.edge === 'right');
-    const bottomPanel = panels.find((panel) => panel instanceof HTMLElement && panel.dataset.edge === 'bottom');
-
-    setSpotlightPanelFrame(topPanel, 0, 0, viewportWidth, top);
-    setSpotlightPanelFrame(leftPanel, 0, top, left, middleHeight);
-    setSpotlightPanelFrame(rightPanel, right, top, Math.max(0, viewportWidth - right), middleHeight);
-    setSpotlightPanelFrame(bottomPanel, 0, bottom, viewportWidth, Math.max(0, viewportHeight - bottom));
-
-    spotlight.hidden = false;
-  }
-
   function initModalBehavior() {
     if (!window.bootstrap || !window.bootstrap.Modal) {
       return;
     }
 
     const modalTriggerMap = new WeakMap();
-    let spotlightFrame = 0;
-
-    function syncVisibleModalSpotlight() {
-      const topModal = getTopVisibleModal();
-
-      document.querySelectorAll('.modal .modal-spotlight-backdrop').forEach((spotlight) => {
-        if (!(spotlight instanceof HTMLElement)) {
-          return;
-        }
-
-        const parentModal = spotlight.parentElement;
-        spotlight.hidden = parentModal !== topModal;
-      });
-
-      if (topModal instanceof HTMLElement) {
-        updateModalSpotlight(topModal);
-      }
-    }
-
-    function queueModalSpotlightSync() {
-      if (spotlightFrame) {
-        return;
-      }
-
-      spotlightFrame = requestAnimationFrame(() => {
-        spotlightFrame = 0;
-        syncVisibleModalSpotlight();
-      });
-    }
-
-    window.addEventListener('resize', queueModalSpotlightSync);
-    window.addEventListener('scroll', queueModalSpotlightSync, true);
 
     document.addEventListener('show.bs.modal', (event) => {
       const modal = event.target;
@@ -501,18 +383,6 @@
       if (trigger && trigger !== document.body && trigger !== modal && !modal.contains(trigger)) {
         modalTriggerMap.set(modal, trigger);
       }
-
-      ensureModalSpotlight(modal);
-      queueModalSpotlightSync();
-    });
-
-    document.addEventListener('shown.bs.modal', (event) => {
-      const modal = event.target;
-      if (!(modal instanceof HTMLElement) || !modal.classList.contains('modal')) {
-        return;
-      }
-
-      queueModalSpotlightSync();
     });
 
     document.addEventListener('hidden.bs.modal', (event) => {
@@ -533,13 +403,6 @@
           }
         });
       }
-
-      const spotlight = ensureModalSpotlight(modal);
-      if (spotlight instanceof HTMLElement) {
-        spotlight.hidden = true;
-      }
-
-      queueModalSpotlightSync();
     });
 
     document.addEventListener('keydown', (event) => {

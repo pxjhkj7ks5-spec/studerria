@@ -260,37 +260,25 @@ strong,
   box-shadow: var(--shadow-soft);
 }
 
-.modal {
-  --modal-spotlight-gap: 18px;
-  --modal-spotlight-blur: calc(var(--glass-blur) + 2px);
-  --modal-spotlight-saturate: 1.08;
-  --modal-spotlight-tint: rgba(3, 8, 20, 0.42);
-}
-
-body.theme-light .modal {
-  --modal-spotlight-blur: var(--glass-blur);
-  --modal-spotlight-saturate: 1.02;
-  --modal-spotlight-tint: rgba(226, 232, 240, 0.24);
-}
-
-.modal-spotlight-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.modal-spotlight-panel {
-  position: absolute;
-  background: var(--modal-spotlight-tint);
-  -webkit-backdrop-filter: blur(var(--modal-spotlight-blur)) saturate(var(--modal-spotlight-saturate));
-  backdrop-filter: blur(var(--modal-spotlight-blur)) saturate(var(--modal-spotlight-saturate));
-}
-
 .modal-dialog {
   position: relative;
   isolation: isolate;
   z-index: 1;
+}
+
+.modal,
+.modal-backdrop,
+.modal-dialog,
+.modal-content {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.modal-header,
+.modal-body,
+.modal-footer {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 .modal-content {
@@ -300,8 +288,6 @@ body.theme-light .modal {
   border: 1px solid var(--surface-border);
   background: var(--surface);
   box-shadow: var(--shadow-soft);
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
 }
 
 .surface--elevated,
@@ -1504,9 +1490,6 @@ body.theme-light .glass-float {
 
 .changelog-liquid-modal .modal-dialog {
   max-width: min(760px, calc(100vw - 1.5rem));
-  --modal-spotlight-gap: 22px;
-  --modal-spotlight-blur: calc(var(--glass-blur) + 8px);
-  --modal-spotlight-saturate: 1.16;
 }
 
 .changelog-liquid-modal .modal-content {

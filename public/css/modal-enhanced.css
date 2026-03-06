@@ -84,6 +84,24 @@ html body.theme-light.studerria-theme .modal.show .modal-body .small {
   color: rgba(51, 65, 85, 0.76) !important;
 }
 
+html body.studerria-theme .modal,
+html body.studerria-theme .modal-backdrop,
+html body.studerria-theme .modal-dialog,
+html body.studerria-theme .modal-dialog-scrollable .modal-content,
+html body.studerria-theme .modal-content,
+html body.studerria-theme .modal-header,
+html body.studerria-theme .modal-body,
+html body.studerria-theme .modal-footer,
+html body.studerria-theme .modal-content::before,
+html body.studerria-theme .modal-content::after,
+html body.studerria-theme .modal-header::before,
+html body.studerria-theme .modal-header::after,
+html body.studerria-theme .modal-footer::before,
+html body.studerria-theme .modal-footer::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
 html body.studerria-theme #welcomeModal .modal-dialog,
 html body.studerria-theme #welcomeModal .modal-content,
 html body.studerria-theme #welcomeModal .modal-body,
