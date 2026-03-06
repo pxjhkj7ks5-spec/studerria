@@ -7004,7 +7004,7 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
     }
 
     if (hasMissingRequired) {
-      return res.redirect('/register/subjects?error=Select%20group');
+      return res.redirect('/register/subjects?error=missing-group');
     }
 
     const user = await db.get(
@@ -7031,7 +7031,7 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
     return req.session.save(() => res.redirect('/home?welcome=1'));
   } catch (err) {
     console.error('Register subjects save failed', err);
-    return res.redirect('/register/subjects?error=Database%20error');
+    return res.redirect('/register/subjects?error=db-error');
   }
 });
 

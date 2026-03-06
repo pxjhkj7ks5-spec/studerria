@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.50",
+      "date": "2026-03-06",
+      "items": [
+        "style(register-subjects-alert): redesigned the subject-group registration alert into an admin-style glass flash block with stronger contrast, depth, and readable icon/title/text hierarchy",
+        "fix(register-subjects-error-copy): replaced the raw `Select group` redirect text with a proper route error code and localized display copy so missing-group errors now read cleanly for users",
+        "style(register-subjects-empty-state): applied the same polished flash treatment to the `no subjects` info message so the whole page keeps one consistent Studerria shell language"
+      ]
+    },
+    {
       "version": "1.1.49",
       "date": "2026-03-06",
       "items": [
