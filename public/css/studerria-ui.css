@@ -468,15 +468,22 @@ body.page-local-topbar .topbar-title-spotlight::after {
   margin-right: 0.15rem;
   padding: 0.28rem 0.62rem;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, rgba(34, 197, 94, 0.32) 38%, var(--studerria-footer-dock-border));
-  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 88%, rgba(34, 197, 94, 0.08));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border: 1px solid color-mix(in srgb, var(--studerria-footer-dock-border) 90%, rgba(255, 255, 255, 0.08));
+  background: color-mix(in srgb, var(--studerria-panel-bg) 78%, rgba(255, 255, 255, 0.06));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   color: var(--studerria-footer-text) !important;
   font-size: 10.5px;
   font-weight: 600;
   line-height: 1;
   letter-spacing: 0.01em;
   white-space: nowrap;
+}
+
+body.theme-light .studerria-theme .app-footer .footer-sync-pill,
+body.theme-light.studerria-theme .app-footer .footer-sync-pill {
+  border-color: color-mix(in srgb, var(--studerria-footer-dock-border) 92%, rgba(255, 255, 255, 0.18));
+  background: rgba(255, 255, 255, 0.52);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
 }
 
 .studerria-theme .app-footer .footer-sync-label {
@@ -497,8 +504,8 @@ body.page-local-topbar .topbar-title-spotlight::after {
 }
 
 .studerria-theme .app-footer .footer-sync-pill.is-offline {
-  border-color: color-mix(in srgb, rgba(245, 158, 11, 0.28) 38%, var(--studerria-footer-dock-border));
-  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 90%, rgba(245, 158, 11, 0.08));
+  border-color: inherit;
+  background: inherit;
 }
 
 .studerria-theme .app-footer .footer-sync-pill.is-offline .sync-dot {

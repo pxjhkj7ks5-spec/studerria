@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.75",
+      "date": "2026-03-07",
+      "items": [
+        "tune(footer-sync-pill-tone): aligned the online/offline footer status pill with the rest of the footer dock palette so the status chip no longer looks more saturated than adjacent footer controls",
+        "tune(footer-sync-state-accent): kept network-state emphasis in the blinking dot while neutralizing the pill background and border for both online and offline states"
+      ]
+    },
+    {
       "version": "1.1.74",
       "date": "2026-03-07",
       "items": [
