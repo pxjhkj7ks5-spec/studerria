@@ -40,8 +40,8 @@
     activeBackdrop.style.pointerEvents = 'auto';
     activeBackdrop.style.opacity = 'var(--bs-backdrop-opacity, 0.42)';
     activeBackdrop.style.zIndex = '1075';
-    activeBackdrop.style.webkitBackdropFilter = 'blur(16px)';
-    activeBackdrop.style.backdropFilter = 'blur(16px)';
+    activeBackdrop.style.webkitBackdropFilter = 'none';
+    activeBackdrop.style.backdropFilter = 'none';
   }
 
   function portalModal(modal) {

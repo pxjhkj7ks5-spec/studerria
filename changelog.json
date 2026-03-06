@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.57",
+      "date": "2026-03-06",
+      "items": [
+        "fix(modal-backdrop): removed the remaining full-screen backdrop blur so opening a modal no longer blurs the entire page outside the dialog",
+        "fix(changelog-backdrop): stopped the changelog modal script from reapplying runtime blur to the Bootstrap backdrop, keeping blur localized to the modal sheet styling only"
+      ]
+    },
+    {
       "version": "1.1.56",
       "date": "2026-03-06",
       "items": [

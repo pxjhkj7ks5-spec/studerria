@@ -395,7 +395,8 @@ body.theme-light .form-select {
 /* Modals / overlays */
 .modal-backdrop.show {
   background: rgba(8, 12, 24, 0.45);
-  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .modal-content {

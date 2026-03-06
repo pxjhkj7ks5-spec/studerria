@@ -3,18 +3,16 @@ html body.studerria-theme .modal-backdrop,
 html body.studerria-theme.modal-open .modal-backdrop {
   z-index: 1070 !important;
   background: rgba(4, 8, 20, 0.56) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(0.92) brightness(0.74) !important;
-  backdrop-filter: blur(18px) saturate(0.92) brightness(0.74) !important;
-  transition: opacity 220ms ease, -webkit-backdrop-filter 220ms ease !important;
-  transition: opacity 220ms ease, backdrop-filter 220ms ease !important;
-  transition: opacity 220ms ease, backdrop-filter 220ms ease, -webkit-backdrop-filter 220ms ease !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  transition: opacity 220ms ease !important;
 }
 
 html body.theme-light.studerria-theme .modal-backdrop,
 html body.theme-light.studerria-theme.modal-open .modal-backdrop {
   background: rgba(232, 238, 251, 0.42) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(0.94) brightness(0.98) !important;
-  backdrop-filter: blur(14px) saturate(0.94) brightness(0.98) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 html body.studerria-theme .modal-backdrop.show,
