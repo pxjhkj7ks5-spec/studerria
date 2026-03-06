@@ -66,6 +66,13 @@ body.theme-light.studerria-theme {
   --studerria-cta-end: #a855f7;
   --studerria-cta-border: rgba(99, 102, 241, 0.56);
   --studerria-cta-shadow: 0 12px 26px rgba(99, 102, 241, 0.2);
+  --studerria-topbar-bg: linear-gradient(135deg, rgba(248, 250, 255, 0.86), rgba(231, 238, 255, 0.78));
+  --studerria-topbar-border: rgba(129, 140, 248, 0.2);
+  --studerria-topbar-shadow: 0 22px 56px rgba(99, 102, 241, 0.1), 0 12px 28px rgba(15, 23, 42, 0.08);
+  --studerria-topbar-text: #0f172a;
+  --studerria-topbar-muted: rgba(51, 65, 85, 0.72);
+  --studerria-topbar-pill-bg: rgba(255, 255, 255, 0.62);
+  --studerria-topbar-pill-hover: rgba(255, 255, 255, 0.82);
   --studerria-footer-border: rgba(15, 23, 42, 0.12);
   --studerria-footer-text: rgba(51, 65, 85, 0.8);
   --studerria-footer-dock-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(236, 242, 255, 0.84));
@@ -571,6 +578,22 @@ body.page-local-topbar .topbar-title-spotlight::after {
   opacity: 0.74;
   border-color: color-mix(in srgb, var(--studerria-control-border) 72%, transparent);
   box-shadow: none;
+}
+
+.studerria-theme input[type="datetime-local"]:disabled,
+.studerria-theme input[type="date"]:disabled,
+.studerria-theme input[type="time"]:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  color: color-mix(in srgb, var(--studerria-control-text) 64%, transparent);
+  -webkit-text-fill-color: color-mix(in srgb, var(--studerria-control-text) 64%, transparent);
+}
+
+body.theme-light.studerria-theme input[type="datetime-local"]:disabled,
+body.theme-light.studerria-theme input[type="date"]:disabled,
+body.theme-light.studerria-theme input[type="time"]:disabled {
+  color: rgba(51, 65, 85, 0.72);
+  -webkit-text-fill-color: rgba(51, 65, 85, 0.72);
 }
 
 .studerria-theme .form-check-input {

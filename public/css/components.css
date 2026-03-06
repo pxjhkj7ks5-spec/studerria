@@ -550,9 +550,9 @@ body.theme-dark .topbar .mobile-menu-btn:hover {
 
 body.theme-light .topbar,
 body.theme-light .admin-nav {
-  background: rgba(10, 16, 34, 0.74);
-  border-color: rgba(148, 163, 184, 0.22);
-  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.24);
+  background: var(--studerria-topbar-bg, linear-gradient(135deg, rgba(248, 250, 255, 0.86), rgba(231, 238, 255, 0.78)));
+  border-color: var(--studerria-topbar-border, rgba(129, 140, 248, 0.2));
+  box-shadow: var(--studerria-topbar-shadow, 0 22px 56px rgba(99, 102, 241, 0.1));
 }
 
 body.theme-light .topbar .btn-glass,
@@ -564,9 +564,9 @@ body.theme-light .admin-nav .theme-toggle-min,
 body.theme-light .admin-nav .msg-btn,
 body.theme-light .admin-nav .mobile-menu-btn,
 body.theme-light .admin-nav .session-health-chip {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #f8fafc;
+  background: var(--studerria-topbar-pill-bg, rgba(255, 255, 255, 0.62));
+  border-color: color-mix(in srgb, var(--studerria-topbar-border, rgba(129, 140, 248, 0.2)) 82%, rgba(255, 255, 255, 0.56));
+  color: var(--studerria-topbar-text, #0f172a);
 }
 
 body.theme-light .topbar .btn-glass:hover,
@@ -578,26 +578,26 @@ body.theme-light .admin-nav .theme-toggle-min:hover,
 body.theme-light .admin-nav .msg-btn:hover,
 body.theme-light .admin-nav .mobile-menu-btn:hover,
 body.theme-light .admin-nav .session-health-chip:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.28);
-  color: #ffffff;
+  background: var(--studerria-topbar-pill-hover, rgba(255, 255, 255, 0.82));
+  border-color: color-mix(in srgb, var(--studerria-topbar-border, rgba(129, 140, 248, 0.2)) 94%, rgba(255, 255, 255, 0.72));
+  color: var(--studerria-topbar-text, #0f172a);
 }
 
 body.theme-light .topbar .btn-glass,
 body.theme-light .topbar .theme-toggle-min,
 body.theme-light .topbar .msg-btn,
 body.theme-light .topbar .mobile-menu-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #f8fafc;
+  background: var(--studerria-topbar-pill-bg, rgba(255, 255, 255, 0.62));
+  border-color: color-mix(in srgb, var(--studerria-topbar-border, rgba(129, 140, 248, 0.2)) 82%, rgba(255, 255, 255, 0.56));
+  color: var(--studerria-topbar-text, #0f172a);
 }
 
 body.theme-light .topbar .btn-glass:hover,
 body.theme-light .topbar .theme-toggle-min:hover,
 body.theme-light .topbar .msg-btn:hover,
 body.theme-light .topbar .mobile-menu-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.28);
+  background: var(--studerria-topbar-pill-hover, rgba(255, 255, 255, 0.82));
+  border-color: color-mix(in srgb, var(--studerria-topbar-border, rgba(129, 140, 248, 0.2)) 94%, rgba(255, 255, 255, 0.72));
 }
 
 .topbar.topbar--title-spotlight .drawer-menu-btn,
@@ -615,7 +615,7 @@ body.theme-dark .topbar.topbar--title-spotlight {
 }
 
 body.theme-light .topbar.topbar--title-spotlight {
-  background: rgba(10, 16, 34, 0.74) !important;
+  background: var(--studerria-topbar-bg, linear-gradient(135deg, rgba(248, 250, 255, 0.86), rgba(231, 238, 255, 0.78))) !important;
 }
 
 @media (max-width: 991px) {

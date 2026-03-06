@@ -88,6 +88,41 @@ body {
   backdrop-filter: none;
 }
 
+.schedule-publication-slot {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.schedule-publication-hint {
+  margin-top: 0.45rem;
+  font-size: 0.76rem;
+  letter-spacing: 0.01em;
+}
+
+.schedule-publication-slot.is-inactive {
+  opacity: 0.88;
+}
+
+.schedule-publication-slot.is-inactive .form-label {
+  color: var(--studerria-text-muted);
+}
+
+.schedule-publication-slot.is-inactive .form-control {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 82%, rgba(255, 255, 255, 0.04));
+}
+
+.schedule-publication-slot.is-inactive .schedule-publication-hint {
+  color: var(--studerria-text-muted);
+}
+
+.schedule-publication-slot.is-scheduled .schedule-publication-hint {
+  color: color-mix(in srgb, var(--studerria-text-muted) 74%, var(--studerria-text-primary));
+}
+
+body.theme-light .schedule-publication-slot.is-inactive .form-control {
+  background: linear-gradient(180deg, rgba(247, 249, 255, 0.96), rgba(235, 241, 255, 0.9));
+}
+
 body.theme-dark {
   background:
     radial-gradient(1200px 760px at 10% 4%, rgba(59, 130, 246, 0.22), transparent 64%),

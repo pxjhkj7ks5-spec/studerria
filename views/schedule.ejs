@@ -2176,9 +2176,10 @@
                         <option value="draft">Draft</option>
                       </select>
                     </div>
-                    <div class="col-12 col-md-5">
+                    <div class="col-12 col-md-5 schedule-publication-slot" data-schedule-slot>
                       <label for="hwScheduledAt" class="form-label">Publish at</label>
                       <input id="hwScheduledAt" name="scheduled_at" type="datetime-local" class="form-control" />
+                      <div class="form-text schedule-publication-hint">Choose "Schedule" to set a specific date and time.</div>
                     </div>
                   </div>
                 <% } %>
@@ -2324,9 +2325,10 @@
                       <option value="draft">Draft</option>
                     </select>
                   </div>
-                  <div class="col-12 col-md-5">
+                  <div class="col-12 col-md-5 schedule-publication-slot" data-schedule-slot>
                     <label class="form-label">Publish at</label>
                     <input id="customHwScheduledAt" name="scheduled_at" type="datetime-local" class="form-control" />
+                    <div class="form-text schedule-publication-hint">Choose "Schedule" to set a specific date and time.</div>
                   </div>
                 <% } %>
                 <div class="col-12">
@@ -2556,10 +2558,15 @@
         const statusSelect = document.getElementById(selectId);
         const scheduleInput = document.getElementById(inputId);
         if (!statusSelect || !scheduleInput) return;
+        const scheduleSlot = scheduleInput.closest('[data-schedule-slot]');
         const sync = () => {
           const isScheduled = statusSelect.value === 'scheduled';
           scheduleInput.disabled = !isScheduled;
           scheduleInput.required = isScheduled;
+          if (scheduleSlot) {
+            scheduleSlot.classList.toggle('is-scheduled', isScheduled);
+            scheduleSlot.classList.toggle('is-inactive', !isScheduled);
+          }
           if (!isScheduled) {
             scheduleInput.value = '';
           }

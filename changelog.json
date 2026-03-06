@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.28",
+      "date": "2026-03-06",
+      "items": [
+        "fix(schedule-publication-clarity): made the `Publish at` slot readable in its inactive state, added a scheduling hint, and synced the publication row state so delayed publishing is clearer inside homework modals",
+        "style(light-topbar-tint): replaced the washed-out gray light-theme topbar treatment with the same indigo liquid-glass family used by the shared Studerria shell, including matching topbar pills and spotlight variant surfaces",
+        "fix(disabled-datetime-contrast): improved disabled `date`, `time`, and `datetime-local` contrast in the shared control system so non-active scheduling fields stay legible instead of fading into the modal background"
+      ]
+    },
+    {
       "version": "1.1.27",
       "date": "2026-03-06",
       "items": [
