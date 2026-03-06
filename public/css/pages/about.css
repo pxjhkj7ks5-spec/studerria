@@ -132,11 +132,50 @@
   border-radius: 999px;
   background: linear-gradient(135deg, var(--studerria-cta-start), var(--studerria-cta-end));
   box-shadow: 0 0 0 0.28rem color-mix(in srgb, var(--studerria-cta-start) 18%, transparent);
+  animation: studerria-about-dot-pulse 2200ms ease-in-out infinite;
 }
 
 .studerria-about-list span {
   color: var(--studerria-text-muted);
   line-height: 1.55;
+}
+
+.studerria-about-list li:nth-child(2)::before {
+  animation-delay: 280ms;
+}
+
+.studerria-about-list li:nth-child(3)::before {
+  animation-delay: 560ms;
+}
+
+@keyframes studerria-about-dot-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.92);
+    box-shadow:
+      0 0 0 0.22rem color-mix(in srgb, var(--studerria-cta-start) 14%, transparent),
+      0 0 14px color-mix(in srgb, var(--studerria-cta-end) 8%, transparent);
+  }
+
+  42% {
+    opacity: 1;
+    transform: scale(1.08);
+    box-shadow:
+      0 0 0 0.34rem color-mix(in srgb, var(--studerria-cta-start) 22%, transparent),
+      0 0 18px color-mix(in srgb, var(--studerria-cta-end) 20%, transparent);
+  }
+
+  62% {
+    opacity: 0.88;
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studerria-about-list li::before {
+    animation: none;
+  }
 }
 
 @media (max-width: 991px) {

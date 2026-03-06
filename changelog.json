@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.46",
+      "date": "2026-03-06",
+      "items": [
+        "fix(about-topbar-shell): switched the `/about` page into the same local topbar mode used across the rest of the authenticated Studerria shell so the navbar alignment and spacing now match the other app screens",
+        "copy(about-vision): updated the hero and about-card copy on the Studerria page to the new wording about the shared learning space, daily route, unified navigation, and role ownership",
+        "style(about-bullet-dots): added a soft staggered pulse animation to the purple list markers on the about cards while keeping reduced-motion users on a static version"
+      ]
+    },
+    {
       "version": "1.1.45",
       "date": "2026-03-06",
       "items": [
