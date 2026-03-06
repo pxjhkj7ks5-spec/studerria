@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.42",
+      "date": "2026-03-06",
+      "items": [
+        "feat(about-page): added a new authenticated `/about` page in the shared Studerria shell with vision-style glass cards for purpose, modules, roles, and a direct jump back to the main dashboard",
+        "fix(navbar-brand-route): pointed the shared `Studerria` brand in the navbar to `/about` while leaving `Головна` mapped to the existing dashboard route",
+        "fix(teacher-pending-about-access): whitelisted `/about` in the teacher-pending gate so the new brand route stays reachable for authenticated users in every role state"
+      ]
+    },
+    {
       "version": "1.1.41",
       "date": "2026-03-06",
       "items": [
