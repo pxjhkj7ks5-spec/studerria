@@ -3805,9 +3805,6 @@
 
       applyLocalWeekTimes();
 
-      const syncDot = document.getElementById('syncDot');
-      const syncStatusLabel = document.getElementById('syncStatusLabel');
-      const syncStatusMeta = document.getElementById('syncStatusMeta');
       const scheduleCacheKey = `schedule-cache:<%= currentWeek || 1 %>:<%= selectedCourseId || 'all' %>:<%= userId || 'guest' %>:<%= role || 'user' %>`;
       let lastSyncTs = Date.now();
 
@@ -3848,6 +3845,12 @@
           syncStatusMeta.textContent = `${prefix}${formatRelativeTime(lastSyncTs)}`;
         }
       }
+
+      updateSyncStatus = function updateSharedSyncStatus() {
+        if (typeof window.__updateFooterNetworkStatus === 'function') {
+          window.__updateFooterNetworkStatus();
+        }
+      };
 
       function readScheduleCache() {
         try {
@@ -4054,12 +4057,10 @@
       initTooltips();
 
       setInterval(updateSmartHighlights, 30000);
-      setInterval(() => updateSyncStatus(), 60000);
       const scheduleRefreshMinutes = Number(<%= (settings && settings.schedule_refresh_minutes) ? settings.schedule_refresh_minutes : 5 %>);
       const scheduleRefreshMs = Math.max(60000, scheduleRefreshMinutes * 60 * 1000);
       setInterval(refreshSchedule, scheduleRefreshMs);
       window.addEventListener('online', () => refreshSchedule());
-      window.addEventListener('offline', () => updateSyncStatus());
 
       let messageListRequestToken = 0;
       let unreadBadgeRequestToken = 0;

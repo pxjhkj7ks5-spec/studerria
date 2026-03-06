@@ -3,7 +3,7 @@
   if (typeof footerMetaClass === 'string' && footerMetaClass.trim()) {
     footerMetaClassList.push(footerMetaClass.trim());
   }
-  const showFooterSyncStatus = (typeof footerSyncStatus !== 'undefined') ? Boolean(footerSyncStatus) : false;
+  const showFooterSyncStatus = (typeof footerSyncStatus !== 'undefined') ? Boolean(footerSyncStatus) : true;
   const latestRelease = Array.isArray(changelog) && changelog.length ? changelog[0] : null;
   const footerReleaseProps = {
     appVersion: appVersion || '',
@@ -15,11 +15,15 @@
 <footer class="app-footer text-center py-4">
   <small class="<%= footerMetaClassList.join(' ') %>">
     <% if (showFooterSyncStatus) { %>
-      <span class="sync-pill footer-sync-pill" aria-live="polite">
-        <span class="sync-dot" id="syncDot"></span>
-        <span id="syncStatusLabel">Онлайн</span>
-        <span class="sync-sep">•</span>
-        <span id="syncStatusMeta">Щойно</span>
+      <span
+        class="footer-sync-pill"
+        data-footer-network-status
+        role="status"
+        aria-live="polite"
+        aria-label="Online"
+      >
+        <span class="sync-dot" data-footer-sync-dot aria-hidden="true"></span>
+        <span class="footer-sync-label" data-footer-sync-label>Online</span>
       </span>
     <% } %>
     <span
@@ -51,6 +55,35 @@
 </footer>
 <script>
   window.__KMA_APP_META__ = Object.assign({}, window.__KMA_APP_META__, <%- JSON.stringify(footerReleaseProps) %>);
+  if (typeof window.__updateFooterNetworkStatus !== 'function') {
+    window.__updateFooterNetworkStatus = function updateFooterNetworkStatus(root) {
+      const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+      const isOnline = navigator.onLine;
+
+      scope.querySelectorAll('[data-footer-network-status]').forEach((pill) => {
+        if (!(pill instanceof HTMLElement)) {
+          return;
+        }
+
+        pill.classList.toggle('is-offline', !isOnline);
+        pill.setAttribute('aria-label', isOnline ? 'Online' : 'Offline');
+
+        const label = pill.querySelector('[data-footer-sync-label]');
+        if (label instanceof HTMLElement) {
+          label.textContent = isOnline ? 'Online' : 'Offline';
+        }
+      });
+    };
+  }
+
+  if (!window.__footerNetworkStatusBound) {
+    const syncFooterNetworkStatus = () => window.__updateFooterNetworkStatus();
+    window.addEventListener('online', syncFooterNetworkStatus);
+    window.addEventListener('offline', syncFooterNetworkStatus);
+    window.__footerNetworkStatusBound = true;
+  }
+
+  window.__updateFooterNetworkStatus();
 </script>
 <script
   src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"

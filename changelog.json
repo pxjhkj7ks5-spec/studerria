@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.65",
+      "date": "2026-03-06",
+      "items": [
+        "fix(footer-network-pill): unified the shared footer status across app pages into a compact blinking dot plus English `Online` or `Offline` label instead of the longer localized sync text",
+        "fix(schedule-footer-sync-override): removed the remaining schedule-specific footer sync styling and status refresh overrides so the shared footer pill now stays consistent everywhere"
+      ]
+    },
+    {
       "version": "1.1.64",
       "date": "2026-03-06",
       "items": [

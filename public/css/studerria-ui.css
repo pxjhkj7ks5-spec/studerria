@@ -458,7 +458,66 @@ body.page-local-topbar .topbar-title-spotlight::after {
 }
 
 .studerria-theme .app-footer .footer-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
   margin-right: 0.15rem;
+  padding: 0.28rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, rgba(34, 197, 94, 0.32) 38%, var(--studerria-footer-dock-border));
+  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 88%, rgba(34, 197, 94, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--studerria-footer-text) !important;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.studerria-theme .app-footer .footer-sync-label {
+  color: inherit !important;
+  opacity: 0.92;
+}
+
+.studerria-theme .app-footer .footer-sync-pill .sync-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16);
+  animation: footerSyncPulse 2.2s ease-out infinite;
+  transform-origin: center;
+  will-change: transform, box-shadow;
+}
+
+.studerria-theme .app-footer .footer-sync-pill.is-offline {
+  border-color: color-mix(in srgb, rgba(245, 158, 11, 0.28) 38%, var(--studerria-footer-dock-border));
+  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 90%, rgba(245, 158, 11, 0.08));
+}
+
+.studerria-theme .app-footer .footer-sync-pill.is-offline .sync-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14);
+  animation: none;
+}
+
+@keyframes footerSyncPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 4px rgba(34, 197, 94, 0.16),
+      0 0 0 0 rgba(34, 197, 94, 0.2);
+  }
+
+  50% {
+    transform: scale(1.08);
+    box-shadow:
+      0 0 0 4px rgba(34, 197, 94, 0.22),
+      0 0 0 8px rgba(34, 197, 94, 0);
+  }
 }
 
 .studerria-theme .app-footer .footer-version,
@@ -837,6 +896,12 @@ body.theme-light.studerria-theme input[type="week"] {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .studerria-theme .app-footer .footer-sync-pill .sync-dot {
+    animation: none;
+  }
+}
+
 .studerria-theme .modal {
   position: fixed !important;
   inset: 0;
@@ -1142,26 +1207,6 @@ body.page-schedule .drawer-action,
 body.page-schedule .control-toggle,
 body.page-schedule .chip {
   border-radius: 999px;
-}
-
-body.page-schedule .topbar-sync-pill,
-body.page-schedule .footer-sync-pill {
-  margin-right: 0.35rem;
-  border-color: color-mix(in srgb, rgba(34, 197, 94, 0.28) 36%, var(--studerria-panel-border));
-  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 82%, rgba(255, 255, 255, 0.08));
-  box-shadow: 0 10px 24px rgba(2, 6, 23, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-body.page-schedule .topbar-sync-pill #syncStatusLabel,
-body.page-schedule .topbar-sync-pill #syncStatusMeta,
-body.page-schedule .footer-sync-pill #syncStatusLabel,
-body.page-schedule .footer-sync-pill #syncStatusMeta {
-  color: var(--studerria-text-primary);
-}
-
-body.page-schedule .topbar-sync-pill .sync-sep,
-body.page-schedule .footer-sync-pill .sync-sep {
-  color: var(--studerria-text-muted);
 }
 
 body.page-schedule .sync-pill,
