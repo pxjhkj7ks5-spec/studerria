@@ -836,6 +836,9 @@
             <% if (sectionAllowed('admin-courses')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-courses">Courses</button>
             <% } %>
+            <% if (canManagePathways) { %>
+              <button class="admin-nav-link" type="button" onclick="window.location.href='/admin/pathways'">Pathways</button>
+            <% } %>
             <% if (sectionAllowed('admin-homework')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-homework">Homework</button>
             <% } %>

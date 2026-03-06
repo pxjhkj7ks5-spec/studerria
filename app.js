@@ -23315,6 +23315,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     if (!Array.isArray(courses) || !courses.length) {
       return res.redirect('/admin?err=No%20courses%20configured');
     }
+    const courseById = new Map((courses || []).map((course) => [Number(course.id || 0), course]));
 
     const rememberedCourseId = getAdminCourse(req);
     let selectedCourseId = parsePositiveIntStrict(req.query.course, rememberedCourseId);
@@ -23420,6 +23421,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     let courseMappings = (courses || []).map((course) => ({
       course_id: Number(course.id || 0),
       course_name: sanitizeCompactText(course.name || '', 120),
+      course_location: normalizeCourseCampus(course.location),
       is_teacher_course: course.is_teacher_course === true || Number(course.is_teacher_course) === 1,
       is_visible: false,
     }));
@@ -23429,6 +23431,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
           SELECT
             c.id AS course_id,
             c.name AS course_name,
+            COALESCE(c.location, 'kyiv') AS course_location,
             c.is_teacher_course,
             COALESCE(pac.is_visible, false) AS is_visible
           FROM courses c
@@ -23442,6 +23445,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       courseMappings = (mappingRows || []).map((row) => ({
         course_id: Number(row.course_id || 0),
         course_name: sanitizeCompactText(row.course_name || '', 120),
+        course_location: normalizeCourseCampus(row.course_location),
         is_teacher_course: row.is_teacher_course === true || Number(row.is_teacher_course) === 1,
         is_visible: row.is_visible === true || Number(row.is_visible) === 1,
       }));
@@ -23563,6 +23567,44 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     };
     visibilitySummary.hidden = Math.max(0, visibilitySummary.total - visibilitySummary.visible);
 
+    const subjectCatalogRows = await db.all(
+      `
+        SELECT
+          s.id,
+          s.name,
+          s.course_id,
+          COALESCE(s.group_count, 1) AS group_count,
+          COALESCE(s.visible, true) AS visible
+        FROM subjects s
+        ORDER BY s.course_id ASC, s.name ASC
+      `
+    );
+    const subjectCatalogMap = new Map();
+    (subjectCatalogRows || []).forEach((row) => {
+      const courseId = Number(row.course_id || 0);
+      if (!courseId) return;
+      const course = courseById.get(courseId);
+      if (!course) return;
+      if (!subjectCatalogMap.has(courseId)) {
+        subjectCatalogMap.set(courseId, {
+          course_id: courseId,
+          course_name: sanitizeCompactText(course.name || '', 120),
+          course_location: normalizeCourseCampus(course.location),
+          is_teacher_course: course.is_teacher_course === true || Number(course.is_teacher_course) === 1,
+          subjects: [],
+        });
+      }
+      subjectCatalogMap.get(courseId).subjects.push({
+        id: Number(row.id || 0),
+        name: sanitizeCompactText(row.name || '', 140),
+        group_count: Number(row.group_count || 1),
+        is_visible: row.visible === true || Number(row.visible) === 1,
+      });
+    });
+    const subjectCatalogCourses = (courses || [])
+      .map((course) => subjectCatalogMap.get(Number(course.id || 0)))
+      .filter((item) => item && Array.isArray(item.subjects) && item.subjects.length);
+
     const pageRole = hasSessionRole(req, 'admin')
       ? 'admin'
       : (hasSessionRole(req, 'deanery')
@@ -23589,6 +23631,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       courseMappings,
       mappingSummary,
       subjectVisibilityItems: configurableSubjectVisibility,
+      subjectCatalogCourses,
       hiddenSubjectCount,
       visibilitySummary,
     });

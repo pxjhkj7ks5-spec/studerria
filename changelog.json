@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.76",
+      "date": "2026-03-07",
+      "items": [
+        "feat(admin-pathways-sidebar): added a visible `Pathways` entry to the legacy admin sidebar so the pathways workspace is reachable without typing `/admin/pathways` manually",
+        "feat(pathways-subject-catalog): added a read-only subject catalog on the pathways page that lists every subject grouped by its current course without changing existing course bindings",
+        "fix(pathways-text-encoding): converted the pathways template to UTF-8 so Ukrainian copy renders correctly instead of broken replacement glyphs"
+      ]
+    },
+    {
       "version": "1.1.75",
       "date": "2026-03-07",
       "items": [

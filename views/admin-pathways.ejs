@@ -6,6 +6,7 @@
   const selectedProgram = (programs || []).find((item) => Number(item.id) === selectedProgramValue) || null;
   const selectedAdmission = (admissions || []).find((item) => Number(item.id) === selectedAdmissionValue) || null;
   const copyAdmissions = Array.isArray(admissionCopyOptions) ? admissionCopyOptions : [];
+  const subjectCatalogList = Array.isArray(subjectCatalogCourses) ? subjectCatalogCourses : [];
   const courseChecklistPropsJson = JSON.stringify({
     targetSelector: '#pathwayCourseMappingForm',
     checkboxSelector: 'input[type="checkbox"][name^="course_"]',
@@ -54,6 +55,17 @@
 
     const query = params.toString();
     return `/admin/pathways${query ? `?${query}` : ''}`;
+  };
+  const formatCampusLabel = (location) => String(location || 'kyiv').trim().toLowerCase() === 'munich' ? 'Munich' : 'Kyiv';
+  const isTeacherCourse = (course) => course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
+  const buildCourseLabel = (course) => {
+    const name = String(course && (course.name || course.course_name) || '').trim();
+    const campus = formatCampusLabel(course && (course.location || course.course_location));
+    return isTeacherCourse(course) ? `${name} / ${campus} / Teacher` : `${name} / ${campus}`;
+  };
+  const buildCourseMetaLine = (course) => {
+    const campus = `${formatCampusLabel(course && (course.location || course.course_location))} campus`;
+    return isTeacherCourse(course) ? `${campus} / Teacher course` : `${campus} / Student course`;
   };
 %>
 <!doctype html>
@@ -255,6 +267,56 @@
       .btn-soft:hover {
         border-color: rgba(125, 211, 252, 0.52);
       }
+      .catalog-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 12px;
+      }
+      .catalog-card {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .catalog-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .catalog-subject-list {
+        display: grid;
+        gap: 8px;
+        max-height: 320px;
+        overflow: auto;
+        padding-right: 4px;
+      }
+      .catalog-subject-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        background: rgba(15, 23, 42, 0.28);
+        padding: 10px 12px;
+      }
+      .catalog-subject-row.is-hidden {
+        opacity: 0.64;
+      }
+      body.theme-light .catalog-subject-row {
+        background: rgba(255, 255, 255, 0.92);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .catalog-subject-meta {
+        font-size: 0.79rem;
+        color: rgba(203, 213, 225, 0.76);
+      }
+      body.theme-light .catalog-subject-meta {
+        color: rgba(15, 23, 42, 0.6);
+      }
+      .catalog-count {
+        white-space: nowrap;
+      }
     </style>
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/pages/admin-pathways.css" />
@@ -293,7 +355,7 @@
       <section class="glass hero mb-3">
         <h1 class="hero-title">Academic pathways workspace</h1>
         <p class="hero-subtitle">
-          Керуйте треками, програмами, роками вступу та видимістю предметів для кожної когорти. Нові admission роки автоматично успадковують конфігурацію з останнього року в межах програми.
+          РљРµСЂСѓР№С‚Рµ С‚СЂРµРєР°РјРё, РїСЂРѕРіСЂР°РјР°РјРё, СЂРѕРєР°РјРё РІСЃС‚СѓРїСѓ С‚Р° РІРёРґРёРјС–СЃС‚СЋ РїСЂРµРґРјРµС‚С–РІ РґР»СЏ РєРѕР¶РЅРѕС— РєРѕРіРѕСЂС‚Рё. РќРѕРІС– admission СЂРѕРєРё Р°РІС‚РѕРјР°С‚РёС‡РЅРѕ СѓСЃРїР°РґРєРѕРІСѓСЋС‚СЊ РєРѕРЅС„С–РіСѓСЂР°С†С–СЋ Р· РѕСЃС‚Р°РЅРЅСЊРѕРіРѕ СЂРѕРєСѓ РІ РјРµР¶Р°С… РїСЂРѕРіСЂР°РјРё.
         </p>
         <div class="chip-row">
           <span class="chip">Programs: <%= (programs || []).length %></span>
@@ -305,14 +367,14 @@
 
       <section class="glass section mb-3">
         <h2 class="section-title">Scope</h2>
-        <p class="section-subtitle">Виберіть курс і трек для фокусного редагування.</p>
+        <p class="section-subtitle">Р’РёР±РµСЂС–С‚СЊ РєСѓСЂСЃ С– С‚СЂРµРє РґР»СЏ С„РѕРєСѓСЃРЅРѕРіРѕ СЂРµРґР°РіСѓРІР°РЅРЅСЏ.</p>
         <form method="GET" action="/admin/pathways" class="row g-2 mt-1">
           <div class="col-12 col-md-6 col-xl-4">
             <label class="form-label small" for="pathwayCourseSelect">Course</label>
             <select id="pathwayCourseSelect" class="form-select compact-select" name="course">
               <% (courses || []).forEach((course) => { %>
                 <option value="<%= course.id %>" <%= Number(course.id) === Number(selectedCourseValue) ? 'selected' : '' %>>
-                  <%= course.name %>
+                  <%= buildCourseLabel(course) %>
                 </option>
               <% }) %>
             </select>
@@ -341,7 +403,7 @@
 
       <section class="glass section mb-3">
         <h2 class="section-title">Programs</h2>
-        <p class="section-subtitle">Створіть нову програму або оновіть існуючі параметри треку.</p>
+        <p class="section-subtitle">РЎС‚РІРѕСЂС–С‚СЊ РЅРѕРІСѓ РїСЂРѕРіСЂР°РјСѓ Р°Р±Рѕ РѕРЅРѕРІС–С‚СЊ С–СЃРЅСѓСЋС‡С– РїР°СЂР°РјРµС‚СЂРё С‚СЂРµРєСѓ.</p>
 
         <form method="POST" action="/admin/pathways/programs/add" class="soft-panel row g-2 mb-3">
           <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
@@ -424,7 +486,7 @@
 
       <section class="glass section mb-3">
         <h2 class="section-title">Admission years</h2>
-        <p class="section-subtitle">Налаштуйте когорти для обраної програми. При створенні нового року дані копіюються з попереднього.</p>
+        <p class="section-subtitle">РќР°Р»Р°С€С‚СѓР№С‚Рµ РєРѕРіРѕСЂС‚Рё РґР»СЏ РѕР±СЂР°РЅРѕС— РїСЂРѕРіСЂР°РјРё. РџСЂРё СЃС‚РІРѕСЂРµРЅРЅС– РЅРѕРІРѕРіРѕ СЂРѕРєСѓ РґР°РЅС– РєРѕРїС–СЋСЋС‚СЊСЃСЏ Р· РїРѕРїРµСЂРµРґРЅСЊРѕРіРѕ.</p>
 
         <form method="POST" action="/admin/pathways/admissions/add" class="soft-panel row g-2 mb-3">
           <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
@@ -493,7 +555,7 @@
         <div class="col-12 col-xl-5">
           <article class="glass section h-100">
             <h2 class="section-title">Course mapping</h2>
-            <p class="section-subtitle">Курси, для яких admission доступний на етапі реєстрації.</p>
+            <p class="section-subtitle">РљСѓСЂСЃРё, РґР»СЏ СЏРєРёС… admission РґРѕСЃС‚СѓРїРЅРёР№ РЅР° РµС‚Р°РїС– СЂРµС”СЃС‚СЂР°С†С–С—.</p>
             <% if (selectedAdmissionValue > 0) { %>
               <form id="pathwayCourseMappingForm" method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/courses/save">
                 <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
@@ -511,11 +573,11 @@
                     <label
                       class="subject-row"
                       data-checklist-row
-                      data-checklist-text="<%= `${item.course_name} ${item.is_teacher_course ? 'teacher' : 'regular'}` %>"
+                      data-checklist-text="<%= `${item.course_name} ${item.course_location || 'kyiv'} ${item.is_teacher_course ? 'teacher' : 'regular'}` %>"
                     >
                       <span>
                         <span class="row-label"><%= item.course_name %></span>
-                        <span class="muted d-block"><%= item.is_teacher_course ? 'Teacher course' : 'Regular course' %></span>
+                        <span class="muted d-block"><%= buildCourseMetaLine(item) %></span>
                       </span>
                       <input class="form-check-input" type="checkbox" name="course_<%= item.course_id %>" value="1" <%= item.is_visible ? 'checked' : '' %> />
                     </label>
@@ -538,7 +600,7 @@
                         <option value="">Select source admission</option>
                         <% (copyAdmissions || []).forEach((option) => { %>
                           <option value="<%= option.id %>">
-                            <%= option.admission_year %><%= option.label ? (' • ' + option.label) : '' %> · <%= Number(option.course_visible_count || 0) %>/<%= Number(option.course_total_count || 0) %> courses
+                            <%= option.admission_year %><%= option.label ? (' вЂў ' + option.label) : '' %> В· <%= Number(option.course_visible_count || 0) %>/<%= Number(option.course_total_count || 0) %> courses
                           </option>
                         <% }) %>
                       </select>
@@ -557,7 +619,7 @@
         <div class="col-12 col-xl-7">
           <article class="glass section h-100">
             <h2 class="section-title">Subject visibility</h2>
-            <p class="section-subtitle">Предмети, які бачать студенти під час реєстрації для вибраної когорти.</p>
+            <p class="section-subtitle">РџСЂРµРґРјРµС‚Рё, СЏРєС– Р±Р°С‡Р°С‚СЊ СЃС‚СѓРґРµРЅС‚Рё РїС–Рґ С‡Р°СЃ СЂРµС”СЃС‚СЂР°С†С–С— РґР»СЏ РІРёР±СЂР°РЅРѕС— РєРѕРіРѕСЂС‚Рё.</p>
             <% if (selectedAdmissionValue > 0) { %>
               <% if (hiddenSubjectCount > 0) { %>
                 <div class="muted mb-2">Globally hidden in course scope: <%= hiddenSubjectCount %></div>
@@ -614,7 +676,7 @@
                         <option value="">Select source admission</option>
                         <% (copyAdmissions || []).forEach((option) => { %>
                           <option value="<%= option.id %>">
-                            <%= option.admission_year %><%= option.label ? (' • ' + option.label) : '' %> · <%= Number(option.subject_visible_count || 0) %>/<%= Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) %> visible
+                            <%= option.admission_year %><%= option.label ? (' вЂў ' + option.label) : '' %> В· <%= Number(option.subject_visible_count || 0) %>/<%= Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) %> visible
                           </option>
                         <% }) %>
                       </select>
@@ -629,6 +691,45 @@
               <div class="soft-panel muted">Select admission year first.</div>
             <% } %>
           </article>
+        </div>
+      </section>
+
+      <section class="glass section mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+          <div>
+            <h2 class="section-title">Subject catalog</h2>
+            <p class="section-subtitle">Read-only list of all subjects across every course. Current course bindings stay unchanged.</p>
+          </div>
+          <span class="chip">Courses with subjects: <%= subjectCatalogList.length %></span>
+        </div>
+        <div class="catalog-grid">
+          <% (subjectCatalogList || []).forEach((course) => { %>
+            <article class="soft-panel catalog-card">
+              <div class="catalog-card-header">
+                <div>
+                  <div class="row-label"><%= buildCourseLabel(course) %></div>
+                  <div class="muted"><%= buildCourseMetaLine(course) %></div>
+                </div>
+                <span class="chip catalog-count"><%= Number((course.subjects || []).length) %> subjects</span>
+              </div>
+              <div class="catalog-subject-list">
+                <% (course.subjects || []).forEach((subject) => { %>
+                  <div class="catalog-subject-row <%= subject.is_visible ? '' : 'is-hidden' %>">
+                    <div>
+                      <div class="row-label"><%= subject.name %></div>
+                      <div class="catalog-subject-meta">
+                        Groups: <%= Number(subject.group_count || 1) %><%= subject.is_visible ? '' : ' / Hidden in base course' %>
+                      </div>
+                    </div>
+                    <span class="chip">#<%= subject.id %></span>
+                  </div>
+                <% }) %>
+              </div>
+            </article>
+          <% }) %>
+          <% if (!subjectCatalogList.length) { %>
+            <div class="soft-panel muted">No subjects found yet.</div>
+          <% } %>
         </div>
       </section>
 
