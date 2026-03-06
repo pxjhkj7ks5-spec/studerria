@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.22",
+      "date": "2026-03-06",
+      "items": [
+        "style(footer-dock-unification): moved footer dock styling into the shared Studerria shell so footer capsules now use one consistent liquid-glass surface, border, and text treatment across pages instead of drifting between local implementations",
+        "refactor(page-footer-overrides): removed duplicate footer overrides from `schedule` and `my-day`, leaving only page-specific spacing while the shared footer surface and interactions stay synchronized in both dark and light themes"
+      ]
+    },
+    {
       "version": "1.1.21",
       "date": "2026-03-05",
       "items": [

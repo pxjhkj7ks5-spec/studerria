@@ -459,11 +459,6 @@ body.theme-dark .day-card.glass::before {
   display: none;
 }
 
-.app-footer .footer-meta.glass-dock {
-  position: relative;
-  z-index: 1061;
-}
-
 .badge-glow {
   background: linear-gradient(135deg, rgba(191, 219, 254, 0.9), rgba(196, 181, 253, 0.82));
   border: 1px solid rgba(147, 197, 253, 0.62);
@@ -1652,62 +1647,6 @@ body.is-scrolling .week-pager {
 
 .app-footer {
   padding-bottom: calc(104px + env(safe-area-inset-bottom));
-}
-
-.footer-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  line-height: var(--lh-meta);
-  font-weight: var(--w-medium);
-  opacity: 0.56;
-  color: var(--text-muted-dark);
-}
-
-body.theme-light .footer-meta {
-  color: var(--text-muted-light);
-}
-
-.footer-version {
-  font-weight: var(--w-medium);
-}
-
-.footer-build,
-.footer-link {
-  border: none;
-  background: transparent;
-  color: inherit;
-  padding: 0;
-  font-size: 12px;
-  font-weight: var(--w-medium);
-  opacity: 0.72;
-  transition: opacity 180ms ease-out, text-decoration-color 180ms ease-out;
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  text-underline-offset: 2px;
-}
-
-.footer-link:hover,
-.footer-build:hover {
-  color: inherit;
-  opacity: 0.95;
-  text-decoration-color: currentColor;
-}
-
-body.theme-dark .footer-build,
-body.theme-dark .footer-link {
-  color: rgba(226, 232, 240, 0.78);
-}
-
-body.theme-light .footer-build,
-body.theme-light .footer-link {
-  color: rgba(51, 65, 85, 0.76);
-}
-
-.footer-link {
-  text-decoration: underline;
-  text-decoration-color: transparent;
 }
 
 @media (max-width: 991px) {
