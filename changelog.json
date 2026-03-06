@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.55",
+      "date": "2026-03-06",
+      "items": [
+        "fix(modal-sheet-blur): removed the extra backdrop blur from shared modal surfaces so only the page behind the dialog is blurred, not the dialog content itself",
+        "fix(modal-sheet-contrast): made the shared dark and light modal backgrounds slightly denser after removing sheet blur so text stays crisp without losing contrast"
+      ]
+    },
+    {
       "version": "1.1.54",
       "date": "2026-03-06",
       "items": [

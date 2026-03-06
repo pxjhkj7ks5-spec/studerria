@@ -28,13 +28,13 @@ html body.studerria-theme #confirmActionModal.modal.show .modal-content,
 html body.studerria-theme #journalCellModal.modal.show .modal-content,
 html body.studerria-theme #mobileMenuModal.modal.show .modal-content,
 html body.studerria-theme .changelog-liquid-modal.modal.show .modal-content {
-  background: linear-gradient(180deg, rgba(19, 26, 48, 0.95), rgba(8, 13, 28, 0.985)) !important;
+  background: linear-gradient(180deg, rgba(19, 26, 48, 0.985), rgba(8, 13, 28, 0.995)) !important;
   color: #f8fafc !important;
   border: 1px solid rgba(191, 219, 254, 0.16) !important;
   border-radius: 28px !important;
   background-clip: padding-box;
-  -webkit-backdrop-filter: blur(24px) saturate(1.06) !important;
-  backdrop-filter: blur(24px) saturate(1.06) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   box-shadow: 0 36px 110px rgba(2, 6, 23, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
 }
 
@@ -43,7 +43,7 @@ html body.theme-light.studerria-theme #confirmActionModal.modal.show .modal-cont
 html body.theme-light.studerria-theme #journalCellModal.modal.show .modal-content,
 html body.theme-light.studerria-theme #mobileMenuModal.modal.show .modal-content,
 html body.theme-light.studerria-theme .changelog-liquid-modal.modal.show .modal-content {
-  background: linear-gradient(180deg, rgba(249, 251, 255, 0.96), rgba(239, 244, 255, 0.985)) !important;
+  background: linear-gradient(180deg, rgba(249, 251, 255, 0.99), rgba(239, 244, 255, 0.996)) !important;
   color: #0f172a !important;
   border-color: rgba(148, 163, 184, 0.24) !important;
   box-shadow: 0 30px 88px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.78) !important;
