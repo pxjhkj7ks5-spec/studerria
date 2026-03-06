@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.23",
+      "date": "2026-03-06",
+      "items": [
+        "style(footer-dock-brightness): lightened the shared footer dock surface, border, and text so the footer capsule sits closer to the rest of the indigo glass shell instead of reading as an overly dark strip"
+      ]
+    },
+    {
       "version": "1.1.22",
       "date": "2026-03-06",
       "items": [
