@@ -8,6 +8,10 @@
   const BACKDROP_CLASS = 'studerria-changelog-backdrop';
   const BODY_OPEN_CLASS = 'studerria-changelog-open';
   const BOOTSTRAP_OPEN_CLASS = 'modal-open';
+  const GLOBAL_SYNC_BOOT_FLAG = '__studerriaGlobalModalSyncBoot';
+  const SCROLL_LOCK_STATE_ATTR = 'data-studerria-scroll-lock';
+  const SCROLL_LOCK_VALUE_ATTR = 'data-studerria-scroll-lock-overflow-value';
+  const SCROLL_LOCK_PRIORITY_ATTR = 'data-studerria-scroll-lock-overflow-priority';
   const NO_BLUR_STATE_ATTR = 'data-studerria-no-blur-active';
   const EMPTY_STYLE_TOKEN = '__studerria-empty-style__';
   const NO_BLUR_SELECTOR = [
@@ -41,6 +45,10 @@
 
   function getModal() {
     return document.querySelector(MODAL_SELECTOR);
+  }
+
+  function hasVisibleModal() {
+    return document.querySelector('.modal.show') instanceof HTMLElement;
   }
 
   function cleanupBackdrop() {
@@ -146,25 +154,130 @@
     });
   }
 
-  function syncBodyOpenClasses(forceOpen) {
+  function syncBodyOpenClasses(forceOpen, includeChangelogClass = false) {
     const body = document.body;
     if (!(body instanceof HTMLElement)) {
       return;
     }
 
-    const hasVisibleModal = document.querySelector('.modal.show') instanceof HTMLElement;
-    const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : hasVisibleModal;
+    const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : hasVisibleModal();
+    const changelogIsVisible = document.querySelector(`${MODAL_SELECTOR}.show`) instanceof HTMLElement;
 
     if (shouldOpen) {
-      body.classList.add(BODY_OPEN_CLASS);
       body.classList.add(BOOTSTRAP_OPEN_CLASS);
+      if (includeChangelogClass || changelogIsVisible) {
+        body.classList.add(BODY_OPEN_CLASS);
+      } else {
+        body.classList.remove(BODY_OPEN_CLASS);
+      }
+      const root = document.documentElement;
+      if (root instanceof HTMLElement && root.getAttribute(SCROLL_LOCK_STATE_ATTR) !== '1') {
+        root.setAttribute(SCROLL_LOCK_STATE_ATTR, '1');
+        root.setAttribute(
+          SCROLL_LOCK_VALUE_ATTR,
+          root.style.getPropertyValue('overflow') || EMPTY_STYLE_TOKEN
+        );
+        root.setAttribute(
+          SCROLL_LOCK_PRIORITY_ATTR,
+          root.style.getPropertyPriority('overflow') || EMPTY_STYLE_TOKEN
+        );
+      }
+      if (root instanceof HTMLElement) {
+        root.style.setProperty('overflow', 'hidden', 'important');
+      }
       syncNoBlurTargets(true);
       return;
     }
 
     body.classList.remove(BODY_OPEN_CLASS);
     body.classList.remove(BOOTSTRAP_OPEN_CLASS);
+    const root = document.documentElement;
+    if (root instanceof HTMLElement && root.getAttribute(SCROLL_LOCK_STATE_ATTR) === '1') {
+      const previousValue = root.getAttribute(SCROLL_LOCK_VALUE_ATTR);
+      const previousPriority = root.getAttribute(SCROLL_LOCK_PRIORITY_ATTR);
+      if (previousValue && previousValue !== EMPTY_STYLE_TOKEN) {
+        root.style.setProperty(
+          'overflow',
+          previousValue,
+          previousPriority && previousPriority !== EMPTY_STYLE_TOKEN ? previousPriority : ''
+        );
+      } else {
+        root.style.removeProperty('overflow');
+      }
+      root.removeAttribute(SCROLL_LOCK_STATE_ATTR);
+      root.removeAttribute(SCROLL_LOCK_VALUE_ATTR);
+      root.removeAttribute(SCROLL_LOCK_PRIORITY_ATTR);
+    }
     syncNoBlurTargets(false);
+  }
+
+  function isModalElement(node) {
+    return node instanceof HTMLElement && node.classList.contains('modal');
+  }
+
+  function bindGlobalModalSync() {
+    if (window[GLOBAL_SYNC_BOOT_FLAG] === true) {
+      return;
+    }
+    window[GLOBAL_SYNC_BOOT_FLAG] = true;
+
+    document.addEventListener(
+      'show.bs.modal',
+      (event) => {
+        if (!isModalElement(event.target)) {
+          return;
+        }
+
+        syncBodyOpenClasses(true);
+        requestAnimationFrame(syncBackdrop);
+      },
+      true
+    );
+
+    document.addEventListener(
+      'shown.bs.modal',
+      (event) => {
+        if (!isModalElement(event.target)) {
+          return;
+        }
+
+        syncBodyOpenClasses(true);
+        syncBackdrop();
+      },
+      true
+    );
+
+    document.addEventListener(
+      'hide.bs.modal',
+      (event) => {
+        if (!isModalElement(event.target)) {
+          return;
+        }
+
+        requestAnimationFrame(() => {
+          syncBodyOpenClasses();
+        });
+      },
+      true
+    );
+
+    document.addEventListener(
+      'hidden.bs.modal',
+      (event) => {
+        if (!isModalElement(event.target)) {
+          return;
+        }
+
+        syncBodyOpenClasses();
+        if (hasVisibleModal()) {
+          requestAnimationFrame(syncBackdrop);
+          return;
+        }
+
+        cleanupBackdrop();
+      },
+      true
+    );
   }
 
   function primeModal(modal) {
@@ -198,17 +311,21 @@
 
     modal.addEventListener('show.bs.modal', () => {
       portalModal(modal);
-      syncBodyOpenClasses(true);
+      syncBodyOpenClasses(true, true);
       requestAnimationFrame(syncBackdrop);
     });
 
     modal.addEventListener('shown.bs.modal', () => {
-      syncBodyOpenClasses(true);
+      syncBodyOpenClasses(true, true);
       syncBackdrop();
     });
 
     modal.addEventListener('hidden.bs.modal', () => {
       syncBodyOpenClasses();
+      if (hasVisibleModal()) {
+        requestAnimationFrame(syncBackdrop);
+        return;
+      }
       cleanupBackdrop();
     });
 
@@ -229,6 +346,8 @@
   }
 
   function init() {
+    bindGlobalModalSync();
+
     const modal = getModal();
     if (!(modal instanceof HTMLElement)) {
       return;

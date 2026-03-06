@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.70",
+      "date": "2026-03-07",
+      "items": [
+        "fix(global-modal-sync): extended the changelog modal runtime to all Bootstrap modals so body open-state, root scroll-lock, and no-blur fallback are synchronized consistently on `show/shown/hide/hidden` events",
+        "fix(backdrop-interaction-lock): forced visible modal backdrops to keep pointer events enabled and added a modal-open overflow guard so background scrolling no longer leaks through on admin and other page-specific modal styles"
+      ]
+    },
+    {
       "version": "1.1.69",
       "date": "2026-03-06",
       "items": [
