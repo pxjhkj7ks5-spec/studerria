@@ -1,0 +1,12 @@
+<script>
+  (function applyStuderriaThemeToBody() {
+    var body = document.body;
+    if (!body) {
+      return;
+    }
+    var theme = window.__studerriaThemeBoot === 'light' ? 'light' : 'dark';
+    body.classList.remove('theme-dark', 'theme-light', 'dark', 'light');
+    body.classList.add(theme === 'dark' ? 'theme-dark' : 'theme-light');
+    body.setAttribute('data-theme', theme);
+  })();
+</script>

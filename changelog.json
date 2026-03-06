@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.27",
+      "date": "2026-03-06",
+      "items": [
+        "fix(theme-bootstrap-legacy-pages): added shared head and body theme bootstrap partials across legacy `dynamic-bg` pages so standalone screens now load the correct dark or light theme before local page scripts run",
+        "style(shell-unification-legacy-pages): injected shared `studerria-ui.css` plus `studerria-theme` and `page-local-topbar` shell classes into legacy topbar pages so headers, controls, cards, and footer dock stay visually aligned with the main Studerria shell",
+        "fix(theme-toggle-standalone-pages): rebuilt standalone theme handlers on pages like `admin-pathways`, `journal-insights`, `teacher-hub`, `teacher-subjects`, and `teacher-workspace` so mobile menu toggles now persist one canonical theme and sync `data-theme` on both `html` and `body`"
+      ]
+    },
+    {
       "version": "1.1.26",
       "date": "2026-03-06",
       "items": [

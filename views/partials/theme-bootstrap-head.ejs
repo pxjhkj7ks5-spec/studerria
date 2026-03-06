@@ -1,0 +1,20 @@
+<script>
+  (function bootstrapStuderriaTheme() {
+    var root = document.documentElement;
+    var defaultTheme = '<%= (defaultTheme || "dark") === "light" ? "light" : "dark" %>';
+    var theme = defaultTheme;
+    try {
+      var stored = localStorage.getItem('ui-theme');
+      if (stored === 'theme-light' || stored === 'light') {
+        theme = 'light';
+      } else if (stored === 'theme-dark' || stored === 'dark') {
+        theme = 'dark';
+      }
+      localStorage.setItem('ui-theme', theme === 'dark' ? 'theme-dark' : 'theme-light');
+    } catch (_error) {
+      theme = defaultTheme;
+    }
+    root.setAttribute('data-theme', theme);
+    window.__studerriaThemeBoot = theme;
+  })();
+</script>
