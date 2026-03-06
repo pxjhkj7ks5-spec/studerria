@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.24",
+      "date": "2026-03-06",
+      "items": [
+        "style(footer-dock-sheen): refined the top highlight inside the footer dock so the upper gloss no longer reads like a separate oval, using a narrower and softer liquid-glass sheen"
+      ]
+    },
+    {
       "version": "1.1.23",
       "date": "2026-03-06",
       "items": [

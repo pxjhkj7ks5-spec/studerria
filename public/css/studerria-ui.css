@@ -398,6 +398,7 @@ body.page-local-topbar .topbar-title-spotlight::after {
   line-height: 1.25;
   opacity: 1;
   isolation: isolate;
+  overflow: hidden;
   -webkit-backdrop-filter: blur(16px) saturate(1.12);
   backdrop-filter: blur(16px) saturate(1.12);
   box-shadow: var(--studerria-footer-dock-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.14);
@@ -407,13 +408,13 @@ body.page-local-topbar .topbar-title-spotlight::after {
 .studerria-theme .app-footer .footer-meta.glass-dock::before {
   content: "";
   position: absolute;
-  left: 14px;
-  right: 14px;
-  top: 1px;
-  height: 38%;
-  border-radius: inherit;
+  left: 20px;
+  right: 20px;
+  top: 2px;
+  height: 26%;
+  border-radius: 999px 999px 14px 14px / 100% 100% 24% 24%;
   background: linear-gradient(180deg, var(--studerria-footer-sheen), transparent);
-  opacity: 0.4;
+  opacity: 0.22;
   pointer-events: none;
   display: block;
 }
