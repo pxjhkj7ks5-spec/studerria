@@ -1,3 +1,7 @@
+html {
+  scrollbar-gutter: stable;
+}
+
 body.studerria-theme {
   position: relative;
   min-height: 100vh;
@@ -1013,7 +1017,6 @@ body.theme-light.studerria-theme .modal-content {
 body.modal-open {
   overflow-x: hidden !important;
   overflow-y: hidden !important;
-  padding-right: 0 !important;
 }
 
 .studerria-theme .modal.show .modal-dialog,
