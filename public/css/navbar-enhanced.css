@@ -19,21 +19,26 @@ body.page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell .topb
   flex: 0 0 auto;
 }
 
+body.page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell .navbar-brand.topbar-title-spotlight {
+  margin-right: 0;
+  padding-right: 0;
+}
+
 .snav-main {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 14px;
+  gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
   overflow: visible;
 }
 
 .snav-brand-spacer {
-  width: 8px;
-  min-width: 8px;
+  width: 2px;
+  min-width: 2px;
   height: 1px;
-  flex: 0 0 8px;
+  flex: 0 0 2px;
 }
 
 .snav-list,
@@ -46,7 +51,7 @@ body.page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell .topb
 .snav-list {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 20px;
   flex-wrap: nowrap;
   overflow: visible;
 }
