@@ -10,6 +10,7 @@ const { Pool } = require('pg');
 const { WebSocketServer } = require('ws');
 const bcrypt = require('bcryptjs');
 const pkg = require('./package.json');
+const navMiddleware = require('./middleware/nav');
 const versionFile = path.join(__dirname, 'version.json');
 const changelogFile = path.join(__dirname, 'changelog.json');
 let appVersion = pkg.version || '0.0.0';
@@ -1854,6 +1855,8 @@ app.use(async (req, res, next) => {
   res.locals.pathwaysPanelHref = '/admin/pathways';
   return next();
 });
+
+app.use(navMiddleware);
 
 app.use(async (req, res, next) => {
   if (!req.session || !req.session.user) {

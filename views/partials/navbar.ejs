@@ -1,47 +1,175 @@
 <%
-  const shouldRenderNavbar = showGlobalNavbar !== false;
-  const currentRole = String(role || '').trim();
-  const isAuthed = Boolean(currentRole);
-  const displayName = String(username || '').trim();
+  const shouldRenderNavbar = showGlobalNavbar !== false || forceAppNavbar;
+  const currentRole = String((userNav && userNav.role) || role || '').trim();
+  const userRoles = Array.isArray(userNav && userNav.roles) ? userNav.roles : (currentRole ? [currentRole] : []);
+  const isAuthed = Boolean(userNav && userNav.isAuthenticated) || Boolean(currentRole);
+  const displayName = String((userNav && userNav.name) || username || '').trim();
+  const visibleNavItems = Array.isArray(navItems)
+    ? navItems.filter((item) => !item.hidden && String(item.section || 'main') === 'main')
+    : [];
+  const shouldRenderAppNav = Boolean(forceAppNavbar) || (isAuthed && visibleNavItems.length > 0);
+  const personalLabel = String((navMeta && navMeta.personalLabel) || (userNav && userNav.personalLabel) || 'Особисте').trim() || 'Особисте';
+  const roleLabelMap = {
+    admin: (typeof t === 'function' ? t('role.admin') : 'Адмін'),
+    starosta: (typeof t === 'function' ? t('role.starosta') : 'Староста'),
+    deanery: (typeof t === 'function' ? t('role.deanery') : 'Деканат'),
+    teacher: (typeof t === 'function' ? t('role.teacher') : 'Викладач'),
+    student: (typeof t === 'function' ? t('role.student') : 'Студент'),
+  };
+  const displayRoleLabel = roleLabelMap[currentRole] || currentRole || '';
+  const displayRoleText = displayName
+    ? `${displayRoleLabel}: ${displayName}`
+    : displayRoleLabel;
+
+  const escapeHtml = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  const buildTriggerClass = (level, item) => {
+    const classNames = [level === 0 ? 'btn btn-glass snav-link' : 'btn btn-glass snav-menu-link'];
+    if (Array.isArray(item.children) && item.children.length) {
+      classNames.push('snav-trigger');
+    }
+    if (item.navAction === 'theme-toggle') {
+      classNames.push('theme-toggle');
+    }
+    if (item.isCurrentContainer) {
+      classNames.push('is-current');
+    }
+    return classNames.join(' ');
+  };
+
+  const renderTriggerLabel = (item) => {
+    const label = escapeHtml(item.label || '');
+    const indicator = Array.isArray(item.children) && item.children.length
+      ? '<span class="snav-indicator" aria-hidden="true">&gt;</span>'
+      : '';
+    return `<span class="snav-label">${label}</span>${indicator}`;
+  };
+
+  const renderTrigger = (item, level) => {
+    const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+    const attrs = [
+      `class="${buildTriggerClass(level, item)}"`,
+      `data-nav-label="${escapeHtml(item.label || '')}"`,
+    ];
+
+    if (hasChildren) {
+      attrs.push('data-nav-trigger');
+      attrs.push('aria-haspopup="true"');
+      attrs.push('aria-expanded="false"');
+    }
+
+    if (item.navAction) {
+      attrs.push(`data-nav-action="${escapeHtml(item.navAction)}"`);
+    }
+
+    if (item.navAction === 'theme-toggle') {
+      attrs.push('data-light-label="☀️ Зміна теми"');
+      attrs.push('data-dark-label="🌙 Зміна теми"');
+    }
+
+    if (item.isCurrent || item.isCurrentContainer) {
+      attrs.push('aria-current="page"');
+    }
+
+    if (item.navAction === 'theme-toggle' || item.isDisabledLink) {
+      return `<button type="button" ${attrs.join(' ')}>${renderTriggerLabel(item)}</button>`;
+    }
+
+    const href = item.href || '#';
+    return `<a href="${escapeHtml(href)}" ${attrs.join(' ')}>${renderTriggerLabel(item)}</a>`;
+  };
+
+  const renderMenuItems = (items, level) => items.map((item) => {
+    const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+    const classNames = ['snav-item', `snav-item--level-${level}`];
+    if (hasChildren) {
+      classNames.push('snav-item--has-children');
+    }
+    if (item.isCurrentContainer) {
+      classNames.push('is-current');
+    }
+
+    const itemId = escapeHtml(item.id || item.label || `nav-item-${level}`);
+    const panelClass = level === 0
+      ? 'snav-menu snav-menu--dropdown'
+      : 'snav-menu snav-menu--flyout';
+
+    let html = `<li class="${classNames.join(' ')}" data-nav-item-id="${itemId}" data-nav-level="${level}">`;
+    html += renderTrigger(item, level);
+    if (hasChildren) {
+      html += `<div class="${panelClass}" hidden>`;
+      html += `<ul class="snav-menu-list" data-nav-level="${level + 1}">`;
+      html += renderMenuItems(item.children, level + 1);
+      html += '</ul></div>';
+    }
+    html += '</li>';
+    return html;
+  }).join('');
 %>
 <% if (shouldRenderNavbar) { %>
-  <nav class="studerria-navbar" aria-label="Global Navigation">
-    <a class="studerria-brand" href="<%= isAuthed ? '/home' : '/' %>">Studerria</a>
+  <% if (shouldRenderAppNav) { %>
+    <nav class="navbar navbar-expand-lg topbar topbar--title-spotlight studerria-nav-shell" aria-label="Global Navigation" data-studerria-nav>
+      <div class="container">
+        <div class="snav-main">
+          <a class="navbar-brand text-white me-auto topbar-title-spotlight" href="<%= isAuthed ? '/home' : '/' %>">Studerria</a>
+          <span class="snav-brand-spacer" aria-hidden="true"></span>
+          <ul class="snav-list" data-nav-level="0">
+            <%- renderMenuItems(visibleNavItems, 0) %>
+          </ul>
+        </div>
+        <div class="d-flex align-items-center gap-2 topbar-actions snav-actions justify-content-end">
+          <% if (displayRoleText) { %>
+            <span class="me-2 muted text-nowrap snav-user-meta"><%= displayRoleText %></span>
+          <% } %>
+          <form method="POST" action="/logout" class="snav-logout-form">
+            <button class="theme-toggle-min snav-logout-btn" type="submit" aria-label="Вийти">Вийти</button>
+          </form>
+        </div>
+      </div>
+    </nav>
+  <% } else { %>
+    <nav class="studerria-navbar" aria-label="Global Navigation">
+      <a class="studerria-brand" href="<%= isAuthed ? '/home' : '/' %>">Studerria</a>
 
-    <div class="studerria-nav-links">
-      <% if (isAuthed) { %>
-        <a class="studerria-nav-link" href="/schedule">Schedule</a>
-        <a class="studerria-nav-link" href="/subjects">Subjects</a>
-        <a class="studerria-nav-link" href="/teamwork">Teamwork</a>
-        <a class="studerria-nav-link" href="/profile">Profile</a>
-        <% if (currentRole === 'admin') { %>
-          <a class="studerria-nav-link" href="/admin">Admin</a>
+      <div class="studerria-nav-links">
+        <% if (isAuthed) { %>
+          <a class="studerria-nav-link" href="/home">Головна</a>
+          <a class="studerria-nav-link" href="/schedule">Навчання</a>
+          <a class="studerria-nav-link" href="/profile"><%= personalLabel %></a>
+          <% if (userRoles.some((roleKey) => ['admin', 'deanery', 'starosta', 'teacher'].includes(roleKey))) { %>
+            <a class="studerria-nav-link" href="/admin">Адмінка</a>
+          <% } %>
+        <% } else { %>
+          <a class="studerria-nav-link" href="/">Overview</a>
+          <a class="studerria-nav-link" href="/login">Login</a>
         <% } %>
-      <% } else { %>
-        <a class="studerria-nav-link" href="/">Overview</a>
-        <a class="studerria-nav-link" href="/login">Login</a>
-      <% } %>
-    </div>
+      </div>
 
-    <div class="studerria-nav-actions">
-      <% if (displayName) { %>
-        <span class="studerria-user-pill" title="Signed in"><%= displayName %></span>
-      <% } %>
-      <button
-        type="button"
-        class="studerria-theme-toggle"
-        id="studerriaThemeToggle"
-        aria-label="Toggle theme"
-        data-light-label="�����"
-        data-dark-label="�����"
-      >
-        �����
-      </button>
-      <% if (isAuthed) { %>
-        <a class="studerria-signup" href="/home">Open App</a>
-      <% } else { %>
-        <a class="studerria-signup" href="/register">Sign up</a>
-      <% } %>
-    </div>
-  </nav>
+      <div class="studerria-nav-actions">
+        <% if (displayName) { %>
+          <span class="studerria-user-pill" title="Signed in"><%= displayName %></span>
+        <% } %>
+        <button
+          type="button"
+          class="studerria-theme-toggle"
+          id="studerriaThemeToggle"
+          aria-label="Toggle theme"
+          data-light-label="Світла"
+          data-dark-label="Темна"
+        >
+          Темна
+        </button>
+        <% if (isAuthed) { %>
+          <a class="studerria-signup" href="/home">Open App</a>
+        <% } else { %>
+          <a class="studerria-signup" href="/register">Sign up</a>
+        <% } %>
+      </div>
+    </nav>
+  <% } %>
 <% } %>

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.31",
+      "date": "2026-03-06",
+      "items": [
+        "refactor(nav-config): replaced the duplicated page-level menu logic with one shared navbar config, one nav middleware, and one recursive EJS renderer that now injects consistent navigation locals across Studerria pages",
+        "feat(nav-dropdown-flyouts): rebuilt the app navigation structure into `Studerria -> Адмінка -> Головна -> Навчання -> Особисте`, with role-aware filtering, current-page removal, Journal -> Insights flyouts, and desktop hover plus mobile tap plus keyboard interactions",
+        "chore(nav-legacy-drawers): retired the old desktop drawer and mobile menu partial behavior, wired shared navbar JS/CSS globally, and kept logout plus changelog access aligned with the existing liquid-glass shell"
+      ]
+    },
+    {
       "version": "1.1.30",
       "date": "2026-03-06",
       "items": [

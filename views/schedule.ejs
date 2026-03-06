@@ -1660,61 +1660,13 @@
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'schedule' }) %>
-    <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
-      <div class="drawer-head">
-        <div class="drawer-title">Меню</div>
-        <button class="drawer-close" type="button" id="scheduleDrawerClose" aria-label="Close menu">✕</button>
-      </div>
-      <div class="drawer-actions">
-        <% if (role === 'admin') { %>
-          <form method="POST" action="/admin/switch-to-admin" class="drawer-action-wrap">
-            <button class="drawer-action" type="submit">🛠️ <%= t('schedule.backToAdmin') %></button>
-          </form>
-        <% } else if (hasCustomAdminPanelAccess) { %>
-          <a class="drawer-action" href="<%= customAdminPanelHref || '/admin' %>">🛠️ <%= t('schedule.backToAdmin') %></a>
-        <% } %>
-        <% if (role === 'starosta') { %>
-          <a class="drawer-action" href="/starosta">🧑‍🏫 <%= t('menu.starosta') %></a>
-        <% } %>
-        <% if (role === 'deanery') { %>
-          <a class="drawer-action" href="/deanery">🏛️ <%= t('menu.deanery') %></a>
-        <% } %>
-        <a class="drawer-action" href="/home">🏠 Головна</a>
-        <a class="drawer-action" href="/journal">📘 Журнал</a>
-        <a class="drawer-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
-        <a class="drawer-action" href="/subjects">📚 Предмети</a>
-        <% if (role === 'teacher') { %>
-          <a class="drawer-action" href="/teacher/workspace">Teacher workspace</a>
-        <% } %>
-        <% if ((role === 'student' || role === 'starosta' || role === 'teacher' || viewAs === 'student') && settings && settings.allow_custom_deadlines) { %>
-          <button class="drawer-action" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
-            🌀 Дивні дедлайни
-          </button>
-        <% } %>
-        <% if (settings && settings.allow_messages) { %>
-          <button class="drawer-action" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">💬 Повідомлення</button>
-        <% } %>
-        <a class="drawer-action" href="/profile">👤 <%= t('schedule.profile') %></a>
-        <button
-          class="drawer-action theme-toggle"
-          type="button"
-          data-light-label="☀️ Зміна теми"
-          data-dark-label="🌙 Зміна теми"
-        >
-          🌙 Зміна теми
-        </button>
-        <form method="POST" action="/logout" class="drawer-action-wrap">
-          <button class="drawer-action" type="submit">🚪 <%= t('schedule.logout') %></button>
-        </form>
-      </div>
-    </aside>
 
     <div class="schedule-shell" id="scheduleShell">
       <main class="container pt-2 pb-4 schedule-content enter">
         <div class="glass week-hero liquid-card mb-4">
           <div>
             <h1 class="hero-title weekHeadline mb-1"><%= t('schedule.header') %></h1>
-            <div class="hero-sub" id="daily-phrase">Your rhythm, your focus — let’s make this week count.</div>
+            <div class="hero-sub" id="daily-phrase">Your rhythm, your focus вЂ” letвЂ™s make this week count.</div>
           </div>
           <div class="hero-actions">
             <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
@@ -1799,8 +1751,8 @@
                   <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : ''; %>
                   <% const subjectName = cls.subject_name || ''; %>
                   <% const subjectNameLower = subjectName.toLowerCase(); %>
-                  <% const inlineType = /(лекц|семін|лаб|практ|lecture|seminar|lab|practice)/.test(subjectNameLower); %>
-                  <% const typeLabel = cls.lesson_type === 'lecture' ? 'Лекція' : cls.lesson_type === 'seminar' ? 'Семінар' : cls.lesson_type === 'lab' ? 'Лаб' : cls.lesson_type === 'practice' ? 'Практика' : ''; %>
+                  <% const inlineType = /(Р»РµРєС†|СЃРµРјС–РЅ|Р»Р°Р±|РїСЂР°РєС‚|lecture|seminar|lab|practice)/.test(subjectNameLower); %>
+                  <% const typeLabel = cls.lesson_type === 'lecture' ? 'Р›РµРєС†С–СЏ' : cls.lesson_type === 'seminar' ? 'РЎРµРјС–РЅР°СЂ' : cls.lesson_type === 'lab' ? 'Р›Р°Р±' : cls.lesson_type === 'practice' ? 'РџСЂР°РєС‚РёРєР°' : ''; %>
                   <% const showTypeBadge = cls.lesson_type && !inlineType && typeLabel; %>
                   <% const legacyKey = `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}`; %>
                   <% const datedKey = cls.class_date ? `${legacyKey}|${cls.class_date}` : null; %>
@@ -1815,17 +1767,17 @@
                   <% const sessionKindRaw = hwMeta && hwMeta.session_kind ? String(hwMeta.session_kind) : ''; %>
                   <% const sessionKind = ['exam', 'credit', 'consultation', 'mixed', 'session'].includes(sessionKindRaw) ? sessionKindRaw : ''; %>
                   <% const sessionChipText = sessionKind === 'exam'
-                    ? 'Сесія · Екзамен'
+                    ? 'РЎРµСЃС–СЏ В· Р•РєР·Р°РјРµРЅ'
                     : sessionKind === 'credit'
-                      ? 'Сесія · Залік'
+                      ? 'РЎРµСЃС–СЏ В· Р—Р°Р»С–Рє'
                       : sessionKind === 'consultation'
-                        ? 'Сесія · Консультація'
+                        ? 'РЎРµСЃС–СЏ В· РљРѕРЅСЃСѓР»СЊС‚Р°С†С–СЏ'
                         : sessionKind
-                          ? 'Сесія'
+                          ? 'РЎРµСЃС–СЏ'
                           : ''; %>
                   <% const sessionCardClass = sessionKind ? `has-session session-${sessionKind}` : ''; %>
                   <% const groupLabel = cls.group_label ? cls.group_label : `Group ${cls.group_number}`; %>
-                  <% const courseLabel = cls.course_name ? ` · ${cls.course_name}` : ''; %>
+                  <% const courseLabel = cls.course_name ? ` В· ${cls.course_name}` : ''; %>
                   <% const prev = idx > 0 ? dayEntries[idx - 1] : null; %>
                   <% const next = idx < dayEntries.length - 1 ? dayEntries[idx + 1] : null; %>
                   <% const chainPrev = prev && prev.subject_id === cls.subject_id && cls.class_number === prev.class_number + 1; %>
@@ -1854,7 +1806,7 @@
                     data-date="<%= cls.class_date %>"
                     data-is-general="<%= cls.is_general ? 1 : 0 %>"
                     data-use-local-time="<%= cls.use_local_time ? 1 : 0 %>"
-                    data-detail="<%= tooltipParts.join(' • ') %>"
+                    data-detail="<%= tooltipParts.join(' вЂў ') %>"
                   >
                     <div class="schedule-card-inner">
                       <div class="schedule-main">
@@ -1864,7 +1816,7 @@
                             <span class="lesson-pill"><%= typeLabel %></span>
                           <% } %>
                         </div>
-                        <div class="schedule-meta classMeta"><%= groupLabel %> · Пара <%= cls.class_number %><%= courseLabel %></div>
+                        <div class="schedule-meta classMeta"><%= groupLabel %> В· РџР°СЂР° <%= cls.class_number %><%= courseLabel %></div>
                       </div>
                       <div class="schedule-aside">
                         <div class="schedule-time classTime"><%= timeLabel %></div>
@@ -1873,13 +1825,13 @@
                             <span class="session-chip chip <%= sessionKind === 'exam' ? 'session-chip--exam' : sessionKind === 'credit' ? 'session-chip--credit' : sessionKind === 'consultation' ? 'session-chip--consultation' : 'session-chip--mixed' %>"><%= sessionChipText %></span>
                           <% } %>
                           <% if (hwMeta && hwMeta.control) { %>
-                            <span class="control-chip chip badge--control">Контроль</span>
+                            <span class="control-chip chip badge--control">РљРѕРЅС‚СЂРѕР»СЊ</span>
                           <% } %>
                           <% if (hwMeta && hwMeta.teacher_homework) { %>
-                            <span class="hw-chip chip badge--hw">Викл.ДЗ</span>
+                            <span class="hw-chip chip badge--hw">Р’РёРєР».Р”Р—</span>
                           <% } %>
                           <% if (hwMeta && hwMeta.credit) { %>
-                            <span class="hw-chip chip badge--control">Залік</span>
+                            <span class="hw-chip chip badge--control">Р—Р°Р»С–Рє</span>
                           <% } %>
                           <% if (hwMeta && hwMeta.meet) { %>
                             <% if (hwMeta.meet_link) { %>
@@ -1889,10 +1841,10 @@
                             <% } %>
                           <% } %>
                           <% if (hwMeta) { %>
-                            <span class="hw-chip chip badge--hw">ДЗ <%= hwMeta.count %></span>
+                            <span class="hw-chip chip badge--hw">Р”Р— <%= hwMeta.count %></span>
                           <% } %>
-                          <span class="schedule-chip chip chip-now">Зараз</span>
-                          <span class="schedule-chip chip chip-next">Далі</span>
+                          <span class="schedule-chip chip chip-now">Р—Р°СЂР°Р·</span>
+                          <span class="schedule-chip chip chip-next">Р”Р°Р»С–</span>
                         </div>
                       </div>
                     </div>
@@ -1904,11 +1856,11 @@
             <% const customItems = dateKey && customDeadlinesByDate ? customDeadlinesByDate[dateKey] : null; %>
             <% if (settings && settings.allow_custom_deadlines && customItems && customItems.length) { %>
               <details class="deadline-block">
-                <summary class="deadline-title">Дивні дедлайни</summary>
+                <summary class="deadline-title">Р”РёРІРЅС– РґРµРґР»Р°Р№РЅРё</summary>
                 <div class="deadline-content">
                   <% customItems.forEach(function(item) { %>
                     <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
-                    <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
+                    <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + 'вЂ¦' : item.description) : ''; %>
                     <div
                       class="deadline-item"
                       data-custom-id="<%= item.id %>"
@@ -1922,23 +1874,23 @@
                         <% let groupNote = ''; %>
                         <% if (role === 'teacher') { %>
                           <% if (teacherGroups.length > 1) { %>
-                            <% groupNote = ` · Групи ${teacherGroups.join(', ')}`; %>
+                            <% groupNote = ` В· Р“СЂСѓРїРё ${teacherGroups.join(', ')}`; %>
                           <% } else if (teacherGroups.length === 1) { %>
-                            <% groupNote = ` · Група ${teacherGroups[0]}`; %>
+                            <% groupNote = ` В· Р“СЂСѓРїР° ${teacherGroups[0]}`; %>
                           <% } else if (item.group_number) { %>
-                            <% groupNote = ` · Група ${item.group_number}`; %>
+                            <% groupNote = ` В· Р“СЂСѓРїР° ${item.group_number}`; %>
                           <% } %>
                         <% } %>
-                        <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+                        <div class="deadline-meta">Р”РµРґР»Р°Р№РЅ: <%= dueLabel %><%= groupNote %></div>
                         <% if (item.created_by) { %>
-                          <div class="deadline-meta">Додав: <%= item.created_by %></div>
+                          <div class="deadline-meta">Р”РѕРґР°РІ: <%= item.created_by %></div>
                         <% } %>
                         <div class="d-flex flex-wrap gap-1 mt-1">
                           <% if (Number(item.is_credit || 0) === 1) { %>
-                            <span class="priority-chip priority-control">Залік</span>
+                            <span class="priority-chip priority-control">Р—Р°Р»С–Рє</span>
                           <% } %>
                           <% if (Number(item.is_teacher_homework || 0) === 1) { %>
-                            <span class="priority-chip priority-urgent">Викл.ДЗ</span>
+                            <span class="priority-chip priority-urgent">Р’РёРєР».Р”Р—</span>
                           <% } %>
                         </div>
                       </div>
@@ -1964,11 +1916,11 @@
                 </div>
               </div>
               <details class="deadline-block">
-                <summary class="deadline-title">Дивні дедлайни</summary>
+                <summary class="deadline-title">Р”РёРІРЅС– РґРµРґР»Р°Р№РЅРё</summary>
                 <div class="deadline-content">
                   <% card.items.forEach(function(item) { %>
                     <% const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : ''; %>
-                    <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) : ''; %>
+                    <% const shortDesc = item.description ? (item.description.length > 80 ? item.description.slice(0, 80) + 'вЂ¦' : item.description) : ''; %>
                     <div
                       class="deadline-item"
                       data-custom-id="<%= item.id %>"
@@ -1982,23 +1934,23 @@
                         <% let groupNote = ''; %>
                         <% if (role === 'teacher') { %>
                           <% if (teacherGroups.length > 1) { %>
-                            <% groupNote = ` · Групи ${teacherGroups.join(', ')}`; %>
+                            <% groupNote = ` В· Р“СЂСѓРїРё ${teacherGroups.join(', ')}`; %>
                           <% } else if (teacherGroups.length === 1) { %>
-                            <% groupNote = ` · Група ${teacherGroups[0]}`; %>
+                            <% groupNote = ` В· Р“СЂСѓРїР° ${teacherGroups[0]}`; %>
                           <% } else if (item.group_number) { %>
-                            <% groupNote = ` · Група ${item.group_number}`; %>
+                            <% groupNote = ` В· Р“СЂСѓРїР° ${item.group_number}`; %>
                           <% } %>
                         <% } %>
-                        <div class="deadline-meta">Дедлайн: <%= dueLabel %><%= groupNote %></div>
+                        <div class="deadline-meta">Р”РµРґР»Р°Р№РЅ: <%= dueLabel %><%= groupNote %></div>
                         <% if (item.created_by) { %>
-                          <div class="deadline-meta">Додав: <%= item.created_by %></div>
+                          <div class="deadline-meta">Р”РѕРґР°РІ: <%= item.created_by %></div>
                         <% } %>
                         <div class="d-flex flex-wrap gap-1 mt-1">
                           <% if (Number(item.is_credit || 0) === 1) { %>
-                            <span class="priority-chip priority-control">Залік</span>
+                            <span class="priority-chip priority-control">Р—Р°Р»С–Рє</span>
                           <% } %>
                           <% if (Number(item.is_teacher_homework || 0) === 1) { %>
-                            <span class="priority-chip priority-urgent">Викл.ДЗ</span>
+                            <span class="priority-chip priority-urgent">Р’РёРєР».Р”Р—</span>
                           <% } %>
                         </div>
                       </div>
@@ -2014,14 +1966,14 @@
       </main>
 
       <div class="week-rail week-pager" id="weekPager">
-        <button class="week-nav-btn week-nav-btn--prev" type="button" id="weekPrev" aria-label="Previous week">‹</button>
+        <button class="week-nav-btn week-nav-btn--prev" type="button" id="weekPrev" aria-label="Previous week">вЂ№</button>
         <div class="week-pill" id="weekPill" aria-label="Current week">
           <span class="week-pill-title"><%= t('schedule.week') %> <span id="weekPillCurrent"><%= currentWeek %></span></span>
           <span class="week-pill-progress" aria-hidden="true">
             <span class="week-pill-progress-fill" id="weekPillProgress"></span>
           </span>
         </div>
-        <button class="week-nav-btn week-nav-btn--next" type="button" id="weekNext" aria-label="Next week">›</button>
+        <button class="week-nav-btn week-nav-btn--next" type="button" id="weekNext" aria-label="Next week">вЂє</button>
       </div>
 
       <%- include('partials/app-footer', { footerSyncStatus: true }) %>
@@ -2153,7 +2105,7 @@
                     <label class="toggle" for="hwControl">
                       <span class="toggle-knob"></span>
                     </label>
-                    <span class="toggle-text">Контроль</span>
+                    <span class="toggle-text">РљРѕРЅС‚СЂРѕР»СЊ</span>
                   </div>
                 </div>
                 <div class="mb-3">
@@ -2161,8 +2113,8 @@
                   <div class="file-field">
                     <input id="hwFile" name="attachment" type="file" class="file-input" />
                     <div class="file-ui">
-                      <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="hwFile">Оберіть</button>
-                      <span class="file-name" data-file-name="hwFile">Файл не вибрано</span>
+                      <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="hwFile">РћР±РµСЂС–С‚СЊ</button>
+                      <span class="file-name" data-file-name="hwFile">Р¤Р°Р№Р» РЅРµ РІРёР±СЂР°РЅРѕ</span>
                     </div>
                   </div>
                 </div>
@@ -2194,7 +2146,7 @@
               </form>
             <% } else { %>
               <div class="alert alert-info mb-0">
-                Студентські ДЗ вимкнені в System Settings.
+                РЎС‚СѓРґРµРЅС‚СЃСЊРєС– Р”Р— РІРёРјРєРЅРµРЅС– РІ System Settings.
               </div>
             <% } %>
           </div>
@@ -2213,17 +2165,17 @@
         <div class="modal-content">
           <form method="POST" id="homeworkSubmitForm" enctype="multipart/form-data" autocomplete="off">
             <div class="modal-header">
-              <h5 class="modal-title">Здати домашнє завдання</h5>
+              <h5 class="modal-title">Р—РґР°С‚Рё РґРѕРјР°С€РЅС” Р·Р°РІРґР°РЅРЅСЏ</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
               <div class="mb-3 text-muted small" id="homeworkSubmitMeta">-</div>
               <div class="mb-3">
-                <label class="form-label">Текст відповіді (опц.)</label>
+                <label class="form-label">РўРµРєСЃС‚ РІС–РґРїРѕРІС–РґС– (РѕРїС†.)</label>
                 <textarea class="form-control" name="submission_text" id="homeworkSubmitText" rows="4" maxlength="4000"></textarea>
               </div>
               <div class="mb-3">
-                <label class="form-label">Посилання (опц.)</label>
+                <label class="form-label">РџРѕСЃРёР»Р°РЅРЅСЏ (РѕРїС†.)</label>
                 <input
                   class="form-control"
                   type="text"
@@ -2236,20 +2188,20 @@
                 />
               </div>
               <div class="mb-3">
-                <label class="form-label">Файл (опц.)</label>
+                <label class="form-label">Р¤Р°Р№Р» (РѕРїС†.)</label>
                 <div class="file-field">
                   <input id="homeworkSubmitFile" type="file" class="file-input" name="submission_attachment" />
                   <div class="file-ui">
-                    <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="homeworkSubmitFile">Оберіть</button>
-                    <span class="file-name" data-file-name="homeworkSubmitFile">Файл не вибрано</span>
+                    <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="homeworkSubmitFile">РћР±РµСЂС–С‚СЊ</button>
+                    <span class="file-name" data-file-name="homeworkSubmitFile">Р¤Р°Р№Р» РЅРµ РІРёР±СЂР°РЅРѕ</span>
                   </div>
                 </div>
               </div>
               <input type="hidden" id="homeworkSubmitId" />
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Закрити</button>
-              <button type="submit" class="btn btn-primary glass">Здати</button>
+              <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Р—Р°РєСЂРёС‚Рё</button>
+              <button type="submit" class="btn btn-primary glass">Р—РґР°С‚Рё</button>
             </div>
           </form>
         </div>
@@ -2262,19 +2214,19 @@
         <div class="modal-content">
           <form method="POST" action="/homework/custom" enctype="multipart/form-data" autocomplete="off">
             <div class="modal-header">
-              <h5 class="modal-title">Дивні дедлайни</h5>
+              <h5 class="modal-title">Р”РёРІРЅС– РґРµРґР»Р°Р№РЅРё</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
               <% if (!customDeadlineSubjects || !customDeadlineSubjects.length) { %>
-                <div class="alert alert-warning">Спочатку оберіть предмети у профілі, щоб додати дедлайн.</div>
+                <div class="alert alert-warning">РЎРїРѕС‡Р°С‚РєСѓ РѕР±РµСЂС–С‚СЊ РїСЂРµРґРјРµС‚Рё Сѓ РїСЂРѕС„С–Р»С–, С‰РѕР± РґРѕРґР°С‚Рё РґРµРґР»Р°Р№РЅ.</div>
               <% } %>
               <div class="row g-3">
                 <% if (role === 'teacher') { %>
                   <div class="col-12 col-md-6">
-                    <label class="form-label">Курс</label>
+                    <label class="form-label">РљСѓСЂСЃ</label>
                     <select class="form-select" id="customCourseSelect" name="course_id" required>
-                      <option value="" disabled selected>Оберіть курс</option>
+                      <option value="" disabled selected>РћР±РµСЂС–С‚СЊ РєСѓСЂСЃ</option>
                       <% (teacherCourses || []).forEach(function(c) { %>
                         <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
                       <% }); %>
@@ -2282,7 +2234,7 @@
                   </div>
                 <% } %>
                 <div class="col-12 col-md-6">
-                  <label class="form-label">Предмет</label>
+                  <label class="form-label">РџСЂРµРґРјРµС‚</label>
                   <select
                     class="form-select"
                     id="customSubjectSelect"
@@ -2290,7 +2242,7 @@
                     <%= (!customDeadlineSubjects || !customDeadlineSubjects.length) ? 'disabled' : '' %>
                     required
                   >
-                    <option value="" disabled selected>Оберіть предмет</option>
+                    <option value="" disabled selected>РћР±РµСЂС–С‚СЊ РїСЂРµРґРјРµС‚</option>
                     <% (customDeadlineSubjects || []).forEach(function(subj) { %>
                       <option
                         value="<%= subj.id %>"
@@ -2306,14 +2258,14 @@
                 </div>
                 <% if (role === 'teacher') { %>
                   <div class="col-12 col-md-6">
-                    <label class="form-label">Група</label>
+                    <label class="form-label">Р“СЂСѓРїР°</label>
                     <select class="form-select" id="customGroupSelect" name="group_number">
-                      <option value="">Усі групи</option>
+                      <option value="">РЈСЃС– РіСЂСѓРїРё</option>
                     </select>
                   </div>
                 <% } %>
                 <div class="col-12 col-md-6">
-                  <label class="form-label">Дедлайн</label>
+                  <label class="form-label">Р”РµРґР»Р°Р№РЅ</label>
                   <input type="date" class="form-control" name="custom_due_date" required />
                 </div>
                 <% if (role && role !== 'student') { %>
@@ -2332,11 +2284,11 @@
                   </div>
                 <% } %>
                 <div class="col-12">
-                  <label class="form-label">Опис</label>
+                  <label class="form-label">РћРїРёСЃ</label>
                   <textarea class="form-control" id="customHwDescription" name="description" rows="3" required></textarea>
                 </div>
                 <div class="col-12 col-md-6">
-                  <label class="form-label">Посилання (опц.)</label>
+                  <label class="form-label">РџРѕСЃРёР»Р°РЅРЅСЏ (РѕРїС†.)</label>
                   <input
                     type="text"
                     inputmode="url"
@@ -2348,7 +2300,7 @@
                   />
                 </div>
                 <div class="col-12 col-md-6">
-                  <label class="form-label">Онлайн-зустріч (опц.)</label>
+                  <label class="form-label">РћРЅР»Р°Р№РЅ-Р·СѓСЃС‚СЂС–С‡ (РѕРїС†.)</label>
                   <input
                     type="text"
                     inputmode="url"
@@ -2378,21 +2330,21 @@
                   </div>
                 <% } %>
                 <div class="col-12">
-                  <label class="form-label">Файл (опц.)</label>
+                  <label class="form-label">Р¤Р°Р№Р» (РѕРїС†.)</label>
                   <div class="file-field">
                     <input id="customFile" type="file" class="file-input" name="attachment" />
                     <div class="file-ui">
-                      <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="customFile">Оберіть</button>
-                      <span class="file-name" data-file-name="customFile">Файл не вибрано</span>
+                      <button class="btn btn-ghost btn-sm file-btn" type="button" data-file-target="customFile">РћР±РµСЂС–С‚СЊ</button>
+                      <span class="file-name" data-file-name="customFile">Р¤Р°Р№Р» РЅРµ РІРёР±СЂР°РЅРѕ</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Закрити</button>
+              <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Р—Р°РєСЂРёС‚Рё</button>
               <button type="submit" class="btn btn-primary glass" <%= (!customDeadlineSubjects || !customDeadlineSubjects.length) ? 'disabled' : '' %>>
-                Зберегти
+                Р—Р±РµСЂРµРіС‚Рё
               </button>
             </div>
           </form>
@@ -2404,7 +2356,7 @@
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Дивні дедлайни</h5>
+            <h5 class="modal-title">Р”РёРІРЅС– РґРµРґР»Р°Р№РЅРё</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -2415,8 +2367,8 @@
             <div class="mb-3" id="customDeadlineDescription"></div>
             <div class="mb-2" id="customDeadlineLinks"></div>
             <div class="d-flex align-items-center gap-2" id="customDeadlineReactions">
-              <button class="react-btn" type="button" data-emoji="🔥">🔥 <span class="react-count">0</span></button>
-              <button class="react-btn" type="button" data-emoji="👍">👍 <span class="react-count">0</span></button>
+              <button class="react-btn" type="button" data-emoji="рџ”Ґ">рџ”Ґ <span class="react-count">0</span></button>
+              <button class="react-btn" type="button" data-emoji="рџ‘Ќ">рџ‘Ќ <span class="react-count">0</span></button>
             </div>
           </div>
           <div class="modal-footer">
@@ -2434,21 +2386,21 @@
       <div class="modal-dialog modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Повідомлення</h5>
+            <h5 class="modal-title">РџРѕРІС–РґРѕРјР»РµРЅРЅСЏ</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <label class="form-label">Фільтр по предмету</label>
+              <label class="form-label">Р¤С–Р»СЊС‚СЂ РїРѕ РїСЂРµРґРјРµС‚Сѓ</label>
               <select class="form-select" id="messagesSubjectFilter">
-                <option value="">Усі предмети</option>
+                <option value="">РЈСЃС– РїСЂРµРґРјРµС‚Рё</option>
                 <% (messageSubjects || []).forEach(function(s) { %>
                   <option value="<%= s.subject_id %>"><%= s.subject_name %></option>
                 <% }); %>
               </select>
             </div>
             <ul id="messagesList" class="list-group">
-              <li class="list-group-item text-muted">Завантаження...</li>
+              <li class="list-group-item text-muted">Р—Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ...</li>
             </ul>
           </div>
         </div>
@@ -2460,16 +2412,16 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-welcome-modal">
           <div class="modal-body text-center">
-            <div class="welcome-title mb-2">👋 Ласкаво просимо до Studerria!</div>
+            <div class="welcome-title mb-2">рџ‘‹ Р›Р°СЃРєР°РІРѕ РїСЂРѕСЃРёРјРѕ РґРѕ Studerria!</div>
             <div class="welcome-subtitle mb-3">
-              із задоволенням презентуємо платформу <strong>Studerria</strong>, створену студентом - для студентів.
+              С–Р· Р·Р°РґРѕРІРѕР»РµРЅРЅСЏРј РїСЂРµР·РµРЅС‚СѓС”РјРѕ РїР»Р°С‚С„РѕСЂРјСѓ <strong>Studerria</strong>, СЃС‚РІРѕСЂРµРЅСѓ СЃС‚СѓРґРµРЅС‚РѕРј - РґР»СЏ СЃС‚СѓРґРµРЅС‚С–РІ.
             </div>
             <div class="small mb-4">
-              🎯 Організовуйте пари, домашні завдання та командну роботу з єдиного зручного простору.
+              рџЋЇ РћСЂРіР°РЅС–Р·РѕРІСѓР№С‚Рµ РїР°СЂРё, РґРѕРјР°С€РЅС– Р·Р°РІРґР°РЅРЅСЏ С‚Р° РєРѕРјР°РЅРґРЅСѓ СЂРѕР±РѕС‚Сѓ Р· С”РґРёРЅРѕРіРѕ Р·СЂСѓС‡РЅРѕРіРѕ РїСЂРѕСЃС‚РѕСЂСѓ.
               <br />
-              ⚙️ Усі зауваження, баги чи пропозиції — надсилайте напряму адміністратору системи.
+              вљ™пёЏ РЈСЃС– Р·Р°СѓРІР°Р¶РµРЅРЅСЏ, Р±Р°РіРё С‡Рё РїСЂРѕРїРѕР·РёС†С–С— вЂ” РЅР°РґСЃРёР»Р°Р№С‚Рµ РЅР°РїСЂСЏРјСѓ Р°РґРјС–РЅС–СЃС‚СЂР°С‚РѕСЂСѓ СЃРёСЃС‚РµРјРё.
             </div>
-            <button type="button" class="btn btn-primary glass" data-bs-dismiss="modal">Почати користування</button>
+            <button type="button" class="btn btn-primary glass" data-bs-dismiss="modal">РџРѕС‡Р°С‚Рё РєРѕСЂРёСЃС‚СѓРІР°РЅРЅСЏ</button>
           </div>
         </div>
       </div>
@@ -2508,7 +2460,7 @@
         const key = el.id || el.name || anchor.id || '';
         const tip = document.createElement('div');
         tip.className = 'custom-tooltip';
-        tip.textContent = message || 'Перевірте поле';
+        tip.textContent = message || 'РџРµСЂРµРІС–СЂС‚Рµ РїРѕР»Рµ';
         if (key) tip.dataset.for = key;
         document.body.appendChild(tip);
 
@@ -2612,7 +2564,7 @@
         customGroupSelect.innerHTML = '';
         if (!opt || !opt.value) {
           customGroupSelect.disabled = true;
-          customGroupSelect.innerHTML = '<option value="">Усі групи</option>';
+          customGroupSelect.innerHTML = '<option value="">РЈСЃС– РіСЂСѓРїРё</option>';
           return;
         }
         const isGeneral = opt.dataset.isGeneral === '1';
@@ -2620,28 +2572,28 @@
         const groupCount = Number(opt.dataset.groupCount || 0);
         if (isGeneral) {
           customGroupSelect.disabled = true;
-          customGroupSelect.innerHTML = '<option value="">Усі групи</option>';
+          customGroupSelect.innerHTML = '<option value="">РЈСЃС– РіСЂСѓРїРё</option>';
           return;
         }
         if (groupNum) {
           customGroupSelect.disabled = false;
-          customGroupSelect.innerHTML = `<option value="${groupNum}">Група ${groupNum}</option>`;
+          customGroupSelect.innerHTML = `<option value="${groupNum}">Р“СЂСѓРїР° ${groupNum}</option>`;
           customGroupSelect.value = groupNum;
           return;
         }
         if (groupCount > 0) {
           customGroupSelect.disabled = false;
-          customGroupSelect.innerHTML = '<option value="" disabled selected>Оберіть групу</option>';
+          customGroupSelect.innerHTML = '<option value="" disabled selected>РћР±РµСЂС–С‚СЊ РіСЂСѓРїСѓ</option>';
           for (let i = 1; i <= groupCount; i += 1) {
             const option = document.createElement('option');
             option.value = String(i);
-            option.textContent = `Група ${i}`;
+            option.textContent = `Р“СЂСѓРїР° ${i}`;
             customGroupSelect.appendChild(option);
           }
           return;
         }
         customGroupSelect.disabled = true;
-        customGroupSelect.innerHTML = '<option value="">Усі групи</option>';
+        customGroupSelect.innerHTML = '<option value="">РЈСЃС– РіСЂСѓРїРё</option>';
       }
 
       if (customCourseSelect) {
@@ -2825,18 +2777,18 @@
           if (item.custom_due_date || item.class_date) {
             const dueDate = item.custom_due_date || item.class_date;
             const dueLabel = new Date(dueDate).toLocaleDateString('uk-UA');
-            tooltipParts.push(`Дедлайн: ${dueLabel}`);
+            tooltipParts.push(`Р”РµРґР»Р°Р№РЅ: ${dueLabel}`);
           }
           if (item.tags && item.tags.length) {
-            tooltipParts.push(`Теги: ${item.tags.join(', ')}`);
+            tooltipParts.push(`РўРµРіРё: ${item.tags.join(', ')}`);
           }
-          if (item.link_url) tooltipParts.push('Є посилання');
-          if (item.meeting_url) tooltipParts.push('Є онлайн-зустріч');
-          if (item.file_path) tooltipParts.push('Є файл');
+          if (item.link_url) tooltipParts.push('Р„ РїРѕСЃРёР»Р°РЅРЅСЏ');
+          if (item.meeting_url) tooltipParts.push('Р„ РѕРЅР»Р°Р№РЅ-Р·СѓСЃС‚СЂС–С‡');
+          if (item.file_path) tooltipParts.push('Р„ С„Р°Р№Р»');
           if (tooltipParts.length) {
             li.setAttribute('data-bs-toggle', 'tooltip');
             li.setAttribute('data-bs-placement', 'top');
-            li.setAttribute('data-bs-title', tooltipParts.join(' • '));
+            li.setAttribute('data-bs-title', tooltipParts.join(' вЂў '));
           }
 
           const title = document.createElement('div');
@@ -2847,17 +2799,17 @@
           const meta = document.createElement('div');
           meta.className = 'text-muted small mb-2';
           const created = new Date(item.created_at).toLocaleString();
-          meta.textContent = `Додав: ${item.created_by || '—'} • ${created}`;
+          meta.textContent = `Р”РѕРґР°РІ: ${item.created_by || 'вЂ”'} вЂў ${created}`;
           if (isTeacherView) {
             const groups = Array.isArray(item.group_numbers)
               ? item.group_numbers.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
               : [];
             if (groups.length > 1) {
-              meta.textContent += ` • Групи ${groups.join(', ')}`;
+              meta.textContent += ` вЂў Р“СЂСѓРїРё ${groups.join(', ')}`;
             } else if (groups.length === 1) {
-              meta.textContent += ` • Група ${groups[0]}`;
+              meta.textContent += ` вЂў Р“СЂСѓРїР° ${groups[0]}`;
             } else if (item.group_number) {
-              meta.textContent += ` • Група ${item.group_number}`;
+              meta.textContent += ` вЂў Р“СЂСѓРїР° ${item.group_number}`;
             }
           }
           li.appendChild(meta);
@@ -2879,55 +2831,55 @@
             const sessionChip = document.createElement('span');
             sessionChip.className = 'priority-chip priority-control';
             if (sessionType === 'exam') {
-              sessionChip.textContent = 'Сесія: Екзамен';
+              sessionChip.textContent = 'РЎРµСЃС–СЏ: Р•РєР·Р°РјРµРЅ';
             } else if (sessionType === 'credit') {
-              sessionChip.textContent = 'Сесія: Залік';
+              sessionChip.textContent = 'РЎРµСЃС–СЏ: Р—Р°Р»С–Рє';
             } else if (sessionType === 'consultation') {
-              sessionChip.textContent = 'Сесія: Консультація';
+              sessionChip.textContent = 'РЎРµСЃС–СЏ: РљРѕРЅСЃСѓР»СЊС‚Р°С†С–СЏ';
             } else {
-              sessionChip.textContent = 'Сесія';
+              sessionChip.textContent = 'РЎРµСЃС–СЏ';
             }
             priorityWrap.appendChild(sessionChip);
           }
           if (item.is_control) {
             const control = document.createElement('span');
             control.className = 'priority-chip priority-control';
-            control.textContent = 'Контрольна';
+            control.textContent = 'РљРѕРЅС‚СЂРѕР»СЊРЅР°';
             priorityWrap.appendChild(control);
           } else if (isUrgent) {
             const urgent = document.createElement('span');
             urgent.className = 'priority-chip priority-urgent';
-            urgent.textContent = 'Терміново';
+            urgent.textContent = 'РўРµСЂРјС–РЅРѕРІРѕ';
             priorityWrap.appendChild(urgent);
           } else {
             const normal = document.createElement('span');
             normal.className = 'priority-chip priority-normal';
-            normal.textContent = 'Звичайне';
+            normal.textContent = 'Р—РІРёС‡Р°Р№РЅРµ';
             priorityWrap.appendChild(normal);
           }
           if (item.is_credit) {
             const credit = document.createElement('span');
             credit.className = 'priority-chip priority-control';
-            credit.textContent = 'Залік';
+            credit.textContent = 'Р—Р°Р»С–Рє';
             priorityWrap.appendChild(credit);
           }
           if (item.is_teacher_homework) {
             const teacherHw = document.createElement('span');
             teacherHw.className = 'priority-chip priority-urgent';
-            teacherHw.textContent = 'Викл.ДЗ';
+            teacherHw.textContent = 'Р’РёРєР».Р”Р—';
             priorityWrap.appendChild(teacherHw);
           }
           if (dueDate) {
             const dueLabel = new Date(dueDate).toLocaleDateString('uk-UA');
             const due = document.createElement('span');
             due.className = 'priority-chip priority-normal';
-            due.textContent = `Дедлайн: ${dueLabel}`;
+            due.textContent = `Р”РµРґР»Р°Р№РЅ: ${dueLabel}`;
             priorityWrap.appendChild(due);
           }
           if (hasSubmitted && submittedAt && !Number.isNaN(submittedAt.getTime())) {
             const submittedChip = document.createElement('span');
             submittedChip.className = 'priority-chip priority-submitted';
-            submittedChip.textContent = 'Здано';
+            submittedChip.textContent = 'Р—РґР°РЅРѕ';
             priorityWrap.appendChild(submittedChip);
           }
           li.appendChild(priorityWrap);
@@ -2935,7 +2887,7 @@
           if (hasSubmitted && submittedAt && !Number.isNaN(submittedAt.getTime())) {
             const submittedMeta = document.createElement('div');
             submittedMeta.className = 'text-muted small mb-2';
-            submittedMeta.textContent = `Ви здали: ${submittedAt.toLocaleString('uk-UA')}`;
+            submittedMeta.textContent = `Р’Рё Р·РґР°Р»Рё: ${submittedAt.toLocaleString('uk-UA')}`;
             li.appendChild(submittedMeta);
           }
 
@@ -2944,7 +2896,7 @@
             link.href = item.link_url;
             link.target = '_blank';
             link.rel = 'noopener';
-            link.textContent = 'Посилання';
+            link.textContent = 'РџРѕСЃРёР»Р°РЅРЅСЏ';
             link.className = 'me-3';
             li.appendChild(link);
           }
@@ -2953,7 +2905,7 @@
             meet.href = item.meeting_url;
             meet.target = '_blank';
             meet.rel = 'noopener';
-            meet.textContent = 'Онлайн-зустріч';
+            meet.textContent = 'РћРЅР»Р°Р№РЅ-Р·СѓСЃС‚СЂС–С‡';
             meet.className = 'me-3';
             li.appendChild(meet);
           }
@@ -2961,7 +2913,7 @@
           if (item.file_path) {
             const fileLink = document.createElement('a');
             fileLink.href = item.file_path;
-            fileLink.textContent = item.file_name || 'Файл';
+            fileLink.textContent = item.file_name || 'Р¤Р°Р№Р»';
             fileLink.className = 'd-inline-block';
             li.appendChild(fileLink);
           }
@@ -2972,15 +2924,15 @@
             const submitBtn = document.createElement('button');
             submitBtn.type = 'button';
             submitBtn.className = 'btn btn-sm btn-outline-primary';
-            submitBtn.textContent = hasSubmitted ? 'Оновити здачу' : 'Здати ДЗ';
+            submitBtn.textContent = hasSubmitted ? 'РћРЅРѕРІРёС‚Рё Р·РґР°С‡Сѓ' : 'Р—РґР°С‚Рё Р”Р—';
             submitBtn.addEventListener('click', () => {
               if (!homeworkSubmitForm) return;
               homeworkSubmitForm.action = `/homework/${encodeURIComponent(item.id)}/submit`;
               if (homeworkSubmitMeta) {
                 const dueDate = item.custom_due_date || item.class_date;
-                const dueLabel = dueDate ? new Date(dueDate).toLocaleDateString('uk-UA') : 'Без дедлайну';
-                const submittedHint = hasSubmitted ? ' • статус: здано' : '';
-                homeworkSubmitMeta.textContent = `${item.subject || ''} • дедлайн: ${dueLabel}${submittedHint}`;
+                const dueLabel = dueDate ? new Date(dueDate).toLocaleDateString('uk-UA') : 'Р‘РµР· РґРµРґР»Р°Р№РЅСѓ';
+                const submittedHint = hasSubmitted ? ' вЂў СЃС‚Р°С‚СѓСЃ: Р·РґР°РЅРѕ' : '';
+                homeworkSubmitMeta.textContent = `${item.subject || ''} вЂў РґРµРґР»Р°Р№РЅ: ${dueLabel}${submittedHint}`;
               }
               if (homeworkSubmitId) homeworkSubmitId.value = String(item.id);
               if (homeworkSubmitText) homeworkSubmitText.value = '';
@@ -2994,7 +2946,7 @@
 
           const reactWrap = document.createElement('div');
           reactWrap.className = 'd-flex gap-2 mt-2';
-          ['🔥', '👍'].forEach((emoji) => {
+          ['рџ”Ґ', 'рџ‘Ќ'].forEach((emoji) => {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'btn btn-sm btn-outline-secondary react-btn';
@@ -3087,7 +3039,7 @@
           const parts = [String(template.title || '').trim()].filter(Boolean);
           if (template.subject_name) parts.push(String(template.subject_name));
           if (template.course_name) parts.push(String(template.course_name));
-          option.textContent = parts.join(' · ');
+          option.textContent = parts.join(' В· ');
           hwTemplateSelect.appendChild(option);
         });
         hwTemplateSelect.disabled = filtered.length === 0;
@@ -3141,7 +3093,7 @@
         const isGeneral = button.getAttribute('data-is-general') === '1';
 
         document.getElementById('homeworkModalTitle').textContent = subject;
-        document.getElementById('homeworkModalMeta').textContent = `${day} · ${time}`;
+        document.getElementById('homeworkModalMeta').textContent = `${day} В· ${time}`;
 
         const hwDayField = document.getElementById('hwDay');
         if (hwDayField) hwDayField.value = day;
@@ -3276,44 +3228,12 @@
       const messagesModalEl = document.getElementById('messagesModal');
       const weekPrev = document.getElementById('weekPrev');
       const weekNext = document.getElementById('weekNext');
-      const scheduleDrawer = document.getElementById('scheduleActionDrawer');
-      const scheduleDrawerToggle = document.getElementById('scheduleDrawerToggle');
-      const scheduleDrawerClose = document.getElementById('scheduleDrawerClose');
       const densityChipBalance = document.getElementById('densityChipBalance');
       const densityChipEvening = document.getElementById('densityChipEvening');
       const densityChipPeak = document.getElementById('densityChipPeak');
       const totalWeeks = <%= totalWeeks || 15 %>;
       const semesterStartDate = <%- JSON.stringify(semester && semester.start_date ? semester.start_date : null) %>;
       let currentWeek = <%= currentWeek %>;
-      function setDrawerOpen(open) {
-        if (!scheduleDrawer) return;
-        document.body.classList.toggle('schedule-drawer-open', open);
-        scheduleDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
-        if (scheduleDrawerToggle) {
-          scheduleDrawerToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        }
-      }
-
-      if (scheduleDrawerToggle && scheduleDrawer) {
-        scheduleDrawerToggle.addEventListener('click', () => {
-          const isOpen = document.body.classList.contains('schedule-drawer-open');
-          setDrawerOpen(!isOpen);
-        });
-      }
-
-      if (scheduleDrawerClose && scheduleDrawer) {
-        scheduleDrawerClose.addEventListener('click', () => setDrawerOpen(false));
-      }
-
-      document.addEventListener('click', (event) => {
-        if (!scheduleDrawer || !document.body.classList.contains('schedule-drawer-open')) return;
-        const insideDrawer = scheduleDrawer.contains(event.target);
-        const onToggle = scheduleDrawerToggle && scheduleDrawerToggle.contains(event.target);
-        if (!insideDrawer && !onToggle) {
-          setDrawerOpen(false);
-        }
-      });
-
       let isWeekSwitching = false;
       let weekDebounceUntil = 0;
       const weekDebounceMs = 240;
@@ -3424,9 +3344,6 @@
       }
 
       window.addEventListener('resize', () => {
-        if (window.innerWidth < 992) {
-          setDrawerOpen(false);
-        }
         syncWeekPager(currentWeek);
       });
       if (messagesBtnMobile) {
@@ -3454,7 +3371,7 @@
         if (customDeadlineSubject) customDeadlineSubject.textContent = item.subject_name || '';
         if (customDeadlineDue) {
           const dueLabel = item.custom_due_date ? new Date(item.custom_due_date).toLocaleDateString('uk-UA') : '';
-          customDeadlineDue.textContent = dueLabel ? `Дедлайн: ${dueLabel}` : '';
+          customDeadlineDue.textContent = dueLabel ? `Р”РµРґР»Р°Р№РЅ: ${dueLabel}` : '';
         }
         if (customDeadlineDescription) {
           customDeadlineDescription.textContent = item.description || '';
@@ -3463,16 +3380,16 @@
           customDeadlineLinks.innerHTML = '';
           const links = [];
           if (item.link_url) {
-            links.push(`<a href="${item.link_url}" target="_blank" rel="noopener">Посилання</a>`);
+            links.push(`<a href="${item.link_url}" target="_blank" rel="noopener">РџРѕСЃРёР»Р°РЅРЅСЏ</a>`);
           }
           if (item.meeting_url) {
-            links.push(`<a href="${item.meeting_url}" target="_blank" rel="noopener">Онлайн-зустріч</a>`);
+            links.push(`<a href="${item.meeting_url}" target="_blank" rel="noopener">РћРЅР»Р°Р№РЅ-Р·СѓСЃС‚СЂС–С‡</a>`);
           }
           if (item.file_path) {
-            links.push(`<a href="${item.file_path}" target="_blank" rel="noopener">${item.file_name || 'Файл'}</a>`);
+            links.push(`<a href="${item.file_path}" target="_blank" rel="noopener">${item.file_name || 'Р¤Р°Р№Р»'}</a>`);
           }
           if (links.length) {
-            customDeadlineLinks.innerHTML = links.join(' · ');
+            customDeadlineLinks.innerHTML = links.join(' В· ');
           }
         }
         if (customDeadlineReactions) {
@@ -3544,7 +3461,7 @@
             ${rows.map((row) => `
               <article class="month-summary-item">
                 <div class="month-summary-day">${row.dayName}</div>
-                <div class="month-summary-date">${row.dayDate || '—'}</div>
+                <div class="month-summary-date">${row.dayDate || 'вЂ”'}</div>
                 <div class="month-summary-metrics">
                   <span>${row.classesCount} classes</span>
                   <span>${row.hwCount} homework</span>
@@ -3780,10 +3697,10 @@
           btn.dataset.time = localRange;
           const detail = btn.dataset.detail || '';
           if (detail) {
-            const parts = detail.split(' • ');
+            const parts = detail.split(' вЂў ');
             if (parts.length >= 4) {
               parts[3] = localRange;
-              btn.dataset.detail = parts.join(' • ');
+              btn.dataset.detail = parts.join(' вЂў ');
             }
           }
         });
@@ -3805,15 +3722,15 @@
       }
 
       function formatRelativeTime(ts) {
-        if (!ts) return 'ніколи';
+        if (!ts) return 'РЅС–РєРѕР»Рё';
         const diff = Math.max(0, Date.now() - ts);
-        if (diff < 60000) return 'щойно';
+        if (diff < 60000) return 'С‰РѕР№РЅРѕ';
         const minutes = Math.round(diff / 60000);
-        if (minutes < 60) return `${minutes} хв тому`;
+        if (minutes < 60) return `${minutes} С…РІ С‚РѕРјСѓ`;
         const hours = Math.round(minutes / 60);
-        if (hours < 24) return `${hours} год тому`;
+        if (hours < 24) return `${hours} РіРѕРґ С‚РѕРјСѓ`;
         const days = Math.round(hours / 24);
-        return `${days} дн тому`;
+        return `${days} РґРЅ С‚РѕРјСѓ`;
       }
 
       function updateSyncStatus(state = {}) {
@@ -3823,14 +3740,14 @@
           syncDot.classList.toggle('offline', !online);
         }
         if (syncStatusLabel) {
-          syncStatusLabel.textContent = online ? 'Онлайн' : 'Офлайн';
+          syncStatusLabel.textContent = online ? 'РћРЅР»Р°Р№РЅ' : 'РћС„Р»Р°Р№РЅ';
         }
         if (syncStatusMeta) {
           const prefix = failed
-            ? 'Не вдалося оновити · кеш '
+            ? 'РќРµ РІРґР°Р»РѕСЃСЏ РѕРЅРѕРІРёС‚Рё В· РєРµС€ '
             : online
-              ? 'Оновлено '
-              : 'Офлайн · кеш ';
+              ? 'РћРЅРѕРІР»РµРЅРѕ '
+              : 'РћС„Р»Р°Р№РЅ В· РєРµС€ ';
           syncStatusMeta.textContent = `${prefix}${formatRelativeTime(lastSyncTs)}`;
         }
       }
@@ -3944,7 +3861,7 @@
         if (!dayStats.length) {
           setDensityChip(densityChipBalance, 'Day balance: no classes yet', 'No classes are scheduled for this week.', 0.14);
           setDensityChip(densityChipEvening, 'Evenings feel light this week', 'Evening intensity appears after classes are added.', 0.14);
-          setDensityChip(densityChipPeak, 'Most intense day: —', 'Most intense day appears once there are classes.', 0.14);
+          setDensityChip(densityChipPeak, 'Most intense day: вЂ”', 'Most intense day appears once there are classes.', 0.14);
           return;
         }
 
@@ -3981,7 +3898,7 @@
         setDensityChip(
           densityChipEvening,
           eveningLabel,
-          `${eveningClasses} of ${totalClasses} classes are in 6th–7th slots.`,
+          `${eveningClasses} of ${totalClasses} classes are in 6thвЂ“7th slots.`,
           0.14 + Math.min(0.2, eveningRatio * 0.6)
         );
         setDensityChip(
@@ -4069,7 +3986,7 @@
         const { markAsRead = false, showLoading = true } = options;
         if (!messagesList) return;
         if (showLoading) {
-          messagesList.innerHTML = '<li class="list-group-item text-muted">Завантаження...</li>';
+          messagesList.innerHTML = '<li class="list-group-item text-muted">Р—Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ...</li>';
         }
         try {
           const subjectId = messagesSubjectFilter && messagesSubjectFilter.value
@@ -4083,7 +4000,7 @@
           if (requestToken !== messageListRequestToken) return;
           const messages = Array.isArray(data.messages) ? data.messages : [];
           if (!messages.length) {
-            messagesList.innerHTML = '<li class="list-group-item text-muted">Немає повідомлень</li>';
+            messagesList.innerHTML = '<li class="list-group-item text-muted">РќРµРјР°С” РїРѕРІС–РґРѕРјР»РµРЅСЊ</li>';
             if (shouldSyncBadgeFromResponse) {
               updateUnreadBadges(Number(data.unread_count) || 0);
             } else {
@@ -4094,8 +4011,8 @@
           messagesList.innerHTML = messages
             .map((m) => {
               const meta = m.target_all
-                ? 'Всі студенти'
-                : `${m.subject_name || 'Предмет'} · Group ${m.group_number}`;
+                ? 'Р’СЃС– СЃС‚СѓРґРµРЅС‚Рё'
+                : `${m.subject_name || 'РџСЂРµРґРјРµС‚'} В· Group ${m.group_number}`;
               const unreadClass = m.read_id ? '' : 'fw-semibold';
               const reactions = m.reactions || {};
               const reacted = m.reacted || {};
@@ -4109,10 +4026,10 @@
               return `
                 <li class="list-group-item">
                   <div class="${unreadClass} mb-1">${m.body}</div>
-                  <div class="text-muted small">${meta} · ${m.created_by || 'Admin'} · ${new Date(m.created_at).toLocaleString()}</div>
+                  <div class="text-muted small">${meta} В· ${m.created_by || 'Admin'} В· ${new Date(m.created_at).toLocaleString()}</div>
                   <div class="d-flex gap-2 mt-2 msg-reactions">
-                    ${makeBtn('🔥')}
-                    ${makeBtn('👍')}
+                    ${makeBtn('рџ”Ґ')}
+                    ${makeBtn('рџ‘Ќ')}
                   </div>
                 </li>
               `;
@@ -4166,7 +4083,7 @@
             });
           });
         } catch (err) {
-          messagesList.innerHTML = '<li class="list-group-item text-muted">Помилка завантаження</li>';
+          messagesList.innerHTML = '<li class="list-group-item text-muted">РџРѕРјРёР»РєР° Р·Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ</li>';
         }
       }
 
@@ -4204,40 +4121,40 @@
       setInterval(refreshUnreadBadges, 60000);
 
       const phrases = [
-        "Start fresh — today is full of potential.",
+        "Start fresh вЂ” today is full of potential.",
         "Small steps, big progress.",
-        "Focus on now — the rest will follow.",
-        "One thing at a time — and that’s enough.",
-        "You’ve got more in you than you think.",
+        "Focus on now вЂ” the rest will follow.",
+        "One thing at a time вЂ” and thatвЂ™s enough.",
+        "YouвЂ™ve got more in you than you think.",
         "Let clarity lead your day.",
         "Stay present, stay steady.",
-        "Keep going — you’re getting closer.",
+        "Keep going вЂ” youвЂ™re getting closer.",
         "Be kind to your focus.",
         "Today is a great day to grow.",
         "Balance over burnout.",
-        "Show up — even a little is progress.",
+        "Show up вЂ” even a little is progress.",
         "A clear mind gets more done.",
-        "You set the tone — begin with calm.",
+        "You set the tone вЂ” begin with calm.",
         "Progress, not perfection.",
         "Let effort be your win today.",
-        "This hour matters — make it count.",
+        "This hour matters вЂ” make it count.",
         "Energy follows attention.",
-        "You’re building momentum.",
+        "YouвЂ™re building momentum.",
         "Stay grounded, keep moving.",
         "Let your actions match your goals.",
         "Your best today is enough.",
         "Choose one goal, and give it space.",
         "Rest is part of the rhythm.",
-        "Trust your pace — fast or slow.",
-        "You don’t need to rush to be great.",
+        "Trust your pace вЂ” fast or slow.",
+        "You donвЂ™t need to rush to be great.",
         "Small focus. Big ripple.",
-        "The day is yours — use it gently.",
+        "The day is yours вЂ” use it gently.",
         "Notice what fuels you today.",
-        "Begin again — always welcome."
+        "Begin again вЂ” always welcome."
       ];
 
       const specialPhrasesByDate = {
-        "02-14": "\"Любов варта всього.\""
+        "02-14": "\"Р›СЋР±РѕРІ РІР°СЂС‚Р° РІСЃСЊРѕРіРѕ.\""
       };
 
       function getKyivDateParts() {
@@ -4316,7 +4233,7 @@
         input.addEventListener('change', () => {
           const label = document.querySelector(`[data-file-name="${input.id}"]`);
           if (!label) return;
-          const name = input.files && input.files.length ? input.files[0].name : 'Файл не вибрано';
+          const name = input.files && input.files.length ? input.files[0].name : 'Р¤Р°Р№Р» РЅРµ РІРёР±СЂР°РЅРѕ';
           label.textContent = name;
         });
       });
@@ -4333,4 +4250,3 @@
     <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>
-

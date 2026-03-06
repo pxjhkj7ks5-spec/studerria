@@ -1,0 +1,221 @@
+.studerria-nav-shell {
+  position: relative;
+  z-index: 32;
+}
+
+.studerria-nav-shell .container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.studerria-nav-shell .topbar-title-spotlight {
+  margin-right: 0;
+  flex: 0 0 auto;
+}
+
+.snav-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: visible;
+}
+
+.snav-brand-spacer {
+  width: 12px;
+  min-width: 12px;
+  height: 1px;
+  flex: 0 0 12px;
+}
+
+.snav-list,
+.snav-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.snav-list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.snav-item {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.studerria-nav-shell .snav-link,
+.studerria-nav-shell .snav-menu-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.studerria-nav-shell .snav-link.snav-trigger,
+.studerria-nav-shell .snav-menu-link.snav-trigger {
+  min-width: 100%;
+}
+
+.snav-label {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.snav-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.64;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.snav-item.is-open > .snav-link .snav-indicator,
+.snav-item.is-open > .snav-menu-link .snav-indicator,
+.snav-item.is-subopen > .snav-link .snav-indicator,
+.snav-item.is-subopen > .snav-menu-link .snav-indicator {
+  opacity: 0.92;
+  transform: translateX(2px);
+}
+
+.snav-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 10px);
+  min-width: 220px;
+  padding: 10px;
+  border-radius: 24px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 18px 45px rgba(8, 8, 20, 0.32);
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+  z-index: 48;
+}
+
+body.theme-dark .snav-menu {
+  background: rgba(10, 14, 24, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+body.theme-light .snav-menu {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.snav-item.is-open > .snav-menu,
+.snav-item.is-subopen > .snav-menu {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.snav-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.snav-menu-link {
+  width: 100%;
+  text-align: left;
+}
+
+.snav-menu--flyout {
+  top: -10px;
+  left: calc(100% + 10px);
+}
+
+.snav-actions {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.snav-logout-form {
+  margin: 0;
+}
+
+.snav-logout-btn {
+  white-space: nowrap;
+}
+
+.snav-user-meta {
+  display: inline-block;
+  max-width: min(34vw, 320px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 991px) {
+  .studerria-nav-shell .container {
+    align-items: flex-start;
+  }
+
+  .snav-main {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .snav-brand-spacer {
+    display: none;
+  }
+
+  .snav-list {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .snav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .snav-item {
+    flex: 0 0 auto;
+  }
+
+  .snav-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .snav-user-meta {
+    max-width: calc(100vw - 168px);
+  }
+
+  .snav-menu,
+  .snav-menu--flyout {
+    position: static;
+    min-width: min(280px, calc(100vw - 48px));
+    width: 100%;
+    margin-top: 8px;
+    transform: translateY(0);
+  }
+
+  .snav-menu--flyout {
+    margin-left: 12px;
+  }
+
+  .snav-menu[hidden] {
+    display: none !important;
+  }
+}
