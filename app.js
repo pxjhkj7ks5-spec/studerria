@@ -23574,7 +23574,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
           s.name,
           s.course_id,
           COALESCE(s.group_count, 1) AS group_count,
-          COALESCE(s.visible, true) AS visible
+          s.visible AS visible
         FROM subjects s
         ORDER BY s.course_id ASC, s.name ASC
       `
@@ -23598,7 +23598,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
         id: Number(row.id || 0),
         name: sanitizeCompactText(row.name || '', 140),
         group_count: Number(row.group_count || 1),
-        is_visible: row.visible === true || Number(row.visible) === 1,
+        is_visible: ['1', 'true', 't', 'yes', 'on', ''].includes(String(row.visible ?? '1').trim().toLowerCase()),
       });
     });
     const subjectCatalogCourses = (courses || [])
