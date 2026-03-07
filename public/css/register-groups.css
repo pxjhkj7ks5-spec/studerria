@@ -16,7 +16,7 @@
   --reg-groups-chip-bg: rgba(148, 163, 184, 0.12);
   --reg-groups-chip-border: rgba(148, 163, 184, 0.2);
   --reg-groups-chip-text: rgba(30, 41, 59, 0.74);
-  --reg-groups-sticky-width: min(calc(100vw - 24px), 980px);
+  --reg-groups-sticky-width: min(calc(100vw - 24px), 34rem);
   padding-bottom: 10.75rem;
 }
 
@@ -42,6 +42,14 @@
 
 .page-register-subjects .reg-groups-card {
   margin-bottom: 1.6rem;
+  max-width: 34rem;
+  margin-inline: auto;
+  container-type: inline-size;
+}
+
+.page-register-subjects .app-footer {
+  width: min(100%, 34rem);
+  margin-inline: auto;
 }
 
 .page-register-subjects .reg-groups-hero {
@@ -397,7 +405,8 @@
 }
 
 .page-register-subjects .reg-groups-submit-btn {
-  min-width: 210px;
+  width: 100%;
+  min-width: 0;
 }
 
 .page-register-subjects .reg-groups-sticky-shell {
@@ -411,8 +420,9 @@
 
 .page-register-subjects .reg-groups-sticky {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   gap: 1rem;
   padding: 0.95rem 1rem;
 }
@@ -442,17 +452,45 @@
 
 .page-register-subjects .reg-groups-sticky__actions {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   gap: 0.9rem;
+  flex: 1 1 auto;
 }
 
 .page-register-subjects .reg-groups-sticky__hint {
-  max-width: 18rem;
+  max-width: none;
   color: var(--reg-groups-warning-text);
   font-size: 0.82rem;
   line-height: 1.4;
-  text-align: right;
+  text-align: left;
+}
+
+@container (max-width: 42rem) {
+  .page-register-subjects .reg-groups-progress-panel,
+  .page-register-subjects .reg-groups-quick-panel,
+  .page-register-subjects .reg-groups-row,
+  .page-register-subjects .reg-groups-inline-submit {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-register-subjects .reg-groups-progress-panel__headline,
+  .page-register-subjects .reg-groups-row__heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .page-register-subjects .reg-groups-filter,
+  .page-register-subjects .reg-groups-row__status {
+    align-self: flex-start;
+  }
+
+  .page-register-subjects .reg-groups-row__actions,
+  .page-register-subjects .reg-groups-quick-panel__actions {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 991.98px) {

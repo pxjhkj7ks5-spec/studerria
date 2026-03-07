@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.88",
+      "date": "2026-03-07",
+      "items": [
+        "tune(register-groups-auth-width): narrowed the subject-group registration step to the same auth-card width as the other registration screens and aligned the submit area and sticky CTA to that tighter layout"
+      ]
+    },
+    {
       "version": "1.1.87",
       "date": "2026-03-07",
       "items": [
