@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.81",
+      "date": "2026-03-07",
+      "items": [
+        "tune(pathways-flash-alerts): aligned success and error banners in the pathways workspace with the legacy admin flash-message styling so status feedback now renders in the same visual language"
+      ]
+    },
+    {
       "version": "1.1.80",
       "date": "2026-03-07",
       "items": [
