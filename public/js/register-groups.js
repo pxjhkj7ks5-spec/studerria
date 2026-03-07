@@ -34,7 +34,7 @@
   const submitButtons = Array.from(document.querySelectorAll('[data-reg-groups-submit]'));
   const progressbar = document.querySelector('[data-reg-groups-progress]');
   const progressFill = document.querySelector('[data-reg-groups-progress-bar]');
-  const filterInput = form.querySelector('[data-reg-groups-filter]');
+  const filterInput = document.querySelector('[data-reg-groups-filter]');
   const emptyState = form.querySelector('[data-reg-groups-empty]');
   const quickButtons = Array.from(document.querySelectorAll('[data-reg-groups-quick-group]'));
   const resetButton = document.querySelector('[data-reg-groups-reset]');

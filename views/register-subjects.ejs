@@ -128,18 +128,18 @@
         --page-text: #0f172a;
         --page-muted: rgba(15, 23, 42, 0.68);
         background:
-          radial-gradient(1200px 760px at 16% 10%, rgba(138, 190, 255, 0.24), transparent 62%),
-          radial-gradient(920px 640px at 88% 12%, rgba(201, 181, 255, 0.22), transparent 58%),
-          linear-gradient(180deg, #eef4ff 0%, #f4f7ff 44%, #f9fbff 100%);
+          radial-gradient(1200px 760px at 18% 10%, rgba(147, 197, 253, 0.3), transparent 60%),
+          radial-gradient(920px 640px at 88% 12%, rgba(196, 181, 253, 0.28), transparent 58%),
+          linear-gradient(135deg, #eef2ff 0%, #f0f7ff 48%, #f9fbff 100%);
       }
 
       body.theme-dark {
         --page-text: #f8fafc;
         --page-muted: rgba(226, 232, 240, 0.72);
         background:
-          radial-gradient(1200px 760px at 14% 10%, rgba(94, 124, 255, 0.24), transparent 62%),
-          radial-gradient(920px 640px at 84% 14%, rgba(140, 167, 255, 0.18), transparent 58%),
-          linear-gradient(180deg, #090c12 0%, #101623 50%, #131a2a 100%);
+          radial-gradient(1200px 780px at 12% 10%, rgba(88, 99, 230, 0.28), transparent 62%),
+          radial-gradient(940px 700px at 86% 12%, rgba(152, 93, 255, 0.28), transparent 58%),
+          linear-gradient(160deg, #15184b 0%, #1a2266 44%, #231a6a 100%);
       }
 
       .glass {
@@ -188,16 +188,15 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-width: 72px;
-        height: 42px;
-        padding: 0 1rem;
+        width: 40px;
+        height: 40px;
+        padding: 0;
         border-radius: 999px;
         border: 1px solid rgba(255, 255, 255, 0.18);
         background: rgba(255, 255, 255, 0.14);
         color: inherit;
-        font-size: 0.84rem;
-        font-weight: 600;
-        letter-spacing: -0.01em;
+        font-size: 1rem;
+        line-height: 1;
         -webkit-backdrop-filter: blur(14px);
         backdrop-filter: blur(14px);
       }
@@ -334,9 +333,7 @@
         }
 
         .theme-toggle-min {
-          min-width: 64px;
           height: 40px;
-          padding: 0 0.85rem;
         }
       }
     </style>
@@ -358,17 +355,17 @@
         class="theme-toggle-min"
         type="button"
         id="themeToggle"
-        aria-label="<%= t('theme.dark') %>"
-        data-light-label="<%= t('theme.light') %>"
-        data-dark-label="<%= t('theme.dark') %>"
+        aria-label="Змінити тему"
+        data-light-label="☀️"
+        data-dark-label="🌙"
       >
-        <%= t('theme.dark') %>
+        🌙
       </button>
     </div>
 
     <div class="container py-4">
       <div class="row justify-content-center">
-        <div class="col-11 col-sm-8 col-md-6 col-lg-4">
+        <div class="col-11 col-sm-10 col-md-9 col-lg-8 col-xl-7">
           <div class="card auth-card glass reg-groups-card">
             <div class="card-body p-4 p-lg-5">
               <div class="reg-groups-hero">
@@ -413,48 +410,6 @@
                 <% } %>
 
                 <% if (selectableSubjects.length) { %>
-                  <section
-                    class="reg-groups-surface reg-groups-progress-panel"
-                    aria-label="<%= t('registerSubjects.progressSelected') %>"
-                  >
-                    <div class="reg-groups-progress-panel__main">
-                      <div class="reg-groups-progress-panel__headline">
-                        <span class="reg-groups-kicker"><%= t('registerSubjects.progressSelected') %></span>
-                        <strong class="reg-groups-progress-panel__value">
-                          <span data-reg-groups-selected><%= selectedActiveCount %></span>/<span data-reg-groups-total><%= totalActiveCount %></span>
-                        </strong>
-                      </div>
-                      <div
-                        class="reg-groups-progress-bar"
-                        role="progressbar"
-                        aria-label="<%= t('registerSubjects.progressSelected') %>"
-                        aria-valuemin="0"
-                        aria-valuemax="<%= totalActiveCount %>"
-                        aria-valuenow="<%= selectedActiveCount %>"
-                        data-reg-groups-progress
-                      >
-                        <span style="width: <%= progressPercent %>%;" data-reg-groups-progress-bar></span>
-                      </div>
-                      <p class="reg-groups-caption mb-0" data-reg-groups-remaining role="status" aria-live="polite">
-                        <%= remainingText %>
-                      </p>
-                      <p
-                        class="reg-groups-caption reg-groups-caption--accent mb-0"
-                        data-reg-groups-missing
-                        role="status"
-                        aria-live="polite"
-                        <%= missingSummaryText ? '' : 'hidden' %>
-                      >
-                        <%= missingSummaryText %>
-                      </p>
-                    </div>
-
-                    <label class="reg-groups-filter">
-                      <input type="checkbox" data-reg-groups-filter />
-                      <span><%= t('registerSubjects.filterUnselected') %></span>
-                    </label>
-                  </section>
-
                   <section class="reg-groups-surface reg-groups-quick-panel" aria-labelledby="quickSelectHeading">
                     <div class="reg-groups-quick-panel__copy">
                       <span class="reg-groups-kicker" id="quickSelectHeading"><%= t('registerSubjects.quickTitle') %></span>
@@ -547,24 +502,6 @@
                     <p class="reg-groups-filter-empty" data-reg-groups-empty hidden><%= t('registerSubjects.filterEmpty') %></p>
                   </section>
                 <% } %>
-
-                <div class="reg-groups-inline-submit">
-                  <p
-                    class="reg-groups-inline-submit__hint mb-0"
-                    data-reg-groups-submit-hint
-                    <%= submitHintText ? '' : 'hidden' %>
-                  >
-                    <%= submitHintText %>
-                  </p>
-                  <button
-                    type="submit"
-                    class="btn btn-primary reg-groups-submit-btn"
-                    data-reg-groups-submit
-                    <%= (selectableSubjects.length && hasPendingSelections) ? 'disabled' : '' %>
-                  >
-                    <%= t('registerSubjects.finish') %>
-                  </button>
-                </div>
               </form>
             </div>
           </div>
@@ -572,14 +509,41 @@
           <% if (selectableSubjects.length) { %>
             <div class="reg-groups-sticky-shell">
               <div class="reg-groups-sticky glass">
-                <div class="reg-groups-sticky__summary">
-                  <div class="reg-groups-sticky__count">
-                    <strong><span data-reg-groups-selected><%= selectedActiveCount %></span>/<span data-reg-groups-total><%= totalActiveCount %></span></strong>
-                    <span><%= t('registerSubjects.selectedSuffix') %></span>
+                <div class="reg-groups-sticky__meta">
+                  <div class="reg-groups-sticky__summary">
+                    <div class="reg-groups-sticky__count">
+                      <strong><span data-reg-groups-selected><%= selectedActiveCount %></span>/<span data-reg-groups-total><%= totalActiveCount %></span></strong>
+                      <span><%= t('registerSubjects.selectedSuffix') %></span>
+                    </div>
+                    <p class="reg-groups-sticky__remaining mb-0" data-reg-groups-remaining role="status" aria-live="polite">
+                      <%= remainingText %>
+                    </p>
+                    <p
+                      class="reg-groups-sticky__missing mb-0"
+                      data-reg-groups-missing
+                      role="status"
+                      aria-live="polite"
+                      <%= missingSummaryText ? '' : 'hidden' %>
+                    >
+                      <%= missingSummaryText %>
+                    </p>
+                    <div
+                      class="reg-groups-progress-bar reg-groups-sticky__progress"
+                      role="progressbar"
+                      aria-label="<%= t('registerSubjects.progressSelected') %>"
+                      aria-valuemin="0"
+                      aria-valuemax="<%= totalActiveCount %>"
+                      aria-valuenow="<%= selectedActiveCount %>"
+                      data-reg-groups-progress
+                    >
+                      <span style="width: <%= progressPercent %>%;" data-reg-groups-progress-bar></span>
+                    </div>
                   </div>
-                  <p class="reg-groups-sticky__remaining mb-0" data-reg-groups-sticky-remaining role="status" aria-live="polite">
-                    <%= remainingText %>
-                  </p>
+
+                  <label class="reg-groups-filter reg-groups-filter--sticky">
+                    <input type="checkbox" data-reg-groups-filter />
+                    <span><%= t('registerSubjects.filterUnselected') %></span>
+                  </label>
                 </div>
 
                 <div class="reg-groups-sticky__actions">
@@ -628,10 +592,6 @@
         themeToggle.textContent = savedTheme === 'theme-dark'
           ? themeToggle.dataset.lightLabel
           : themeToggle.dataset.darkLabel;
-        themeToggle.setAttribute(
-          'aria-label',
-          savedTheme === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel
-        );
 
         themeToggle.addEventListener('click', () => {
           const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
@@ -641,10 +601,6 @@
           themeToggle.textContent = next === 'theme-dark'
             ? themeToggle.dataset.lightLabel
             : themeToggle.dataset.darkLabel;
-          themeToggle.setAttribute(
-            'aria-label',
-            next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel
-          );
         });
       }
     </script>
