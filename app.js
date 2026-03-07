@@ -7252,7 +7252,24 @@ app.get('/register/subjects', async (req, res) => {
       [req.session.pendingUserId]
     );
     const optouts = (optoutRows || []).map((row) => Number(row.subject_id));
-    return res.render('register-subjects', { subjects, optouts, error: req.query.error || '' });
+    const selectedGroupRows = await db.all(
+      'SELECT subject_id, group_number FROM student_groups WHERE student_id = ?',
+      [req.session.pendingUserId]
+    );
+    const selectedGroups = {};
+    (selectedGroupRows || []).forEach((row) => {
+      const subjectId = Number(row.subject_id);
+      const groupNumber = Number(row.group_number);
+      if (!Number.isInteger(subjectId) || subjectId < 1) return;
+      if (!Number.isInteger(groupNumber) || groupNumber < 1) return;
+      selectedGroups[subjectId] = groupNumber;
+    });
+    return res.render('register-subjects', {
+      subjects,
+      optouts,
+      selectedGroups,
+      error: req.query.error || '',
+    });
   } catch (err) {
     console.error('Register subjects step failed', err);
     return res.status(500).send('Database error');

@@ -4,17 +4,91 @@
   const subjectRegistrationErrorText = (() => {
     if (!subjectRegistrationError) return '';
     if (subjectRegistrationError === 'missing-group' || subjectRegistrationError === 'Select group') {
-      return lang === 'uk'
-        ? "Оберіть групу для кожного обов'язкового предмета."
-        : 'Select a group for every required subject.';
+      return t('registerSubjects.errorMissingGroup');
     }
     if (subjectRegistrationError === 'db-error' || subjectRegistrationError === 'Database error') {
-      return lang === 'uk'
-        ? 'Не вдалося зберегти вибір груп. Спробуйте ще раз.'
-        : 'Could not save subject group selections. Please try again.';
+      return t('registerSubjects.errorDb');
     }
     return subjectRegistrationError;
   })();
+
+  const subjectOptouts = Array.isArray(optouts) ? optouts.map((id) => Number(id)) : [];
+  const selectedGroupMap = selectedGroups && typeof selectedGroups === 'object' ? selectedGroups : {};
+  const allSubjects = Array.isArray(subjects) ? subjects : [];
+  const isRequiredSubject = (subject) =>
+    subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
+
+  const selectableSubjects = allSubjects.reduce((list, subject) => {
+    const requiredFlag = isRequiredSubject(subject);
+    const groupCount = Math.max(1, Number(subject.group_count || 1));
+    if (requiredFlag && groupCount === 1) {
+      return list;
+    }
+
+    const subjectId = Number(subject.id || 0);
+    const selectedGroupValue = Object.prototype.hasOwnProperty.call(selectedGroupMap, subjectId)
+      ? selectedGroupMap[subjectId]
+      : selectedGroupMap[String(subjectId)];
+    const selectedGroupRaw = Number(selectedGroupValue);
+    const selectedGroup =
+      Number.isInteger(selectedGroupRaw) && selectedGroupRaw >= 1 && selectedGroupRaw <= groupCount
+        ? selectedGroupRaw
+        : null;
+    const optedOut = !requiredFlag && subjectOptouts.includes(subjectId);
+
+    list.push({
+      id: subjectId,
+      name: subject.name || '',
+      groupCount,
+      requiredFlag,
+      selectedGroup,
+      optedOut,
+    });
+
+    return list;
+  }, []);
+
+  const activeSelectableSubjects = selectableSubjects.filter((subject) => !subject.optedOut);
+  const selectedActiveCount = activeSelectableSubjects.filter((subject) => Boolean(subject.selectedGroup)).length;
+  const pendingSelectableSubjects = activeSelectableSubjects.filter((subject) => !subject.selectedGroup);
+  const totalActiveCount = activeSelectableSubjects.length;
+  const hasPendingSelections = pendingSelectableSubjects.length > 0;
+  const progressPercent = totalActiveCount ? Math.round((selectedActiveCount / totalActiveCount) * 100) : 100;
+  const summarizeSubjectNames = (list) => {
+    const names = list.map((subject) => String(subject.name || '').trim()).filter(Boolean);
+    if (!names.length) return '';
+    if (names.length <= 3) return names.join(', ');
+    return `${names.slice(0, 3).join(', ')} +${names.length - 3}`;
+  };
+  const pendingSubjectSummary = summarizeSubjectNames(pendingSelectableSubjects);
+  const remainingText = hasPendingSelections
+    ? `${t('registerSubjects.remaining')}: ${pendingSelectableSubjects.length}`
+    : t('registerSubjects.allSet');
+  const missingSummaryText = hasPendingSelections && pendingSubjectSummary
+    ? `${t('registerSubjects.missingHintPrefix')}: ${pendingSubjectSummary}`
+    : '';
+  const submitHintText = hasPendingSelections ? t('registerSubjects.submitHintIncomplete') : '';
+  const quickSelectedGroup = (() => {
+    if (!activeSelectableSubjects.length) return null;
+    const [firstSubject] = activeSelectableSubjects;
+    if (!firstSubject || !firstSubject.selectedGroup) return null;
+    return activeSelectableSubjects.every((subject) => subject.selectedGroup === firstSubject.selectedGroup)
+      ? firstSubject.selectedGroup
+      : null;
+  })();
+  const showNoSubjectsNotice = !allSubjects.length;
+  const showAutoAssignedNotice = !showNoSubjectsNotice && !selectableSubjects.length;
+  const registerGroupsUi = {
+    statusSelected: t('registerSubjects.statusSelected'),
+    statusPending: t('registerSubjects.statusPending'),
+    statusSkipped: t('registerSubjects.statusSkipped'),
+    remaining: t('registerSubjects.remaining'),
+    allSet: t('registerSubjects.allSet'),
+    submitHintIncomplete: t('registerSubjects.submitHintIncomplete'),
+    missingHintPrefix: t('registerSubjects.missingHintPrefix'),
+    filterEmpty: t('registerSubjects.filterEmpty'),
+    selectedSuffix: t('registerSubjects.selectedSuffix'),
+  };
 %>
 <html lang="<%= lang %>">
   <head>
@@ -31,557 +105,512 @@
     />
     <style>
       :root {
-        --accent: #3b82f6;
-        --accent-dark: #2563eb;
-        --card-radius: 20px;
-        --glass-border-dark: rgba(255, 255, 255, 0.14);
+        --accent: #5e7cff;
+        --accent-strong: #3f67ec;
+        --page-radius: 28px;
+        --page-text: #0f172a;
+        --page-muted: rgba(15, 23, 42, 0.68);
+        --glass-light: rgba(255, 255, 255, 0.72);
+        --glass-dark: rgba(20, 24, 34, 0.5);
         --glass-border-light: rgba(15, 23, 42, 0.08);
-        --glass-bg-dark: rgba(255, 255, 255, 0.06);
-        --glass-bg-light: rgba(255, 255, 255, 0.7);
+        --glass-border-dark: rgba(255, 255, 255, 0.12);
       }
+
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-          "Helvetica Neue", "Inter", Arial, sans-serif;
         min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+          "Helvetica Neue", Helvetica, Arial, sans-serif;
+        color: var(--page-text);
+        transition: background 220ms ease, color 220ms ease;
       }
+
       body.theme-light {
-        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.35), transparent 60%),
-          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.35), transparent 60%),
-          linear-gradient(135deg, #eef2ff 0%, #f0f9ff 50%, #fdf4ff 100%);
-        color: #0f172a;
+        --page-text: #0f172a;
+        --page-muted: rgba(15, 23, 42, 0.68);
+        background:
+          radial-gradient(1200px 760px at 16% 10%, rgba(138, 190, 255, 0.24), transparent 62%),
+          radial-gradient(920px 640px at 88% 12%, rgba(201, 181, 255, 0.22), transparent 58%),
+          linear-gradient(180deg, #eef4ff 0%, #f4f7ff 44%, #f9fbff 100%);
       }
+
       body.theme-dark {
-        background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.3), transparent 60%),
-          radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.25), transparent 60%),
-          linear-gradient(160deg, #050508 0%, #12061a 45%, #1b0f26 100%);
-        color: #f8fafc;
+        --page-text: #f8fafc;
+        --page-muted: rgba(226, 232, 240, 0.72);
+        background:
+          radial-gradient(1200px 760px at 14% 10%, rgba(94, 124, 255, 0.24), transparent 62%),
+          radial-gradient(920px 640px at 84% 14%, rgba(140, 167, 255, 0.18), transparent 58%),
+          linear-gradient(180deg, #090c12 0%, #101623 50%, #131a2a 100%);
       }
+
       .glass {
         position: relative;
-        isolation: isolate;
         overflow: clip;
-        background-clip: padding-box;
-        border-radius: var(--card-radius);
-        backdrop-filter: blur(20px);
-        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+        border-radius: var(--page-radius);
+        -webkit-backdrop-filter: blur(22px) saturate(1.08);
+        backdrop-filter: blur(22px) saturate(1.08);
+        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
       }
-      body.theme-dark .glass {
-        background: var(--glass-bg-dark);
-        border: 1px solid var(--glass-border-dark);
-        box-shadow: 0 18px 45px rgba(8, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
-      }
+
       body.theme-light .glass {
-        background: var(--glass-bg-light);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.54));
         border: 1px solid var(--glass-border-light);
-        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+        box-shadow: 0 28px 70px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.72);
       }
-      .auth-card .form-control,
-      .auth-card .form-check-input,
-      .auth-card .form-select {
-        border-radius: 12px;
-        border: 1px solid rgba(15, 23, 42, 0.12);
-        transition: border-color 150ms ease, box-shadow 150ms ease;
+
+      body.theme-dark .glass {
+        background: linear-gradient(180deg, rgba(22, 28, 40, 0.74), rgba(15, 20, 32, 0.58));
+        border: 1px solid var(--glass-border-dark);
+        box-shadow: 0 30px 72px rgba(2, 6, 23, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.03);
       }
-      body.theme-dark .auth-card .form-control,
-      body.theme-dark .auth-card .form-check-input,
-      body.theme-dark .auth-card .form-select {
-        background: rgba(255, 255, 255, 0.08);
-        color: #f8fafc;
-        border-color: rgba(255, 255, 255, 0.18);
+
+      .auth-card {
+        border: 0;
+        overflow: visible;
       }
-      body.theme-dark .auth-card h1,
-      body.theme-dark .auth-card .h4 {
-        color: #f8fafc;
-      }
-      body.theme-dark .auth-card .form-check-label,
-      body.theme-dark .auth-card .fw-semibold {
-        color: rgba(248, 250, 252, 0.92);
-      }
-      body.theme-dark .auth-card .form-check-input:checked {
-        background-color: #3b82f6;
-        border-color: #3b82f6;
-      }
-      body.theme-dark .auth-card .form-check-input {
-        width: 1.1rem;
-        height: 1.1rem;
-        border-radius: 50%;
-        background-color: transparent;
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
-      }
-      body.theme-dark .auth-card .form-check-input:checked {
-        box-shadow: inset 0 0 0 4px #0f172a, 0 0 0 1px #3b82f6;
-      }
-      body.theme-light .auth-card .form-check-input {
-        width: 1.1rem;
-        height: 1.1rem;
-        border-radius: 50%;
-        background-color: transparent;
-        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.35);
-      }
-      body.theme-light .auth-card .form-check-input:checked {
-        box-shadow: inset 0 0 0 4px #ffffff, 0 0 0 1px #3b82f6;
-      }
-      body.theme-light .subject-card {
-        background: rgba(255, 255, 255, 0.8);
-        border-color: rgba(15, 23, 42, 0.12) !important;
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-      }
-      body.theme-light .subject-card .fw-semibold {
-        color: #0f172a;
-      }
-      .group-buttons {
-        display: grid;
-        gap: 12px;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      }
-      .group-option {
+
+      .container {
         position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 52px;
-        border-radius: 14px;
-        border: 1px solid rgba(15, 23, 42, 0.15);
-        background: rgba(255, 255, 255, 0.7);
-        font-weight: 600;
-        cursor: pointer;
-        transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+        z-index: 1;
       }
-      .group-option:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
-        border-color: rgba(59, 130, 246, 0.6);
+
+      .text-muted {
+        color: var(--page-muted) !important;
       }
-      .group-option input {
-        position: absolute;
-        opacity: 0;
-        pointer-events: none;
-      }
-      .group-option.is-selected {
-        border-color: rgba(59, 130, 246, 0.9);
-        background: rgba(59, 130, 246, 0.12);
-        box-shadow: 0 10px 22px rgba(59, 130, 246, 0.2);
-      }
-      body.theme-dark .group-option {
-        background: rgba(255, 255, 255, 0.08);
-        border-color: rgba(255, 255, 255, 0.18);
-        color: #f8fafc;
-      }
-      body.theme-dark .group-option.is-selected {
-        background: rgba(59, 130, 246, 0.2);
-        border-color: rgba(59, 130, 246, 0.9);
-      }
-      body.theme-dark .auth-card .border {
-        border-color: rgba(255, 255, 255, 0.2) !important;
-      }
-      body.theme-dark .text-muted {
-        color: rgba(255, 255, 255, 0.7) !important;
-      }
-      .auth-card .form-control:focus,
-      .auth-card .form-check-input:focus,
-      .auth-card .form-select:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-      }
-      .btn-primary {
-        background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
-        border: none;
-        border-radius: 12px;
-        padding: 0.75rem 1rem;
-        font-weight: 600;
-      }
-      .theme-toggle-btn {
-        border-radius: 999px;
-      }
-      .btn {
-        transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
-      }
-      .btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
-      }
-      body.theme-dark .btn:hover {
-        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.4);
-      }
-      .btn:active {
-        transform: translateY(0);
-        box-shadow: none;
-      }
-      .app-footer {
-        font-size: 0.8rem;
-      }
-      body.theme-dark .app-footer {
-        color: rgba(255, 255, 255, 0.6);
-      }
-      body.theme-light .app-footer {
-        color: rgba(15, 23, 42, 0.6);
-      }
-      :root {
-        --radius-lg: 20px;
-        --radius-md: 14px;
-        --radius-sm: 10px;
-        --s-1: 8px;
-        --s-2: 12px;
-        --s-3: 16px;
-        --s-4: 24px;
-        --border-subtle: 1px solid rgba(255, 255, 255, 0.12);
-        --border-hover: 1px solid rgba(255, 255, 255, 0.18);
-        --glass-bg: rgba(20, 24, 32, 0.45);
-        --glass-bg-light: rgba(255, 255, 255, 0.55);
-        --glass-blur: 18px;
-        --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-        --text-primary: rgba(255, 255, 255, 0.92);
-        --text-secondary: rgba(255, 255, 255, 0.68);
-        --text-muted: rgba(255, 255, 255, 0.52);
-        --focus-ring: 0 0 0 3px rgba(90, 140, 255, 0.25);
-        --focus-border: rgba(90, 140, 255, 0.65);
-      }
-      body.theme-light {
-        --text-primary: rgba(15, 23, 42, 0.92);
-        --text-secondary: rgba(15, 23, 42, 0.68);
-        --text-muted: rgba(15, 23, 42, 0.52);
-      }
-      body.theme-dark {
-        background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.22), transparent 60%),
-          radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.18), transparent 60%),
-          linear-gradient(160deg, #07070b 0%, #110b18 55%, #161225 100%);
-      }
-      body.theme-light {
-        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.18), transparent 60%),
-          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.18), transparent 60%),
-          linear-gradient(135deg, #ecf2fb 0%, #eef3fb 45%, #f5f7ff 100%);
-      }
-      .glass {
-        border-radius: var(--radius-lg);
-        backdrop-filter: blur(var(--glass-blur));
-        background: var(--glass-bg);
-        border: var(--border-subtle);
-        box-shadow: var(--glass-shadow);
-      }
-      body.theme-light .glass {
-        background: var(--glass-bg-light);
-        border: 1px solid rgba(15, 23, 42, 0.08);
-        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
-      }
-      .segment-control {
-        display: grid;
-        grid-auto-flow: column;
-        grid-auto-columns: 1fr;
-        gap: 0;
-        border-radius: var(--radius-md);
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        background: rgba(255, 255, 255, 0.08);
-        overflow: hidden;
-      }
-      body.theme-light .segment-control {
-        border-color: rgba(15, 23, 42, 0.12);
-        background: rgba(15, 23, 42, 0.04);
-      }
-      .segment {
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 46px;
-        border: none;
-        background: transparent;
-        font-weight: 600;
-        cursor: pointer;
-        color: var(--text-secondary);
-        transition: background 160ms ease, color 160ms ease;
-      }
-      .segment:hover {
-        background: rgba(59, 130, 246, 0.08);
-        color: var(--text-primary);
-      }
-      .segment input {
-        position: absolute;
-        opacity: 0;
-        pointer-events: none;
-      }
-      .segment.is-selected {
-        background: rgba(59, 130, 246, 0.18);
-        color: #fff;
-        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.5);
-      }
-      body.theme-light .segment.is-selected {
-        color: #0f172a;
-        background: rgba(59, 130, 246, 0.2);
-      }
+
       .theme-toggle-floating {
         position: fixed;
         top: 16px;
         right: 16px;
-        z-index: 10;
+        z-index: 20;
       }
+
       .theme-toggle-min {
-        width: 40px;
-        height: 40px;
-        border-radius: 999px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        background: rgba(255, 255, 255, 0.08);
-        color: var(--text-primary);
-        backdrop-filter: blur(10px);
-      }
-      body.theme-light .theme-toggle-min {
-        border-color: rgba(15, 23, 42, 0.12);
-        background: rgba(255, 255, 255, 0.7);
-      }
-      .subject-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 10px;
-        flex-wrap: wrap;
-      }
-      .subject-header .fw-semibold {
-        flex: 1 1 220px;
-        min-width: 0;
-        word-break: break-word;
-      }
-      .optout-toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.85rem;
-        color: var(--text-secondary);
-        flex: 0 0 auto;
-        margin-left: auto;
-        white-space: nowrap;
-      }
-      .optout-toggle input {
-        appearance: none;
-        width: 36px;
-        height: 20px;
+        min-width: 72px;
+        height: 42px;
+        padding: 0 1rem;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.18);
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        position: relative;
-        transition: background 150ms ease, border-color 150ms ease;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.14);
+        color: inherit;
+        font-size: 0.84rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
       }
-      .optout-toggle input::after {
-        content: '';
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        background: #fff;
-        transition: transform 150ms ease;
+
+      body.theme-light .theme-toggle-min {
+        border-color: rgba(15, 23, 42, 0.08);
+        background: rgba(255, 255, 255, 0.76);
       }
-      .optout-toggle input:checked {
-        background: rgba(59, 130, 246, 0.7);
-        border-color: rgba(59, 130, 246, 0.8);
+
+      .btn {
+        transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
       }
-      .optout-toggle input:checked::after {
-        transform: translateX(16px);
+
+      .btn:hover:not(:disabled) {
+        transform: translateY(-1px);
       }
-      body.theme-light .optout-toggle {
-        color: rgba(15, 23, 42, 0.7);
+
+      .btn-primary {
+        border: 0;
+        border-radius: 16px;
+        padding: 0.82rem 1.15rem;
+        font-weight: 650;
+        background: linear-gradient(180deg, var(--accent) 0%, var(--accent-strong) 100%);
+        box-shadow: 0 16px 28px rgba(79, 108, 236, 0.28);
       }
-      body.theme-light .optout-toggle input {
-        background: rgba(15, 23, 42, 0.12);
-        border-color: rgba(15, 23, 42, 0.25);
+
+      .btn-primary:disabled {
+        opacity: 0.56;
+        box-shadow: none;
+        transform: none;
       }
-      body.theme-light .optout-toggle input::after {
-        background: #0f172a;
-      }
-      body.theme-light .optout-toggle input:checked {
-        background: rgba(59, 130, 246, 0.85);
-        border-color: rgba(59, 130, 246, 0.9);
-      }
-      body.theme-light .optout-toggle input:checked::after {
-        background: #ffffff;
-      }
+
       .flash-alert {
         display: flex;
         align-items: flex-start;
         gap: 0.8rem;
-        padding: 0.85rem 1rem;
-        border-radius: 18px;
+        padding: 0.95rem 1rem;
+        border-radius: 20px;
         border: 1px solid rgba(148, 163, 184, 0.22);
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.44), rgba(255, 255, 255, 0.22));
-        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
-        -webkit-backdrop-filter: blur(14px) saturate(1.08);
-        backdrop-filter: blur(14px) saturate(1.08);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.46));
+        box-shadow: 0 18px 36px rgba(15, 23, 42, 0.1);
+        -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
       }
+
       .flash-alert__icon {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 1.7rem;
-        height: 1.7rem;
-        flex: 0 0 1.7rem;
+        width: 1.8rem;
+        height: 1.8rem;
+        flex: 0 0 1.8rem;
         border-radius: 999px;
-        font-size: 0.84rem;
+        font-size: 0.86rem;
         font-weight: 700;
-        line-height: 1;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
       }
+
       .flash-alert__body {
         min-width: 0;
       }
+
       .flash-alert__title {
         display: block;
-        margin: 0 0 0.2rem;
+        margin-bottom: 0.18rem;
         font-size: 0.92rem;
         font-weight: 650;
-        letter-spacing: -0.01em;
       }
+
       .flash-alert__text {
         margin: 0;
-        font-size: 0.88rem;
+        font-size: 0.89rem;
         line-height: 1.5;
       }
+
       .flash-alert.alert-danger {
-        border-color: rgba(239, 68, 68, 0.28);
-        color: #991b1b;
-        background: linear-gradient(135deg, rgba(254, 226, 226, 0.9), rgba(252, 165, 165, 0.38));
+        color: #8b1d32;
+        border-color: rgba(225, 29, 72, 0.18);
+        background: linear-gradient(180deg, rgba(255, 241, 242, 0.96), rgba(255, 228, 230, 0.8));
       }
+
       .flash-alert.alert-danger .flash-alert__icon {
-        background: rgba(239, 68, 68, 0.16);
-        color: #b91c1c;
-        border: 1px solid rgba(239, 68, 68, 0.24);
+        background: rgba(225, 29, 72, 0.12);
+        color: #be123c;
       }
+
       .flash-alert.alert-info {
-        border-color: rgba(59, 130, 246, 0.24);
-        color: #1e3a8a;
-        background: linear-gradient(135deg, rgba(219, 234, 254, 0.92), rgba(147, 197, 253, 0.28));
-      }
-      .flash-alert.alert-info .flash-alert__icon {
-        background: rgba(59, 130, 246, 0.14);
         color: #1d4ed8;
-        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-color: rgba(96, 165, 250, 0.16);
+        background: linear-gradient(180deg, rgba(239, 246, 255, 0.96), rgba(219, 234, 254, 0.78));
       }
+
+      .flash-alert.alert-info .flash-alert__icon {
+        background: rgba(59, 130, 246, 0.12);
+        color: #2563eb;
+      }
+
       body.theme-dark .flash-alert {
+        color: #e2e8f0;
         border-color: rgba(191, 219, 254, 0.12);
-        color: #f8fafc;
-        background: linear-gradient(135deg, rgba(24, 31, 58, 0.82), rgba(18, 22, 44, 0.68));
-        box-shadow: 0 18px 36px rgba(4, 8, 22, 0.28);
+        background: linear-gradient(180deg, rgba(21, 28, 40, 0.86), rgba(18, 24, 37, 0.72));
+        box-shadow: 0 24px 42px rgba(2, 6, 23, 0.32);
       }
+
       body.theme-dark .flash-alert.alert-danger {
-        border-color: rgba(248, 113, 113, 0.2);
-        color: #fecaca;
-        background: linear-gradient(135deg, rgba(88, 28, 42, 0.84), rgba(69, 18, 33, 0.72));
+        color: #fecdd3;
+        border-color: rgba(251, 113, 133, 0.18);
+        background: linear-gradient(180deg, rgba(79, 24, 42, 0.9), rgba(57, 17, 33, 0.74));
       }
+
       body.theme-dark .flash-alert.alert-danger .flash-alert__icon {
-        background: rgba(248, 113, 113, 0.16);
+        background: rgba(251, 113, 133, 0.16);
         color: #fda4af;
-        border-color: rgba(248, 113, 113, 0.2);
       }
+
       body.theme-dark .flash-alert.alert-info {
-        border-color: rgba(96, 165, 250, 0.18);
         color: #dbeafe;
-        background: linear-gradient(135deg, rgba(30, 41, 82, 0.84), rgba(22, 33, 70, 0.72));
+        border-color: rgba(96, 165, 250, 0.18);
+        background: linear-gradient(180deg, rgba(26, 40, 70, 0.86), rgba(20, 30, 56, 0.74));
       }
+
       body.theme-dark .flash-alert.alert-info .flash-alert__icon {
         background: rgba(96, 165, 250, 0.16);
         color: #bfdbfe;
-        border-color: rgba(96, 165, 250, 0.18);
       }
-</style>
-      <link rel="stylesheet" href="/css/tokens.css" />
+
+      .app-footer {
+        font-size: 0.8rem;
+      }
+
+      @media (max-width: 767.98px) {
+        .theme-toggle-floating {
+          top: 12px;
+          right: 12px;
+        }
+
+        .theme-toggle-min {
+          min-width: 64px;
+          height: 40px;
+          padding: 0 0.85rem;
+        }
+      }
+    </style>
+    <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/auth.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/dynamic-bg.css" />
+    <link rel="stylesheet" href="/css/register-groups.css" />
   </head>
   <body class="studerria-theme theme-light page-register-subjects">
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
+
     <div class="theme-toggle-floating">
       <button
         class="theme-toggle-min"
         type="button"
         id="themeToggle"
-        aria-label="Toggle theme"
-        data-light-label="☀️"
-        data-dark-label="🌙"
+        aria-label="<%= t('theme.dark') %>"
+        data-light-label="<%= t('theme.light') %>"
+        data-dark-label="<%= t('theme.dark') %>"
       >
-        🌙
+        <%= t('theme.dark') %>
       </button>
     </div>
+
     <div class="container py-4">
       <div class="row justify-content-center">
-        <div class="col-12 col-lg-8">
-          <div class="card auth-card glass">
-            <div class="card-body p-4">
-              <h1 class="h4 mb-3"><%= t('registerSubjects.title') %></h1>
-              <p class="text-muted"><%= t('registerSubjects.subtitle') %></p>
+        <div class="col-12 col-xl-9 col-xxl-8">
+          <div class="card auth-card glass reg-groups-card">
+            <div class="card-body p-4 p-lg-5">
+              <div class="reg-groups-hero">
+                <div>
+                  <h1 class="h4 mb-2"><%= t('registerSubjects.title') %></h1>
+                  <p class="text-muted reg-groups-subtitle mb-0"><%= t('registerSubjects.subtitle') %></p>
+                </div>
+              </div>
 
-              <form method="POST" action="/register/subjects">
-                <% if (subjectRegistrationErrorText) { %>
-                  <div class="alert alert-danger flash-alert mb-3" role="alert">
-                    <span class="flash-alert__icon" aria-hidden="true">!</span>
-                    <div class="flash-alert__body">
-                      <span class="flash-alert__title"><%= lang === 'uk' ? 'Потрібна увага' : 'Action needed' %></span>
-                      <p class="flash-alert__text"><%= subjectRegistrationErrorText %></p>
-                    </div>
+              <div class="reg-groups-instructions">
+                <p class="mb-0"><%= t('registerSubjects.instructionsPrimary') %></p>
+                <p class="mb-0"><%= t('registerSubjects.instructionsSecondary') %></p>
+              </div>
+
+              <% if (subjectRegistrationErrorText) { %>
+                <div class="alert alert-danger flash-alert mb-3" role="alert">
+                  <span class="flash-alert__icon" aria-hidden="true">!</span>
+                  <div class="flash-alert__body">
+                    <span class="flash-alert__title"><%= t('registerSubjects.alertTitleAction') %></span>
+                    <p class="flash-alert__text"><%= subjectRegistrationErrorText %></p>
                   </div>
-                <% } %>
-                <% if (!subjects.length) { %>
+                </div>
+              <% } %>
+
+              <form method="POST" action="/register/subjects" id="registerGroupsForm" data-reg-groups-form novalidate>
+                <% if (showNoSubjectsNotice) { %>
                   <div class="alert alert-info flash-alert mb-3" role="status">
                     <span class="flash-alert__icon" aria-hidden="true">i</span>
                     <div class="flash-alert__body">
-                      <span class="flash-alert__title"><%= lang === 'uk' ? 'Наразі без предметів' : 'No subjects yet' %></span>
+                      <span class="flash-alert__title"><%= t('registerSubjects.noSubjectsTitle') %></span>
                       <p class="flash-alert__text"><%= t('registerSubjects.noSubjects') %></p>
                     </div>
                   </div>
-                <% } else { %>
-                  <% subjects.forEach(function(s) { %>
-                    <% const isRequired = s.is_required === true || s.is_required === 1 || s.is_required === '1'; %>
-                    <% if (!(isRequired && Number(s.group_count) === 1)) { %>
-                    <div class="border rounded p-3 mb-3 subject-card" data-subject-id="<%= s.id %>">
-                      <div class="subject-header">
-                        <div class="fw-semibold"><%= s.name %></div>
-                        <% if (!isRequired) { %>
-                          <label class="optout-toggle">
-                            <span>предмет не викладається</span>
-                            <input
-                              type="checkbox"
-                              name="optout_<%= s.id %>"
-                              value="1"
-                              class="optout-input"
-                              <%= (optouts || []).includes(s.id) ? 'checked' : '' %>
-                            />
-                          </label>
-                        <% } %>
-                      </div>
-                      <% if (Number(s.group_count) >= 1) { %>
-                      <div class="segment-control <%= (!isRequired && (optouts || []).includes(s.id)) ? 'is-disabled' : '' %>">
-                        <% for (let g = 1; g <= s.group_count; g++) { %>
-                          <label class="segment">
-                            <input
-                              type="radio"
-                              name="subject_<%= s.id %>"
-                              value="<%= g %>"
-                              <%= (!isRequired && (optouts || []).includes(s.id)) ? 'disabled' : '' %>
-                            />
-                            <%= t('registerSubjects.group') %> <%= g %>
-                          </label>
-                        <% } %>
-                      </div>
-                      <% } %>
+                <% } else if (showAutoAssignedNotice) { %>
+                  <div class="alert alert-info flash-alert mb-3" role="status">
+                    <span class="flash-alert__icon" aria-hidden="true">i</span>
+                    <div class="flash-alert__body">
+                      <span class="flash-alert__title"><%= t('registerSubjects.autoAssignedTitle') %></span>
+                      <p class="flash-alert__text"><%= t('registerSubjects.autoAssignedText') %></p>
                     </div>
-                    <% } %>
-                  <% }); %>
+                  </div>
                 <% } %>
 
-                <button type="submit" class="btn btn-primary"><%= t('registerSubjects.finish') %></button>
+                <% if (selectableSubjects.length) { %>
+                  <section
+                    class="reg-groups-surface reg-groups-progress-panel"
+                    aria-label="<%= t('registerSubjects.progressSelected') %>"
+                  >
+                    <div class="reg-groups-progress-panel__main">
+                      <div class="reg-groups-progress-panel__headline">
+                        <span class="reg-groups-kicker"><%= t('registerSubjects.progressSelected') %></span>
+                        <strong class="reg-groups-progress-panel__value">
+                          <span data-reg-groups-selected><%= selectedActiveCount %></span>/<span data-reg-groups-total><%= totalActiveCount %></span>
+                        </strong>
+                      </div>
+                      <div
+                        class="reg-groups-progress-bar"
+                        role="progressbar"
+                        aria-label="<%= t('registerSubjects.progressSelected') %>"
+                        aria-valuemin="0"
+                        aria-valuemax="<%= totalActiveCount %>"
+                        aria-valuenow="<%= selectedActiveCount %>"
+                        data-reg-groups-progress
+                      >
+                        <span style="width: <%= progressPercent %>%;" data-reg-groups-progress-bar></span>
+                      </div>
+                      <p class="reg-groups-caption mb-0" data-reg-groups-remaining role="status" aria-live="polite">
+                        <%= remainingText %>
+                      </p>
+                      <p
+                        class="reg-groups-caption reg-groups-caption--accent mb-0"
+                        data-reg-groups-missing
+                        role="status"
+                        aria-live="polite"
+                        <%= missingSummaryText ? '' : 'hidden' %>
+                      >
+                        <%= missingSummaryText %>
+                      </p>
+                    </div>
+
+                    <label class="reg-groups-filter">
+                      <input type="checkbox" data-reg-groups-filter />
+                      <span><%= t('registerSubjects.filterUnselected') %></span>
+                    </label>
+                  </section>
+
+                  <section class="reg-groups-surface reg-groups-quick-panel" aria-labelledby="quickSelectHeading">
+                    <div class="reg-groups-quick-panel__copy">
+                      <span class="reg-groups-kicker" id="quickSelectHeading"><%= t('registerSubjects.quickTitle') %></span>
+                      <p class="mb-0 text-muted"><%= t('registerSubjects.quickText') %></p>
+                    </div>
+                    <div class="reg-groups-quick-panel__actions" role="group" aria-label="<%= t('registerSubjects.quickTitle') %>">
+                      <% for (let g = 1; g <= 3; g += 1) { %>
+                        <button
+                          type="button"
+                          class="reg-groups-quick-pill <%= quickSelectedGroup === g ? 'is-active' : '' %>"
+                          data-reg-groups-quick-group="<%= g %>"
+                          aria-pressed="<%= quickSelectedGroup === g ? 'true' : 'false' %>"
+                        >
+                          <%= t('registerSubjects.group') %> <%= g %>
+                        </button>
+                      <% } %>
+                      <button type="button" class="reg-groups-reset" data-reg-groups-reset>
+                        <%= t('registerSubjects.resetSelection') %>
+                      </button>
+                    </div>
+                  </section>
+
+                  <section class="reg-groups-surface reg-groups-list-panel">
+                    <div class="reg-groups-list" data-reg-groups-list>
+                      <% selectableSubjects.forEach(function(subject) { %>
+                        <% const subjectStatusText = subject.optedOut ? t('registerSubjects.statusSkipped') : (subject.selectedGroup ? t('registerSubjects.statusSelected') : t('registerSubjects.statusPending')); %>
+                        <div
+                          class="reg-groups-row<%= (!subject.selectedGroup && !subject.optedOut) ? ' is-pending' : '' %><%= subject.optedOut ? ' is-opted-out' : '' %>"
+                          data-reg-groups-row
+                          data-subject-id="<%= subject.id %>"
+                          data-subject-name="<%= subject.name %>"
+                          data-group-count="<%= subject.groupCount %>"
+                          data-opted-out="<%= subject.optedOut ? '1' : '0' %>"
+                          data-required="<%= subject.requiredFlag ? '1' : '0' %>"
+                        >
+                          <div class="reg-groups-row__heading">
+                            <div class="reg-groups-row__title-stack">
+                              <div class="reg-groups-row__title-line">
+                                <span class="reg-groups-row__title"><%= subject.name %></span>
+                                <span class="reg-groups-row__chip">
+                                  <%= subject.requiredFlag ? t('registerSubjects.required') : t('registerSubjects.optional') %>
+                                </span>
+                              </div>
+
+                              <% if (!subject.requiredFlag) { %>
+                                <label class="reg-groups-optout">
+                                  <input
+                                    type="checkbox"
+                                    name="optout_<%= subject.id %>"
+                                    value="1"
+                                    class="reg-groups-optout__input"
+                                    data-reg-groups-optout
+                                    <%= subject.optedOut ? 'checked' : '' %>
+                                  />
+                                  <span><%= t('registerSubjects.optout') %></span>
+                                </label>
+                              <% } %>
+                            </div>
+
+                            <span class="reg-groups-row__status" data-reg-groups-status>
+                              <span class="reg-groups-row__status-dot" aria-hidden="true"></span>
+                              <span data-reg-groups-status-label><%= subjectStatusText %></span>
+                            </span>
+                          </div>
+
+                          <div class="reg-groups-row__actions" role="group" aria-label="<%= subject.name %>">
+                            <% for (let g = 1; g <= subject.groupCount; g += 1) { %>
+                              <button
+                                type="button"
+                                class="reg-groups-pill <%= subject.selectedGroup === g ? 'is-active' : '' %>"
+                                data-reg-groups-group="<%= g %>"
+                                aria-pressed="<%= subject.selectedGroup === g ? 'true' : 'false' %>"
+                                <%= subject.optedOut ? 'disabled aria-disabled="true"' : '' %>
+                              >
+                                <%= t('registerSubjects.group') %> <%= g %>
+                              </button>
+                            <% } %>
+                          </div>
+
+                          <input
+                            type="hidden"
+                            name="subject_<%= subject.id %>"
+                            value="<%= subject.selectedGroup || '' %>"
+                            data-reg-groups-input
+                          />
+                        </div>
+                      <% }); %>
+                    </div>
+
+                    <p class="reg-groups-filter-empty" data-reg-groups-empty hidden><%= t('registerSubjects.filterEmpty') %></p>
+                  </section>
+                <% } %>
+
+                <div class="reg-groups-inline-submit">
+                  <p
+                    class="reg-groups-inline-submit__hint mb-0"
+                    data-reg-groups-submit-hint
+                    <%= submitHintText ? '' : 'hidden' %>
+                  >
+                    <%= submitHintText %>
+                  </p>
+                  <button
+                    type="submit"
+                    class="btn btn-primary reg-groups-submit-btn"
+                    data-reg-groups-submit
+                    <%= (selectableSubjects.length && hasPendingSelections) ? 'disabled' : '' %>
+                  >
+                    <%= t('registerSubjects.finish') %>
+                  </button>
+                </div>
               </form>
             </div>
           </div>
+
+          <% if (selectableSubjects.length) { %>
+            <div class="reg-groups-sticky-shell">
+              <div class="reg-groups-sticky glass">
+                <div class="reg-groups-sticky__summary">
+                  <div class="reg-groups-sticky__count">
+                    <strong><span data-reg-groups-selected><%= selectedActiveCount %></span>/<span data-reg-groups-total><%= totalActiveCount %></span></strong>
+                    <span><%= t('registerSubjects.selectedSuffix') %></span>
+                  </div>
+                  <p class="reg-groups-sticky__remaining mb-0" data-reg-groups-sticky-remaining role="status" aria-live="polite">
+                    <%= remainingText %>
+                  </p>
+                </div>
+
+                <div class="reg-groups-sticky__actions">
+                  <p
+                    class="reg-groups-sticky__hint mb-0"
+                    data-reg-groups-submit-hint
+                    <%= submitHintText ? '' : 'hidden' %>
+                  ><%= submitHintText %></p>
+                  <button
+                    type="submit"
+                    form="registerGroupsForm"
+                    class="btn btn-primary reg-groups-submit-btn"
+                    data-reg-groups-submit
+                    <%= hasPendingSelections ? 'disabled' : '' %>
+                  >
+                    <%= t('registerSubjects.finish') %>
+                  </button>
+                </div>
+              </div>
+            </div>
+          <% } %>
+
           <%- include('partials/app-footer') %>
         </div>
       </div>
     </div>
+
     <%- include('partials/changelog-modal') %>
+
+    <script>
+      window.__registerGroupsConfig = <%- JSON.stringify(registerGroupsUi) %>;
+    </script>
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
@@ -590,49 +619,36 @@
     <script>
       const themeToggle = document.getElementById('themeToggle');
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
+
       document.body.classList.remove('theme-light', 'theme-dark');
       document.body.classList.add(savedTheme);
-      themeToggle.textContent = savedTheme === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
-      themeToggle.addEventListener('click', () => {
-        const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
-        document.body.classList.remove('theme-light', 'theme-dark');
-        document.body.classList.add(next);
-        localStorage.setItem('ui-theme', next);
-        themeToggle.textContent = next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
-      });
 
-      document.querySelectorAll('.segment-control').forEach((group) => {
-        group.addEventListener('click', (event) => {
-          const label = event.target.closest('.segment');
-          if (!label) return;
-          group.querySelectorAll('.segment').forEach((el) => el.classList.remove('is-selected'));
-          label.classList.add('is-selected');
-        });
-      });
+      if (themeToggle) {
+        themeToggle.textContent = savedTheme === 'theme-dark'
+          ? themeToggle.dataset.lightLabel
+          : themeToggle.dataset.darkLabel;
+        themeToggle.setAttribute(
+          'aria-label',
+          savedTheme === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel
+        );
 
-      document.querySelectorAll('.optout-input').forEach((toggle) => {
-        toggle.addEventListener('change', () => {
-          const card = toggle.closest('.subject-card');
-          if (!card) return;
-          const segment = card.querySelector('.segment-control');
-          if (!segment) return;
-          if (toggle.checked) {
-            segment.classList.add('is-disabled');
-            segment.querySelectorAll('input').forEach((input) => {
-              input.checked = false;
-              input.disabled = true;
-            });
-            segment.querySelectorAll('.segment').forEach((el) => el.classList.remove('is-selected'));
-          } else {
-            segment.classList.remove('is-disabled');
-            segment.querySelectorAll('input').forEach((input) => {
-              input.disabled = false;
-            });
-          }
+        themeToggle.addEventListener('click', () => {
+          const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
+          document.body.classList.remove('theme-light', 'theme-dark');
+          document.body.classList.add(next);
+          localStorage.setItem('ui-theme', next);
+          themeToggle.textContent = next === 'theme-dark'
+            ? themeToggle.dataset.lightLabel
+            : themeToggle.dataset.darkLabel;
+          themeToggle.setAttribute(
+            'aria-label',
+            next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel
+          );
         });
-      });
+      }
     </script>
-      <script src="/js/design-system.js" defer></script>
-      <script src="/js/dynamic-bg.js" defer></script>
+    <script src="/js/register-groups.js" defer></script>
+    <script src="/js/design-system.js" defer></script>
+    <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>
