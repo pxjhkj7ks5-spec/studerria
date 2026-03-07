@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.82",
+      "date": "2026-03-07",
+      "items": [
+        "feat(register-teacher-no-admission-step): removed the visible admission-year choice from the teacher registration flow so teachers now move through track, program, and campus without picking a cohort manually",
+        "fix(register-teacher-admission-resolution): added backend auto-resolution of the active teacher pathway admission so campus-to-course binding still works when teacher registration submits without an explicit admission year"
+      ]
+    },
+    {
       "version": "1.1.81",
       "date": "2026-03-07",
       "items": [

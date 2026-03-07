@@ -2583,6 +2583,47 @@ async function resolveRegistrationCourseForCampus({ admissionId, programId, trac
   };
 }
 
+async function resolveLatestRegistrationAdmissionId(programId, options = {}) {
+  const normalizedProgramId = parsePositiveIntStrict(programId);
+  if (!normalizedProgramId) {
+    return null;
+  }
+
+  const trackKey = options.trackKey ? normalizeRegistrationTrack(options.trackKey, '') : '';
+  const courseId = parsePositiveIntStrict(options.courseId);
+  const params = [normalizedProgramId];
+  const where = [
+    'a.program_id = ?',
+    'a.is_active = true',
+    'p.is_active = true',
+  ];
+
+  if (trackKey) {
+    where.push('p.track_key = ?');
+    params.push(trackKey);
+  }
+  if (courseId) {
+    where.push('pac.course_id = ?');
+    where.push('pac.is_visible = true');
+    params.push(courseId);
+  }
+
+  const row = await db.get(
+    `
+      SELECT a.id
+      FROM program_admissions a
+      JOIN study_programs p ON p.id = a.program_id
+      ${courseId ? 'JOIN program_admission_courses pac ON pac.admission_id = a.id' : ''}
+      WHERE ${where.join('\n        AND ')}
+      ORDER BY a.admission_year DESC, a.id DESC
+      LIMIT 1
+    `,
+    params
+  );
+
+  return parsePositiveIntStrict(row && row.id);
+}
+
 async function cloneAdmissionConfigurationFromLatest(programId, targetAdmissionId) {
   const normalizedProgramId = parsePositiveIntStrict(programId);
   const normalizedTargetAdmissionId = parsePositiveIntStrict(targetAdmissionId);
@@ -7014,6 +7055,14 @@ app.post('/register/course', registerLimiter, async (req, res) => {
   let courseId = parsePositiveIntStrict(req.body.course_id);
 
   try {
+    await ensureDbReady();
+
+    if (trackFromBody === 'teacher' && !selectedAdmissionId && selectedProgramId) {
+      selectedAdmissionId = await resolveLatestRegistrationAdmissionId(selectedProgramId, {
+        trackKey: 'teacher',
+      });
+    }
+
     if (!courseId && selectedAdmissionId && requestedCampus) {
       const resolvedCourse = await resolveRegistrationCourseForCampus({
         admissionId: selectedAdmissionId,
@@ -7034,7 +7083,6 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       return res.redirect('/register/course?error=Select%20campus');
     }
 
-    await ensureDbReady();
     const [pendingUser, course] = await Promise.all([
       db.get('SELECT id FROM users WHERE id = ?', [userId]),
       db.get('SELECT id, is_teacher_course FROM courses WHERE id = ?', [courseId]),
@@ -7052,6 +7100,13 @@ app.post('/register/course', registerLimiter, async (req, res) => {
     let selectedTrack = trackFromBody || inferRegistrationTrackFromCourse(course);
     if (teacherCourse) {
       selectedTrack = 'teacher';
+    }
+
+    if (selectedTrack === 'teacher' && selectedProgramId && !selectedAdmissionId) {
+      selectedAdmissionId = await resolveLatestRegistrationAdmissionId(selectedProgramId, {
+        trackKey: 'teacher',
+        courseId,
+      });
     }
 
     if (selectedProgramId && selectedAdmissionId) {
@@ -7076,6 +7131,20 @@ app.post('/register/course', registerLimiter, async (req, res) => {
           return res.redirect('/register/course?error=Invalid%20pathway');
         }
         selectedTrack = explicitTrack;
+      } else if (selectedTrack === 'teacher') {
+        const teacherAdmissionId = await resolveLatestRegistrationAdmissionId(selectedProgramId, {
+          trackKey: 'teacher',
+          courseId,
+        });
+        if (teacherAdmissionId) {
+          selectedAdmissionId = teacherAdmissionId;
+          selectedTrack = 'teacher';
+        } else if (requestedProgramId || requestedAdmissionId || requestedCampus) {
+          return res.redirect('/register/course?error=Invalid%20campus%20mapping');
+        } else {
+          selectedProgramId = null;
+          selectedAdmissionId = null;
+        }
       } else if (requestedProgramId || requestedAdmissionId || requestedCampus) {
         return res.redirect('/register/course?error=Invalid%20campus%20mapping');
       } else {

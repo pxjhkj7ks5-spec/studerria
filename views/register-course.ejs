@@ -483,7 +483,7 @@
                   </div>
                 </div>
 
-                <div class="mb-3">
+                <div class="mb-3" id="admissionField">
                   <label class="pathway-label" for="admissionSelect">Admission year</label>
                   <select
                     id="admissionSelect"
@@ -528,6 +528,7 @@
       const programField = document.getElementById('programField');
       const programStaticField = document.getElementById('programStaticField');
       const programStaticLabel = document.getElementById('programStaticLabel');
+      const admissionField = document.getElementById('admissionField');
       const admissionSelect = document.getElementById('admissionSelect');
       const courseIdInput = document.getElementById('selectedCourseIdInput');
       const campusInput = document.getElementById('selectedCampusInput');
@@ -566,6 +567,16 @@
 
       function formatCampusLabelClient(location) {
         return normalizeCampusKey(location) === 'munich' ? 'Munich' : 'Kyiv';
+      }
+
+      function isTeacherTrack(trackKey) {
+        return String(trackKey || '').trim().toLowerCase() === 'teacher';
+      }
+
+      function getCampusReadyHint(trackKey) {
+        return isTeacherTrack(trackKey)
+          ? 'Campus selection resolves the linked teacher course automatically.'
+          : 'Admission year defines the cohort. Campus selection resolves the linked course automatically.';
       }
 
       function syncTrackCards() {
@@ -622,6 +633,7 @@
       }
 
       function refreshAdmissionOptions() {
+        const trackKey = getSelectedTrack();
         const programId = Number(programSelect?.value || 0);
         const options = pathwayAdmissions
           .filter((admission) => Number(admission.program_id) === programId)
@@ -636,6 +648,9 @@
           ? currentValue
           : (options[0] ? Number(options[0].value) : null);
         setOptions(admissionSelect, options, resolvedValue, 'Select admission year');
+        if (admissionField) {
+          admissionField.style.display = isTeacherTrack(trackKey) ? 'none' : '';
+        }
       }
 
       function getAdmissionCourses(admissionId, trackKey) {
@@ -700,6 +715,7 @@
       function renderCampusOptions() {
         if (!campusOptions || !courseIdInput || !campusInput) return;
         const trackKey = getSelectedTrack();
+        const programId = Number(programSelect?.value || 0);
         const admissionId = Number(admissionSelect?.value || 0);
         const campusChoices = buildCampusChoices(admissionId, trackKey);
         const preferredCourse = courseById.get(selectedCourseSeed);
@@ -714,18 +730,35 @@
         if (!admissionId) {
           const emptyState = document.createElement('div');
           emptyState.className = 'track-option campus-option is-disabled';
+          if (isTeacherTrack(trackKey)) {
+            if (!programId) {
+              emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">Select program first</span><span class="course-option-subtitle">Teacher registration resolves campus from the selected program.</span></span>';
+              campusOptions.appendChild(emptyState);
+              setCampusHint('Select the teacher program first. Campus selection will resolve the linked course automatically.', true);
+              return;
+            }
+            emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">No teacher pathway configured</span><span class="course-option-subtitle">Ask the admin to keep one active teacher admission for this program.</span></span>';
+            campusOptions.appendChild(emptyState);
+            setCampusHint('Teacher registration needs one active pathway admission for the selected program.', true);
+            return;
+          }
           emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">Select admission year first</span><span class="course-option-subtitle">Programs and admission years define which campus can be used.</span></span>';
           campusOptions.appendChild(emptyState);
-          setCampusHint('Admission year defines the cohort. Campus selection resolves the linked course automatically.');
+          setCampusHint(getCampusReadyHint(trackKey));
           return;
         }
 
         if (!campusChoices.length) {
           const emptyState = document.createElement('div');
           emptyState.className = 'track-option campus-option is-disabled';
-          emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">No campuses configured</span><span class="course-option-subtitle">Ask the admin to map one course per campus for this admission year.</span></span>';
+          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">No campuses configured</span><span class="course-option-subtitle">${isTeacherTrack(trackKey) ? 'Ask the admin to map one teacher course per campus.' : 'Ask the admin to map one course per campus for this admission year.'}</span></span>`;
           campusOptions.appendChild(emptyState);
-          setCampusHint('No campus is available for this admission year yet.', true);
+          setCampusHint(
+            isTeacherTrack(trackKey)
+              ? 'No campus is available for this teacher program yet.'
+              : 'No campus is available for this admission year yet.',
+            true
+          );
           return;
         }
 
@@ -770,7 +803,7 @@
               button.classList.add('is-selected');
               courseIdInput.value = String(choice.courseId || '');
               campusInput.value = choice.campusKey;
-              setCampusHint('Admission year defines the cohort. Campus selection resolves the linked course automatically.');
+              setCampusHint(getCampusReadyHint(trackKey));
             });
           }
 
@@ -780,7 +813,7 @@
         if (!courseIdInput.value || !campusInput.value) {
           setCampusHint('Campus mapping is ambiguous. Ask the admin to keep one visible course per campus.', true);
         } else {
-          setCampusHint('Admission year defines the cohort. Campus selection resolves the linked course automatically.');
+          setCampusHint(getCampusReadyHint(trackKey));
         }
       }
 
