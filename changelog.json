@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.78",
+      "date": "2026-03-07",
+      "items": [
+        "feat(register-campus-flow): replaced direct course picking on the registration pathway screen with campus selection so track, program, and admission year now resolve the linked course automatically",
+        "feat(pathways-user-migration): added an admin pathways bulk action that assigns existing users from selected legacy courses to the chosen track, program, and admission year without forcing re-registration or changing their current course binding",
+        "feat(pathways-campus-summary): added a registration-campus summary in pathways so ambiguous Kyiv or Munich bindings are visible before they break cohort registration"
+      ]
+    },
+    {
       "version": "1.1.77",
       "date": "2026-03-07",
       "items": [

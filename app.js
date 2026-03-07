@@ -2250,6 +2250,62 @@ function inferRegistrationTrackFromCourse(course) {
   return isTeacher ? 'teacher' : 'bachelor';
 }
 
+function isTeacherCourseRecord(course) {
+  return Boolean(course) && (
+    course.is_teacher_course === true
+    || Number(course.is_teacher_course) === 1
+  );
+}
+
+function courseMatchesRegistrationTrack(course, trackKey) {
+  const normalizedTrack = normalizeRegistrationTrack(trackKey, 'bachelor');
+  return normalizedTrack === 'teacher' ? isTeacherCourseRecord(course) : !isTeacherCourseRecord(course);
+}
+
+function formatCampusLabelServer(location) {
+  return normalizeCourseCampus(location) === 'munich' ? 'Munich' : 'Kyiv';
+}
+
+function buildAdmissionCampusChoicesFromCourses(courseRows, trackKey = '') {
+  const campusMap = new Map();
+  (Array.isArray(courseRows) ? courseRows : []).forEach((course) => {
+    if (!course) return;
+    if (trackKey && !courseMatchesRegistrationTrack(course, trackKey)) return;
+    const courseId = Number(course.course_id || course.id || 0);
+    if (!Number.isInteger(courseId) || courseId < 1) return;
+    const campusKey = normalizeCourseCampus(course.course_location || course.location);
+    if (!campusMap.has(campusKey)) {
+      campusMap.set(campusKey, {
+        campus_key: campusKey,
+        campus_label: formatCampusLabelServer(campusKey),
+        course_ids: [],
+        course_labels: [],
+      });
+    }
+    const entry = campusMap.get(campusKey);
+    entry.course_ids.push(courseId);
+    entry.course_labels.push(
+      sanitizeCompactText(course.course_name || course.name || `Course ${courseId}`, 140)
+    );
+  });
+
+  return ['kyiv', 'munich']
+    .map((campusKey) => campusMap.get(campusKey))
+    .filter(Boolean)
+    .map((entry) => {
+      const courseIds = Array.from(new Set(entry.course_ids));
+      const courseLabels = Array.from(new Set(entry.course_labels));
+      return {
+        campus_key: entry.campus_key,
+        campus_label: entry.campus_label,
+        course_count: courseIds.length,
+        course_id: courseIds.length === 1 ? courseIds[0] : null,
+        is_ambiguous: courseIds.length !== 1,
+        course_labels: courseLabels,
+      };
+    });
+}
+
 async function getRegistrationPathways() {
   const cached = cacheGet(referenceCache.registrationPathways, 'pathways');
   if (cached) return cached;
@@ -2396,6 +2452,88 @@ async function getRegistrationPathways() {
     links,
     courses,
   });
+}
+
+async function getAdmissionRegistrationCourses(admissionId, options = {}) {
+  const normalizedAdmissionId = parsePositiveIntStrict(admissionId);
+  if (!normalizedAdmissionId) {
+    return [];
+  }
+
+  const normalizedProgramId = parsePositiveIntStrict(options.programId);
+  const trackKey = options.trackKey ? normalizeRegistrationTrack(options.trackKey, '') : '';
+  const params = [normalizedAdmissionId];
+  const where = [
+    'pac.admission_id = ?',
+    'pac.is_visible = true',
+    'a.is_active = true',
+    'p.is_active = true',
+  ];
+
+  if (normalizedProgramId) {
+    where.push('p.id = ?');
+    params.push(normalizedProgramId);
+  }
+  if (trackKey) {
+    where.push('p.track_key = ?');
+    params.push(trackKey);
+  }
+
+  const rows = await db.all(
+    `
+      SELECT
+        c.id AS course_id,
+        c.name AS course_name,
+        COALESCE(c.location, 'kyiv') AS course_location,
+        c.is_teacher_course
+      FROM program_admission_courses pac
+      JOIN program_admissions a ON a.id = pac.admission_id
+      JOIN study_programs p ON p.id = a.program_id
+      JOIN courses c ON c.id = pac.course_id
+      WHERE ${where.join('\n        AND ')}
+      ORDER BY
+        CASE COALESCE(c.location, 'kyiv')
+          WHEN 'kyiv' THEN 0
+          WHEN 'munich' THEN 1
+          ELSE 2
+        END,
+        c.id ASC
+    `,
+    params
+  );
+
+  return (rows || [])
+    .map((row) => ({
+      course_id: Number(row.course_id || 0),
+      course_name: sanitizeCompactText(row.course_name || '', 140),
+      course_location: normalizeCourseCampus(row.course_location),
+      is_teacher_course: row.is_teacher_course === true || Number(row.is_teacher_course) === 1,
+    }))
+    .filter((course) => (trackKey ? courseMatchesRegistrationTrack(course, trackKey) : true));
+}
+
+async function resolveRegistrationCourseForCampus({ admissionId, programId, trackKey, campus }) {
+  const campusKey = parseCourseCampus(campus);
+  if (!campusKey) {
+    return { courseId: null, reason: 'missing_campus' };
+  }
+
+  const admissionCourses = await getAdmissionRegistrationCourses(admissionId, { programId, trackKey });
+  const campusChoices = buildAdmissionCampusChoicesFromCourses(admissionCourses, trackKey);
+  const matchingCampus = campusChoices.find((item) => item.campus_key === campusKey) || null;
+  if (!matchingCampus) {
+    return { courseId: null, reason: 'campus_not_available', campusChoices };
+  }
+  if (matchingCampus.is_ambiguous || !matchingCampus.course_id) {
+    return { courseId: null, reason: 'ambiguous_campus', campusChoices, matchingCampus };
+  }
+
+  return {
+    courseId: Number(matchingCampus.course_id || 0) || null,
+    reason: null,
+    campusChoices,
+    matchingCampus,
+  };
 }
 
 async function cloneAdmissionConfigurationFromLatest(programId, targetAdmissionId) {
@@ -5319,10 +5457,16 @@ function sanitizeCompactText(rawValue, maxLength = 160) {
   return compact.slice(0, Math.max(1, Number(maxLength) || 160));
 }
 
-function normalizeCourseCampus(rawValue, fallback = 'kyiv') {
+function parseCourseCampus(rawValue) {
   const normalized = String(rawValue || '').trim().toLowerCase();
   if (normalized === 'munich') return 'munich';
   if (normalized === 'kyiv') return 'kyiv';
+  return '';
+}
+
+function normalizeCourseCampus(rawValue, fallback = 'kyiv') {
+  const normalized = parseCourseCampus(rawValue);
+  if (normalized) return normalized;
   return String(fallback || '').trim().toLowerCase() === 'munich' ? 'munich' : 'kyiv';
 }
 
@@ -6784,6 +6928,7 @@ app.get('/register/course', async (req, res) => {
       pendingUser.study_track,
       inferRegistrationTrackFromCourse(selectedCourse)
     );
+    const selectedCampus = selectedCourse ? normalizeCourseCampus(selectedCourse.location) : '';
     const selectedProgramId = Number.isFinite(Number(pendingUser.study_program_id))
       ? Number(pendingUser.study_program_id)
       : null;
@@ -6793,6 +6938,7 @@ app.get('/register/course', async (req, res) => {
     return res.render('register-course', {
       courses,
       selectedCourseId,
+      selectedCampus,
       selectedTrack,
       selectedProgramId,
       selectedAdmissionId,
@@ -6811,19 +6957,36 @@ app.post('/register/course', registerLimiter, async (req, res) => {
     return res.redirect('/register');
   }
 
-  const courseId = Number(req.body.course_id);
-  if (!Number.isFinite(courseId) || courseId < 1) {
-    return res.redirect('/register/course?error=Select%20course');
-  }
-
   const rawTrack = String(req.body.study_track || req.body.track || '').trim().toLowerCase();
   const trackFromBody = REGISTRATION_TRACK_KEYS.has(rawTrack) ? rawTrack : '';
+  const requestedCampus = parseCourseCampus(req.body.campus || req.body.location);
   const requestedProgramId = Number(req.body.study_program_id || 0);
   const requestedAdmissionId = Number(req.body.admission_id || 0);
   let selectedProgramId = Number.isFinite(requestedProgramId) && requestedProgramId > 0 ? requestedProgramId : null;
   let selectedAdmissionId = Number.isFinite(requestedAdmissionId) && requestedAdmissionId > 0 ? requestedAdmissionId : null;
+  let courseId = parsePositiveIntStrict(req.body.course_id);
 
   try {
+    if (!courseId && selectedAdmissionId && requestedCampus) {
+      const resolvedCourse = await resolveRegistrationCourseForCampus({
+        admissionId: selectedAdmissionId,
+        programId: selectedProgramId,
+        trackKey: trackFromBody,
+        campus: requestedCampus,
+      });
+      if (!resolvedCourse.courseId) {
+        if (resolvedCourse.reason === 'ambiguous_campus') {
+          return res.redirect('/register/course?error=Campus%20mapping%20is%20ambiguous');
+        }
+        return res.redirect('/register/course?error=Selected%20campus%20is%20not%20available');
+      }
+      courseId = resolvedCourse.courseId;
+    }
+
+    if (!courseId) {
+      return res.redirect('/register/course?error=Select%20campus');
+    }
+
     await ensureDbReady();
     const [pendingUser, course] = await Promise.all([
       db.get('SELECT id FROM users WHERE id = ?', [userId]),
@@ -6866,6 +7029,8 @@ app.post('/register/course', registerLimiter, async (req, res) => {
           return res.redirect('/register/course?error=Invalid%20pathway');
         }
         selectedTrack = explicitTrack;
+      } else if (requestedProgramId || requestedAdmissionId || requestedCampus) {
+        return res.redirect('/register/course?error=Invalid%20campus%20mapping');
       } else {
         selectedProgramId = null;
         selectedAdmissionId = null;
@@ -23567,6 +23732,84 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     };
     visibilitySummary.hidden = Math.max(0, visibilitySummary.total - visibilitySummary.visible);
 
+    const selectedProgram = programs.find((item) => Number(item.id) === Number(selectedProgramId)) || null;
+    const selectedTrackKey = selectedProgram
+      ? normalizeRegistrationTrack(selectedProgram.track_key, 'bachelor')
+      : '';
+    const registrationCampusBindings = buildAdmissionCampusChoicesFromCourses(
+      (courseMappings || []).filter((row) => row.is_visible),
+      selectedTrackKey
+    );
+    const ambiguousCampusBindings = registrationCampusBindings.filter((item) => item.is_ambiguous);
+
+    let migrationCourseOptions = [];
+    if (selectedAdmissionId && selectedProgramId && selectedTrackKey) {
+      const compatibleCourses = (courses || []).filter((course) => courseMatchesRegistrationTrack(course, selectedTrackKey));
+      const compatibleCourseIds = compatibleCourses
+        .map((course) => Number(course.id || 0))
+        .filter((value) => Number.isInteger(value) && value > 0);
+      const userStatsByCourse = new Map();
+
+      if (compatibleCourseIds.length) {
+        const userStatRows = await db.all(
+          `
+            SELECT
+              course_id,
+              COUNT(*) FILTER (
+                WHERE LOWER(COALESCE(role, '')) <> 'admin'
+              )::int AS users_count,
+              COUNT(*) FILTER (
+                WHERE LOWER(COALESCE(role, '')) <> 'admin'
+                  AND study_program_id = ?
+                  AND admission_id = ?
+              )::int AS assigned_count
+            FROM users
+            WHERE course_id = ANY(?::int[])
+            GROUP BY course_id
+          `,
+          [selectedProgramId, selectedAdmissionId, compatibleCourseIds]
+        );
+        (userStatRows || []).forEach((row) => {
+          const scopedCourseId = Number(row.course_id || 0);
+          if (!Number.isInteger(scopedCourseId) || scopedCourseId < 1) return;
+          userStatsByCourse.set(scopedCourseId, {
+            users_count: Number(row.users_count || 0),
+            assigned_count: Number(row.assigned_count || 0),
+          });
+        });
+      }
+
+      const mappedCourseSet = new Set(
+        (courseMappings || [])
+          .filter((row) => row.is_visible)
+          .map((row) => Number(row.course_id || 0))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      );
+      migrationCourseOptions = compatibleCourses
+        .map((course) => {
+          const scopedCourseId = Number(course.id || 0);
+          const stats = userStatsByCourse.get(scopedCourseId) || { users_count: 0, assigned_count: 0 };
+          return {
+            course_id: scopedCourseId,
+            course_name: sanitizeCompactText(course.name || '', 120),
+            course_location: normalizeCourseCampus(course.location),
+            is_teacher_course: isTeacherCourseRecord(course),
+            is_mapped: mappedCourseSet.has(scopedCourseId),
+            users_count: Number(stats.users_count || 0),
+            assigned_count: Number(stats.assigned_count || 0),
+          };
+        })
+        .sort((a, b) => {
+          const mappedDiff = Number(b.is_mapped) - Number(a.is_mapped);
+          if (mappedDiff !== 0) return mappedDiff;
+          const usersDiff = Number(b.users_count || 0) - Number(a.users_count || 0);
+          if (usersDiff !== 0) return usersDiff;
+          const campusDiff = String(a.course_location || '').localeCompare(String(b.course_location || ''));
+          if (campusDiff !== 0) return campusDiff;
+          return String(a.course_name || '').localeCompare(String(b.course_name || ''));
+        });
+    }
+
     const subjectCatalogRows = await db.all(
       `
         SELECT
@@ -23629,9 +23872,12 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       selectedAdmissionId,
       admissionCopyOptions,
       courseMappings,
+      registrationCampusBindings,
+      ambiguousCampusBindings,
       mappingSummary,
       subjectVisibilityItems: configurableSubjectVisibility,
       subjectCatalogCourses,
+      migrationCourseOptions,
       hiddenSubjectCount,
       visibilitySummary,
     });
@@ -24015,6 +24261,134 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.courses.copy');
+  }
+});
+
+app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const admissionId = parsePositiveIntStrict(req.params.id);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+  const rawSourceCourseIds = Array.isArray(req.body.source_course_ids)
+    ? req.body.source_course_ids
+    : (req.body.source_course_ids ? [req.body.source_course_ids] : []);
+  const sourceCourseIds = Array.from(new Set(
+    rawSourceCourseIds
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+
+  if (!admissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      error: 'Invalid admission year',
+    }));
+  }
+  if (!sourceCourseIds.length) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: 'Select at least one source course',
+    }));
+  }
+
+  try {
+    const admissionRow = await db.get(
+      `
+        SELECT
+          a.id,
+          a.program_id,
+          a.admission_year,
+          p.track_key
+        FROM program_admissions a
+        JOIN study_programs p ON p.id = a.program_id
+        WHERE a.id = ?
+      `,
+      [admissionId]
+    );
+    if (!admissionRow) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        error: 'Admission year not found',
+      }));
+    }
+
+    const resolvedProgramId = Number(admissionRow.program_id || 0);
+    if (programId && Number(programId) !== resolvedProgramId) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId: resolvedProgramId,
+        admissionId,
+        error: 'Admission year does not belong to selected program',
+      }));
+    }
+
+    const sourceRows = await db.all(
+      `
+        SELECT id, is_teacher_course
+        FROM courses
+        WHERE id = ANY(?::int[])
+      `,
+      [sourceCourseIds]
+    );
+    const validSourceCourseIds = (sourceRows || [])
+      .filter((row) => courseMatchesRegistrationTrack(row, admissionRow.track_key))
+      .map((row) => Number(row.id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0);
+
+    if (validSourceCourseIds.length !== sourceCourseIds.length) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId: resolvedProgramId,
+        admissionId,
+        error: 'Selected courses do not match the admission track',
+      }));
+    }
+
+    const updatedRows = await db.all(
+      `
+        UPDATE users
+        SET
+          study_track = ?,
+          study_program_id = ?,
+          admission_id = ?
+        WHERE course_id = ANY(?::int[])
+          AND LOWER(COALESCE(role, '')) <> 'admin'
+        RETURNING id
+      `,
+      [admissionRow.track_key, resolvedProgramId, admissionId, validSourceCourseIds]
+    );
+
+    const migratedCount = Array.isArray(updatedRows) ? updatedRows.length : 0;
+    logAction(db, req, 'pathways_user_migrate', {
+      admission_id: admissionId,
+      program_id: resolvedProgramId,
+      study_track: admissionRow.track_key,
+      source_course_ids: validSourceCourseIds,
+      migrated_count: migratedCount,
+    });
+    broadcast('users_updated');
+
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId: resolvedProgramId,
+      admissionId,
+      ok: migratedCount > 0
+        ? `Migrated ${migratedCount} users to admission ${Number(admissionRow.admission_year || 0)}`
+        : 'No eligible users found in selected courses',
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.users.migrate');
   }
 });
 

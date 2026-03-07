@@ -3,6 +3,7 @@
   const selectedTrackValue = typeof selectedTrack === 'string' && selectedTrack ? selectedTrack : 'bachelor';
   const selectedProgramValue = Number.isFinite(Number(selectedProgramId)) ? Number(selectedProgramId) : null;
   const selectedAdmissionValue = Number.isFinite(Number(selectedAdmissionId)) ? Number(selectedAdmissionId) : null;
+  const selectedCampusValue = typeof selectedCampus === 'string' ? selectedCampus : '';
   const isTeacherCourse = (course) => course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
   const formatCampusLabel = (location) => String(location || 'kyiv').trim().toLowerCase() === 'munich' ? 'Munich' : 'Kyiv';
 %>
@@ -113,6 +114,11 @@
         gap: 0.35rem;
         min-width: 0;
       }
+      .course-option-subtitle {
+        font-size: 0.78rem;
+        line-height: 1.35;
+        opacity: 0.76;
+      }
       .course-option-title {
         font-weight: 650;
         line-height: 1.26;
@@ -142,6 +148,12 @@
       .course-option:hover {
         transform: translateY(-1px);
         box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+      }
+      .course-option.is-disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
       }
       .course-option.is-selected {
         border-color: rgba(59, 130, 246, 0.9);
@@ -457,33 +469,13 @@
                   </select>
                 </div>
 
-                <div class="d-grid gap-2 mb-3">
-                  <% courses.forEach((course) => { %>
-                    <label
-                      class="course-option d-flex align-items-center"
-                      data-course-card="<%= course.id %>"
-                      data-course-teacher="<%= (course.is_teacher_course === true || Number(course.is_teacher_course) === 1) ? '1' : '0' %>"
-                    >
-                      <input
-                        type="radio"
-                        name="course_id"
-                        value="<%= course.id %>"
-                        <%= Number(selectedCourseId) === Number(course.id) ? 'checked' : '' %>
-                        required
-                      />
-                      <span class="course-option-content">
-                        <span class="course-option-title"><%= course.name %></span>
-                        <span class="course-option-meta">
-                          <span class="course-option-pill"><%= formatCampusLabel(course.location) %></span>
-                          <% if (isTeacherCourse(course)) { %>
-                            <span class="course-option-pill">Teacher</span>
-                          <% } %>
-                        </span>
-                      </span>
-                    </label>
-                  <% }) %>
+                <div class="mb-3">
+                  <label class="pathway-label">Campus</label>
+                  <input type="hidden" name="course_id" id="selectedCourseIdInput" value="<%= Number(selectedCourseId || 0) || '' %>" />
+                  <input type="hidden" name="campus" id="selectedCampusInput" value="<%= selectedCampusValue %>" />
+                  <div class="d-grid gap-2" id="campusOptions"></div>
                 </div>
-                <p class="pathway-hint mb-3">Programs and admission years define which courses and subjects are visible.</p>
+                <p class="pathway-hint mb-3" id="campusHint">Admission year defines the cohort. Campus selection resolves the linked course automatically.</p>
                 <button type="submit" class="btn btn-primary w-100"><%= t('registerCourse.continue') %></button>
                 <a href="/register" class="btn btn-outline-secondary w-100 mt-2"><%= t('registerCourse.backToRegister') %></a>
               </form>
@@ -504,25 +496,22 @@
       const pathwayPrograms = Array.isArray(pathwayPayload.programs) ? pathwayPayload.programs : [];
       const pathwayAdmissions = Array.isArray(pathwayPayload.admissions) ? pathwayPayload.admissions : [];
       const pathwayLinks = Array.isArray(pathwayPayload.links) ? pathwayPayload.links : [];
-
+      const pathwayCourses = Array.isArray(pathwayPayload.courses) ? pathwayPayload.courses : [];
       const trackInputs = Array.from(document.querySelectorAll('input[name="study_track"]'));
       const programSelect = document.getElementById('studyProgramSelect');
       const admissionSelect = document.getElementById('admissionSelect');
-      const courseCards = Array.from(document.querySelectorAll('[data-course-card]'));
+      const courseIdInput = document.getElementById('selectedCourseIdInput');
+      const campusInput = document.getElementById('selectedCampusInput');
+      const campusOptions = document.getElementById('campusOptions');
+      const campusHint = document.getElementById('campusHint');
+      const registerCourseForm = document.querySelector('form[action="/register/course"]');
       const selectedProgramSeed = Number(programSelect?.dataset.selectedProgram || 0);
       const selectedAdmissionSeed = Number(admissionSelect?.dataset.selectedAdmission || 0);
-
-      const admissionToCourseSet = new Map();
-      pathwayLinks.forEach((link) => {
-        const admissionId = Number(link.admission_id || 0);
-        const courseId = Number(link.course_id || 0);
-        if (!admissionToCourseSet.has(admissionId)) {
-          admissionToCourseSet.set(admissionId, new Set());
-        }
-        if (courseId > 0) {
-          admissionToCourseSet.get(admissionId).add(courseId);
-        }
-      });
+      const selectedCourseSeed = Number(courseIdInput?.value || 0);
+      const selectedCampusSeed = String(campusInput?.value || '').trim().toLowerCase();
+      const courseById = new Map(
+        pathwayCourses.map((course) => [Number(course.id || 0), course])
+      );
 
       function getSelectedTrack() {
         const checked = trackInputs.find((input) => input.checked);
@@ -533,6 +522,21 @@
           return firstEnabled.value;
         }
         return 'bachelor';
+      }
+
+      function isTeacherCourseClient(course) {
+        return Boolean(course) && (
+          course.is_teacher_course === true
+          || Number(course.is_teacher_course) === 1
+        );
+      }
+
+      function normalizeCampusKey(rawValue) {
+        return String(rawValue || '').trim().toLowerCase() === 'munich' ? 'munich' : 'kyiv';
+      }
+
+      function formatCampusLabelClient(location) {
+        return normalizeCampusKey(location) === 'munich' ? 'Munich' : 'Kyiv';
       }
 
       function syncTrackCards() {
@@ -564,13 +568,8 @@
 
       function refreshProgramOptions() {
         const trackKey = getSelectedTrack();
-        const programIdsByTrack = new Set(
-          pathwayPrograms
-            .filter((program) => program.track_key === trackKey)
-            .map((program) => Number(program.id))
-        );
         const options = pathwayPrograms
-          .filter((program) => programIdsByTrack.has(Number(program.id)))
+          .filter((program) => program.track_key === trackKey)
           .map((program) => ({
             value: Number(program.id),
             label: program.code ? `${program.name} (${program.code})` : program.name,
@@ -599,66 +598,157 @@
         setOptions(admissionSelect, options, resolvedValue, 'Select admission year');
       }
 
-      function getTrackCourseFilter(trackKey) {
-        if (trackKey === 'teacher') {
-          return (courseCard) => courseCard.dataset.courseTeacher === '1';
-        }
-        return (courseCard) => courseCard.dataset.courseTeacher !== '1';
+      function getAdmissionCourses(admissionId, trackKey) {
+        const targetAdmissionId = Number(admissionId || 0);
+        if (!targetAdmissionId) return [];
+        const courseIds = [];
+        pathwayLinks.forEach((link) => {
+          const linkAdmissionId = Number(link.admission_id || 0);
+          const courseId = Number(link.course_id || 0);
+          if (linkAdmissionId !== targetAdmissionId || !courseId) return;
+          if (!courseById.has(courseId)) return;
+          if (!courseIds.includes(courseId)) {
+            courseIds.push(courseId);
+          }
+        });
+
+        return courseIds
+          .map((courseId) => courseById.get(courseId))
+          .filter((course) => {
+            const teacherCourse = isTeacherCourseClient(course);
+            return trackKey === 'teacher' ? teacherCourse : !teacherCourse;
+          });
       }
 
-      function refreshCourseOptions() {
+      function buildCampusChoices(admissionId, trackKey) {
+        const campusMap = new Map();
+        getAdmissionCourses(admissionId, trackKey).forEach((course) => {
+          const courseId = Number(course.id || 0);
+          if (!courseId) return;
+          const campusKey = normalizeCampusKey(course.location);
+          if (!campusMap.has(campusKey)) {
+            campusMap.set(campusKey, {
+              campusKey,
+              campusLabel: formatCampusLabelClient(campusKey),
+              courseIds: [],
+            });
+          }
+          campusMap.get(campusKey).courseIds.push(courseId);
+        });
+
+        return ['kyiv', 'munich']
+          .map((campusKey) => campusMap.get(campusKey))
+          .filter(Boolean)
+          .map((entry) => {
+            const uniqueIds = Array.from(new Set(entry.courseIds));
+            return {
+              campusKey: entry.campusKey,
+              campusLabel: entry.campusLabel,
+              courseCount: uniqueIds.length,
+              courseId: uniqueIds.length === 1 ? uniqueIds[0] : null,
+              isAmbiguous: uniqueIds.length !== 1,
+            };
+          });
+      }
+
+      function setCampusHint(message, isError = false) {
+        if (!campusHint) return;
+        campusHint.textContent = message;
+        campusHint.style.color = isError ? '#dc2626' : '';
+      }
+
+      function renderCampusOptions() {
+        if (!campusOptions || !courseIdInput || !campusInput) return;
         const trackKey = getSelectedTrack();
         const admissionId = Number(admissionSelect?.value || 0);
-        const mappedCourses = admissionToCourseSet.get(admissionId);
-        const trackFilter = getTrackCourseFilter(trackKey);
-        let anyVisible = false;
-        let firstVisibleInput = null;
+        const campusChoices = buildCampusChoices(admissionId, trackKey);
+        const preferredCourse = courseById.get(selectedCourseSeed);
+        const preferredCampus = selectedCampusSeed || (preferredCourse ? normalizeCampusKey(preferredCourse.location) : '');
+        const activeCourseId = Number(courseIdInput.value || 0);
+        const activeCampusKey = String(campusInput.value || preferredCampus || '').trim().toLowerCase();
 
-        courseCards.forEach((card) => {
-          const input = card.querySelector('input[type="radio"][name="course_id"]');
-          if (!input) return;
-          const courseId = Number(input.value || 0);
-          const mappedVisible = mappedCourses ? mappedCourses.has(courseId) : true;
-          const trackVisible = trackFilter(card);
-          const visible = mappedVisible && trackVisible;
-          card.style.display = visible ? '' : 'none';
-          input.disabled = !visible;
-          if (!visible && input.checked) {
-            input.checked = false;
-            card.classList.remove('is-selected');
-          }
-          if (visible) {
-            anyVisible = true;
-            if (!firstVisibleInput) firstVisibleInput = input;
-          }
-        });
+        campusOptions.innerHTML = '';
+        courseIdInput.value = '';
+        campusInput.value = '';
 
-        const checkedVisible = courseCards.some((card) => {
-          const input = card.querySelector('input[type="radio"][name="course_id"]');
-          return Boolean(input && !input.disabled && input.checked);
-        });
-
-        if (!checkedVisible && firstVisibleInput) {
-          firstVisibleInput.checked = true;
+        if (!admissionId) {
+          const emptyState = document.createElement('div');
+          emptyState.className = 'course-option is-disabled d-flex align-items-center';
+          emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">Select admission year first</span><span class="course-option-subtitle">Programs and admission years define which campus can be used.</span></span>';
+          campusOptions.appendChild(emptyState);
+          setCampusHint('Admission year defines the cohort. Campus selection resolves the linked course automatically.');
+          return;
         }
-        if (!anyVisible) {
-          courseCards.forEach((card) => card.classList.remove('is-selected'));
-        }
-        syncCourseCards();
-      }
 
-      function syncCourseCards() {
-        courseCards.forEach((card) => {
-          const input = card.querySelector('input[type="radio"][name="course_id"]');
-          card.classList.toggle('is-selected', Boolean(input && input.checked));
+        if (!campusChoices.length) {
+          const emptyState = document.createElement('div');
+          emptyState.className = 'course-option is-disabled d-flex align-items-center';
+          emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">No campuses configured</span><span class="course-option-subtitle">Ask the admin to map one course per campus for this admission year.</span></span>';
+          campusOptions.appendChild(emptyState);
+          setCampusHint('No campus is available for this admission year yet.', true);
+          return;
+        }
+
+        let selectedChoice = campusChoices.find((choice) => choice.courseId === activeCourseId) || null;
+        if (!selectedChoice && activeCampusKey) {
+          selectedChoice = campusChoices.find((choice) => choice.campusKey === activeCampusKey && !choice.isAmbiguous) || null;
+        }
+        if (!selectedChoice && preferredCampus) {
+          selectedChoice = campusChoices.find((choice) => choice.campusKey === preferredCampus && !choice.isAmbiguous) || null;
+        }
+        if (!selectedChoice) {
+          selectedChoice = campusChoices.find((choice) => !choice.isAmbiguous) || null;
+        }
+
+        campusChoices.forEach((choice) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `course-option d-flex align-items-center ${choice.isAmbiguous ? 'is-disabled' : ''}`;
+          if (selectedChoice && selectedChoice.campusKey === choice.campusKey && !choice.isAmbiguous) {
+            button.classList.add('is-selected');
+            courseIdInput.value = String(choice.courseId || '');
+            campusInput.value = choice.campusKey;
+          }
+
+          const courseCountLabel = choice.courseCount === 1 ? '1 linked course' : `${choice.courseCount} linked courses`;
+          const subtitle = choice.isAmbiguous
+            ? 'Multiple courses are linked to this campus. Admin must keep one course here.'
+            : 'This campus is ready for registration.';
+          button.innerHTML = `
+            <span class="course-option-content">
+              <span class="course-option-title">${choice.campusLabel}</span>
+              <span class="course-option-subtitle">${subtitle}</span>
+              <span class="course-option-meta">
+                <span class="course-option-pill">${courseCountLabel}</span>
+              </span>
+            </span>
+          `;
+
+          if (!choice.isAmbiguous) {
+            button.addEventListener('click', () => {
+              campusOptions.querySelectorAll('.course-option').forEach((item) => item.classList.remove('is-selected'));
+              button.classList.add('is-selected');
+              courseIdInput.value = String(choice.courseId || '');
+              campusInput.value = choice.campusKey;
+              setCampusHint('Admission year defines the cohort. Campus selection resolves the linked course automatically.');
+            });
+          }
+
+          campusOptions.appendChild(button);
         });
+
+        if (!courseIdInput.value || !campusInput.value) {
+          setCampusHint('Campus mapping is ambiguous. Ask the admin to keep one visible course per campus.', true);
+        } else {
+          setCampusHint('Admission year defines the cohort. Campus selection resolves the linked course automatically.');
+        }
       }
 
       function refreshPathwaySelections() {
         syncTrackCards();
         refreshProgramOptions();
         refreshAdmissionOptions();
-        refreshCourseOptions();
+        renderCampusOptions();
       }
 
       trackInputs.forEach((input) => {
@@ -668,23 +758,22 @@
       if (programSelect) {
         programSelect.addEventListener('change', () => {
           refreshAdmissionOptions();
-          refreshCourseOptions();
+          renderCampusOptions();
         });
       }
 
       if (admissionSelect) {
-        admissionSelect.addEventListener('change', refreshCourseOptions);
+        admissionSelect.addEventListener('change', renderCampusOptions);
       }
 
-      courseCards.forEach((card) => {
-        card.addEventListener('click', () => {
-          const input = card.querySelector('input[type="radio"][name="course_id"]');
-          if (!input || input.disabled) return;
-          courseCards.forEach((item) => item.classList.remove('is-selected'));
-          input.checked = true;
-          card.classList.add('is-selected');
+      if (registerCourseForm) {
+        registerCourseForm.addEventListener('submit', (event) => {
+          if (courseIdInput && !courseIdInput.value) {
+            event.preventDefault();
+            setCampusHint('Select a valid campus before continuing.', true);
+          }
         });
-      });
+      }
 
       refreshPathwaySelections();
 

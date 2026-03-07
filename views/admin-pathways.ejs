@@ -7,6 +7,9 @@
   const selectedAdmission = (admissions || []).find((item) => Number(item.id) === selectedAdmissionValue) || null;
   const copyAdmissions = Array.isArray(admissionCopyOptions) ? admissionCopyOptions : [];
   const subjectCatalogList = Array.isArray(subjectCatalogCourses) ? subjectCatalogCourses : [];
+  const campusBindingList = Array.isArray(registrationCampusBindings) ? registrationCampusBindings : [];
+  const ambiguousCampusList = Array.isArray(ambiguousCampusBindings) ? ambiguousCampusBindings : [];
+  const migrationCourseList = Array.isArray(migrationCourseOptions) ? migrationCourseOptions : [];
   const courseChecklistPropsJson = JSON.stringify({
     targetSelector: '#pathwayCourseMappingForm',
     checkboxSelector: 'input[type="checkbox"][name^="course_"]',
@@ -14,6 +17,20 @@
     rowTextSelector: '[data-checklist-text]',
     searchEnabled: true,
     searchPlaceholder: 'Find course',
+    labels: {
+      all: 'All',
+      none: 'None',
+      invert: 'Invert',
+      selected: 'Selected',
+    },
+  }).replace(/'/g, '&#39;');
+  const migrationChecklistPropsJson = JSON.stringify({
+    targetSelector: '#pathwayUserMigrationForm',
+    checkboxSelector: 'input[type="checkbox"][name="source_course_ids[]"]',
+    rowSelector: '[data-checklist-row]',
+    rowTextSelector: '[data-checklist-text]',
+    searchEnabled: true,
+    searchPlaceholder: 'Find source course',
     labels: {
       all: 'All',
       none: 'None',
@@ -691,6 +708,85 @@
               <div class="soft-panel muted">Select admission year first.</div>
             <% } %>
           </article>
+        </div>
+      </section>
+
+      <section class="glass section mb-3">
+        <div class="row g-3">
+          <div class="col-12 col-xl-5">
+            <h2 class="section-title">Registration campuses</h2>
+            <p class="section-subtitle">Registration now resolves one hidden course per campus. Keep only one visible course per campus for the selected admission year.</p>
+            <% if (selectedAdmissionValue > 0) { %>
+              <div class="d-grid gap-2 mt-3">
+                <% (campusBindingList || []).forEach((binding) => { %>
+                  <div class="subject-row">
+                    <span>
+                      <span class="row-label"><%= binding.campus_label %></span>
+                      <span class="muted d-block">
+                        <%= binding.is_ambiguous ? `${binding.course_count} linked courses` : '1 linked course' %>
+                      </span>
+                    </span>
+                    <span class="chip"><%= binding.is_ambiguous ? 'Fix mapping' : 'Ready' %></span>
+                  </div>
+                <% }) %>
+                <% if (!(campusBindingList || []).length) { %>
+                  <div class="soft-panel muted">No campus bindings yet. Map at least one course to this admission year first.</div>
+                <% } %>
+                <% if ((ambiguousCampusList || []).length) { %>
+                  <div class="soft-panel muted">
+                    Ambiguous campuses: <%= ambiguousCampusList.map((item) => `${item.campus_label} (${item.course_count})`).join(', ') %>. Registration will stay blocked there until one course remains per campus.
+                  </div>
+                <% } %>
+              </div>
+            <% } else { %>
+              <div class="soft-panel muted mt-3">Select admission year first.</div>
+            <% } %>
+          </div>
+
+          <div class="col-12 col-xl-7">
+            <h2 class="section-title">Existing user migration</h2>
+            <p class="section-subtitle">Stamp current users with the selected track, program, and admission year without forcing re-registration. Current course IDs stay unchanged.</p>
+            <% if (selectedAdmissionValue > 0 && selectedProgramValue > 0) { %>
+              <form id="pathwayUserMigrationForm" method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/users/migrate" class="mt-3">
+                <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                <input type="hidden" name="track" value="<%= activeTrack %>" />
+                <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                  <span class="muted">Bulk actions</span>
+                  <span
+                    data-react-island="checklist-toolbar"
+                    data-island-props='<%- migrationChecklistPropsJson %>'
+                  ></span>
+                </div>
+                <div class="d-grid gap-2 mb-3">
+                  <% (migrationCourseList || []).forEach((course) => { %>
+                    <label
+                      class="subject-row"
+                      data-checklist-row
+                      data-checklist-text="<%= `${course.course_name} ${course.course_location} users ${Number(course.users_count || 0)}` %>"
+                    >
+                      <span>
+                        <span class="row-label"><%= buildCourseLabel(course) %></span>
+                        <span class="muted d-block">
+                          Users: <%= Number(course.users_count || 0) %> / Already assigned: <%= Number(course.assigned_count || 0) %><%= course.is_mapped ? ' / Mapped to this admission' : '' %>
+                        </span>
+                      </span>
+                      <input class="form-check-input" type="checkbox" name="source_course_ids[]" value="<%= course.course_id %>" />
+                    </label>
+                  <% }) %>
+                  <% if (!(migrationCourseList || []).length) { %>
+                    <div class="soft-panel muted">No compatible source courses found for this track yet.</div>
+                  <% } %>
+                </div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <button class="btn btn-primary btn-pill" type="submit">Assign users to this admission</button>
+                  <span class="muted">Safe mode: only track/program/admission are updated. The existing course binding is preserved.</span>
+                </div>
+              </form>
+            <% } else { %>
+              <div class="soft-panel muted mt-3">Select program and admission year first.</div>
+            <% } %>
+          </div>
         </div>
       </section>
 
