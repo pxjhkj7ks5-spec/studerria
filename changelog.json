@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.80",
+      "date": "2026-03-07",
+      "items": [
+        "feat(register-single-program-flow): hide the program dropdown on the course-registration step when a track has only one program and show it as a locked selected card instead",
+        "feat(legacy-admission-course-mapping): added legacy year inference so bachelor or master admissions can resolve `1 курс`, `2 курс`, and campus duplicates into the right cohort mapping without exposing raw course choice during registration",
+        "feat(pathways-legacy-quick-map): added a one-click admin pathways action that writes legacy year mappings into `program_admission_courses`, so flows like `1 курс -> 2026` and `2 курс -> 2025` can be applied directly from the selected admission year"
+      ]
+    },
+    {
       "version": "1.1.79",
       "date": "2026-03-07",
       "items": [

@@ -465,7 +465,7 @@
                   </div>
                 </div>
 
-                <div class="mb-3">
+                <div class="mb-3" id="programField">
                   <label class="pathway-label" for="studyProgramSelect">Program</label>
                   <select
                     id="studyProgramSelect"
@@ -475,6 +475,12 @@
                   >
                     <option value="">Select program</option>
                   </select>
+                </div>
+                <div class="mb-3" id="programStaticField" style="display: none;">
+                  <span class="pathway-label">Program</span>
+                  <div class="track-option is-selected">
+                    <span id="programStaticLabel"></span>
+                  </div>
                 </div>
 
                 <div class="mb-3">
@@ -519,6 +525,9 @@
       const pathwayCourses = Array.isArray(pathwayPayload.courses) ? pathwayPayload.courses : [];
       const trackInputs = Array.from(document.querySelectorAll('input[name="study_track"]'));
       const programSelect = document.getElementById('studyProgramSelect');
+      const programField = document.getElementById('programField');
+      const programStaticField = document.getElementById('programStaticField');
+      const programStaticLabel = document.getElementById('programStaticLabel');
       const admissionSelect = document.getElementById('admissionSelect');
       const courseIdInput = document.getElementById('selectedCourseIdInput');
       const campusInput = document.getElementById('selectedCampusInput');
@@ -599,6 +608,17 @@
           ? currentValue
           : (options[0] ? Number(options[0].value) : null);
         setOptions(programSelect, options, resolvedValue, 'Select program');
+        if (programField && programStaticField && programStaticLabel) {
+          if (options.length === 1) {
+            programField.style.display = 'none';
+            programStaticField.style.display = '';
+            programStaticLabel.textContent = options[0].label;
+          } else {
+            programField.style.display = '';
+            programStaticField.style.display = 'none';
+            programStaticLabel.textContent = '';
+          }
+        }
       }
 
       function refreshAdmissionOptions() {

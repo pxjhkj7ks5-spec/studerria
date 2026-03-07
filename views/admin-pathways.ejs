@@ -10,6 +10,8 @@
   const campusBindingList = Array.isArray(registrationCampusBindings) ? registrationCampusBindings : [];
   const ambiguousCampusList = Array.isArray(ambiguousCampusBindings) ? ambiguousCampusBindings : [];
   const migrationCourseList = Array.isArray(migrationCourseOptions) ? migrationCourseOptions : [];
+  const legacyAdmissionOrdinal = Number(selectedAdmissionLegacyOrdinal || 0);
+  const legacySuggestedCount = Number(legacySuggestedCourseCount || 0);
   const courseChecklistPropsJson = JSON.stringify({
     targetSelector: '#pathwayCourseMappingForm',
     checkboxSelector: 'input[type="checkbox"][name^="course_"]',
@@ -574,6 +576,24 @@
             <h2 class="section-title">Course mapping</h2>
             <p class="section-subtitle">Курси, для яких admission доступний на етапі реєстрації.</p>
             <% if (selectedAdmissionValue > 0) { %>
+              <% if (legacyAdmissionOrdinal > 0 || activeTrack === 'teacher') { %>
+                <div class="soft-panel mb-3">
+                  <div class="row-label mb-1">Legacy quick map</div>
+                  <div class="muted">
+                    <% if (activeTrack === 'teacher') { %>
+                      Teacher track can map every teacher course at once.
+                    <% } else { %>
+                      Admission year <%= Number(selectedAdmission && selectedAdmission.admission_year ? selectedAdmission.admission_year : 0) %> is treated as legacy year <%= legacyAdmissionOrdinal %>. Matching courses found: <%= legacySuggestedCount %>.
+                    <% } %>
+                  </div>
+                  <form class="mt-2" method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/courses/legacy-map">
+                    <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                    <input type="hidden" name="track" value="<%= activeTrack %>" />
+                    <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                    <button class="btn btn-soft btn-pill" type="submit"><%= activeTrack === 'teacher' ? 'Map teacher courses' : 'Apply legacy year mapping' %></button>
+                  </form>
+                </div>
+              <% } %>
               <form id="pathwayCourseMappingForm" method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/courses/save">
                 <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
                 <input type="hidden" name="track" value="<%= activeTrack %>" />

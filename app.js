@@ -2262,6 +2262,20 @@ function courseMatchesRegistrationTrack(course, trackKey) {
   return normalizedTrack === 'teacher' ? isTeacherCourseRecord(course) : !isTeacherCourseRecord(course);
 }
 
+function inferLegacyCourseOrdinal(rawCourseName) {
+  const normalizedName = sanitizeCompactText(
+    stripLegacyCourseCampusSuffix(rawCourseName || '') || rawCourseName || '',
+    120
+  ).toLowerCase();
+  if (!normalizedName) return null;
+  const match = normalizedName.match(/(^|\s)(\d{1,2})\s*курс\b/u)
+    || normalizedName.match(/(^|\s)(\d{1,2})\s*course\b/u)
+    || normalizedName.match(/^(\d{1,2})\b/u);
+  if (!match) return null;
+  const rawOrdinal = Number(match[2] || match[1] || 0);
+  return Number.isInteger(rawOrdinal) && rawOrdinal > 0 ? rawOrdinal : null;
+}
+
 function formatCampusLabelServer(location) {
   return normalizeCourseCampus(location) === 'munich' ? 'Munich' : 'Kyiv';
 }
@@ -2502,7 +2516,7 @@ async function getAdmissionRegistrationCourses(admissionId, options = {}) {
     params
   );
 
-  return (rows || [])
+  const mappedRows = (rows || [])
     .map((row) => ({
       course_id: Number(row.course_id || 0),
       course_name: sanitizeCompactText(row.course_name || '', 140),
@@ -2510,6 +2524,39 @@ async function getAdmissionRegistrationCourses(admissionId, options = {}) {
       is_teacher_course: row.is_teacher_course === true || Number(row.is_teacher_course) === 1,
     }))
     .filter((course) => (trackKey ? courseMatchesRegistrationTrack(course, trackKey) : true));
+
+  if (!trackKey || trackKey === 'teacher' || mappedRows.length < 2) {
+    return mappedRows;
+  }
+
+  const currentCampusBindings = buildAdmissionCampusChoicesFromCourses(mappedRows, trackKey);
+  const hasAmbiguousCampus = currentCampusBindings.some((binding) => binding.is_ambiguous);
+  if (!hasAmbiguousCampus) {
+    return mappedRows;
+  }
+
+  const admissionRows = await db.all(
+    `
+      SELECT id
+      FROM program_admissions
+      WHERE program_id = (
+        SELECT program_id
+        FROM program_admissions
+        WHERE id = ?
+      )
+      ORDER BY admission_year DESC, id DESC
+    `,
+    [normalizedAdmissionId]
+  );
+  const legacyOrdinal = (admissionRows || []).findIndex((row) => Number(row.id || 0) === normalizedAdmissionId) + 1;
+  if (!Number.isInteger(legacyOrdinal) || legacyOrdinal < 1) {
+    return mappedRows;
+  }
+
+  const legacyFilteredRows = mappedRows.filter(
+    (course) => inferLegacyCourseOrdinal(course.course_name) === legacyOrdinal
+  );
+  return legacyFilteredRows.length ? legacyFilteredRows : mappedRows;
 }
 
 async function resolveRegistrationCourseForCampus({ admissionId, programId, trackKey, campus }) {
@@ -23736,11 +23783,35 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     const selectedTrackKey = selectedProgram
       ? normalizeRegistrationTrack(selectedProgram.track_key, 'bachelor')
       : '';
+    const selectedProgramAdmissionsSorted = [...selectedProgramAdmissions].sort((a, b) => {
+      const yearDiff = Number(b.admission_year || 0) - Number(a.admission_year || 0);
+      if (yearDiff !== 0) return yearDiff;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
+    const selectedAdmissionLegacyOrdinal = selectedAdmissionId
+      ? (selectedProgramAdmissionsSorted.findIndex((item) => Number(item.id || 0) === Number(selectedAdmissionId)) + 1)
+      : 0;
     const registrationCampusBindings = buildAdmissionCampusChoicesFromCourses(
       (courseMappings || []).filter((row) => row.is_visible),
       selectedTrackKey
     );
     const ambiguousCampusBindings = registrationCampusBindings.filter((item) => item.is_ambiguous);
+    const legacySuggestedCourseIds = new Set();
+    if (selectedTrackKey === 'teacher') {
+      (courses || []).forEach((course) => {
+        if (isTeacherCourseRecord(course)) {
+          legacySuggestedCourseIds.add(Number(course.id || 0));
+        }
+      });
+    } else if (selectedAdmissionLegacyOrdinal > 0) {
+      (courses || []).forEach((course) => {
+        if (!courseMatchesRegistrationTrack(course, selectedTrackKey)) return;
+        if (inferLegacyCourseOrdinal(course.name) === selectedAdmissionLegacyOrdinal) {
+          legacySuggestedCourseIds.add(Number(course.id || 0));
+        }
+      });
+    }
+    const legacySuggestedCourseCount = Array.from(legacySuggestedCourseIds.values()).filter((value) => value > 0).length;
 
     let migrationCourseOptions = [];
     if (selectedAdmissionId && selectedProgramId && selectedTrackKey) {
@@ -23874,6 +23945,8 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       courseMappings,
       registrationCampusBindings,
       ambiguousCampusBindings,
+      selectedAdmissionLegacyOrdinal,
+      legacySuggestedCourseCount,
       mappingSummary,
       subjectVisibilityItems: configurableSubjectVisibility,
       subjectCatalogCourses,
@@ -24261,6 +24334,123 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.courses.copy');
+  }
+});
+
+app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const admissionId = parsePositiveIntStrict(req.params.id);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+
+  if (!admissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      error: 'Invalid admission year',
+    }));
+  }
+
+  try {
+    const admissionRow = await db.get(
+      `
+        SELECT
+          a.id,
+          a.program_id,
+          a.admission_year,
+          p.track_key
+        FROM program_admissions a
+        JOIN study_programs p ON p.id = a.program_id
+        WHERE a.id = ?
+      `,
+      [admissionId]
+    );
+    if (!admissionRow) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        error: 'Admission year not found',
+      }));
+    }
+
+    const resolvedProgramId = Number(admissionRow.program_id || 0);
+    const trackKey = normalizeRegistrationTrack(admissionRow.track_key, 'bachelor');
+    const programAdmissions = await db.all(
+      `
+        SELECT id
+        FROM program_admissions
+        WHERE program_id = ?
+        ORDER BY admission_year DESC, id DESC
+      `,
+      [resolvedProgramId]
+    );
+    const legacyOrdinal = (programAdmissions || []).findIndex((row) => Number(row.id || 0) === admissionId) + 1;
+    if (trackKey !== 'teacher' && (!Number.isInteger(legacyOrdinal) || legacyOrdinal < 1)) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId: resolvedProgramId,
+        admissionId,
+        error: 'Cannot resolve legacy course year for this admission',
+      }));
+    }
+
+    const courses = await getCoursesCached();
+    const compatibleCourses = (courses || []).filter((course) => courseMatchesRegistrationTrack(course, trackKey));
+    const targetCourseIds = compatibleCourses
+      .filter((course) => (
+        trackKey === 'teacher'
+          ? true
+          : inferLegacyCourseOrdinal(course.name) === legacyOrdinal
+      ))
+      .map((course) => Number(course.id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0);
+
+    if (!targetCourseIds.length) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId: resolvedProgramId,
+        admissionId,
+        error: trackKey === 'teacher'
+          ? 'No teacher courses found'
+          : `No legacy courses matched year ${legacyOrdinal}`,
+      }));
+    }
+
+    const targetCourseSet = new Set(targetCourseIds);
+    for (const scopedCourse of compatibleCourses) {
+      const scopedCourseId = Number(scopedCourse.id || 0);
+      if (!scopedCourseId) continue;
+      await db.run(
+        `
+          INSERT INTO program_admission_courses
+            (admission_id, course_id, is_visible, created_at, updated_at)
+          VALUES (?, ?, ?, NOW(), NOW())
+          ON CONFLICT (admission_id, course_id)
+          DO UPDATE SET
+            is_visible = EXCLUDED.is_visible,
+            updated_at = NOW()
+        `,
+        [admissionId, scopedCourseId, targetCourseSet.has(scopedCourseId)]
+      );
+    }
+
+    invalidateRegistrationPathwaysCache();
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId: resolvedProgramId,
+      admissionId,
+      ok: trackKey === 'teacher'
+        ? `Mapped ${targetCourseIds.length} teacher courses`
+        : `Mapped legacy year ${legacyOrdinal} courses to ${Number(admissionRow.admission_year || 0)}`,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.courses.legacy-map');
   }
 });
 
