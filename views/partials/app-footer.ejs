@@ -11,6 +11,10 @@
     latestDate: latestRelease && latestRelease.date ? String(latestRelease.date) : '',
   };
   const footerReleasePropsJson = JSON.stringify(footerReleaseProps).replace(/'/g, '&#39;');
+  const footerNetworkLabels = {
+    online: t('footer.online'),
+    offline: t('footer.offline'),
+  };
 %>
 <footer class="app-footer text-center py-4">
   <small class="<%= footerMetaClassList.join(' ') %>">
@@ -20,10 +24,10 @@
         data-footer-network-status
         role="status"
         aria-live="polite"
-        aria-label="Online"
+        aria-label="<%= footerNetworkLabels.online %>"
       >
         <span class="sync-dot" data-footer-sync-dot aria-hidden="true"></span>
-        <span class="footer-sync-label" data-footer-sync-label>Online</span>
+        <span class="footer-sync-label" data-footer-sync-label><%= footerNetworkLabels.online %></span>
       </span>
     <% } %>
     <span
@@ -39,9 +43,9 @@
       data-bs-placement="top"
       data-bs-title="<%= buildStamp %>"
       title="<%= buildStamp %>"
-      aria-label="Build timestamp"
+      aria-label="<%= t('footer.buildTimestamp') %>"
     >
-      build
+      <%= t('footer.build') %>
     </button>
     <button
       type="button"
@@ -49,16 +53,18 @@
       data-bs-toggle="modal"
       data-bs-target="#changelogModal"
     >
-      Changelog
+      <%= t('footer.changelog') %>
     </button>
   </small>
 </footer>
 <script>
   window.__KMA_APP_META__ = Object.assign({}, window.__KMA_APP_META__, <%- JSON.stringify(footerReleaseProps) %>);
+  window.__KMA_FOOTER_LABELS__ = Object.assign({}, window.__KMA_FOOTER_LABELS__, <%- JSON.stringify(footerNetworkLabels) %>);
   if (typeof window.__updateFooterNetworkStatus !== 'function') {
     window.__updateFooterNetworkStatus = function updateFooterNetworkStatus(root) {
       const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
       const isOnline = navigator.onLine;
+      const labels = Object.assign({ online: 'Online', offline: 'Offline' }, window.__KMA_FOOTER_LABELS__ || {});
 
       scope.querySelectorAll('[data-footer-network-status]').forEach((pill) => {
         if (!(pill instanceof HTMLElement)) {
@@ -66,11 +72,11 @@
         }
 
         pill.classList.toggle('is-offline', !isOnline);
-        pill.setAttribute('aria-label', isOnline ? 'Online' : 'Offline');
+        pill.setAttribute('aria-label', isOnline ? labels.online : labels.offline);
 
         const label = pill.querySelector('[data-footer-sync-label]');
         if (label instanceof HTMLElement) {
-          label.textContent = isOnline ? 'Online' : 'Offline';
+          label.textContent = isOnline ? labels.online : labels.offline;
         }
       });
     };

@@ -7044,6 +7044,8 @@ app.post('/register/course', registerLimiter, async (req, res) => {
   if (!Number.isInteger(userId) || userId < 1) {
     return res.redirect('/register');
   }
+  const redirectRegisterCourseError = (message) =>
+    res.redirect(`/register/course?error=${encodeURIComponent(message)}`);
 
   const rawTrack = String(req.body.study_track || req.body.track || '').trim().toLowerCase();
   const trackFromBody = REGISTRATION_TRACK_KEYS.has(rawTrack) ? rawTrack : '';
@@ -7072,15 +7074,15 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       });
       if (!resolvedCourse.courseId) {
         if (resolvedCourse.reason === 'ambiguous_campus') {
-          return res.redirect('/register/course?error=Campus%20mapping%20is%20ambiguous');
+          return redirectRegisterCourseError('Прив’язка кампусу неоднозначна');
         }
-        return res.redirect('/register/course?error=Selected%20campus%20is%20not%20available');
+        return redirectRegisterCourseError('Обраний кампус недоступний');
       }
       courseId = resolvedCourse.courseId;
     }
 
     if (!courseId) {
-      return res.redirect('/register/course?error=Select%20campus');
+      return redirectRegisterCourseError('Оберіть кампус');
     }
 
     const [pendingUser, course] = await Promise.all([
@@ -7093,7 +7095,7 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       return res.redirect('/register?error=Session%20expired');
     }
     if (!course) {
-      return res.redirect('/register/course?error=Invalid%20course');
+      return redirectRegisterCourseError('Некоректний курс');
     }
 
     const teacherCourse = course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
@@ -7128,7 +7130,7 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       if (explicitPath) {
         const explicitTrack = normalizeRegistrationTrack(explicitPath.track_key, selectedTrack);
         if (trackFromBody && explicitTrack !== selectedTrack) {
-          return res.redirect('/register/course?error=Invalid%20pathway');
+          return redirectRegisterCourseError('Некоректний шлях реєстрації');
         }
         selectedTrack = explicitTrack;
       } else if (selectedTrack === 'teacher') {
@@ -7140,13 +7142,13 @@ app.post('/register/course', registerLimiter, async (req, res) => {
           selectedAdmissionId = teacherAdmissionId;
           selectedTrack = 'teacher';
         } else if (requestedProgramId || requestedAdmissionId || requestedCampus) {
-          return res.redirect('/register/course?error=Invalid%20campus%20mapping');
+          return redirectRegisterCourseError('Некоректна прив’язка кампусу');
         } else {
           selectedProgramId = null;
           selectedAdmissionId = null;
         }
       } else if (requestedProgramId || requestedAdmissionId || requestedCampus) {
-        return res.redirect('/register/course?error=Invalid%20campus%20mapping');
+        return redirectRegisterCourseError('Некоректна прив’язка кампусу');
       } else {
         selectedProgramId = null;
         selectedAdmissionId = null;

@@ -8,9 +8,9 @@
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content changelog-sheet">
       <div class="modal-header">
-        <h5 class="modal-title">Changelog</h5>
-        <span class="status-chip status-chip--info">Release notes</span>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title"><%= t('changelog.title') %></h5>
+        <span class="status-chip status-chip--info"><%= t('changelog.releaseNotes') %></span>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= t('changelog.close') %>"></button>
       </div>
       <div class="modal-body">
         <% if (changelog && changelog.length) { %>
@@ -33,7 +33,7 @@
               <summary class="changelog-series__summary">
                 <span class="changelog-series__title">
                   <span>v<%= seriesKey %>.x</span>
-                  <span class="changelog-series__count"><%= seriesItems.length %> releases</span>
+                  <span class="changelog-series__count"><%= seriesItems.length %> <%= t('changelog.releases') %></span>
                 </span>
                 <span class="changelog-series__chevron" aria-hidden="true">›</span>
               </summary>
@@ -57,11 +57,11 @@
             </details>
           <% }); %>
         <% } else { %>
-          <p class="text-muted mb-0">Немає оновлень.</p>
+          <p class="text-muted mb-0"><%= t('changelog.noUpdates') %></p>
         <% } %>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Закрити</button>
+        <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal"><%= t('changelog.close') %></button>
       </div>
     </div>
   </div>

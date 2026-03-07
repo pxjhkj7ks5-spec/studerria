@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.1.84",
+      "date": "2026-03-07",
+      "items": [
+        "tune(register-admission-cards): replaced the admission-year dropdown on the course registration step with the same card-based selection language used by the other pathway choices",
+        "tune(register-course-ukrainian-copy): translated the visible registration-course labels, helper messages, campus states, and validation errors into Ukrainian so the whole pathway step reads consistently",
+        "tune(shared-footer-and-changelog-copy): localized the shared footer pills and changelog modal labels so the registration screen no longer mixes English footer controls into the Ukrainian flow"
+      ]
+    },
+    {
       "version": "1.1.83",
       "date": "2026-03-07",
       "items": [
