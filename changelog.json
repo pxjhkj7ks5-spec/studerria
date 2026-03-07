@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.79",
+      "date": "2026-03-07",
+      "items": [
+        "tune(register-campus-controls): restyled the Kyiv and Munich campus choices to use the same compact selection language as the other pathway buttons instead of oversized message cards",
+        "tune(register-campus-ambiguity-copy): shortened ambiguous campus copy and kept the conflict explanation in the shared hint area so the campus step reads cleaner while still blocking invalid mappings"
+      ]
+    },
+    {
       "version": "1.1.78",
       "date": "2026-03-07",
       "items": [

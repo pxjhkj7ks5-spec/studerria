@@ -114,6 +114,10 @@
         gap: 0.35rem;
         min-width: 0;
       }
+      .campus-option .course-option-content {
+        align-items: center;
+        text-align: center;
+      }
       .course-option-subtitle {
         font-size: 0.78rem;
         line-height: 1.35;
@@ -159,6 +163,22 @@
         border-color: rgba(59, 130, 246, 0.9);
         background: rgba(59, 130, 246, 0.12);
         box-shadow: 0 10px 22px rgba(59, 130, 246, 0.2);
+      }
+      .campus-option {
+        min-height: 96px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .campus-option .course-option-title {
+        font-size: 1rem;
+      }
+      .campus-option .course-option-subtitle {
+        font-size: 0.73rem;
+        max-width: 18ch;
+      }
+      .campus-option .course-option-meta {
+        justify-content: center;
       }
       body.theme-dark .course-option {
         border-color: rgba(255, 255, 255, 0.15);
@@ -473,7 +493,7 @@
                   <label class="pathway-label">Campus</label>
                   <input type="hidden" name="course_id" id="selectedCourseIdInput" value="<%= Number(selectedCourseId || 0) || '' %>" />
                   <input type="hidden" name="campus" id="selectedCampusInput" value="<%= selectedCampusValue %>" />
-                  <div class="d-grid gap-2" id="campusOptions"></div>
+                  <div class="pathway-grid" id="campusOptions"></div>
                 </div>
                 <p class="pathway-hint mb-3" id="campusHint">Admission year defines the cohort. Campus selection resolves the linked course automatically.</p>
                 <button type="submit" class="btn btn-primary w-100"><%= t('registerCourse.continue') %></button>
@@ -673,7 +693,7 @@
 
         if (!admissionId) {
           const emptyState = document.createElement('div');
-          emptyState.className = 'course-option is-disabled d-flex align-items-center';
+          emptyState.className = 'track-option campus-option is-disabled';
           emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">Select admission year first</span><span class="course-option-subtitle">Programs and admission years define which campus can be used.</span></span>';
           campusOptions.appendChild(emptyState);
           setCampusHint('Admission year defines the cohort. Campus selection resolves the linked course automatically.');
@@ -682,7 +702,7 @@
 
         if (!campusChoices.length) {
           const emptyState = document.createElement('div');
-          emptyState.className = 'course-option is-disabled d-flex align-items-center';
+          emptyState.className = 'track-option campus-option is-disabled';
           emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">No campuses configured</span><span class="course-option-subtitle">Ask the admin to map one course per campus for this admission year.</span></span>';
           campusOptions.appendChild(emptyState);
           setCampusHint('No campus is available for this admission year yet.', true);
@@ -703,7 +723,7 @@
         campusChoices.forEach((choice) => {
           const button = document.createElement('button');
           button.type = 'button';
-          button.className = `course-option d-flex align-items-center ${choice.isAmbiguous ? 'is-disabled' : ''}`;
+          button.className = `track-option campus-option ${choice.isAmbiguous ? 'is-disabled' : ''}`;
           if (selectedChoice && selectedChoice.campusKey === choice.campusKey && !choice.isAmbiguous) {
             button.classList.add('is-selected');
             courseIdInput.value = String(choice.courseId || '');
@@ -712,8 +732,8 @@
 
           const courseCountLabel = choice.courseCount === 1 ? '1 linked course' : `${choice.courseCount} linked courses`;
           const subtitle = choice.isAmbiguous
-            ? 'Multiple courses are linked to this campus. Admin must keep one course here.'
-            : 'This campus is ready for registration.';
+            ? 'Needs one linked course'
+            : 'Ready for registration';
           button.innerHTML = `
             <span class="course-option-content">
               <span class="course-option-title">${choice.campusLabel}</span>
@@ -726,7 +746,7 @@
 
           if (!choice.isAmbiguous) {
             button.addEventListener('click', () => {
-              campusOptions.querySelectorAll('.course-option').forEach((item) => item.classList.remove('is-selected'));
+              campusOptions.querySelectorAll('.campus-option').forEach((item) => item.classList.remove('is-selected'));
               button.classList.add('is-selected');
               courseIdInput.value = String(choice.courseId || '');
               campusInput.value = choice.campusKey;
