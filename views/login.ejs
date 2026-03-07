@@ -274,7 +274,7 @@
       .login-form-stack,
       .login-feedback-stack {
         width: calc(100% - 2rem);
-        max-width: 22rem;
+        max-width: var(--auth-action-max-width, 22rem);
         margin-inline: auto;
       }
       .login-feedback-stack {
@@ -334,6 +334,7 @@
     <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/auth.css" />
+    <link rel="stylesheet" href="/css/auth-actions.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/dynamic-bg.css" />
@@ -398,9 +399,9 @@
                 </div>
                 <div class="helper mb-3"><%= t('login.forgot') %></div>
 
-                <div class="login-action-stack">
-                  <button type="submit" class="btn btn-primary"><%= t('login.signIn') %></button>
-                  <a class="btn btn-outline-primary" href="/register"><%= t('login.createAccount') %></a>
+                <div class="login-action-stack auth-action-stack auth-action-stack--grid">
+                  <button type="submit" class="btn btn-primary auth-action-btn"><%= t('login.signIn') %></button>
+                  <a class="btn btn-outline-primary auth-action-btn" href="/register"><%= t('login.createAccount') %></a>
                 </div>
                 </div>
               </form>

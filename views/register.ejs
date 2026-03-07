@@ -422,6 +422,7 @@
       <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/auth.css" />
+    <link rel="stylesheet" href="/css/auth-actions.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/dynamic-bg.css" />
@@ -486,7 +487,9 @@
             </label>
           </div>
           <div class="field-error" id="consent-error" aria-live="polite"></div>
-          <button type="submit" class="btn btn-primary w-100"><%= t('register.continue') %></button>
+          <div class="auth-action-stack mt-4">
+            <button type="submit" class="btn btn-primary auth-action-btn"><%= t('register.continue') %></button>
+          </div>
               </form>
 
               <div class="text-center mt-3">

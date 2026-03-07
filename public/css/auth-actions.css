@@ -1,0 +1,17 @@
+.auth-action-stack {
+  width: calc(100% - 2rem);
+  max-width: 22rem;
+  margin-inline: auto;
+}
+
+.auth-action-stack--grid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.auth-action-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

@@ -406,7 +406,9 @@
 
 .page-register-subjects .reg-groups-submit-btn {
   width: 100%;
+  max-width: var(--auth-action-max-width, 22rem);
   min-width: 0;
+  margin-inline: auto;
 }
 
 .page-register-subjects .reg-groups-sticky-shell {

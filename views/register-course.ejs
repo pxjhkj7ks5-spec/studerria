@@ -421,9 +421,10 @@
         color: rgba(15, 23, 42, 0.6);
       }
 </style>
-      <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/auth.css" />
+    <link rel="stylesheet" href="/css/auth-actions.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/dynamic-bg.css" />
@@ -506,8 +507,10 @@
                   <div class="pathway-grid" id="campusOptions"></div>
                 </div>
                 <p class="pathway-hint mb-3" id="campusHint">Рік вступу визначає когорту. Вибір кампусу автоматично прив'язує потрібний курс.</p>
-                <button type="submit" class="btn btn-primary register-action-btn w-100"><%= t('registerCourse.continue') %></button>
-                <a href="/register" class="btn btn-outline-primary register-action-btn w-100 mt-2"><%= t('registerCourse.backToRegister') %></a>
+                <div class="auth-action-stack auth-action-stack--grid">
+                  <button type="submit" class="btn btn-primary register-action-btn auth-action-btn"><%= t('registerCourse.continue') %></button>
+                  <a href="/register" class="btn btn-outline-primary register-action-btn auth-action-btn"><%= t('registerCourse.backToRegister') %></a>
+                </div>
               </form>
             </div>
           </div>
