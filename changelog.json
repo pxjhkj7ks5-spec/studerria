@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.92",
+      "date": "2026-03-07",
+      "items": [
+        "tune(register-groups-readability): stacked the pending-status badge away from subject titles so three-group rows no longer squeeze the names together, brightened subject titles in the dark theme, and updated the profile hint copy to the new \"Choose groups again\" path"
+      ]
+    },
+    {
       "version": "1.1.91",
       "date": "2026-03-07",
       "items": [

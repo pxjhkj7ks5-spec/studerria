@@ -57,7 +57,7 @@
   "registerSubjects.submitHintIncomplete": "Оберіть групу для всіх активних предметів.",
   "registerSubjects.missingHintPrefix": "Оберіть групи для",
   "registerSubjects.instructionsPrimary": "Оберіть групу для кожного предмета. Якщо не впевнені — скористайтеся «Швидким вибором» і виправте лише винятки.",
-  "registerSubjects.instructionsSecondary": "Змінити вибір можна пізніше у: Особисте → Профіль → Навчання.",
+  "registerSubjects.instructionsSecondary": "Змінити вибір можна пізніше у: Особисте → Профіль → Обрати групи заново.",
   "registerSubjects.required": "Обов’язковий",
   "registerSubjects.optional": "Опційний",
   "registerSubjects.optout": "Предмет не викладається",

@@ -58,7 +58,7 @@
   "registerSubjects.submitHintIncomplete": "Choose a group for every active subject.",
   "registerSubjects.missingHintPrefix": "Choose groups for",
   "registerSubjects.instructionsPrimary": "Choose a group for each subject. If you are not sure, use Quick Select and fix only the exceptions.",
-  "registerSubjects.instructionsSecondary": "You can change this later in Personal account → Profile → Study.",
+  "registerSubjects.instructionsSecondary": "You can change this later in Personal account → Profile → Choose groups again.",
   "registerSubjects.required": "Required",
   "registerSubjects.optional": "Optional",
   "registerSubjects.optout": "This subject is not taught",
