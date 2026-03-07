@@ -464,13 +464,13 @@ body.page-local-topbar .topbar-title-spotlight::after {
 .studerria-theme .app-footer .footer-sync-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.42rem;
+  gap: 5px;
   margin-right: 0.15rem;
-  padding: 0.28rem 0.62rem;
+  padding: 3px 8px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--studerria-footer-dock-border) 90%, rgba(255, 255, 255, 0.08));
-  background: color-mix(in srgb, var(--studerria-panel-bg) 78%, rgba(255, 255, 255, 0.06));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--surface-border));
+  background: color-mix(in srgb, var(--surface-soft) 84%, rgba(125, 211, 252, 0.1));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   color: var(--studerria-footer-text) !important;
   font-size: 10.5px;
   font-weight: 600;
@@ -481,9 +481,9 @@ body.page-local-topbar .topbar-title-spotlight::after {
 
 body.theme-light .studerria-theme .app-footer .footer-sync-pill,
 body.theme-light.studerria-theme .app-footer .footer-sync-pill {
-  border-color: color-mix(in srgb, var(--studerria-footer-dock-border) 92%, rgba(255, 255, 255, 0.18));
-  background: rgba(255, 255, 255, 0.52);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--surface-border));
+  background: color-mix(in srgb, var(--surface-soft) 88%, rgba(125, 211, 252, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26);
 }
 
 .studerria-theme .app-footer .footer-sync-label {
@@ -504,8 +504,7 @@ body.theme-light.studerria-theme .app-footer .footer-sync-pill {
 }
 
 .studerria-theme .app-footer .footer-sync-pill.is-offline {
-  border-color: inherit;
-  background: inherit;
+  opacity: 0.94;
 }
 
 .studerria-theme .app-footer .footer-sync-pill.is-offline .sync-dot {

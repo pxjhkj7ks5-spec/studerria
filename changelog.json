@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.83",
+      "date": "2026-03-07",
+      "items": [
+        "tune(register-campus-button-language): simplified the campus choice cards on the registration step so they now read closer to the same compact selection language as the track and program buttons instead of standing out as oversized status widgets",
+        "tune(footer-sync-pill-tone): aligned the footer online or offline status chip with the release version pill across the shared design system and Studerria theme so both footer chips now use the same base border and background treatment"
+      ]
+    },
+    {
       "version": "1.1.82",
       "date": "2026-03-07",
       "items": [

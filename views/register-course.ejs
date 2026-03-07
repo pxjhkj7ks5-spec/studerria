@@ -165,20 +165,19 @@
         box-shadow: 0 10px 22px rgba(59, 130, 246, 0.2);
       }
       .campus-option {
-        min-height: 96px;
+        min-height: 78px;
         display: flex;
         align-items: center;
         justify-content: center;
+        padding: 0.75rem 0.85rem;
       }
       .campus-option .course-option-title {
-        font-size: 1rem;
+        font-size: 0.98rem;
       }
       .campus-option .course-option-subtitle {
-        font-size: 0.73rem;
-        max-width: 18ch;
-      }
-      .campus-option .course-option-meta {
-        justify-content: center;
+        font-size: 0.74rem;
+        max-width: 20ch;
+        line-height: 1.34;
       }
       body.theme-dark .course-option {
         border-color: rgba(255, 255, 255, 0.15);
@@ -785,15 +784,12 @@
 
           const courseCountLabel = choice.courseCount === 1 ? '1 linked course' : `${choice.courseCount} linked courses`;
           const subtitle = choice.isAmbiguous
-            ? 'Needs one linked course'
-            : 'Ready for registration';
+            ? `${courseCountLabel}. Needs one visible course.`
+            : `${courseCountLabel}. Ready for registration.`;
           button.innerHTML = `
             <span class="course-option-content">
               <span class="course-option-title">${choice.campusLabel}</span>
               <span class="course-option-subtitle">${subtitle}</span>
-              <span class="course-option-meta">
-                <span class="course-option-pill">${courseCountLabel}</span>
-              </span>
             </span>
           `;
 

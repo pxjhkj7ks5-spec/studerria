@@ -942,6 +942,42 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
   white-space: nowrap;
 }
 
+.app-footer .footer-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--surface-border));
+  background: color-mix(in srgb, var(--surface-soft) 84%, rgba(125, 211, 252, 0.1));
+  color: var(--ds-text1);
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.app-footer .footer-sync-pill .sync-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16);
+  animation: footer-release-dot-pulse 2.35s ease-in-out infinite;
+}
+
+.app-footer .footer-sync-label {
+  color: inherit;
+  white-space: nowrap;
+}
+
+.app-footer .footer-sync-pill.is-offline .sync-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14);
+  animation: none;
+}
+
 @keyframes footer-release-dot-pulse {
   0% {
     transform: scale(1);
@@ -958,6 +994,7 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .app-footer .footer-sync-pill .sync-dot,
   .footer-release-pill__dot {
     animation: none;
   }
