@@ -359,39 +359,21 @@
         color: #f8fafc;
         background: #1b2342;
       }
-      body.page-register-course .btn-outline-secondary {
-        border-radius: 16px;
+      body.page-register-course .register-action-btn {
+        height: 46px;
+        border-radius: 14px;
         font-weight: 600;
-      }
-      body.theme-light.page-register-course .btn-outline-secondary {
-        border-color: rgba(148, 163, 184, 0.26);
-        background: rgba(255, 255, 255, 0.42);
-        color: #1e293b;
-      }
-      body.theme-dark.page-register-course .btn-outline-secondary {
-        border-color: rgba(191, 219, 254, 0.16);
-        background: linear-gradient(180deg, rgba(32, 41, 94, 0.82), rgba(21, 29, 72, 0.9));
-        color: rgba(248, 250, 252, 0.96);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-      }
-      body.theme-light.page-register-course .btn-outline-secondary:hover,
-      body.theme-light.page-register-course .btn-outline-secondary:focus-visible {
-        background: rgba(255, 255, 255, 0.7);
-        border-color: rgba(99, 102, 241, 0.32);
-        color: #0f172a;
-      }
-      body.theme-dark.page-register-course .btn-outline-secondary:hover,
-      body.theme-dark.page-register-course .btn-outline-secondary:focus-visible {
-        background: linear-gradient(180deg, rgba(42, 53, 116, 0.92), rgba(28, 37, 88, 0.96));
-        border-color: rgba(147, 197, 253, 0.24);
-        color: #ffffff;
-      }
-      .btn-primary {
-        background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
-        border: none;
-        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         padding: 0.75rem 1rem;
-        font-weight: 600;
+      }
+      body.page-register-course .btn-primary.register-action-btn {
+        background: #3b82f6;
+        border: 1px solid rgba(59, 130, 246, 0.6);
+      }
+      body.page-register-course .btn-outline-primary.register-action-btn {
+        border-radius: 14px;
       }
       .theme-toggle-floating {
         position: fixed;
@@ -424,6 +406,10 @@
       }
       body.theme-dark .btn:hover {
         box-shadow: 0 10px 22px rgba(0, 0, 0, 0.4);
+      }
+      .btn:active {
+        transform: translateY(0);
+        box-shadow: none;
       }
       .app-footer {
         font-size: 0.8rem;
@@ -520,8 +506,8 @@
                   <div class="pathway-grid" id="campusOptions"></div>
                 </div>
                 <p class="pathway-hint mb-3" id="campusHint">Рік вступу визначає когорту. Вибір кампусу автоматично прив'язує потрібний курс.</p>
-                <button type="submit" class="btn btn-primary w-100"><%= t('registerCourse.continue') %></button>
-                <a href="/register" class="btn btn-outline-secondary w-100 mt-2"><%= t('registerCourse.backToRegister') %></a>
+                <button type="submit" class="btn btn-primary register-action-btn w-100"><%= t('registerCourse.continue') %></button>
+                <a href="/register" class="btn btn-outline-primary register-action-btn w-100 mt-2"><%= t('registerCourse.backToRegister') %></a>
               </form>
             </div>
           </div>

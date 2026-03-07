@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.85",
+      "date": "2026-03-07",
+      "items": [
+        "tune(register-course-action-buttons): aligned the course-registration submit and back buttons with the login auth buttons by matching the primary fill, outline treatment, height, radius, and active interaction states"
+      ]
+    },
+    {
       "version": "1.1.84",
       "date": "2026-03-07",
       "items": [
