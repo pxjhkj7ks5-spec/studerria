@@ -51,24 +51,25 @@
       const whatIfSubjects = Array.isArray(cockpit.what_if_subjects) ? cockpit.what_if_subjects : [];
       const defaultWhatIfSubjectId = Number(cockpit.what_if_default_subject_id || 0);
       const briefToneClass = `brief-tone-${brief.tone || 'calm'}`;
+      const localeCode = lang === 'en' ? 'en-US' : 'uk-UA';
 
       const formatShortDate = (value) => {
         if (!value) return '-';
         const parsed = new Date(`${value}T00:00:00`);
         if (Number.isNaN(parsed.getTime())) return value;
-        return parsed.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' });
+        return parsed.toLocaleDateString(localeCode, { day: '2-digit', month: '2-digit' });
       };
       const formatReminderDate = (value) => {
         if (!value) return '-';
         const parsed = new Date(`${value}T00:00:00`);
         if (Number.isNaN(parsed.getTime())) return value;
-        return parsed.toLocaleDateString('uk-UA');
+        return parsed.toLocaleDateString(localeCode);
       };
       const formatDateTime = (value) => {
         if (!value) return '-';
         const parsed = new Date(value);
         if (Number.isNaN(parsed.getTime())) return value;
-        return parsed.toLocaleString('uk-UA', {
+        return parsed.toLocaleString(localeCode, {
           day: '2-digit',
           month: '2-digit',
           hour: '2-digit',
@@ -77,46 +78,48 @@
       };
       const getDeadlineStatus = (item) => {
         if (item && item.submission_status === 'submitted_on_time') {
-          return { label: 'Вчасно', className: 'status-on-time' };
+          return { label: t('myDay.status.onTime'), className: 'status-on-time' };
         }
         if (item && item.submission_status === 'submitted_late') {
-          return { label: 'Із запізненням', className: 'status-late' };
+          return { label: t('myDay.status.late'), className: 'status-late' };
         }
         if (item && item.submission_status === 'overdue') {
-          return { label: 'Прострочено', className: 'status-overdue' };
+          return { label: t('myDay.status.overdue'), className: 'status-overdue' };
         }
-        return { label: 'Відкрито', className: 'status-open' };
+        return { label: t('myDay.status.open'), className: 'status-open' };
       };
-      const getDayContext = (item) => (item && item.day_context === 'tomorrow' ? 'Завтра' : 'Сьогодні');
+      const getDayContext = (item) => (item && item.day_context === 'tomorrow'
+        ? t('myDay.day.tomorrow')
+        : t('myDay.day.today'));
       const getReviewQueueTypeMeta = (item) => {
         const queueType = String(item && item.queue_type ? item.queue_type : 'new');
         if (queueType === 'overdue') {
-          return { label: 'Прострочені', className: 'status-overdue' };
+          return { label: t('myDay.reviewQueue.overdue'), className: 'status-overdue' };
         }
         if (queueType === 'no_comment') {
-          return { label: 'Без коментаря', className: 'status-late' };
+          return { label: t('myDay.reviewQueue.noComment'), className: 'status-late' };
         }
-        return { label: 'Нові', className: 'status-open' };
+        return { label: t('myDay.reviewQueue.new'), className: 'status-open' };
       };
       const getSubmissionStatusMeta = (item) => {
         const status = String(item && item.submission_status ? item.submission_status : '');
-        if (status === 'late') return { label: 'Здано пізно', className: 'type-chip type-chip-warning' };
-        if (status === 'on_time') return { label: 'Вчасно', className: 'type-chip type-chip-success' };
-        if (status === 'manual') return { label: 'Ручна колонка', className: 'type-chip' };
+        if (status === 'late') return { label: t('myDay.submissionStatus.late'), className: 'type-chip type-chip-warning' };
+        if (status === 'on_time') return { label: t('myDay.submissionStatus.onTime'), className: 'type-chip type-chip-success' };
+        if (status === 'manual') return { label: t('myDay.submissionStatus.manual'), className: 'type-chip' };
         return null;
       };
       const getProgressRiskMeta = (item) => {
         const level = String(item && item.risk_level ? item.risk_level : 'low');
-        if (level === 'high') return { label: 'Високий ризик', className: 'progress-risk-high' };
-        if (level === 'medium') return { label: 'Помірний ризик', className: 'progress-risk-medium' };
-        return { label: 'Стабільно', className: 'progress-risk-low' };
+        if (level === 'high') return { label: t('myDay.progressRisk.high'), className: 'progress-risk-high' };
+        if (level === 'medium') return { label: t('myDay.progressRisk.medium'), className: 'progress-risk-medium' };
+        return { label: t('myDay.progressRisk.stable'), className: 'progress-risk-low' };
       };
     %>
 
-    <%- include('partials/topbar', { role, username, t, activePage: 'my-day', pageTitle: 'Головна' }) %>
+    <%- include('partials/topbar', { role, username, t, activePage: 'my-day', pageTitle: t('myDay.pageTitle') }) %>
     <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
       <div class="drawer-head">
-        <div class="drawer-title">Меню</div>
+        <div class="drawer-title"><%= t('myDay.drawer.title') %></div>
         <button class="drawer-close" type="button" id="scheduleDrawerClose" aria-label="<%= t('navigation.closeMenu') %>">✕</button>
       </div>
       <div class="drawer-actions">
@@ -133,24 +136,24 @@
         <% if (role === 'deanery') { %>
           <a class="drawer-action" href="/deanery">🏛️ <%= t('menu.deanery') %></a>
         <% } %>
-        <a class="drawer-action" href="/schedule">📅 Розклад</a>
-        <a class="drawer-action" href="/journal">📘 Журнал</a>
+        <a class="drawer-action" href="/schedule">📅 <%= t('myDay.drawer.schedule') %></a>
+        <a class="drawer-action" href="/journal">📘 <%= t('myDay.drawer.journal') %></a>
         <a class="drawer-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
-        <a class="drawer-action" href="/subjects">📚 Предмети</a>
+        <a class="drawer-action" href="/subjects">📚 <%= t('myDay.drawer.subjects') %></a>
         <% if (canUseCustomDeadlinesUi) { %>
-          <a class="drawer-action" href="/schedule">🌀 Дивні дедлайни</a>
+          <a class="drawer-action" href="/schedule">🌀 <%= t('myDay.drawer.customDeadlines') %></a>
         <% } %>
         <% if (settings && settings.allow_messages) { %>
-          <a class="drawer-action" href="/schedule">💬 Повідомлення</a>
+          <a class="drawer-action" href="/schedule">💬 <%= t('myDay.drawer.messages') %></a>
         <% } %>
         <a class="drawer-action" href="/profile">👤 <%= t('schedule.profile') %></a>
         <button
           class="drawer-action theme-toggle"
           type="button"
-          data-light-label="☀️ Зміна теми"
-          data-dark-label="🌙 Зміна теми"
+          data-light-label="☀️ <%= t('myDay.drawer.themeToggle') %>"
+          data-dark-label="🌙 <%= t('myDay.drawer.themeToggle') %>"
         >
-          🌙 Зміна теми
+          🌙 <%= t('myDay.drawer.themeToggle') %>
         </button>
         <form method="POST" action="/logout" class="drawer-action-wrap">
           <button class="drawer-action" type="submit">🚪 <%= t('schedule.logout') %></button>
@@ -169,13 +172,13 @@
       <section class="cockpit-card brief-card <%= briefToneClass %>">
         <div class="brief-head">
           <span class="brief-kicker"><%= t('myDay.briefKicker') %></span>
-          <span class="brief-meta">Тиждень <%= cockpit.week_number || '-' %></span>
+          <span class="brief-meta"><%= t('myDay.briefWeek') %> <%= cockpit.week_number || '-' %></span>
         </div>
-        <h1 class="brief-title"><%= brief.title || 'Твій день під контролем' %></h1>
-        <p class="brief-message"><%= brief.message || 'Критичних сигналів не знайдено, тримай темп.' %></p>
+        <h1 class="brief-title"><%= brief.title || t('myDay.briefTitleFallback') %></h1>
+        <p class="brief-message"><%= brief.message || t('myDay.briefMessageFallback') %></p>
         <div class="brief-actions">
-          <a class="btn btn-glass" href="<%= brief.action_href || '/schedule' %>"><%= brief.action_label || 'Відкрити розклад' %></a>
-          <button type="button" class="btn btn-soft" id="briefWhyToggle">Чому я це бачу?</button>
+          <a class="btn btn-glass" href="<%= brief.action_href || '/schedule' %>"><%= brief.action_label || t('myDay.briefOpenSchedule') %></a>
+          <button type="button" class="btn btn-soft" id="briefWhyToggle"><%= t('myDay.briefWhy') %></button>
         </div>
         <div class="brief-reasons d-none" id="briefWhyPanel">
           <% if (briefReasons.length) { %>
@@ -183,7 +186,7 @@
               <div class="brief-reason-row"><%= reason %></div>
             <% }) %>
           <% } else { %>
-            <div class="brief-reason-row">Сигнали ще накопичуються.</div>
+            <div class="brief-reason-row"><%= t('myDay.briefWhyEmpty') %></div>
           <% } %>
         </div>
       </section>
@@ -192,20 +195,20 @@
         <% if (isStudentLikeMyDayView) { %>
           <article class="cockpit-card section-card order-1 dual-focus-card" id="deadlinesClassesBlock">
             <div class="section-head">
-              <h2 class="section-title">Найближчі дедлайни та пари</h2>
-              <span class="section-subtitle">Ключові задачі та найближчі заняття</span>
+              <h2 class="section-title"><%= t('myDay.student.dualFocusTitle') %></h2>
+              <span class="section-subtitle"><%= t('myDay.student.dualFocusSubtitle') %></span>
             </div>
 
             <div class="dual-focus-grid">
               <section class="dual-focus-pane" aria-labelledby="deadlinesPaneTitle">
                 <div class="dual-focus-pane-head">
-                  <h3 class="dual-focus-pane-title" id="deadlinesPaneTitle">Найближчі дедлайни</h3>
-                  <span class="dual-focus-pane-subtitle">2-3 задачі з пріоритетом</span>
+                  <h3 class="dual-focus-pane-title" id="deadlinesPaneTitle"><%= t('myDay.deadlines.title') %></h3>
+                  <span class="dual-focus-pane-subtitle"><%= t('myDay.deadlines.subtitle') %></span>
                 </div>
                 <% if (!deadlineItems.length) { %>
                   <div class="empty-state compact">
-                    <div class="empty-state-title">Критичних дедлайнів не знайдено</div>
-                    <div class="empty-state-subtitle">Система не бачить відкритих ризиків на найближчий період.</div>
+                    <div class="empty-state-title"><%= t('myDay.deadlines.emptyTitle') %></div>
+                    <div class="empty-state-subtitle"><%= t('myDay.deadlines.emptySubtitle') %></div>
                   </div>
                 <% } else { %>
                   <div class="item-list">
@@ -218,13 +221,13 @@
                     %>
                       <div class="item-row deadline-row">
                         <div class="item-main">
-                          <div class="item-title"><%= item.description || 'Завдання' %></div>
+                          <div class="item-title"><%= item.description || t('myDay.item.taskFallback') %></div>
                           <div class="item-meta">
-                            <span><%= item.subject_name || 'Предмет' %></span>
-                            <span>до <%= formatShortDate(item.deadline_date) %></span>
-                            <% if (creatorName) { %><span>додав: <%= creatorName %></span><% } %>
-                            <% if (item.is_control) { %><span class="type-chip">Контроль</span><% } %>
-                            <% if (item.is_credit) { %><span class="type-chip">Залік</span><% } %>
+                            <span><%= item.subject_name || t('myDay.item.subjectFallback') %></span>
+                            <span><%= t('myDay.item.duePrefix') %> <%= formatShortDate(item.deadline_date) %></span>
+                            <% if (creatorName) { %><span><%= t('myDay.item.addedBy') %>: <%= creatorName %></span><% } %>
+                            <% if (item.is_control) { %><span class="type-chip"><%= t('myDay.item.control') %></span><% } %>
+                            <% if (item.is_credit) { %><span class="type-chip"><%= t('myDay.item.credit') %></span><% } %>
                           </div>
                         </div>
                         <div class="item-side">
@@ -234,19 +237,19 @@
                               type="button"
                               class="btn btn-submit-now"
                               data-submit-homework-id="<%= item.id %>"
-                              data-submit-title="<%= item.description || 'Завдання' %>"
+                              data-submit-title="<%= item.description || t('myDay.item.taskFallback') %>"
                               data-submit-mode="<%= hasSubmission ? 'update' : 'create' %>"
                             >
-                              <%= hasSubmission ? 'Оновити здачу' : 'Здати' %>
+                              <%= hasSubmission ? t('myDay.item.updateSubmission') : t('myDay.item.submit') %>
                             </button>
                           <% } else if (isHomework && hasSubmission && item.submission_status === 'submitted_on_time') { %>
-                            <span class="item-note">Здано <%= item.submitted_date || '' %></span>
+                            <span class="item-note"><%= t('myDay.item.submittedAt') %> <%= item.submitted_date || '' %></span>
                           <% } else if (isHomework && hasSubmission && item.submission_status === 'submitted_late') { %>
-                            <span class="item-note">Здано із запізненням</span>
+                            <span class="item-note"><%= t('myDay.item.submittedLate') %></span>
                           <% } else if (item.type === 'teamwork') { %>
-                            <a href="/teamwork" class="btn btn-inline-link">Відкрити</a>
+                            <a href="/teamwork" class="btn btn-inline-link"><%= t('myDay.item.open') %></a>
                           <% } else { %>
-                            <a href="/schedule" class="btn btn-inline-link">Відкрити</a>
+                            <a href="/schedule" class="btn btn-inline-link"><%= t('myDay.item.open') %></a>
                           <% } %>
                         </div>
                       </div>
@@ -254,35 +257,35 @@
                   </div>
                 <% } %>
                 <div class="section-footer-link dual-focus-footer">
-                  <a href="/schedule">Відкрити повний список у розкладі</a>
+                  <a href="/schedule"><%= t('myDay.item.openFullList') %></a>
                 </div>
               </section>
 
               <section class="dual-focus-pane" aria-labelledby="nextClassesPaneTitle">
                 <div class="dual-focus-pane-head">
-                  <h3 class="dual-focus-pane-title" id="nextClassesPaneTitle">Пари найближчим часом</h3>
-                  <span class="dual-focus-pane-subtitle">Сьогодні та завтра</span>
+                  <h3 class="dual-focus-pane-title" id="nextClassesPaneTitle"><%= t('myDay.classes.title') %></h3>
+                  <span class="dual-focus-pane-subtitle"><%= t('myDay.classes.subtitle') %></span>
                 </div>
                 <% if (!classItems.length) { %>
                   <div class="empty-state compact">
-                    <div class="empty-state-title">Найближчих пар немає</div>
-                    <div class="empty-state-subtitle">Перевір розклад, якщо очікуєш зміни.</div>
+                    <div class="empty-state-title"><%= t('myDay.classes.emptyTitle') %></div>
+                    <div class="empty-state-subtitle"><%= t('myDay.classes.emptySubtitle') %></div>
                   </div>
                 <% } else { %>
                   <div class="item-list">
                     <% classItems.forEach((item) => { %>
                       <div class="item-row class-row">
                         <div class="item-main">
-                          <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
+                          <div class="item-title"><%= item.subject_name || t('myDay.item.subjectFallback') %></div>
                           <div class="item-meta">
                             <span class="type-chip"><%= getDayContext(item) %></span>
-                            <span>Пара <%= item.class_number || '-' %></span>
+                            <span><%= t('myDay.item.classLabel') %> <%= item.class_number || '-' %></span>
                             <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
-                            <% if (item.group_number) { %><span>Група <%= item.group_number %></span><% } %>
+                            <% if (item.group_number) { %><span><%= t('myDay.item.groupLabel') %> <%= item.group_number %></span><% } %>
                           </div>
                         </div>
                         <div class="item-side">
-                          <a href="/schedule" class="btn btn-inline-link">До розкладу</a>
+                          <a href="/schedule" class="btn btn-inline-link"><%= t('myDay.item.toSchedule') %></a>
                         </div>
                       </div>
                     <% }) %>
@@ -296,36 +299,36 @@
         <% if (isTeacherMyDayView) { %>
           <article class="cockpit-card section-card order-1 dual-focus-card teacher-focus-card" id="teacherClassesRemindersBlock">
             <div class="section-head">
-              <h2 class="section-title">Пари найближчим часом</h2>
-              <span class="section-subtitle">Сьогодні та завтра + особисті нагадування</span>
+              <h2 class="section-title"><%= t('myDay.classes.title') %></h2>
+              <span class="section-subtitle"><%= t('myDay.teacher.classesSubtitle') %></span>
             </div>
 
             <div class="dual-focus-grid dual-focus-grid-single">
               <section class="dual-focus-pane" aria-labelledby="teacherNextClassesPaneTitle">
                 <div class="dual-focus-pane-head">
-                  <h3 class="dual-focus-pane-title" id="teacherNextClassesPaneTitle">Пари найближчим часом</h3>
-                  <span class="dual-focus-pane-subtitle">Сьогодні та завтра</span>
+                  <h3 class="dual-focus-pane-title" id="teacherNextClassesPaneTitle"><%= t('myDay.classes.title') %></h3>
+                  <span class="dual-focus-pane-subtitle"><%= t('myDay.classes.subtitle') %></span>
                 </div>
                 <% if (!classItems.length) { %>
                   <div class="empty-state compact">
-                    <div class="empty-state-title">Найближчих пар немає</div>
-                    <div class="empty-state-subtitle">Перевір розклад, якщо очікуєш зміни.</div>
+                    <div class="empty-state-title"><%= t('myDay.classes.emptyTitle') %></div>
+                    <div class="empty-state-subtitle"><%= t('myDay.classes.emptySubtitle') %></div>
                   </div>
                 <% } else { %>
                   <div class="item-list">
                     <% classItems.forEach((item) => { %>
                       <div class="item-row class-row">
                         <div class="item-main">
-                          <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
+                          <div class="item-title"><%= item.subject_name || t('myDay.item.subjectFallback') %></div>
                           <div class="item-meta">
                             <span class="type-chip"><%= getDayContext(item) %></span>
-                            <span>Пара <%= item.class_number || '-' %></span>
+                            <span><%= t('myDay.item.classLabel') %> <%= item.class_number || '-' %></span>
                             <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
-                            <% if (item.group_number) { %><span>Група <%= item.group_number %></span><% } %>
+                            <% if (item.group_number) { %><span><%= t('myDay.item.groupLabel') %> <%= item.group_number %></span><% } %>
                           </div>
                         </div>
                         <div class="item-side">
-                          <a href="/schedule" class="btn btn-inline-link">До розкладу</a>
+                          <a href="/schedule" class="btn btn-inline-link"><%= t('myDay.item.toSchedule') %></a>
                         </div>
                       </div>
                     <% }) %>
@@ -336,31 +339,31 @@
 
             <div class="reminder-block teacher-inline-reminders">
               <div class="reminder-header">
-                <h3>Нагадування</h3>
-                <button type="button" class="btn btn-soft btn-sm" id="toggleReminderForm">Додати</button>
+                <h3><%= t('myDay.reminders.title') %></h3>
+                <button type="button" class="btn btn-soft btn-sm" id="toggleReminderForm"><%= t('myDay.reminders.add') %></button>
               </div>
               <form id="reminderForm" class="reminder-form d-none">
                 <input type="hidden" id="reminderEditId" value="" />
                 <div class="reminder-row">
-                  <input type="text" id="reminderTitle" class="form-control reminder-input" maxlength="160" placeholder="Назва нагадування" required />
+                  <input type="text" id="reminderTitle" class="form-control reminder-input" maxlength="160" placeholder="<%= t('myDay.reminders.titlePlaceholder') %>" required />
                 </div>
                 <div class="reminder-row">
-                  <textarea id="reminderNote" class="form-control reminder-input" rows="2" maxlength="500" placeholder="Нотатка (опційно)"></textarea>
+                  <textarea id="reminderNote" class="form-control reminder-input" rows="2" maxlength="500" placeholder="<%= t('myDay.reminders.notePlaceholder') %>"></textarea>
                 </div>
                 <div class="reminder-row reminder-row-split">
                   <input type="date" id="reminderDate" class="form-control reminder-input" required />
                   <input type="time" id="reminderTime" class="form-control reminder-input" />
                 </div>
                 <div class="reminder-actions">
-                  <button type="submit" class="btn btn-glass btn-sm" id="reminderSubmit">Додати</button>
-                  <button type="button" class="btn btn-soft btn-sm" id="reminderCancel">Скасувати</button>
+                  <button type="submit" class="btn btn-glass btn-sm" id="reminderSubmit"><%= t('myDay.reminders.add') %></button>
+                  <button type="button" class="btn btn-soft btn-sm" id="reminderCancel"><%= t('myDay.reminders.cancel') %></button>
                 </div>
               </form>
               <div id="reminderList" class="reminder-list">
                 <% if (!reminders.length) { %>
                   <div class="empty-state compact">
-                    <div class="empty-state-title">Нагадувань немає</div>
-                    <div class="empty-state-subtitle">Додай перше на найближчий тиждень.</div>
+                    <div class="empty-state-title"><%= t('myDay.reminders.emptyTitle') %></div>
+                    <div class="empty-state-subtitle"><%= t('myDay.reminders.emptySubtitle') %></div>
                   </div>
                 <% } else { %>
                   <% reminders.forEach((reminder) => { %>
@@ -380,13 +383,13 @@
         <% if (isDefaultStaffMyDayView) { %>
         <article class="cockpit-card section-card<%= isStudentLikeMyDayView ? ' order-1' : '' %>" id="deadlinesBlock">
           <div class="section-head">
-            <h2 class="section-title">Найближчі дедлайни</h2>
-            <span class="section-subtitle">2-3 задачі з найвищим пріоритетом</span>
+            <h2 class="section-title"><%= t('myDay.deadlines.title') %></h2>
+            <span class="section-subtitle"><%= t('myDay.staff.deadlinesSubtitle') %></span>
           </div>
           <% if (!deadlineItems.length) { %>
             <div class="empty-state">
-              <div class="empty-state-title">Критичних дедлайнів не знайдено</div>
-              <div class="empty-state-subtitle">Система не бачить відкритих ризиків на найближчий період.</div>
+              <div class="empty-state-title"><%= t('myDay.deadlines.emptyTitle') %></div>
+              <div class="empty-state-subtitle"><%= t('myDay.deadlines.emptySubtitle') %></div>
             </div>
           <% } else { %>
             <div class="item-list">
@@ -399,13 +402,13 @@
               %>
                 <div class="item-row deadline-row">
                   <div class="item-main">
-                    <div class="item-title"><%= item.description || 'Завдання' %></div>
+                    <div class="item-title"><%= item.description || t('myDay.item.taskFallback') %></div>
                     <div class="item-meta">
-                      <span><%= item.subject_name || 'Предмет' %></span>
-                      <span>до <%= formatShortDate(item.deadline_date) %></span>
-                      <% if (creatorName) { %><span>додав: <%= creatorName %></span><% } %>
-                      <% if (item.is_control) { %><span class="type-chip">Контроль</span><% } %>
-                      <% if (item.is_credit) { %><span class="type-chip">Залік</span><% } %>
+                      <span><%= item.subject_name || t('myDay.item.subjectFallback') %></span>
+                      <span><%= t('myDay.item.duePrefix') %> <%= formatShortDate(item.deadline_date) %></span>
+                      <% if (creatorName) { %><span><%= t('myDay.item.addedBy') %>: <%= creatorName %></span><% } %>
+                      <% if (item.is_control) { %><span class="type-chip"><%= t('myDay.item.control') %></span><% } %>
+                      <% if (item.is_credit) { %><span class="type-chip"><%= t('myDay.item.credit') %></span><% } %>
                     </div>
                   </div>
                   <div class="item-side">
@@ -415,19 +418,19 @@
                         type="button"
                         class="btn btn-submit-now"
                         data-submit-homework-id="<%= item.id %>"
-                        data-submit-title="<%= item.description || 'Завдання' %>"
+                        data-submit-title="<%= item.description || t('myDay.item.taskFallback') %>"
                         data-submit-mode="<%= hasSubmission ? 'update' : 'create' %>"
                       >
-                        <%= hasSubmission ? 'Оновити здачу' : 'Здати' %>
+                        <%= hasSubmission ? t('myDay.item.updateSubmission') : t('myDay.item.submit') %>
                       </button>
                     <% } else if (isHomework && hasSubmission && item.submission_status === 'submitted_on_time') { %>
-                      <span class="item-note">Здано <%= item.submitted_date || '' %></span>
+                      <span class="item-note"><%= t('myDay.item.submittedAt') %> <%= item.submitted_date || '' %></span>
                     <% } else if (isHomework && hasSubmission && item.submission_status === 'submitted_late') { %>
-                      <span class="item-note">Здано із запізненням</span>
+                      <span class="item-note"><%= t('myDay.item.submittedLate') %></span>
                     <% } else if (item.type === 'teamwork') { %>
-                      <a href="/teamwork" class="btn btn-inline-link">Відкрити</a>
+                      <a href="/teamwork" class="btn btn-inline-link"><%= t('myDay.item.open') %></a>
                     <% } else { %>
-                      <a href="/schedule" class="btn btn-inline-link">Відкрити</a>
+                      <a href="/schedule" class="btn btn-inline-link"><%= t('myDay.item.open') %></a>
                     <% } %>
                   </div>
                 </div>
@@ -435,35 +438,35 @@
             </div>
           <% } %>
           <div class="section-footer-link">
-            <a href="/schedule">Відкрити повний список у розкладі</a>
+            <a href="/schedule"><%= t('myDay.item.openFullList') %></a>
           </div>
         </article>
 
         <article class="cockpit-card section-card<%= isStudentLikeMyDayView ? ' order-4' : '' %>" id="nextClassesBlock">
           <div class="section-head">
-            <h2 class="section-title">Пари найближчим часом</h2>
-            <span class="section-subtitle">Сьогодні та завтра</span>
+            <h2 class="section-title"><%= t('myDay.classes.title') %></h2>
+            <span class="section-subtitle"><%= t('myDay.classes.subtitle') %></span>
           </div>
           <% if (!classItems.length) { %>
             <div class="empty-state">
-              <div class="empty-state-title">Найближчих пар немає</div>
-              <div class="empty-state-subtitle">Перевір розклад, якщо очікуєш зміни.</div>
+              <div class="empty-state-title"><%= t('myDay.classes.emptyTitle') %></div>
+              <div class="empty-state-subtitle"><%= t('myDay.classes.emptySubtitle') %></div>
             </div>
           <% } else { %>
             <div class="item-list">
               <% classItems.forEach((item) => { %>
                 <div class="item-row class-row">
                   <div class="item-main">
-                    <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
+                    <div class="item-title"><%= item.subject_name || t('myDay.item.subjectFallback') %></div>
                     <div class="item-meta">
                       <span class="type-chip"><%= getDayContext(item) %></span>
-                      <span>Пара <%= item.class_number || '-' %></span>
+                      <span><%= t('myDay.item.classLabel') %> <%= item.class_number || '-' %></span>
                       <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
-                      <% if (item.group_number) { %><span>Група <%= item.group_number %></span><% } %>
+                      <% if (item.group_number) { %><span><%= t('myDay.item.groupLabel') %> <%= item.group_number %></span><% } %>
                     </div>
                   </div>
                   <div class="item-side">
-                    <a href="/schedule" class="btn btn-inline-link">До розкладу</a>
+                    <a href="/schedule" class="btn btn-inline-link"><%= t('myDay.item.toSchedule') %></a>
                   </div>
                 </div>
               <% }) %>
@@ -873,27 +876,27 @@
           <form id="homeworkSubmitForm" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="redirect_to" value="/home" />
             <div class="modal-header">
-              <h5 class="modal-title">Здати завдання</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              <h5 class="modal-title"><%= t('myDay.submitModal.createTitle') %></h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= t('changelog.close') %>"></button>
             </div>
             <div class="modal-body">
-              <div class="submit-target" id="submitHomeworkTarget">Завдання</div>
+              <div class="submit-target" id="submitHomeworkTarget"><%= t('myDay.item.taskFallback') %></div>
               <div class="mb-3">
-                <label for="submissionText" class="form-label">Текст</label>
-                <textarea id="submissionText" name="submission_text" class="form-control reminder-input" rows="4" maxlength="4000" placeholder="Опиши відповідь або короткий підсумок"></textarea>
+                <label for="submissionText" class="form-label"><%= t('myDay.submitModal.textLabel') %></label>
+                <textarea id="submissionText" name="submission_text" class="form-control reminder-input" rows="4" maxlength="4000" placeholder="<%= t('myDay.submitModal.textPlaceholder') %>"></textarea>
               </div>
               <div class="mb-3">
-                <label for="submissionLink" class="form-label">Посилання</label>
+                <label for="submissionLink" class="form-label"><%= t('myDay.submitModal.linkLabel') %></label>
                 <input id="submissionLink" name="link_url" class="form-control reminder-input" type="url" placeholder="https://..." />
               </div>
               <div>
-                <label for="submissionAttachment" class="form-label">Файл</label>
+                <label for="submissionAttachment" class="form-label"><%= t('myDay.submitModal.fileLabel') %></label>
                 <input id="submissionAttachment" name="submission_attachment" class="form-control reminder-input" type="file" />
               </div>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-soft" data-bs-dismiss="modal">Скасувати</button>
-              <button type="submit" class="btn btn-glass">Здати</button>
+              <button type="button" class="btn btn-soft" data-bs-dismiss="modal"><%= t('myDay.submitModal.cancel') %></button>
+              <button type="submit" class="btn btn-glass"><%= t('myDay.submitModal.createButton') %></button>
             </div>
           </form>
         </div>
@@ -912,6 +915,23 @@
     <script>
       const myDay = <%- JSON.stringify(myDay || {}) %>;
       const currentUserId = <%- JSON.stringify(userId || null) %>;
+      const uiLocale = <%- JSON.stringify(localeCode) %>;
+      const myDayText = <%- JSON.stringify({
+        taskFallback: t('myDay.item.taskFallback'),
+        submitCreateTitle: t('myDay.submitModal.createTitle'),
+        submitUpdateTitle: t('myDay.submitModal.updateTitle'),
+        submitCreateButton: t('myDay.submitModal.createButton'),
+        submitUpdateButton: t('myDay.submitModal.updateButton'),
+        reminderAdd: t('myDay.reminders.add'),
+        reminderUpdate: t('myDay.reminders.update'),
+        reminderEmptyTitle: t('myDay.reminders.emptyTitle'),
+        reminderEmptySubtitle: t('myDay.reminders.emptySubtitle'),
+        reminderRestore: t('myDay.reminders.restore'),
+        reminderDone: t('myDay.reminders.done'),
+        reminderEdit: t('myDay.reminders.edit'),
+        reminderDelete: t('myDay.reminders.delete'),
+        reminderDeleteConfirm: t('myDay.reminders.deleteConfirm'),
+      }) %>;
       const themeToggles = document.querySelectorAll('.theme-toggle');
       if (window.bootstrap && window.bootstrap.Tooltip) {
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
@@ -1041,16 +1061,16 @@
       document.querySelectorAll('[data-submit-homework-id]').forEach((button) => {
         button.addEventListener('click', () => {
           const homeworkId = Number(button.dataset.submitHomeworkId || 0);
-          const homeworkTitle = String(button.dataset.submitTitle || 'Завдання');
+          const homeworkTitle = String(button.dataset.submitTitle || myDayText.taskFallback);
           const submitMode = String(button.dataset.submitMode || 'create');
           const isUpdateMode = submitMode === 'update';
           if (!homeworkId || !submitForm) return;
           submitForm.action = `/homework/${homeworkId}/submit`;
           if (submitModalTitle) {
-            submitModalTitle.textContent = isUpdateMode ? 'Оновити здачу завдання' : 'Здати завдання';
+            submitModalTitle.textContent = isUpdateMode ? myDayText.submitUpdateTitle : myDayText.submitCreateTitle;
           }
           if (submitFormButton) {
-            submitFormButton.textContent = isUpdateMode ? 'Оновити здачу' : 'Здати';
+            submitFormButton.textContent = isUpdateMode ? myDayText.submitUpdateButton : myDayText.submitCreateButton;
           }
           if (submitTarget) submitTarget.textContent = homeworkTitle;
           if (submissionText) submissionText.value = '';
@@ -1073,7 +1093,7 @@
         if (!value) return '-';
         const parsed = new Date(`${value}T00:00:00`);
         if (Number.isNaN(parsed.getTime())) return value;
-        return parsed.toLocaleDateString('uk-UA');
+        return parsed.toLocaleDateString(uiLocale);
       }
 
       function setActiveWhatIfTarget(target) {
@@ -1184,7 +1204,7 @@
         reminderDate.value = myDay.today || '';
         reminderTime.value = '';
         reminderEditId.value = '';
-        reminderSubmit.textContent = 'Додати';
+        reminderSubmit.textContent = myDayText.reminderAdd;
       }
 
       function renderReminders(list) {
@@ -1192,8 +1212,8 @@
         if (!Array.isArray(list) || !list.length) {
           reminderList.innerHTML = `
             <div class="empty-state compact">
-              <div class="empty-state-title">Нагадувань немає</div>
-              <div class="empty-state-subtitle">Додай перше на найближчий тиждень.</div>
+              <div class="empty-state-title">${escapeHtml(myDayText.reminderEmptyTitle)}</div>
+              <div class="empty-state-subtitle">${escapeHtml(myDayText.reminderEmptySubtitle)}</div>
             </div>
           `;
           return;
@@ -1203,7 +1223,7 @@
           const dateLabel = formatDate(reminder.remind_date);
           const timeLabel = reminder.remind_time ? ` · ${escapeHtml(reminder.remind_time)}` : '';
           const doneClass = reminder.is_done ? 'done' : '';
-          const toggleLabel = reminder.is_done ? 'Відновити' : 'Готово';
+          const toggleLabel = reminder.is_done ? myDayText.reminderRestore : myDayText.reminderDone;
           return `
             <div class="reminder-item" data-reminder-id="${reminder.id}">
               <div class="reminder-main">
@@ -1213,8 +1233,8 @@
               </div>
               <div class="reminder-actions-inline">
                 <button type="button" class="btn btn-soft btn-xs reminder-toggle" data-id="${reminder.id}" data-done="${reminder.is_done ? '1' : '0'}">${toggleLabel}</button>
-                <button type="button" class="btn btn-soft btn-xs reminder-edit" data-id="${reminder.id}">Редагувати</button>
-                <button type="button" class="btn btn-soft btn-xs reminder-delete" data-id="${reminder.id}">Видалити</button>
+                <button type="button" class="btn btn-soft btn-xs reminder-edit" data-id="${reminder.id}">${escapeHtml(myDayText.reminderEdit)}</button>
+                <button type="button" class="btn btn-soft btn-xs reminder-delete" data-id="${reminder.id}">${escapeHtml(myDayText.reminderDelete)}</button>
               </div>
             </div>
           `;
@@ -1306,7 +1326,7 @@
         reminderDate.value = reminder.remind_date || myDay.today || '';
         reminderTime.value = reminder.remind_time || '';
         reminderEditId.value = reminder.id;
-        reminderSubmit.textContent = 'Оновити';
+        reminderSubmit.textContent = myDayText.reminderUpdate;
         reminderTitle.focus();
       }
 
@@ -1314,7 +1334,7 @@
         const button = event.target.closest('.reminder-delete');
         if (!button) return;
         const reminderId = button.dataset.id;
-        if (!confirm('Видалити нагадування?')) return;
+        if (!confirm(myDayText.reminderDeleteConfirm)) return;
         button.disabled = true;
         try {
           const response = await fetch(`/api/reminders/${reminderId}`, { method: 'DELETE' });

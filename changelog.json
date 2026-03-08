@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.97",
+      "date": "2026-03-09",
+      "items": [
+        "tune(my-day-core-localization): moved the main My Day cockpit copy for the brief card, learning drawers, student and teacher focus blocks, reminder form, and homework submit modal into locale keys so the dashboard no longer hardcodes its core Ukrainian labels",
+        "tune(my-day-locale-formatting): aligned My Day date rendering with the active interface language on both the server-rendered cards and the client-side reminder refresh flow"
+      ]
+    },
+    {
       "version": "1.1.96",
       "date": "2026-03-09",
       "items": [
