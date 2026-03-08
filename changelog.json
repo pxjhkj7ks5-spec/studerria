@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.94",
+      "date": "2026-03-08",
+      "items": [
+        "fix(admin-light-topbar): rebuilt the admin light-theme topbar into a brighter liquid-glass surface so the title, account label, status chip, actions, and course switcher read cleanly instead of collapsing into a dark navbar block",
+        "fix(select-light-arrow-tiling): centralized the custom form-select indicator styling so light-theme dropdowns render a single chevron, keep the open-state arrow stable, and stop repeating the icon across the field background"
+      ]
+    },
+    {
       "version": "1.1.93",
       "date": "2026-03-08",
       "items": [
