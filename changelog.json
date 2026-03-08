@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.96",
+      "date": "2026-03-09",
+      "items": [
+        "fix(teacher-hub-schema-fallback): hardened the Teacher Hub dashboard so legacy or partially migrated teacher-specific tables no longer take the whole page down and instead fall back to empty teacher stats",
+        "fix(teacher-nav-learning): exposed Teacher Hub inside the Learning menu for teacher accounts and made the nav item stay active across the broader /teacher workspace flow"
+      ]
+    },
+    {
       "version": "1.1.95",
       "date": "2026-03-08",
       "items": [

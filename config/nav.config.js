@@ -93,7 +93,7 @@ const navConfig = {
           href: '/teacher',
           section: 'main',
           rolesAllowed: ['teacher'],
-          hidden: true,
+          matchMode: 'prefix',
           matchPaths: ['/teacher'],
         },
         {

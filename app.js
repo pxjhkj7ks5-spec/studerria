@@ -6362,6 +6362,18 @@ async function getTeacherAssignedSubjects(userId) {
   );
 }
 
+// Keep the teacher hub available on legacy DB variants where optional teacher tables lag behind.
+async function getTeacherHubSubjects(userId) {
+  try {
+    return await getTeacherAssignedSubjects(userId);
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
+}
+
 function buildTeacherCourseList(subjectRows = []) {
   const map = new Map();
   (subjectRows || []).forEach((row) => {
@@ -6375,6 +6387,18 @@ function buildTeacherCourseList(subjectRows = []) {
     });
   });
   return Array.from(map.values()).sort((a, b) => Number(a.id) - Number(b.id));
+}
+
+async function getTeacherHubCount(sql, params = []) {
+  try {
+    const row = await db.get(sql, params);
+    return Number(row && row.count ? row.count : 0);
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return 0;
+    }
+    throw err;
+  }
 }
 
 async function getTeacherHomeworkTemplates(userId, options = {}) {
@@ -7482,30 +7506,32 @@ app.get('/teacher', requireLogin, async (req, res) => {
     }
   };
   try {
-    const teacherSubjects = await getTeacherAssignedSubjects(userId);
+    const [teacherSubjects, templatesCount, createdHomeworkCount, recentHomeworkCount] = await Promise.all([
+      getTeacherHubSubjects(userId),
+      getTeacherHubCount(
+        'SELECT COUNT(*) AS count FROM teacher_homework_templates WHERE user_id = ?',
+        [userId]
+      ),
+      getTeacherHubCount(
+        'SELECT COUNT(*) AS count FROM homework WHERE created_by_id = ? AND is_teacher_homework = 1',
+        [userId]
+      ),
+      getTeacherHubCount(
+        `
+          SELECT COUNT(*) AS count
+          FROM homework
+          WHERE created_by_id = ?
+            AND is_teacher_homework = 1
+            AND created_at >= NOW() - INTERVAL '30 days'
+        `,
+        [userId]
+      ),
+    ]);
     const teacherCourses = buildTeacherCourseList(teacherSubjects);
     const uniqueSubjectIds = new Set(
       (teacherSubjects || [])
         .map((row) => Number(row.subject_id))
         .filter((value) => Number.isInteger(value) && value > 0)
-    );
-    const templatesCountRow = await db.get(
-      'SELECT COUNT(*) AS count FROM teacher_homework_templates WHERE user_id = ?',
-      [userId]
-    );
-    const createdHomeworkCountRow = await db.get(
-      'SELECT COUNT(*) AS count FROM homework WHERE created_by_id = ? AND is_teacher_homework = 1',
-      [userId]
-    );
-    const recentHomeworkCountRow = await db.get(
-      `
-        SELECT COUNT(*) AS count
-        FROM homework
-        WHERE created_by_id = ?
-          AND is_teacher_homework = 1
-          AND created_at >= NOW() - INTERVAL '30 days'
-      `,
-      [userId]
     );
 
     return res.render('teacher-hub', {
@@ -7515,9 +7541,9 @@ app.get('/teacher', requireLogin, async (req, res) => {
       stats: {
         subjects: uniqueSubjectIds.size,
         courses: teacherCourses.length,
-        templates: Number(templatesCountRow && templatesCountRow.count ? templatesCountRow.count : 0),
-        created_homework: Number(createdHomeworkCountRow && createdHomeworkCountRow.count ? createdHomeworkCountRow.count : 0),
-        recent_homework: Number(recentHomeworkCountRow && recentHomeworkCountRow.count ? recentHomeworkCountRow.count : 0),
+        templates: templatesCount,
+        created_homework: createdHomeworkCount,
+        recent_homework: recentHomeworkCount,
       },
       teacherCourses,
       error: decodeMessage(req.query.error),
