@@ -67,6 +67,7 @@
   --week-glass-dark-border: rgba(148, 163, 184, 0.36);
   --week-glass-light-bg: linear-gradient(180deg, rgba(245, 248, 255, 0.78), rgba(231, 238, 250, 0.72));
   --week-glass-light-border: rgba(100, 116, 139, 0.3);
+  --studerria-mobile-week-dock-space: 126px;
 }
 
 body {
@@ -76,6 +77,12 @@ body {
   font-weight: var(--w-regular);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+body.page-schedule {
+  min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
 }
 
 .topbar .navbar-brand {
@@ -1639,7 +1646,21 @@ body.is-scrolling .week-pager {
   padding-bottom: calc(104px + env(safe-area-inset-bottom));
 }
 
+body.page-schedule .week-rail {
+  bottom: calc(16px + env(safe-area-inset-bottom) + var(--studerria-vv-offset-bottom, 0px));
+}
+
 @media (max-width: 991px) {
+  body.page-schedule .schedule-content {
+    padding-top: 10px !important;
+    padding-bottom: calc(var(--studerria-mobile-week-dock-space) + env(safe-area-inset-bottom) + 24px) !important;
+    padding-inline: 12px !important;
+  }
+
+  body.page-schedule .schedule-shell {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
+  }
+
   .schedule-panel,
   .schedule-panel.single-panel {
     grid-template-columns: 1fr;
@@ -1662,9 +1683,30 @@ body.is-scrolling .week-pager {
     padding: 16px;
   }
 
-  .week-rail {
+  body.page-schedule .week-rail {
+    width: min(364px, calc(100vw - 16px));
+    min-width: 0;
     max-width: calc(100vw - 16px);
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 8px;
+    padding: 10px 8px;
+    border-radius: 28px;
     transform: none;
+  }
+
+  body.page-schedule .week-pill {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+  }
+
+  body.page-schedule .week-nav-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  body.page-schedule .app-footer {
+    padding-bottom: calc(var(--studerria-mobile-week-dock-space) + env(safe-area-inset-bottom) + 26px);
   }
 }
 
@@ -1677,9 +1719,22 @@ body.is-scrolling .week-pager {
     transform: none;
   }
 
-  .week-rail {
-    padding: 12px 4px;
-    bottom: 12px;
+  body.page-schedule .week-hero {
+    padding: 1.2rem 1.15rem;
+  }
+
+  body.page-schedule .day-card {
+    border-radius: 24px;
+  }
+
+  body.page-schedule .schedule-card {
+    border-radius: 20px;
+  }
+
+  body.page-schedule .week-rail {
+    width: calc(100vw - 20px);
+    padding: 8px;
+    bottom: calc(10px + env(safe-area-inset-bottom) + var(--studerria-vv-offset-bottom, 0px));
     transform: none;
   }
 }

@@ -3,6 +3,15 @@
   const ITEM_SELECTOR = '.snav-item--has-children';
   const TRIGGER_SELECTOR = '[data-nav-trigger]';
   const ACTION_SELECTOR = '[data-nav-action]';
+  const MOBILE_TOGGLE_SELECTOR = '[data-mobile-nav-toggle]';
+  const MOBILE_SHEET_SELECTOR = '[data-mobile-nav-sheet]';
+  const MOBILE_CLOSE_SELECTOR = '[data-mobile-nav-close]';
+  const MOBILE_BACKDROP_SELECTOR = '[data-mobile-nav-backdrop]';
+  const MOBILE_DISMISS_SELECTOR = '[data-mobile-nav-dismiss]';
+  const MOBILE_THEME_SELECTOR = '[data-theme-toggle]';
+  const MOBILE_ROOT_OPEN_CLASS = 'is-mobile-open';
+  const MOBILE_BODY_OPEN_CLASS = 'studerria-mobile-nav-open';
+  const VIEWPORT_METRICS_BOOT_FLAG = '__studerriaViewportMetricsBound';
   const PANEL_MAP = {
     messages: 'messagesModal',
     'custom-deadlines': 'customDeadlineModal',
@@ -159,6 +168,163 @@
     return true;
   }
 
+  function isMobileViewport() {
+    if (typeof window.matchMedia === 'function') {
+      return window.matchMedia('(max-width: 991px)').matches;
+    }
+    return window.innerWidth <= 991;
+  }
+
+  function queueViewportMetricsSync() {
+    if (window.__studerriaViewportMetricsRaf) {
+      window.cancelAnimationFrame(window.__studerriaViewportMetricsRaf);
+    }
+    window.__studerriaViewportMetricsRaf = window.requestAnimationFrame(() => {
+      window.__studerriaViewportMetricsRaf = 0;
+      const root = document.documentElement;
+      if (!(root instanceof HTMLElement)) {
+        return;
+      }
+
+      const visualViewport = window.visualViewport || null;
+      const layoutHeight = Math.max(window.innerHeight || 0, root.clientHeight || 0);
+      const viewportHeight = visualViewport ? visualViewport.height : layoutHeight;
+      const viewportOffsetTop = visualViewport ? visualViewport.offsetTop : 0;
+      const viewportOffsetBottom = Math.max(0, layoutHeight - viewportHeight - viewportOffsetTop);
+
+      root.style.setProperty('--studerria-vv-height', `${Math.round(viewportHeight)}px`);
+      root.style.setProperty('--studerria-vv-offset-top', `${Math.round(viewportOffsetTop)}px`);
+      root.style.setProperty('--studerria-vv-offset-bottom', `${Math.round(viewportOffsetBottom)}px`);
+    });
+  }
+
+  function initViewportMetrics() {
+    if (window[VIEWPORT_METRICS_BOOT_FLAG] === true) {
+      return;
+    }
+    window[VIEWPORT_METRICS_BOOT_FLAG] = true;
+
+    queueViewportMetricsSync();
+    window.addEventListener('resize', queueViewportMetricsSync, { passive: true });
+    window.addEventListener('orientationchange', queueViewportMetricsSync, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', queueViewportMetricsSync, { passive: true });
+      window.visualViewport.addEventListener('scroll', queueViewportMetricsSync, { passive: true });
+    }
+  }
+
+  function getMobileSheet(root) {
+    if (!(root instanceof HTMLElement)) {
+      return null;
+    }
+    const sheet = root.querySelector(MOBILE_SHEET_SELECTOR);
+    return sheet instanceof HTMLElement ? sheet : null;
+  }
+
+  function isMobileNavOpen(root) {
+    return root instanceof HTMLElement && root.classList.contains(MOBILE_ROOT_OPEN_CLASS);
+  }
+
+  function setMobileNavOpen(root, open, options = {}) {
+    if (!(root instanceof HTMLElement)) {
+      return;
+    }
+
+    const sheet = getMobileSheet(root);
+    const toggle = root.querySelector(MOBILE_TOGGLE_SELECTOR);
+    if (!(sheet instanceof HTMLElement) || !(toggle instanceof HTMLElement)) {
+      return;
+    }
+
+    const nextOpen = Boolean(open) && isMobileViewport();
+    const restoreFocus = options.restoreFocus !== false;
+    window.clearTimeout(root.__studerriaMobileNavHideTimer || 0);
+    root.classList.toggle(MOBILE_ROOT_OPEN_CLASS, nextOpen);
+    document.body?.classList.toggle(MOBILE_BODY_OPEN_CLASS, nextOpen);
+    toggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+    sheet.setAttribute('aria-hidden', nextOpen ? 'false' : 'true');
+
+    if (nextOpen) {
+      root.__studerriaMobileNavLastFocus = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : toggle;
+      sheet.hidden = false;
+      queueViewportMetricsSync();
+      window.requestAnimationFrame(() => {
+        sheet.classList.add('is-open');
+        const closeButton = root.querySelector(MOBILE_CLOSE_SELECTOR);
+        if (closeButton instanceof HTMLElement) {
+          closeButton.focus();
+        }
+      });
+      return;
+    }
+
+    sheet.classList.remove('is-open');
+    root.__studerriaMobileNavHideTimer = window.setTimeout(() => {
+      if (!root.classList.contains(MOBILE_ROOT_OPEN_CLASS)) {
+        sheet.hidden = true;
+      }
+    }, 240);
+
+    if (restoreFocus) {
+      const returnFocus = root.__studerriaMobileNavLastFocus;
+      if (returnFocus instanceof HTMLElement && document.contains(returnFocus)) {
+        returnFocus.focus();
+      } else {
+        toggle.focus();
+      }
+    }
+  }
+
+  function toggleThemeFromMobileControl(control) {
+    if (!(control instanceof HTMLElement) || !(document.body instanceof HTMLElement)) {
+      return;
+    }
+
+    const body = document.body;
+    const nextTheme = body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
+    body.classList.remove('theme-dark', 'theme-light');
+    body.classList.add(nextTheme);
+
+    try {
+      window.localStorage.setItem('ui-theme', nextTheme);
+    } catch (_error) {
+      // Ignore storage errors and keep the in-memory theme.
+    }
+
+    const labelTarget = control.querySelector('[data-mobile-link-label]');
+    if (labelTarget instanceof HTMLElement) {
+      labelTarget.textContent = nextTheme === 'theme-dark'
+        ? (control.dataset.lightLabel || 'Світла тема')
+        : (control.dataset.darkLabel || 'Темна тема');
+    }
+
+    window.dispatchEvent(new CustomEvent('studerria:theme-toggled', {
+      detail: { theme: nextTheme },
+    }));
+  }
+
+  function syncMobileThemeLabels(root) {
+    if (!(root instanceof HTMLElement) || !(document.body instanceof HTMLElement)) {
+      return;
+    }
+
+    const isDark = document.body.classList.contains('theme-dark');
+    root.querySelectorAll(MOBILE_THEME_SELECTOR).forEach((control) => {
+      if (!(control instanceof HTMLElement)) {
+        return;
+      }
+
+      const labelTarget = control.querySelector('[data-mobile-link-label]');
+      if (labelTarget instanceof HTMLElement) {
+        labelTarget.textContent = isDark
+          ? (control.dataset.lightLabel || 'Світла тема')
+          : (control.dataset.darkLabel || 'Темна тема');
+      }
+    });
+  }
+
   function handleActionElement(actionElement, event, root) {
     if (!(actionElement instanceof HTMLElement)) {
       return;
@@ -272,7 +438,10 @@
     }
     root.dataset.navReady = '1';
 
+    initViewportMetrics();
     initUnreadIndicators(root);
+    syncMobileThemeLabels(root);
+    window.addEventListener('studerria:theme-toggled', () => syncMobileThemeLabels(root));
 
     const hoverMatcher = getHoverMatcher();
     let hoverEnabled = hoverMatcher ? hoverMatcher.matches : false;
@@ -334,17 +503,54 @@
     });
 
     root.addEventListener('click', (event) => {
+      const mobileToggle = event.target instanceof Element
+        ? event.target.closest(MOBILE_TOGGLE_SELECTOR)
+        : null;
+      if (mobileToggle && root.contains(mobileToggle)) {
+        event.preventDefault();
+        setMobileNavOpen(root, !isMobileNavOpen(root));
+        return;
+      }
+
+      const mobileClose = event.target instanceof Element
+        ? event.target.closest(`${MOBILE_CLOSE_SELECTOR}, ${MOBILE_BACKDROP_SELECTOR}`)
+        : null;
+      if (mobileClose && root.contains(mobileClose)) {
+        event.preventDefault();
+        setMobileNavOpen(root, false, { restoreFocus: false });
+        return;
+      }
+
+      const mobileThemeControl = event.target instanceof Element
+        ? event.target.closest(MOBILE_THEME_SELECTOR)
+        : null;
+      if (mobileThemeControl && root.contains(mobileThemeControl)) {
+        event.preventDefault();
+        toggleThemeFromMobileControl(mobileThemeControl);
+        setMobileNavOpen(root, false, { restoreFocus: false });
+        return;
+      }
+
       const actionElement = event.target instanceof Element
         ? event.target.closest(ACTION_SELECTOR)
         : null;
       if (actionElement && root.contains(actionElement)) {
         handleActionElement(actionElement, event, root);
+        if (isMobileNavOpen(root)) {
+          setMobileNavOpen(root, false, { restoreFocus: false });
+        }
       }
 
       const trigger = event.target instanceof Element
         ? event.target.closest(TRIGGER_SELECTOR)
         : null;
       if (!(trigger instanceof HTMLElement) || !root.contains(trigger)) {
+        const dismissElement = event.target instanceof Element
+          ? event.target.closest(MOBILE_DISMISS_SELECTOR)
+          : null;
+        if (dismissElement && root.contains(dismissElement) && isMobileNavOpen(root)) {
+          setMobileNavOpen(root, false, { restoreFocus: false });
+        }
         return;
       }
 
@@ -385,6 +591,11 @@
       const owningItem = getOwningItem(event.target);
 
       if (event.key === 'Escape') {
+        if (isMobileNavOpen(root)) {
+          event.preventDefault();
+          setMobileNavOpen(root, false);
+          return;
+        }
         closeAll(root);
         if (trigger instanceof HTMLElement) {
           trigger.focus();
@@ -428,8 +639,18 @@
       if (root.contains(event.target)) {
         return;
       }
+      if (isMobileNavOpen(root)) {
+        setMobileNavOpen(root, false, { restoreFocus: false });
+      }
       closeAll(root);
     });
+
+    window.addEventListener('resize', () => {
+      queueViewportMetricsSync();
+      if (!isMobileViewport() && isMobileNavOpen(root)) {
+        setMobileNavOpen(root, false, { restoreFocus: false });
+      }
+    }, { passive: true });
   }
 
   function init() {

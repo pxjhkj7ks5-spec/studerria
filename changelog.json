@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.93",
+      "date": "2026-03-08",
+      "items": [
+        "fix(schedule-mobile-menu): rebuilt the phone navigation into a compact OpenAI-style sheet with a cleaner Studerria topbar, structured workspace sections, and an account footer that keeps the mobile menu usable instead of falling back to the retired legacy modal",
+        "fix(schedule-mobile-height): added viewport-aware safe-area offsets and tighter week-dock spacing on the schedule screen so the floating week controls sit correctly on iPhone-sized viewports without crowding the content as aggressively"
+      ]
+    },
+    {
       "version": "1.1.92",
       "date": "2026-03-07",
       "items": [

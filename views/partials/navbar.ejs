@@ -26,6 +26,26 @@
   const displayRoleText = displayName
     ? `${displayRoleLabel}: ${displayName}`
     : displayRoleLabel;
+  const mobileGlyphMap = {
+    admin: 'AD',
+    deanery: 'DN',
+    home: 'HM',
+    learning: 'ED',
+    schedule: 'WK',
+    journal: 'JR',
+    'journal-insights': 'IN',
+    teamwork: 'TW',
+    'custom-deadlines': 'DL',
+    subjects: 'SB',
+    personal: 'ME',
+    profile: 'PR',
+    messages: 'MS',
+    theme: 'TH',
+    starosta: 'ST',
+    'teacher-workspace': 'TW',
+    'teacher-hub': 'TH',
+    'teacher-subjects': 'TS',
+  };
 
   const escapeHtml = (value) => String(value || '')
     .replace(/&/g, '&amp;')
@@ -33,6 +53,81 @@
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+
+  const getMobileGlyph = (item) => {
+    const mapped = mobileGlyphMap[item && item.id ? item.id : ''];
+    if (mapped) {
+      return mapped;
+    }
+
+    const labelParts = String(item && item.label ? item.label : '')
+      .split(/\s+/)
+      .map((part) => String(part || '').replace(/[^A-Za-z0-9]/g, ''))
+      .filter(Boolean);
+
+    if (!labelParts.length) {
+      return 'GO';
+    }
+
+    return labelParts
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join('');
+  };
+
+  const buildMobileMeta = (trail) => {
+    if (!Array.isArray(trail) || trail.length <= 1) {
+      return '';
+    }
+    return trail.slice(1).join(' / ');
+  };
+
+  const toMobileDescriptor = (item, trail) => ({
+    id: String(item && item.id ? item.id : item && item.label ? item.label : 'nav-item'),
+    label: String(item && item.label ? item.label : ''),
+    href: String(item && item.href ? item.href : '#'),
+    navAction: String(item && item.navAction ? item.navAction : ''),
+    glyph: getMobileGlyph(item),
+    meta: buildMobileMeta(trail),
+    isCurrent: Boolean(item && (item.isCurrent || item.isCurrentContainer)),
+    hasUnread: allowMessages && String(item && item.id ? item.id : '') === 'messages',
+  });
+
+  const flattenMobileItems = (items, trail) => items.reduce((result, item) => {
+    if (!item) {
+      return result;
+    }
+
+    if ((item.href && !item.isDisabledLink) || item.navAction) {
+      result.push(toMobileDescriptor(item, trail));
+    }
+
+    if (Array.isArray(item.children) && item.children.length) {
+      const nextTrail = item.label ? [...trail, String(item.label)] : trail;
+      result.push(...flattenMobileItems(item.children, nextTrail));
+    }
+
+    return result;
+  }, []);
+
+  const mobilePrimaryItems = [];
+  const mobileSections = [];
+  visibleNavItems.forEach((item) => {
+    if (Array.isArray(item.children) && item.children.length) {
+      const sectionItems = flattenMobileItems(item.children, [String(item.label || '')]);
+      if (sectionItems.length) {
+        mobileSections.push({
+          title: String(item.label || ''),
+          items: sectionItems,
+        });
+      }
+      return;
+    }
+
+    if ((item.href && !item.isDisabledLink) || item.navAction) {
+      mobilePrimaryItems.push(toMobileDescriptor(item, []));
+    }
+  });
 
   const buildTriggerClass = (level, item) => {
     const classNames = [level === 0 ? 'snav-link' : 'snav-menu-link'];
@@ -120,13 +215,66 @@
     html += '</li>';
     return html;
   }).join('');
+
+  const renderMobileLink = (item) => {
+    const classNames = ['snav-mobile-link'];
+    if (item.isCurrent) {
+      classNames.push('is-current');
+    }
+
+    const attrs = [
+      `class="${classNames.join(' ')}"`,
+      'data-mobile-nav-dismiss',
+      `data-nav-label="${escapeHtml(item.label || '')}"`,
+    ];
+
+    if (item.navAction) {
+      attrs.push(`data-nav-action="${escapeHtml(item.navAction)}"`);
+    }
+
+    if (item.navAction === 'theme-toggle') {
+      attrs.push('data-theme-toggle');
+      attrs.push('data-light-label="Світла тема"');
+      attrs.push('data-dark-label="Темна тема"');
+    }
+
+    if (item.isCurrent) {
+      attrs.push('aria-current="page"');
+    }
+
+    const metaHtml = item.meta
+      ? `<span class="snav-mobile-link-meta">${escapeHtml(item.meta)}</span>`
+      : '';
+    const unreadHtml = item.hasUnread
+      ? '<span class="snav-unread-chip" data-message-indicator="messages" hidden aria-hidden="true"></span>'
+      : '';
+    const contentHtml = `
+      <span class="snav-mobile-link-glyph" aria-hidden="true">${escapeHtml(item.glyph || 'GO')}</span>
+      <span class="snav-mobile-link-copy">
+        <span class="snav-mobile-link-title"><span data-mobile-link-label>${escapeHtml(item.label || '')}</span>${unreadHtml}</span>
+        ${metaHtml}
+      </span>
+      <span class="snav-mobile-link-chevron" aria-hidden="true">&rsaquo;</span>
+    `;
+
+    if (item.navAction === 'theme-toggle') {
+      return `<button type="button" ${attrs.join(' ')}>${contentHtml}</button>`;
+    }
+
+    return `<a href="${escapeHtml(item.href || '#')}" ${attrs.join(' ')}>${contentHtml}</a>`;
+  };
 %>
 <% if (shouldRenderNavbar) { %>
   <% if (shouldRenderAppNav) { %>
     <nav class="navbar navbar-expand-lg topbar topbar--title-spotlight studerria-nav-shell" aria-label="Global Navigation" data-studerria-nav>
       <div class="container">
         <div class="snav-main">
-          <a class="navbar-brand text-white topbar-title-spotlight" href="/about">Studerria</a>
+          <div class="snav-brand-stack">
+            <a class="navbar-brand text-white topbar-title-spotlight" href="/about">Studerria</a>
+            <% if (displayRoleText) { %>
+              <span class="snav-mobile-meta"><%= displayRoleText %></span>
+            <% } %>
+          </div>
           <span class="snav-brand-spacer" aria-hidden="true"></span>
           <ul class="snav-list" data-nav-level="0">
             <%- renderMenuItems(visibleNavItems, 0) %>
@@ -136,10 +284,91 @@
           <% if (displayRoleText) { %>
             <span class="me-2 muted text-nowrap snav-user-meta"><%= displayRoleText %></span>
           <% } %>
+          <button
+            type="button"
+            class="snav-mobile-trigger"
+            data-mobile-nav-toggle
+            aria-label="Відкрити навігацію"
+            aria-expanded="false"
+            aria-controls="studerriaMobileNav"
+          >
+            <span class="snav-mobile-trigger-line"></span>
+            <span class="snav-mobile-trigger-line"></span>
+          </button>
           <form method="POST" action="/logout" class="snav-logout-form">
             <button class="theme-toggle-min snav-logout-btn" type="submit" aria-label="Вийти">Вийти</button>
           </form>
         </div>
+      </div>
+      <div
+        class="snav-mobile-sheet"
+        id="studerriaMobileNav"
+        data-mobile-nav-sheet
+        hidden
+        aria-hidden="true"
+      >
+        <button
+          type="button"
+          class="snav-mobile-backdrop"
+          data-mobile-nav-backdrop
+          aria-label="Закрити навігацію"
+          tabindex="-1"
+        ></button>
+        <section
+          class="snav-mobile-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="studerriaMobileNavTitle"
+        >
+          <div class="snav-mobile-panel-head">
+            <div class="snav-mobile-panel-copy">
+              <p class="snav-mobile-kicker">Простір</p>
+              <h2 class="snav-mobile-title" id="studerriaMobileNavTitle">Studerria</h2>
+              <% if (displayRoleText) { %>
+                <p class="snav-mobile-panel-meta"><%= displayRoleText %></p>
+              <% } %>
+            </div>
+            <button
+              type="button"
+              class="snav-mobile-close"
+              data-mobile-nav-close
+              aria-label="Закрити навігацію"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="snav-mobile-scroll">
+            <% if (mobilePrimaryItems.length) { %>
+              <section class="snav-mobile-section" aria-label="Основна навігація">
+                <div class="snav-mobile-section-label">Огляд</div>
+                <div class="snav-mobile-link-list">
+                  <% mobilePrimaryItems.forEach((item) => { %>
+                    <%- renderMobileLink(item) %>
+                  <% }) %>
+                </div>
+              </section>
+            <% } %>
+            <% mobileSections.forEach((section) => { %>
+              <section class="snav-mobile-section" aria-label="<%= section.title %>">
+                <div class="snav-mobile-section-label"><%= section.title %></div>
+                <div class="snav-mobile-link-list">
+                  <% section.items.forEach((item) => { %>
+                    <%- renderMobileLink(item) %>
+                  <% }) %>
+                </div>
+              </section>
+            <% }) %>
+          </div>
+          <div class="snav-mobile-footer">
+            <div class="snav-mobile-account">
+              <span class="snav-mobile-account-label">Активний профіль</span>
+              <span class="snav-mobile-account-value"><%= displayRoleText || 'Профіль Studerria' %></span>
+            </div>
+            <form method="POST" action="/logout" class="snav-mobile-logout-form">
+              <button type="submit" class="snav-mobile-logout-btn" data-mobile-nav-dismiss>Вийти</button>
+            </form>
+          </div>
+        </section>
       </div>
     </nav>
   <% } else { %>
