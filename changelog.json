@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.95",
+      "date": "2026-03-08",
+      "items": [
+        "tune(teacher-surfaces-localization): localized the Teacher Hub and Journal Insights screens through locale keys so titles, actions, filters, summary labels, table headings, and empty states no longer ship with hardcoded English copy",
+        "tune(my-day-copy): localized the My Day briefing kicker and drawer close-label to keep the student cockpit navigation consistent with the rest of the Ukrainian UI"
+      ]
+    },
+    {
       "version": "1.1.94",
       "date": "2026-03-08",
       "items": [

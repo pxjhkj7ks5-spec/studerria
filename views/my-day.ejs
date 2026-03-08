@@ -117,7 +117,7 @@
     <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
       <div class="drawer-head">
         <div class="drawer-title">Меню</div>
-        <button class="drawer-close" type="button" id="scheduleDrawerClose" aria-label="Close menu">✕</button>
+        <button class="drawer-close" type="button" id="scheduleDrawerClose" aria-label="<%= t('navigation.closeMenu') %>">✕</button>
       </div>
       <div class="drawer-actions">
         <% if (role === 'admin') { %>
@@ -168,7 +168,7 @@
 
       <section class="cockpit-card brief-card <%= briefToneClass %>">
         <div class="brief-head">
-          <span class="brief-kicker">Leadership Brief</span>
+          <span class="brief-kicker"><%= t('myDay.briefKicker') %></span>
           <span class="brief-meta">Тиждень <%= cockpit.week_number || '-' %></span>
         </div>
         <h1 class="brief-title"><%= brief.title || 'Твій день під контролем' %></h1>

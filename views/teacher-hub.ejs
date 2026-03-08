@@ -5,7 +5,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <%- include('partials/theme-bootstrap-head', { defaultTheme: 'dark' }) %>
-    <title>Teacher hub</title>
+    <title><%= t('teacherHub.pageTitle') %></title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -183,7 +183,7 @@
   <body class="studerria-theme theme-dark page-teacher-hub page-journal page-local-topbar">
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
-    <%- include('partials/topbar', { role, username, t, activePage: 'teacher-hub', pageTitle: 'Teacher hub', settings: settings }) %>
+    <%- include('partials/topbar', { role, username, t, activePage: 'teacher-hub', pageTitle: t('teacherHub.title'), settings: settings }) %>
     <%- include('partials/desktop-menu-drawer', {
       role,
       t,
@@ -200,41 +200,41 @@
       <% } %>
 
       <section class="glass hub-hero mb-3">
-        <h1 class="hub-title">Teacher hub</h1>
+        <h1 class="hub-title"><%= t('teacherHub.title') %></h1>
         <p class="hub-subtitle">
-          Centralized workspace for teaching flow: subjects, reusable templates, schedule operations, and journal.
+          <%= t('teacherHub.subtitle') %>
         </p>
         <div class="hub-actions">
-          <a class="btn btn-hub" href="/schedule">Schedule</a>
-          <a class="btn btn-hub" href="/teacher/workspace">Template workspace</a>
-          <a class="btn btn-hub" href="/teacher/subjects">Teacher subjects</a>
-          <a class="btn btn-hub" href="/journal">Journal</a>
+          <a class="btn btn-hub" href="/schedule"><%= t('teacherHub.action.schedule') %></a>
+          <a class="btn btn-hub" href="/teacher/workspace"><%= t('teacherHub.action.workspace') %></a>
+          <a class="btn btn-hub" href="/teacher/subjects"><%= t('teacherHub.action.subjects') %></a>
+          <a class="btn btn-hub" href="/journal"><%= t('teacherHub.action.journal') %></a>
         </div>
       </section>
 
       <section class="row g-3">
         <div class="col-12 col-xl-5">
           <article class="glass hub-panel h-100">
-            <h5 class="mb-3">Snapshot</h5>
+            <h5 class="mb-3"><%= t('teacherHub.snapshot') %></h5>
             <div class="stat-grid">
               <div class="stat-card">
-                <div class="stat-label">Assigned subjects</div>
+                <div class="stat-label"><%= t('teacherHub.stat.assignedSubjects') %></div>
                 <div class="stat-value"><%= Number(stats && stats.subjects ? stats.subjects : 0) %></div>
               </div>
               <div class="stat-card">
-                <div class="stat-label">Courses</div>
+                <div class="stat-label"><%= t('teacherHub.stat.courses') %></div>
                 <div class="stat-value"><%= Number(stats && stats.courses ? stats.courses : 0) %></div>
               </div>
               <div class="stat-card">
-                <div class="stat-label">Saved templates</div>
+                <div class="stat-label"><%= t('teacherHub.stat.savedTemplates') %></div>
                 <div class="stat-value"><%= Number(stats && stats.templates ? stats.templates : 0) %></div>
               </div>
               <div class="stat-card">
-                <div class="stat-label">Homework created</div>
+                <div class="stat-label"><%= t('teacherHub.stat.homeworkCreated') %></div>
                 <div class="stat-value"><%= Number(stats && stats.created_homework ? stats.created_homework : 0) %></div>
               </div>
               <div class="stat-card">
-                <div class="stat-label">Last 30 days</div>
+                <div class="stat-label"><%= t('teacherHub.stat.last30Days') %></div>
                 <div class="stat-value"><%= Number(stats && stats.recent_homework ? stats.recent_homework : 0) %></div>
               </div>
             </div>
@@ -242,23 +242,23 @@
         </div>
         <div class="col-12 col-xl-7">
           <article class="glass hub-panel h-100">
-            <h5 class="mb-3">Quick actions</h5>
+            <h5 class="mb-3"><%= t('teacherHub.quickActions') %></h5>
             <div class="quick-grid">
               <a class="quick-card" href="/teacher/workspace">
-                <span class="quick-title">Manage templates</span>
-                <span class="quick-desc">Create, edit, clone, and bulk-manage homework templates.</span>
+                <span class="quick-title"><%= t('teacherHub.quick.manageTemplates.title') %></span>
+                <span class="quick-desc"><%= t('teacherHub.quick.manageTemplates.desc') %></span>
               </a>
               <a class="quick-card" href="/teacher/subjects">
-                <span class="quick-title">Update teaching scope</span>
-                <span class="quick-desc">Adjust subject and group mapping for your teaching load.</span>
+                <span class="quick-title"><%= t('teacherHub.quick.updateScope.title') %></span>
+                <span class="quick-desc"><%= t('teacherHub.quick.updateScope.desc') %></span>
               </a>
               <a class="quick-card" href="/schedule">
-                <span class="quick-title">Open schedule flow</span>
-                <span class="quick-desc">Create homework from class cards and apply templates instantly.</span>
+                <span class="quick-title"><%= t('teacherHub.quick.openSchedule.title') %></span>
+                <span class="quick-desc"><%= t('teacherHub.quick.openSchedule.desc') %></span>
               </a>
               <a class="quick-card" href="/journal">
-                <span class="quick-title">Go to journal</span>
-                <span class="quick-desc">Review grading dynamics and progress by subject and group.</span>
+                <span class="quick-title"><%= t('teacherHub.quick.goJournal.title') %></span>
+                <span class="quick-desc"><%= t('teacherHub.quick.goJournal.desc') %></span>
               </a>
             </div>
             <% if ((teacherCourses || []).length) { %>

@@ -30,7 +30,7 @@
     active: periodValue,
     submitOnPick: true,
   }).replace(/'/g, '&#39;');
-  const scopeLabelValue = scopeLabel || 'Scope';
+  const scopeLabelValue = scopeLabel || t('journalInsights.scope');
   const gradeTrend = (trends && Array.isArray(trends.grade)) ? trends.grade : [];
   const attendanceTrend = (trends && Array.isArray(trends.attendance)) ? trends.attendance : [];
   const gradeMax = Math.max(100, ...gradeTrend.map((item) => Number(item.avg_score_percent || 0)));
@@ -42,7 +42,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <%- include('partials/theme-bootstrap-head', { defaultTheme: 'dark' }) %>
-    <title>Journal insights</title>
+    <title><%= t('journalInsights.pageTitle') %></title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -400,7 +400,7 @@
   <body class="studerria-theme theme-dark page-journal-insights page-journal page-local-topbar">
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
-    <%- include('partials/topbar', { role, username, t, activePage: 'journal-insights', pageTitle: 'Journal insights', settings: settings }) %>
+    <%- include('partials/topbar', { role, username, t, activePage: 'journal-insights', pageTitle: t('journalInsights.title'), settings: settings }) %>
     <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'journal-insights', settings: settings }) %>
 
     <main class="container shell">
@@ -414,17 +414,17 @@
       <section class="glass hero mb-3">
         <div class="hero-grid">
           <div class="hero-main">
-            <h1 class="hero-title">Journal insights</h1>
+            <h1 class="hero-title"><%= t('journalInsights.title') %></h1>
             <p class="hero-subtitle">
-              Performance and attendance insights across flexible scopes: student, group, subject, or whole course. Built for quick ranking review, comparison, export, and publication workflows.
+              <%= t('journalInsights.subtitle') %>
             </p>
             <div class="chip-row">
               <span class="chip"><%= scopeLabelValue %></span>
-              <span class="chip">Period: <%= periodLabel %></span>
-              <span class="chip">Compare: <%= compareLabel %></span>
-              <span class="chip">Participants: <%= Number(summary && summary.participants_count ? summary.participants_count : 0) %></span>
+              <span class="chip"><%= t('journalInsights.period') %>: <%= periodLabel %></span>
+              <span class="chip"><%= t('journalInsights.compare') %>: <%= compareLabel %></span>
+              <span class="chip"><%= t('journalInsights.participants') %>: <%= Number(summary && summary.participants_count ? summary.participants_count : 0) %></span>
               <% if (isAllCoursesScope && scopeCourseCountValue > 0) { %>
-                <span class="chip">Courses: <%= scopeCourseCountValue %></span>
+                <span class="chip"><%= t('journalInsights.courses') %>: <%= scopeCourseCountValue %></span>
               <% } %>
               <% if (selectedSemester && selectedSemester.title) { %>
                 <span class="chip"><%= selectedSemester.title %></span>
@@ -433,24 +433,24 @@
           </div>
           <div class="hero-side">
             <div class="hero-stat">
-              <div class="hero-stat-label">Average</div>
+              <div class="hero-stat-label"><%= t('journalInsights.stat.average') %></div>
               <div class="hero-stat-value"><%= Number(summary && summary.average_score ? summary.average_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
-              <div class="hero-stat-meta">median <%= Number(summary && summary.median_score ? summary.median_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
+              <div class="hero-stat-meta"><%= t('journalInsights.stat.median') %> <%= Number(summary && summary.median_score ? summary.median_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
             </div>
             <div class="hero-stat">
-              <div class="hero-stat-label">Attendance reliability</div>
+              <div class="hero-stat-label"><%= t('journalInsights.stat.attendanceReliability') %></div>
               <div class="hero-stat-value"><%= Number(summary && summary.attendance_reliability ? summary.attendance_reliability : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
-              <div class="hero-stat-meta">absence share <%= Number(summary && summary.attendance_absent_share ? summary.attendance_absent_share : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
+              <div class="hero-stat-meta"><%= t('journalInsights.stat.absenceShare') %> <%= Number(summary && summary.attendance_absent_share ? summary.attendance_absent_share : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
             </div>
             <div class="hero-stat">
-              <div class="hero-stat-label">At risk</div>
+              <div class="hero-stat-label"><%= t('journalInsights.stat.atRisk') %></div>
               <div class="hero-stat-value"><%= Number(summary && summary.at_risk_count ? summary.at_risk_count : 0) %></div>
-              <div class="hero-stat-meta">excellent <%= Number(summary && summary.excellent_count ? summary.excellent_count : 0) %></div>
+              <div class="hero-stat-meta"><%= t('journalInsights.stat.excellent') %> <%= Number(summary && summary.excellent_count ? summary.excellent_count : 0) %></div>
             </div>
             <div class="hero-stat">
-              <div class="hero-stat-label">Momentum</div>
+              <div class="hero-stat-label"><%= t('journalInsights.stat.momentum') %></div>
               <div class="hero-stat-value"><%= Number(summary && summary.momentum_score ? summary.momentum_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
-              <div class="hero-stat-meta">trend delta <%= Number(summary && summary.grade_delta ? summary.grade_delta : 0).toFixed(2).replace(/\.00$/, '') %></div>
+              <div class="hero-stat-meta"><%= t('journalInsights.stat.trendDelta') %> <%= Number(summary && summary.grade_delta ? summary.grade_delta : 0).toFixed(2).replace(/\.00$/, '') %></div>
             </div>
           </div>
         </div>
@@ -459,13 +459,13 @@
       <section class="glass section mb-3">
         <div class="section-head">
           <div>
-            <h2 class="section-title">Filters</h2>
-            <p class="section-subtitle">Refine scope, period, and compare mode before exporting or publishing insights.</p>
+            <h2 class="section-title"><%= t('journalInsights.filtersTitle') %></h2>
+            <p class="section-subtitle"><%= t('journalInsights.filtersSubtitle') %></p>
           </div>
         </div>
         <form id="journalInsightsFiltersForm" method="GET" action="/journal/insights" class="row g-2 mt-1">
           <div class="col-12 col-md-3">
-            <label class="form-label small" for="insightsCourse">Course</label>
+            <label class="form-label small" for="insightsCourse"><%= t('journalInsights.course') %></label>
             <select id="insightsCourse" class="form-select compact-select" name="course_id" <%= isAllCoursesScope ? 'disabled' : '' %>>
               <% (courseOptions || []).forEach((course) => { %>
                 <option value="<%= course.course_id %>" <%= Number(course.course_id) === selectedCourseValue ? 'selected' : '' %>><%= course.course_name %></option>
@@ -476,7 +476,7 @@
             <% } %>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label small" for="insightsScope">Scope</label>
+            <label class="form-label small" for="insightsScope"><%= t('journalInsights.scope') %></label>
             <select id="insightsScope" class="form-select compact-select" name="scope_type">
               <% (scopeOptions || []).forEach((scope) => { %>
                 <option value="<%= scope.key %>" <%= scope.key === scopeValue ? 'selected' : '' %>><%= scope.label %></option>
@@ -484,7 +484,7 @@
             </select>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label small" for="insightsPeriod">Period</label>
+            <label class="form-label small" for="insightsPeriod"><%= t('journalInsights.period') %></label>
             <select id="insightsPeriod" class="form-select compact-select" name="period">
               <% (periodOptions || []).forEach((item) => { %>
                 <option value="<%= item.key %>" <%= item.key === periodValue ? 'selected' : '' %>><%= item.label %></option>
@@ -492,7 +492,7 @@
             </select>
           </div>
           <div class="col-12 col-md-3 align-self-end d-grid">
-            <button class="btn btn-primary" type="submit">Apply</button>
+            <button class="btn btn-primary" type="submit"><%= t('journalInsights.apply') %></button>
           </div>
 
           <div class="col-12">
@@ -503,10 +503,10 @@
           </div>
 
           <div class="col-12 col-md-3">
-            <label class="form-label small" for="insightsSubject">Subject</label>
+            <label class="form-label small" for="insightsSubject"><%= t('journalInsights.subject') %></label>
             <select id="insightsSubject" class="form-select compact-select" name="subject_id" <%= isCourseAggregateScope ? 'disabled' : '' %>>
               <% if (!(subjectOptions || []).length) { %>
-                <option value="">No subject access</option>
+                <option value=""><%= t('journalInsights.noSubjectAccess') %></option>
               <% } else { %>
                 <% (subjectOptions || []).filter((subject) => Number(subject.course_id) === selectedCourseValue).forEach((subject) => { %>
                   <option value="<%= subject.subject_id %>" <%= Number(subject.subject_id) === selectedSubjectValue ? 'selected' : '' %>>
@@ -521,9 +521,9 @@
           </div>
 
           <div class="col-12 col-md-3">
-            <label class="form-label small" for="insightsGroup">Group</label>
+            <label class="form-label small" for="insightsGroup"><%= t('journalInsights.group') %></label>
             <select id="insightsGroup" class="form-select compact-select" name="group_number" <%= scopeValue === 'group' ? '' : 'disabled' %>>
-              <option value="">All groups</option>
+              <option value=""><%= t('journalInsights.allGroups') %></option>
               <% (groupOptions || []).forEach((groupNumber) => { %>
                 <option value="<%= groupNumber %>" <%= Number(groupNumber) === selectedGroupValue ? 'selected' : '' %>>
                   Group <%= groupNumber %>
@@ -536,12 +536,12 @@
           </div>
 
           <div class="col-12 col-md-3">
-            <label class="form-label small" for="insightsStudent">Student</label>
+            <label class="form-label small" for="insightsStudent"><%= t('journalInsights.student') %></label>
             <select id="insightsStudent" class="form-select compact-select" name="student_id" <%= (scopeValue === 'student' || scopeValue === 'student-course') ? '' : 'disabled' %>>
-              <option value="">Select student</option>
+              <option value=""><%= t('journalInsights.selectStudent') %></option>
               <% (studentOptions || []).forEach((student) => { %>
                 <option value="<%= student.id %>" <%= Number(student.id) === selectedStudentValue ? 'selected' : '' %>>
-                  <%= student.full_name %> - Group <%= Number(student.group_number || 0) %>
+                  <%= student.full_name %> - <%= t('journalInsights.group') %> <%= Number(student.group_number || 0) %>
                 </option>
               <% }) %>
             </select>
@@ -551,7 +551,7 @@
           </div>
 
           <div class="col-12 col-md-3">
-            <label class="form-label small" for="insightsCompare">Compare</label>
+            <label class="form-label small" for="insightsCompare"><%= t('journalInsights.compare') %></label>
             <select id="insightsCompare" class="form-select compact-select" name="compare_mode">
               <% (compareOptions || []).forEach((item) => { %>
                 <option value="<%= item.key %>" <%= item.key === compareValue ? 'selected' : '' %>><%= item.label %></option>
@@ -560,8 +560,8 @@
           </div>
 
           <div class="col-12 filters-actions">
-            <a class="btn btn-outline-primary" href="<%= exportCsvHref %>">Export CSV</a>
-            <a class="btn btn-outline-secondary" href="/journal<%= selectedSubjectValue ? `?subject_id=${selectedSubjectValue}` : '' %>">Back to journal</a>
+            <a class="btn btn-outline-primary" href="<%= exportCsvHref %>"><%= t('journalInsights.exportCsv') %></a>
+            <a class="btn btn-outline-secondary" href="/journal<%= selectedSubjectValue ? `?subject_id=${selectedSubjectValue}` : '' %>"><%= t('journalInsights.backToJournal') %></a>
           </div>
         </form>
       </section>
@@ -570,8 +570,8 @@
         <section class="glass section mb-3">
           <div class="section-head">
             <div>
-              <h2 class="section-title">Publish rating</h2>
-              <p class="section-subtitle">Generate a lightweight leaderboard snapshot for the current selection and send it to messages.</p>
+              <h2 class="section-title"><%= t('journalInsights.publishTitle') %></h2>
+              <p class="section-subtitle"><%= t('journalInsights.publishSubtitle') %></p>
             </div>
           </div>
           <% if (canPublishRating) { %>
@@ -584,16 +584,16 @@
               <input type="hidden" name="period" value="<%= periodValue %>" />
               <input type="hidden" name="compare_mode" value="<%= compareValue %>" />
               <div class="col-12 col-md-3">
-                <label class="form-label small" for="publishTopN">Top N</label>
+                <label class="form-label small" for="publishTopN"><%= t('journalInsights.topN') %></label>
                 <input id="publishTopN" class="form-control compact-input" type="number" min="3" max="30" name="top_n" value="10" />
               </div>
               <div class="col-12 col-md-9 d-grid">
-                <button class="btn btn-primary" type="submit">Publish ranking to messages</button>
+                <button class="btn btn-primary" type="submit"><%= t('journalInsights.publishAction') %></button>
               </div>
             </form>
           <% } else { %>
             <div class="soft-panel">
-              <span class="text-muted"><%= publishDisabledReason || 'Select a valid scope to publish rating.' %></span>
+              <span class="text-muted"><%= publishDisabledReason || t('journalInsights.publishDisabledDefault') %></span>
             </div>
           <% } %>
         </section>
@@ -602,61 +602,61 @@
       <section class="glass section mb-3">
         <div class="section-head">
           <div>
-            <h2 class="section-title">Summary</h2>
-            <p class="section-subtitle">Core performance, attendance, and risk metrics for the active scope.</p>
+            <h2 class="section-title"><%= t('journalInsights.summaryTitle') %></h2>
+            <p class="section-subtitle"><%= t('journalInsights.summarySubtitle') %></p>
           </div>
         </div>
         <div class="summary-grid mt-2">
           <div class="summary-card">
-            <div class="summary-label">Average score</div>
+            <div class="summary-label"><%= t('journalInsights.summary.averageScore') %></div>
             <div class="summary-value"><%= Number(summary && summary.average_score ? summary.average_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Median</div>
+            <div class="summary-label"><%= t('journalInsights.summary.median') %></div>
             <div class="summary-value"><%= Number(summary && summary.median_score ? summary.median_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Top score</div>
+            <div class="summary-label"><%= t('journalInsights.summary.topScore') %></div>
             <div class="summary-value"><%= Number(summary && summary.top_score ? summary.top_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">At risk (&lt;60)</div>
+            <div class="summary-label"><%= t('journalInsights.summary.atRisk') %></div>
             <div class="summary-value"><%= Number(summary && summary.at_risk_count ? summary.at_risk_count : 0) %></div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Excellent (90+)</div>
+            <div class="summary-label"><%= t('journalInsights.summary.excellent') %></div>
             <div class="summary-value"><%= Number(summary && summary.excellent_count ? summary.excellent_count : 0) %></div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Grade trend delta</div>
+            <div class="summary-label"><%= t('journalInsights.summary.gradeTrendDelta') %></div>
             <div class="summary-value"><%= Number(summary && summary.grade_delta ? summary.grade_delta : 0).toFixed(2).replace(/\.00$/, '') %></div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Attendance absent share</div>
+            <div class="summary-label"><%= t('journalInsights.summary.attendanceAbsentShare') %></div>
             <div class="summary-value"><%= Number(summary && summary.attendance_absent_share ? summary.attendance_absent_share : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Attendance late share</div>
+            <div class="summary-label"><%= t('journalInsights.summary.attendanceLateShare') %></div>
             <div class="summary-value"><%= Number(summary && summary.attendance_late_share ? summary.attendance_late_share : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Risk rate</div>
+            <div class="summary-label"><%= t('journalInsights.summary.riskRate') %></div>
             <div class="summary-value"><%= Number(summary && summary.risk_rate ? summary.risk_rate : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Excellence rate</div>
+            <div class="summary-label"><%= t('journalInsights.summary.excellenceRate') %></div>
             <div class="summary-value"><%= Number(summary && summary.excellence_rate ? summary.excellence_rate : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Score consistency</div>
+            <div class="summary-label"><%= t('journalInsights.summary.scoreConsistency') %></div>
             <div class="summary-value"><%= Number(summary && summary.score_consistency ? summary.score_consistency : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Attendance reliability</div>
+            <div class="summary-label"><%= t('journalInsights.summary.attendanceReliability') %></div>
             <div class="summary-value"><%= Number(summary && summary.attendance_reliability ? summary.attendance_reliability : 0).toFixed(2).replace(/\.00$/, '') %>%</div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Momentum score</div>
+            <div class="summary-label"><%= t('journalInsights.summary.momentumScore') %></div>
             <div class="summary-value"><%= Number(summary && summary.momentum_score ? summary.momentum_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
           </div>
         </div>
@@ -665,8 +665,8 @@
       <section class="glass section mb-3">
         <div class="section-head">
           <div>
-            <h2 class="section-title">Comparison</h2>
-            <p class="section-subtitle">Cross-segment snapshot for the selected compare mode.</p>
+            <h2 class="section-title"><%= t('journalInsights.comparisonTitle') %></h2>
+            <p class="section-subtitle"><%= t('journalInsights.comparisonSubtitle') %></p>
           </div>
         </div>
         <div class="table-shell mt-2">
@@ -674,17 +674,17 @@
             <table class="table table-sm align-middle mb-0 insights-table">
               <thead>
                 <tr>
-                  <th>Segment</th>
-                  <th>Participants</th>
-                  <th>Average</th>
-                  <th>At risk</th>
-                  <th>Excellent</th>
+                  <th><%= t('journalInsights.table.segment') %></th>
+                  <th><%= t('journalInsights.table.participants') %></th>
+                  <th><%= t('journalInsights.table.average') %></th>
+                  <th><%= t('journalInsights.table.atRisk') %></th>
+                  <th><%= t('journalInsights.table.excellent') %></th>
                 </tr>
               </thead>
               <tbody>
                 <% if (!comparisonRowsValue.length || compareValue === 'none') { %>
                   <tr>
-                    <td colspan="5" class="empty-state">Select compare mode to see cross-segment metrics.</td>
+                    <td colspan="5" class="empty-state"><%= t('journalInsights.empty.compare') %></td>
                   </tr>
                 <% } %>
                 <% comparisonRowsValue.forEach((row) => { %>
@@ -707,8 +707,8 @@
           <article class="glass section h-100">
             <div class="section-head">
               <div>
-                <h2 class="section-title">Ranking</h2>
-                <p class="section-subtitle">Top students inside the current scope, sorted by final score.</p>
+                <h2 class="section-title"><%= t('journalInsights.rankingTitle') %></h2>
+                <p class="section-subtitle"><%= t('journalInsights.rankingSubtitle') %></p>
               </div>
             </div>
             <div class="table-shell mt-2">
@@ -717,16 +717,16 @@
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Student</th>
-                      <th>Group</th>
-                      <th>Score</th>
-                      <th>Subjects</th>
+                      <th><%= t('journalInsights.table.student') %></th>
+                      <th><%= t('journalInsights.table.group') %></th>
+                      <th><%= t('journalInsights.table.score') %></th>
+                      <th><%= t('journalInsights.table.subjects') %></th>
                     </tr>
                   </thead>
                   <tbody>
                     <% if (!(rankingTop || []).length) { %>
                       <tr>
-                        <td colspan="5" class="empty-state">No ranking data in selected scope.</td>
+                        <td colspan="5" class="empty-state"><%= t('journalInsights.empty.ranking') %></td>
                       </tr>
                     <% } %>
                     <% (rankingTop || []).forEach((row) => { %>
@@ -749,8 +749,8 @@
           <article class="glass section">
             <div class="section-head">
               <div>
-                <h2 class="section-title">Subject mix</h2>
-                <p class="section-subtitle">Subject-level distribution for the selected course or aggregate scope.</p>
+                <h2 class="section-title"><%= t('journalInsights.subjectMixTitle') %></h2>
+                <p class="section-subtitle"><%= t('journalInsights.subjectMixSubtitle') %></p>
               </div>
             </div>
             <div class="table-shell mt-2">
@@ -758,16 +758,16 @@
                 <table class="table table-sm align-middle mb-0 insights-table">
                   <thead>
                     <tr>
-                      <th>Subject</th>
-                      <th>Students</th>
-                      <th>Avg</th>
-                      <th>Risk</th>
+                      <th><%= t('journalInsights.table.subject') %></th>
+                      <th><%= t('journalInsights.table.students') %></th>
+                      <th><%= t('journalInsights.table.avg') %></th>
+                      <th><%= t('journalInsights.table.risk') %></th>
                     </tr>
                   </thead>
                   <tbody>
                     <% if (!(courseSubjectSummaries || []).length) { %>
                       <tr>
-                        <td colspan="4" class="empty-state">No subject summaries.</td>
+                        <td colspan="4" class="empty-state"><%= t('journalInsights.empty.subjectSummaries') %></td>
                       </tr>
                     <% } %>
                     <% (courseSubjectSummaries || []).forEach((item) => { %>
@@ -791,13 +791,13 @@
           <article class="glass section h-100">
             <div class="section-head">
               <div>
-                <h2 class="section-title">Grades trend</h2>
-                <p class="section-subtitle">Average grade change across the selected period buckets.</p>
+                <h2 class="section-title"><%= t('journalInsights.gradeTrendTitle') %></h2>
+                <p class="section-subtitle"><%= t('journalInsights.gradeTrendSubtitle') %></p>
               </div>
             </div>
             <div class="trend-grid mt-2">
               <% if (!gradeTrend.length) { %>
-                <div class="empty-state">No grade trend data for selected filters.</div>
+                <div class="empty-state"><%= t('journalInsights.empty.gradeTrend') %></div>
               <% } %>
               <% gradeTrend.forEach((item) => { %>
                 <% const value = Number(item.avg_score_percent || 0); %>
@@ -816,13 +816,13 @@
           <article class="glass section h-100">
             <div class="section-head">
               <div>
-                <h2 class="section-title">Attendance trend</h2>
-                <p class="section-subtitle">Absent-share drift across the same buckets used for grades.</p>
+                <h2 class="section-title"><%= t('journalInsights.attendanceTrendTitle') %></h2>
+                <p class="section-subtitle"><%= t('journalInsights.attendanceTrendSubtitle') %></p>
               </div>
             </div>
             <div class="trend-grid mt-2">
               <% if (!attendanceTrend.length) { %>
-                <div class="empty-state">No attendance trend data for selected filters.</div>
+                <div class="empty-state"><%= t('journalInsights.empty.attendanceTrend') %></div>
               <% } %>
               <% attendanceTrend.forEach((item) => { %>
                 <% const total = Number(item.total_count || 0); %>
@@ -832,7 +832,7 @@
                   <div class="trend-bar-track">
                     <div class="trend-bar" style="--w: <%= Math.max(0, Math.min(100, absentShare)) %>%"></div>
                   </div>
-                  <div class="trend-value"><%= absentShare.toFixed(2).replace(/\.00$/, '') %>% absent</div>
+                  <div class="trend-value"><%= absentShare.toFixed(2).replace(/\.00$/, '') %>% <%= t('journalInsights.trend.absent') %></div>
                 </div>
               <% }) %>
             </div>
