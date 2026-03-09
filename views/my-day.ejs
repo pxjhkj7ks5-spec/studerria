@@ -478,33 +478,33 @@
         <% if (hasProgressDashboard && isDefaultStaffMyDayView) { %>
           <article class="cockpit-card section-card" id="progressRiskBlock">
             <div class="section-head">
-              <h2 class="section-title">Прогрес і ризик</h2>
-              <span class="section-subtitle">Прогноз фіналу та ризик недопуску</span>
+              <h2 class="section-title"><%= t('myDay.progress.title') %></h2>
+              <span class="section-subtitle"><%= t('myDay.progress.subtitle') %></span>
             </div>
 
             <div class="summary-grid progress-summary-grid">
               <div class="summary-pill">
-                <span>У ризику</span>
+                <span><%= t('myDay.progress.summary.atRisk') %></span>
                 <strong><%= Number(progressDashboard.at_risk_count || 0) %></strong>
               </div>
               <div class="summary-pill">
-                <span>Високий</span>
+                <span><%= t('myDay.progress.summary.high') %></span>
                 <strong><%= Number(progressDashboard.high_risk_count || 0) %></strong>
               </div>
               <div class="summary-pill">
-                <span>Ціль</span>
+                <span><%= t('myDay.progress.summary.target') %></span>
                 <strong><%= Number(progressDashboard.admission_target || 60) %></strong>
               </div>
               <div class="summary-pill">
-                <span>Вчасно</span>
+                <span><%= t('myDay.progress.summary.onTime') %></span>
                 <strong><%= progressDashboard.overall_on_time_share === null || typeof progressDashboard.overall_on_time_share === 'undefined' ? '-' : `${progressDashboard.overall_on_time_share}%` %></strong>
               </div>
             </div>
 
             <% if (!progressSubjects.length) { %>
               <div class="empty-state compact">
-                <div class="empty-state-title">Поки немає даних прогресу</div>
-                <div class="empty-state-subtitle">Потрібні оцінені активності для побудови прогнозу.</div>
+                <div class="empty-state-title"><%= t('myDay.progress.emptyTitle') %></div>
+                <div class="empty-state-subtitle"><%= t('myDay.progress.emptySubtitle') %></div>
               </div>
             <% } else { %>
               <div class="item-list progress-list">
@@ -513,12 +513,12 @@
                 %>
                   <div class="item-row progress-row">
                     <div class="item-main">
-                      <div class="item-title"><%= item.subject_name || 'Предмет' %></div>
+                      <div class="item-title"><%= item.subject_name || t('myDay.item.subjectFallback') %></div>
                       <div class="item-meta">
-                        <span>Фінал: <strong><%= Number(item.current_final_score || 0) %></strong> / 100</span>
-                        <span>Стеля: <strong><%= Number(item.max_reachable_final_score || 0) %></strong></span>
-                        <span>Прострочок: <%= Number(item.overdue_count || 0) %></span>
-                        <span>Вчасно: <%= item.on_time_share === null || typeof item.on_time_share === 'undefined' ? '-' : `${item.on_time_share}%` %></span>
+                        <span><%= t('myDay.progress.item.finalLabel') %>: <strong><%= Number(item.current_final_score || 0) %></strong> / 100</span>
+                        <span><%= t('myDay.progress.item.ceilingLabel') %>: <strong><%= Number(item.max_reachable_final_score || 0) %></strong></span>
+                        <span><%= t('myDay.progress.item.overdueLabel') %>: <%= Number(item.overdue_count || 0) %></span>
+                        <span><%= t('myDay.progress.item.onTimeLabel') %>: <%= item.on_time_share === null || typeof item.on_time_share === 'undefined' ? '-' : `${item.on_time_share}%` %></span>
                       </div>
                       <div class="progress-track">
                         <span style="width: <%= Math.max(0, Math.min(100, Number(item.current_final_score || 0))) %>%"></span>
@@ -532,9 +532,9 @@
                         class="btn btn-inline-link progress-whatif-btn"
                         data-progress-subject-id="<%= item.subject_id %>"
                       >
-                        What-if
+                        <%= t('myDay.whatIf.action') %>
                       </button>
-                      <a class="btn btn-inline-link" href="<%= item.review_href || '/journal' %>">Журнал</a>
+                      <a class="btn btn-inline-link" href="<%= item.review_href || '/journal' %>"><%= t('myDay.progress.item.openJournal') %></a>
                     </div>
                   </div>
                 <% }) %>
@@ -546,39 +546,39 @@
         <% if (hasReviewQueue && !isStudentLikeMyDayView) { %>
           <article class="cockpit-card section-card review-queue-card<%= isStudentLikeMyDayView ? ' order-last' : (isTeacherMyDayView ? ' order-3 teacher-review-queue-card' : '') %>" id="reviewQueueBlock">
             <div class="section-head">
-              <h2 class="section-title">Черга перевірки</h2>
-              <span class="section-subtitle">Пріоритет: прострочені, нові, без коментаря</span>
+              <h2 class="section-title"><%= t('myDay.review.title') %></h2>
+              <span class="section-subtitle"><%= t('myDay.review.subtitle') %></span>
             </div>
 
             <div class="summary-grid review-summary-grid">
               <div class="summary-pill">
-                <span>Всього</span>
+                <span><%= t('myDay.review.summary.total') %></span>
                 <strong><%= Number(reviewQueue.total || reviewQueueItems.length || 0) %></strong>
               </div>
               <div class="summary-pill">
-                <span>Прострочені</span>
+                <span><%= t('myDay.review.summary.overdue') %></span>
                 <strong><%= Number(reviewQueueCounts.overdue || 0) %></strong>
               </div>
               <div class="summary-pill">
-                <span>Нові</span>
+                <span><%= t('myDay.review.summary.new') %></span>
                 <strong><%= Number(reviewQueueCounts.new || 0) %></strong>
               </div>
               <div class="summary-pill">
-                <span>Без коментаря</span>
+                <span><%= t('myDay.review.summary.noComment') %></span>
                 <strong><%= Number(reviewQueueCounts.no_comment || 0) %></strong>
               </div>
             </div>
 
             <div class="review-queue-toolbar">
               <div class="review-filter-group" id="reviewQueueFilters">
-                <button type="button" class="btn btn-soft btn-xs review-filter-btn is-active" data-review-filter="all">Всі</button>
-                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="overdue">Прострочені</button>
-                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="new">Нові</button>
-                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="no_comment">Без коментаря</button>
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn is-active" data-review-filter="all"><%= t('myDay.review.filter.all') %></button>
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="overdue"><%= t('myDay.review.filter.overdue') %></button>
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="new"><%= t('myDay.review.filter.new') %></button>
+                <button type="button" class="btn btn-soft btn-xs review-filter-btn" data-review-filter="no_comment"><%= t('myDay.review.filter.noComment') %></button>
               </div>
               <% if (reviewQueueTemplates.length) { %>
                 <div class="review-template-group" id="reviewQueueTemplates">
-                  <span class="review-template-label">Шаблон фідбеку:</span>
+                  <span class="review-template-label"><%= t('myDay.review.templateLabel') %></span>
                   <% reviewQueueTemplates.forEach((template, index) => { %>
                     <button
                       type="button"
@@ -588,15 +588,15 @@
                       <%= template.label %>
                     </button>
                   <% }) %>
-                  <button type="button" class="btn btn-soft btn-xs review-template-btn" data-template-clear="1">Без шаблону</button>
+                  <button type="button" class="btn btn-soft btn-xs review-template-btn" data-template-clear="1"><%= t('myDay.review.templateNone') %></button>
                 </div>
               <% } %>
             </div>
 
             <% if (!reviewQueueItems.length) { %>
               <div class="empty-state compact">
-                <div class="empty-state-title">Черга перевірки порожня</div>
-                <div class="empty-state-subtitle">Усі здані роботи з коментарями або без задач на ревʼю.</div>
+                <div class="empty-state-title"><%= t('myDay.review.emptyTitle') %></div>
+                <div class="empty-state-subtitle"><%= t('myDay.review.emptySubtitle') %></div>
               </div>
             <% } else { %>
               <div class="item-list review-queue-list">
@@ -607,14 +607,14 @@
                 %>
                   <div class="item-row review-row" data-queue-type="<%= item.queue_type || 'new' %>">
                     <div class="item-main">
-                      <div class="item-title"><%= item.student_name || 'Студент' %></div>
+                      <div class="item-title"><%= item.student_name || t('myDay.review.item.studentFallback') %></div>
                       <div class="item-meta">
-                        <span><%= item.subject_name || 'Предмет' %></span>
-                        <% if (item.student_group) { %><span>Група <%= item.student_group %></span><% } %>
-                        <span>Колонка: <%= item.column_title || 'Колонка' %></span>
-                        <span>Здано: <%= formatDateTime(item.submitted_at) %></span>
-                        <% if (item.due_date) { %><span>Дедлайн: <%= formatShortDate(item.due_date) %></span><% } %>
-                        <% if (hasScore) { %><span>Бал: <%= String(item.score).replace(/\.00$/, '') %></span><% } %>
+                        <span><%= item.subject_name || t('myDay.item.subjectFallback') %></span>
+                        <% if (item.student_group) { %><span><%= t('myDay.review.item.groupLabel') %> <%= item.student_group %></span><% } %>
+                        <span><%= t('myDay.review.item.columnLabel') %>: <%= item.column_title || t('myDay.review.item.columnFallback') %></span>
+                        <span><%= t('myDay.review.item.submittedLabel') %>: <%= formatDateTime(item.submitted_at) %></span>
+                        <% if (item.due_date) { %><span><%= t('myDay.review.item.deadlineLabel') %>: <%= formatShortDate(item.due_date) %></span><% } %>
+                        <% if (hasScore) { %><span><%= t('myDay.review.item.scoreLabel') %>: <%= String(item.score).replace(/\.00$/, '') %></span><% } %>
                       </div>
                     </div>
                     <div class="item-side">
@@ -622,7 +622,7 @@
                       <% if (submissionMeta) { %>
                         <span class="<%= submissionMeta.className %>"><%= submissionMeta.label %></span>
                       <% } %>
-                      <a class="btn btn-inline-link review-open-link" href="<%= item.review_href %>">Перевірити</a>
+                      <a class="btn btn-inline-link review-open-link" href="<%= item.review_href %>"><%= t('myDay.review.open') %></a>
                     </div>
                   </div>
                 <% }) %>
@@ -630,11 +630,11 @@
             <% } %>
             <% if (reviewQueue.truncated) { %>
               <div class="section-footer-link review-footer-note">
-                Показано перші <%= reviewQueueItems.length %> записів. Уточни фільтр або предмет у журналі.
+                <%= t('myDay.review.truncatedPrefix') %> <%= reviewQueueItems.length %> <%= t('myDay.review.truncatedSuffix') %>
               </div>
             <% } %>
             <div class="section-footer-link">
-              <a href="/journal">Перейти в журнал</a>
+              <a href="/journal"><%= t('myDay.review.goJournal') %></a>
             </div>
           </article>
         <% } %>
@@ -642,25 +642,25 @@
         <% if (!isTeacherMyDayView) { %>
         <article class="cockpit-card section-card<%= isStudentLikeMyDayView ? ' order-3' : '' %>" id="inboxBlock">
           <div class="section-head">
-            <h2 class="section-title">Пульс та інбокс</h2>
-            <span class="section-subtitle">Швидкий зріз прогресу і сигналів</span>
+            <h2 class="section-title"><%= t('myDay.inbox.title') %></h2>
+            <span class="section-subtitle"><%= t('myDay.inbox.subtitle') %></span>
           </div>
 
           <div class="summary-grid">
             <div class="summary-pill">
-              <span>Вчасно</span>
+              <span><%= t('myDay.inbox.summary.onTime') %></span>
               <strong><%= activity.on_time_share === null || typeof activity.on_time_share === 'undefined' ? '-' : `${activity.on_time_share}%` %></strong>
             </div>
             <div class="summary-pill">
-              <span>Прострочки</span>
+              <span><%= t('myDay.inbox.summary.overdue') %></span>
               <strong><%= activity.overdue || 0 %></strong>
             </div>
             <div class="summary-pill">
-              <span>У ризику</span>
+              <span><%= t('myDay.inbox.summary.atRisk') %></span>
               <strong><%= activity.risky_subjects || 0 %></strong>
             </div>
             <div class="summary-pill">
-              <span>Новий фідбек</span>
+              <span><%= t('myDay.inbox.summary.newFeedback') %></span>
               <strong><%= activity.recent_feedback || 0 %></strong>
             </div>
           </div>
@@ -669,23 +669,23 @@
             <% inboxItems.forEach((item) => { %>
               <div class="inbox-item inbox-<%= item.kind || 'info' %>">
                 <div class="inbox-main">
-                  <div class="inbox-title"><%= item.title || 'Оновлення' %></div>
+                  <div class="inbox-title"><%= item.title || t('myDay.inbox.updateFallback') %></div>
                   <div class="inbox-meta"><%= item.meta || '' %></div>
                 </div>
-                <a class="btn btn-inline-link" href="<%= item.action_href || '/schedule' %>"><%= item.action_label || 'Відкрити' %></a>
+                <a class="btn btn-inline-link" href="<%= item.action_href || '/schedule' %>"><%= item.action_label || t('myDay.item.open') %></a>
               </div>
             <% }) %>
           </div>
 
           <div class="whatif-block" id="whatIfBlock">
             <div class="whatif-header">
-              <h3>What-if калькулятор</h3>
-              <span>Скільки потрібно на наступних роботах</span>
+              <h3><%= t('myDay.whatIf.title') %></h3>
+              <span><%= t('myDay.whatIf.subtitle') %></span>
             </div>
             <% if (!whatIfSubjects.length) { %>
               <div class="empty-state compact">
-                <div class="empty-state-title">Немає доступних предметів</div>
-                <div class="empty-state-subtitle">Калькулятор працює для твоїх предметів з журналу.</div>
+                <div class="empty-state-title"><%= t('myDay.whatIf.emptyTitle') %></div>
+                <div class="empty-state-subtitle"><%= t('myDay.whatIf.emptySubtitle') %></div>
               </div>
             <% } else { %>
               <div class="whatif-controls">
@@ -703,7 +703,7 @@
                 </div>
               </div>
               <div class="whatif-result" id="whatIfResult">
-                <div class="whatif-result-line">Обери ціль, щоб побачити потрібний темп.</div>
+                <div class="whatif-result-line"><%= t('myDay.whatIf.initial') %></div>
               </div>
             <% } %>
           </div>
@@ -713,37 +713,37 @@
         <% if (!isTeacherMyDayView) { %>
         <article class="cockpit-card section-card reminder-card<%= isStudentLikeMyDayView ? ' order-4' : '' %>" id="remindersBlock">
           <div class="section-head">
-            <h2 class="section-title">Нагадування</h2>
-            <span class="section-subtitle">Особисті задачі та короткі нотатки</span>
+            <h2 class="section-title"><%= t('myDay.reminders.title') %></h2>
+            <span class="section-subtitle"><%= t('myDay.reminders.sectionSubtitle') %></span>
           </div>
 
           <div class="reminder-block reminder-block-standalone">
             <div class="reminder-header">
-              <h3>Список нагадувань</h3>
-              <button type="button" class="btn btn-soft btn-sm" id="toggleReminderForm">Додати</button>
+              <h3><%= t('myDay.reminders.listTitle') %></h3>
+              <button type="button" class="btn btn-soft btn-sm" id="toggleReminderForm"><%= t('myDay.reminders.add') %></button>
             </div>
             <form id="reminderForm" class="reminder-form d-none">
               <input type="hidden" id="reminderEditId" value="" />
               <div class="reminder-row">
-                <input type="text" id="reminderTitle" class="form-control reminder-input" maxlength="160" placeholder="Назва нагадування" required />
+                <input type="text" id="reminderTitle" class="form-control reminder-input" maxlength="160" placeholder="<%= t('myDay.reminders.titlePlaceholder') %>" required />
               </div>
               <div class="reminder-row">
-                <textarea id="reminderNote" class="form-control reminder-input" rows="2" maxlength="500" placeholder="Нотатка (опційно)"></textarea>
+                <textarea id="reminderNote" class="form-control reminder-input" rows="2" maxlength="500" placeholder="<%= t('myDay.reminders.notePlaceholder') %>"></textarea>
               </div>
               <div class="reminder-row reminder-row-split">
                 <input type="date" id="reminderDate" class="form-control reminder-input" required />
                 <input type="time" id="reminderTime" class="form-control reminder-input" />
               </div>
               <div class="reminder-actions">
-                <button type="submit" class="btn btn-glass btn-sm" id="reminderSubmit">Додати</button>
-                <button type="button" class="btn btn-soft btn-sm" id="reminderCancel">Скасувати</button>
+                <button type="submit" class="btn btn-glass btn-sm" id="reminderSubmit"><%= t('myDay.reminders.add') %></button>
+                <button type="button" class="btn btn-soft btn-sm" id="reminderCancel"><%= t('myDay.reminders.cancel') %></button>
               </div>
             </form>
             <div id="reminderList" class="reminder-list">
               <% if (!reminders.length) { %>
                 <div class="empty-state compact">
-                  <div class="empty-state-title">Нагадувань немає</div>
-                  <div class="empty-state-subtitle">Додай перше на найближчий тиждень.</div>
+                  <div class="empty-state-title"><%= t('myDay.reminders.emptyTitle') %></div>
+                  <div class="empty-state-subtitle"><%= t('myDay.reminders.emptySubtitle') %></div>
                 </div>
               <% } else { %>
                 <% reminders.forEach((reminder) => { %>
@@ -762,60 +762,60 @@
 
         <article class="cockpit-card section-card<%= isStudentLikeMyDayView || isTeacherMyDayView ? ' order-2 competency-card-compact' : '' %><%= isTeacherMyDayView ? ' teacher-competency-card' : '' %>" id="competencyBlock">
           <div class="section-head">
-            <h2 class="section-title">Компас компетентностей</h2>
+            <h2 class="section-title"><%= t('myDay.competency.title') %></h2>
             <% if (isTeacherMyDayView && teacherCompetencyPicker.enabled && teacherCompetencySubjects.length) { %>
               <form method="GET" action="/home" class="teacher-competency-picker" id="teacherCompetencyPickerForm">
                 <select
                   name="competency_subject_id"
                   id="teacherCompetencySubjectSelect"
                   class="form-select reminder-input teacher-competency-select"
-                  aria-label="Обрати предмет для компаса компетентностей"
+                  aria-label="<%= t('myDay.competency.selectAria') %>"
                 >
                   <% teacherCompetencySubjects.forEach((subject) => { %>
                     <option value="<%= subject.subject_id %>" <%= Number(subject.subject_id) === teacherSelectedCompetencySubjectId ? 'selected' : '' %>>
-                      <%= subject.subject_name || 'Предмет' %>
+                      <%= subject.subject_name || t('myDay.item.subjectFallback') %>
                     </option>
                   <% }) %>
                 </select>
               </form>
             <% } else { %>
-              <span class="section-subtitle">Портфоліо сильних сторін і точок росту</span>
+              <span class="section-subtitle"><%= t('myDay.competency.subtitle') %></span>
             <% } %>
           </div>
           <% if (isTeacherMyDayView && teacherCompetencyPicker.enabled && teacherCompetencyPicker.selected_subject_name) { %>
-            <div class="teacher-competency-subtitle">Предмет: <%= teacherCompetencyPicker.selected_subject_name %></div>
+            <div class="teacher-competency-subtitle"><%= t('myDay.competency.subjectLabel') %>: <%= teacherCompetencyPicker.selected_subject_name %></div>
           <% } %>
           <div class="competency-source-summary">
-            <span>Ручні: <strong><%= competencyManualTotalMarks %></strong></span>
-            <span>Авто: <strong><%= competencyAutoTotalMarks %></strong></span>
+            <span><%= t('myDay.competency.manual') %>: <strong><%= competencyManualTotalMarks %></strong></span>
+            <span><%= t('myDay.competency.auto') %>: <strong><%= competencyAutoTotalMarks %></strong></span>
           </div>
 
           <div class="competency-hero">
             <div class="competency-orb" id="competencyOrb">
               <div class="competency-orb-core">
                 <strong><%= cockpit.competency_total_marks || 0 %></strong>
-                <span>відміток</span>
+                <span><%= t('myDay.competency.marks') %></span>
               </div>
             </div>
             <div class="competency-insights">
               <div class="competency-insight">
-                <span>Сильна</span>
-                <strong><%= cockpit.competency_strongest ? cockpit.competency_strongest.label : 'Накопичуємо дані' %></strong>
+                <span><%= t('myDay.competency.strongest') %></span>
+                <strong><%= cockpit.competency_strongest ? cockpit.competency_strongest.label : t('myDay.competency.collectingData') %></strong>
               </div>
               <div class="competency-insight">
-                <span>Зростає</span>
+                <span><%= t('myDay.competency.growing') %></span>
                 <strong>
                   <% if (cockpit.competency_fastest_growth) { %>
                     <%= cockpit.competency_fastest_growth.label %>
                     <% if (cockpit.competency_fastest_growth.delta > 0) { %>+<%= cockpit.competency_fastest_growth.delta %><% } else { %><%= cockpit.competency_fastest_growth.delta %><% } %>
                   <% } else { %>
-                    Накопичуємо дані
+                    <%= t('myDay.competency.collectingData') %>
                   <% } %>
                 </strong>
               </div>
               <div class="competency-insight">
-                <span>Підтягнути</span>
-                <strong><%= cockpit.competency_weakest ? cockpit.competency_weakest.label : 'Накопичуємо дані' %></strong>
+                <span><%= t('myDay.competency.improve') %></span>
+                <strong><%= cockpit.competency_weakest ? cockpit.competency_weakest.label : t('myDay.competency.collectingData') %></strong>
               </div>
             </div>
           </div>
@@ -823,8 +823,8 @@
           <div class="competency-list">
             <% if (!competencies.length) { %>
               <div class="empty-state compact">
-                <div class="empty-state-title">Ще немає достатньо даних</div>
-                <div class="empty-state-subtitle">Після оцінених активностей з'явиться портрет компетентностей.</div>
+                <div class="empty-state-title"><%= t('myDay.competency.emptyTitle') %></div>
+                <div class="empty-state-subtitle"><%= t('myDay.competency.emptySubtitle') %></div>
               </div>
             <% } else { %>
               <% competencies.forEach((item, index) => { %>
@@ -834,8 +834,8 @@
                     <span class="competency-score"><%= item.count %></span>
                   </div>
                   <div class="competency-source-meta">
-                    <span>ручні <%= Number(item.manual_count || 0) %></span>
-                    <span>авто <%= Number(item.auto_count || 0) %></span>
+                    <span><%= t('myDay.competency.manualShort') %> <%= Number(item.manual_count || 0) %></span>
+                    <span><%= t('myDay.competency.autoShort') %> <%= Number(item.auto_count || 0) %></span>
                   </div>
                   <div class="competency-bar">
                     <span style="width: <%= Math.max(0, Math.min(100, Number(item.bar_percent || 0))) %>%"></span>
@@ -855,16 +855,16 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-welcome-modal">
           <div class="modal-body text-center">
-            <div class="welcome-title mb-2">👋 Вітаємо у Studerria!</div>
+            <div class="welcome-title mb-2">👋 <%= t('myDay.welcome.title') %></div>
             <div class="welcome-subtitle mb-3">
-              <strong>Studerria</strong> — унікальна платформа, створена <strong>студентом для студентів</strong>, щоб усе важливе для навчання було в одному місці.
+              <%= t('myDay.welcome.subtitle') %>
             </div>
             <div class="small mb-4">
-              🎯 На <strong>Головній</strong> ти одразу бачиш пріоритети: дедлайни, найближчі пари, компетентності та нагадування.
+              <%= t('myDay.welcome.bodyLine1') %>
               <br />
-              🧭 Використовуй це як щоденний центр керування навчанням і тримай темп без хаосу.
+              <%= t('myDay.welcome.bodyLine2') %>
             </div>
-            <button type="button" class="btn btn-primary welcome-cta" data-bs-dismiss="modal" data-welcome-dismiss>Почати роботу</button>
+            <button type="button" class="btn btn-primary welcome-cta" data-bs-dismiss="modal" data-welcome-dismiss><%= t('myDay.welcome.cta') %></button>
           </div>
         </div>
       </div>
@@ -931,6 +931,19 @@
         reminderEdit: t('myDay.reminders.edit'),
         reminderDelete: t('myDay.reminders.delete'),
         reminderDeleteConfirm: t('myDay.reminders.deleteConfirm'),
+        whatIfTargetUnavailable: t('myDay.whatIf.targetUnavailable'),
+        whatIfCurrentFinalLabel: t('myDay.whatIf.currentFinalLabel'),
+        whatIfForTargetPrefix: t('myDay.whatIf.forTargetPrefix'),
+        whatIfNeedsAverage: t('myDay.whatIf.needsAverage'),
+        whatIfRemainingWork: t('myDay.whatIf.remainingWork'),
+        whatIfRawPointsLabel: t('myDay.whatIf.rawPointsLabel'),
+        whatIfCeilingLabel: t('myDay.whatIf.ceilingLabel'),
+        whatIfUnreachableSuffix: t('myDay.whatIf.unreachableSuffix'),
+        whatIfMissingPointsPrefix: t('myDay.whatIf.missingPointsPrefix'),
+        whatIfMissingPointsSuffix: t('myDay.whatIf.missingPointsSuffix'),
+        whatIfLoading: t('myDay.whatIf.loading'),
+        whatIfFetchError: t('myDay.whatIf.fetchError'),
+        whatIfCalcError: t('myDay.whatIf.calcError'),
       }) %>;
       const themeToggles = document.querySelectorAll('.theme-toggle');
       if (window.bootstrap && window.bootstrap.Tooltip) {
@@ -1109,7 +1122,7 @@
           ? data.targets.find((item) => Number(item.target) === Number(target))
           : null;
         if (!targetEntry) {
-          whatIfResult.innerHTML = '<div class="whatif-result-line">Дані для обраної цілі недоступні.</div>';
+          whatIfResult.innerHTML = `<div class="whatif-result-line">${myDayText.whatIfTargetUnavailable}</div>`;
           return;
         }
 
@@ -1118,15 +1131,15 @@
           const rawPoints = Number(targetEntry.required_raw_points || 0);
           whatIfResult.innerHTML = `
             <div class="whatif-result-line">
-              Поточний фінал: <strong>${Number(data.current_final_score || 0)}</strong> / 100
+              ${myDayText.whatIfCurrentFinalLabel}: <strong>${Number(data.current_final_score || 0)}</strong> / 100
             </div>
             <div class="whatif-result-line whatif-positive">
-              Для цілі <strong>${Number(targetEntry.target || target)}</strong> потрібно в середньому
-              <strong>${average}%</strong> на залишку робіт
-              (${rawPoints} з ${Number(data.remaining_raw_max || 0)} сирих балів).
+              ${myDayText.whatIfForTargetPrefix} <strong>${Number(targetEntry.target || target)}</strong> ${myDayText.whatIfNeedsAverage}
+              <strong>${average}%</strong> ${myDayText.whatIfRemainingWork}
+              (${rawPoints} / ${Number(data.remaining_raw_max || 0)} ${myDayText.whatIfRawPointsLabel}).
             </div>
             <div class="whatif-result-line muted-line">
-              Теоретична стеля: ${Number(data.max_reachable_final_score || 0)} / 100.
+              ${myDayText.whatIfCeilingLabel}: ${Number(data.max_reachable_final_score || 0)} / 100.
             </div>
           `;
           return;
@@ -1134,14 +1147,14 @@
 
         whatIfResult.innerHTML = `
           <div class="whatif-result-line">
-            Поточний фінал: <strong>${Number(data.current_final_score || 0)}</strong> / 100
+            ${myDayText.whatIfCurrentFinalLabel}: <strong>${Number(data.current_final_score || 0)}</strong> / 100
           </div>
           <div class="whatif-result-line whatif-negative">
-            Ціль <strong>${Number(targetEntry.target || target)}</strong> зараз недосяжна
-            (бракує ${Number(targetEntry.needed_points || 0)} балів внеску).
+            ${myDayText.whatIfForTargetPrefix} <strong>${Number(targetEntry.target || target)}</strong> ${myDayText.whatIfUnreachableSuffix}
+            (${myDayText.whatIfMissingPointsPrefix} ${Number(targetEntry.needed_points || 0)} ${myDayText.whatIfMissingPointsSuffix}).
           </div>
           <div class="whatif-result-line muted-line">
-            Теоретична стеля: ${Number(data.max_reachable_final_score || 0)} / 100.
+            ${myDayText.whatIfCeilingLabel}: ${Number(data.max_reachable_final_score || 0)} / 100.
           </div>
         `;
       }
@@ -1152,7 +1165,7 @@
         if (!subjectId) return;
         const target = Number(targetValue || selectedWhatIfTarget || 75);
         setActiveWhatIfTarget(target);
-        whatIfResult.innerHTML = '<div class="whatif-result-line">Рахую прогноз...</div>';
+        whatIfResult.innerHTML = `<div class="whatif-result-line">${myDayText.whatIfLoading}</div>`;
         try {
           const params = new URLSearchParams({
             subject_id: String(subjectId),
@@ -1160,14 +1173,14 @@
           });
           const response = await fetch(`/api/my-day/what-if?${params.toString()}`);
           if (!response.ok) {
-            whatIfResult.innerHTML = '<div class="whatif-result-line">Не вдалося отримати прогноз.</div>';
+            whatIfResult.innerHTML = `<div class="whatif-result-line">${myDayText.whatIfFetchError}</div>`;
             return;
           }
           const data = await response.json();
           renderWhatIfResult(data, target);
         } catch (err) {
           console.error(err);
-          whatIfResult.innerHTML = '<div class="whatif-result-line">Помилка при розрахунку прогнозу.</div>';
+          whatIfResult.innerHTML = `<div class="whatif-result-line">${myDayText.whatIfCalcError}</div>`;
         }
       }
 

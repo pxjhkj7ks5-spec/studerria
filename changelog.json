@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.01",
+      "date": "2026-03-09",
+      "items": [
+        "tune(my-day-lower-localization): localized the lower My Day surfaces including progress and risk, review queue, pulse and inbox, standalone reminders, competency compass, and the welcome modal so the dashboard no longer ships these panels with hardcoded Ukrainian copy",
+        "tune(my-day-whatif-locale-feedback): moved the dynamic What-if calculator status and result strings to locale keys and finished full locale coverage for the My Day template"
+      ]
+    },
+    {
       "version": "1.2.00",
       "date": "2026-03-09",
       "items": [
