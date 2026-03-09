@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.02",
+      "date": "2026-03-09",
+      "items": [
+        "tune(schedule-overlay-localization): moved the schedule drawer, homework overlays, custom-deadline flows, messages modal, and welcome modal onto locale keys so these teacher and student surfaces no longer ship with mixed hardcoded Ukrainian and English copy",
+        "tune(schedule-modal-feedback): localized dynamic schedule-side labels for subgroup cards, template pickers, file inputs, message loading states, custom-deadline details, and homework submit meta while aligning those overlay dates with the active interface language"
+      ]
+    },
+    {
       "version": "1.2.01",
       "date": "2026-03-09",
       "items": [
