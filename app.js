@@ -582,6 +582,7 @@ function splitRenderedDocument(renderedHtml) {
 
   const hasLegacyTopbar = /class=["'][^"']*\btopbar\b[^"']*["']/i.test(bodyContent);
   const hasStuderriaNavbar = /class=["'][^"']*\bstuderria-navbar\b[^"']*["']/i.test(bodyContent);
+  const hasAdminNavbar = /<nav\b[^>]*class=["'][^"']*\badmin-nav\b[^"']*["'][^>]*>/i.test(bodyContent);
 
   return {
     pageLang,
@@ -590,7 +591,7 @@ function splitRenderedDocument(renderedHtml) {
     bodyContent,
     bodyClass,
     bodyTheme,
-    hasTopbar: hasLegacyTopbar || hasStuderriaNavbar,
+    hasTopbar: hasLegacyTopbar || hasStuderriaNavbar || hasAdminNavbar,
   };
 }
 

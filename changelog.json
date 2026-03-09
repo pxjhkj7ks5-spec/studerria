@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.1.99",
+      "date": "2026-03-09",
+      "items": [
+        "fix(admin-layout-navbar-dedup): taught the shared page layout to treat admin pages with their own .admin-nav as local topbars so the global Studerria navbar no longer renders a second stacked navigation bar above admin screens"
+      ]
+    },
+    {
       "version": "1.1.98",
       "date": "2026-03-09",
       "items": [
