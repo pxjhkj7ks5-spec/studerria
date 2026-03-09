@@ -747,45 +747,49 @@
               <%= t('role.user') %>: <%= username %>
             <% } %>
           </span>
-          <button
-            class="session-health-chip is-loading"
-            type="button"
-            id="sessionHealthChip"
-            aria-label="Session store status"
-            title="Session store status"
-          >
-            <span class="session-health-dot" aria-hidden="true"></span>
-            <span id="sessionHealthLabel">Session…</span>
-          </button>
-          <button
-            class="theme-toggle-min"
-            type="button"
-            id="themeToggle"
-            aria-label="Toggle theme"
-            data-light-label="☀️"
-            data-dark-label="🌙"
-          >
-            🌙
-          </button>
-          <% if (!isLimitedView && role === 'admin') { %>
+          <div class="admin-topbar-utility">
             <button
-              class="btn btn-outline-primary btn-sm admin-topbar-btn"
+              class="session-health-chip is-loading"
               type="button"
-              data-bs-toggle="modal"
-              data-bs-target="#adminPreviewModal"
+              id="sessionHealthChip"
+              aria-label="Session store status"
+              title="Session store status"
             >
-              Превʼю
+              <span class="session-health-dot" aria-hidden="true"></span>
+              <span id="sessionHealthLabel">Session…</span>
             </button>
-            <form method="POST" action="/admin/switch-to-student">
-              <input type="hidden" name="mode" value="self" />
-              <button class="btn btn-outline-secondary btn-sm admin-topbar-btn" type="submit">Розклад</button>
+            <button
+              class="theme-toggle-min"
+              type="button"
+              id="themeToggle"
+              aria-label="Toggle theme"
+              data-light-label="☀️"
+              data-dark-label="🌙"
+            >
+              🌙
+            </button>
+          </div>
+          <div class="admin-topbar-actions">
+            <% if (!isLimitedView && role === 'admin') { %>
+              <button
+                class="btn btn-outline-primary btn-sm admin-topbar-btn"
+                type="button"
+                data-bs-toggle="modal"
+                data-bs-target="#adminPreviewModal"
+              >
+                Превʼю
+              </button>
+              <form method="POST" action="/admin/switch-to-student">
+                <input type="hidden" name="mode" value="self" />
+                <button class="btn btn-outline-secondary btn-sm admin-topbar-btn" type="submit">Розклад</button>
+              </form>
+            <% } else if (isLimitedView) { %>
+              <a class="btn btn-outline-primary btn-sm admin-topbar-btn" href="/schedule"><%= t('admin.backToSchedule') %></a>
+            <% } %>
+            <form method="POST" action="/logout">
+              <button class="btn btn-outline-secondary btn-sm admin-topbar-btn" type="submit"><%= t('admin.logout') %></button>
             </form>
-          <% } else if (isLimitedView) { %>
-            <a class="btn btn-outline-primary btn-sm admin-topbar-btn" href="/schedule"><%= t('admin.backToSchedule') %></a>
-          <% } %>
-          <form method="POST" action="/logout">
-            <button class="btn btn-outline-secondary btn-sm admin-topbar-btn" type="submit"><%= t('admin.logout') %></button>
-          </form>
+          </div>
         </div>
       </div>
     </nav>

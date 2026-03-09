@@ -129,6 +129,21 @@ body.theme-light .admin-nav .text-muted {
   font-size: 0.84rem;
 }
 
+.admin-topbar-utility {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .admin-topbar-right form {
   margin: 0;
 }
@@ -1155,14 +1170,19 @@ body.theme-light .admin-toast.is-error {
     margin-right: 0;
   }
 
-  .admin-topbar-right > form,
-  .admin-topbar-right > a.admin-topbar-btn,
-  .admin-topbar-right > button.admin-topbar-btn {
+  .admin-topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .admin-topbar-actions > form,
+  .admin-topbar-actions > a.admin-topbar-btn,
+  .admin-topbar-actions > button.admin-topbar-btn {
     flex: 1 1 calc(50% - 10px);
     min-width: min(220px, 100%);
   }
 
-  .admin-topbar-right > form .admin-topbar-btn {
+  .admin-topbar-actions > form .admin-topbar-btn {
     width: 100%;
   }
 
@@ -1276,6 +1296,11 @@ body.theme-light .admin-toast.is-error {
 @media (max-width: 768px) {
   .admin-topbar-right {
     justify-content: flex-start;
+    gap: 8px;
+  }
+  .admin-topbar-utility,
+  .admin-topbar-actions {
+    gap: 8px;
   }
   .admin-topbar-btn {
     min-height: 40px;
@@ -1336,7 +1361,7 @@ body.theme-light .admin-toast.is-error {
   .admin-nav {
     width: calc(100vw - 16px);
     margin: 8px auto 14px;
-    padding: 10px 12px;
+    padding: 9px 10px;
     border-radius: 22px;
   }
 
@@ -1349,10 +1374,33 @@ body.theme-light .admin-toast.is-error {
     padding: 12px;
   }
 
-  .admin-topbar-right > form,
-  .admin-topbar-right > a.admin-topbar-btn,
-  .admin-topbar-right > button.admin-topbar-btn {
-    flex-basis: 100%;
+  .admin-topbar-right {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .admin-topbar-user {
+    width: auto;
+    flex: 1 1 140px;
+    margin-right: 0;
+    font-size: 0.8rem;
+  }
+
+  .admin-topbar-utility {
+    margin-left: auto;
+    flex: 0 0 auto;
+  }
+
+  .admin-topbar-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    gap: 8px;
+  }
+
+  .admin-topbar-actions > form,
+  .admin-topbar-actions > a.admin-topbar-btn,
+  .admin-topbar-actions > button.admin-topbar-btn {
     min-width: 0;
   }
 
@@ -1379,6 +1427,21 @@ body.theme-light .admin-toast.is-error {
   .import-card,
   .danger-zone {
     padding: 12px;
+  }
+
+  .admin-course-chip {
+    padding: 10px 12px;
+    gap: 8px;
+    border-radius: 20px;
+  }
+
+  .admin-topbar-btn {
+    min-height: 38px;
+    padding: 0 12px;
+  }
+
+  .admin-topbar-btn.btn-sm {
+    font-size: 0.9rem;
   }
 
   .admin-metric-value {
