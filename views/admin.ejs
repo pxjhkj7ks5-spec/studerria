@@ -884,13 +884,32 @@
       <div class="admin-content">
         <div class="container py-4">
       <div class="admin-header-rail mb-3">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <h1 class="h3 mb-0"><%= t('admin.dashboard') %></h1>
-          <% if (sectionAllowed('admin-overview')) { %>
-            <a class="btn btn-outline-primary btn-sm" href="/admin/overview?course=<%= selectedCourseId %>"><%= t('admin.openOverview') %></a>
-          <% } %>
+        <div class="admin-header-hero">
+          <div class="admin-header-copy">
+            <h1 class="h3 mb-0"><%= t('admin.dashboard') %></h1>
+            <div class="admin-header-subtitle small text-muted">
+              Мобільний режим з швидким перемиканням розділів, курсом під рукою та щільнішим layout для щоденних адмін-сценаріїв.
+            </div>
+          </div>
+          <div class="admin-header-actions">
+            <% if (sectionAllowed('admin-overview')) { %>
+              <a class="btn btn-outline-primary btn-sm" href="/admin/overview?course=<%= selectedCourseId %>"><%= t('admin.openOverview') %></a>
+            <% } %>
+          </div>
         </div>
         <div class="admin-breadcrumbs mb-0" id="adminBreadcrumbs"></div>
+        <div class="admin-mobile-dock d-lg-none">
+          <label class="admin-mobile-dock-label" for="adminMobileNavSelect">Розділ</label>
+          <div class="admin-mobile-dock-row">
+            <select class="form-select" id="adminMobileNavSelect" aria-label="Перемикання розділів адмінки">
+              <option value="">Оберіть розділ</option>
+            </select>
+            <button class="btn btn-outline-secondary btn-sm admin-mobile-top" type="button" id="adminMobileTopButton">Вгору</button>
+          </div>
+          <% if (canManagePathways) { %>
+            <a class="btn btn-outline-secondary btn-sm admin-mobile-pathway" href="/admin/pathways">Pathways</a>
+          <% } %>
+        </div>
       </div>
 
       <% const msg = typeof messages !== 'undefined' && messages ? messages : (typeof locals !== 'undefined' ? locals.messages : {}); %>
@@ -935,7 +954,7 @@
                     <h5 class="card-title mb-1">Overview</h5>
                     <div class="small text-muted">Швидкий стан по курсу та найближчих діях.</div>
                   </div>
-                  <div class="d-flex gap-2 flex-wrap">
+                  <div class="admin-overview-actions d-flex gap-2 flex-wrap">
                     <a class="btn btn-outline-primary btn-sm" href="/admin/schedule-generator">Генератор розкладу</a>
                     <a class="btn btn-outline-secondary btn-sm" href="/admin/session-generator">Генератор сесій</a>
                     <button class="btn btn-outline-secondary btn-sm" type="button" data-admin-nav="admin-import-export">Import/Export</button>
@@ -8258,7 +8277,11 @@
       (function adminTabsFallback() {
         const navLinks = Array.from(document.querySelectorAll('[data-admin-nav]'));
         const panels = Array.from(document.querySelectorAll('.admin-panels .admin-panel'));
+        const sidebarNavLinks = Array.from(document.querySelectorAll('.admin-sidebar [data-admin-nav]'));
         const breadcrumbsEl = document.getElementById('adminBreadcrumbs');
+        const mobileNavSelect = document.getElementById('adminMobileNavSelect');
+        const mobileTopButton = document.getElementById('adminMobileTopButton');
+        const headerRail = document.querySelector('.admin-header-rail');
         if (!panels.length) return;
 
         const safeGet = (key, fallback = '') => {
@@ -8278,6 +8301,10 @@
         };
 
         const panelIds = new Set(panels.map((panel) => panel.id));
+        const compactNavLinks = sidebarNavLinks.filter((link, index, collection) => {
+          const targetId = link.dataset.adminNav || '';
+          return panelIds.has(targetId) && collection.findIndex((item) => (item.dataset.adminNav || '') === targetId) === index;
+        });
         const getDefaultTab = () => {
           const firstLinked = navLinks.find((link) => panelIds.has(link.dataset.adminNav || ''));
           return firstLinked ? firstLinked.dataset.adminNav : panels[0].id;
@@ -8298,6 +8325,21 @@
             : '<span class="breadcrumb-item">Admin</span>';
         };
 
+        if (mobileNavSelect) {
+          const optionsMarkup = compactNavLinks
+            .map((link) => {
+              const targetId = link.dataset.adminNav || '';
+              const label = (link.textContent || '').trim();
+              return `<option value="${targetId}">${label}</option>`;
+            })
+            .join('');
+          mobileNavSelect.innerHTML = `<option value="">Оберіть розділ</option>${optionsMarkup}`;
+          mobileNavSelect.addEventListener('change', (event) => {
+            const nextTab = event.target.value || getDefaultTab();
+            applyTab(nextTab, true);
+          });
+        }
+
         const applyTab = (requestedTab, push = true) => {
           const resolved = resolveAdminTab(requestedTab);
           panels.forEach((panel) => {
@@ -8306,6 +8348,9 @@
           navLinks.forEach((link) => {
             link.classList.toggle('is-active', link.dataset.adminNav === resolved);
           });
+          if (mobileNavSelect && mobileNavSelect.value !== resolved) {
+            mobileNavSelect.value = resolved;
+          }
           updateBreadcrumbs(resolved);
           safeSet('admin:tab', resolved);
           if (push) {
@@ -8313,12 +8358,29 @@
             url.searchParams.set('tab', resolved);
             window.history.replaceState({}, '', url);
           }
+          if (
+            push
+            && headerRail instanceof HTMLElement
+            && window.matchMedia('(max-width: 991.98px)').matches
+          ) {
+            const headerTop = headerRail.getBoundingClientRect().top + window.scrollY - 12;
+            window.scrollTo({ top: Math.max(headerTop, 0), behavior: 'smooth' });
+          }
         };
 
         const initialTab = new URLSearchParams(window.location.search).get('tab')
           || safeGet('admin:tab', '')
           || getDefaultTab();
         applyTab(initialTab, false);
+
+        if (mobileTopButton) {
+          mobileTopButton.addEventListener('click', () => {
+            const headerTop = headerRail instanceof HTMLElement
+              ? headerRail.getBoundingClientRect().top + window.scrollY - 12
+              : 0;
+            window.scrollTo({ top: Math.max(headerTop, 0), behavior: 'smooth' });
+          });
+        }
 
         navLinks.forEach((link) => {
           link.addEventListener('click', () => {

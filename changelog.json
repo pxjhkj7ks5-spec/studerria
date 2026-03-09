@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.1.98",
+      "date": "2026-03-09",
+      "items": [
+        "feat(admin-mobile-section-switcher): added a compact mobile section switcher with quick jump-to-top behavior and preserved Pathways access so phone users can move between admin areas without relying on the desktop sidebar",
+        "tune(admin-mobile-shell): tightened the admin topbar, overview quick actions, responsive table wrappers, and stacked utility bars so the main admin workflows remain usable on narrow mobile screens"
+      ]
+    },
+    {
       "version": "1.1.97",
       "date": "2026-03-09",
       "items": [
