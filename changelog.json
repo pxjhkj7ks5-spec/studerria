@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.03",
+      "date": "2026-03-11",
+      "items": [
+        "tune(subjects-local-copy): localized the Subjects workspace with a page-level copy map for teacher and student states, material publishing controls, type labels, and destructive actions so the page no longer ships with hardcoded Ukrainian chrome",
+        "tune(teamwork-local-copy): localized the Teamwork workspace including subject selection, task cards, subgroup management, join and move actions, create-task modal controls, and validation fallback text while keeping the underlying teamwork flows unchanged"
+      ]
+    },
+    {
       "version": "1.2.02",
       "date": "2026-03-09",
       "items": [

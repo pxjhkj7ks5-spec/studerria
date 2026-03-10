@@ -1,11 +1,130 @@
+<%
+  const teamworkCopy = lang === 'en'
+    ? {
+        subjectsTitle: 'Your subjects',
+        noSubjects: 'No subjects available to choose from.',
+        tasksTitle: 'Subject tasks',
+        createTask: 'Create task',
+        noTasks: 'No teamwork tasks yet.',
+        subjectLabel: 'Subject',
+        teacherLabel: 'Teacher',
+        randomDistribution: 'Random distribution',
+        freeGroupChoice: 'Free group choice',
+        seminarLabel: 'Seminar',
+        lectureLabel: 'Lecture',
+        allGroups: 'All groups',
+        groupsCountLabel: 'Groups',
+        teamSizeLabel: 'Team',
+        groupsLocked: 'Groups are locked',
+        groupsEditable: 'Groups can be changed',
+        groupSwitchLocked: 'Switching between groups is locked by the teacher.',
+        subgroupsTitle: 'Subgroups',
+        groupNamePlaceholder: 'Group name',
+        maxShort: 'Max',
+        newGroup: '+ New',
+        noGroups: 'No groups yet.',
+        seminarGroupShort: 'Seminar group',
+        leaderLabel: 'Leader',
+        maxLabel: 'Max',
+        locked: 'Locked',
+        leave: 'Leave',
+        join: 'Join',
+        alreadyInAnotherGroup: 'You are already in another group',
+        membersEmpty: 'Members: none',
+        move: 'Move',
+        nameLabel: 'Name',
+        maxMembersLabel: 'Max members',
+        noLimitPlaceholder: 'no limit',
+        update: 'Update',
+        disband: 'Disband',
+        availableToJoin: 'Can still join',
+        noFreeStudents: 'No free students',
+        newTaskTitle: 'New task',
+        close: 'Close',
+        taskNameLabel: 'Task name',
+        taskNamePlaceholder: 'For example: Practice 1',
+        dueDateOptional: 'Deadline (optional)',
+        lessonTypeLabel: 'Lesson type',
+        lessonScopeAria: 'Lesson scope',
+        showForGroups: 'Show for groups',
+        defaultAllGroups: 'Default: all groups',
+        groupSingular: 'Group',
+        randomStudents: 'Random student distribution',
+        groupCountInput: 'Number of groups',
+        memberLimits: 'Limit team members',
+        teamSizeRange: 'Team size',
+        lockGroupMembers: 'Lock group membership',
+        lockHint: 'If enabled, students cannot leave or switch between groups.',
+        create: 'Create',
+        validationCheckField: 'Check the field',
+      }
+    : {
+        subjectsTitle: 'Ваші предмети',
+        noSubjects: 'Немає предметів для вибору',
+        tasksTitle: 'Завдання по предмету',
+        createTask: 'Створити завдання',
+        noTasks: 'Ще немає командних завдань',
+        subjectLabel: 'Предмет',
+        teacherLabel: 'Викладач',
+        randomDistribution: 'Рандомний розподіл',
+        freeGroupChoice: 'Вільний вибір групи',
+        seminarLabel: 'Семінар',
+        lectureLabel: 'Лекція',
+        allGroups: 'Усі групи',
+        groupsCountLabel: 'Груп',
+        teamSizeLabel: 'Команда',
+        groupsLocked: 'Групи зафіксовані',
+        groupsEditable: 'Групи можна змінювати',
+        groupSwitchLocked: 'Перемикання між групами заблоковане викладачем.',
+        subgroupsTitle: 'Підгрупи',
+        groupNamePlaceholder: 'Назва групи',
+        maxShort: 'Макс.',
+        newGroup: '+ Нова',
+        noGroups: 'Груп ще немає.',
+        seminarGroupShort: 'Сем. група',
+        leaderLabel: 'Лідер',
+        maxLabel: 'Макс',
+        locked: 'Зафіксовано',
+        leave: 'Вийти',
+        join: 'Приєднатися',
+        alreadyInAnotherGroup: 'Ви вже в іншій групі',
+        membersEmpty: 'Учасники: немає',
+        move: 'Перенести',
+        nameLabel: 'Назва',
+        maxMembersLabel: 'Макс. учасників',
+        noLimitPlaceholder: 'без ліміту',
+        update: 'Оновити',
+        disband: 'Розформувати',
+        availableToJoin: 'Можуть приєднатися',
+        noFreeStudents: 'Немає вільних студентів',
+        newTaskTitle: 'Нове завдання',
+        close: 'Закрити',
+        taskNameLabel: 'Назва завдання',
+        taskNamePlaceholder: 'Наприклад: Практика 1',
+        dueDateOptional: 'Дедлайн (опц.)',
+        lessonTypeLabel: 'Тип заняття',
+        lessonScopeAria: 'Тип заняття',
+        showForGroups: 'Показ для груп',
+        defaultAllGroups: 'За замовчуванням: усі групи',
+        groupSingular: 'Група',
+        randomStudents: 'Рандомний розподіл студентів',
+        groupCountInput: 'Кількість груп',
+        memberLimits: 'Обмеження учасників в команді',
+        teamSizeRange: 'Розмір команди',
+        lockGroupMembers: 'Зафіксувати склад груп',
+        lockHint: 'Якщо увімкнено, студенти не зможуть виходити або переходити між групами.',
+        create: 'Створити',
+        validationCheckField: 'Перевірте поле',
+      };
+%>
 <!doctype html>
-<html lang="en">
+<html lang="<%= lang %>">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <%- include('partials/theme-bootstrap-head', { defaultTheme: 'dark' }) %>
-    <title>Teamwork</title>
+    <title><%= t('menu.teamwork') %></title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -637,10 +756,10 @@
       <% } %>
 
       <div class="glass glass-float glass-float--no-top-glare p-3 mb-4">
-        <h5 class="mb-3">Ваші предмети</h5>
+        <h5 class="mb-3"><%= teamworkCopy.subjectsTitle %></h5>
         <div class="d-flex flex-wrap gap-2 subject-pills-wrap">
           <% if (!subjects.length) { %>
-            <span class="text-muted">Немає предметів для вибору</span>
+            <span class="text-muted"><%= teamworkCopy.noSubjects %></span>
           <% } else { %>
             <% subjects.forEach(function(s) { %>
               <a
@@ -662,7 +781,7 @@
       <% if (selectedSubjectId) { %>
         <div class="d-flex justify-content-between align-items-center mb-3">
           <div>
-            <h4 class="mb-0">Завдання по предмету</h4>
+              <h4 class="mb-0"><%= teamworkCopy.tasksTitle %></h4>
             <% if (selectedSubject) { %>
               <div class="text-muted small mt-1">
                 <span class="course-badge"><%= selectedSubject.course_name %></span>
@@ -674,14 +793,14 @@
           </div>
           <% if (isTeacherMode) { %>
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createTaskModal">
-              Створити завдання
+              <%= teamworkCopy.createTask %>
             </button>
           <% } %>
         </div>
         <div class="living-separator mb-3" aria-hidden="true"></div>
 
         <% if (!tasks.length) { %>
-          <div class="glass p-4 text-center text-muted">Ще немає командних завдань</div>
+          <div class="glass p-4 text-center text-muted"><%= teamworkCopy.noTasks %></div>
         <% } %>
 
         <% tasks.forEach(function(task) { %>
@@ -689,21 +808,21 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
               <div>
                 <h5 class="mb-1"><%= task.title %></h5>
-                <div class="text-muted">Предмет: <%= task.subject_name %></div>
+                <div class="text-muted"><%= teamworkCopy.subjectLabel %>: <%= task.subject_name %></div>
                 <% if (!isTeacherMode) { %>
-                  <div class="text-muted small">Викладач: <%= task.created_by_name %></div>
+                  <div class="text-muted small"><%= teamworkCopy.teacherLabel %>: <%= task.created_by_name %></div>
                 <% } %>
                 <div class="d-flex flex-wrap gap-2 mt-2 task-settings-line">
-                  <span class="task-setting-pill"><%= task.random_distribution ? 'Рандомний розподіл' : 'Вільний вибір групи' %></span>
-                  <span class="task-setting-pill"><%= task.lesson_scope === 'seminar' ? 'Семінар' : 'Лекція' %>: <%= task.audience_label || 'Усі групи' %></span>
-                  <span class="task-setting-pill">Груп: <%= task.group_count || 1 %></span>
+                  <span class="task-setting-pill"><%= task.random_distribution ? teamworkCopy.randomDistribution : teamworkCopy.freeGroupChoice %></span>
+                  <span class="task-setting-pill"><%= task.lesson_scope === 'seminar' ? teamworkCopy.seminarLabel : teamworkCopy.lectureLabel %>: <%= task.audience_label || teamworkCopy.allGroups %></span>
+                  <span class="task-setting-pill"><%= teamworkCopy.groupsCountLabel %>: <%= task.group_count || 1 %></span>
                   <% if (task.member_limits_enabled) { %>
-                    <span class="task-setting-pill">Команда: <%= task.min_members %> - <%= task.max_members %></span>
+                    <span class="task-setting-pill"><%= teamworkCopy.teamSizeLabel %>: <%= task.min_members %> - <%= task.max_members %></span>
                   <% } %>
-                  <span class="task-setting-pill"><%= task.group_lock_enabled ? 'Групи зафіксовані' : 'Групи можна змінювати' %></span>
+                  <span class="task-setting-pill"><%= task.group_lock_enabled ? teamworkCopy.groupsLocked : teamworkCopy.groupsEditable %></span>
                 </div>
                 <% if (!isTeacherMode && task.group_lock_enabled && task.current_user_group_id) { %>
-                  <div class="small text-muted mt-1">Перемикання між групами заблоковане викладачем.</div>
+                  <div class="small text-muted mt-1"><%= teamworkCopy.groupSwitchLocked %></div>
                 <% } %>
                 <div class="d-flex gap-2 mt-2 task-reactions">
                   <% const reactMap = task.reactions || {}; %>
@@ -733,21 +852,21 @@
             <div class="row g-3">
               <div class="col-12 col-lg-8">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h6 class="mb-0">Підгрупи</h6>
+                  <h6 class="mb-0"><%= teamworkCopy.subgroupsTitle %></h6>
                   <% if (task.is_owner && task.can_create_groups) { %>
                     <form method="POST" action="/teamwork/group/create" class="d-flex gap-2">
                       <input type="hidden" name="task_id" value="<%= task.id %>" />
-                      <input class="form-control form-control-sm" name="name" placeholder="Назва групи" />
+                      <input class="form-control form-control-sm" name="name" placeholder="<%= teamworkCopy.groupNamePlaceholder %>" />
                       <% if (!task.member_limits_enabled) { %>
-                        <input class="form-control form-control-sm" name="max_members" placeholder="Макс." type="number" min="1" />
+                        <input class="form-control form-control-sm" name="max_members" placeholder="<%= teamworkCopy.maxShort %>" type="number" min="1" />
                       <% } %>
-                      <button class="btn btn-outline-light btn-sm" type="submit">+ Нова</button>
+                      <button class="btn btn-outline-light btn-sm" type="submit"><%= teamworkCopy.newGroup %></button>
                     </form>
                   <% } %>
                 </div>
 
                 <% if (!task.groups.length) { %>
-                  <div class="text-muted">Груп ще немає.</div>
+                  <div class="text-muted"><%= teamworkCopy.noGroups %></div>
                 <% } %>
 
                 <div class="d-grid gap-3 context-cloud-list">
@@ -757,37 +876,37 @@
                         <div>
                           <strong><%= group.name %></strong>
                           <% if (task.lesson_scope === 'seminar' && group.seminar_group_number) { %>
-                            <span class="text-muted ms-2">Сем. група <%= group.seminar_group_number %></span>
+                            <span class="text-muted ms-2"><%= teamworkCopy.seminarGroupShort %> <%= group.seminar_group_number %></span>
                           <% } %>
-                          <span class="text-muted ms-2">Лідер: <%= group.leader_name %></span>
+                          <span class="text-muted ms-2"><%= teamworkCopy.leaderLabel %>: <%= group.leader_name %></span>
                           <% if (group.max_members) { %>
-                            <span class="text-muted ms-2">Макс: <%= group.max_members %></span>
+                            <span class="text-muted ms-2"><%= teamworkCopy.maxLabel %>: <%= group.max_members %></span>
                           <% } %>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
                           <% if (!isTeacherMode) { %>
                             <% if (group.is_member) { %>
                               <% if (task.group_lock_enabled) { %>
-                                <span class="small text-muted">Зафіксовано</span>
+                                <span class="small text-muted"><%= teamworkCopy.locked %></span>
                               <% } else { %>
                                 <form method="POST" action="/teamwork/group/leave">
                                   <input type="hidden" name="group_id" value="<%= group.id %>" />
-                                  <button class="btn btn-outline-secondary btn-sm" type="submit">Вийти</button>
+                                  <button class="btn btn-outline-secondary btn-sm" type="submit"><%= teamworkCopy.leave %></button>
                                 </form>
                               <% } %>
                             <% } else if (!task.current_user_group_id) { %>
                               <form method="POST" action="/teamwork/group/join">
                                 <input type="hidden" name="group_id" value="<%= group.id %>" />
-                                <button class="btn btn-outline-light btn-sm" type="submit">Приєднатися</button>
+                                <button class="btn btn-outline-light btn-sm" type="submit"><%= teamworkCopy.join %></button>
                               </form>
                             <% } else { %>
-                              <span class="small text-muted">Ви вже в іншій групі</span>
+                              <span class="small text-muted"><%= teamworkCopy.alreadyInAnotherGroup %></span>
                             <% } %>
                           <% } %>
                         </div>
                       </div>
                       <% if (!group.members.length) { %>
-                        <div class="small text-muted mb-2">Учасники: немає</div>
+                        <div class="small text-muted mb-2"><%= teamworkCopy.membersEmpty %></div>
                       <% } else { %>
                         <div class="member-stack mb-2">
                           <% group.members.forEach(function(member) { %>
@@ -800,11 +919,11 @@
                                   <select class="form-select form-select-sm" name="target_group_id">
                                     <% task.groups.forEach(function(targetGroup) { %>
                                       <option value="<%= targetGroup.id %>" <%= Number(targetGroup.id) === Number(group.id) ? 'selected' : '' %>>
-                                        <%= targetGroup.name %><%= task.lesson_scope === 'seminar' && targetGroup.seminar_group_number ? ` (сем. ${targetGroup.seminar_group_number})` : '' %>
+                                        <%= targetGroup.name %><%= task.lesson_scope === 'seminar' && targetGroup.seminar_group_number ? ` (${teamworkCopy.seminarGroupShort.toLowerCase()} ${targetGroup.seminar_group_number})` : '' %>
                                       </option>
                                     <% }); %>
                                   </select>
-                                  <button class="btn btn-outline-light btn-sm" type="submit">Перенести</button>
+                                  <button class="btn btn-outline-light btn-sm" type="submit"><%= teamworkCopy.move %></button>
                                 </form>
                               <% } %>
                             </div>
@@ -815,17 +934,17 @@
                         <form method="POST" action="/teamwork/group/update" class="row g-2 align-items-end">
                           <input type="hidden" name="group_id" value="<%= group.id %>" />
                           <div class="col-12 col-md-5">
-                            <label class="form-label">Назва</label>
+                            <label class="form-label"><%= teamworkCopy.nameLabel %></label>
                             <input class="form-control form-control-sm" name="name" placeholder="<%= group.name %>" />
                           </div>
                           <% if (!task.member_limits_enabled) { %>
                             <div class="col-12 col-md-3">
-                              <label class="form-label">Макс. учасників</label>
-                              <input class="form-control form-control-sm" name="max_members" type="number" min="1" placeholder="без ліміту" />
+                              <label class="form-label"><%= teamworkCopy.maxMembersLabel %></label>
+                              <input class="form-control form-control-sm" name="max_members" type="number" min="1" placeholder="<%= teamworkCopy.noLimitPlaceholder %>" />
                             </div>
                           <% } else { %>
                             <div class="col-12 col-md-3">
-                              <label class="form-label">Макс. учасників</label>
+                              <label class="form-label"><%= teamworkCopy.maxMembersLabel %></label>
                               <input
                                 class="form-control form-control-sm"
                                 type="number"
@@ -835,12 +954,12 @@
                             </div>
                           <% } %>
                           <div class="col-12 col-md-4 d-flex gap-2">
-                            <button class="btn btn-outline-primary btn-sm" type="submit">Оновити</button>
+                            <button class="btn btn-outline-primary btn-sm" type="submit"><%= teamworkCopy.update %></button>
                           </div>
                         </form>
                         <form method="POST" action="/teamwork/group/disband" class="mt-2">
                           <input type="hidden" name="group_id" value="<%= group.id %>" />
-                          <button class="btn btn-outline-danger btn-sm" type="submit">Розформувати</button>
+                          <button class="btn btn-outline-danger btn-sm" type="submit"><%= teamworkCopy.disband %></button>
                         </form>
                       <% } %>
                     </div>
@@ -850,13 +969,13 @@
 
               <div class="col-12 col-lg-4">
                 <div class="glass p-3">
-                  <h6>Можуть приєднатись</h6>
+                  <h6><%= teamworkCopy.availableToJoin %></h6>
                   <ul class="list-group list-group-flush mt-2">
                     <% (freeStudents[task.id] || []).forEach(function(stu) { %>
                       <li class="list-group-item bg-transparent context-cloud-item"><%= stu.full_name %></li>
                     <% }); %>
                     <% if (!(freeStudents[task.id] || []).length) { %>
-                      <li class="list-group-item bg-transparent text-muted context-cloud-item">Немає вільних студентів</li>
+                      <li class="list-group-item bg-transparent text-muted context-cloud-item"><%= teamworkCopy.noFreeStudents %></li>
                     <% } %>
                   </ul>
                 </div>
@@ -874,46 +993,46 @@
         <div class="modal-dialog">
           <div class="modal-content glass p-3">
             <div class="modal-header">
-              <h5 class="modal-title">Нове завдання</h5>
-              <button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              <h5 class="modal-title"><%= teamworkCopy.newTaskTitle %></h5>
+              <button class="btn-close" data-bs-dismiss="modal" aria-label="<%= teamworkCopy.close %>"></button>
             </div>
             <div class="modal-body">
               <form method="POST" action="/teamwork/task/create">
                 <input type="hidden" name="subject_id" value="<%= selectedSubjectId %>" />
                 <div class="mb-3">
-                  <label class="form-label">Назва завдання</label>
-                  <input class="form-control" name="title" placeholder="Наприклад: Практика 1" required />
+                  <label class="form-label"><%= teamworkCopy.taskNameLabel %></label>
+                  <input class="form-control" name="title" placeholder="<%= teamworkCopy.taskNamePlaceholder %>" required />
                 </div>
                 <div class="mb-3">
-                  <label class="form-label">Дедлайн (опц.)</label>
+                  <label class="form-label"><%= teamworkCopy.dueDateOptional %></label>
                   <input class="form-control" type="date" name="due_date" />
                 </div>
 
                 <div class="glass p-3 mb-3 task-options-block">
                   <div class="lesson-scope-picker mb-3">
-                    <label class="form-label d-block">Тип заняття</label>
-                    <div class="btn-group w-100 liquid-chip-control" role="group" aria-label="Lesson scope">
+                    <label class="form-label d-block"><%= teamworkCopy.lessonTypeLabel %></label>
+                    <div class="btn-group w-100 liquid-chip-control" role="group" aria-label="<%= teamworkCopy.lessonScopeAria %>">
                       <input class="btn-check" type="radio" name="lesson_scope" id="lessonScopeLecture" value="lecture" checked />
-                      <label class="btn btn-outline-light liquid-chip" for="lessonScopeLecture">Лекція</label>
+                      <label class="btn btn-outline-light liquid-chip" for="lessonScopeLecture"><%= teamworkCopy.lectureLabel %></label>
                       <input class="btn-check" type="radio" name="lesson_scope" id="lessonScopeSeminar" value="seminar" />
-                      <label class="btn btn-outline-light liquid-chip" for="lessonScopeSeminar">Семінар</label>
+                      <label class="btn btn-outline-light liquid-chip" for="lessonScopeSeminar"><%= teamworkCopy.seminarLabel %></label>
                     </div>
                   </div>
 
                   <div id="seminarGroupsPanel" class="seminar-groups-panel is-hidden mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                      <span class="small text-muted">Показ для груп</span>
-                      <span class="small text-muted">За замовчуванням: усі групи</span>
+                      <span class="small text-muted"><%= teamworkCopy.showForGroups %></span>
+                      <span class="small text-muted"><%= teamworkCopy.defaultAllGroups %></span>
                     </div>
                     <div class="form-check form-switch mb-2">
                       <input class="form-check-input" type="checkbox" role="switch" id="seminarAllGroupsToggle" name="seminar_group_numbers" value="all" checked />
-                      <label class="form-check-label" for="seminarAllGroupsToggle">Усі групи</label>
+                      <label class="form-check-label" for="seminarAllGroupsToggle"><%= teamworkCopy.allGroups %></label>
                     </div>
                     <div id="seminarGroupsList" class="seminar-groups-list">
                       <% for (let groupNum = 1; groupNum <= Math.max(1, Number((selectedSubject && selectedSubject.group_count) || 1)); groupNum += 1) { %>
                         <label class="seminar-group-chip">
                           <input class="seminar-group-check" type="checkbox" name="seminar_group_numbers" value="<%= groupNum %>" disabled />
-                          <span>Група <%= groupNum %></span>
+                          <span><%= teamworkCopy.groupSingular %> <%= groupNum %></span>
                         </label>
                       <% } %>
                     </div>
@@ -921,22 +1040,22 @@
 
                   <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="randomDistributionToggle" name="random_distribution" value="1" checked />
-                    <label class="form-check-label" for="randomDistributionToggle">Рандомний розподіл студентів</label>
+                    <label class="form-check-label" for="randomDistributionToggle"><%= teamworkCopy.randomStudents %></label>
                   </div>
 
                   <div class="mb-3">
-                    <label class="form-label" for="groupCountInput">Кількість груп</label>
+                    <label class="form-label" for="groupCountInput"><%= teamworkCopy.groupCountInput %></label>
                     <input class="form-control" id="groupCountInput" type="number" name="group_count" min="1" max="12" value="4" required />
                   </div>
 
                   <div class="form-check form-switch mb-2">
                     <input class="form-check-input" type="checkbox" role="switch" id="memberLimitsToggle" name="limit_members_enabled" value="1" />
-                    <label class="form-check-label" for="memberLimitsToggle">Обмеження учасників в команді</label>
+                    <label class="form-check-label" for="memberLimitsToggle"><%= teamworkCopy.memberLimits %></label>
                   </div>
 
                   <div id="memberLimitsPanel" class="member-limits-panel is-disabled">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                      <span class="small text-muted">Розмір команди</span>
+                      <span class="small text-muted"><%= teamworkCopy.teamSizeRange %></span>
                       <span class="range-value-chip"><span id="rangeMinValue">2</span> - <span id="rangeMaxValue">4</span></span>
                     </div>
                     <div class="double-range" id="doubleRangeBox">
@@ -969,12 +1088,12 @@
 
                   <div class="form-check form-switch mt-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="groupLockToggle" name="group_lock_enabled" value="1" />
-                    <label class="form-check-label" for="groupLockToggle">Зафіксувати склад груп</label>
+                    <label class="form-check-label" for="groupLockToggle"><%= teamworkCopy.lockGroupMembers %></label>
                   </div>
-                  <div class="small text-muted mt-1">Якщо увімкнено, студенти не зможуть виходити або переходити між групами.</div>
+                  <div class="small text-muted mt-1"><%= teamworkCopy.lockHint %></div>
                 </div>
 
-                <button class="btn btn-primary glass w-100" type="submit">Створити</button>
+                <button class="btn btn-primary glass w-100" type="submit"><%= teamworkCopy.create %></button>
               </form>
             </div>
           </div>
@@ -1013,7 +1132,7 @@
         const key = el.id || el.name || anchor.id || '';
         const tip = document.createElement('div');
         tip.className = 'custom-tooltip';
-        tip.textContent = message || 'Перевірте поле';
+        tip.textContent = message || '<%= teamworkCopy.validationCheckField %>';
         if (key) tip.dataset.for = key;
         document.body.appendChild(tip);
 

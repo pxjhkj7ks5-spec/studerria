@@ -1,11 +1,76 @@
+<%
+  const subjectsCopy = lang === 'en'
+    ? {
+        pageTitle: 'Subjects',
+        roleTeacher: 'Teacher',
+        roleStudent: 'Student',
+        emptySubjects: 'No subjects are available right now.',
+        addMaterial: 'Add material',
+        addMaterialHint: 'Lectures, syllabus items, files, and links for students. Syllabus items stay pinned at the top.',
+        titleLabel: 'Title',
+        titlePlaceholder: 'For example: Lecture 3 — international regimes',
+        typeLabel: 'Type',
+        typeLecture: 'Lecture',
+        typeSyllabus: 'Syllabus',
+        typeFile: 'File',
+        typeLink: 'Link',
+        typeMixed: 'Mixed',
+        audienceLabel: 'Audience group',
+        linkOptional: 'Link (optional)',
+        fileOptional: 'File (optional)',
+        descriptionLabel: 'Description',
+        descriptionPlaceholder: 'Short plan, talking points, or instructions...',
+        publishAction: 'Publish material',
+        emptyTeacher: 'No materials for this subject yet.',
+        emptyStudent: 'The teacher has not added any materials for this subject yet.',
+        addedBy: 'Added by',
+        materialDefault: 'Material',
+        openLink: 'Open link',
+        openFile: 'Open file',
+        deleteConfirm: 'Delete this material?',
+        deleteAction: 'Delete',
+        chooseSubject: 'Choose a subject to view materials.',
+      }
+    : {
+        pageTitle: 'Предмети',
+        roleTeacher: 'Викладач',
+        roleStudent: 'Студент',
+        emptySubjects: 'Наразі немає доступних предметів.',
+        addMaterial: 'Додати матеріал',
+        addMaterialHint: 'Лекції, силабус, файли та посилання для студентів. Силабус закріплюється зверху.',
+        titleLabel: 'Назва',
+        titlePlaceholder: 'Наприклад: Лекція 3 — міжнародні режими',
+        typeLabel: 'Тип',
+        typeLecture: 'Лекція',
+        typeSyllabus: 'Силабус',
+        typeFile: 'Файл',
+        typeLink: 'Посилання',
+        typeMixed: 'Змішаний',
+        audienceLabel: 'Для групи',
+        linkOptional: 'Посилання (опц.)',
+        fileOptional: 'Файл (опц.)',
+        descriptionLabel: 'Опис',
+        descriptionPlaceholder: 'Короткий план, питання до обговорення, інструкції...',
+        publishAction: 'Опублікувати матеріал',
+        emptyTeacher: 'Ще немає матеріалів для цього предмета.',
+        emptyStudent: 'Викладач ще не додав матеріали для цього предмета.',
+        addedBy: 'Додав',
+        materialDefault: 'Матеріал',
+        openLink: 'Відкрити посилання',
+        openFile: 'Відкрити файл',
+        deleteConfirm: 'Видалити цей матеріал?',
+        deleteAction: 'Видалити',
+        chooseSubject: 'Оберіть предмет, щоб переглядати матеріали.',
+      };
+%>
 <!doctype html>
-<html lang="uk">
+<html lang="<%= lang %>">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <%- include('partials/theme-bootstrap-head', { defaultTheme: 'dark' }) %>
-    <title>Предмети • Studerria</title>
+    <title><%= subjectsCopy.pageTitle %> • Studerria</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -22,7 +87,7 @@
   <body class="studerria-theme theme-dark page-subjects page-local-topbar">
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
-    <%- include('partials/topbar', { role, username, t, activePage: 'subjects', pageTitle: 'Предмети' }) %>
+    <%- include('partials/topbar', { role, username, t, activePage: 'subjects', pageTitle: subjectsCopy.pageTitle }) %>
     <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'subjects' }) %>
 
     <main class="container py-4">
@@ -36,7 +101,7 @@
       <div class="glass glass-float glass-float--no-top-glare subject-picker-card p-3 mb-4">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
           <div>
-            <h5 class="mb-1">Предмети</h5>
+            <h5 class="mb-1"><%= subjectsCopy.pageTitle %></h5>
             <% if (selectedSubject) { %>
               <div class="text-muted small">
                 <span class="course-badge"><%= selectedSubject.course_name %></span>
@@ -44,11 +109,11 @@
               </div>
             <% } %>
           </div>
-          <span class="status-chip status-chip--info"><%= isTeacherMode ? 'Викладач' : 'Студент' %></span>
+          <span class="status-chip status-chip--info"><%= isTeacherMode ? subjectsCopy.roleTeacher : subjectsCopy.roleStudent %></span>
         </div>
         <div class="subject-chip-grid">
           <% if (!subjects || !subjects.length) { %>
-            <span class="text-muted">Наразі немає доступних предметів.</span>
+            <span class="text-muted"><%= subjectsCopy.emptySubjects %></span>
           <% } else { %>
             <% subjects.forEach(function(subject) { %>
               <a
@@ -69,28 +134,28 @@
         <% if (isTeacherMode) { %>
           <section class="glass materials-add-form mb-4">
             <div class="materials-toolbar mb-3">
-              <h6 class="mb-0">Додати матеріал</h6>
-              <span class="text-muted small">Лекції, силабус (закріплюється зверху), файли та посилання для студентів</span>
+              <h6 class="mb-0"><%= subjectsCopy.addMaterial %></h6>
+              <span class="text-muted small"><%= subjectsCopy.addMaterialHint %></span>
             </div>
             <form method="POST" action="/subjects/materials" enctype="multipart/form-data">
               <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
               <div class="row g-3">
                 <div class="col-12 col-lg-5">
-                  <label class="form-label">Назва</label>
-                  <input class="form-control" name="title" maxlength="180" placeholder="Наприклад: Лекція 3 — міжнародні режими" required />
+                  <label class="form-label"><%= subjectsCopy.titleLabel %></label>
+                  <input class="form-control" name="title" maxlength="180" placeholder="<%= subjectsCopy.titlePlaceholder %>" required />
                 </div>
                 <div class="col-12 col-md-6 col-lg-3">
-                  <label class="form-label">Тип</label>
+                  <label class="form-label"><%= subjectsCopy.typeLabel %></label>
                   <select class="form-select" name="material_type">
-                    <option value="lecture">Лекція</option>
-                    <option value="syllabus">Силабус</option>
-                    <option value="file">Файл</option>
-                    <option value="link">Посилання</option>
-                    <option value="mixed">Змішаний</option>
+                    <option value="lecture"><%= subjectsCopy.typeLecture %></option>
+                    <option value="syllabus"><%= subjectsCopy.typeSyllabus %></option>
+                    <option value="file"><%= subjectsCopy.typeFile %></option>
+                    <option value="link"><%= subjectsCopy.typeLink %></option>
+                    <option value="mixed"><%= subjectsCopy.typeMixed %></option>
                   </select>
                 </div>
                 <div class="col-12 col-md-6 col-lg-4">
-                  <label class="form-label">Для групи</label>
+                  <label class="form-label"><%= subjectsCopy.audienceLabel %></label>
                   <select class="form-select" name="group_number">
                     <% (materialAudienceOptions || []).forEach(function(option) { %>
                       <option value="<%= option.value %>"><%= option.label %></option>
@@ -98,19 +163,19 @@
                   </select>
                 </div>
                 <div class="col-12 col-lg-6">
-                  <label class="form-label">Посилання (опц.)</label>
+                  <label class="form-label"><%= subjectsCopy.linkOptional %></label>
                   <input class="form-control" name="link_url" placeholder="https://example.com/lecture" />
                 </div>
                 <div class="col-12 col-lg-6">
-                  <label class="form-label">Файл (опц.)</label>
+                  <label class="form-label"><%= subjectsCopy.fileOptional %></label>
                   <input class="form-control" type="file" name="attachment" />
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Опис</label>
-                  <textarea class="form-control" name="description" rows="3" maxlength="4000" placeholder="Короткий план, питання до обговорення, інструкції..."></textarea>
+                  <label class="form-label"><%= subjectsCopy.descriptionLabel %></label>
+                  <textarea class="form-control" name="description" rows="3" maxlength="4000" placeholder="<%= subjectsCopy.descriptionPlaceholder %>"></textarea>
                 </div>
                 <div class="col-12">
-                  <button class="btn btn-primary" type="submit">Опублікувати матеріал</button>
+                  <button class="btn btn-primary" type="submit"><%= subjectsCopy.publishAction %></button>
                 </div>
               </div>
             </form>
@@ -118,13 +183,13 @@
         <% } %>
 
         <section class="materials-feed">
-          <% const typeLabelMap = { lecture: 'Лекція', file: 'Файл', link: 'Посилання', mixed: 'Змішаний' }; %>
+          <% const typeLabelMap = { lecture: subjectsCopy.typeLecture, file: subjectsCopy.typeFile, link: subjectsCopy.typeLink, mixed: subjectsCopy.typeMixed }; %>
           <% if (!materials || !materials.length) { %>
             <div class="glass p-4 text-center text-muted">
               <% if (isTeacherMode) { %>
-                Ще немає матеріалів для цього предмета.
+                <%= subjectsCopy.emptyTeacher %>
               <% } else { %>
-                Викладач ще не додав матеріали для цього предмета.
+                <%= subjectsCopy.emptyStudent %>
               <% } %>
             </div>
           <% } else { %>
@@ -136,12 +201,12 @@
                     <div class="material-meta">
                       <span><%= item.group_label %></span>
                       <span class="mx-1">•</span>
-                      <span>Додав: <%= item.created_by_name %></span>
+                      <span><%= subjectsCopy.addedBy %>: <%= item.created_by_name %></span>
                       <span class="mx-1">•</span>
                       <span><%= item.created_at_label %></span>
                     </div>
                   </div>
-                  <span class="status-chip status-chip--neutral material-type-chip"><%= item.is_syllabus ? 'Силабус' : (typeLabelMap[item.material_type] || 'Матеріал') %></span>
+                  <span class="status-chip status-chip--neutral material-type-chip"><%= item.is_syllabus ? subjectsCopy.typeSyllabus : (typeLabelMap[item.material_type] || subjectsCopy.materialDefault) %></span>
                 </div>
 
                 <% if (item.description) { %>
@@ -150,14 +215,14 @@
 
                 <div class="material-links">
                   <% if (item.link_url) { %>
-                    <a class="btn btn-outline-primary btn-sm" href="<%= item.link_url %>" target="_blank" rel="noopener noreferrer">Відкрити посилання</a>
+                    <a class="btn btn-outline-primary btn-sm" href="<%= item.link_url %>" target="_blank" rel="noopener noreferrer"><%= subjectsCopy.openLink %></a>
                   <% } %>
                   <% if (item.file_path) { %>
-                    <a class="btn btn-outline-light btn-sm" href="<%= item.file_path %>" target="_blank" rel="noopener noreferrer"><%= item.file_name || 'Відкрити файл' %></a>
+                    <a class="btn btn-outline-light btn-sm" href="<%= item.file_path %>" target="_blank" rel="noopener noreferrer"><%= item.file_name || subjectsCopy.openFile %></a>
                   <% } %>
                   <% if (isTeacherMode && item.can_manage) { %>
                     <form method="POST" action="/subjects/materials/<%= item.id %>/delete" class="d-inline">
-                      <button class="btn btn-outline-danger btn-sm" type="submit" onclick="return confirm('Видалити цей матеріал?')">Видалити</button>
+                      <button class="btn btn-outline-danger btn-sm" type="submit" onclick="return confirm('<%= subjectsCopy.deleteConfirm %>')"><%= subjectsCopy.deleteAction %></button>
                     </form>
                   <% } %>
                 </div>
@@ -166,7 +231,7 @@
           <% } %>
         </section>
       <% } else { %>
-        <div class="glass p-4 text-center text-muted">Оберіть предмет, щоб переглядати матеріали.</div>
+        <div class="glass p-4 text-center text-muted"><%= subjectsCopy.chooseSubject %></div>
       <% } %>
     </main>
 
