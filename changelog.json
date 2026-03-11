@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.05",
+      "date": "2026-03-11",
+      "items": [
+        "fix(pathways-health-compat): normalized new Pathways health aggregates to treat legacy boolean-like values safely instead of assuming strict PostgreSQL booleans in every visibility column",
+        "fix(pathways-render-fallback): added guarded fallback behavior around the new readiness aggregate queries so `/admin/pathways` stays renderable even when a derived insight query cannot be computed"
+      ]
+    },
+    {
       "version": "1.2.04",
       "date": "2026-03-11",
       "items": [

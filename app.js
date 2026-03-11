@@ -23816,66 +23816,76 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     const configurableSubjectVisibility = subjectVisibilityItems.filter((item) => item.base_visible);
     const hiddenSubjectCount = subjectVisibilityItems.length - configurableSubjectVisibility.length;
 
+    const truthySqlValues = "('1', 'true', 't', 'yes', 'on', '')";
     const courseMappingStatsByAdmission = new Map();
-    if (selectedProgramAdmissionIds.length) {
-      const mappingStatRows = await db.all(
-        `
-          SELECT
-            pac.admission_id,
-            COUNT(*) FILTER (WHERE pac.is_visible = true)::int AS visible_count,
-            COUNT(*)::int AS total_count
-          FROM program_admission_courses pac
-          WHERE pac.admission_id = ANY(?::int[])
-          GROUP BY pac.admission_id
-        `,
-        [selectedProgramAdmissionIds]
-      );
-      (mappingStatRows || []).forEach((row) => {
-        const admissionId = Number(row.admission_id || 0);
-        if (!Number.isInteger(admissionId) || admissionId < 1) return;
-        courseMappingStatsByAdmission.set(admissionId, {
-          visible_count: Number(row.visible_count || 0),
-          total_count: Number(row.total_count || 0),
-        });
-      });
-    }
-
     const subjectVisibilityStatsByAdmission = new Map();
-    if (selectedProgramAdmissionIds.length && selectedCourseId) {
-      const subjectStatRows = await db.all(
-        `
-          SELECT
-            a.id AS admission_id,
-            COUNT(*) FILTER (
-              WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
-            )::int AS total_count,
-            COUNT(*) FILTER (
-              WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
-                AND COALESCE(sva.is_visible, true) = true
-            )::int AS visible_count,
-            COUNT(*) FILTER (
-              WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
-                AND sva.subject_id IS NOT NULL
-            )::int AS override_count
-          FROM program_admissions a
-          JOIN subjects s ON s.course_id = ?
-          LEFT JOIN subject_visibility_by_admission sva
-            ON sva.admission_id = a.id
-           AND sva.subject_id = s.id
-          WHERE a.id = ANY(?::int[])
-          GROUP BY a.id
-        `,
-        [selectedCourseId, selectedProgramAdmissionIds]
-      );
-      (subjectStatRows || []).forEach((row) => {
-        const admissionId = Number(row.admission_id || 0);
-        if (!Number.isInteger(admissionId) || admissionId < 1) return;
-        subjectVisibilityStatsByAdmission.set(admissionId, {
-          visible_count: Number(row.visible_count || 0),
-          total_count: Number(row.total_count || 0),
-          override_count: Number(row.override_count || 0),
+    const campusStatsByAdmission = new Map();
+    const userAssignmentStatsByAdmission = new Map();
+
+    try {
+      if (selectedProgramAdmissionIds.length) {
+        const mappingStatRows = await db.all(
+          `
+            SELECT
+              pac.admission_id,
+              COUNT(*) FILTER (
+                WHERE COALESCE(LOWER(TRIM(CAST(pac.is_visible AS TEXT))), '1') IN ${truthySqlValues}
+              )::int AS visible_count,
+              COUNT(*)::int AS total_count
+            FROM program_admission_courses pac
+            WHERE pac.admission_id = ANY(?::int[])
+            GROUP BY pac.admission_id
+          `,
+          [selectedProgramAdmissionIds]
+        );
+        (mappingStatRows || []).forEach((row) => {
+          const admissionId = Number(row.admission_id || 0);
+          if (!Number.isInteger(admissionId) || admissionId < 1) return;
+          courseMappingStatsByAdmission.set(admissionId, {
+            visible_count: Number(row.visible_count || 0),
+            total_count: Number(row.total_count || 0),
+          });
         });
-      });
+      }
+
+      if (selectedProgramAdmissionIds.length && selectedCourseId) {
+        const subjectStatRows = await db.all(
+          `
+            SELECT
+              a.id AS admission_id,
+              COUNT(*) FILTER (
+                WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ${truthySqlValues}
+              )::int AS total_count,
+              COUNT(*) FILTER (
+                WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ${truthySqlValues}
+                  AND COALESCE(LOWER(TRIM(CAST(sva.is_visible AS TEXT))), '1') IN ${truthySqlValues}
+              )::int AS visible_count,
+              COUNT(*) FILTER (
+                WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ${truthySqlValues}
+                  AND sva.subject_id IS NOT NULL
+              )::int AS override_count
+            FROM program_admissions a
+            LEFT JOIN subjects s ON s.course_id = ?
+            LEFT JOIN subject_visibility_by_admission sva
+              ON sva.admission_id = a.id
+             AND sva.subject_id = s.id
+            WHERE a.id = ANY(?::int[])
+            GROUP BY a.id
+          `,
+          [selectedCourseId, selectedProgramAdmissionIds]
+        );
+        (subjectStatRows || []).forEach((row) => {
+          const admissionId = Number(row.admission_id || 0);
+          if (!Number.isInteger(admissionId) || admissionId < 1) return;
+          subjectVisibilityStatsByAdmission.set(admissionId, {
+            visible_count: Number(row.visible_count || 0),
+            total_count: Number(row.total_count || 0),
+            override_count: Number(row.override_count || 0),
+          });
+        });
+      }
+    } catch (err) {
+      console.error('Pathways aggregate stats fallback', err);
     }
 
     const admissionCopyOptions = selectedProgramAdmissions
@@ -23940,78 +23950,80 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     }
     const legacySuggestedCourseCount = Array.from(legacySuggestedCourseIds.values()).filter((value) => value > 0).length;
 
-    const campusStatsByAdmission = new Map();
-    if (selectedProgramAdmissionIds.length) {
-      const campusRows = await db.all(
-        `
-          SELECT
-            pac.admission_id,
-            c.id AS course_id,
-            c.name AS course_name,
-            COALESCE(c.location, 'kyiv') AS course_location,
-            c.is_teacher_course
-          FROM program_admission_courses pac
-          JOIN courses c ON c.id = pac.course_id
-          WHERE pac.admission_id = ANY(?::int[])
-            AND pac.is_visible = true
-          ORDER BY pac.admission_id ASC, c.id ASC
-        `,
-        [selectedProgramAdmissionIds]
-      );
-      const campusRowsByAdmission = new Map();
-      (campusRows || []).forEach((row) => {
-        const admissionId = Number(row.admission_id || 0);
-        if (!Number.isInteger(admissionId) || admissionId < 1) return;
-        if (!campusRowsByAdmission.has(admissionId)) {
-          campusRowsByAdmission.set(admissionId, []);
-        }
-        campusRowsByAdmission.get(admissionId).push({
-          course_id: Number(row.course_id || 0),
-          course_name: sanitizeCompactText(row.course_name || '', 120),
-          course_location: normalizeCourseCampus(row.course_location),
-          is_teacher_course: row.is_teacher_course === true || Number(row.is_teacher_course) === 1,
-        });
-      });
-      selectedProgramAdmissionsSorted.forEach((admission) => {
-        const admissionId = Number(admission.id || 0);
-        if (!admissionId) return;
-        const campusBindings = buildAdmissionCampusChoicesFromCourses(
-          campusRowsByAdmission.get(admissionId) || [],
-          normalizeRegistrationTrack(admission.track_key, 'bachelor')
+    try {
+      if (selectedProgramAdmissionIds.length) {
+        const campusRows = await db.all(
+          `
+            SELECT
+              pac.admission_id,
+              c.id AS course_id,
+              c.name AS course_name,
+              COALESCE(c.location, 'kyiv') AS course_location,
+              c.is_teacher_course
+            FROM program_admission_courses pac
+            JOIN courses c ON c.id = pac.course_id
+            WHERE pac.admission_id = ANY(?::int[])
+              AND COALESCE(LOWER(TRIM(CAST(pac.is_visible AS TEXT))), '1') IN ${truthySqlValues}
+            ORDER BY pac.admission_id ASC, c.id ASC
+          `,
+          [selectedProgramAdmissionIds]
         );
-        const ambiguousCount = campusBindings.filter((item) => item.is_ambiguous).length;
-        campusStatsByAdmission.set(admissionId, {
-          total_bindings: campusBindings.length,
-          ready_bindings: campusBindings.filter((item) => !item.is_ambiguous).length,
-          ambiguous_count: ambiguousCount,
-          bindings: campusBindings,
+        const campusRowsByAdmission = new Map();
+        (campusRows || []).forEach((row) => {
+          const admissionId = Number(row.admission_id || 0);
+          if (!Number.isInteger(admissionId) || admissionId < 1) return;
+          if (!campusRowsByAdmission.has(admissionId)) {
+            campusRowsByAdmission.set(admissionId, []);
+          }
+          campusRowsByAdmission.get(admissionId).push({
+            course_id: Number(row.course_id || 0),
+            course_name: sanitizeCompactText(row.course_name || '', 120),
+            course_location: normalizeCourseCampus(row.course_location),
+            is_teacher_course: row.is_teacher_course === true || Number(row.is_teacher_course) === 1,
+          });
         });
-      });
-    }
+        selectedProgramAdmissionsSorted.forEach((admission) => {
+          const admissionId = Number(admission.id || 0);
+          if (!admissionId) return;
+          const campusBindings = buildAdmissionCampusChoicesFromCourses(
+            campusRowsByAdmission.get(admissionId) || [],
+            normalizeRegistrationTrack(admission.track_key, 'bachelor')
+          );
+          const ambiguousCount = campusBindings.filter((item) => item.is_ambiguous).length;
+          campusStatsByAdmission.set(admissionId, {
+            total_bindings: campusBindings.length,
+            ready_bindings: campusBindings.filter((item) => !item.is_ambiguous).length,
+            ambiguous_count: ambiguousCount,
+            bindings: campusBindings,
+          });
+        });
+      }
 
-    const userAssignmentStatsByAdmission = new Map();
-    if (selectedProgramAdmissionIds.length && selectedProgramId) {
-      const assignmentRows = await db.all(
-        `
-          SELECT
-            admission_id,
-            COUNT(*) FILTER (
-              WHERE LOWER(COALESCE(role, '')) <> 'admin'
-            )::int AS users_count
-          FROM users
-          WHERE study_program_id = ?
-            AND admission_id = ANY(?::int[])
-          GROUP BY admission_id
-        `,
-        [selectedProgramId, selectedProgramAdmissionIds]
-      );
-      (assignmentRows || []).forEach((row) => {
-        const admissionId = Number(row.admission_id || 0);
-        if (!Number.isInteger(admissionId) || admissionId < 1) return;
-        userAssignmentStatsByAdmission.set(admissionId, {
-          users_count: Number(row.users_count || 0),
+      if (selectedProgramAdmissionIds.length && selectedProgramId) {
+        const assignmentRows = await db.all(
+          `
+            SELECT
+              admission_id,
+              COUNT(*) FILTER (
+                WHERE LOWER(COALESCE(role, '')) <> 'admin'
+              )::int AS users_count
+            FROM users
+            WHERE study_program_id = ?
+              AND admission_id = ANY(?::int[])
+            GROUP BY admission_id
+          `,
+          [selectedProgramId, selectedProgramAdmissionIds]
+        );
+        (assignmentRows || []).forEach((row) => {
+          const admissionId = Number(row.admission_id || 0);
+          if (!Number.isInteger(admissionId) || admissionId < 1) return;
+          userAssignmentStatsByAdmission.set(admissionId, {
+            users_count: Number(row.users_count || 0),
+          });
         });
-      });
+      }
+    } catch (err) {
+      console.error('Pathways campus or assignment fallback', err);
     }
 
     let migrationCourseOptions = [];
