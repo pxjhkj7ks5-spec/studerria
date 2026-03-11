@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.10",
+      "date": "2026-03-11",
+      "items": [
+        "tune(schedule-week-shell-localization): localized the main schedule shell including the hero phrase, teacher course filters, localized date formatting, dense-day and overlap cues, class cards, session chips, pager labels, and week-grid empty states so the core `/schedule` view no longer mixes hardcoded Ukrainian and English copy",
+        "tune(schedule-summary-and-phrases): localized the rotating daily phrase pool, month snapshot copy, and density-summary labels and details while keeping the existing timetable interactions, homework flows, and modal behavior unchanged"
+      ]
+    },
+    {
       "version": "1.2.09",
       "date": "2026-03-11",
       "items": [

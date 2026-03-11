@@ -1,3 +1,145 @@
+<%
+  const localeCode = lang === 'en' ? 'en-US' : 'uk-UA';
+  const scheduleViewText = lang === 'en'
+    ? {
+        heroPhrase: "Your rhythm, your focus - let's make this week count.",
+        filtersTitle: 'Filters',
+        allCourses: 'All courses',
+        denseDay: 'Dense day',
+        overlapDetected: 'Overlapping slots detected',
+        noClasses: 'No classes',
+        classLabel: 'Class',
+        previousWeekAria: 'Previous week',
+        currentWeekAria: 'Current week',
+        nextWeekAria: 'Next week',
+        monthSummaryEmpty: 'No data yet for the month snapshot.',
+        monthSummaryTitle: 'Month Snapshot',
+        monthSummarySub: 'Prototype view based on current visible week data.',
+        monthSummaryClasses: 'classes',
+        monthSummaryHomework: 'homework',
+        dayFallback: 'Day',
+        lessonTypeLecture: 'Lecture',
+        lessonTypeSeminar: 'Seminar',
+        lessonTypeLab: 'Lab',
+        lessonTypePractice: 'Practice',
+        sessionExam: 'Session · Exam',
+        sessionCredit: 'Session · Credit',
+        sessionConsultation: 'Session · Consultation',
+        sessionGeneric: 'Session',
+        controlBadge: 'Control',
+        teacherHomeworkBadge: 'Teacher HW',
+        creditBadge: 'Credit',
+        homeworkShort: 'HW',
+        nowChip: 'Now',
+        nextChip: 'Next',
+        dayBalanceNone: 'Day balance: no classes yet',
+        dayBalanceNoneDetail: 'No classes are scheduled for this week.',
+        eveningLight: 'Evenings feel light this week',
+        eveningLightDetail: 'Evening intensity appears after classes are added.',
+        peakNone: 'Most intense day: -',
+        peakNoneDetail: 'Most intense day appears once there are classes.',
+        dayBalanceSteady: 'Day balance: steady rhythm',
+        dayBalanceMixed: 'Day balance: mixed rhythm',
+        dayBalanceUneven: 'Day balance: uneven rhythm',
+        eveningModerate: 'Evenings feel moderate this week',
+        eveningHeavy: 'Evenings feel heavy this week',
+        averagePrefix: 'Average',
+        classesPerDay: 'classes/day',
+        spreadLabel: 'Spread',
+        toWord: 'to',
+        ofWord: 'of',
+        lateSlotsSuffix: 'classes are in 6th-7th slots.',
+        peakPrefix: 'Most intense day:',
+        peakHasWord: 'has',
+        peakClassesThisWeek: 'classes this week.',
+        dailyPhrases: [
+          "Your rhythm, your focus - let's make this week count.",
+          'Start fresh - today is full of potential.',
+          'Small steps, big progress.',
+          'Focus on now - the rest will follow.',
+          "One thing at a time, and that's enough.",
+          'Let clarity lead your day.',
+          'Stay present, stay steady.',
+          'Progress, not perfection.',
+          'Balance over burnout.',
+          'This hour matters - make it count.',
+          'Energy follows attention.',
+          'Notice what fuels you today.'
+        ],
+        specialPhrasesByDate: {
+          '02-14': '"Love is worth it all."',
+        },
+      }
+    : {
+        heroPhrase: 'Твій ритм, твій фокус - нехай цей тиждень спрацює на тебе.',
+        filtersTitle: 'Фільтри',
+        allCourses: 'Усі курси',
+        denseDay: 'Щільний день',
+        overlapDetected: 'Виявлено накладання слотів',
+        noClasses: 'Немає пар',
+        classLabel: 'Пара',
+        previousWeekAria: 'Попередній тиждень',
+        currentWeekAria: 'Поточний тиждень',
+        nextWeekAria: 'Наступний тиждень',
+        monthSummaryEmpty: 'Для місячного огляду поки немає даних.',
+        monthSummaryTitle: 'Знімок місяця',
+        monthSummarySub: 'Прототипний огляд на основі поточних даних видимого тижня.',
+        monthSummaryClasses: 'пар',
+        monthSummaryHomework: 'ДЗ',
+        dayFallback: 'День',
+        lessonTypeLecture: 'Лекція',
+        lessonTypeSeminar: 'Семінар',
+        lessonTypeLab: 'Лаб',
+        lessonTypePractice: 'Практика',
+        sessionExam: 'Сесія · Екзамен',
+        sessionCredit: 'Сесія · Залік',
+        sessionConsultation: 'Сесія · Консультація',
+        sessionGeneric: 'Сесія',
+        controlBadge: 'Контроль',
+        teacherHomeworkBadge: 'Викл.ДЗ',
+        creditBadge: 'Залік',
+        homeworkShort: 'ДЗ',
+        nowChip: 'Зараз',
+        nextChip: 'Далі',
+        dayBalanceNone: 'Баланс днів: пар ще немає',
+        dayBalanceNoneDetail: 'На цей тиждень пари ще не заплановані.',
+        eveningLight: 'Вечори цього тижня легкі',
+        eveningLightDetail: 'Вечірнє навантаження зʼявиться після додавання пар.',
+        peakNone: 'Найінтенсивніший день: -',
+        peakNoneDetail: 'Найінтенсивніший день зʼявиться, коли будуть пари.',
+        dayBalanceSteady: 'Баланс днів: рівний ритм',
+        dayBalanceMixed: 'Баланс днів: змішаний ритм',
+        dayBalanceUneven: 'Баланс днів: нерівний ритм',
+        eveningModerate: 'Вечори цього тижня помірні',
+        eveningHeavy: 'Вечори цього тижня насичені',
+        averagePrefix: 'У середньому',
+        classesPerDay: 'пар/день',
+        spreadLabel: 'Розкид',
+        toWord: 'до',
+        ofWord: 'з',
+        lateSlotsSuffix: 'пар припадають на 6-7 пари.',
+        peakPrefix: 'Найінтенсивніший день:',
+        peakHasWord: 'має',
+        peakClassesThisWeek: 'пар цього тижня.',
+        dailyPhrases: [
+          'Твій ритм, твій фокус - нехай цей тиждень спрацює на тебе.',
+          'Почни спокійно - у цього дня є потенціал.',
+          'Малі кроки теж рухають вперед.',
+          'Тримай фокус на зараз - решта підтягнеться.',
+          'Одна важлива справа за раз - цього достатньо.',
+          'Нехай ясність веде твій день.',
+          'Залишайся в моменті й тримай темп.',
+          'Прогрес важливіший за ідеальність.',
+          'Баланс кращий за вигорання.',
+          'Ця година має значення - використай її добре.',
+          'Енергія йде туди, куди й увага.',
+          'Помічай, що сьогодні тебе підсилює.'
+        ],
+        specialPhrasesByDate: {
+          '02-14': '"Любов варта всього."',
+        },
+      };
+%>
 <!doctype html>
 <html lang="<%= lang %>">
   <head>
@@ -1662,7 +1804,6 @@
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
-  <% const localeCode = lang === 'en' ? 'en-US' : 'uk-UA'; %>
   <body class="studerria-theme theme-dark page-schedule page-local-topbar">
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
@@ -1721,7 +1862,7 @@
         <div class="glass week-hero liquid-card mb-4">
           <div>
             <h1 class="hero-title weekHeadline mb-1"><%= t('schedule.header') %></h1>
-            <div class="hero-sub" id="daily-phrase">Your rhythm, your focus — let’s make this week count.</div>
+            <div class="hero-sub" id="daily-phrase"><%= scheduleViewText.heroPhrase %></div>
           </div>
           <div class="hero-actions">
             <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
@@ -1732,12 +1873,12 @@
         <% if (hasCourseFilters) { %>
         <div class="glass schedule-panel liquid-card mb-4">
           <div class="panel-section">
-            <div class="panel-title">Filters</div>
+            <div class="panel-title"><%= scheduleViewText.filtersTitle %></div>
             <div class="panel-body">
               <form method="GET" action="/schedule" class="d-inline">
                 <input type="hidden" name="week" value="<%= currentWeek %>" />
                 <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
-                  <option value="">All courses</option>
+                  <option value=""><%= scheduleViewText.allCourses %></option>
                   <% teacherCourses.forEach(function(c) { %>
                     <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
                   <% }); %>
@@ -1756,7 +1897,7 @@
 
         <div id="scheduleWeekGrid">
         <% daysOfWeek.forEach(function(day) { %>
-          <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
+          <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString(localeCode, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
           <% const dayEntries = scheduleByDay[day] || []; %>
           <% let maxStreak = 0; let currentStreak = 0; let hasOverlap = false; const seenSlots = {}; %>
           <% for (let i = 0; i < dayEntries.length; i++) { %>
@@ -1781,7 +1922,7 @@
               </div>
               <div class="day-indicators">
                 <% if (isDenseDay) { %>
-                  <span class="day-chip day-chip--primary chip">Dense day</span>
+                  <span class="day-chip day-chip--primary chip"><%= scheduleViewText.denseDay %></span>
                 <% } %>
                 <% if (hasOverlap) { %>
                   <button
@@ -1789,8 +1930,8 @@
                     type="button"
                     data-bs-toggle="tooltip"
                     data-bs-placement="top"
-                    data-bs-title="Overlapping slots detected"
-                    aria-label="Overlapping slots detected"
+                      data-bs-title="<%= scheduleViewText.overlapDetected %>"
+                      aria-label="<%= scheduleViewText.overlapDetected %>"
                   >
                     i
                   </button>
@@ -1799,7 +1940,7 @@
             </div>
             <div class="list-group list-group-flush">
               <% if (!dayEntries || dayEntries.length === 0) { %>
-                <div class="list-group-item empty-state">No classes</div>
+                <div class="list-group-item empty-state"><%= scheduleViewText.noClasses %></div>
               <% } else { %>
                 <% dayEntries.forEach(function(cls, idx) { %>
                   <% const slot = bellSchedule[cls.class_number]; %>
@@ -1807,7 +1948,7 @@
                   <% const subjectName = cls.subject_name || ''; %>
                   <% const subjectNameLower = subjectName.toLowerCase(); %>
                   <% const inlineType = /(лекц|семін|лаб|практ|lecture|seminar|lab|practice)/.test(subjectNameLower); %>
-                  <% const typeLabel = cls.lesson_type === 'lecture' ? 'Лекція' : cls.lesson_type === 'seminar' ? 'Семінар' : cls.lesson_type === 'lab' ? 'Лаб' : cls.lesson_type === 'practice' ? 'Практика' : ''; %>
+                  <% const typeLabel = cls.lesson_type === 'lecture' ? scheduleViewText.lessonTypeLecture : cls.lesson_type === 'seminar' ? scheduleViewText.lessonTypeSeminar : cls.lesson_type === 'lab' ? scheduleViewText.lessonTypeLab : cls.lesson_type === 'practice' ? scheduleViewText.lessonTypePractice : ''; %>
                   <% const showTypeBadge = cls.lesson_type && !inlineType && typeLabel; %>
                   <% const legacyKey = `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}`; %>
                   <% const datedKey = cls.class_date ? `${legacyKey}|${cls.class_date}` : null; %>
@@ -1822,22 +1963,22 @@
                   <% const sessionKindRaw = hwMeta && hwMeta.session_kind ? String(hwMeta.session_kind) : ''; %>
                   <% const sessionKind = ['exam', 'credit', 'consultation', 'mixed', 'session'].includes(sessionKindRaw) ? sessionKindRaw : ''; %>
                   <% const sessionChipText = sessionKind === 'exam'
-                    ? 'Сесія · Екзамен'
+                    ? scheduleViewText.sessionExam
                     : sessionKind === 'credit'
-                      ? 'Сесія · Залік'
+                      ? scheduleViewText.sessionCredit
                       : sessionKind === 'consultation'
-                        ? 'Сесія · Консультація'
+                        ? scheduleViewText.sessionConsultation
                         : sessionKind
-                          ? 'Сесія'
+                          ? scheduleViewText.sessionGeneric
                           : ''; %>
                   <% const sessionCardClass = sessionKind ? `has-session session-${sessionKind}` : ''; %>
-                  <% const groupLabel = cls.group_label ? cls.group_label : `Group ${cls.group_number}`; %>
+                  <% const groupLabel = cls.group_label ? cls.group_label : `${t('schedule.group.single')} ${cls.group_number}`; %>
                   <% const courseLabel = cls.course_name ? ` · ${cls.course_name}` : ''; %>
                   <% const prev = idx > 0 ? dayEntries[idx - 1] : null; %>
                   <% const next = idx < dayEntries.length - 1 ? dayEntries[idx + 1] : null; %>
                   <% const chainPrev = prev && prev.subject_id === cls.subject_id && cls.class_number === prev.class_number + 1; %>
                   <% const chainNext = next && next.subject_id === cls.subject_id && next.class_number === cls.class_number + 1; %>
-                  <% const tooltipParts = [subjectName, groupLabel, `Class ${cls.class_number}`, timeLabel]; %>
+                  <% const tooltipParts = [subjectName, groupLabel, `${scheduleViewText.classLabel} ${cls.class_number}`, timeLabel]; %>
                   <% if (sessionChipText) { tooltipParts.push(sessionChipText); } %>
                   <% if (showTypeBadge) { tooltipParts.push(typeLabel); } %>
                   <% if (cls.course_name) { tooltipParts.push(cls.course_name); } %>
@@ -1871,7 +2012,7 @@
                             <span class="lesson-pill"><%= typeLabel %></span>
                           <% } %>
                         </div>
-                        <div class="schedule-meta classMeta"><%= groupLabel %> · Пара <%= cls.class_number %><%= courseLabel %></div>
+                        <div class="schedule-meta classMeta"><%= groupLabel %> · <%= scheduleViewText.classLabel %> <%= cls.class_number %><%= courseLabel %></div>
                       </div>
                       <div class="schedule-aside">
                         <div class="schedule-time classTime"><%= timeLabel %></div>
@@ -1880,13 +2021,13 @@
                             <span class="session-chip chip <%= sessionKind === 'exam' ? 'session-chip--exam' : sessionKind === 'credit' ? 'session-chip--credit' : sessionKind === 'consultation' ? 'session-chip--consultation' : 'session-chip--mixed' %>"><%= sessionChipText %></span>
                           <% } %>
                           <% if (hwMeta && hwMeta.control) { %>
-                            <span class="control-chip chip badge--control">Контроль</span>
+                            <span class="control-chip chip badge--control"><%= scheduleViewText.controlBadge %></span>
                           <% } %>
                           <% if (hwMeta && hwMeta.teacher_homework) { %>
-                            <span class="hw-chip chip badge--hw">Викл.ДЗ</span>
+                            <span class="hw-chip chip badge--hw"><%= scheduleViewText.teacherHomeworkBadge %></span>
                           <% } %>
                           <% if (hwMeta && hwMeta.credit) { %>
-                            <span class="hw-chip chip badge--control">Залік</span>
+                            <span class="hw-chip chip badge--control"><%= scheduleViewText.creditBadge %></span>
                           <% } %>
                           <% if (hwMeta && hwMeta.meet) { %>
                             <% if (hwMeta.meet_link) { %>
@@ -1896,10 +2037,10 @@
                             <% } %>
                           <% } %>
                           <% if (hwMeta) { %>
-                            <span class="hw-chip chip badge--hw">ДЗ <%= hwMeta.count %></span>
+                            <span class="hw-chip chip badge--hw"><%= scheduleViewText.homeworkShort %> <%= hwMeta.count %></span>
                           <% } %>
-                          <span class="schedule-chip chip chip-now">Зараз</span>
-                          <span class="schedule-chip chip chip-next">Далі</span>
+                          <span class="schedule-chip chip chip-now"><%= scheduleViewText.nowChip %></span>
+                          <span class="schedule-chip chip chip-next"><%= scheduleViewText.nextChip %></span>
                         </div>
                       </div>
                     </div>
@@ -1960,7 +2101,7 @@
         <% if (canUseCustomDeadlinesUi && weekendDeadlineCards && weekendDeadlineCards.length) { %>
           <% weekendDeadlineCards.forEach(function(card) { %>
             <% if (activeDaySet.has(card.day)) { return; } %>
-            <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
+            <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString(localeCode, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
             <div class="card mb-3 glass day-card liquid-card" data-day-date="<%= card.date || '' %>">
               <div class="day-header">
                 <div class="day-title">
@@ -2021,14 +2162,14 @@
       </main>
 
       <div class="week-rail week-pager" id="weekPager">
-        <button class="week-nav-btn week-nav-btn--prev" type="button" id="weekPrev" aria-label="Previous week">‹</button>
-        <div class="week-pill" id="weekPill" aria-label="Current week">
+        <button class="week-nav-btn week-nav-btn--prev" type="button" id="weekPrev" aria-label="<%= scheduleViewText.previousWeekAria %>">‹</button>
+        <div class="week-pill" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
           <span class="week-pill-title"><%= t('schedule.week') %> <span id="weekPillCurrent"><%= currentWeek %></span></span>
           <span class="week-pill-progress" aria-hidden="true">
             <span class="week-pill-progress-fill" id="weekPillProgress"></span>
           </span>
         </div>
-        <button class="week-nav-btn week-nav-btn--next" type="button" id="weekNext" aria-label="Next week">›</button>
+        <button class="week-nav-btn week-nav-btn--next" type="button" id="weekNext" aria-label="<%= scheduleViewText.nextWeekAria %>">›</button>
       </div>
 
       <%- include('partials/app-footer', { footerSyncStatus: true }) %>
@@ -2489,6 +2630,7 @@
     ></script>
     <script>
       const scheduleLocale = <%- JSON.stringify(localeCode) %>;
+      const scheduleViewText = <%- JSON.stringify(scheduleViewText) %>;
       const scheduleText = <%- JSON.stringify({
         validationCheckField: t('schedule.validation.checkField'),
         fileNotSelected: t('schedule.file.notSelected'),
@@ -3587,7 +3729,7 @@
       function buildMonthSummary() {
         if (!monthSummary || !weekGrid) return;
         const rows = Array.from(weekGrid.querySelectorAll('.day-card')).map((dayCard) => {
-          const dayName = dayCard.querySelector('.day-name') ? dayCard.querySelector('.day-name').textContent.trim() : 'Day';
+          const dayName = dayCard.querySelector('.day-name') ? dayCard.querySelector('.day-name').textContent.trim() : scheduleViewText.dayFallback;
           const dayDate = dayCard.querySelector('.day-date') ? dayCard.querySelector('.day-date').textContent.trim() : '';
           const classesCount = dayCard.querySelectorAll('.schedule-card').length;
           const hwCount = dayCard.querySelectorAll('.hw-chip, .badge--hw').length;
@@ -3595,14 +3737,14 @@
         }).filter((row) => row.classesCount || row.hwCount);
 
         if (!rows.length) {
-          monthSummary.innerHTML = '<div class="month-summary-empty">No data yet for month summary.</div>';
+          monthSummary.innerHTML = `<div class="month-summary-empty">${scheduleViewText.monthSummaryEmpty}</div>`;
           return;
         }
 
         monthSummary.innerHTML = `
           <div class="month-summary-head">
-            <h2 class="month-summary-title">Month Snapshot</h2>
-            <p class="month-summary-sub">Prototype view based on current visible week data.</p>
+            <h2 class="month-summary-title">${scheduleViewText.monthSummaryTitle}</h2>
+            <p class="month-summary-sub">${scheduleViewText.monthSummarySub}</p>
           </div>
           <div class="month-summary-grid">
             ${rows.map((row) => `
@@ -3610,8 +3752,8 @@
                 <div class="month-summary-day">${row.dayName}</div>
                 <div class="month-summary-date">${row.dayDate || '—'}</div>
                 <div class="month-summary-metrics">
-                  <span>${row.classesCount} classes</span>
-                  <span>${row.hwCount} homework</span>
+                  <span>${row.classesCount} ${scheduleViewText.monthSummaryClasses}</span>
+                  <span>${row.hwCount} ${scheduleViewText.monthSummaryHomework}</span>
                 </div>
               </article>
             `).join('')}
@@ -4004,7 +4146,7 @@
       function updateDensitySummary(root = document) {
         const dayCards = Array.from(root.querySelectorAll('.day-card'));
         const dayStats = dayCards.map((card) => {
-          const dayName = card.querySelector('.day-name') ? card.querySelector('.day-name').textContent.trim() : 'Day';
+          const dayName = card.querySelector('.day-name') ? card.querySelector('.day-name').textContent.trim() : scheduleViewText.dayFallback;
           const classCards = Array.from(card.querySelectorAll('.schedule-card'));
           const count = classCards.length;
           const eveningCount = classCards.filter((entry) => Number(entry.dataset.classnum || 0) >= 6).length;
@@ -4012,9 +4154,9 @@
         }).filter((stat) => stat.count > 0);
 
         if (!dayStats.length) {
-          setDensityChip(densityChipBalance, 'Day balance: no classes yet', 'No classes are scheduled for this week.', 0.14);
-          setDensityChip(densityChipEvening, 'Evenings feel light this week', 'Evening intensity appears after classes are added.', 0.14);
-          setDensityChip(densityChipPeak, 'Most intense day: —', 'Most intense day appears once there are classes.', 0.14);
+          setDensityChip(densityChipBalance, scheduleViewText.dayBalanceNone, scheduleViewText.dayBalanceNoneDetail, 0.14);
+          setDensityChip(densityChipEvening, scheduleViewText.eveningLight, scheduleViewText.eveningLightDetail, 0.14);
+          setDensityChip(densityChipPeak, scheduleViewText.peakNone, scheduleViewText.peakNoneDetail, 0.14);
           return;
         }
 
@@ -4028,36 +4170,36 @@
         const eveningRatio = totalClasses ? eveningClasses / totalClasses : 0;
         const peak = dayStats.reduce((best, stat) => (stat.count > best.count ? stat : best), dayStats[0]);
 
-        let balanceLabel = 'Day balance: steady rhythm';
+        let balanceLabel = scheduleViewText.dayBalanceSteady;
         if (spread >= 3) {
-          balanceLabel = 'Day balance: uneven rhythm';
+          balanceLabel = scheduleViewText.dayBalanceUneven;
         } else if (spread >= 2) {
-          balanceLabel = 'Day balance: mixed rhythm';
+          balanceLabel = scheduleViewText.dayBalanceMixed;
         }
 
-        let eveningLabel = 'Evenings feel light this week';
+        let eveningLabel = scheduleViewText.eveningLight;
         if (eveningRatio >= 0.28) {
-          eveningLabel = 'Evenings feel heavy this week';
+          eveningLabel = scheduleViewText.eveningHeavy;
         } else if (eveningRatio >= 0.14) {
-          eveningLabel = 'Evenings feel moderate this week';
+          eveningLabel = scheduleViewText.eveningModerate;
         }
 
         setDensityChip(
           densityChipBalance,
           balanceLabel,
-          `Average ${average.toFixed(1)} classes/day. Spread: ${minCount} to ${maxCount}.`,
+          `${scheduleViewText.averagePrefix} ${average.toFixed(1)} ${scheduleViewText.classesPerDay}. ${scheduleViewText.spreadLabel}: ${minCount} ${scheduleViewText.toWord} ${maxCount}.`,
           0.14 + Math.min(0.18, spread * 0.06)
         );
         setDensityChip(
           densityChipEvening,
           eveningLabel,
-          `${eveningClasses} of ${totalClasses} classes are in 6th–7th slots.`,
+          `${eveningClasses} ${scheduleViewText.ofWord} ${totalClasses} ${scheduleViewText.lateSlotsSuffix}`,
           0.14 + Math.min(0.2, eveningRatio * 0.6)
         );
         setDensityChip(
           densityChipPeak,
-          `Most intense day: ${peak.dayName}`,
-          `${peak.dayName} has ${peak.count} classes this week.`,
+          `${scheduleViewText.peakPrefix} ${peak.dayName}`,
+          `${peak.dayName} ${scheduleViewText.peakHasWord} ${peak.count} ${scheduleViewText.peakClassesThisWeek}`,
           0.14 + Math.min(0.18, peak.count / Math.max(1, maxCount) * 0.18)
         );
       }
@@ -4271,42 +4413,11 @@
       refreshUnreadBadges();
       setInterval(refreshUnreadBadges, 60000);
 
-      const phrases = [
-        "Start fresh — today is full of potential.",
-        "Small steps, big progress.",
-        "Focus on now — the rest will follow.",
-        "One thing at a time — and that’s enough.",
-        "You’ve got more in you than you think.",
-        "Let clarity lead your day.",
-        "Stay present, stay steady.",
-        "Keep going — you’re getting closer.",
-        "Be kind to your focus.",
-        "Today is a great day to grow.",
-        "Balance over burnout.",
-        "Show up — even a little is progress.",
-        "A clear mind gets more done.",
-        "You set the tone — begin with calm.",
-        "Progress, not perfection.",
-        "Let effort be your win today.",
-        "This hour matters — make it count.",
-        "Energy follows attention.",
-        "You’re building momentum.",
-        "Stay grounded, keep moving.",
-        "Let your actions match your goals.",
-        "Your best today is enough.",
-        "Choose one goal, and give it space.",
-        "Rest is part of the rhythm.",
-        "Trust your pace — fast or slow.",
-        "You don’t need to rush to be great.",
-        "Small focus. Big ripple.",
-        "The day is yours — use it gently.",
-        "Notice what fuels you today.",
-        "Begin again — always welcome."
-      ];
+      const phrases = Array.isArray(scheduleViewText.dailyPhrases) && scheduleViewText.dailyPhrases.length
+        ? scheduleViewText.dailyPhrases
+        : [scheduleViewText.heroPhrase];
 
-      const specialPhrasesByDate = {
-        "02-14": "\"Любов варта всього.\""
-      };
+      const specialPhrasesByDate = scheduleViewText.specialPhrasesByDate || {};
 
       function getKyivDateParts() {
         const now = new Date();
