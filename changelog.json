@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.09",
+      "date": "2026-03-11",
+      "items": [
+        "tune(session-generator-shell-localization): localized the session generator shell, hero, calendar controls, legend, manual planner chrome, filters, publish flow, and delete panel so `/admin/session-generator` no longer ships with hardcoded mixed Ukrainian and English copy",
+        "tune(session-generator-live-feedback): localized client-side group and type labels, block-reason hints, live-conflict statuses, publish source meta, and slot assignment summaries while preserving the existing manual session overlay behavior"
+      ]
+    },
+    {
       "version": "1.2.08",
       "date": "2026-03-11",
       "items": [

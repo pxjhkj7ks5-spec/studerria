@@ -1,3 +1,219 @@
+<%
+  const sessionGeneratorLocale = lang === 'en' ? 'en' : 'uk';
+  const sessionGeneratorText = lang === 'en'
+    ? {
+        pageTitle: 'Session Generator',
+        navTitle: 'Session Generator',
+        themeToggleAria: 'Toggle theme',
+        scheduleGenerator: 'Schedule Generator',
+        backToAdmin: 'Back to admin',
+        heroTitle: 'Exam Session Generator',
+        heroLead: 'Mode: manual session overlay on top of the regular timetable. Pick session weeks first, then choose the assessment type, subject, and group, and click a class slot.',
+        locationKyiv: 'Kyiv',
+        locationMunich: 'Munich',
+        course: 'Course',
+        semester: 'Semester',
+        calendarTitle: 'Calendar parameters',
+        campusAria: 'Campus',
+        calendarHint: 'These settings affect the slot grid used for manual event placement.',
+        newPlan: 'New plan',
+        clearPlan: 'Clear plan',
+        drafts: 'Plans',
+        noCourses: 'No courses',
+        noSemesters: 'No semesters',
+        semesterPrefix: 'Semester #',
+        weeksShort: 'wk.',
+        sessionWeeksCount: 'Session weeks',
+        sessionWeeksSet: 'Which weeks (optional)',
+        sessionWeeksPlaceholder: 'For example 14-15 or 15,16',
+        sessionWeeksSelected: 'Session weeks:',
+        sessionWeeksFallback: 'If empty, we use the last N weeks of the semester.',
+        activeStudyDays: 'Active study days',
+        noSettings: 'No settings',
+        allowWeekends: 'Allow Saturday/Sunday during the session',
+        respectStudyDays: 'Schedule only on the course active study days',
+        updateSlotGrid: 'Update slot grid',
+        manualOnly: 'Auto-generation has been removed: the page now supports only manual overlay on top of the selected semester weeks.',
+        legendTitle: 'Session markers',
+        legendLabel: 'Legend',
+        manualTitle: 'Manual session planning',
+        manualHint: 'pick type and subject, then click a slot',
+        sessionType: 'Assessment type',
+        exam: 'Exam',
+        consultation: 'Consultation',
+        credit: 'Credit',
+        subject: 'Subject',
+        chooseSubject: 'Choose a subject',
+        group: 'Group',
+        allSubjectGroups: 'All subject groups',
+        plannerSteps: '1. Choose type, subject, and group. 2. Click a slot to add or remove an event. 3. Hold the mouse button and drag across slots for bulk editing.',
+        clearManualPlan: 'Clear manual plan',
+        refreshLiveConflicts: 'Refresh live conflicts',
+        liveConflictIdle: 'Live conflicts: check has not been run yet.',
+        blockReasonIdle: 'Blocking reasons: choose a subject and hover or click a slot.',
+        noSlots: 'No slots are available for the current session parameters.',
+        filterTeacher: 'Filter: teacher',
+        allTeachers: 'All teachers',
+        filterSubject: 'Filter: subject',
+        allSubjects: 'All subjects',
+        filterGroup: 'Filter: group',
+        allGroups: 'All groups',
+        allSimple: 'All',
+        groupPrefix: 'Group',
+        filterEventType: 'Filter: event type',
+        allTypes: 'All types',
+        week: 'week',
+        free: 'free',
+        busy: 'busy',
+        pair: 'Class',
+        pairFallback: 'Class',
+        freeSlot: 'Free slot',
+        publishTitle: 'Publish session',
+        publishSourceManual: 'Source: manual plan',
+        publishSourceEmpty: 'Source: manual plan (empty)',
+        events: 'Events',
+        publishHint: '1. Check teacher conflicts. 2. If everything is clean, publish to the journal and timetable.',
+        checkConflicts: 'Check conflicts',
+        publishButton: 'Publish to timetable and journal',
+        deleteConfirm: 'Delete session events in the selected week window?',
+        deleteTitle: 'Delete session',
+        deleteHint: 'Deletes only events with the [Session] prefix inside the selected weeks.',
+        deleteButton: 'Delete session in selected window',
+        typeShortExam: 'Exam',
+        typeShortConsultation: 'Consult',
+        typeShortCredit: 'Credit',
+        more: 'more',
+        liveConflictNoData: 'Live conflicts: no data.',
+        liveConflictEmpty: 'Live conflicts: the manual plan is empty.',
+        liveConflictNotFoundPrefix: 'Live conflicts: none found',
+        checkedEvents: 'checked events',
+        liveConflictBasePrefix: 'Live conflicts:',
+        outOfWindowPrefix: 'Out of selected week window',
+        liveConflictUpdateFailed: 'Live conflicts: could not refresh (check is unavailable).',
+        chooseSubjectAlert: 'Choose a subject before adding an event.',
+        liveConflictUpdating: 'Live conflicts: updating...',
+        blockReasonNeedSelection: 'Blocking reasons: choose a subject and hover or click a slot.',
+        blockReasonNeedSubjectGroup: 'Choose a subject and group to see the reasoning for this slot.',
+        blockReasonDuplicate: 'This exact event is already in the plan. Clicking again will remove it.',
+        blockReasonBusy: 'The slot already has a regular class in the timetable (overlay is allowed, but check whether it makes sense).',
+        teacherConflictPrefix: 'Teacher conflict:',
+        blockReasonOutOfWindow: 'The date is outside the selected session week window.',
+        blockReasonSuitable: 'This slot looks suitable for assignment under the current filters.',
+      }
+    : {
+        pageTitle: 'Генератор сесій',
+        navTitle: 'Генератор сесій',
+        themeToggleAria: 'Перемкнути тему',
+        scheduleGenerator: 'Генератор розкладу',
+        backToAdmin: 'Назад в адмінку',
+        heroTitle: 'Генератор екзаменаційної сесії',
+        heroLead: 'Режим: ручне накладання сесії на звичайний розклад. Оберіть тижні сесії, потім тип контролю, предмет і групу та клікніть по слоту пари.',
+        locationKyiv: 'Kyiv',
+        locationMunich: 'Munich',
+        course: 'Курс',
+        semester: 'Семестр',
+        calendarTitle: 'Параметри календаря',
+        campusAria: 'Кампус',
+        calendarHint: 'Налаштування впливають на сітку слотів для ручного призначення подій.',
+        newPlan: 'Новий план',
+        clearPlan: 'Очистити план',
+        drafts: 'Плани',
+        noCourses: 'Немає курсів',
+        noSemesters: 'Немає семестрів',
+        semesterPrefix: 'Семестр #',
+        weeksShort: 'тиж.',
+        sessionWeeksCount: 'Тижнів сесії',
+        sessionWeeksSet: 'Які тижні (опц.)',
+        sessionWeeksPlaceholder: 'Напр. 14-15 або 15,16',
+        sessionWeeksSelected: 'Сесійні тижні:',
+        sessionWeeksFallback: 'Якщо порожньо, візьмемо останні N тижнів семестру.',
+        activeStudyDays: 'Активні дні курсу',
+        noSettings: 'Немає налаштувань',
+        allowWeekends: 'Дозволити суботу/неділю у сесії',
+        respectStudyDays: 'Планувати тільки в активні навчальні дні курсу',
+        updateSlotGrid: 'Оновити сітку слотів',
+        manualOnly: 'Автогенерацію прибрано: тепер тільки ручний режим з накладанням на вибрані тижні семестру.',
+        legendTitle: 'Спецпозначки',
+        legendLabel: 'Легенда',
+        manualTitle: 'Ручне призначення сесії',
+        manualHint: 'оберіть тип і предмет, потім клік по слоту',
+        sessionType: 'Тип контролю',
+        exam: 'Екзамен',
+        consultation: 'Консультація',
+        credit: 'Залік',
+        subject: 'Предмет',
+        chooseSubject: 'Оберіть предмет',
+        group: 'Група',
+        allSubjectGroups: 'Усі групи предмета',
+        plannerSteps: '1. Оберіть тип, предмет і групу. 2. Клік по слоту додає або видаляє подію. 3. Для масового заповнення затисніть кнопку миші й протягніть по слотах.',
+        clearManualPlan: 'Очистити ручний план',
+        refreshLiveConflicts: 'Оновити live-конфлікти',
+        liveConflictIdle: 'Live-конфлікти: перевірка не запускалась.',
+        blockReasonIdle: 'Пояснення блокувань: оберіть предмет і наведіть або клікніть по слоту.',
+        noSlots: 'Немає слотів для поточних параметрів сесії.',
+        filterTeacher: 'Фільтр: викладач',
+        allTeachers: 'Усі викладачі',
+        filterSubject: 'Фільтр: предмет',
+        allSubjects: 'Усі предмети',
+        filterGroup: 'Фільтр: група',
+        allGroups: 'Усі групи',
+        allSimple: 'Усі',
+        groupPrefix: 'Група',
+        filterEventType: 'Фільтр: тип події',
+        allTypes: 'Усі типи',
+        week: 'тиждень',
+        free: 'вільно',
+        busy: 'зайнято',
+        pair: 'Пара',
+        pairFallback: 'Пара',
+        freeSlot: 'Вільний слот',
+        publishTitle: 'Публікація сесії',
+        publishSourceManual: 'Джерело: ручний план',
+        publishSourceEmpty: 'Джерело: ручний план (порожньо)',
+        events: 'Подій',
+        publishHint: '1. Перевірте конфлікти викладачів. 2. Якщо все чисто, публікуйте в журнал і розклад.',
+        checkConflicts: 'Перевірити конфлікти',
+        publishButton: 'Опублікувати в розклад і журнал',
+        deleteConfirm: 'Видалити сесійні події у вибраному вікні тижнів?',
+        deleteTitle: 'Видалення сесії',
+        deleteHint: 'Видаляє лише події з префіксом [Сесія] у межах вибраних тижнів.',
+        deleteButton: 'Видалити сесію у вибраному вікні',
+        typeShortExam: 'Екз',
+        typeShortConsultation: 'Конс',
+        typeShortCredit: 'Залік',
+        more: 'ще',
+        liveConflictNoData: 'Live-конфлікти: немає даних.',
+        liveConflictEmpty: 'Live-конфлікти: ручний план порожній.',
+        liveConflictNotFoundPrefix: 'Live-конфлікти: не знайдено',
+        checkedEvents: 'перевірених подій',
+        liveConflictBasePrefix: 'Live-конфлікти:',
+        outOfWindowPrefix: 'Поза вікном тижнів',
+        liveConflictUpdateFailed: 'Live-конфлікти: не вдалося оновити (перевірка недоступна).',
+        chooseSubjectAlert: 'Оберіть предмет перед додаванням події.',
+        liveConflictUpdating: 'Live-конфлікти: оновлення...',
+        blockReasonNeedSelection: 'Пояснення блокувань: оберіть предмет і наведіть або клікніть по слоту.',
+        blockReasonNeedSubjectGroup: 'Оберіть предмет і групу, щоб побачити пояснення для слоту.',
+        blockReasonDuplicate: 'У плані вже є ідентична подія. Повторний клік видалить її.',
+        blockReasonBusy: 'Слот уже має звичайну пару в розкладі (накладання допустиме, але перевірте доцільність).',
+        teacherConflictPrefix: 'Конфлікт викладача:',
+        blockReasonOutOfWindow: 'Дата поза вибраним вікном тижнів сесії.',
+        blockReasonSuitable: 'Слот виглядає придатним для призначення за поточними фільтрами.',
+      };
+  const sessionGeneratorTypeShortLabels = {
+    exam: sessionGeneratorText.typeShortExam,
+    consultation: sessionGeneratorText.typeShortConsultation,
+    credit: sessionGeneratorText.typeShortCredit,
+  };
+  const formatSessionLocationLabel = (location) =>
+    location === 'munich' ? sessionGeneratorText.locationMunich : sessionGeneratorText.locationKyiv;
+  const formatSessionGroupLabel = (groupNumber, groupCount) => groupNumber
+    ? `${sessionGeneratorText.groupPrefix} ${groupNumber}`
+    : (groupCount > 1 ? `${sessionGeneratorText.allGroups} (${groupCount})` : sessionGeneratorText.allSimple);
+  const formatSessionSemesterOption = (semester) =>
+    `${semester.title || (sessionGeneratorText.semesterPrefix + semester.id)} · ${semester.weeks_count || '—'} ${sessionGeneratorText.weeksShort}`;
+  const formatSessionFreeBusyLabel = (freeCount, busyCount) =>
+    `${sessionGeneratorText.free} ${freeCount || 0} / ${sessionGeneratorText.busy} ${busyCount || 0}`;
+%>
 <!doctype html>
 <html lang="<%= lang %>">
   <head>
@@ -5,7 +221,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <%- include('partials/theme-bootstrap-head', { defaultTheme: 'light' }) %>
-    <title>Генератор сесій</title>
+    <title><%= sessionGeneratorText.pageTitle %></title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -674,21 +890,21 @@
     <%- include('partials/dynamic-bg') %>
     <nav class="navbar navbar-expand-lg admin-nav">
       <div class="container">
-        <span class="navbar-brand">Генератор сесій</span>
+        <span class="navbar-brand"><%= sessionGeneratorText.navTitle %></span>
         <div class="d-flex align-items-center flex-wrap gap-2 justify-content-end">
           <span class="text-muted small"><%= t('role.admin') %>: <%= username %></span>
           <button
             class="theme-toggle theme-toggle-min"
             type="button"
             id="themeToggle"
-            aria-label="Toggle theme"
+            aria-label="<%= sessionGeneratorText.themeToggleAria %>"
             data-light-label="☀️"
             data-dark-label="🌙"
           >
             🌙
           </button>
-          <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-generator">Генератор розкладу</a>
-          <a class="btn btn-outline-primary btn-sm" href="/admin">Назад в адмінку</a>
+          <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-generator"><%= sessionGeneratorText.scheduleGenerator %></a>
+          <a class="btn btn-outline-primary btn-sm" href="/admin"><%= sessionGeneratorText.backToAdmin %></a>
           <form method="POST" action="/logout" class="m-0">
             <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
           </form>
@@ -707,19 +923,16 @@
       <div class="session-hero mb-4">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
           <div>
-            <h1 class="h3 mb-2">Генератор екзаменаційної сесії</h1>
-            <div class="session-lead">
-              Режим: ручне накладання сесії на звичайний розклад. Оберіть тижні сесії (наприклад 14-15),
-              потім тип контролю + предмет + групу і клікніть по слоту пари.
-            </div>
+            <h1 class="h3 mb-2"><%= sessionGeneratorText.heroTitle %></h1>
+            <div class="session-lead"><%= sessionGeneratorText.heroLead %></div>
           </div>
           <div class="session-chip-row">
-            <span class="session-chip"><span class="tiny-dot"></span> <strong><%= activeLocation === 'munich' ? 'Munich' : 'Kyiv' %></strong></span>
+            <span class="session-chip"><span class="tiny-dot"></span> <strong><%= formatSessionLocationLabel(activeLocation) %></strong></span>
             <% if (selectedCourse) { %>
-              <span class="session-chip">Курс: <strong><%= selectedCourse.name %></strong></span>
+              <span class="session-chip"><%= sessionGeneratorText.course %>: <strong><%= selectedCourse.name %></strong></span>
             <% } %>
             <% if (activeSemester) { %>
-              <span class="session-chip">Семестр: <strong><%= activeSemester.title || ('#' + activeSemester.id) %></strong></span>
+              <span class="session-chip"><%= sessionGeneratorText.semester %>: <strong><%= activeSemester.title || (sessionGeneratorText.semesterPrefix + activeSemester.id) %></strong></span>
             <% } %>
           </div>
         </div>
@@ -738,31 +951,31 @@
           <div class="card liquid-panel mb-4">
             <div class="card-body">
               <div class="panel-title-row">
-                <h5>Параметри календаря</h5>
-                <div class="location-toggle-group" role="tablist" aria-label="Campus">
-                  <button class="btn btn-sm <%= activeLocation === 'kyiv' ? 'btn-primary' : 'btn-outline-secondary' %>" type="button" data-location="kyiv">Kyiv</button>
-                  <button class="btn btn-sm <%= activeLocation === 'munich' ? 'btn-primary' : 'btn-outline-secondary' %>" type="button" data-location="munich">Munich</button>
+                <h5><%= sessionGeneratorText.calendarTitle %></h5>
+                <div class="location-toggle-group" role="tablist" aria-label="<%= sessionGeneratorText.campusAria %>">
+                  <button class="btn btn-sm <%= activeLocation === 'kyiv' ? 'btn-primary' : 'btn-outline-secondary' %>" type="button" data-location="kyiv"><%= sessionGeneratorText.locationKyiv %></button>
+                  <button class="btn btn-sm <%= activeLocation === 'munich' ? 'btn-primary' : 'btn-outline-secondary' %>" type="button" data-location="munich"><%= sessionGeneratorText.locationMunich %></button>
                 </div>
               </div>
-              <div class="session-subtle mb-2">Налаштування впливають на сітку слотів для ручного призначення подій.</div>
+              <div class="session-subtle mb-2"><%= sessionGeneratorText.calendarHint %></div>
               <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
                 <a
                   class="btn btn-outline-secondary btn-sm"
                   href="/admin/session-generator?draft_action=new&location=<%= activeLocation %><%= form && form.course_id ? ('&course_id=' + form.course_id) : '' %><%= selectedSemesterId ? ('&semester_id=' + selectedSemesterId) : '' %>"
                 >
-                  Новий план
+                  <%= sessionGeneratorText.newPlan %>
                 </a>
                 <% if (draftMeta && draftMeta.id) { %>
                   <a
                     class="btn btn-outline-secondary btn-sm"
                     href="/admin/session-generator?draft_id=<%= draftMeta.id %>&draft_action=clear&location=<%= activeLocation %><%= form && form.course_id ? ('&course_id=' + form.course_id) : '' %><%= selectedSemesterId ? ('&semester_id=' + selectedSemesterId) : '' %>"
                   >
-                    Очистити план
+                    <%= sessionGeneratorText.clearPlan %>
                   </a>
                 <% } %>
                 <% if (draftMeta && draftMeta.list && draftMeta.list.length > 1) { %>
                   <div class="d-flex align-items-center gap-2 ms-auto">
-                    <label class="small text-muted m-0" for="draftSwitcherSelect">Плани</label>
+                    <label class="small text-muted m-0" for="draftSwitcherSelect"><%= sessionGeneratorText.drafts %></label>
                     <select class="form-select form-select-sm" id="draftSwitcherSelect" style="width: auto;" data-draft-switch>
                       <% draftMeta.list.forEach(function(d) { %>
                         <option value="/admin/session-generator?draft_id=<%= d.id %>" <%= Number(d.id) === Number(draftMeta.id) ? 'selected' : '' %>>
@@ -777,11 +990,11 @@
                 <input type="hidden" name="location" id="sessionLocationInput" value="<%= activeLocation %>" />
                 <input type="hidden" name="draft_id" id="sessionDraftIdInput" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
                 <div class="col-12">
-                  <label class="form-label">Курс</label>
+                  <label class="form-label"><%= sessionGeneratorText.course %></label>
                   <select class="form-select" name="course_id" onchange="this.form.submit()">
                     <% const locationCourses = (coursesByLocation && coursesByLocation[activeLocation]) || []; %>
                     <% if (!locationCourses.length) { %>
-                      <option value="">Немає курсів</option>
+                      <option value=""><%= sessionGeneratorText.noCourses %></option>
                     <% } %>
                     <% locationCourses.forEach(function(course) { %>
                       <option value="<%= course.id %>" <%= Number(course.id) === Number(form && form.course_id) ? 'selected' : '' %>><%= course.name %></option>
@@ -789,56 +1002,56 @@
                   </select>
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Семестр</label>
+                  <label class="form-label"><%= sessionGeneratorText.semester %></label>
                   <select class="form-select" name="semester_id" onchange="this.form.submit()" <%= (semesters && semesters.length) ? '' : 'disabled' %>>
                     <% if (!(semesters && semesters.length)) { %>
-                      <option value="">Немає семестрів</option>
+                      <option value=""><%= sessionGeneratorText.noSemesters %></option>
                     <% } %>
                     <% (semesters || []).forEach(function(sem) { %>
                       <option value="<%= sem.id %>" <%= Number(sem.id) === Number(selectedSemesterId) ? 'selected' : '' %>>
-                        <%= sem.title || ('Semester #' + sem.id) %> · <%= sem.weeks_count || '—' %> тиж.
+                        <%= formatSessionSemesterOption(sem) %>
                       </option>
                     <% }); %>
                   </select>
                 </div>
                 <input type="hidden" name="window_mode" value="weeks" />
                 <div class="col-4">
-                  <label class="form-label">Тижнів сесії</label>
+                  <label class="form-label"><%= sessionGeneratorText.sessionWeeksCount %></label>
                   <input class="form-control" type="number" min="1" max="12" name="session_weeks_count" value="<%= form && form.session_weeks_count %>" />
                 </div>
                 <div class="col-8">
-                  <label class="form-label">Які тижні (опц.)</label>
-                  <input class="form-control" type="text" name="session_weeks_set" value="<%= (form && form.session_weeks_set) || '' %>" placeholder="Напр. 14-15 або 15,16" />
+                  <label class="form-label"><%= sessionGeneratorText.sessionWeeksSet %></label>
+                  <input class="form-control" type="text" name="session_weeks_set" value="<%= (form && form.session_weeks_set) || '' %>" placeholder="<%= sessionGeneratorText.sessionWeeksPlaceholder %>" />
                   <div class="small text-muted mt-1">
                     <% if (sessionWeekNumbers && sessionWeekNumbers.length) { %>
-                      Сесійні тижні: <%= sessionWeekNumbers.join(', ') %>
+                      <%= sessionGeneratorText.sessionWeeksSelected %> <%= sessionWeekNumbers.join(', ') %>
                     <% } else { %>
-                      Якщо порожньо, візьмемо останні N тижнів семестру.
+                      <%= sessionGeneratorText.sessionWeeksFallback %>
                     <% } %>
                   </div>
                 </div>
                 <input type="hidden" name="start_date" value="<%= (form && form.start_date) || '' %>" />
                 <input type="hidden" name="session_days" value="<%= form && form.session_days ? form.session_days : 14 %>" />
                 <div class="col-12 col-sm-4">
-                  <label class="form-label">Активні дні курсу</label>
+                  <label class="form-label"><%= sessionGeneratorText.activeStudyDays %></label>
                   <div class="form-control d-flex align-items-center flex-wrap gap-1" style="min-height: 38px;">
                     <% if (activeStudyDayNames && activeStudyDayNames.length) { %>
                       <% activeStudyDayNames.forEach(function(day) { %>
                         <span class="mark-pill info"><%= day.slice(0,2) %></span>
                       <% }); %>
                     <% } else { %>
-                      <span class="text-muted small">Немає налаштувань</span>
+                      <span class="text-muted small"><%= sessionGeneratorText.noSettings %></span>
                     <% } %>
                   </div>
                 </div>
                 <div class="col-12 d-grid gap-2">
                   <label class="form-check">
                     <input class="form-check-input" type="checkbox" name="include_weekends" value="1" <%= form && form.include_weekends ? 'checked' : '' %> />
-                    <span class="form-check-label">Дозволити суботу/неділю у сесії</span>
+                    <span class="form-check-label"><%= sessionGeneratorText.allowWeekends %></span>
                   </label>
                   <label class="form-check">
                     <input class="form-check-input" type="checkbox" name="respect_study_days" value="1" <%= form && form.respect_study_days ? 'checked' : '' %> />
-                    <span class="form-check-label">Планувати тільки в активні навчальні дні курсу</span>
+                    <span class="form-check-label"><%= sessionGeneratorText.respectStudyDays %></span>
                   </label>
                 </div>
                 <input type="hidden" name="max_events_per_day" value="<%= form && form.max_events_per_day ? form.max_events_per_day : 3 %>" />
@@ -852,10 +1065,10 @@
                 <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
                 <input type="hidden" name="include_consultations" value="0" />
                 <div class="col-12 d-grid">
-                  <button class="btn btn-primary" type="submit" <%= form && form.course_id ? '' : 'disabled' %>>Оновити сітку слотів</button>
+                  <button class="btn btn-primary" type="submit" <%= form && form.course_id ? '' : 'disabled' %>><%= sessionGeneratorText.updateSlotGrid %></button>
                 </div>
                 <div class="col-12 session-subtle">
-                  Автогенерацію прибрано: тепер тільки ручний режим з накладанням на вибрані тижні семестру.
+                  <%= sessionGeneratorText.manualOnly %>
                 </div>
               </form>
             </div>
@@ -864,8 +1077,8 @@
           <div class="card liquid-panel mb-4">
             <div class="card-body">
               <div class="panel-title-row">
-                <h5>Спецпозначки</h5>
-                <span class="session-subtle">Легенда</span>
+                <h5><%= sessionGeneratorText.legendTitle %></h5>
+                <span class="session-subtle"><%= sessionGeneratorText.legendLabel %></span>
               </div>
               <div class="legend-grid">
                 <% (sessionMarkLegend || []).forEach(function(mark) { %>
@@ -890,94 +1103,94 @@
               };
             })
             .filter(function(subject) { return Number.isFinite(subject.id) && subject.id > 0; })
-            .sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'uk'); }); %>
+            .sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || ''), sessionGeneratorLocale); }); %>
 
           <div class="card liquid-panel mb-4">
             <div class="card-body">
               <div class="panel-title-row">
-                <h5>Ручне призначення сесії</h5>
-                <span class="session-subtle">оберіть тип і предмет, потім клік по слоту</span>
+                <h5><%= sessionGeneratorText.manualTitle %></h5>
+                <span class="session-subtle"><%= sessionGeneratorText.manualHint %></span>
               </div>
               <div class="row g-3">
                 <div class="col-12 col-lg-4 manual-controls-col">
                   <div class="d-grid gap-2">
                     <div>
-                      <label class="form-label">Тип контролю</label>
-                      <div class="btn-group w-100 manual-type-group" role="group" aria-label="Session type">
-                        <button class="btn btn-outline-primary active" type="button" data-manual-type="exam">Екзамен</button>
-                        <button class="btn btn-outline-secondary" type="button" data-manual-type="consultation">Консультація</button>
-                        <button class="btn btn-outline-danger" type="button" data-manual-type="credit">Залік</button>
+                      <label class="form-label"><%= sessionGeneratorText.sessionType %></label>
+                      <div class="btn-group w-100 manual-type-group" role="group" aria-label="<%= sessionGeneratorText.sessionType %>">
+                        <button class="btn btn-outline-primary active" type="button" data-manual-type="exam"><%= sessionGeneratorText.exam %></button>
+                        <button class="btn btn-outline-secondary" type="button" data-manual-type="consultation"><%= sessionGeneratorText.consultation %></button>
+                        <button class="btn btn-outline-danger" type="button" data-manual-type="credit"><%= sessionGeneratorText.credit %></button>
                       </div>
                     </div>
                     <div>
-                      <label class="form-label" for="manualSubjectSelect">Предмет</label>
+                      <label class="form-label" for="manualSubjectSelect"><%= sessionGeneratorText.subject %></label>
                       <select class="form-select" id="manualSubjectSelect">
-                        <option value="">Оберіть предмет</option>
+                        <option value=""><%= sessionGeneratorText.chooseSubject %></option>
                         <% manualSubjectRows.forEach(function(subject) { %>
                           <option value="<%= subject.id %>"><%= subject.name %></option>
                         <% }); %>
                       </select>
                     </div>
                     <div>
-                      <label class="form-label" for="manualGroupSelect">Група</label>
+                      <label class="form-label" for="manualGroupSelect"><%= sessionGeneratorText.group %></label>
                       <select class="form-select" id="manualGroupSelect" disabled>
-                        <option value="">Усі групи предмета</option>
+                        <option value=""><%= sessionGeneratorText.allSubjectGroups %></option>
                       </select>
                     </div>
                     <div class="liquid-alert info">
-                      1) Оберіть тип + предмет + групу. 2) Клік по слоту додає/видаляє подію. 3) Для масового заповнення затисніть кнопку миші і протягніть по слотах.
+                      <%= sessionGeneratorText.plannerSteps %>
                     </div>
                     <div class="d-grid gap-2">
-                      <button class="btn btn-outline-secondary btn-sm" type="button" id="manualPlanClearBtn">Очистити ручний план</button>
-                      <button class="btn btn-outline-secondary btn-sm" type="button" id="manualConflictsRecheckBtn">Оновити live-конфлікти</button>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" id="manualPlanClearBtn"><%= sessionGeneratorText.clearManualPlan %></button>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" id="manualConflictsRecheckBtn"><%= sessionGeneratorText.refreshLiveConflicts %></button>
                     </div>
                     <div class="liquid-alert info" id="manualLiveConflictStatus">
-                      Live-конфлікти: перевірка не запускалась.
+                      <%= sessionGeneratorText.liveConflictIdle %>
                     </div>
                     <div class="liquid-alert warn" id="manualBlockReasonBox">
-                      Пояснення блокувань: оберіть предмет і наведіть/клікніть по слоту.
+                      <%= sessionGeneratorText.blockReasonIdle %>
                     </div>
                   </div>
                 </div>
                 <div class="col-12 col-lg-8 manual-slots-col">
                   <% if (!(slotBoard && slotBoard.length)) { %>
-                    <div class="timeline-empty">Немає слотів для поточних параметрів сесії.</div>
+                    <div class="timeline-empty"><%= sessionGeneratorText.noSlots %></div>
                   <% } else { %>
                     <div class="row g-2 mb-2">
                       <div class="col-12 col-md-6">
-                        <label class="form-label small mb-1" for="slotFilterTeacher">Фільтр: викладач</label>
+                        <label class="form-label small mb-1" for="slotFilterTeacher"><%= sessionGeneratorText.filterTeacher %></label>
                         <select class="form-select form-select-sm" id="slotFilterTeacher">
-                          <option value="">Усі викладачі</option>
+                          <option value=""><%= sessionGeneratorText.allTeachers %></option>
                           <% (sessionTeacherFilterOptions || []).forEach(function(teacher) { %>
                             <option value="<%= teacher.id %>"><%= teacher.name %></option>
                           <% }); %>
                         </select>
                       </div>
                       <div class="col-12 col-md-6">
-                        <label class="form-label small mb-1" for="slotFilterSubject">Фільтр: предмет</label>
+                        <label class="form-label small mb-1" for="slotFilterSubject"><%= sessionGeneratorText.filterSubject %></label>
                         <select class="form-select form-select-sm" id="slotFilterSubject">
-                          <option value="">Усі предмети</option>
+                          <option value=""><%= sessionGeneratorText.allSubjects %></option>
                           <% manualSubjectRows.forEach(function(subject) { %>
                             <option value="<%= subject.id %>"><%= subject.name %></option>
                           <% }); %>
                         </select>
                       </div>
                       <div class="col-12 col-md-6">
-                        <label class="form-label small mb-1" for="slotFilterGroup">Фільтр: група</label>
+                        <label class="form-label small mb-1" for="slotFilterGroup"><%= sessionGeneratorText.filterGroup %></label>
                         <select class="form-select form-select-sm" id="slotFilterGroup">
-                          <option value="">Усі групи</option>
+                          <option value=""><%= sessionGeneratorText.allGroups %></option>
                           <% for (let groupIdx = 1; groupIdx <= 6; groupIdx += 1) { %>
-                            <option value="<%= groupIdx %>">Група <%= groupIdx %></option>
+                            <option value="<%= groupIdx %>"><%= sessionGeneratorText.groupPrefix %> <%= groupIdx %></option>
                           <% } %>
                         </select>
                       </div>
                       <div class="col-12 col-md-6">
-                        <label class="form-label small mb-1" for="slotFilterType">Фільтр: тип події</label>
+                        <label class="form-label small mb-1" for="slotFilterType"><%= sessionGeneratorText.filterEventType %></label>
                         <select class="form-select form-select-sm" id="slotFilterType">
-                          <option value="">Усі типи</option>
-                          <option value="exam">Екзамен</option>
-                          <option value="consultation">Консультація</option>
-                          <option value="credit">Залік</option>
+                          <option value=""><%= sessionGeneratorText.allTypes %></option>
+                          <option value="exam"><%= sessionGeneratorText.exam %></option>
+                          <option value="consultation"><%= sessionGeneratorText.consultation %></option>
+                          <option value="credit"><%= sessionGeneratorText.credit %></option>
                         </select>
                       </div>
                     </div>
@@ -987,9 +1200,9 @@
                           <div class="slot-day-head">
                             <div>
                               <div class="timeline-day-title"><%= day.day_short || '' %> · <%= day.date || '' %></div>
-                              <div class="timeline-day-subtitle"><%= day.day_name || '' %> · тиждень <%= day.week_number || '—' %></div>
+                              <div class="timeline-day-subtitle"><%= day.day_name || '' %> · <%= sessionGeneratorText.week %> <%= day.week_number || '—' %></div>
                             </div>
-                            <span class="mark-pill muted">вільно <%= day.free_count || 0 %> / зайнято <%= day.busy_count || 0 %></span>
+                            <span class="mark-pill muted"><%= formatSessionFreeBusyLabel(day.free_count, day.busy_count) %></span>
                           </div>
                           <div class="slot-row-grid">
                             <% (day.slots || []).forEach(function(slot) { %>
@@ -1004,16 +1217,16 @@
                                 data-slot-time="<%= slot.time_label || '' %>"
                                 data-slot-busy-meta="<%= encodeURIComponent(JSON.stringify(slot.busy || [])) %>"
                               >
-                                <div class="slot-cell-top">Пара <%= slot.class_number %></div>
+                                <div class="slot-cell-top"><%= sessionGeneratorText.pair %> <%= slot.class_number %></div>
                                 <div class="slot-cell-time"><%= slot.time_label || '' %></div>
                                 <% if (slot.is_busy && slot.busy && slot.busy.length) { %>
                                   <div class="slot-cell-content">
                                     <% slot.busy.slice(0, 2).forEach(function(busy, idx) { %>
-                                      <div><%= busy.subject_name || 'Пара' %> · Г<%= busy.group_number || '-' %><%= idx === 1 && slot.busy.length > 2 ? '…' : '' %></div>
+                                      <div><%= busy.subject_name || sessionGeneratorText.pairFallback %> · <%= sessionGeneratorText.groupPrefix.charAt(0) %><%= busy.group_number || '-' %><%= idx === 1 && slot.busy.length > 2 ? '…' : '' %></div>
                                     <% }); %>
                                   </div>
                                 <% } else { %>
-                                  <div class="slot-cell-content text-muted">Вільний слот</div>
+                                  <div class="slot-cell-content text-muted"><%= sessionGeneratorText.freeSlot %></div>
                                 <% } %>
                                 <div class="slot-cell-assignment" data-slot-assignment></div>
                                 <div class="slot-cell-conflict" data-slot-conflict></div>
@@ -1033,12 +1246,12 @@
             <div class="card-body d-grid gap-2">
               <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
-                  <div class="fw-semibold">Публікація сесії</div>
-                  <div class="session-subtle" id="sessionPublishSourceHint">Джерело: ручний план</div>
+                  <div class="fw-semibold"><%= sessionGeneratorText.publishTitle %></div>
+                  <div class="session-subtle" id="sessionPublishSourceHint"><%= sessionGeneratorText.publishSourceManual %></div>
                 </div>
-                <span class="mark-pill info">Подій: <span id="sessionPublishCount">0</span></span>
+                <span class="mark-pill info"><%= sessionGeneratorText.events %>: <span id="sessionPublishCount">0</span></span>
               </div>
-              <div class="session-subtle">1) Перевірте конфлікти викладачів. 2) Якщо все чисто, публікуйте в журнал і розклад.</div>
+              <div class="session-subtle"><%= sessionGeneratorText.publishHint %></div>
               <input type="hidden" name="location" value="<%= activeLocation %>" />
               <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
               <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
@@ -1063,19 +1276,19 @@
               <input type="hidden" name="manual_assignments_json" id="manualAssignmentsInput" value="" />
               <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-outline-secondary" id="sessionCheckConflictsBtn" type="submit" name="publish_action" value="check_conflicts" disabled>
-                  Перевірити конфлікти
+                  <%= sessionGeneratorText.checkConflicts %>
                 </button>
                 <button class="btn btn-danger" id="sessionPublishBtn" type="submit" name="publish_action" value="publish" disabled>
-                  Опублікувати в розклад і журнал
+                  <%= sessionGeneratorText.publishButton %>
                 </button>
               </div>
             </div>
           </form>
 
-          <form method="POST" action="/admin/session-generator/delete" class="card liquid-panel mb-4" onsubmit="return window.confirm('Видалити сесійні події у вибраному вікні тижнів?');">
+          <form method="POST" action="/admin/session-generator/delete" class="card liquid-panel mb-4" onsubmit='return window.confirm(<%- JSON.stringify(sessionGeneratorText.deleteConfirm) %>);'>
             <div class="card-body d-grid gap-2">
-              <div class="fw-semibold">Видалення сесії</div>
-              <div class="session-subtle">Видаляє лише події з префіксом [Сесія] у межах вибраних тижнів.</div>
+              <div class="fw-semibold"><%= sessionGeneratorText.deleteTitle %></div>
+              <div class="session-subtle"><%= sessionGeneratorText.deleteHint %></div>
               <input type="hidden" name="location" value="<%= activeLocation %>" />
               <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
               <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
@@ -1087,7 +1300,7 @@
               <input type="hidden" name="session_weeks_set" value="<%= form && form.session_weeks_set ? form.session_weeks_set : '' %>" />
               <input type="hidden" name="include_weekends" value="<%= form && form.include_weekends ? 1 : 0 %>" />
               <input type="hidden" name="respect_study_days" value="<%= form && form.respect_study_days ? 1 : 0 %>" />
-              <button class="btn btn-outline-danger" type="submit">Видалити сесію у вибраному вікні</button>
+              <button class="btn btn-outline-danger" type="submit"><%= sessionGeneratorText.deleteButton %></button>
             </div>
           </form>
         </div>
@@ -1156,6 +1369,18 @@
         const publishCount = document.getElementById('sessionPublishCount');
         const slotButtons = Array.from(document.querySelectorAll('[data-slot-btn]'));
 
+        const sessionGeneratorText = <%- JSON.stringify(sessionGeneratorText) %>;
+        const sessionGeneratorTypeShortLabels = <%- JSON.stringify(sessionGeneratorTypeShortLabels) %>;
+        const formatClientGroupLabel = (groupNumber, groupCount) => groupNumber
+          ? `${sessionGeneratorText.groupPrefix} ${groupNumber}`
+          : (groupCount > 1 ? `${sessionGeneratorText.allGroups} (${groupCount})` : sessionGeneratorText.allSimple);
+        const formatClientMoreLabel = (count) => `+${count} ${sessionGeneratorText.more}`;
+        const formatLiveConflictNotFound = (count) =>
+          `${sessionGeneratorText.liveConflictNotFoundPrefix} (${count} ${sessionGeneratorText.checkedEvents}).`;
+        const formatLiveConflictBase = (count) =>
+          `${sessionGeneratorText.liveConflictBasePrefix} ${count}.`;
+        const formatLiveConflictOutOfWindow = (count) =>
+          ` ${sessionGeneratorText.outOfWindowPrefix}: ${count}.`;
         const manualSubjects = <%- JSON.stringify(manualSubjectRows || []) %>;
         const manualAssignmentsSeed = <%- JSON.stringify(manualAssignmentsInitial || []) %>;
         const sessionTeacherMapPayload = <%- JSON.stringify(sessionTeacherMapPayload || {}) %>;
@@ -1246,8 +1471,8 @@
             subject_name: String(subject.name || ''),
             group_number: groupNumber,
             group_label: groupNumber
-              ? `Група ${groupNumber}`
-              : (groupCount > 1 ? `Всі групи (${groupCount})` : 'Всі'),
+              ? formatClientGroupLabel(groupNumber, groupCount)
+              : formatClientGroupLabel(null, groupCount),
             type: normalizeAssignmentType(row.type),
             date,
             day_name: String(row.day_name || ''),
@@ -1274,7 +1499,7 @@
           const byClass = Number(a.class_number || 0) - Number(b.class_number || 0);
           if (byClass !== 0) return byClass;
           if (a.type !== b.type) return Number(typeOrder[a.type] || 9) - Number(typeOrder[b.type] || 9);
-          const bySubject = String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
+          const bySubject = String(a.subject_name || '').localeCompare(String(b.subject_name || ''), <%- JSON.stringify(sessionGeneratorLocale) %>);
           if (bySubject !== 0) return bySubject;
           return Number(a.group_number || 0) - Number(b.group_number || 0);
         });
@@ -1380,14 +1605,14 @@
           const subjectId = Number(manualSubjectSelect.value || 0);
           const subject = manualSubjectMap.get(subjectId);
           if (!subject) {
-            manualGroupSelect.innerHTML = '<option value="">Усі групи предмета</option>';
+            manualGroupSelect.innerHTML = `<option value="">${escapeHtml(sessionGeneratorText.allSubjectGroups)}</option>`;
             manualGroupSelect.disabled = true;
             return;
           }
           const groupCount = Math.max(1, Number(subject.group_count || 1));
-          const options = ['<option value="">Усі групи предмета</option>'];
+          const options = [`<option value="">${escapeHtml(sessionGeneratorText.allSubjectGroups)}</option>`];
           for (let index = 1; index <= groupCount; index += 1) {
-            options.push(`<option value="${index}">Група ${index}</option>`);
+            options.push(`<option value="${index}">${escapeHtml(sessionGeneratorText.groupPrefix)} ${index}</option>`);
           }
           manualGroupSelect.innerHTML = options.join('');
           manualGroupSelect.disabled = false;
@@ -1396,36 +1621,36 @@
         const updateBlockReasonMessage = (button) => {
           if (!manualBlockReasonBox) return;
           if (!button) {
-            manualBlockReasonBox.textContent = 'Пояснення блокувань: оберіть предмет і наведіть/клікніть по слоту.';
+            manualBlockReasonBox.textContent = sessionGeneratorText.blockReasonNeedSelection;
             return;
           }
           const candidate = buildCandidateFromSlot(button);
           if (!candidate) {
-            manualBlockReasonBox.textContent = 'Оберіть предмет і групу, щоб побачити пояснення для слоту.';
+            manualBlockReasonBox.textContent = sessionGeneratorText.blockReasonNeedSubjectGroup;
             return;
           }
           const currentSlotKey = slotKey(candidate.date, candidate.class_number);
           const reasons = [];
           const exactAssignmentExists = manualAssignments.some((row) => assignmentKey(row) === assignmentKey(candidate));
           if (exactAssignmentExists) {
-            reasons.push('У плані вже є ідентична подія. Повторний клік видалить її.');
+            reasons.push(sessionGeneratorText.blockReasonDuplicate);
           }
           const slotMeta = slotMetaByKey.get(currentSlotKey);
           const busyRows = slotMeta && Array.isArray(slotMeta.busy_rows) ? slotMeta.busy_rows : [];
           if (busyRows.length) {
-            reasons.push('Слот уже має звичайну пару в розкладі (накладання допустиме, але перевірте доцільність).');
+            reasons.push(sessionGeneratorText.blockReasonBusy);
           }
           const slotConflict = liveConflictState && liveConflictState.slot_conflicts
             ? liveConflictState.slot_conflicts[currentSlotKey]
             : null;
           if (slotConflict && slotConflict.reason_text) {
-            reasons.push(`Конфлікт викладача: ${slotConflict.reason_text}`);
+            reasons.push(`${sessionGeneratorText.teacherConflictPrefix} ${slotConflict.reason_text}`);
           }
           if (explicitSessionDates.length && !explicitSessionDates.includes(candidate.date)) {
-            reasons.push('Дата поза вибраним вікном тижнів сесії.');
+            reasons.push(sessionGeneratorText.blockReasonOutOfWindow);
           }
           if (!reasons.length) {
-            reasons.push('Слот виглядає придатним для призначення за поточними фільтрами.');
+            reasons.push(sessionGeneratorText.blockReasonSuitable);
           }
           manualBlockReasonBox.textContent = reasons.join(' ');
         };
@@ -1451,10 +1676,10 @@
             } else {
               button.classList.add('is-assigned');
               const rowsHtml = slotRows.slice(0, 2).map((item) => `
-                <div><span class="mark-pill ${item.type === 'credit' ? 'danger' : (item.type === 'consultation' ? 'muted' : 'info')}">${item.type === 'credit' ? 'Залік' : (item.type === 'consultation' ? 'Конс' : 'Екз')}</span> ${escapeHtml(item.subject_name)} · ${escapeHtml(item.group_label || 'Усі групи')}</div>
+                <div><span class="mark-pill ${item.type === 'credit' ? 'danger' : (item.type === 'consultation' ? 'muted' : 'info')}">${escapeHtml(sessionGeneratorTypeShortLabels[item.type] || sessionGeneratorTypeShortLabels.exam)}</span> ${escapeHtml(item.subject_name)} · ${escapeHtml(item.group_label || sessionGeneratorText.allGroups)}</div>
               `).join('');
               const moreHtml = slotRows.length > 2
-                ? `<div class="small text-muted">+${slotRows.length - 2} ще</div>`
+                ? `<div class="small text-muted">${escapeHtml(formatClientMoreLabel(slotRows.length - 2))}</div>`
                 : '';
               holder.innerHTML = rowsHtml + moreHtml;
             }
@@ -1494,8 +1719,8 @@
           }))) : '';
           if (publishSourceHint) {
             publishSourceHint.textContent = rows.length
-              ? 'Джерело: ручний план'
-              : 'Джерело: ручний план (порожньо)';
+              ? sessionGeneratorText.publishSourceManual
+              : sessionGeneratorText.publishSourceEmpty;
           }
           if (publishCount) {
             publishCount.textContent = String(rows.length);
@@ -1504,7 +1729,7 @@
 
         const setLiveConflictStatusText = (text, mode) => {
           if (!liveConflictStatus) return;
-          liveConflictStatus.textContent = text || 'Live-конфлікти: немає даних.';
+          liveConflictStatus.textContent = text || sessionGeneratorText.liveConflictNoData;
           liveConflictStatus.classList.remove('live-conflict-ok', 'live-conflict-err');
           if (mode === 'ok') liveConflictStatus.classList.add('live-conflict-ok');
           if (mode === 'err') liveConflictStatus.classList.add('live-conflict-err');
@@ -1590,7 +1815,7 @@
               summary: '',
               slot_conflicts: {},
             };
-            setLiveConflictStatusText('Live-конфлікти: ручний план порожній.', 'ok');
+            setLiveConflictStatusText(sessionGeneratorText.liveConflictEmpty, 'ok');
             renderSlotAssignments();
             if (force) {
               updateBlockReasonMessage(lastHoveredSlotKey && slotMetaByKey.get(lastHoveredSlotKey)
@@ -1636,19 +1861,19 @@
             };
             if (!liveConflictState.conflicts_total && !liveConflictState.out_of_window_total) {
               setLiveConflictStatusText(
-                `Live-конфлікти: не знайдено (${Number(data.checked_rows || 0)} перевірених подій).`,
+                formatLiveConflictNotFound(Number(data.checked_rows || 0)),
                 'ok'
               );
             } else {
-              const base = liveConflictState.summary || `Live-конфлікти: ${liveConflictState.conflicts_total}.`;
+              const base = liveConflictState.summary || formatLiveConflictBase(liveConflictState.conflicts_total);
               const outOfWindowPart = liveConflictState.out_of_window_total
-                ? ` Поза вікном тижнів: ${liveConflictState.out_of_window_total}.`
+                ? formatLiveConflictOutOfWindow(liveConflictState.out_of_window_total)
                 : '';
               setLiveConflictStatusText(`${base}${outOfWindowPart}`.trim(), 'err');
             }
           } catch (_err) {
             if (myToken !== liveConflictRequestToken) return;
-            setLiveConflictStatusText('Live-конфлікти: не вдалося оновити (перевірка недоступна).', 'err');
+            setLiveConflictStatusText(sessionGeneratorText.liveConflictUpdateFailed, 'err');
           }
           renderSlotAssignments();
           if (force) {
@@ -1671,7 +1896,7 @@
         const toggleManualAssignmentFromSlot = (button, explicitMode) => {
           const candidate = buildCandidateFromSlot(button);
           if (!candidate) {
-            window.alert('Оберіть предмет перед додаванням події.');
+            window.alert(sessionGeneratorText.chooseSubjectAlert);
             return false;
           }
           const key = assignmentKey(candidate);
@@ -1815,7 +2040,7 @@
         syncManualTypeButtons();
         renderSlotAssignments();
         syncPublishState();
-        setLiveConflictStatusText('Live-конфлікти: оновлення...', null);
+        setLiveConflictStatusText(sessionGeneratorText.liveConflictUpdating, null);
         runLiveConflictCheck();
 
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
