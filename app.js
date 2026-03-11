@@ -23652,6 +23652,123 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     req.session.adminCourse = selectedCourseId;
 
     const trackFilter = normalizePathwayTrackFilter(req.query.track, 'all');
+    const pathwaysLang = getPreferredLang(req);
+    const isPathwaysUk = pathwaysLang === 'uk';
+    const pathwaysText = isPathwaysUk ? {
+      ready: 'Готово',
+      inactive: 'Неактивна',
+      blocked: 'Заблоковано',
+      needsAttention: 'Потрібна увага',
+      cohortDisabled: 'Когорту вимкнено',
+      noMappedCourses: 'Немає замаплених курсів',
+      noVisibleSubjects: 'Немає видимих предметів',
+      campusConflict: 'Конфлікт кампусу',
+      partialMapping: 'Частковий мапінг',
+      filteredSubjects: 'Відфільтровані предмети',
+      noUsersAssigned: 'Немає призначених користувачів',
+      signalCourseMapping: 'Мапінг курсів',
+      signalSubjectVisibility: 'Видимість предметів',
+      signalCampusRouting: 'Маршрутизація кампусів',
+      signalUserMigration: 'Міграція користувачів',
+      registrationClosed: 'Реєстрація ще закрита',
+      visibleLinkedCourses: 'Видимі прив\'язані курси',
+      studentVisibleScope: 'Студентський видимий контур',
+      oneCoursePerCampus: 'По одному курсу на кампус',
+      noSourceCourses: 'Немає джерельних курсів',
+      selectCompatibleSourceCourses: 'Оберіть сумісні джерельні курси',
+      pickCohortTitle: 'Оберіть когорту, щоб увімкнути фокус-режим',
+      pickCohortBody: 'Спершу оберіть рік вступу, тоді простір зможе показати, чи реально готові мапінг, предмети, кампуси та міграція.',
+      goToAdmissions: 'До років вступу',
+      mappingBlockedTitle: 'Реєстрацію блокує порожній мапінг курсів',
+      mappingBlockedBodyWithLegacy: (count) => `Поки що немає жодного видимого прив\'язаного курсу. Доступний legacy-швидкий мапінг для ${count} відповідних курсів.`,
+      mappingBlockedBody: 'Поки що немає жодного видимого прив\'язаного курсу, тому студенти не зможуть визначити курс для цієї когорти.',
+      openMapping: 'Відкрити мапінг',
+      emptySubjectsTitle: 'Студенти побачать порожній список предметів',
+      emptySubjectsBody: 'У поточному курсі ця когорта зараз приводить до нуля видимих предметів.',
+      openSubjects: 'Відкрити предмети',
+      campusConflictsTitle: 'Маршрутизація кампусів ще має конфлікти',
+      campusConflictsBody: (items) => `Неоднозначні кампуси: ${items}.`,
+      resolveCampuses: 'Вирішити кампуси',
+      campusMissingTitle: 'Маршрутизації кампусів ще немає',
+      campusMissingBody: 'Замаплені курси вже є, але для реєстрації ще не виводиться жодний готовий маршрут по кампусах.',
+      reviewCampuses: 'Перевірити кампуси',
+      existingUsersTitle: 'Наявним користувачам ще треба проставити когорту',
+      existingUsersBody: (pendingUsers, totalCourses) => `${pendingUsers} користувачів у ${totalCourses} сумісних джерельних курсах ще не прив\'язані до цього року вступу.`,
+      openMigration: 'Відкрити міграцію',
+      baseVisibilityTitle: 'Базова видимість курсу все ще фільтрує предмети',
+      baseVisibilityBody: (count) => `${count} предметів приховано глобально в обраному курсі, тому ця когорта не може показати їх навіть через override року вступу.`,
+      reviewSubjects: 'Перевірити предмети',
+      pendingSuffix: 'очікує',
+      alreadyAlignedSuffix: 'вже вирівняно',
+      blockedSuffix: 'заблоковано',
+      readySuffix: 'готово',
+      hiddenInBaseCourse: (count) => `${count} приховано в базовому курсі`,
+      campusKyiv: 'Київ',
+      campusMunich: 'Мюнхен',
+      teacherBadge: 'Викладацький',
+    } : {
+      ready: 'Ready',
+      inactive: 'Inactive',
+      blocked: 'Blocked',
+      needsAttention: 'Needs attention',
+      cohortDisabled: 'Cohort disabled',
+      noMappedCourses: 'No mapped courses',
+      noVisibleSubjects: 'No visible subjects',
+      campusConflict: 'Campus conflict',
+      partialMapping: 'Partial mapping',
+      filteredSubjects: 'Filtered subjects',
+      noUsersAssigned: 'No users assigned',
+      signalCourseMapping: 'Course mapping',
+      signalSubjectVisibility: 'Subject visibility',
+      signalCampusRouting: 'Campus routing',
+      signalUserMigration: 'User migration',
+      registrationClosed: 'Registration is still closed',
+      visibleLinkedCourses: 'Visible linked courses',
+      studentVisibleScope: 'Student-visible subject scope',
+      oneCoursePerCampus: 'One course per campus',
+      noSourceCourses: 'No source courses',
+      selectCompatibleSourceCourses: 'Select compatible source courses',
+      pickCohortTitle: 'Pick a cohort to unlock focus mode',
+      pickCohortBody: 'Select an admission year first, then the workspace can tell you whether mapping, subjects, campuses, and migration are actually ready.',
+      goToAdmissions: 'Go to admissions',
+      mappingBlockedTitle: 'Registration is blocked by empty course mapping',
+      mappingBlockedBodyWithLegacy: (count) => `No visible courses are linked yet. A legacy quick map is available for ${count} matching courses.`,
+      mappingBlockedBody: 'No visible courses are linked yet, so students cannot resolve a course from this cohort.',
+      openMapping: 'Open mapping',
+      emptySubjectsTitle: 'Students would see an empty subject list',
+      emptySubjectsBody: 'This cohort currently resolves to zero visible subjects in the selected course scope.',
+      openSubjects: 'Open subjects',
+      campusConflictsTitle: 'Campus routing still has conflicts',
+      campusConflictsBody: (items) => `Ambiguous campuses: ${items}.`,
+      resolveCampuses: 'Resolve campuses',
+      campusMissingTitle: 'Campus routing is still missing',
+      campusMissingBody: 'Mapped courses exist, but no campus-ready binding can be derived yet for registration.',
+      reviewCampuses: 'Review campuses',
+      existingUsersTitle: 'Existing users still need cohort stamping',
+      existingUsersBody: (pendingUsers, totalCourses) => `${pendingUsers} users across ${totalCourses} compatible source courses are not assigned to this admission yet.`,
+      openMigration: 'Open migration',
+      baseVisibilityTitle: 'Base course visibility is still filtering subjects',
+      baseVisibilityBody: (count) => `${count} subjects are hidden globally in the selected course, so this cohort cannot expose them even with admission overrides.`,
+      reviewSubjects: 'Review subjects',
+      pendingSuffix: 'pending',
+      alreadyAlignedSuffix: 'already aligned',
+      blockedSuffix: 'blocked',
+      readySuffix: 'ready',
+      hiddenInBaseCourse: (count) => `${count} hidden in base course`,
+      campusKyiv: 'Kyiv',
+      campusMunich: 'Munich',
+      teacherBadge: 'Teacher',
+    };
+    const formatPathwaysCampusLabel = (location) =>
+      normalizeCourseCampus(location) === 'munich' ? pathwaysText.campusMunich : pathwaysText.campusKyiv;
+    const formatPathwaysReadyMetric = (count) => `${Number(count || 0)} ${pathwaysText.readySuffix}`;
+    const formatPathwaysBlockedMetric = (count) => `${Number(count || 0)} ${pathwaysText.blockedSuffix}`;
+    const formatPathwaysPendingMetric = (count) => `${Number(count || 0)} ${pathwaysText.pendingSuffix}`;
+    const formatPathwaysAlignedMetric = (count) => `${Number(count || 0)} ${pathwaysText.alreadyAlignedSuffix}`;
+    const localizeCampusBindings = (bindings) => (Array.isArray(bindings) ? bindings : []).map((item) => ({
+      ...item,
+      campus_label: formatPathwaysCampusLabel(item && item.campus_key ? item.campus_key : item && item.campus_label),
+    }));
 
     const programRows = await db.all(
       `
@@ -23928,9 +24045,11 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     const selectedAdmissionLegacyOrdinal = selectedAdmissionId
       ? (selectedProgramAdmissionsSorted.findIndex((item) => Number(item.id || 0) === Number(selectedAdmissionId)) + 1)
       : 0;
-    const registrationCampusBindings = buildAdmissionCampusChoicesFromCourses(
-      (courseMappings || []).filter((row) => row.is_visible),
-      selectedTrackKey
+    const registrationCampusBindings = localizeCampusBindings(
+      buildAdmissionCampusChoicesFromCourses(
+        (courseMappings || []).filter((row) => row.is_visible),
+        selectedTrackKey
+      )
     );
     const ambiguousCampusBindings = registrationCampusBindings.filter((item) => item.is_ambiguous);
     const legacySuggestedCourseIds = new Set();
@@ -24113,7 +24232,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
 
     const selectedCourse = courseById.get(Number(selectedCourseId || 0)) || null;
     const selectedCourseLabel = selectedCourse
-      ? `${sanitizeCompactText(selectedCourse.name || '', 120)} / ${formatCampusLabelServer(selectedCourse.location)}${isTeacherCourseRecord(selectedCourse) ? ' / Teacher' : ''}`
+      ? `${sanitizeCompactText(selectedCourse.name || '', 120)} / ${formatPathwaysCampusLabel(selectedCourse.location)}${isTeacherCourseRecord(selectedCourse) ? ` / ${pathwaysText.teacherBadge}` : ''}`
       : '';
 
     let admissionHealthCards = [];
@@ -24130,34 +24249,34 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
         const statusNotes = [];
         let statusKey = 'ready';
         let statusTone = 'success';
-        let statusLabel = 'Ready';
+        let statusLabel = pathwaysText.ready;
 
         if (!admission.is_active) {
           statusKey = 'inactive';
           statusTone = 'muted';
-          statusLabel = 'Inactive';
-          statusNotes.push('Cohort disabled');
+          statusLabel = pathwaysText.inactive;
+          statusNotes.push(pathwaysText.cohortDisabled);
         }
 
         if (Number(mappingStats.visible_count || 0) < 1) {
           statusKey = 'blocked';
           statusTone = 'danger';
-          statusLabel = 'Blocked';
-          statusNotes.push('No mapped courses');
+          statusLabel = pathwaysText.blocked;
+          statusNotes.push(pathwaysText.noMappedCourses);
         }
 
         if (Number(subjectStats.total_count || 0) > 0 && Number(subjectStats.visible_count || 0) < 1) {
           statusKey = 'blocked';
           statusTone = 'danger';
-          statusLabel = 'Blocked';
-          statusNotes.push('No visible subjects');
+          statusLabel = pathwaysText.blocked;
+          statusNotes.push(pathwaysText.noVisibleSubjects);
         }
 
         if (Number(campusStats.ambiguous_count || 0) > 0) {
           statusKey = 'blocked';
           statusTone = 'danger';
-          statusLabel = 'Blocked';
-          statusNotes.push('Campus conflict');
+          statusLabel = pathwaysText.blocked;
+          statusNotes.push(pathwaysText.campusConflict);
         }
 
         if (statusKey === 'ready') {
@@ -24168,11 +24287,11 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
           if (hasPartialMapping || hasPartialSubjects || Number(userStats.users_count || 0) < 1) {
             statusKey = 'attention';
             statusTone = 'warning';
-            statusLabel = 'Needs attention';
+            statusLabel = pathwaysText.needsAttention;
           }
-          if (hasPartialMapping) statusNotes.push('Partial mapping');
-          if (hasPartialSubjects) statusNotes.push('Filtered subjects');
-          if (Number(userStats.users_count || 0) < 1) statusNotes.push('No users assigned');
+          if (hasPartialMapping) statusNotes.push(pathwaysText.partialMapping);
+          if (hasPartialSubjects) statusNotes.push(pathwaysText.filteredSubjects);
+          if (Number(userStats.users_count || 0) < 1) statusNotes.push(pathwaysText.noUsersAssigned);
         }
 
         return {
@@ -24201,8 +24320,8 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       if (selectedAdmissionId && selectedProgram) {
         const selectedHealthCard = admissionHealthCards.find((item) => item.is_selected) || null;
         const campusSignalValue = ambiguousCampusBindings.length
-          ? `${ambiguousCampusBindings.length} blocked`
-          : `${registrationCampusBindings.length} ready`;
+          ? formatPathwaysBlockedMetric(ambiguousCampusBindings.length)
+          : formatPathwaysReadyMetric(registrationCampusBindings.length);
         selectedCohortHealth = {
           course_label: selectedCourseLabel,
           program_name: sanitizeCompactText(selectedProgram.name || '', 140),
@@ -24212,19 +24331,19 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
           admission_label: sanitizeCompactText(selectedAdmission && selectedAdmission.label ? selectedAdmission.label : '', 120),
           status_key: selectedHealthCard ? selectedHealthCard.status_key : 'attention',
           status_tone: selectedHealthCard ? selectedHealthCard.status_tone : 'warning',
-          status_label: selectedHealthCard ? selectedHealthCard.status_label : 'Needs attention',
+          status_label: selectedHealthCard ? selectedHealthCard.status_label : pathwaysText.needsAttention,
           signals: [
             {
-              label: 'Course mapping',
+              label: pathwaysText.signalCourseMapping,
               value: `${Number(mappingSummary.visible || 0)} / ${Number(mappingSummary.total || 0)}`,
               tone: Number(mappingSummary.visible || 0) < 1
                 ? 'danger'
                 : (Number(mappingSummary.visible || 0) < Number(mappingSummary.total || 0) ? 'warning' : 'success'),
-              meta: Number(mappingSummary.visible || 0) < 1 ? 'Registration is still closed' : 'Visible linked courses',
+              meta: Number(mappingSummary.visible || 0) < 1 ? pathwaysText.registrationClosed : pathwaysText.visibleLinkedCourses,
               href: '#pathways-mapping',
             },
             {
-              label: 'Subject visibility',
+              label: pathwaysText.signalSubjectVisibility,
               value: `${Number(visibilitySummary.visible || 0)} / ${Number(visibilitySummary.total || 0)}`,
               tone: Number(visibilitySummary.total || 0) < 1
                 ? 'muted'
@@ -24232,32 +24351,32 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
                   ? 'danger'
                   : (Number(visibilitySummary.visible || 0) < Number(visibilitySummary.total || 0) ? 'warning' : 'success')),
               meta: Number(hiddenSubjectCount || 0) > 0
-                ? `${Number(hiddenSubjectCount || 0)} hidden in base course`
-                : 'Student-visible subject scope',
+                ? pathwaysText.hiddenInBaseCourse(Number(hiddenSubjectCount || 0))
+                : pathwaysText.studentVisibleScope,
               href: '#pathways-subjects',
             },
             {
-              label: 'Campus routing',
+              label: pathwaysText.signalCampusRouting,
               value: campusSignalValue,
               tone: ambiguousCampusBindings.length
                 ? 'danger'
                 : (registrationCampusBindings.length ? 'success' : 'warning'),
               meta: ambiguousCampusBindings.length
                 ? ambiguousCampusBindings.map((item) => item.campus_label).join(', ')
-                : 'One course per campus',
+                : pathwaysText.oneCoursePerCampus,
               href: '#pathways-campuses',
             },
             {
-              label: 'User migration',
+              label: pathwaysText.signalUserMigration,
               value: migrationSummary.total_courses
-                ? `${Number(migrationSummary.pending_users || 0)} pending`
-                : 'No source courses',
+                ? formatPathwaysPendingMetric(Number(migrationSummary.pending_users || 0))
+                : pathwaysText.noSourceCourses,
               tone: migrationSummary.total_courses
                 ? (Number(migrationSummary.pending_users || 0) > 0 ? 'warning' : 'success')
                 : 'muted',
               meta: migrationSummary.total_courses
-                ? `${Number(migrationSummary.already_assigned || 0)} already aligned`
-                : 'Select compatible source courses',
+                ? formatPathwaysAlignedMetric(Number(migrationSummary.already_assigned || 0))
+                : pathwaysText.selectCompatibleSourceCourses,
               href: '#pathways-migration',
             },
           ],
@@ -24267,64 +24386,64 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       if (!selectedAdmissionId) {
         cohortAlerts.push({
           tone: 'info',
-          title: 'Pick a cohort to unlock focus mode',
-          body: 'Select an admission year first, then the workspace can tell you whether mapping, subjects, campuses, and migration are actually ready.',
-          action_label: 'Go to admissions',
+          title: pathwaysText.pickCohortTitle,
+          body: pathwaysText.pickCohortBody,
+          action_label: pathwaysText.goToAdmissions,
           target: 'pathways-admissions',
         });
       } else {
         if (Number(mappingSummary.visible || 0) < 1) {
           cohortAlerts.push({
             tone: 'danger',
-            title: 'Registration is blocked by empty course mapping',
+            title: pathwaysText.mappingBlockedTitle,
             body: legacySuggestedCourseCount > 0
-              ? `No visible courses are linked yet. A legacy quick map is available for ${legacySuggestedCourseCount} matching courses.`
-              : 'No visible courses are linked yet, so students cannot resolve a course from this cohort.',
-            action_label: 'Open mapping',
+              ? pathwaysText.mappingBlockedBodyWithLegacy(legacySuggestedCourseCount)
+              : pathwaysText.mappingBlockedBody,
+            action_label: pathwaysText.openMapping,
             target: 'pathways-mapping',
           });
         }
         if (Number(visibilitySummary.total || 0) > 0 && Number(visibilitySummary.visible || 0) < 1) {
           cohortAlerts.push({
             tone: 'danger',
-            title: 'Students would see an empty subject list',
-            body: 'This cohort currently resolves to zero visible subjects in the selected course scope.',
-            action_label: 'Open subjects',
+            title: pathwaysText.emptySubjectsTitle,
+            body: pathwaysText.emptySubjectsBody,
+            action_label: pathwaysText.openSubjects,
             target: 'pathways-subjects',
           });
         }
         if (ambiguousCampusBindings.length) {
           cohortAlerts.push({
             tone: 'warning',
-            title: 'Campus routing still has conflicts',
-            body: `Ambiguous campuses: ${ambiguousCampusBindings.map((item) => `${item.campus_label} (${item.course_count})`).join(', ')}.`,
-            action_label: 'Resolve campuses',
+            title: pathwaysText.campusConflictsTitle,
+            body: pathwaysText.campusConflictsBody(ambiguousCampusBindings.map((item) => `${item.campus_label} (${item.course_count})`).join(', ')),
+            action_label: pathwaysText.resolveCampuses,
             target: 'pathways-campuses',
           });
         } else if (!registrationCampusBindings.length && Number(mappingSummary.visible || 0) > 0) {
           cohortAlerts.push({
             tone: 'warning',
-            title: 'Campus routing is still missing',
-            body: 'Mapped courses exist, but no campus-ready binding can be derived yet for registration.',
-            action_label: 'Review campuses',
+            title: pathwaysText.campusMissingTitle,
+            body: pathwaysText.campusMissingBody,
+            action_label: pathwaysText.reviewCampuses,
             target: 'pathways-campuses',
           });
         }
         if (Number(migrationSummary.pending_users || 0) > 0) {
           cohortAlerts.push({
             tone: 'info',
-            title: 'Existing users still need cohort stamping',
-            body: `${migrationSummary.pending_users} users across ${migrationSummary.total_courses} compatible source courses are not assigned to this admission yet.`,
-            action_label: 'Open migration',
+            title: pathwaysText.existingUsersTitle,
+            body: pathwaysText.existingUsersBody(migrationSummary.pending_users, migrationSummary.total_courses),
+            action_label: pathwaysText.openMigration,
             target: 'pathways-migration',
           });
         }
         if (Number(hiddenSubjectCount || 0) > 0) {
           cohortAlerts.push({
             tone: 'info',
-            title: 'Base course visibility is still filtering subjects',
-            body: `${hiddenSubjectCount} subjects are hidden globally in the selected course, so this cohort cannot expose them even with admission overrides.`,
-            action_label: 'Review subjects',
+            title: pathwaysText.baseVisibilityTitle,
+            body: pathwaysText.baseVisibilityBody(hiddenSubjectCount),
+            action_label: pathwaysText.reviewSubjects,
             target: 'pathways-subjects',
           });
         }
@@ -24340,7 +24459,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
         is_selected: Number(admission.id || 0) === Number(selectedAdmissionId || 0),
         status_key: admission.is_active ? 'attention' : 'inactive',
         status_tone: admission.is_active ? 'warning' : 'muted',
-        status_label: admission.is_active ? 'Needs attention' : 'Inactive',
+        status_label: admission.is_active ? pathwaysText.needsAttention : pathwaysText.inactive,
         status_notes: [],
         mapping_visible_count: 0,
         mapping_total_count: 0,
@@ -24355,9 +24474,9 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       selectedCohortHealth = null;
       cohortAlerts = selectedAdmissionId ? [] : [{
         tone: 'info',
-        title: 'Pick a cohort to unlock focus mode',
-        body: 'Select an admission year first, then the workspace can tell you whether mapping, subjects, campuses, and migration are actually ready.',
-        action_label: 'Go to admissions',
+        title: pathwaysText.pickCohortTitle,
+        body: pathwaysText.pickCohortBody,
+        action_label: pathwaysText.goToAdmissions,
         target: 'pathways-admissions',
       }];
     }
@@ -24445,7 +24564,83 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
   }
 });
 
+function getPathwaysRouteMessages(req) {
+  const isUk = getPreferredLang(req) === 'uk';
+  return isUk ? {
+    databaseError: 'Помилка бази даних',
+    programNameRequired: 'Назва програми обов\'язкова',
+    programAdded: 'Програму додано',
+    programUpdated: 'Програму оновлено',
+    programExistsForTrack: 'Програма для цього треку вже існує',
+    invalidProgram: 'Некоректна програма',
+    selectProgram: 'Оберіть програму',
+    admissionYearRequired: 'Рік вступу обов\'язковий',
+    admissionAdded: 'Рік вступу додано',
+    admissionUpdated: 'Рік вступу оновлено',
+    admissionExistsForProgram: 'Такий рік вступу вже існує для цієї програми',
+    invalidAdmissionYear: 'Некоректний рік вступу',
+    programRequired: 'Програма обов\'язкова',
+    courseMappingSaved: 'Мапінг курсів збережено',
+    courseMappingCopied: 'Мапінг курсів скопійовано',
+    selectSourceAndTargetAdmissions: 'Оберіть джерельний і цільовий роки вступу',
+    sourceTargetAdmissionsDifferent: 'Джерельний і цільовий роки вступу мають відрізнятися',
+    admissionNotFound: 'Рік вступу не знайдено',
+    sourceAdmissionSameProgram: 'Джерельний рік вступу має належати тій самій програмі',
+    cannotResolveLegacyCourseYear: 'Не вдалося визначити legacy-рік для цього року вступу',
+    noTeacherCoursesFound: 'Викладацьких курсів не знайдено',
+    noLegacyCoursesMatchedYear: (year) => `Не знайдено legacy-курсів для року ${year}`,
+    mappedTeacherCourses: (count) => count === 1
+      ? 'Замаплено 1 викладацький курс'
+      : `Замаплено ${count} викладацьких курсів`,
+    mappedLegacyYearCourses: (legacyYear, admissionYear) => `Legacy-курси ${legacyYear} замаплено на ${admissionYear}`,
+    selectAtLeastOneSourceCourse: 'Оберіть хоча б один джерельний курс',
+    admissionNotInSelectedProgram: 'Рік вступу не належить вибраній програмі',
+    selectedCoursesDoNotMatchTrack: 'Обрані курси не відповідають треку року вступу',
+    migratedUsers: (count, admissionYear) => count === 1
+      ? `Перенесено 1 користувача до року вступу ${admissionYear}`
+      : `Перенесено ${count} користувачів до року вступу ${admissionYear}`,
+    noEligibleUsersFound: 'У вибраних курсах не знайдено відповідних користувачів',
+    invalidCourse: 'Некоректний курс',
+    subjectVisibilitySaved: 'Видимість предметів збережено',
+    subjectVisibilityCopied: 'Видимість предметів скопійовано',
+  } : {
+    databaseError: 'Database error',
+    programNameRequired: 'Program name is required',
+    programAdded: 'Program added',
+    programUpdated: 'Program updated',
+    programExistsForTrack: 'Program already exists for this track',
+    invalidProgram: 'Invalid program',
+    selectProgram: 'Select program',
+    admissionYearRequired: 'Admission year is required',
+    admissionAdded: 'Admission year added',
+    admissionUpdated: 'Admission year updated',
+    admissionExistsForProgram: 'Admission year already exists for this program',
+    invalidAdmissionYear: 'Invalid admission year',
+    programRequired: 'Program is required',
+    courseMappingSaved: 'Course mapping saved',
+    courseMappingCopied: 'Course mapping copied',
+    selectSourceAndTargetAdmissions: 'Select source and target admission years',
+    sourceTargetAdmissionsDifferent: 'Source and target admission years must be different',
+    admissionNotFound: 'Admission year not found',
+    sourceAdmissionSameProgram: 'Source admission must belong to the same program',
+    cannotResolveLegacyCourseYear: 'Cannot resolve legacy course year for this admission',
+    noTeacherCoursesFound: 'No teacher courses found',
+    noLegacyCoursesMatchedYear: (year) => `No legacy courses matched year ${year}`,
+    mappedTeacherCourses: (count) => `Mapped ${count} teacher course${count === 1 ? '' : 's'}`,
+    mappedLegacyYearCourses: (legacyYear, admissionYear) => `Mapped legacy year ${legacyYear} courses to ${admissionYear}`,
+    selectAtLeastOneSourceCourse: 'Select at least one source course',
+    admissionNotInSelectedProgram: 'Admission year does not belong to selected program',
+    selectedCoursesDoNotMatchTrack: 'Selected courses do not match the admission track',
+    migratedUsers: (count, admissionYear) => `Migrated ${count} users to admission ${admissionYear}`,
+    noEligibleUsersFound: 'No eligible users found in selected courses',
+    invalidCourse: 'Invalid course',
+    subjectVisibilitySaved: 'Subject visibility saved',
+    subjectVisibilityCopied: 'Subject visibility copied',
+  };
+}
+
 app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
   try {
     await ensureDbReady();
   } catch (err) {
@@ -24453,7 +24648,7 @@ app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimi
       buildAdminPathwaysUrl({
         courseId: parsePositiveIntStrict(req.body.course_id, getAdminCourse(req)),
         track: normalizePathwayTrackFilter(req.body.track, 'all'),
-        error: 'Database error',
+        error: msg.databaseError,
       })
     );
   }
@@ -24470,7 +24665,7 @@ app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimi
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      error: 'Program name is required',
+      error: msg.programNameRequired,
     }));
   }
 
@@ -24489,14 +24684,14 @@ app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimi
       courseId,
       track: trackFilter,
       programId: inserted && inserted.id,
-      ok: 'Program added',
+      ok: msg.programAdded,
     }));
   } catch (err) {
     if (err && err.code === '23505') {
       return res.redirect(buildAdminPathwaysUrl({
         courseId,
         track: trackFilter,
-        error: 'Program already exists for this track',
+        error: msg.programExistsForTrack,
       }));
     }
     return handleDbError(res, err, 'admin.pathways.program.add');
@@ -24504,6 +24699,7 @@ app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimi
 });
 
 app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
   const programId = parsePositiveIntStrict(req.params.id);
   const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
   const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
@@ -24511,7 +24707,7 @@ app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, wr
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      error: 'Invalid program',
+      error: msg.invalidProgram,
     }));
   }
 
@@ -24527,7 +24723,7 @@ app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, wr
       courseId,
       track: trackFilter,
       programId,
-      error: 'Program name is required',
+      error: msg.programNameRequired,
     }));
   }
 
@@ -24545,7 +24741,7 @@ app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, wr
       courseId,
       track: trackFilter,
       programId,
-      ok: 'Program updated',
+      ok: msg.programUpdated,
     }));
   } catch (err) {
     if (err && err.code === '23505') {
@@ -24553,7 +24749,7 @@ app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, wr
         courseId,
         track: trackFilter,
         programId,
-        error: 'Program already exists for this track',
+        error: msg.programExistsForTrack,
       }));
     }
     return handleDbError(res, err, 'admin.pathways.program.update');
@@ -24561,6 +24757,7 @@ app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, wr
 });
 
 app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
   const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
   const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
   const programId = parsePositiveIntStrict(req.body.program_id);
@@ -24572,7 +24769,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      error: 'Select program',
+      error: msg.selectProgram,
     }));
   }
   if (!admissionYear) {
@@ -24580,7 +24777,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
       courseId,
       track: trackFilter,
       programId,
-      error: 'Admission year is required',
+      error: msg.admissionYearRequired,
     }));
   }
 
@@ -24604,7 +24801,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
       track: trackFilter,
       programId,
       admissionId,
-      ok: 'Admission year added',
+      ok: msg.admissionAdded,
     }));
   } catch (err) {
     if (err && err.code === '23505') {
@@ -24612,7 +24809,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
         courseId,
         track: trackFilter,
         programId,
-        error: 'Admission year already exists for this program',
+        error: msg.admissionExistsForProgram,
       }));
     }
     return handleDbError(res, err, 'admin.pathways.admission.add');
@@ -24620,6 +24817,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
 });
 
 app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
   const admissionId = parsePositiveIntStrict(req.params.id);
   const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
   const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
@@ -24634,7 +24832,7 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
       courseId,
       track: trackFilter,
       programId,
-      error: 'Invalid admission year',
+      error: msg.invalidAdmissionYear,
     }));
   }
   if (!programId) {
@@ -24643,7 +24841,7 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
       track: trackFilter,
       programId,
       admissionId,
-      error: 'Program is required',
+      error: msg.programRequired,
     }));
   }
   if (!admissionYear) {
@@ -24652,7 +24850,7 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
       track: trackFilter,
       programId,
       admissionId,
-      error: 'Admission year is required',
+      error: msg.admissionYearRequired,
     }));
   }
 
@@ -24671,7 +24869,7 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
       track: trackFilter,
       programId,
       admissionId,
-      ok: 'Admission year updated',
+      ok: msg.admissionUpdated,
     }));
   } catch (err) {
     if (err && err.code === '23505') {
@@ -24680,7 +24878,7 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
         track: trackFilter,
         programId,
         admissionId,
-        error: 'Admission year already exists for this program',
+        error: msg.admissionExistsForProgram,
       }));
     }
     return handleDbError(res, err, 'admin.pathways.admission.update');
@@ -24688,6 +24886,7 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
 });
 
 app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
   const admissionId = parsePositiveIntStrict(req.params.id);
   const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
   const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
@@ -24698,7 +24897,7 @@ app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAc
       courseId,
       track: trackFilter,
       programId,
-      error: 'Invalid admission year',
+      error: msg.invalidAdmissionYear,
     }));
   }
 
@@ -24725,7 +24924,7 @@ app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAc
       track: trackFilter,
       programId,
       admissionId,
-      ok: 'Course mapping saved',
+      ok: msg.courseMappingSaved,
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.courses.save');
@@ -24733,6 +24932,7 @@ app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAc
 });
 
 app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
   const admissionId = parsePositiveIntStrict(req.params.id);
   const sourceAdmissionId = parsePositiveIntStrict(req.body.source_admission_id);
   const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
@@ -24745,7 +24945,7 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
       track: trackFilter,
       programId,
       admissionId,
-      error: 'Select source and target admission years',
+      error: msg.selectSourceAndTargetAdmissions,
     }));
   }
   if (admissionId === sourceAdmissionId) {
@@ -24754,7 +24954,7 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
       track: trackFilter,
       programId,
       admissionId,
-      error: 'Source and target admission years must be different',
+      error: msg.sourceTargetAdmissionsDifferent,
     }));
   }
 
@@ -24775,7 +24975,7 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
         track: trackFilter,
         programId,
         admissionId,
-        error: 'Admission year not found',
+        error: msg.admissionNotFound,
       }));
     }
     if (Number(targetRow.program_id || 0) !== Number(sourceRow.program_id || 0)) {
@@ -24784,7 +24984,7 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
         track: trackFilter,
         programId,
         admissionId,
-        error: 'Source admission must belong to the same program',
+        error: msg.sourceAdmissionSameProgram,
       }));
     }
 
@@ -24816,7 +25016,7 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
       track: trackFilter,
       programId,
       admissionId,
-      ok: 'Course mapping copied',
+      ok: msg.courseMappingCopied,
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.courses.copy');
@@ -24824,6 +25024,7 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
 });
 
 app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
   const admissionId = parsePositiveIntStrict(req.params.id);
   const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
   const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
@@ -24834,7 +25035,7 @@ app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSec
       courseId,
       track: trackFilter,
       programId,
-      error: 'Invalid admission year',
+      error: msg.invalidAdmissionYear,
     }));
   }
 
@@ -24858,7 +25059,7 @@ app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSec
         track: trackFilter,
         programId,
         admissionId,
-        error: 'Admission year not found',
+        error: msg.admissionNotFound,
       }));
     }
 
@@ -24880,7 +25081,7 @@ app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSec
         track: trackFilter,
         programId: resolvedProgramId,
         admissionId,
-        error: 'Cannot resolve legacy course year for this admission',
+        error: msg.cannotResolveLegacyCourseYear,
       }));
     }
 
@@ -24902,8 +25103,8 @@ app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSec
         programId: resolvedProgramId,
         admissionId,
         error: trackKey === 'teacher'
-          ? 'No teacher courses found'
-          : `No legacy courses matched year ${legacyOrdinal}`,
+          ? msg.noTeacherCoursesFound
+          : msg.noLegacyCoursesMatchedYear(legacyOrdinal),
       }));
     }
 
@@ -24932,8 +25133,8 @@ app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSec
       programId: resolvedProgramId,
       admissionId,
       ok: trackKey === 'teacher'
-        ? `Mapped ${targetCourseIds.length} teacher courses`
-        : `Mapped legacy year ${legacyOrdinal} courses to ${Number(admissionRow.admission_year || 0)}`,
+        ? msg.mappedTeacherCourses(targetCourseIds.length)
+        : msg.mappedLegacyYearCourses(legacyOrdinal, Number(admissionRow.admission_year || 0)),
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.courses.legacy-map');
@@ -24941,6 +25142,7 @@ app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSec
 });
 
 app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
   const admissionId = parsePositiveIntStrict(req.params.id);
   const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
   const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
@@ -24959,7 +25161,7 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
       courseId,
       track: trackFilter,
       programId,
-      error: 'Invalid admission year',
+      error: msg.invalidAdmissionYear,
     }));
   }
   if (!sourceCourseIds.length) {
@@ -24968,7 +25170,7 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
       track: trackFilter,
       programId,
       admissionId,
-      error: 'Select at least one source course',
+      error: msg.selectAtLeastOneSourceCourse,
     }));
   }
 
@@ -24992,7 +25194,7 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
         track: trackFilter,
         programId,
         admissionId,
-        error: 'Admission year not found',
+        error: msg.admissionNotFound,
       }));
     }
 
@@ -25003,7 +25205,7 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
         track: trackFilter,
         programId: resolvedProgramId,
         admissionId,
-        error: 'Admission year does not belong to selected program',
+        error: msg.admissionNotInSelectedProgram,
       }));
     }
 
@@ -25026,7 +25228,7 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
         track: trackFilter,
         programId: resolvedProgramId,
         admissionId,
-        error: 'Selected courses do not match the admission track',
+        error: msg.selectedCoursesDoNotMatchTrack,
       }));
     }
 
@@ -25060,8 +25262,8 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
       programId: resolvedProgramId,
       admissionId,
       ok: migratedCount > 0
-        ? `Migrated ${migratedCount} users to admission ${Number(admissionRow.admission_year || 0)}`
-        : 'No eligible users found in selected courses',
+        ? msg.migratedUsers(migratedCount, Number(admissionRow.admission_year || 0))
+        : msg.noEligibleUsersFound,
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.users.migrate');
@@ -25069,6 +25271,7 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
 });
 
 app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
   const admissionId = parsePositiveIntStrict(req.params.id);
   const selectedCourseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
   const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
@@ -25079,7 +25282,7 @@ app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionA
       courseId: selectedCourseId,
       track: trackFilter,
       programId,
-      error: 'Invalid admission year',
+      error: msg.invalidAdmissionYear,
     }));
   }
   if (!selectedCourseId) {
@@ -25087,7 +25290,7 @@ app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionA
       track: trackFilter,
       programId,
       admissionId,
-      error: 'Invalid course',
+      error: msg.invalidCourse,
     }));
   }
 
@@ -25125,7 +25328,7 @@ app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionA
       track: trackFilter,
       programId,
       admissionId,
-      ok: 'Subject visibility saved',
+      ok: msg.subjectVisibilitySaved,
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.subjects.save');
@@ -25133,6 +25336,7 @@ app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionA
 });
 
 app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
   const admissionId = parsePositiveIntStrict(req.params.id);
   const sourceAdmissionId = parsePositiveIntStrict(req.body.source_admission_id);
   const selectedCourseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
@@ -25145,7 +25349,7 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
       track: trackFilter,
       programId,
       admissionId,
-      error: 'Select source and target admission years',
+      error: msg.selectSourceAndTargetAdmissions,
     }));
   }
   if (admissionId === sourceAdmissionId) {
@@ -25154,7 +25358,7 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
       track: trackFilter,
       programId,
       admissionId,
-      error: 'Source and target admission years must be different',
+      error: msg.sourceTargetAdmissionsDifferent,
     }));
   }
   if (!selectedCourseId) {
@@ -25162,7 +25366,7 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
       track: trackFilter,
       programId,
       admissionId,
-      error: 'Invalid course',
+      error: msg.invalidCourse,
     }));
   }
 
@@ -25183,7 +25387,7 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
         track: trackFilter,
         programId,
         admissionId,
-        error: 'Admission year not found',
+        error: msg.admissionNotFound,
       }));
     }
     if (Number(targetRow.program_id || 0) !== Number(sourceRow.program_id || 0)) {
@@ -25192,7 +25396,7 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
         track: trackFilter,
         programId,
         admissionId,
-        error: 'Source admission must belong to the same program',
+        error: msg.sourceAdmissionSameProgram,
       }));
     }
 
@@ -25239,7 +25443,7 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
       track: trackFilter,
       programId,
       admissionId,
-      ok: 'Subject visibility copied',
+      ok: msg.subjectVisibilityCopied,
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.subjects.copy');

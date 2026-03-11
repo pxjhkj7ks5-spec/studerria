@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.07",
+      "date": "2026-03-11",
+      "items": [
+        "tune(pathways-ukrainian-copy): localized the Pathways workspace hero, section navigation, forms, cards, empty states, campus and migration panels, and catalog so `/admin/pathways` no longer ships mixed English admin copy",
+        "tune(pathways-route-feedback): localized server-generated Pathways health labels, readiness alerts, campus labels, and save or copy flash messages so the page stays consistently Ukrainian after cohort, mapping, visibility, and migration actions"
+      ]
+    },
+    {
       "version": "1.2.06",
       "date": "2026-03-11",
       "items": [
