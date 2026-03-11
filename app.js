@@ -24116,215 +24116,250 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       ? `${sanitizeCompactText(selectedCourse.name || '', 120)} / ${formatCampusLabelServer(selectedCourse.location)}${isTeacherCourseRecord(selectedCourse) ? ' / Teacher' : ''}`
       : '';
 
-    const admissionHealthCards = selectedProgramAdmissionsSorted.map((admission) => {
-      const admissionId = Number(admission.id || 0);
-      const mappingStats = courseMappingStatsByAdmission.get(admissionId) || { visible_count: 0, total_count: 0 };
-      const subjectStats = subjectVisibilityStatsByAdmission.get(admissionId) || { visible_count: 0, total_count: 0, override_count: 0 };
-      const campusStats = campusStatsByAdmission.get(admissionId) || { total_bindings: 0, ready_bindings: 0, ambiguous_count: 0, bindings: [] };
-      const userStats = userAssignmentStatsByAdmission.get(admissionId) || { users_count: 0 };
-      const statusNotes = [];
-      let statusKey = 'ready';
-      let statusTone = 'success';
-      let statusLabel = 'Ready';
+    let admissionHealthCards = [];
+    let selectedCohortHealth = null;
+    let cohortAlerts = [];
 
-      if (!admission.is_active) {
-        statusKey = 'inactive';
-        statusTone = 'muted';
-        statusLabel = 'Inactive';
-        statusNotes.push('Cohort disabled');
-      }
+    try {
+      admissionHealthCards = selectedProgramAdmissionsSorted.map((admission) => {
+        const admissionId = Number(admission.id || 0);
+        const mappingStats = courseMappingStatsByAdmission.get(admissionId) || { visible_count: 0, total_count: 0 };
+        const subjectStats = subjectVisibilityStatsByAdmission.get(admissionId) || { visible_count: 0, total_count: 0, override_count: 0 };
+        const campusStats = campusStatsByAdmission.get(admissionId) || { total_bindings: 0, ready_bindings: 0, ambiguous_count: 0, bindings: [] };
+        const userStats = userAssignmentStatsByAdmission.get(admissionId) || { users_count: 0 };
+        const statusNotes = [];
+        let statusKey = 'ready';
+        let statusTone = 'success';
+        let statusLabel = 'Ready';
 
-      if (Number(mappingStats.visible_count || 0) < 1) {
-        statusKey = 'blocked';
-        statusTone = 'danger';
-        statusLabel = 'Blocked';
-        statusNotes.push('No mapped courses');
-      }
-
-      if (Number(subjectStats.total_count || 0) > 0 && Number(subjectStats.visible_count || 0) < 1) {
-        statusKey = 'blocked';
-        statusTone = 'danger';
-        statusLabel = 'Blocked';
-        statusNotes.push('No visible subjects');
-      }
-
-      if (Number(campusStats.ambiguous_count || 0) > 0) {
-        statusKey = 'blocked';
-        statusTone = 'danger';
-        statusLabel = 'Blocked';
-        statusNotes.push('Campus conflict');
-      }
-
-      if (statusKey === 'ready') {
-        const hasPartialMapping = Number(mappingStats.visible_count || 0) > 0
-          && Number(mappingStats.visible_count || 0) < Number(mappingStats.total_count || 0);
-        const hasPartialSubjects = Number(subjectStats.visible_count || 0) > 0
-          && Number(subjectStats.visible_count || 0) < Number(subjectStats.total_count || 0);
-        if (hasPartialMapping || hasPartialSubjects || Number(userStats.users_count || 0) < 1) {
-          statusKey = 'attention';
-          statusTone = 'warning';
-          statusLabel = 'Needs attention';
+        if (!admission.is_active) {
+          statusKey = 'inactive';
+          statusTone = 'muted';
+          statusLabel = 'Inactive';
+          statusNotes.push('Cohort disabled');
         }
-        if (hasPartialMapping) statusNotes.push('Partial mapping');
-        if (hasPartialSubjects) statusNotes.push('Filtered subjects');
-        if (Number(userStats.users_count || 0) < 1) statusNotes.push('No users assigned');
+
+        if (Number(mappingStats.visible_count || 0) < 1) {
+          statusKey = 'blocked';
+          statusTone = 'danger';
+          statusLabel = 'Blocked';
+          statusNotes.push('No mapped courses');
+        }
+
+        if (Number(subjectStats.total_count || 0) > 0 && Number(subjectStats.visible_count || 0) < 1) {
+          statusKey = 'blocked';
+          statusTone = 'danger';
+          statusLabel = 'Blocked';
+          statusNotes.push('No visible subjects');
+        }
+
+        if (Number(campusStats.ambiguous_count || 0) > 0) {
+          statusKey = 'blocked';
+          statusTone = 'danger';
+          statusLabel = 'Blocked';
+          statusNotes.push('Campus conflict');
+        }
+
+        if (statusKey === 'ready') {
+          const hasPartialMapping = Number(mappingStats.visible_count || 0) > 0
+            && Number(mappingStats.visible_count || 0) < Number(mappingStats.total_count || 0);
+          const hasPartialSubjects = Number(subjectStats.visible_count || 0) > 0
+            && Number(subjectStats.visible_count || 0) < Number(subjectStats.total_count || 0);
+          if (hasPartialMapping || hasPartialSubjects || Number(userStats.users_count || 0) < 1) {
+            statusKey = 'attention';
+            statusTone = 'warning';
+            statusLabel = 'Needs attention';
+          }
+          if (hasPartialMapping) statusNotes.push('Partial mapping');
+          if (hasPartialSubjects) statusNotes.push('Filtered subjects');
+          if (Number(userStats.users_count || 0) < 1) statusNotes.push('No users assigned');
+        }
+
+        return {
+          id: admissionId,
+          program_id: Number(admission.program_id || 0),
+          admission_year: Number(admission.admission_year || 0),
+          label: sanitizeCompactText(admission.label || '', 120),
+          is_active: admission.is_active === true || Number(admission.is_active) === 1,
+          is_selected: admissionId === Number(selectedAdmissionId || 0),
+          status_key: statusKey,
+          status_tone: statusTone,
+          status_label: statusLabel,
+          status_notes: Array.from(new Set(statusNotes)),
+          mapping_visible_count: Number(mappingStats.visible_count || 0),
+          mapping_total_count: Number(mappingStats.total_count || 0),
+          subject_visible_count: Number(subjectStats.visible_count || 0),
+          subject_total_count: Number(subjectStats.total_count || 0),
+          subject_override_count: Number(subjectStats.override_count || 0),
+          campus_ready_count: Number(campusStats.ready_bindings || 0),
+          campus_total_count: Number(campusStats.total_bindings || 0),
+          campus_ambiguous_count: Number(campusStats.ambiguous_count || 0),
+          users_count: Number(userStats.users_count || 0),
+        };
+      });
+
+      if (selectedAdmissionId && selectedProgram) {
+        const selectedHealthCard = admissionHealthCards.find((item) => item.is_selected) || null;
+        const campusSignalValue = ambiguousCampusBindings.length
+          ? `${ambiguousCampusBindings.length} blocked`
+          : `${registrationCampusBindings.length} ready`;
+        selectedCohortHealth = {
+          course_label: selectedCourseLabel,
+          program_name: sanitizeCompactText(selectedProgram.name || '', 140),
+          program_code: sanitizeCompactText(selectedProgram.code || '', 40),
+          track_key: selectedTrackKey,
+          admission_year: Number(selectedAdmission && selectedAdmission.admission_year ? selectedAdmission.admission_year : 0),
+          admission_label: sanitizeCompactText(selectedAdmission && selectedAdmission.label ? selectedAdmission.label : '', 120),
+          status_key: selectedHealthCard ? selectedHealthCard.status_key : 'attention',
+          status_tone: selectedHealthCard ? selectedHealthCard.status_tone : 'warning',
+          status_label: selectedHealthCard ? selectedHealthCard.status_label : 'Needs attention',
+          signals: [
+            {
+              label: 'Course mapping',
+              value: `${Number(mappingSummary.visible || 0)} / ${Number(mappingSummary.total || 0)}`,
+              tone: Number(mappingSummary.visible || 0) < 1
+                ? 'danger'
+                : (Number(mappingSummary.visible || 0) < Number(mappingSummary.total || 0) ? 'warning' : 'success'),
+              meta: Number(mappingSummary.visible || 0) < 1 ? 'Registration is still closed' : 'Visible linked courses',
+              href: '#pathways-mapping',
+            },
+            {
+              label: 'Subject visibility',
+              value: `${Number(visibilitySummary.visible || 0)} / ${Number(visibilitySummary.total || 0)}`,
+              tone: Number(visibilitySummary.total || 0) < 1
+                ? 'muted'
+                : (Number(visibilitySummary.visible || 0) < 1
+                  ? 'danger'
+                  : (Number(visibilitySummary.visible || 0) < Number(visibilitySummary.total || 0) ? 'warning' : 'success')),
+              meta: Number(hiddenSubjectCount || 0) > 0
+                ? `${Number(hiddenSubjectCount || 0)} hidden in base course`
+                : 'Student-visible subject scope',
+              href: '#pathways-subjects',
+            },
+            {
+              label: 'Campus routing',
+              value: campusSignalValue,
+              tone: ambiguousCampusBindings.length
+                ? 'danger'
+                : (registrationCampusBindings.length ? 'success' : 'warning'),
+              meta: ambiguousCampusBindings.length
+                ? ambiguousCampusBindings.map((item) => item.campus_label).join(', ')
+                : 'One course per campus',
+              href: '#pathways-campuses',
+            },
+            {
+              label: 'User migration',
+              value: migrationSummary.total_courses
+                ? `${Number(migrationSummary.pending_users || 0)} pending`
+                : 'No source courses',
+              tone: migrationSummary.total_courses
+                ? (Number(migrationSummary.pending_users || 0) > 0 ? 'warning' : 'success')
+                : 'muted',
+              meta: migrationSummary.total_courses
+                ? `${Number(migrationSummary.already_assigned || 0)} already aligned`
+                : 'Select compatible source courses',
+              href: '#pathways-migration',
+            },
+          ],
+        };
       }
 
-      return {
-        id: admissionId,
+      if (!selectedAdmissionId) {
+        cohortAlerts.push({
+          tone: 'info',
+          title: 'Pick a cohort to unlock focus mode',
+          body: 'Select an admission year first, then the workspace can tell you whether mapping, subjects, campuses, and migration are actually ready.',
+          action_label: 'Go to admissions',
+          target: 'pathways-admissions',
+        });
+      } else {
+        if (Number(mappingSummary.visible || 0) < 1) {
+          cohortAlerts.push({
+            tone: 'danger',
+            title: 'Registration is blocked by empty course mapping',
+            body: legacySuggestedCourseCount > 0
+              ? `No visible courses are linked yet. A legacy quick map is available for ${legacySuggestedCourseCount} matching courses.`
+              : 'No visible courses are linked yet, so students cannot resolve a course from this cohort.',
+            action_label: 'Open mapping',
+            target: 'pathways-mapping',
+          });
+        }
+        if (Number(visibilitySummary.total || 0) > 0 && Number(visibilitySummary.visible || 0) < 1) {
+          cohortAlerts.push({
+            tone: 'danger',
+            title: 'Students would see an empty subject list',
+            body: 'This cohort currently resolves to zero visible subjects in the selected course scope.',
+            action_label: 'Open subjects',
+            target: 'pathways-subjects',
+          });
+        }
+        if (ambiguousCampusBindings.length) {
+          cohortAlerts.push({
+            tone: 'warning',
+            title: 'Campus routing still has conflicts',
+            body: `Ambiguous campuses: ${ambiguousCampusBindings.map((item) => `${item.campus_label} (${item.course_count})`).join(', ')}.`,
+            action_label: 'Resolve campuses',
+            target: 'pathways-campuses',
+          });
+        } else if (!registrationCampusBindings.length && Number(mappingSummary.visible || 0) > 0) {
+          cohortAlerts.push({
+            tone: 'warning',
+            title: 'Campus routing is still missing',
+            body: 'Mapped courses exist, but no campus-ready binding can be derived yet for registration.',
+            action_label: 'Review campuses',
+            target: 'pathways-campuses',
+          });
+        }
+        if (Number(migrationSummary.pending_users || 0) > 0) {
+          cohortAlerts.push({
+            tone: 'info',
+            title: 'Existing users still need cohort stamping',
+            body: `${migrationSummary.pending_users} users across ${migrationSummary.total_courses} compatible source courses are not assigned to this admission yet.`,
+            action_label: 'Open migration',
+            target: 'pathways-migration',
+          });
+        }
+        if (Number(hiddenSubjectCount || 0) > 0) {
+          cohortAlerts.push({
+            tone: 'info',
+            title: 'Base course visibility is still filtering subjects',
+            body: `${hiddenSubjectCount} subjects are hidden globally in the selected course, so this cohort cannot expose them even with admission overrides.`,
+            action_label: 'Review subjects',
+            target: 'pathways-subjects',
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Pathways health presentation fallback', err);
+      admissionHealthCards = selectedProgramAdmissionsSorted.map((admission) => ({
+        id: Number(admission.id || 0),
         program_id: Number(admission.program_id || 0),
         admission_year: Number(admission.admission_year || 0),
         label: sanitizeCompactText(admission.label || '', 120),
         is_active: admission.is_active === true || Number(admission.is_active) === 1,
-        is_selected: admissionId === Number(selectedAdmissionId || 0),
-        status_key: statusKey,
-        status_tone: statusTone,
-        status_label: statusLabel,
-        status_notes: Array.from(new Set(statusNotes)),
-        mapping_visible_count: Number(mappingStats.visible_count || 0),
-        mapping_total_count: Number(mappingStats.total_count || 0),
-        subject_visible_count: Number(subjectStats.visible_count || 0),
-        subject_total_count: Number(subjectStats.total_count || 0),
-        subject_override_count: Number(subjectStats.override_count || 0),
-        campus_ready_count: Number(campusStats.ready_bindings || 0),
-        campus_total_count: Number(campusStats.total_bindings || 0),
-        campus_ambiguous_count: Number(campusStats.ambiguous_count || 0),
-        users_count: Number(userStats.users_count || 0),
-      };
-    });
-
-    let selectedCohortHealth = null;
-    if (selectedAdmissionId && selectedProgram) {
-      const selectedHealthCard = admissionHealthCards.find((item) => item.is_selected) || null;
-      const campusSignalValue = ambiguousCampusBindings.length
-        ? `${ambiguousCampusBindings.length} blocked`
-        : `${registrationCampusBindings.length} ready`;
-      selectedCohortHealth = {
-        course_label: selectedCourseLabel,
-        program_name: sanitizeCompactText(selectedProgram.name || '', 140),
-        program_code: sanitizeCompactText(selectedProgram.code || '', 40),
-        track_key: selectedTrackKey,
-        admission_year: Number(selectedAdmission && selectedAdmission.admission_year ? selectedAdmission.admission_year : 0),
-        admission_label: sanitizeCompactText(selectedAdmission && selectedAdmission.label ? selectedAdmission.label : '', 120),
-        status_key: selectedHealthCard ? selectedHealthCard.status_key : 'attention',
-        status_tone: selectedHealthCard ? selectedHealthCard.status_tone : 'warning',
-        status_label: selectedHealthCard ? selectedHealthCard.status_label : 'Needs attention',
-        signals: [
-          {
-            label: 'Course mapping',
-            value: `${Number(mappingSummary.visible || 0)} / ${Number(mappingSummary.total || 0)}`,
-            tone: Number(mappingSummary.visible || 0) < 1
-              ? 'danger'
-              : (Number(mappingSummary.visible || 0) < Number(mappingSummary.total || 0) ? 'warning' : 'success'),
-            meta: Number(mappingSummary.visible || 0) < 1 ? 'Registration is still closed' : 'Visible linked courses',
-            href: '#pathways-mapping',
-          },
-          {
-            label: 'Subject visibility',
-            value: `${Number(visibilitySummary.visible || 0)} / ${Number(visibilitySummary.total || 0)}`,
-            tone: Number(visibilitySummary.total || 0) < 1
-              ? 'muted'
-              : (Number(visibilitySummary.visible || 0) < 1
-                ? 'danger'
-                : (Number(visibilitySummary.visible || 0) < Number(visibilitySummary.total || 0) ? 'warning' : 'success')),
-            meta: Number(hiddenSubjectCount || 0) > 0
-              ? `${Number(hiddenSubjectCount || 0)} hidden in base course`
-              : 'Student-visible subject scope',
-            href: '#pathways-subjects',
-          },
-          {
-            label: 'Campus routing',
-            value: campusSignalValue,
-            tone: ambiguousCampusBindings.length
-              ? 'danger'
-              : (registrationCampusBindings.length ? 'success' : 'warning'),
-            meta: ambiguousCampusBindings.length
-              ? ambiguousCampusBindings.map((item) => item.campus_label).join(', ')
-              : 'One course per campus',
-            href: '#pathways-campuses',
-          },
-          {
-            label: 'User migration',
-            value: migrationSummary.total_courses
-              ? `${Number(migrationSummary.pending_users || 0)} pending`
-              : 'No source courses',
-            tone: migrationSummary.total_courses
-              ? (Number(migrationSummary.pending_users || 0) > 0 ? 'warning' : 'success')
-              : 'muted',
-            meta: migrationSummary.total_courses
-              ? `${Number(migrationSummary.already_assigned || 0)} already aligned`
-              : 'Select compatible source courses',
-            href: '#pathways-migration',
-          },
-        ],
-      };
-    }
-
-    const cohortAlerts = [];
-    if (!selectedAdmissionId) {
-      cohortAlerts.push({
+        is_selected: Number(admission.id || 0) === Number(selectedAdmissionId || 0),
+        status_key: admission.is_active ? 'attention' : 'inactive',
+        status_tone: admission.is_active ? 'warning' : 'muted',
+        status_label: admission.is_active ? 'Needs attention' : 'Inactive',
+        status_notes: [],
+        mapping_visible_count: 0,
+        mapping_total_count: 0,
+        subject_visible_count: 0,
+        subject_total_count: 0,
+        subject_override_count: 0,
+        campus_ready_count: 0,
+        campus_total_count: 0,
+        campus_ambiguous_count: 0,
+        users_count: 0,
+      }));
+      selectedCohortHealth = null;
+      cohortAlerts = selectedAdmissionId ? [] : [{
         tone: 'info',
         title: 'Pick a cohort to unlock focus mode',
         body: 'Select an admission year first, then the workspace can tell you whether mapping, subjects, campuses, and migration are actually ready.',
         action_label: 'Go to admissions',
         target: 'pathways-admissions',
-      });
-    } else {
-      if (Number(mappingSummary.visible || 0) < 1) {
-        cohortAlerts.push({
-          tone: 'danger',
-          title: 'Registration is blocked by empty course mapping',
-          body: legacySuggestedCourseCount > 0
-            ? `No visible courses are linked yet. A legacy quick map is available for ${legacySuggestedCourseCount} matching courses.`
-            : 'No visible courses are linked yet, so students cannot resolve a course from this cohort.',
-          action_label: 'Open mapping',
-          target: 'pathways-mapping',
-        });
-      }
-      if (Number(visibilitySummary.total || 0) > 0 && Number(visibilitySummary.visible || 0) < 1) {
-        cohortAlerts.push({
-          tone: 'danger',
-          title: 'Students would see an empty subject list',
-          body: 'This cohort currently resolves to zero visible subjects in the selected course scope.',
-          action_label: 'Open subjects',
-          target: 'pathways-subjects',
-        });
-      }
-      if (ambiguousCampusBindings.length) {
-        cohortAlerts.push({
-          tone: 'warning',
-          title: 'Campus routing still has conflicts',
-          body: `Ambiguous campuses: ${ambiguousCampusBindings.map((item) => `${item.campus_label} (${item.course_count})`).join(', ')}.`,
-          action_label: 'Resolve campuses',
-          target: 'pathways-campuses',
-        });
-      } else if (!registrationCampusBindings.length && Number(mappingSummary.visible || 0) > 0) {
-        cohortAlerts.push({
-          tone: 'warning',
-          title: 'Campus routing is still missing',
-          body: 'Mapped courses exist, but no campus-ready binding can be derived yet for registration.',
-          action_label: 'Review campuses',
-          target: 'pathways-campuses',
-        });
-      }
-      if (Number(migrationSummary.pending_users || 0) > 0) {
-        cohortAlerts.push({
-          tone: 'info',
-          title: 'Existing users still need cohort stamping',
-          body: `${migrationSummary.pending_users} users across ${migrationSummary.total_courses} compatible source courses are not assigned to this admission yet.`,
-          action_label: 'Open migration',
-          target: 'pathways-migration',
-        });
-      }
-      if (Number(hiddenSubjectCount || 0) > 0) {
-        cohortAlerts.push({
-          tone: 'info',
-          title: 'Base course visibility is still filtering subjects',
-          body: `${hiddenSubjectCount} subjects are hidden globally in the selected course, so this cohort cannot expose them even with admission overrides.`,
-          action_label: 'Review subjects',
-          target: 'pathways-subjects',
-        });
-      }
+      }];
     }
 
     const subjectCatalogRows = await db.all(

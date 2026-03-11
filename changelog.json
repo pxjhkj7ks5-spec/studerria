@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.06",
+      "date": "2026-03-11",
+      "items": [
+        "fix(pathways-health-safe-mode): wrapped the new cohort health presentation layer in a final fallback so unexpected legacy data no longer takes down the whole `/admin/pathways` page",
+        "fix(pathways-render-resilience): kept admission cards and focus flow renderable even when one of the new readiness enrichments cannot be derived"
+      ]
+    },
+    {
       "version": "1.2.05",
       "date": "2026-03-11",
       "items": [
