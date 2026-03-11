@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.12",
+      "date": "2026-03-11",
+      "items": [
+        "tune(journal-shell-localization): localized the main `/journal` shell including the page title, subject picker, subject-closure controls, grading summary chrome, attendance summaries, and journal-table status chips so this workspace no longer opens with hardcoded mixed Ukrainian and English copy",
+        "tune(journal-attendance-feedback): localized the quick-attendance modal, attendance editor labels, localized date formatting, undo timer copy, top-level grading presets, and client-side attendance fallback messages while keeping the journal grading and attendance logic unchanged"
+      ]
+    },
+    {
       "version": "1.2.11",
       "date": "2026-03-11",
       "items": [
