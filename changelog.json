@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.11",
+      "date": "2026-03-11",
+      "items": [
+        "tune(register-course-shell-localization): localized the register-course flow shell, track, program, admission-year, and campus labels so the onboarding step no longer mixes hardcoded Ukrainian and English copy across the main form",
+        "tune(register-course-pathway-feedback): localized client-side pathway placeholders, empty states, campus hints, teacher-path warnings, ambiguous-campus guidance, and campus mapping summaries while keeping the existing registration logic unchanged"
+      ]
+    },
+    {
       "version": "1.2.10",
       "date": "2026-03-11",
       "items": [

@@ -4,13 +4,88 @@
   const selectedProgramValue = Number.isFinite(Number(selectedProgramId)) ? Number(selectedProgramId) : null;
   const selectedAdmissionValue = Number.isFinite(Number(selectedAdmissionId)) ? Number(selectedAdmissionId) : null;
   const selectedCampusValue = typeof selectedCampus === 'string' ? selectedCampus : '';
+  const registerCourseText = lang === 'en'
+    ? {
+        themeToggleAria: 'Change theme',
+        campusKyiv: 'Kyiv',
+        campusMunich: 'Munich',
+        trackBachelor: 'Bachelor',
+        trackMaster: "Master's",
+        trackTeacher: 'Teacher',
+        level: 'Level',
+        program: 'Program',
+        chooseProgram: 'Choose a program',
+        admissionYear: 'Admission year',
+        campus: 'Campus',
+        campusReadyTeacherHint: 'Choosing a campus automatically links the correct teacher course.',
+        campusReadyStudentHint: 'The admission year defines the cohort. Choosing a campus automatically links the correct course.',
+        chooseProgramFirstTitle: 'Choose a program first',
+        chooseProgramFirstSubtitle: 'Available admission years will appear after that.',
+        chooseProgramFirstTeacherSubtitle: 'For teachers, the campus is determined within the selected program.',
+        noAdmissionYearsTitle: 'No admission years configured',
+        noAdmissionYearsSubtitle: 'Ask an administrator to add an admission year for this program.',
+        noTeacherPathTitle: 'No teacher pathway configured',
+        noTeacherPathSubtitle: 'Ask an administrator to keep one active path for this program.',
+        teacherPathRequiredHint: 'Teacher registration requires one active path for the selected program.',
+        noAvailableAdmissionTitle: 'No admission year available',
+        noAvailableAdmissionSubtitle: 'Ask an administrator to configure an admission year for this program.',
+        noCampusesTitle: 'No campuses configured',
+        noCampusesTeacherSubtitle: 'Ask an administrator to link one teacher course per campus.',
+        noCampusesStudentSubtitle: 'Ask an administrator to link one course per campus for this admission year.',
+        noCampusesTeacherHint: 'There are no campuses available for this teacher program yet.',
+        noCampusesStudentHint: 'There are no campuses available for this admission year yet.',
+        oneLinkedCourse: '1 linked course',
+        linkedCoursesSuffix: 'linked courses',
+        oneVisibleCourseNeeded: 'One visible course is required.',
+        readyToRegister: 'Ready to register.',
+        ambiguousCampusHint: 'Campus mapping is ambiguous. Ask an administrator to leave one visible course per campus.',
+        chooseValidCampus: 'Choose a valid campus before continuing.',
+      }
+    : {
+        themeToggleAria: 'Змінити тему',
+        campusKyiv: 'Київ',
+        campusMunich: 'Мюнхен',
+        trackBachelor: 'Бакалаврат',
+        trackMaster: 'Магістратура',
+        trackTeacher: 'Викладач',
+        level: 'Рівень',
+        program: 'Програма',
+        chooseProgram: 'Оберіть програму',
+        admissionYear: 'Рік вступу',
+        campus: 'Кампус',
+        campusReadyTeacherHint: 'Вибір кампусу автоматично привʼязує потрібний викладацький курс.',
+        campusReadyStudentHint: 'Рік вступу визначає когорту. Вибір кампусу автоматично привʼязує потрібний курс.',
+        chooseProgramFirstTitle: 'Спершу оберіть програму',
+        chooseProgramFirstSubtitle: 'Після цього зʼявляться доступні роки вступу.',
+        chooseProgramFirstTeacherSubtitle: 'Для викладача кампус визначається в межах обраної програми.',
+        noAdmissionYearsTitle: 'Немає налаштованих років вступу',
+        noAdmissionYearsSubtitle: 'Попросіть адміністратора додати рік вступу для цієї програми.',
+        noTeacherPathTitle: 'Немає налаштованого викладацького шляху',
+        noTeacherPathSubtitle: 'Попросіть адміністратора залишити один активний шлях для цієї програми.',
+        teacherPathRequiredHint: 'Для реєстрації викладача потрібен один активний шлях для обраної програми.',
+        noAvailableAdmissionTitle: 'Немає доступного року вступу',
+        noAvailableAdmissionSubtitle: 'Попросіть адміністратора налаштувати рік вступу для цієї програми.',
+        noCampusesTitle: 'Немає налаштованих кампусів',
+        noCampusesTeacherSubtitle: 'Попросіть адміністратора привʼязати по одному викладацькому курсу на кампус.',
+        noCampusesStudentSubtitle: 'Попросіть адміністратора привʼязати по одному курсу на кампус для цього року вступу.',
+        noCampusesTeacherHint: 'Для цієї викладацької програми ще немає доступних кампусів.',
+        noCampusesStudentHint: 'Для цього року вступу ще немає доступних кампусів.',
+        oneLinkedCourse: '1 привʼязаний курс',
+        linkedCoursesSuffix: 'привʼязані курси',
+        oneVisibleCourseNeeded: 'Потрібен один видимий курс.',
+        readyToRegister: 'Готово до реєстрації.',
+        ambiguousCampusHint: 'Привʼязка кампусів неоднозначна. Попросіть адміністратора залишити по одному видимому курсу на кампус.',
+        chooseValidCampus: 'Оберіть коректний кампус перед продовженням.',
+      };
   const isTeacherCourse = (course) => course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
-  const formatCampusLabel = (location) => String(location || 'kyiv').trim().toLowerCase() === 'munich' ? 'Мюнхен' : 'Київ';
+  const formatCampusLabel = (location) => String(location || 'kyiv').trim().toLowerCase() === 'munich'
+    ? registerCourseText.campusMunich
+    : registerCourseText.campusKyiv;
   const formatTrackLabel = (trackKey, fallback) => {
     const normalized = String(trackKey || '').trim().toLowerCase();
-    if (normalized === 'bachelor') return 'Бакалаврат';
-    if (normalized === 'master') return 'Магістратура';
-    if (normalized === 'teacher') return 'Викладач';
+    if (normalized === 'bachelor') return registerCourseText.trackBachelor;
+    if (normalized === 'master') return registerCourseText.trackMaster;
+    if (normalized === 'teacher') return registerCourseText.trackTeacher;
     return fallback || normalized;
   };
 %>
@@ -437,7 +512,7 @@
         class="theme-toggle-min"
         type="button"
         id="themeToggle"
-        aria-label="Змінити тему"
+        aria-label="<%= registerCourseText.themeToggleAria %>"
         data-light-label="☀️"
         data-dark-label="🌙"
       >
@@ -455,7 +530,7 @@
               <% } %>
               <form method="POST" action="/register/course">
                 <div class="mb-3">
-                  <span class="pathway-label">Рівень</span>
+                  <span class="pathway-label"><%= registerCourseText.level %></span>
                   <div class="pathway-grid" id="trackGrid">
                     <% (pathways.tracks || []).forEach((track) => { %>
                       <label
@@ -477,36 +552,36 @@
                 </div>
 
                 <div class="mb-3" id="programField">
-                  <label class="pathway-label" for="studyProgramSelect">Програма</label>
+                  <label class="pathway-label" for="studyProgramSelect"><%= registerCourseText.program %></label>
                   <select
                     id="studyProgramSelect"
                     name="study_program_id"
                     class="form-select pathway-select"
                     data-selected-program="<%= selectedProgramValue || '' %>"
                   >
-                    <option value="">Оберіть програму</option>
+                    <option value=""><%= registerCourseText.chooseProgram %></option>
                   </select>
                 </div>
                 <div class="mb-3" id="programStaticField" style="display: none;">
-                  <span class="pathway-label">Програма</span>
+                  <span class="pathway-label"><%= registerCourseText.program %></span>
                   <div class="track-option is-selected">
                     <span id="programStaticLabel"></span>
                   </div>
                 </div>
 
                 <div class="mb-3" id="admissionField">
-                  <label class="pathway-label">Рік вступу</label>
+                  <label class="pathway-label"><%= registerCourseText.admissionYear %></label>
                   <input type="hidden" name="admission_id" id="selectedAdmissionInput" value="<%= selectedAdmissionValue || '' %>" />
                   <div class="pathway-grid" id="admissionOptions"></div>
                 </div>
 
                 <div class="mb-3">
-                  <label class="pathway-label">Кампус</label>
+                  <label class="pathway-label"><%= registerCourseText.campus %></label>
                   <input type="hidden" name="course_id" id="selectedCourseIdInput" value="<%= Number(selectedCourseId || 0) || '' %>" />
                   <input type="hidden" name="campus" id="selectedCampusInput" value="<%= selectedCampusValue %>" />
                   <div class="pathway-grid" id="campusOptions"></div>
                 </div>
-                <p class="pathway-hint mb-3" id="campusHint">Рік вступу визначає когорту. Вибір кампусу автоматично прив'язує потрібний курс.</p>
+                <p class="pathway-hint mb-3" id="campusHint"><%= registerCourseText.campusReadyStudentHint %></p>
                 <div class="auth-action-stack auth-action-stack--grid">
                   <button type="submit" class="btn btn-primary register-action-btn auth-action-btn"><%= t('registerCourse.continue') %></button>
                   <a href="/register" class="btn btn-outline-primary register-action-btn auth-action-btn"><%= t('registerCourse.backToRegister') %></a>
@@ -525,6 +600,8 @@
       crossorigin="anonymous"
     ></script>
     <script>
+      const isEnglishRegisterCourse = <%- JSON.stringify(lang === 'en') %>;
+      const registerCourseText = <%- JSON.stringify(registerCourseText) %>;
       const pathwayPayload = <%- JSON.stringify(pathways) %>;
       const pathwayPrograms = Array.isArray(pathwayPayload.programs) ? pathwayPayload.programs : [];
       const pathwayAdmissions = Array.isArray(pathwayPayload.admissions) ? pathwayPayload.admissions : [];
@@ -551,6 +628,12 @@
         pathwayCourses.map((course) => [Number(course.id || 0), course])
       );
 
+      function formatLinkedCourseCount(count) {
+        return Number(count || 0) === 1
+          ? registerCourseText.oneLinkedCourse
+          : `${count} ${registerCourseText.linkedCoursesSuffix}`;
+      }
+
       function getSelectedTrack() {
         const checked = trackInputs.find((input) => input.checked);
         if (checked) return checked.value;
@@ -574,12 +657,15 @@
       }
 
       function formatCampusLabelClient(location) {
-        return normalizeCampusKey(location) === 'munich' ? 'Мюнхен' : 'Київ';
+        return normalizeCampusKey(location) === 'munich'
+          ? registerCourseText.campusMunich
+          : registerCourseText.campusKyiv;
       }
 
       function localizeAdmissionLabel(rawLabel) {
-        return String(rawLabel || '')
-          .trim()
+        const normalized = String(rawLabel || '').trim();
+        if (isEnglishRegisterCourse) return normalized;
+        return normalized
           .replace(/^Cohort\b/i, 'Когорта')
           .replace(/\bCohort\b/gi, 'Когорта');
       }
@@ -590,8 +676,8 @@
 
       function getCampusReadyHint(trackKey) {
         return isTeacherTrack(trackKey)
-          ? "Вибір кампусу автоматично прив'язує потрібний викладацький курс."
-          : "Рік вступу визначає когорту. Вибір кампусу автоматично прив'язує потрібний курс.";
+          ? registerCourseText.campusReadyTeacherHint
+          : registerCourseText.campusReadyStudentHint;
       }
 
       function syncTrackCards() {
@@ -633,7 +719,7 @@
         const resolvedValue = options.some((option) => Number(option.value) === currentValue)
           ? currentValue
           : (options[0] ? Number(options[0].value) : null);
-        setOptions(programSelect, options, resolvedValue, 'Оберіть програму');
+        setOptions(programSelect, options, resolvedValue, registerCourseText.chooseProgram);
         if (programField && programStaticField && programStaticLabel) {
           if (options.length === 1) {
             programField.style.display = 'none';
@@ -654,7 +740,7 @@
           .filter((admission) => Number(admission.program_id) === programId)
           .map((admission) => ({
             value: Number(admission.id),
-            title: String(admission.admission_year || 'Рік вступу'),
+            title: String(admission.admission_year || registerCourseText.admissionYear),
             subtitle: localizeAdmissionLabel(admission.label),
           }));
         const currentValue = Number(admissionInput?.value || selectedAdmissionSeed || 0);
@@ -675,14 +761,14 @@
         if (!programId) {
           const emptyState = document.createElement('div');
           emptyState.className = 'track-option admission-option is-disabled';
-          emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">Спершу оберіть програму</span><span class="course-option-subtitle">Після цього з\'являться доступні роки вступу.</span></span>';
+          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.chooseProgramFirstTitle}</span><span class="course-option-subtitle">${registerCourseText.chooseProgramFirstSubtitle}</span></span>`;
           admissionOptions.appendChild(emptyState);
           return;
         }
         if (!options.length) {
           const emptyState = document.createElement('div');
           emptyState.className = 'track-option admission-option is-disabled';
-          emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">Немає налаштованих років вступу</span><span class="course-option-subtitle">Попросіть адміністратора додати рік вступу для цієї програми.</span></span>';
+          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.noAdmissionYearsTitle}</span><span class="course-option-subtitle">${registerCourseText.noAdmissionYearsSubtitle}</span></span>`;
           admissionOptions.appendChild(emptyState);
           return;
         }
@@ -791,20 +877,20 @@
           emptyState.className = 'track-option campus-option is-disabled';
           if (isTeacherTrack(trackKey)) {
             if (!programId) {
-              emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">Спершу оберіть програму</span><span class="course-option-subtitle">Для викладача кампус визначається в межах обраної програми.</span></span>';
+              emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.chooseProgramFirstTitle}</span><span class="course-option-subtitle">${registerCourseText.chooseProgramFirstTeacherSubtitle}</span></span>`;
               campusOptions.appendChild(emptyState);
-              setCampusHint('Спершу оберіть програму. Далі вибір кампусу автоматично прив\'яже потрібний курс.', true);
+              setCampusHint(registerCourseText.campusReadyTeacherHint, true);
               return;
             }
-            emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">Немає налаштованого викладацького шляху</span><span class="course-option-subtitle">Попросіть адміністратора залишити один активний шлях для цієї програми.</span></span>';
+            emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.noTeacherPathTitle}</span><span class="course-option-subtitle">${registerCourseText.noTeacherPathSubtitle}</span></span>`;
             campusOptions.appendChild(emptyState);
-            setCampusHint('Для реєстрації викладача потрібен один активний шлях для обраної програми.', true);
+            setCampusHint(registerCourseText.teacherPathRequiredHint, true);
             return;
           }
           if (!programId) {
-            emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">Спершу оберіть програму</span><span class="course-option-subtitle">Після цього з\'являться доступні роки вступу та кампуси.</span></span>';
+            emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.chooseProgramFirstTitle}</span><span class="course-option-subtitle">${registerCourseText.chooseProgramFirstSubtitle}</span></span>`;
           } else {
-            emptyState.innerHTML = '<span class="course-option-content"><span class="course-option-title">Немає доступного року вступу</span><span class="course-option-subtitle">Попросіть адміністратора налаштувати рік вступу для цієї програми.</span></span>';
+            emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.noAvailableAdmissionTitle}</span><span class="course-option-subtitle">${registerCourseText.noAvailableAdmissionSubtitle}</span></span>`;
           }
           campusOptions.appendChild(emptyState);
           setCampusHint(getCampusReadyHint(trackKey));
@@ -814,12 +900,12 @@
         if (!campusChoices.length) {
           const emptyState = document.createElement('div');
           emptyState.className = 'track-option campus-option is-disabled';
-          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">Немає налаштованих кампусів</span><span class="course-option-subtitle">${isTeacherTrack(trackKey) ? 'Попросіть адміністратора прив\'язати по одному викладацькому курсу на кампус.' : 'Попросіть адміністратора прив\'язати по одному курсу на кампус для цього року вступу.'}</span></span>`;
+          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.noCampusesTitle}</span><span class="course-option-subtitle">${isTeacherTrack(trackKey) ? registerCourseText.noCampusesTeacherSubtitle : registerCourseText.noCampusesStudentSubtitle}</span></span>`;
           campusOptions.appendChild(emptyState);
           setCampusHint(
             isTeacherTrack(trackKey)
-              ? 'Для цієї викладацької програми ще немає доступних кампусів.'
-              : 'Для цього року вступу ще немає доступних кампусів.',
+              ? registerCourseText.noCampusesTeacherHint
+              : registerCourseText.noCampusesStudentHint,
             true
           );
           return;
@@ -846,10 +932,10 @@
             campusInput.value = choice.campusKey;
           }
 
-          const courseCountLabel = choice.courseCount === 1 ? '1 прив\'язаний курс' : `${choice.courseCount} прив'язані курси`;
+          const courseCountLabel = formatLinkedCourseCount(choice.courseCount);
           const subtitle = choice.isAmbiguous
-            ? `${courseCountLabel}. Потрібен один видимий курс.`
-            : `${courseCountLabel}. Готово до реєстрації.`;
+            ? `${courseCountLabel}. ${registerCourseText.oneVisibleCourseNeeded}`
+            : `${courseCountLabel}. ${registerCourseText.readyToRegister}`;
           button.innerHTML = `
             <span class="course-option-content">
               <span class="course-option-title">${choice.campusLabel}</span>
@@ -871,7 +957,7 @@
         });
 
         if (!courseIdInput.value || !campusInput.value) {
-          setCampusHint('Прив\'язка кампусів неоднозначна. Попросіть адміністратора залишити по одному видимому курсу на кампус.', true);
+          setCampusHint(registerCourseText.ambiguousCampusHint, true);
         } else {
           setCampusHint(getCampusReadyHint(trackKey));
         }
@@ -899,7 +985,7 @@
         registerCourseForm.addEventListener('submit', (event) => {
           if (courseIdInput && !courseIdInput.value) {
             event.preventDefault();
-            setCampusHint('Оберіть коректний кампус перед продовженням.', true);
+            setCampusHint(registerCourseText.chooseValidCampus, true);
           }
         });
       }
