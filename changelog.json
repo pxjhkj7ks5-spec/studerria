@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.04",
+      "date": "2026-03-11",
+      "items": [
+        "feat(pathways-health-focus): rebuilt the Pathways workspace into a cohort health control center with a sticky focus nav, selected-admission readiness panel, and action-oriented warnings for mapping, subjects, campuses, and migration",
+        "tune(pathways-admission-cards): turned admission years into richer status cards with mapping, visibility, campus, and user signals while pushing the overall page deeper into the Apple liquid-glass direction"
+      ]
+    },
+    {
       "version": "1.2.03",
       "date": "2026-03-11",
       "items": [

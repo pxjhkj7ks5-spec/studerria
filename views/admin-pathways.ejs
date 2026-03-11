@@ -10,8 +10,38 @@
   const campusBindingList = Array.isArray(registrationCampusBindings) ? registrationCampusBindings : [];
   const ambiguousCampusList = Array.isArray(ambiguousCampusBindings) ? ambiguousCampusBindings : [];
   const migrationCourseList = Array.isArray(migrationCourseOptions) ? migrationCourseOptions : [];
+  const admissionCards = Array.isArray(admissionHealthCards) ? admissionHealthCards : [];
+  const cohortHealth = selectedCohortHealth || null;
+  const cohortAlertsList = Array.isArray(cohortAlerts) ? cohortAlerts : [];
+  const migrationSummaryValue = migrationSummary || {
+    total_courses: 0,
+    mapped_courses: 0,
+    candidate_users: 0,
+    already_assigned: 0,
+    pending_users: 0,
+  };
   const legacyAdmissionOrdinal = Number(selectedAdmissionLegacyOrdinal || 0);
   const legacySuggestedCount = Number(legacySuggestedCourseCount || 0);
+  const trackLabels = {
+    all: 'All tracks',
+    bachelor: 'Bachelor',
+    master: 'Master',
+    teacher: 'Teacher',
+  };
+  const activeTrackLabel = trackLabels[String(activeTrack)] || String(activeTrack || 'All tracks');
+  const cohortFocusLabel = cohortHealth
+    ? `${cohortHealth.program_code ? `${cohortHealth.program_code} · ` : ''}${cohortHealth.admission_year || 'Admission'}${cohortHealth.admission_label ? ` · ${cohortHealth.admission_label}` : ''}`
+    : 'No cohort selected';
+  const sectionLinks = [
+    { href: '#pathways-scope', label: 'Scope' },
+    { href: '#pathways-programs', label: 'Programs' },
+    { href: '#pathways-admissions', label: 'Admissions' },
+    { href: '#pathways-mapping', label: 'Mapping' },
+    { href: '#pathways-subjects', label: 'Subjects' },
+    { href: '#pathways-campuses', label: 'Campuses' },
+    { href: '#pathways-migration', label: 'Migration' },
+    { href: '#pathways-catalog', label: 'Catalog' },
+  ];
   const courseChecklistPropsJson = JSON.stringify({
     targetSelector: '#pathwayCourseMappingForm',
     checkboxSelector: 'input[type="checkbox"][name^="course_"]',
@@ -399,22 +429,107 @@
         <div class="alert flash-alert alert-success mb-3"><%= success %></div>
       <% } %>
 
-      <section class="glass hero mb-3">
-        <h1 class="hero-title">Academic pathways workspace</h1>
-        <p class="hero-subtitle">
-          Керуйте треками, програмами, роками вступу та видимістю предметів для кожної когорти. Нові admission роки автоматично успадковують конфігурацію з останнього року в межах програми.
-        </p>
-        <div class="chip-row">
-          <span class="chip">Programs: <%= (programs || []).length %></span>
-          <span class="chip">Admissions: <%= (admissions || []).length %></span>
-          <span class="chip">Mapped courses: <%= Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) %> / <%= Number(mappingSummary && mappingSummary.total ? mappingSummary.total : 0) %></span>
-          <span class="chip">Visible subjects: <%= Number(visibilitySummary && visibilitySummary.visible ? visibilitySummary.visible : 0) %> / <%= Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) %></span>
+      <section class="glass hero hero-stage mb-3" id="pathways-top">
+        <div class="hero-stage__content">
+          <div class="hero-stage__copy">
+            <span class="hero-kicker">Pathways control center</span>
+            <h1 class="hero-title">Academic pathways workspace</h1>
+            <p class="hero-subtitle">
+              Керуйте треками, програмами, роками вступу та видимістю предметів для кожної когорти. Тепер сторінка одразу показує, чи готова обрана когорта до реєстрації, чи ще зависла на mapping, campuses або user migration.
+            </p>
+            <div class="chip-row">
+              <span class="chip">Programs: <%= (programs || []).length %></span>
+              <span class="chip">Admissions: <%= (admissions || []).length %></span>
+              <span class="chip">Mapped courses: <%= Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) %> / <%= Number(mappingSummary && mappingSummary.total ? mappingSummary.total : 0) %></span>
+              <span class="chip">Visible subjects: <%= Number(visibilitySummary && visibilitySummary.visible ? visibilitySummary.visible : 0) %> / <%= Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) %></span>
+            </div>
+            <div class="hero-focus-strip">
+              <div class="hero-focus-item">
+                <span class="hero-focus-label">Course scope</span>
+                <strong><%= selectedCourseLabel || 'No course selected' %></strong>
+              </div>
+              <div class="hero-focus-item">
+                <span class="hero-focus-label">Track filter</span>
+                <strong><%= activeTrackLabel %></strong>
+              </div>
+              <div class="hero-focus-item">
+                <span class="hero-focus-label">Focused cohort</span>
+                <strong><%= cohortFocusLabel %></strong>
+              </div>
+            </div>
+          </div>
+          <aside class="hero-health <%= cohortHealth ? `is-${cohortHealth.status_tone}` : 'is-muted' %>">
+            <div class="hero-health__topline">
+              <span class="status-pill status-pill--<%= cohortHealth ? cohortHealth.status_tone : 'muted' %>">
+                <%= cohortHealth ? cohortHealth.status_label : 'Pick a cohort' %>
+              </span>
+              <span class="hero-health__caption"><%= cohortHealth ? 'Selected admission health' : 'Focus mode' %></span>
+            </div>
+            <% if (cohortHealth) { %>
+              <div class="hero-health__title">
+                <strong><%= cohortHealth.program_name %></strong>
+                <span>
+                  <%= cohortHealth.program_code ? `${cohortHealth.program_code} · ` : '' %><%= cohortHealth.admission_year %><%= cohortHealth.admission_label ? ` · ${cohortHealth.admission_label}` : '' %>
+                </span>
+              </div>
+              <div class="hero-health__meta">
+                <span class="chip"><%= trackLabels[String(cohortHealth.track_key)] || cohortHealth.track_key %></span>
+                <span class="chip"><%= cohortHealth.course_label %></span>
+              </div>
+              <div class="hero-health__grid">
+                <% (cohortHealth.signals || []).forEach((signal) => { %>
+                  <a class="health-signal-card is-<%= signal.tone || 'muted' %>" href="<%= signal.href %>">
+                    <span class="health-signal-card__label"><%= signal.label %></span>
+                    <strong class="health-signal-card__value"><%= signal.value %></strong>
+                    <span class="health-signal-card__meta"><%= signal.meta %></span>
+                  </a>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <div class="hero-health__empty">
+                Pick an admission year to see cohort readiness, campus conflicts, and migration pressure in one place.
+              </div>
+            <% } %>
+          </aside>
         </div>
       </section>
 
-      <section class="glass section mb-3">
-        <h2 class="section-title">Scope</h2>
-        <p class="section-subtitle">Виберіть курс і трек для фокусного редагування.</p>
+      <nav class="glass focus-nav mb-3" aria-label="Pathways sections">
+        <div class="focus-nav__links">
+          <% sectionLinks.forEach((item) => { %>
+            <a class="focus-nav__link" href="<%= item.href %>"><%= item.label %></a>
+          <% }) %>
+        </div>
+        <div class="focus-nav__meta">
+          <span class="focus-nav__meta-label">Focus</span>
+          <strong class="focus-nav__meta-value"><%= cohortFocusLabel %></strong>
+        </div>
+      </nav>
+
+      <% if (cohortAlertsList.length) { %>
+        <section class="pathways-alert-stack mb-3">
+          <% cohortAlertsList.forEach((alert) => { %>
+            <article class="glass pathways-alert pathways-alert--<%= alert.tone || 'info' %>">
+              <div class="pathways-alert__body">
+                <strong class="pathways-alert__title"><%= alert.title %></strong>
+                <p class="pathways-alert__text"><%= alert.body %></p>
+              </div>
+              <% if (alert.target) { %>
+                <a class="btn btn-soft btn-pill pathways-alert__action" href="#<%= alert.target %>"><%= alert.action_label || 'Open section' %></a>
+              <% } %>
+            </article>
+          <% }) %>
+        </section>
+      <% } %>
+
+      <section class="glass section mb-3" id="pathways-scope">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Scope</h2>
+            <p class="section-subtitle">Виберіть курс і трек для фокусного редагування. Поточний focus зберігає program і admission, якщо вони ще валідні в новому scope.</p>
+          </div>
+          <span class="chip"><%= activeTrackLabel %></span>
+        </div>
         <form method="GET" action="/admin/pathways" class="row g-2 mt-1">
           <div class="col-12 col-md-6 col-xl-4">
             <label class="form-label small" for="pathwayCourseSelect">Course</label>
@@ -446,11 +561,29 @@
             <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
           <% } %>
         </form>
+        <div class="scope-summary-grid">
+          <div class="scope-summary-card">
+            <span class="scope-summary-card__label">Course scope</span>
+            <strong><%= selectedCourseLabel || 'No course selected' %></strong>
+          </div>
+          <div class="scope-summary-card">
+            <span class="scope-summary-card__label">Program focus</span>
+            <strong><%= selectedProgram ? selectedProgram.name : 'No program selected' %></strong>
+          </div>
+          <div class="scope-summary-card">
+            <span class="scope-summary-card__label">Admission focus</span>
+            <strong><%= selectedAdmission ? `${selectedAdmission.admission_year}${selectedAdmission.label ? ` · ${selectedAdmission.label}` : ''}` : 'No admission selected' %></strong>
+          </div>
+        </div>
       </section>
 
-      <section class="glass section mb-3">
-        <h2 class="section-title">Programs</h2>
-        <p class="section-subtitle">Створіть нову програму або оновіть існуючі параметри треку.</p>
+      <section class="glass section mb-3" id="pathways-programs">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Programs</h2>
+            <p class="section-subtitle">Створіть нову програму або оновіть існуючі параметри треку. Program cards тепер працюють як стартова точка для focus flow.</p>
+          </div>
+        </div>
 
         <form method="POST" action="/admin/pathways/programs/add" class="soft-panel row g-2 mb-3">
           <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
@@ -482,12 +615,20 @@
 
         <div class="program-grid">
           <% (filteredPrograms || []).forEach((program) => { %>
-            <form method="POST" action="/admin/pathways/programs/<%= program.id %>/update" class="soft-panel">
+            <form method="POST" action="/admin/pathways/programs/<%= program.id %>/update" class="soft-panel program-card <%= Number(program.id) === Number(selectedProgramValue) ? 'is-selected' : '' %>">
               <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
               <input type="hidden" name="track" value="<%= activeTrack %>" />
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="row-label">#<%= program.id %> <%= program.name %></span>
-                <a class="btn btn-soft btn-sm btn-pill" href="<%= buildPathwaysUrl({ program_id: program.id, admission_id: null }) %>">Open</a>
+              <div class="program-card__header">
+                <div>
+                  <div class="program-card__eyebrow">Program #<%= program.id %></div>
+                  <div class="row-label"><%= program.name %></div>
+                </div>
+                <div class="program-card__actions">
+                  <% if (program.code) { %>
+                    <span class="chip"><%= program.code %></span>
+                  <% } %>
+                  <a class="btn btn-soft btn-sm btn-pill" href="<%= buildPathwaysUrl({ program_id: program.id, admission_id: null }) %>">Open</a>
+                </div>
               </div>
               <div class="row g-2">
                 <div class="col-12 col-sm-4">
@@ -520,7 +661,7 @@
                   <button class="btn btn-primary btn-pill" type="submit">Save</button>
                 </div>
               </div>
-              <div class="muted mt-2">Admissions in program: <%= Number(program.admissions_count || 0) %></div>
+              <div class="program-card__footer muted">Admissions in program: <%= Number(program.admissions_count || 0) %></div>
             </form>
           <% }) %>
           <% if (!(filteredPrograms || []).length) { %>
@@ -531,9 +672,16 @@
         </div>
       </section>
 
-      <section class="glass section mb-3">
-        <h2 class="section-title">Admission years</h2>
-        <p class="section-subtitle">Налаштуйте когорти для обраної програми. При створенні нового року дані копіюються з попереднього.</p>
+      <section class="glass section mb-3" id="pathways-admissions">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Admission years</h2>
+            <p class="section-subtitle">Налаштуйте когорти для обраної програми. Cards нижче одразу показують readiness без відкривання mapping чи campus секцій навмання.</p>
+          </div>
+          <% if (selectedProgram) { %>
+            <span class="chip"><%= selectedProgram.name %></span>
+          <% } %>
+        </div>
 
         <form method="POST" action="/admin/pathways/admissions/add" class="soft-panel row g-2 mb-3">
           <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
@@ -562,35 +710,72 @@
           </div>
         </form>
 
-        <div class="d-grid gap-2">
-          <% (selectedProgramAdmissions || []).forEach((admission) => { %>
-            <form class="admission-row" method="POST" action="/admin/pathways/admissions/<%= admission.id %>/update">
+        <div class="admission-grid">
+          <% admissionCards.forEach((admission) => { %>
+            <form class="soft-panel admission-card <%= admission.is_selected ? 'is-selected' : '' %>" method="POST" action="/admin/pathways/admissions/<%= admission.id %>/update">
               <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
               <input type="hidden" name="track" value="<%= activeTrack %>" />
               <input type="hidden" name="program_id" value="<%= admission.program_id %>" />
-              <div class="row g-2 flex-grow-1">
-                <div class="col-12 col-md-3">
+              <div class="admission-card__head">
+                <div>
+                  <div class="admission-card__eyebrow">Admission year</div>
+                  <div class="admission-card__title"><%= admission.admission_year %><%= admission.label ? ` · ${admission.label}` : '' %></div>
+                </div>
+                <div class="admission-card__status">
+                  <span class="status-pill status-pill--<%= admission.status_tone %>"><%= admission.status_label %></span>
+                  <% if (admission.is_selected) { %>
+                    <span class="status-pill status-pill--focus">Focused</span>
+                  <% } %>
+                </div>
+              </div>
+              <div class="admission-card__metrics">
+                <div class="mini-stat">
+                  <span class="mini-stat__label">Courses</span>
+                  <strong class="mini-stat__value"><%= admission.mapping_visible_count %>/<%= admission.mapping_total_count %></strong>
+                </div>
+                <div class="mini-stat">
+                  <span class="mini-stat__label">Subjects</span>
+                  <strong class="mini-stat__value"><%= admission.subject_visible_count %>/<%= admission.subject_total_count %></strong>
+                </div>
+                <div class="mini-stat">
+                  <span class="mini-stat__label">Campuses</span>
+                  <strong class="mini-stat__value"><%= admission.campus_ambiguous_count ? `${admission.campus_ambiguous_count} blocked` : `${admission.campus_ready_count} ready` %></strong>
+                </div>
+                <div class="mini-stat">
+                  <span class="mini-stat__label">Users</span>
+                  <strong class="mini-stat__value"><%= admission.users_count %></strong>
+                </div>
+              </div>
+              <% if ((admission.status_notes || []).length) { %>
+                <div class="admission-card__notes">
+                  <% (admission.status_notes || []).forEach((note) => { %>
+                    <span class="chip"><%= note %></span>
+                  <% }) %>
+                </div>
+              <% } %>
+              <div class="row g-2">
+                <div class="col-12 col-sm-4">
                   <label class="form-label small">Year</label>
                   <input class="form-control compact-input" type="number" name="admission_year" min="2000" max="2100" value="<%= admission.admission_year %>" required />
                 </div>
-                <div class="col-12 col-md-5">
+                <div class="col-12 col-sm-5">
                   <label class="form-label small">Label</label>
                   <input class="form-control compact-input" type="text" name="label" maxlength="120" value="<%= admission.label || '' %>" />
                 </div>
-                <div class="col-6 col-md-2 align-self-end">
-                  <div class="form-check">
+                <div class="col-12 col-sm-3 align-self-end">
+                  <div class="form-check admission-card__check">
                     <input class="form-check-input" type="checkbox" id="adm_active_<%= admission.id %>" name="is_active" value="1" <%= admission.is_active ? 'checked' : '' %> />
                     <label class="form-check-label" for="adm_active_<%= admission.id %>">Active</label>
                   </div>
                 </div>
-                <div class="col-6 col-md-2 align-self-end d-grid">
-                  <button class="btn btn-primary btn-pill" type="submit">Save</button>
-                </div>
               </div>
-              <a class="btn btn-soft btn-sm btn-pill" href="<%= buildPathwaysUrl({ program_id: admission.program_id, admission_id: admission.id }) %>">Focus</a>
+              <div class="admission-card__footer">
+                <a class="btn btn-soft btn-pill" href="<%= buildPathwaysUrl({ program_id: admission.program_id, admission_id: admission.id }) %>">Focus cohort</a>
+                <button class="btn btn-primary btn-pill" type="submit">Save</button>
+              </div>
             </form>
           <% }) %>
-          <% if (!(selectedProgramAdmissions || []).length) { %>
+          <% if (!admissionCards.length) { %>
             <div class="soft-panel muted">
               Select program to manage its admission years.
             </div>
@@ -600,10 +785,27 @@
 
       <section class="row g-3">
         <div class="col-12 col-xl-5">
-          <article class="glass section h-100">
-            <h2 class="section-title">Course mapping</h2>
-            <p class="section-subtitle">Курси, для яких admission доступний на етапі реєстрації.</p>
+          <article class="glass section h-100" id="pathways-mapping">
+            <div class="section-header">
+              <div>
+                <h2 class="section-title">Course mapping</h2>
+                <p class="section-subtitle">Курси, для яких admission доступний на етапі реєстрації. Це перша критична умова для працездатного onboarding flow.</p>
+              </div>
+              <span class="chip"><%= Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) %>/<%= Number(mappingSummary && mappingSummary.total ? mappingSummary.total : 0) %></span>
+            </div>
             <% if (selectedAdmissionValue > 0) { %>
+              <div class="pathways-banner pathways-banner--<%= Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) < 1 ? 'danger' : (Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) < Number(mappingSummary && mappingSummary.total ? mappingSummary.total : 0) ? 'warning' : 'success') %>">
+                <strong><%= Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) < 1 ? 'No course mapping yet' : 'Mapping coverage' %></strong>
+                <span>
+                  <% if (Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) < 1) { %>
+                    Registration cannot resolve a course for this cohort until at least one linked course is visible.
+                  <% } else if (Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) < Number(mappingSummary && mappingSummary.total ? mappingSummary.total : 0)) { %>
+                    Cohort is partially mapped. Keep only the intended courses visible for registration.
+                  <% } else { %>
+                    Mapping is filled. Now verify campus routing and subjects.
+                  <% } %>
+                </span>
+              </div>
               <% if (legacyAdmissionOrdinal > 0 || activeTrack === 'teacher') { %>
                 <div class="soft-panel mb-3">
                   <div class="row-label mb-1">Legacy quick map</div>
@@ -682,13 +884,27 @@
           </article>
         </div>
         <div class="col-12 col-xl-7">
-          <article class="glass section h-100">
-            <h2 class="section-title">Subject visibility</h2>
-            <p class="section-subtitle">Предмети, які бачать студенти під час реєстрації для вибраної когорти.</p>
+          <article class="glass section h-100" id="pathways-subjects">
+            <div class="section-header">
+              <div>
+                <h2 class="section-title">Subject visibility</h2>
+                <p class="section-subtitle">Предмети, які бачать студенти під час реєстрації для вибраної когорти. Тут тепер видно, коли cohort technically exists, але subject list фактично порожній.</p>
+              </div>
+              <span class="chip"><%= Number(visibilitySummary && visibilitySummary.visible ? visibilitySummary.visible : 0) %>/<%= Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) %></span>
+            </div>
             <% if (selectedAdmissionValue > 0) { %>
-              <% if (hiddenSubjectCount > 0) { %>
-                <div class="muted mb-2">Globally hidden in course scope: <%= hiddenSubjectCount %></div>
-              <% } %>
+              <div class="pathways-banner pathways-banner--<%= Number(visibilitySummary && visibilitySummary.visible ? visibilitySummary.visible : 0) < 1 && Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) > 0 ? 'danger' : (Number(hiddenSubjectCount || 0) > 0 ? 'warning' : 'success') %>">
+                <strong><%= Number(visibilitySummary && visibilitySummary.visible ? visibilitySummary.visible : 0) < 1 && Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) > 0 ? 'No visible subjects' : 'Visibility coverage' %></strong>
+                <span>
+                  <% if (Number(visibilitySummary && visibilitySummary.visible ? visibilitySummary.visible : 0) < 1 && Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) > 0) { %>
+                    Students would land on an empty subject picker in this course scope.
+                  <% } else if (Number(hiddenSubjectCount || 0) > 0) { %>
+                    <%= hiddenSubjectCount %> subjects are hidden globally in the base course and cannot be re-exposed here.
+                  <% } else { %>
+                    Subject visibility is aligned for the selected course scope.
+                  <% } %>
+                </span>
+              </div>
               <form id="pathwaySubjectVisibilityForm" method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/subjects/save">
                 <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
                 <input type="hidden" name="track" value="<%= activeTrack %>" />
@@ -741,7 +957,7 @@
                         <option value="">Select source admission</option>
                         <% (copyAdmissions || []).forEach((option) => { %>
                           <option value="<%= option.id %>">
-                            <%= option.admission_year %><%= option.label ? (' • ' + option.label) : '' %> · <%= Number(option.subject_visible_count || 0) %>/<%= Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) %> visible
+                            <%= option.admission_year %><%= option.label ? (' • ' + option.label) : '' %> · <%= Number(option.subject_visible_count || 0) %>/<%= Number(option.subject_total_count || 0) %> visible
                           </option>
                         <% }) %>
                       </select>
@@ -762,87 +978,143 @@
       <section class="glass section mb-3">
         <div class="row g-3">
           <div class="col-12 col-xl-5">
-            <h2 class="section-title">Registration campuses</h2>
-            <p class="section-subtitle">Registration now resolves one hidden course per campus. Keep only one visible course per campus for the selected admission year.</p>
-            <% if (selectedAdmissionValue > 0) { %>
-              <div class="d-grid gap-2 mt-3">
-                <% (campusBindingList || []).forEach((binding) => { %>
-                  <div class="subject-row">
-                    <span>
-                      <span class="row-label"><%= binding.campus_label %></span>
-                      <span class="muted d-block">
-                        <%= binding.is_ambiguous ? `${binding.course_count} linked courses` : '1 linked course' %>
-                      </span>
-                    </span>
-                    <span class="chip"><%= binding.is_ambiguous ? 'Fix mapping' : 'Ready' %></span>
-                  </div>
-                <% }) %>
-                <% if (!(campusBindingList || []).length) { %>
-                  <div class="soft-panel muted">No campus bindings yet. Map at least one course to this admission year first.</div>
-                <% } %>
-                <% if ((ambiguousCampusList || []).length) { %>
-                  <div class="soft-panel muted">
-                    Ambiguous campuses: <%= ambiguousCampusList.map((item) => `${item.campus_label} (${item.course_count})`).join(', ') %>. Registration will stay blocked there until one course remains per campus.
-                  </div>
-                <% } %>
+            <div id="pathways-campuses">
+              <div class="section-header">
+                <div>
+                  <h2 class="section-title">Registration campuses</h2>
+                  <p class="section-subtitle">Registration resolves one hidden course per campus. This block now surfaces ambiguity as a first-class readiness error, not just a side note.</p>
+                </div>
+                <span class="chip"><%= ambiguousCampusList.length ? `${ambiguousCampusList.length} blocked` : `${campusBindingList.length} ready` %></span>
               </div>
-            <% } else { %>
-              <div class="soft-panel muted mt-3">Select admission year first.</div>
-            <% } %>
+              <% if (selectedAdmissionValue > 0) { %>
+                <div class="pathways-banner pathways-banner--<%= ambiguousCampusList.length ? 'danger' : (campusBindingList.length ? 'success' : 'warning') %>">
+                  <strong><%= ambiguousCampusList.length ? 'Campus routing conflict' : (campusBindingList.length ? 'Campus routing ready' : 'No campus routing yet') %></strong>
+                  <span>
+                    <% if (ambiguousCampusList.length) { %>
+                      Registration stays blocked until each campus resolves to exactly one visible linked course.
+                    <% } else if (campusBindingList.length) { %>
+                      Every available campus has a single registration route.
+                    <% } else { %>
+                      Map at least one visible course before campus routing can be derived.
+                    <% } %>
+                  </span>
+                </div>
+                <div class="d-grid gap-2 mt-3">
+                  <% (campusBindingList || []).forEach((binding) => { %>
+                    <div class="soft-panel campus-binding-card <%= binding.is_ambiguous ? 'is-ambiguous' : 'is-ready' %>">
+                      <div class="campus-binding-card__top">
+                        <div>
+                          <div class="row-label"><%= binding.campus_label %></div>
+                          <div class="muted"><%= binding.is_ambiguous ? `${binding.course_count} linked courses` : '1 linked course' %></div>
+                        </div>
+                        <span class="status-pill status-pill--<%= binding.is_ambiguous ? 'danger' : 'success' %>"><%= binding.is_ambiguous ? 'Fix mapping' : 'Ready' %></span>
+                      </div>
+                      <% if ((binding.course_labels || []).length) { %>
+                        <div class="campus-binding-card__chips">
+                          <% (binding.course_labels || []).forEach((label) => { %>
+                            <span class="chip"><%= label %></span>
+                          <% }) %>
+                        </div>
+                      <% } %>
+                    </div>
+                  <% }) %>
+                  <% if (!(campusBindingList || []).length) { %>
+                    <div class="soft-panel muted">No campus bindings yet. Map at least one course to this admission year first.</div>
+                  <% } %>
+                </div>
+              <% } else { %>
+                <div class="soft-panel muted mt-3">Select admission year first.</div>
+              <% } %>
+            </div>
           </div>
 
           <div class="col-12 col-xl-7">
-            <h2 class="section-title">Existing user migration</h2>
-            <p class="section-subtitle">Stamp current users with the selected track, program, and admission year without forcing re-registration. Current course IDs stay unchanged.</p>
-            <% if (selectedAdmissionValue > 0 && selectedProgramValue > 0) { %>
-              <form id="pathwayUserMigrationForm" method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/users/migrate" class="mt-3">
-                <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                <input type="hidden" name="track" value="<%= activeTrack %>" />
-                <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                  <span class="muted">Bulk actions</span>
-                  <span
-                    data-react-island="checklist-toolbar"
-                    data-island-props='<%- migrationChecklistPropsJson %>'
-                  ></span>
+            <div id="pathways-migration">
+              <div class="section-header">
+                <div>
+                  <h2 class="section-title">Existing user migration</h2>
+                  <p class="section-subtitle">Stamp current users with the selected track, program, and admission year without forcing re-registration. The panel now shows whether migration is already mostly aligned or still backlog-heavy.</p>
                 </div>
-                <div class="d-grid gap-2 mb-3">
-                  <% (migrationCourseList || []).forEach((course) => { %>
-                    <label
-                      class="subject-row"
-                      data-checklist-row
-                      data-checklist-text="<%= `${course.course_name} ${course.course_location} users ${Number(course.users_count || 0)}` %>"
-                    >
-                      <span>
-                        <span class="row-label"><%= buildCourseLabel(course) %></span>
-                        <span class="muted d-block">
-                          Users: <%= Number(course.users_count || 0) %> / Already assigned: <%= Number(course.assigned_count || 0) %><%= course.is_mapped ? ' / Mapped to this admission' : '' %>
+                <span class="chip"><%= migrationSummaryValue.pending_users %> pending</span>
+              </div>
+              <% if (selectedAdmissionValue > 0 && selectedProgramValue > 0) { %>
+                <div class="migration-summary-grid">
+                  <div class="mini-stat">
+                    <span class="mini-stat__label">Source courses</span>
+                    <strong class="mini-stat__value"><%= migrationSummaryValue.total_courses %></strong>
+                  </div>
+                  <div class="mini-stat">
+                    <span class="mini-stat__label">Mapped courses</span>
+                    <strong class="mini-stat__value"><%= migrationSummaryValue.mapped_courses %></strong>
+                  </div>
+                  <div class="mini-stat">
+                    <span class="mini-stat__label">Candidate users</span>
+                    <strong class="mini-stat__value"><%= migrationSummaryValue.candidate_users %></strong>
+                  </div>
+                  <div class="mini-stat">
+                    <span class="mini-stat__label">Already aligned</span>
+                    <strong class="mini-stat__value"><%= migrationSummaryValue.already_assigned %></strong>
+                  </div>
+                </div>
+                <div class="pathways-banner pathways-banner--<%= migrationSummaryValue.total_courses ? (migrationSummaryValue.pending_users > 0 ? 'warning' : 'success') : 'muted' %>">
+                  <strong><%= migrationSummaryValue.total_courses ? (migrationSummaryValue.pending_users > 0 ? 'Migration backlog still exists' : 'Migration is aligned') : 'No source courses yet' %></strong>
+                  <span>
+                    <% if (migrationSummaryValue.total_courses) { %>
+                      Safe mode only updates track, program, and admission. Existing course bindings are preserved.
+                    <% } else { %>
+                      Pick compatible source courses to start cohort stamping for existing users.
+                    <% } %>
+                  </span>
+                </div>
+                <form id="pathwayUserMigrationForm" method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/users/migrate" class="mt-3">
+                  <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                  <input type="hidden" name="track" value="<%= activeTrack %>" />
+                  <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                    <span class="muted">Bulk actions</span>
+                    <span
+                      data-react-island="checklist-toolbar"
+                      data-island-props='<%- migrationChecklistPropsJson %>'
+                    ></span>
+                  </div>
+                  <div class="d-grid gap-2 mb-3">
+                    <% (migrationCourseList || []).forEach((course) => { %>
+                      <label
+                        class="subject-row"
+                        data-checklist-row
+                        data-checklist-text="<%= `${course.course_name} ${course.course_location} users ${Number(course.users_count || 0)}` %>"
+                      >
+                        <span>
+                          <span class="row-label"><%= buildCourseLabel(course) %></span>
+                          <span class="muted d-block">
+                            Users: <%= Number(course.users_count || 0) %> / Already assigned: <%= Number(course.assigned_count || 0) %><%= course.is_mapped ? ' / Mapped to this admission' : '' %>
+                          </span>
                         </span>
-                      </span>
-                      <input class="form-check-input" type="checkbox" name="source_course_ids[]" value="<%= course.course_id %>" />
-                    </label>
-                  <% }) %>
-                  <% if (!(migrationCourseList || []).length) { %>
-                    <div class="soft-panel muted">No compatible source courses found for this track yet.</div>
-                  <% } %>
-                </div>
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                  <button class="btn btn-primary btn-pill" type="submit">Assign users to this admission</button>
-                  <span class="muted">Safe mode: only track/program/admission are updated. The existing course binding is preserved.</span>
-                </div>
-              </form>
-            <% } else { %>
-              <div class="soft-panel muted mt-3">Select program and admission year first.</div>
-            <% } %>
+                        <input class="form-check-input" type="checkbox" name="source_course_ids[]" value="<%= course.course_id %>" />
+                      </label>
+                    <% }) %>
+                    <% if (!(migrationCourseList || []).length) { %>
+                      <div class="soft-panel muted">No compatible source courses found for this track yet.</div>
+                    <% } %>
+                  </div>
+                  <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <button class="btn btn-primary btn-pill" type="submit">Assign users to this admission</button>
+                    <span class="muted">Safe mode: only track/program/admission are updated. The existing course binding is preserved.</span>
+                  </div>
+                </form>
+              <% } else { %>
+                <div class="soft-panel muted mt-3">Select program and admission year first.</div>
+              <% } %>
+            </div>
           </div>
         </div>
       </section>
 
-      <section class="glass section mb-3">
+      <section class="glass section mb-3" id="pathways-catalog">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <div>
             <h2 class="section-title">Subject catalog</h2>
-            <p class="section-subtitle">Read-only list of all subjects across every course. Current course bindings stay unchanged.</p>
+            <p class="section-subtitle">Read-only list of all subjects across every course. This remains the long-tail reference view for debugging scope mismatches.</p>
           </div>
           <span class="chip">Courses with subjects: <%= subjectCatalogList.length %></span>
         </div>

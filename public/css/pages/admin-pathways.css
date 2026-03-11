@@ -73,6 +73,495 @@
   gap: 16px;
 }
 
+.page-admin-pathways #pathways-top,
+.page-admin-pathways #pathways-scope,
+.page-admin-pathways #pathways-programs,
+.page-admin-pathways #pathways-admissions,
+.page-admin-pathways #pathways-mapping,
+.page-admin-pathways #pathways-subjects,
+.page-admin-pathways #pathways-campuses,
+.page-admin-pathways #pathways-migration,
+.page-admin-pathways #pathways-catalog {
+  scroll-margin-top: 118px;
+}
+
+.page-admin-pathways .hero-stage {
+  position: relative;
+  overflow: clip;
+  background:
+    radial-gradient(560px 280px at 0% 0%, color-mix(in srgb, var(--studerria-cta-start) 24%, transparent), transparent 70%),
+    radial-gradient(520px 320px at 100% 0%, rgba(255, 255, 255, 0.08), transparent 74%),
+    radial-gradient(540px 320px at 100% 100%, color-mix(in srgb, var(--studerria-cta-end) 18%, transparent), transparent 72%),
+    var(--studerria-panel-bg-strong);
+}
+
+.page-admin-pathways .hero-stage__content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.page-admin-pathways .hero-stage__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.page-admin-pathways .hero-kicker {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--studerria-cta-start) 24%, var(--studerria-panel-border));
+  background: color-mix(in srgb, var(--studerria-pill-bg) 88%, transparent);
+  color: var(--studerria-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.page-admin-pathways .hero-focus-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: auto;
+}
+
+.page-admin-pathways .hero-focus-item,
+.page-admin-pathways .scope-summary-card,
+.page-admin-pathways .mini-stat {
+  border-radius: 22px;
+  border: 1px solid var(--studerria-panel-border);
+  background: color-mix(in srgb, var(--studerria-panel-bg-strong) 86%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.page-admin-pathways .hero-focus-item {
+  padding: 14px 16px;
+}
+
+.page-admin-pathways .hero-focus-item strong,
+.page-admin-pathways .scope-summary-card strong {
+  display: block;
+  font-size: 0.97rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.page-admin-pathways .hero-focus-label,
+.page-admin-pathways .scope-summary-card__label,
+.page-admin-pathways .mini-stat__label,
+.page-admin-pathways .health-signal-card__label,
+.page-admin-pathways .focus-nav__meta-label,
+.page-admin-pathways .program-card__eyebrow,
+.page-admin-pathways .admission-card__eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--studerria-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-admin-pathways .hero-health {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--studerria-panel-border) 88%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--studerria-panel-bg-strong) 96%, transparent), color-mix(in srgb, var(--studerria-panel-bg) 96%, transparent));
+  box-shadow:
+    0 20px 42px rgba(2, 6, 23, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.page-admin-pathways .hero-health.is-success {
+  border-color: color-mix(in srgb, #34d399 24%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .hero-health.is-warning {
+  border-color: color-mix(in srgb, #f59e0b 26%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .hero-health.is-danger {
+  border-color: color-mix(in srgb, #fb7185 28%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .hero-health__topline,
+.page-admin-pathways .program-card__header,
+.page-admin-pathways .admission-card__head,
+.page-admin-pathways .campus-binding-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.page-admin-pathways .hero-health__caption {
+  color: var(--studerria-text-muted);
+  font-size: 0.82rem;
+}
+
+.page-admin-pathways .hero-health__title strong {
+  display: block;
+  font-size: 1.16rem;
+  line-height: 1.2;
+}
+
+.page-admin-pathways .hero-health__title span,
+.page-admin-pathways .health-signal-card__meta,
+.page-admin-pathways .pathways-alert__text {
+  color: var(--studerria-text-muted);
+}
+
+.page-admin-pathways .hero-health__meta,
+.page-admin-pathways .admission-card__notes,
+.page-admin-pathways .campus-binding-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.page-admin-pathways .hero-health__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.page-admin-pathways .hero-health__empty {
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--studerria-panel-bg) 92%, transparent);
+  color: var(--studerria-text-muted);
+}
+
+.page-admin-pathways .health-signal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px;
+  border-radius: 20px;
+  border: 1px solid var(--studerria-panel-border);
+  background: color-mix(in srgb, var(--studerria-panel-bg) 90%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: inherit;
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.page-admin-pathways .health-signal-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 30%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .health-signal-card__value,
+.page-admin-pathways .mini-stat__value,
+.page-admin-pathways .focus-nav__meta-value {
+  font-size: 1.04rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.page-admin-pathways .health-signal-card.is-success {
+  border-color: color-mix(in srgb, #34d399 24%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .health-signal-card.is-warning {
+  border-color: color-mix(in srgb, #f59e0b 26%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .health-signal-card.is-danger {
+  border-color: color-mix(in srgb, #fb7185 28%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .focus-nav {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 84px);
+  z-index: 14;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--studerria-panel-bg-strong) 94%, transparent), color-mix(in srgb, var(--studerria-panel-bg) 92%, transparent));
+}
+
+.page-admin-pathways .focus-nav__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.page-admin-pathways .focus-nav__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 15px;
+  border-radius: 999px;
+  border: 1px solid var(--studerria-panel-border);
+  background: var(--studerria-pill-bg);
+  color: var(--studerria-text-primary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.page-admin-pathways .focus-nav__link:hover {
+  background: var(--studerria-pill-hover);
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 30%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .focus-nav__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+}
+
+.page-admin-pathways .focus-nav__meta-value {
+  max-width: 320px;
+  text-align: right;
+  text-wrap: balance;
+}
+
+.page-admin-pathways .pathways-alert-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.page-admin-pathways .pathways-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.page-admin-pathways .pathways-alert__body {
+  min-width: 0;
+}
+
+.page-admin-pathways .pathways-alert__title {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.page-admin-pathways .pathways-alert__text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.page-admin-pathways .pathways-alert__action {
+  flex-shrink: 0;
+}
+
+.page-admin-pathways .pathways-alert--danger {
+  border-color: color-mix(in srgb, #fb7185 28%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .pathways-alert--warning {
+  border-color: color-mix(in srgb, #f59e0b 24%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .pathways-alert--info {
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 22%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.page-admin-pathways .scope-summary-grid,
+.page-admin-pathways .migration-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.page-admin-pathways .scope-summary-card {
+  padding: 14px 16px;
+}
+
+.page-admin-pathways .mini-stat {
+  display: grid;
+  gap: 2px;
+  padding: 13px 14px;
+}
+
+.page-admin-pathways .program-card,
+.page-admin-pathways .admission-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.page-admin-pathways .program-card.is-selected,
+.page-admin-pathways .admission-card.is-selected {
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 28%, var(--studerria-panel-border));
+  box-shadow:
+    0 18px 36px rgba(14, 165, 233, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.page-admin-pathways .program-card__actions,
+.page-admin-pathways .admission-card__status,
+.page-admin-pathways .admission-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-admin-pathways .program-card__actions {
+  justify-content: flex-end;
+}
+
+.page-admin-pathways .program-card__footer {
+  margin-top: auto;
+}
+
+.page-admin-pathways .admission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.page-admin-pathways .admission-card {
+  min-height: 100%;
+}
+
+.page-admin-pathways .admission-card__title {
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.page-admin-pathways .admission-card__metrics,
+.page-admin-pathways .migration-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.page-admin-pathways .admission-card__metrics {
+  display: grid;
+  gap: 10px;
+}
+
+.page-admin-pathways .admission-card__check {
+  padding-top: 10px;
+}
+
+.page-admin-pathways .admission-card__footer {
+  margin-top: auto;
+  justify-content: space-between;
+}
+
+.page-admin-pathways .status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--studerria-panel-border);
+  background: color-mix(in srgb, var(--studerria-pill-bg) 90%, transparent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.page-admin-pathways .status-pill--success {
+  border-color: color-mix(in srgb, #34d399 26%, var(--studerria-panel-border));
+  color: color-mix(in srgb, #6ee7b7 86%, var(--studerria-text-primary));
+}
+
+.page-admin-pathways .status-pill--warning {
+  border-color: color-mix(in srgb, #f59e0b 26%, var(--studerria-panel-border));
+  color: color-mix(in srgb, #fbbf24 84%, var(--studerria-text-primary));
+}
+
+.page-admin-pathways .status-pill--danger {
+  border-color: color-mix(in srgb, #fb7185 28%, var(--studerria-panel-border));
+  color: color-mix(in srgb, #fda4af 82%, var(--studerria-text-primary));
+}
+
+.page-admin-pathways .status-pill--info {
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 28%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .status-pill--muted {
+  opacity: 0.82;
+}
+
+.page-admin-pathways .status-pill--focus {
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 28%, var(--studerria-panel-border));
+  background: color-mix(in srgb, var(--studerria-cta-start) 12%, var(--studerria-pill-bg));
+}
+
+.page-admin-pathways .pathways-banner {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--studerria-panel-border);
+  background: color-mix(in srgb, var(--studerria-panel-bg) 92%, transparent);
+}
+
+.page-admin-pathways .pathways-banner strong {
+  font-size: 0.96rem;
+}
+
+.page-admin-pathways .pathways-banner span {
+  color: var(--studerria-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.page-admin-pathways .pathways-banner--success {
+  border-color: color-mix(in srgb, #34d399 22%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .pathways-banner--warning {
+  border-color: color-mix(in srgb, #f59e0b 24%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .pathways-banner--danger {
+  border-color: color-mix(in srgb, #fb7185 26%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .pathways-banner--muted {
+  border-style: dashed;
+}
+
+.page-admin-pathways .campus-binding-card {
+  display: grid;
+  gap: 10px;
+}
+
+.page-admin-pathways .campus-binding-card.is-ambiguous {
+  border-color: color-mix(in srgb, #fb7185 28%, var(--studerria-panel-border));
+}
+
+.page-admin-pathways .campus-binding-card.is-ready {
+  border-color: color-mix(in srgb, #34d399 22%, var(--studerria-panel-border));
+}
+
 .page-admin-pathways .subject-list {
   max-height: 460px;
   scrollbar-width: thin;
@@ -125,5 +614,68 @@ body.theme-light.page-admin-pathways .admission-row {
   .page-admin-pathways .hero,
   .page-admin-pathways .section {
     padding: 20px;
+  }
+
+  .page-admin-pathways .hero-stage__content,
+  .page-admin-pathways .hero-focus-strip,
+  .page-admin-pathways .scope-summary-grid,
+  .page-admin-pathways .admission-card__metrics,
+  .page-admin-pathways .migration-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-admin-pathways .focus-nav {
+    top: calc(env(safe-area-inset-top, 0px) + 72px);
+    align-items: flex-start;
+  }
+
+  .page-admin-pathways .focus-nav__meta {
+    align-items: flex-start;
+  }
+
+  .page-admin-pathways .focus-nav__meta-value {
+    max-width: none;
+    text-align: left;
+  }
+
+  .page-admin-pathways .pathways-alert {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-admin-pathways .admission-card__footer {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 767px) {
+  .page-admin-pathways .focus-nav {
+    padding: 12px 14px;
+  }
+
+  .page-admin-pathways .focus-nav__links {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .page-admin-pathways .focus-nav__links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .page-admin-pathways .section-header,
+  .page-admin-pathways .hero-health__topline,
+  .page-admin-pathways .program-card__header,
+  .page-admin-pathways .admission-card__head,
+  .page-admin-pathways .campus-binding-card__top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .page-admin-pathways .hero-health__grid,
+  .page-admin-pathways .admission-grid {
+    grid-template-columns: 1fr;
   }
 }
