@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.08",
+      "date": "2026-03-11",
+      "items": [
+        "tune(schedule-generator-shell-localization): localized the schedule generator shell, hero, settings, scope controls, validation panels, analytics summaries, load map, teacher controls, and plan table so this admin workspace no longer ships with hardcoded mixed Ukrainian and English chrome",
+        "tune(schedule-generator-dryrun-and-mirror-copy): localized the subject merge dry-run, mirror key summaries, conflict explanations, auto-pair modal, and client-side merge preview status messages while preserving the existing generator behavior"
+      ]
+    },
+    {
       "version": "1.2.07",
       "date": "2026-03-11",
       "items": [

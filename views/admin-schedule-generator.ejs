@@ -1,3 +1,460 @@
+<%
+  const scheduleGeneratorCopy = lang === 'en'
+    ? {
+        pageTitle: 'Schedule Generator',
+        backToAdmin: 'Back to admin',
+        sessionGenerator: 'Session Generator',
+        newPlan: 'New plan',
+        heroTitle: 'Schedule Generator',
+        heroLead: 'Build the full timetable for the selected location: fixed slots, mirror weeks, and teacher constraints.',
+        runLabel: 'Run',
+        statusPublished: 'Published',
+        statusDraft: 'Draft',
+        generatePreview: 'Generate preview',
+        openPreview: 'Open preview',
+        rerunCourse: 'Regenerate course',
+        coursesTitle: 'Courses',
+        analyticsTitle: 'Generator analytics',
+        analyticsUnavailable: 'Analytics are unavailable.',
+        qualityIndex: 'Quality index',
+        blockers: 'Blockers',
+        warnings: 'Warnings',
+        partialPlanned: 'Partial plan',
+        noSlot: 'No slot',
+        noAllowedSlots: 'No allowed slots',
+        eveningPairs: 'Evening classes',
+        dayImbalance: 'Day imbalance',
+        peakLabel: 'Peak',
+        classShort: 'Class',
+        settingsTitle: 'Generation settings',
+        autoTune: 'Безпечний auto-tune',
+        distributionLabel: 'Pair distribution',
+        distributionStart: 'Front-loaded',
+        distributionEven: 'Balanced',
+        distributionEnd: 'Back-loaded',
+        seminarsLabel: 'Seminars',
+        seminarStart: 'At the start',
+        seminarEven: 'Balanced',
+        seminarEnd: 'At the end',
+        maxPairsPerDay: 'Max pairs/day',
+        targetPairsPerDay: 'Target pairs/day',
+        evennessBalance: 'Evenness bias',
+        evennessHint: '0 means more compact, 100 means as evenly spread as possible.',
+        avoidLateSlots: 'Avoid late slots',
+        lateSlotsHint: '0 ignores this, 100 strongly avoids pairs 5-7.',
+        strictNoEvening: 'Strict no-evening (block pairs 6-7)',
+        strictNoEveningHint: 'Hard-block evening slots. If capacity runs out, the generator will show conflicts.',
+        specialWeeks: 'Special weeks (1-3,8)',
+        specialWeeksMode: 'Special weeks mode',
+        specialWeeksBlock: 'Block classes',
+        specialWeeksOverlay: 'Overlay on top',
+        courseSemesters: 'Course semesters',
+        autoSubjectDays: 'Auto-assign subject days',
+        autoSubjectDaysHint: 'Automatically keep a subject on one day so pairs do not scatter.',
+        subjectSingleDay: 'One day per subject (except different teachers)',
+        subjectSingleDayHint: 'Languages and subjects with different teachers may still split across several days.',
+        lectureSeminarSameDay: 'Lecture + seminar on the same day',
+        lectureBeforeSeminar: 'Priority: lecture before seminar',
+        lectureBeforeSeminarHint: 'If a subject has both, place the seminar only after the lecture within the week.',
+        preferCompactness: 'Fewer gaps between pairs',
+        mirrorGroups: 'Fast group mirroring (A/B)',
+        mirrorGroupsHint: 'Pair groups 1/2 with the same mirror key and alternate them by weeks.',
+        saveSettings: 'Save settings',
+        scopeControls: 'Область генерації',
+        scopeHint: 'Applies to Preview/Publish. If empty, generate the whole semester.',
+        semesterOptional: 'Семестр (необовʼязково)',
+        allSemesters: 'All semesters',
+        weekFrom: 'Тиждень від',
+        weekTo: 'Тиждень до',
+        groups: 'Групи',
+        days: 'Дні',
+        beforeRun: 'Before run',
+        readyToGenerate: 'Everything is ready to generate.',
+        critical: 'Critical',
+        attention: 'Attention',
+        blocksGeneration: 'Blocks generation',
+        warningState: 'Warning',
+        mergePreviewTitle: 'Subject merge dry-run',
+        mergePreviewHint: 'Shows which subjects will be merged before migration. This is preview-only and does not change the database.',
+        allCourses: 'All courses',
+        showDryRun: 'Show dry-run',
+        lastGeneration: 'Last generation',
+        records: 'Records',
+        conflicts: 'Conflicts',
+        diffPreview: 'Порівняння (Preview)',
+        overwriteSlots: 'Перезапис слотів',
+        manualOverwrite: 'Ручний перезапис',
+        manualOverwriteTodo: 'TODO (needs is_manual)',
+        updatedAt: 'Updated',
+        operation: 'Операція',
+        course: 'Course',
+        subject: 'Subject',
+        location: 'Location',
+        noSubject: 'No subject',
+        unknownCourse: 'Unknown',
+        notGeneratedYet: 'Generation has not been run yet.',
+        problems: 'Problems',
+        loadMapTitle: 'Load map (day x pair)',
+        loadMapHint: 'The darker the cell, the more classes are in that slot. The number inside the cell is the class count.',
+        noHeatmapData: 'No heatmap data.',
+        intensity: 'Intensity',
+        low: 'Low',
+        medium: 'Medium',
+        high: 'High',
+        teachersTitle: 'Teachers',
+        maxPairsPerWeek: 'Max pairs/week',
+        noLimit: 'No limit',
+        save: 'Save',
+        noTeachers: 'No teachers.',
+        addSubjectTitle: 'Add subject',
+        lessonType: 'Lesson type',
+        lecture: 'Lecture',
+        seminar: 'Seminar',
+        lab: 'Lab',
+        practice: 'Practice',
+        group: 'Group',
+        allGroups: 'All groups',
+        pairsCount: 'Pairs',
+        teacher: 'Teacher',
+        noTeacher: 'No teacher',
+        mirrorKey: 'Mirror key',
+        generate: 'Generate',
+        copy: 'Copy',
+        mirrorKeyHint: 'Same key for groups 1/2.',
+        weeksOptional: 'Weeks (optional)',
+        any: 'Any',
+        addToGenerator: 'Add to generator',
+        mirrorKeysTitle: 'Mirror keys',
+        mirrorAutoAB: 'Auto A/B pairs',
+        noMirrorKeys: 'No mirror keys.',
+        mirrorStatusProblem: 'Problem',
+        mirrorStatusNoPair: 'No pair',
+        groupOne: 'Group 1',
+        groupTwo: 'Group 2',
+        subjects: 'Subjects',
+        courses: 'Courses',
+        conflictsAfterGeneration: 'Conflicts after generation',
+        noConflicts: 'No conflicts.',
+        problem: 'Problem',
+        slotRejectionReasons: 'Slot rejection reasons',
+        studyPlan: 'Lesson plan',
+        type: 'Type',
+        mirror: 'Mirror',
+        fixedDayShort: 'Fixed day',
+        fixedSlotShort: 'Fixed slot',
+        actions: 'Actions',
+        unlock: 'Розблокувати',
+        lock: 'Зафіксувати',
+        delete: 'Видалити',
+        deleteRecordConfirm: 'Delete record?',
+        addSubjectsToCreatePlan: 'Add subjects to create a plan.',
+        mirrorAutoTitle: 'Mirror auto-pairs',
+        close: 'Close',
+        mirrorAutoHint: 'We will pick pairs for groups 1/2 with the same number of pairs and without fixed weeks or slots. Shared subjects and subjects with an existing mirror key are skipped.',
+        selectAll: 'Select all',
+        clearAll: 'Clear all',
+        noAutoMirrorCandidates: 'No candidates for auto-pairs in this location.',
+        cancel: 'Cancel',
+        applyPairs: 'Apply pairs',
+        foundMergesLabel: 'Found',
+        noMerges: 'No subjects to merge.',
+        untitled: 'Untitled',
+        canonical: 'Canonical',
+        rename: 'Rename',
+        renameConflict: 'Rename conflict: the title already exists.',
+        loading: 'Loading...',
+        loadingList: 'Loading list...',
+        dryRunFetchFailed: 'Could not load the dry-run. Try again.',
+        locationKyiv: 'Kyiv',
+        locationMunich: 'Munich',
+        noActiveSemester: 'No active semester',
+        weeksUnit: 'weeks',
+        activeDays: 'Active days',
+        healthGood: 'Stable',
+        healthWarn: 'Needs attention',
+        healthCritical: 'Risky',
+        noClassesText: 'classes',
+        statusOk: 'OK',
+        allSeminars: 'All groups',
+        checksLabel: (count) => `${count} checks`,
+        moreItems: (count) => `${count} more items.`,
+        noCoursesFor: (label) => `No courses for ${label}.`,
+        lateSummary: (percent, label) => `Evening classes: ${percent}% (${label})`,
+        balanceSummary: (label) => `Day balance: ${label}`,
+        peakSummary: (label) => `Peak load: ${label}`,
+        heatmapCellTitle: (dayLabel, slot, count) => `${dayLabel}, pair ${slot}: ${count} classes`,
+        showProblematic: (count) => `Show problematic (${count})`,
+        moreConflicts: (count) => `${count} more conflicts.`,
+        autoPairLabel: (a, b) => `Group 1: ${a} -> Group 2: ${b}`,
+        whyNotInAutoPairs: (count) => `Why it did not get into auto-pairs (${count})`,
+        moreRecords: (count) => `${count} more records.`,
+        foundMerges: (count) => `Found ${count} merges`,
+        pairsUnit: 'pairs',
+      }
+    : {
+        pageTitle: 'Генератор розкладу',
+        backToAdmin: 'Назад в адмінку',
+        sessionGenerator: 'Генератор сесій',
+        newPlan: 'Новий план',
+        heroTitle: 'Генератор розкладу',
+        heroLead: 'Формуємо повний розклад по вибраній локації: фіксовані слоти, дзеркальні тижні, обмеження викладачів.',
+        runLabel: 'Запуск',
+        statusPublished: 'Опубліковано',
+        statusDraft: 'Чернетка',
+        generatePreview: 'Згенерувати превʼю',
+        openPreview: 'Відкрити превʼю',
+        rerunCourse: 'Перегенерувати курс',
+        coursesTitle: 'Курси',
+        analyticsTitle: 'Аналітика генератора',
+        analyticsUnavailable: 'Аналітика недоступна.',
+        qualityIndex: 'Індекс якості',
+        blockers: 'Блокери',
+        warnings: 'Попередження',
+        partialPlanned: 'Частково заплан.',
+        noSlot: 'Без слота',
+        noAllowedSlots: 'Немає дозвол. слотів',
+        eveningPairs: 'Вечірні пари',
+        dayImbalance: 'Перекіс по днях',
+        peakLabel: 'Пік',
+        classShort: 'Пара',
+        settingsTitle: 'Налаштування генерації',
+        autoTune: 'Safe auto-tune',
+        distributionLabel: 'Розподіл пар',
+        distributionStart: 'Концентрація на початку',
+        distributionEven: 'Рівномірно',
+        distributionEnd: 'Концентрація в кінці',
+        seminarsLabel: 'Семінари',
+        seminarStart: 'На початку',
+        seminarEven: 'Рівномірно',
+        seminarEnd: 'В кінці',
+        maxPairsPerDay: 'Max пар/день',
+        targetPairsPerDay: 'Ціль пар/день',
+        evennessBalance: 'Баланс рівномірності',
+        evennessHint: '0 — компактніше, 100 — максимально рівномірно.',
+        avoidLateSlots: 'Уникати вечірніх слотів',
+        lateSlotsHint: '0 — не враховувати, 100 — максимально уникати 5-7 пар.',
+        strictNoEvening: 'Strict no-evening (заборонити 6-7 пари)',
+        strictNoEveningHint: 'Жорстка заборона вечірніх слотів. Якщо не вистачає місця — генератор покаже конфлікти.',
+        specialWeeks: 'Особливі тижні (1-3,8)',
+        specialWeeksMode: 'Режим особливих тижнів',
+        specialWeeksBlock: 'Блокувати заняття',
+        specialWeeksOverlay: 'Накладати поверх',
+        courseSemesters: 'Семестри курсів',
+        autoSubjectDays: 'Авто-розклад днів для предметів',
+        autoSubjectDaysHint: 'Автоматично закріплюємо предмет за одним днем, щоб пари не розповзались.',
+        subjectSingleDay: 'Один день на предмет (окрім різних викладачів)',
+        subjectSingleDayHint: 'Для мов та предметів з різними викладачами дозволяємо розбиття на кілька днів.',
+        lectureSeminarSameDay: 'Лекція + семінар в один день',
+        lectureBeforeSeminar: 'Пріоритет: лекція перед семінаром',
+        lectureBeforeSeminarHint: 'Для предметів, де є і лекція, і семінар: семінар ставимо тільки після лекції в межах тижня.',
+        preferCompactness: 'Менше вікон між парами',
+        mirrorGroups: 'Швидке дзеркало груп (A/B)',
+        mirrorGroupsHint: 'Парно зʼєднуємо групи 1/2 з однаковим ключем дзеркала та чергуємо по тижнях.',
+        saveSettings: 'Зберегти налаштування',
+        scopeControls: 'Scope controls',
+        scopeHint: 'Застосовується до Preview/Publish. Якщо порожньо — генеруємо весь семестр.',
+        semesterOptional: 'Semester (optional)',
+        allSemesters: 'Усі семестри',
+        weekFrom: 'Week from',
+        weekTo: 'Week to',
+        groups: 'Groups',
+        days: 'Days',
+        beforeRun: 'Перед запуском',
+        readyToGenerate: 'Все готово до генерації.',
+        critical: 'Критично',
+        attention: 'Увага',
+        blocksGeneration: 'Блокує генерацію',
+        warningState: 'Попередження',
+        mergePreviewTitle: 'Dry-run злиття предметів',
+        mergePreviewHint: 'Показує, які предмети будуть злиті перед міграцією. Дані лише для перегляду — базу не змінює.',
+        allCourses: 'Усі курси',
+        showDryRun: 'Показати dry-run',
+        lastGeneration: 'Остання генерація',
+        records: 'Записів',
+        conflicts: 'Конфліктів',
+        diffPreview: 'Diff (Preview)',
+        overwriteSlots: 'Overwrite slots',
+        manualOverwrite: 'Manual overwrite',
+        manualOverwriteTodo: 'TODO (needs is_manual)',
+        updatedAt: 'Оновлено',
+        operation: 'Operation',
+        course: 'Курс',
+        subject: 'Предмет',
+        location: 'Локація',
+        noSubject: 'Без предмета',
+        unknownCourse: 'Невідомий',
+        notGeneratedYet: 'Ще не запускали генерацію.',
+        problems: 'Проблеми',
+        loadMapTitle: 'Карта завантаження (день x пара)',
+        loadMapHint: 'Чим темніша клітинка, тим більше занять у цьому слоті. Цифра в клітинці — кількість занять.',
+        noHeatmapData: 'Немає даних для теплової карти.',
+        intensity: 'Інтенсивність',
+        low: 'Низька',
+        medium: 'Середня',
+        high: 'Висока',
+        teachersTitle: 'Викладачі',
+        maxPairsPerWeek: 'Max пар/тиждень',
+        noLimit: 'Без ліміту',
+        save: 'Зберегти',
+        noTeachers: 'Немає викладачів.',
+        addSubjectTitle: 'Додати предмет',
+        lessonType: 'Тип заняття',
+        lecture: 'Лекція',
+        seminar: 'Семінар',
+        lab: 'Лаб',
+        practice: 'Практика',
+        group: 'Група',
+        allGroups: 'Усі групи',
+        pairsCount: 'К-сть пар',
+        teacher: 'Викладач',
+        noTeacher: 'Без викладача',
+        mirrorKey: 'Ключ дзеркала',
+        generate: 'Згенерувати',
+        copy: 'Копіювати',
+        mirrorKeyHint: 'Однаковий ключ для груп 1/2.',
+        weeksOptional: 'Тижні (необовʼязково)',
+        any: 'Будь-який',
+        addToGenerator: 'Додати до генератора',
+        mirrorKeysTitle: 'Дзеркальні ключі',
+        mirrorAutoAB: 'Авто-пари A/B',
+        noMirrorKeys: 'Немає дзеркальних ключів.',
+        mirrorStatusProblem: 'Проблема',
+        mirrorStatusNoPair: 'Немає пари',
+        groupOne: 'Група 1',
+        groupTwo: 'Група 2',
+        subjects: 'Предмети',
+        courses: 'Курси',
+        conflictsAfterGeneration: 'Конфлікти після генерації',
+        noConflicts: 'Конфліктів немає.',
+        problem: 'Проблема',
+        slotRejectionReasons: 'Причини відсіву слотів',
+        studyPlan: 'План занять',
+        type: 'Тип',
+        mirror: 'Дзеркало',
+        fixedDayShort: 'Фікс. день',
+        fixedSlotShort: 'Фікс. слот',
+        actions: 'Дії',
+        unlock: 'Unlock',
+        lock: 'Lock',
+        delete: 'Delete',
+        deleteRecordConfirm: 'Видалити запис?',
+        addSubjectsToCreatePlan: 'Додайте предмети, щоб створити план.',
+        mirrorAutoTitle: 'Авто-пари для дзеркала',
+        close: 'Закрити',
+        mirrorAutoHint: 'Ми підберемо пари для груп 1/2 з однаковою кількістю пар і без фіксованих тижнів чи слотів. Загальні предмети та предмети з уже заданим дзеркалом не включаємо.',
+        selectAll: 'Вибрати всі',
+        clearAll: 'Зняти всі',
+        noAutoMirrorCandidates: 'Немає кандидатів для автопар у цій локації.',
+        cancel: 'Скасувати',
+        applyPairs: 'Застосувати пари',
+        foundMergesLabel: 'Знайдено',
+        noMerges: 'Немає предметів для злиття.',
+        untitled: 'Без назви',
+        canonical: 'Канонічний',
+        rename: 'Перейменування',
+        renameConflict: 'Конфлікт перейменування: назва вже існує.',
+        loading: 'Завантаження...',
+        loadingList: 'Завантажуємо список...',
+        dryRunFetchFailed: 'Не вдалося отримати dry-run. Спробуйте ще раз.',
+        locationKyiv: 'Київ',
+        locationMunich: 'Мюнхен',
+        noActiveSemester: 'Немає активного семестру',
+        weeksUnit: 'тижнів',
+        activeDays: 'Активні дні',
+        healthGood: 'Стабільно',
+        healthWarn: 'Потрібна увага',
+        healthCritical: 'Ризиковано',
+        noClassesText: 'занять',
+        statusOk: 'OK',
+        allSeminars: 'Усі групи',
+        checksLabel: (count) => `${count} перевірок`,
+        moreItems: (count) => `Ще ${count} пунктів.`,
+        noCoursesFor: (label) => `Немає курсів для ${label}.`,
+        lateSummary: (percent, label) => `Вечірні пари: ${percent}% (${label})`,
+        balanceSummary: (label) => `Рівномірність по днях: ${label}`,
+        peakSummary: (label) => `Найбільше навантаження: ${label}`,
+        heatmapCellTitle: (dayLabel, slot, count) => `${dayLabel}, пара ${slot}: ${count} занять`,
+        showProblematic: (count) => `Показати проблемні (${count})`,
+        moreConflicts: (count) => `Ще ${count} конфліктів.`,
+        autoPairLabel: (a, b) => `Група 1: ${a} -> Група 2: ${b}`,
+        whyNotInAutoPairs: (count) => `Чому не попало в авто-пари (${count})`,
+        moreRecords: (count) => `Ще ${count} записів.`,
+        foundMerges: (count) => `Знайдено ${count} злиттів`,
+        pairsUnit: 'пар',
+      };
+  const scheduleGeneratorLessonTypeLabels = {
+    lecture: scheduleGeneratorCopy.lecture,
+    seminar: scheduleGeneratorCopy.seminar,
+    lab: scheduleGeneratorCopy.lab,
+    practice: scheduleGeneratorCopy.practice,
+  };
+  const scheduleGeneratorHealthLabels = {
+    good: scheduleGeneratorCopy.healthGood,
+    warn: scheduleGeneratorCopy.healthWarn,
+    critical: scheduleGeneratorCopy.healthCritical,
+  };
+  const scheduleGeneratorConflictLabels = lang === 'en'
+    ? {
+        missing_course_context: 'No active semester',
+        missing_weeks_count: 'Week count is not set',
+        no_available_weeks: 'No available weeks',
+        no_allowed_days: 'No available days',
+        no_allowed_classes: 'No allowed slots',
+        no_slot_found: 'No slot found',
+        partial_schedule: 'Partial generation',
+        subject_day_mismatch: 'Subject spans different days',
+        unknown: 'Unknown reason',
+      }
+    : {
+        missing_course_context: 'Немає активного семестру',
+        missing_weeks_count: 'Не задано кількість тижнів',
+        no_available_weeks: 'Немає доступних тижнів',
+        no_allowed_days: 'Немає доступних днів',
+        no_allowed_classes: 'Немає дозволених слотів',
+        no_slot_found: 'Немає слота',
+        partial_schedule: 'Часткова генерація',
+        subject_day_mismatch: 'Предмет має різні дні',
+        unknown: 'Невідома причина',
+      };
+  const scheduleGeneratorRejectionLabels = lang === 'en'
+    ? {
+        course_slot_busy: 'Slot is occupied by a lecture/course',
+        lecture_slot_busy: 'Lecture blocks the slot',
+        subject_slot_busy: 'Subject is already in this slot',
+        lecture_must_be_first: 'Seminar must be after the lecture',
+        teacher_slot_busy: 'Teacher is busy',
+        group_slot_busy: 'Group is busy',
+        group_day_limit: 'Group pair/day limit',
+        teacher_week_limit: 'Teacher week limit',
+        unknown: 'Other',
+      }
+    : {
+        course_slot_busy: 'Слот зайнятий лекцією/курсом',
+        lecture_slot_busy: 'Слот блокує лекція',
+        subject_slot_busy: 'Предмет уже стоїть у цей слот',
+        lecture_must_be_first: 'Семінар має бути після лекції',
+        teacher_slot_busy: 'Викладач зайнятий',
+        group_slot_busy: 'Група зайнята',
+        group_day_limit: 'Ліміт пар/день у групи',
+        teacher_week_limit: 'Ліміт викладача на тиждень',
+        unknown: 'Інше',
+      };
+  const formatScheduleGeneratorLocation = (location) => String(location || '').toLowerCase() === 'munich'
+    ? scheduleGeneratorCopy.locationMunich
+    : scheduleGeneratorCopy.locationKyiv;
+  const formatScheduleGeneratorDateTime = (value) => {
+    if (!value) return '';
+    try {
+      return new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'uk-UA', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date(value));
+    } catch (_err) {
+      return String(value);
+    }
+  };
+  const formatScheduleGeneratorLessonType = (value) => scheduleGeneratorLessonTypeLabels[String(value || '').toLowerCase()] || value || '—';
+%>
 <!doctype html>
 <html lang="<%= lang %>">
   <head>
@@ -5,7 +462,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <%- include('partials/theme-bootstrap-head', { defaultTheme: 'light' }) %>
-    <title>Генератор розкладу</title>
+    <title><%= scheduleGeneratorCopy.pageTitle %></title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -25,23 +482,23 @@
     <%- include('partials/dynamic-bg') %>
     <nav class="navbar navbar-expand-lg admin-nav">
       <div class="container">
-        <span class="navbar-brand">Генератор розкладу</span>
+        <span class="navbar-brand"><%= scheduleGeneratorCopy.pageTitle %></span>
         <div class="d-flex align-items-center">
           <span class="me-3 text-muted"><%= t('role.admin') %>: <%= username %></span>
           <button
             class="theme-toggle theme-toggle-min me-2"
             type="button"
             id="themeToggle"
-            aria-label="Toggle theme"
+            aria-label="<%= t('theme.toggle') %>"
             data-light-label="☀️"
             data-dark-label="🌙"
           >
             🌙
           </button>
-          <a class="btn btn-outline-primary btn-sm me-2" href="/admin">Назад в адмінку</a>
-          <a class="btn btn-outline-secondary btn-sm me-2" href="/admin/session-generator">Генератор сесій</a>
+          <a class="btn btn-outline-primary btn-sm me-2" href="/admin"><%= scheduleGeneratorCopy.backToAdmin %></a>
+          <a class="btn btn-outline-secondary btn-sm me-2" href="/admin/session-generator"><%= scheduleGeneratorCopy.sessionGenerator %></a>
           <form method="POST" action="/admin/schedule-generator/new" class="me-2">
-            <button class="btn btn-outline-secondary btn-sm" type="submit">Новий план</button>
+            <button class="btn btn-outline-secondary btn-sm" type="submit"><%= scheduleGeneratorCopy.newPlan %></button>
           </form>
           <form method="POST" action="/logout">
             <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
@@ -64,15 +521,15 @@
       <div class="generator-hero glass mb-4">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
           <div>
-            <h1 class="h3 mb-2">Генератор розкладу</h1>
+            <h1 class="h3 mb-2"><%= scheduleGeneratorCopy.heroTitle %></h1>
             <div class="text-muted">
-              Формуємо повний розклад по вибраній локації: фіксовані слоти, дзеркальні тижні, обмеження викладачів.
+              <%= scheduleGeneratorCopy.heroLead %>
             </div>
           </div>
           <div class="generator-status">
-            <span class="generator-chip">Run #<%= run.id %></span>
+            <span class="generator-chip"><%= scheduleGeneratorCopy.runLabel %> #<%= run.id %></span>
             <span class="badge bg-<%= run.status === 'published' ? 'success' : 'secondary' %>">
-              <%= run.status === 'published' ? 'Опубліковано' : 'Чернетка' %>
+              <%= run.status === 'published' ? scheduleGeneratorCopy.statusPublished : scheduleGeneratorCopy.statusDraft %>
             </span>
           </div>
         </div>
@@ -88,15 +545,15 @@
               data-disable-munich="<%= disableRunMunich ? 'true' : 'false' %>"
               <%= (activeLocation === 'kyiv' ? disableRunKyiv : disableRunMunich) ? 'disabled' : '' %>
             >
-              Згенерувати превʼю
+              <%= scheduleGeneratorCopy.generatePreview %>
             </button>
           </form>
           <% const activeCourseList = (courseSemestersByLocation && courseSemestersByLocation[activeLocation]) || []; %>
           <% const firstCourseId = activeCourseList.length ? activeCourseList[0].course.id : null; %>
           <% if (firstCourseId) { %>
-            <a class="btn btn-outline-primary" href="/admin/schedule-generator/<%= run.id %>/preview?course=<%= firstCourseId %>&week=1">Відкрити превʼю</a>
+            <a class="btn btn-outline-primary" href="/admin/schedule-generator/<%= run.id %>/preview?course=<%= firstCourseId %>&week=1"><%= scheduleGeneratorCopy.openPreview %></a>
           <% } %>
-          <a class="btn btn-outline-secondary" href="/admin/session-generator?location=<%= activeLocation %>">Генератор сесій</a>
+          <a class="btn btn-outline-secondary" href="/admin/session-generator?location=<%= activeLocation %>"><%= scheduleGeneratorCopy.sessionGenerator %></a>
         </div>
         <div class="generator-actions mt-2">
           <% ['kyiv', 'munich'].forEach(function(location) { %>
@@ -118,7 +575,7 @@
                   data-disable-munich="<%= disableRunMunich ? 'true' : 'false' %>"
                   <%= (location === 'kyiv' ? disableRunKyiv : disableRunMunich) ? 'disabled' : '' %>
                 >
-                  Перегенерувати курс
+                  <%= scheduleGeneratorCopy.rerunCourse %>
                 </button>
               </form>
             <% } %>
@@ -131,10 +588,10 @@
           <div class="card glass-panel mb-4">
             <div class="card-body">
               <div class="d-flex align-items-center justify-content-between mb-2">
-                <div class="generator-section-title">Курси</div>
+                <div class="generator-section-title"><%= scheduleGeneratorCopy.coursesTitle %></div>
                 <div class="btn-group btn-group-sm">
-                  <button class="btn btn-outline-primary location-toggle <%= activeLocation === 'kyiv' ? 'active' : '' %>" type="button" data-location="kyiv">Kyiv</button>
-                  <button class="btn btn-outline-primary location-toggle <%= activeLocation === 'munich' ? 'active' : '' %>" type="button" data-location="munich">Munich</button>
+                  <button class="btn btn-outline-primary location-toggle <%= activeLocation === 'kyiv' ? 'active' : '' %>" type="button" data-location="kyiv"><%= formatScheduleGeneratorLocation('kyiv') %></button>
+                  <button class="btn btn-outline-primary location-toggle <%= activeLocation === 'munich' ? 'active' : '' %>" type="button" data-location="munich"><%= formatScheduleGeneratorLocation('munich') %></button>
                 </div>
               </div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
@@ -145,16 +602,16 @@
                       <div class="glass-inset p-3">
                         <div class="fw-semibold"><%= row.course.name %></div>
                         <div class="small text-muted">
-                          <%= row.semester ? row.semester.title : 'Немає активного семестру' %>
-                          <% if (row.semester) { %> · <%= row.semester.weeks_count %> тижнів <% } %>
+                          <%= row.semester ? row.semester.title : scheduleGeneratorCopy.noActiveSemester %>
+                          <% if (row.semester) { %> · <%= row.semester.weeks_count %> <%= scheduleGeneratorCopy.weeksUnit %> <% } %>
                         </div>
                         <div class="small text-muted">
-                          Активні дні: <%= (courseDaysByLocation[location][row.course.id] || []).join(', ') %>
+                          <%= scheduleGeneratorCopy.activeDays %>: <%= (courseDaysByLocation[location][row.course.id] || []).join(', ') %>
                         </div>
                       </div>
                     <% }); %>
                   <% } else { %>
-                    <div class="generator-empty">Немає курсів для <%= location === 'kyiv' ? 'Kyiv' : 'Munich' %>.</div>
+                    <div class="generator-empty"><%= scheduleGeneratorCopy.noCoursesFor(formatScheduleGeneratorLocation(location)) %></div>
                   <% } %>
                 </div>
               <% }); %>
@@ -163,33 +620,33 @@
 
           <div class="card glass-panel mb-4">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Аналітика генератора</div>
+              <div class="generator-section-title mb-2"><%= scheduleGeneratorCopy.analyticsTitle %></div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const insight = generationInsightsByLocation && generationInsightsByLocation[location]; %>
                 <div class="generator-insights" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                   <% if (!insight) { %>
-                    <div class="generator-empty">Аналітика недоступна.</div>
+                    <div class="generator-empty"><%= scheduleGeneratorCopy.analyticsUnavailable %></div>
                   <% } else { %>
                     <div class="insight-header mb-2">
                       <span class="insight-health <%= insight.healthState === 'good' ? 'is-good' : insight.healthState === 'warn' ? 'is-warn' : 'is-critical' %>">
-                        <%= insight.healthState === 'good' ? 'Стабільно' : insight.healthState === 'warn' ? 'Потрібна увага' : 'Ризиковано' %>
+                        <%= scheduleGeneratorHealthLabels[insight.healthState] || scheduleGeneratorCopy.healthCritical %>
                       </span>
-                      <span class="small text-muted">Індекс якості: <%= insight.healthScore %>/100</span>
+                      <span class="small text-muted"><%= scheduleGeneratorCopy.qualityIndex %>: <%= insight.healthScore %>/100</span>
                     </div>
                     <div class="insight-metrics mb-2">
-                      <div class="insight-metric"><span>Блокери</span><strong><%= insight.blockers %></strong></div>
-                      <div class="insight-metric"><span>Попередження</span><strong><%= insight.warnings %></strong></div>
-                      <div class="insight-metric"><span>Частково заплан.</span><strong><%= insight.partialCount %></strong></div>
-                      <div class="insight-metric"><span>Без слота</span><strong><%= insight.noSlotCount %></strong></div>
-                      <div class="insight-metric"><span>Немає дозвол. слотів</span><strong><%= insight.noAllowedClassesCount || 0 %></strong></div>
-                      <div class="insight-metric"><span>Вечірні пари</span><strong><%= Math.round((insight.lateShare || 0) * 100) %>%</strong></div>
-                      <div class="insight-metric"><span>Перекіс по днях</span><strong><%= Math.round((insight.dayImbalance || 0) * 100) %>%</strong></div>
+                      <div class="insight-metric"><span><%= scheduleGeneratorCopy.blockers %></span><strong><%= insight.blockers %></strong></div>
+                      <div class="insight-metric"><span><%= scheduleGeneratorCopy.warnings %></span><strong><%= insight.warnings %></strong></div>
+                      <div class="insight-metric"><span><%= scheduleGeneratorCopy.partialPlanned %></span><strong><%= insight.partialCount %></strong></div>
+                      <div class="insight-metric"><span><%= scheduleGeneratorCopy.noSlot %></span><strong><%= insight.noSlotCount %></strong></div>
+                      <div class="insight-metric"><span><%= scheduleGeneratorCopy.noAllowedSlots %></span><strong><%= insight.noAllowedClassesCount || 0 %></strong></div>
+                      <div class="insight-metric"><span><%= scheduleGeneratorCopy.eveningPairs %></span><strong><%= Math.round((insight.lateShare || 0) * 100) %>%</strong></div>
+                      <div class="insight-metric"><span><%= scheduleGeneratorCopy.dayImbalance %></span><strong><%= Math.round((insight.dayImbalance || 0) * 100) %>%</strong></div>
                     </div>
                     <div class="small text-muted mb-2">
                       <% const peakDay = insight.peakDay && insight.peakDay.day ? insight.peakDay.day : null; %>
                       <% const peakDayIdx = peakDay ? dayOptions.indexOf(peakDay) : -1; %>
                       <% const peakDayLabel = peakDayIdx >= 0 ? (dayLabels[peakDayIdx] || peakDay) : (peakDay || '—'); %>
-                      Пік: <%= peakDayLabel %> (<%= insight.peakDay ? insight.peakDay.total : 0 %>) · Пара #<%= insight.peakSlot ? insight.peakSlot.slot : '—' %> (<%= insight.peakSlot ? insight.peakSlot.count : 0 %>)
+                      <%= scheduleGeneratorCopy.peakLabel %>: <%= peakDayLabel %> (<%= insight.peakDay ? insight.peakDay.total : 0 %>) · <%= scheduleGeneratorCopy.classShort %> #<%= insight.peakSlot ? insight.peakSlot.slot : '—' %> (<%= insight.peakSlot ? insight.peakSlot.count : 0 %>)
                     </div>
                     <% if (insight.conflictTop && insight.conflictTop.length) { %>
                       <div class="insight-top mb-2">
@@ -212,44 +669,44 @@
           <div class="card glass-panel mb-4">
             <div class="card-body">
               <div class="d-flex align-items-center justify-content-between mb-2 gap-2">
-                <div class="generator-section-title m-0">Налаштування генерації</div>
+                <div class="generator-section-title m-0"><%= scheduleGeneratorCopy.settingsTitle %></div>
                 <form method="POST" action="/admin/schedule-generator/config/autotune" class="m-0">
                   <input type="hidden" name="run_id" value="<%= run.id %>" />
                   <input type="hidden" name="active_location" id="autoTuneLocationInput" value="<%= activeLocation %>" />
-                  <button class="btn btn-outline-primary btn-sm" type="submit">Safe auto-tune</button>
+                  <button class="btn btn-outline-primary btn-sm" type="submit"><%= scheduleGeneratorCopy.autoTune %></button>
                 </form>
               </div>
               <form method="POST" action="/admin/schedule-generator/config" class="row g-3">
                 <input type="hidden" name="run_id" value="<%= run.id %>" />
                 <input type="hidden" name="active_location" id="activeLocationInput" value="<%= activeLocation %>" />
                 <div class="col-12">
-                  <label class="form-label">Розподіл пар</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.distributionLabel %></label>
                   <select class="form-select" name="distribution">
-                    <option value="start" <%= config.distribution === 'start' ? 'selected' : '' %>>Концентрація на початку</option>
-                    <option value="even" <%= config.distribution === 'even' ? 'selected' : '' %>>Рівномірно</option>
-                    <option value="end" <%= config.distribution === 'end' ? 'selected' : '' %>>Концентрація в кінці</option>
+                    <option value="start" <%= config.distribution === 'start' ? 'selected' : '' %>><%= scheduleGeneratorCopy.distributionStart %></option>
+                    <option value="even" <%= config.distribution === 'even' ? 'selected' : '' %>><%= scheduleGeneratorCopy.distributionEven %></option>
+                    <option value="end" <%= config.distribution === 'end' ? 'selected' : '' %>><%= scheduleGeneratorCopy.distributionEnd %></option>
                   </select>
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Семінари</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.seminarsLabel %></label>
                   <select class="form-select" name="seminar_distribution">
-                    <option value="start" <%= config.seminar_distribution === 'start' ? 'selected' : '' %>>На початку</option>
-                    <option value="even" <%= config.seminar_distribution === 'even' ? 'selected' : '' %>>Рівномірно</option>
-                    <option value="end" <%= config.seminar_distribution === 'end' ? 'selected' : '' %>>В кінці</option>
+                    <option value="start" <%= config.seminar_distribution === 'start' ? 'selected' : '' %>><%= scheduleGeneratorCopy.seminarStart %></option>
+                    <option value="even" <%= config.seminar_distribution === 'even' ? 'selected' : '' %>><%= scheduleGeneratorCopy.seminarEven %></option>
+                    <option value="end" <%= config.seminar_distribution === 'end' ? 'selected' : '' %>><%= scheduleGeneratorCopy.seminarEnd %></option>
                   </select>
                 </div>
                 <div class="col-6">
-                  <label class="form-label">Max пар/день</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.maxPairsPerDay %></label>
                   <input class="form-control" type="number" name="max_daily_pairs" min="1" max="7" value="<%= config.max_daily_pairs || 7 %>" />
                 </div>
                 <div class="col-6">
-                  <label class="form-label">Ціль пар/день</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.targetPairsPerDay %></label>
                   <input class="form-control" type="number" name="target_daily_pairs" min="1" max="7" value="<%= config.target_daily_pairs || 4 %>" />
                 </div>
                 <div class="col-12">
                   <% const evennessValue = Number.isFinite(Number(config.evenness_bias)) ? Number(config.evenness_bias) : 50; %>
                   <label class="form-label d-flex justify-content-between align-items-center">
-                    <span>Баланс рівномірності</span>
+                    <span><%= scheduleGeneratorCopy.evennessBalance %></span>
                     <span class="badge bg-secondary" id="evennessBiasValue"><%= evennessValue %>%</span>
                   </label>
                   <input
@@ -261,12 +718,12 @@
                     max="100"
                     value="<%= evennessValue %>"
                   />
-                  <div class="small text-muted">0 — компактніше, 100 — максимально рівномірно.</div>
+                  <div class="small text-muted"><%= scheduleGeneratorCopy.evennessHint %></div>
                 </div>
                 <div class="col-12">
                   <% const lateSlotValue = Number.isFinite(Number(config.late_slot_weight)) ? Number(config.late_slot_weight) : 60; %>
                   <label class="form-label d-flex justify-content-between align-items-center">
-                    <span>Уникати вечірніх слотів</span>
+                    <span><%= scheduleGeneratorCopy.avoidLateSlots %></span>
                     <span class="badge bg-secondary" id="lateSlotWeightValue"><%= lateSlotValue %>%</span>
                   </label>
                   <input
@@ -278,28 +735,28 @@
                     max="100"
                     value="<%= lateSlotValue %>"
                   />
-                  <div class="small text-muted">0 — не враховувати, 100 — максимально уникати 5–7 пар.</div>
+                  <div class="small text-muted"><%= scheduleGeneratorCopy.lateSlotsHint %></div>
                 </div>
                 <div class="col-12">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="strict_no_evening" id="strictNoEvening" <%= config.strict_no_evening ? 'checked' : '' %> />
-                    <label class="form-check-label" for="strictNoEvening">Strict no-evening (заборонити 6-7 пари)</label>
+                    <label class="form-check-label" for="strictNoEvening"><%= scheduleGeneratorCopy.strictNoEvening %></label>
                   </div>
-                  <div class="small text-muted">Жорстка заборона вечірніх слотів. Якщо не вистачає місця — генератор покаже конфлікти.</div>
+                  <div class="small text-muted"><%= scheduleGeneratorCopy.strictNoEveningHint %></div>
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Особливі тижні (1-3,8)</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.specialWeeks %></label>
                   <input class="form-control" name="blocked_weeks" value="<%= config.blocked_weeks || '' %>" placeholder="1-2,6,9" />
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Режим особливих тижнів</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.specialWeeksMode %></label>
                   <select class="form-select" name="special_weeks_mode">
-                    <option value="block" <%= config.special_weeks_mode !== 'overlay' ? 'selected' : '' %>>Блокувати заняття</option>
-                    <option value="overlay" <%= config.special_weeks_mode === 'overlay' ? 'selected' : '' %>>Накладати поверх</option>
+                    <option value="block" <%= config.special_weeks_mode !== 'overlay' ? 'selected' : '' %>><%= scheduleGeneratorCopy.specialWeeksBlock %></option>
+                    <option value="overlay" <%= config.special_weeks_mode === 'overlay' ? 'selected' : '' %>><%= scheduleGeneratorCopy.specialWeeksOverlay %></option>
                   </select>
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Семестри курсів</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.courseSemesters %></label>
                   <% ['kyiv', 'munich'].forEach(function(location) { %>
                     <div class="d-grid gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                       <% (courseSemestersByLocation[location] || []).forEach(function(row) { %>
@@ -310,7 +767,7 @@
                           <select class="form-select form-select-sm mt-2" name="course_semesters[<%= row.course.id %>]">
                             <% semList.forEach(function(sem) { %>
                               <option value="<%= sem.id %>" <%= Number(sem.id) === Number(selectedSemId) ? 'selected' : '' %>>
-                                <%= sem.title %> · <%= sem.weeks_count %> тижнів
+                                <%= sem.title %> · <%= sem.weeks_count %> <%= scheduleGeneratorCopy.weeksUnit %>
                               </option>
                             <% }); %>
                           </select>
@@ -322,45 +779,45 @@
                 <div class="col-12">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="auto_subject_days" id="autoSubjectDays" <%= config.auto_subject_days ? 'checked' : '' %> />
-                    <label class="form-check-label" for="autoSubjectDays">Авто-розклад днів для предметів</label>
+                    <label class="form-check-label" for="autoSubjectDays"><%= scheduleGeneratorCopy.autoSubjectDays %></label>
                   </div>
-                  <div class="small text-muted">Автоматично закріплюємо предмет за одним днем, щоб пари не розповзались.</div>
+                  <div class="small text-muted"><%= scheduleGeneratorCopy.autoSubjectDaysHint %></div>
                 </div>
                 <div class="col-12">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="subject_single_day" id="subjectSingleDay" <%= config.subject_single_day !== false ? 'checked' : '' %> />
-                    <label class="form-check-label" for="subjectSingleDay">Один день на предмет (окрім різних викладачів)</label>
+                    <label class="form-check-label" for="subjectSingleDay"><%= scheduleGeneratorCopy.subjectSingleDay %></label>
                   </div>
-                  <div class="small text-muted">Для мов та предметів з різними викладачами дозволяємо розбиття на кілька днів.</div>
+                  <div class="small text-muted"><%= scheduleGeneratorCopy.subjectSingleDayHint %></div>
                 </div>
                 <div class="col-12">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="lecture_seminar_same_day" id="lectureSeminarSameDay" <%= config.lecture_seminar_same_day !== false ? 'checked' : '' %> />
-                    <label class="form-check-label" for="lectureSeminarSameDay">Лекція + семінар в один день</label>
+                    <label class="form-check-label" for="lectureSeminarSameDay"><%= scheduleGeneratorCopy.lectureSeminarSameDay %></label>
                   </div>
                 </div>
                 <div class="col-12">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="lecture_before_seminar" id="lectureBeforeSeminar" <%= config.lecture_before_seminar !== false ? 'checked' : '' %> />
-                    <label class="form-check-label" for="lectureBeforeSeminar">Пріоритет: лекція перед семінаром</label>
+                    <label class="form-check-label" for="lectureBeforeSeminar"><%= scheduleGeneratorCopy.lectureBeforeSeminar %></label>
                   </div>
-                  <div class="small text-muted">Для предметів, де є і лекція, і семінар: семінар ставимо тільки після лекції в межах тижня.</div>
+                  <div class="small text-muted"><%= scheduleGeneratorCopy.lectureBeforeSeminarHint %></div>
                 </div>
                 <div class="col-12">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="prefer_compactness" id="preferCompactness" <%= config.prefer_compactness ? 'checked' : '' %> />
-                    <label class="form-check-label" for="preferCompactness">Менше вікон між парами</label>
+                    <label class="form-check-label" for="preferCompactness"><%= scheduleGeneratorCopy.preferCompactness %></label>
                   </div>
                 </div>
                 <div class="col-12">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="mirror_groups" id="mirrorGroups" <%= config.mirror_groups ? 'checked' : '' %> />
-                    <label class="form-check-label" for="mirrorGroups">Швидке дзеркало груп (A/B)</label>
+                    <label class="form-check-label" for="mirrorGroups"><%= scheduleGeneratorCopy.mirrorGroups %></label>
                   </div>
-                  <div class="small text-muted">Парно зʼєднуємо групи 1/2 з однаковим ключем дзеркала та чергуємо по тижнях.</div>
+                  <div class="small text-muted"><%= scheduleGeneratorCopy.mirrorGroupsHint %></div>
                 </div>
                 <div class="col-12 d-grid">
-                  <button class="btn btn-outline-primary" type="submit">Зберегти налаштування</button>
+                  <button class="btn btn-outline-primary" type="submit"><%= scheduleGeneratorCopy.saveSettings %></button>
                 </div>
               </form>
             </div>
@@ -368,8 +825,8 @@
 
           <div class="card glass-panel mb-4" id="generatorScopeCard">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Scope controls</div>
-              <div class="small text-muted mb-3">Застосовується до Preview/Publish. Якщо порожньо — генеруємо весь семестр.</div>
+              <div class="generator-section-title mb-2"><%= scheduleGeneratorCopy.scopeControls %></div>
+              <div class="small text-muted mb-3"><%= scheduleGeneratorCopy.scopeHint %></div>
               <% const lastScope = lastStats && lastStats.scope ? lastStats.scope : {}; %>
               <% const scopeWeeks = Array.isArray(lastScope.weeks) ? lastScope.weeks : []; %>
               <% const scopeGroups = Array.isArray(lastScope.groups) ? lastScope.groups : []; %>
@@ -378,15 +835,15 @@
               <% const scopeTo = scopeWeeks.length ? Math.max(...scopeWeeks) : ''; %>
               <div class="row g-3">
                 <div class="col-12">
-                  <label class="form-label">Semester (optional)</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.semesterOptional %></label>
                   <select class="form-select" name="scope_semester_id" data-scope-field>
-                    <option value="">Усі семестри</option>
+                    <option value=""><%= scheduleGeneratorCopy.allSemesters %></option>
                     <% const seenScopeSem = new Set(); %>
                     <% Object.values(semestersByCourse || {}).forEach(function(list) { %>
                       <% (list || []).forEach(function(sem) { %>
                         <% if (!seenScopeSem.has(sem.id)) { seenScopeSem.add(sem.id); %>
                           <option value="<%= sem.id %>" <%= lastScope.semester_id && Number(lastScope.semester_id) === Number(sem.id) ? 'selected' : '' %>>
-                            <%= sem.title %> · <%= sem.weeks_count %> тижнів
+                            <%= sem.title %> · <%= sem.weeks_count %> <%= scheduleGeneratorCopy.weeksUnit %>
                           </option>
                         <% } %>
                       <% }); %>
@@ -394,15 +851,15 @@
                   </select>
                 </div>
                 <div class="col-6">
-                  <label class="form-label">Week from</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.weekFrom %></label>
                   <input class="form-control" type="number" min="1" max="20" name="scope_week_from" value="<%= scopeFrom %>" data-scope-field />
                 </div>
                 <div class="col-6">
-                  <label class="form-label">Week to</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.weekTo %></label>
                   <input class="form-control" type="number" min="1" max="20" name="scope_week_to" value="<%= scopeTo %>" data-scope-field />
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Groups</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.groups %></label>
                   <div class="d-flex flex-wrap gap-2">
                     <% [1,2,3].forEach(function(group) { %>
                       <label class="form-check">
@@ -413,7 +870,7 @@
                   </div>
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Days</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.days %></label>
                   <div class="d-flex flex-wrap gap-2">
                     <% (dayOptions || []).forEach(function(day, idx) { %>
                       <label class="form-check">
@@ -429,18 +886,18 @@
 
           <div class="card glass-panel mb-4">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Перед запуском</div>
+              <div class="generator-section-title mb-2"><%= scheduleGeneratorCopy.beforeRun %></div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const validation = validationByLocation && validationByLocation[location]; %>
                 <div data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                   <% if (!validation || !validation.issues.length) { %>
-                    <div class="validation-empty">Все готово до генерації.</div>
+                    <div class="validation-empty"><%= scheduleGeneratorCopy.readyToGenerate %></div>
                   <% } else { %>
                     <div class="validation-summary mb-2">
                       <span class="validation-chip <%= validation.hasCritical ? 'is-error' : 'is-warn' %>">
-                        <%= validation.hasCritical ? 'Критично' : 'Увага' %>
+                        <%= validation.hasCritical ? scheduleGeneratorCopy.critical : scheduleGeneratorCopy.attention %>
                       </span>
-                      <span class="small text-muted"><%= validation.issues.length %> перевірок</span>
+                      <span class="small text-muted"><%= scheduleGeneratorCopy.checksLabel(validation.issues.length) %></span>
                     </div>
                     <div class="d-grid gap-2">
                       <% validation.issues.slice(0, 6).forEach(function(issue) { %>
@@ -448,13 +905,13 @@
                           <span class="validation-dot"></span>
                           <div>
                             <div class="small fw-semibold"><%= issue.message %></div>
-                            <div class="small text-muted"><%= issue.level === 'error' ? 'Блокує генерацію' : 'Попередження' %></div>
+                            <div class="small text-muted"><%= issue.level === 'error' ? scheduleGeneratorCopy.blocksGeneration : scheduleGeneratorCopy.warningState %></div>
                           </div>
                         </div>
                       <% }); %>
                     </div>
                     <% if (validation.issues.length > 6) { %>
-                      <div class="small text-muted mt-2">Ще <%= validation.issues.length - 6 %> пунктів.</div>
+                      <div class="small text-muted mt-2"><%= scheduleGeneratorCopy.moreItems(validation.issues.length - 6) %></div>
                     <% } %>
                   <% } %>
                 </div>
@@ -464,13 +921,13 @@
 
           <div class="card glass-panel mb-4">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Dry-run злиття предметів</div>
+              <div class="generator-section-title mb-2"><%= scheduleGeneratorCopy.mergePreviewTitle %></div>
               <div class="small text-muted mb-3">
-                Показує, які предмети будуть злиті перед міграцією. Дані лише для перегляду — базу не змінює.
+                <%= scheduleGeneratorCopy.mergePreviewHint %>
               </div>
               <div class="d-flex flex-wrap align-items-center gap-2">
                 <select class="form-select form-select-sm w-auto" id="mergePreviewCourse">
-                  <option value="">Усі курси</option>
+                  <option value=""><%= scheduleGeneratorCopy.allCourses %></option>
                   <% ['kyiv', 'munich'].forEach(function(location) { %>
                     <% const courseList = courseSemestersByLocation[location] || []; %>
                     <% courseList.forEach(function(row) { %>
@@ -478,7 +935,7 @@
                     <% }); %>
                   <% }); %>
                 </select>
-                <button class="btn btn-outline-primary btn-sm" type="button" id="mergePreviewBtn">Показати dry-run</button>
+                <button class="btn btn-outline-primary btn-sm" type="button" id="mergePreviewBtn"><%= scheduleGeneratorCopy.showDryRun %></button>
               </div>
               <div id="mergePreviewMeta" class="small text-muted mt-2"></div>
               <div id="mergePreviewList" class="merge-preview-list mt-3 d-grid gap-2"></div>
@@ -487,46 +944,46 @@
 
           <div class="card glass-panel mb-4">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Остання генерація</div>
+              <div class="generator-section-title mb-2"><%= scheduleGeneratorCopy.lastGeneration %></div>
               <% if (lastStats) { %>
                 <div class="d-grid gap-2 mb-3">
                   <div class="glass-inset p-3">
-                    <div class="small text-muted">Записів</div>
-                    <div class="fw-semibold"><%= lastStats.entries %> пар</div>
+                    <div class="small text-muted"><%= scheduleGeneratorCopy.records %></div>
+                    <div class="fw-semibold"><%= lastStats.entries %> <%= scheduleGeneratorCopy.pairsUnit %></div>
                   </div>
                   <div class="glass-inset p-3">
-                    <div class="small text-muted">Конфліктів</div>
+                    <div class="small text-muted"><%= scheduleGeneratorCopy.conflicts %></div>
                     <div class="fw-semibold"><%= lastStats.conflicts %></div>
                   </div>
                   <% if (lastStats.diff) { %>
                     <div class="glass-inset p-3">
-                      <div class="small text-muted">Diff (Preview)</div>
+                      <div class="small text-muted"><%= scheduleGeneratorCopy.diffPreview %></div>
                       <div class="fw-semibold">+<%= lastStats.diff.added %> · ~<%= lastStats.diff.updated %> · −<%= lastStats.diff.removed %></div>
-                      <div class="small text-muted">Overwrite slots: <%= lastStats.diff.overwrite %></div>
-                      <div class="small text-muted">Manual overwrite: TODO (needs `is_manual`)</div>
+                      <div class="small text-muted"><%= scheduleGeneratorCopy.overwriteSlots %>: <%= lastStats.diff.overwrite %></div>
+                      <div class="small text-muted"><%= scheduleGeneratorCopy.manualOverwrite %>: <%= scheduleGeneratorCopy.manualOverwriteTodo %></div>
                     </div>
                   <% } %>
-                  <div class="small text-muted">Оновлено: <%= lastStats.generated_at ? new Date(lastStats.generated_at).toLocaleString('uk-UA') : '' %></div>
-                  <div class="small text-muted">Operation: <%= lastStats.operation_id || '—' %></div>
+                  <div class="small text-muted"><%= scheduleGeneratorCopy.updatedAt %>: <%= formatScheduleGeneratorDateTime(lastStats.generated_at) %></div>
+                  <div class="small text-muted"><%= scheduleGeneratorCopy.operation %>: <%= lastStats.operation_id || '—' %></div>
                   <% if (lastStats.scope) { %>
                     <div class="small text-muted">
                       <% if (lastStats.scope.type === 'course') { %>
-                        Курс: <%= courseById[lastStats.scope.course_id] || 'Невідомий' %>
+                        <%= scheduleGeneratorCopy.course %>: <%= courseById[lastStats.scope.course_id] || scheduleGeneratorCopy.unknownCourse %>
                       <% } else { %>
-                        Локація: <%= lastStats.scope.location === 'munich' ? 'Munich' : 'Kyiv' %>
+                        <%= scheduleGeneratorCopy.location %>: <%= formatScheduleGeneratorLocation(lastStats.scope.location) %>
                       <% } %>
                     </div>
                   <% } %>
                 </div>
               <% } else { %>
-                <div class="generator-empty mb-3">Ще не запускали генерацію.</div>
+                <div class="generator-empty mb-3"><%= scheduleGeneratorCopy.notGeneratedYet %></div>
               <% } %>
               <% if (lastConflicts && lastConflicts.length) { %>
-                <div class="small text-muted mb-2">Проблеми:</div>
+                <div class="small text-muted mb-2"><%= scheduleGeneratorCopy.problems %>:</div>
                 <div class="d-grid gap-2">
                   <% lastConflicts.slice(0, 5).forEach(function(conflict) { %>
                     <div class="glass-inset p-2">
-                      <div class="fw-semibold"><%= conflict.subject || 'Без предмета' %></div>
+                      <div class="fw-semibold"><%= conflict.subject || scheduleGeneratorCopy.noSubject %></div>
                       <div class="small text-muted"><%= conflict.reason %></div>
                     </div>
                   <% }); %>
@@ -537,32 +994,32 @@
 
           <div class="card glass-panel mb-4">
             <div class="card-body">
-              <div class="generator-section-title mb-1">Карта завантаження (день × пара)</div>
-              <div class="small text-muted mb-2">Чим темніша клітинка, тим більше занять у цьому слоті. Цифра в клітинці — кількість занять.</div>
+              <div class="generator-section-title mb-1"><%= scheduleGeneratorCopy.loadMapTitle %></div>
+              <div class="small text-muted mb-2"><%= scheduleGeneratorCopy.loadMapHint %></div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const heatmap = heatmapByLocation && heatmapByLocation[location]; %>
                 <% const insight = generationInsightsByLocation && generationInsightsByLocation[location]; %>
                 <div class="heatmap" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                   <% if (!heatmap || !heatmap.max) { %>
-                    <div class="generator-empty">Немає даних для теплової карти.</div>
+                    <div class="generator-empty"><%= scheduleGeneratorCopy.noHeatmapData %></div>
                   <% } else { %>
                     <% const latePercent = insight ? Math.round((insight.lateShare || 0) * 100) : 0; %>
                     <% const imbalancePercent = insight ? Math.round((insight.dayImbalance || 0) * 100) : 0; %>
-                    <% const lateLevel = latePercent >= 30 ? 'високе навантаження' : latePercent >= 18 ? 'помірне' : 'низьке'; %>
-                    <% const balanceLevel = imbalancePercent >= 45 ? 'сильний перекіс' : imbalancePercent >= 25 ? 'помірний перекіс' : 'рівномірно'; %>
+                    <% const lateLevel = latePercent >= 30 ? (lang === 'en' ? 'high load' : 'високе навантаження') : latePercent >= 18 ? (lang === 'en' ? 'moderate' : 'помірне') : (lang === 'en' ? 'low' : 'низьке'); %>
+                    <% const balanceLevel = imbalancePercent >= 45 ? (lang === 'en' ? 'strong imbalance' : 'сильний перекіс') : imbalancePercent >= 25 ? (lang === 'en' ? 'moderate imbalance' : 'помірний перекіс') : (lang === 'en' ? 'balanced' : 'рівномірно'); %>
                     <% const peakDay = insight && insight.peakDay && insight.peakDay.day ? insight.peakDay.day : null; %>
                     <% const peakDayIdx = peakDay ? dayOptions.indexOf(peakDay) : -1; %>
                     <% const peakDayLabel = peakDayIdx >= 0 ? (dayLabels[peakDayIdx] || peakDay) : (peakDay || '—'); %>
                     <div class="heatmap-summary mb-2">
-                      <span class="heatmap-summary-chip">Вечірні пари: <strong><%= latePercent %>%</strong> (<%= lateLevel %>)</span>
-                      <span class="heatmap-summary-chip">Рівномірність по днях: <strong><%= balanceLevel %></strong></span>
-                      <span class="heatmap-summary-chip">Найбільше навантаження: <strong><%= peakDayLabel %></strong></span>
+                      <span class="heatmap-summary-chip"><%= scheduleGeneratorCopy.lateSummary(latePercent, lateLevel) %></span>
+                      <span class="heatmap-summary-chip"><%= scheduleGeneratorCopy.balanceSummary(balanceLevel) %></span>
+                      <span class="heatmap-summary-chip"><%= scheduleGeneratorCopy.peakSummary(peakDayLabel) %></span>
                     </div>
                     <div class="heatmap-legend mb-2">
-                      <span class="heatmap-legend-label">Інтенсивність:</span>
-                      <span class="heatmap-legend-chip is-low">Низька</span>
-                      <span class="heatmap-legend-chip is-mid">Середня</span>
-                      <span class="heatmap-legend-chip is-high">Висока</span>
+                      <span class="heatmap-legend-label"><%= scheduleGeneratorCopy.intensity %>:</span>
+                      <span class="heatmap-legend-chip is-low"><%= scheduleGeneratorCopy.low %></span>
+                      <span class="heatmap-legend-chip is-mid"><%= scheduleGeneratorCopy.medium %></span>
+                      <span class="heatmap-legend-chip is-high"><%= scheduleGeneratorCopy.high %></span>
                     </div>
                     <div class="heatmap-grid">
                       <div class="heatmap-row heatmap-head">
@@ -581,7 +1038,7 @@
                             <span
                               class="heatmap-cell"
                               style="--heat:<%= intensity.toFixed(2) %>;"
-                              title="<%= dayLabel %>, пара <%= slot %>: <%= count %> занять"
+                              title="<%= scheduleGeneratorCopy.heatmapCellTitle(dayLabel, slot, count) %>"
                             >
                               <%= count ? count : '' %>
                             </span>
@@ -597,7 +1054,7 @@
 
           <div class="card glass-panel">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Викладачі</div>
+              <div class="generator-section-title mb-2"><%= scheduleGeneratorCopy.teachersTitle %></div>
               <% if (teachers && teachers.length) { %>
                 <div class="d-grid gap-3">
                   <% teachers.forEach(function(teacher) { %>
@@ -623,23 +1080,23 @@
                       </div>
                       <div class="d-flex align-items-center gap-2">
                         <div class="flex-grow-1">
-                          <label class="form-label small">Max пар/тиждень</label>
+                          <label class="form-label small"><%= scheduleGeneratorCopy.maxPairsPerWeek %></label>
                           <input
                             class="form-control form-control-sm"
                             type="number"
                             name="max_pairs_per_week"
                             min="1"
-                            placeholder="Без ліміту"
+                            placeholder="<%= scheduleGeneratorCopy.noLimit %>"
                             value="<%= limit.max_pairs_per_week || '' %>"
                           />
                         </div>
-                        <button class="btn btn-outline-primary btn-sm" type="submit">Зберегти</button>
+                        <button class="btn btn-outline-primary btn-sm" type="submit"><%= scheduleGeneratorCopy.save %></button>
                       </div>
                     </form>
                   <% }); %>
                 </div>
               <% } else { %>
-                <div class="generator-empty">Немає викладачів.</div>
+                <div class="generator-empty"><%= scheduleGeneratorCopy.noTeachers %></div>
               <% } %>
             </div>
           </div>
@@ -648,11 +1105,11 @@
         <div class="col-12 col-xl-8">
           <div class="card glass-panel mb-4">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Додати предмет</div>
+              <div class="generator-section-title mb-2"><%= scheduleGeneratorCopy.addSubjectTitle %></div>
               <form method="POST" action="/admin/schedule-generator/items/add" class="row g-3">
                 <input type="hidden" name="run_id" value="<%= run.id %>" />
                 <div class="col-12 col-md-4">
-                  <label class="form-label">Курс</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.course %></label>
                   <select class="form-select" name="course_id" id="genCourseSelect" required>
                     <% Object.values(coursesByLocation).flat().forEach(function(course) { %>
                       <option value="<%= course.id %>" data-location="<%= course.location || 'kyiv' %>"><%= course.name %></option>
@@ -660,7 +1117,7 @@
                   </select>
                 </div>
                 <div class="col-12 col-md-4">
-                  <label class="form-label">Предмет</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.subject %></label>
                   <select class="form-select" name="subject_id" id="genSubjectSelect" required>
                     <% Object.values(coursesByLocation).flat().forEach(function(course) { %>
                       <optgroup label="<%= course.name %>" data-location="<%= course.location || 'kyiv' %>">
@@ -674,69 +1131,69 @@
                   </select>
                 </div>
                 <div class="col-12 col-md-4">
-                  <label class="form-label">Тип заняття</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.lessonType %></label>
                   <select class="form-select" name="lesson_type">
-                    <option value="lecture">Лекція</option>
-                    <option value="seminar">Семінар</option>
-                    <option value="lab">Лаб</option>
-                    <option value="practice">Практика</option>
+                    <option value="lecture"><%= scheduleGeneratorCopy.lecture %></option>
+                    <option value="seminar"><%= scheduleGeneratorCopy.seminar %></option>
+                    <option value="lab"><%= scheduleGeneratorCopy.lab %></option>
+                    <option value="practice"><%= scheduleGeneratorCopy.practice %></option>
                   </select>
                 </div>
                 <div class="col-6 col-md-3">
-                  <label class="form-label">Група</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.group %></label>
                   <select class="form-select" name="group_number" id="genGroupSelect">
-                    <option value="all">Усі групи</option>
+                    <option value="all"><%= scheduleGeneratorCopy.allGroups %></option>
                     <option value="1" data-group="1">1</option>
                     <option value="2" data-group="2">2</option>
                     <option value="3" data-group="3">3</option>
                   </select>
                 </div>
                 <div class="col-6 col-md-3">
-                  <label class="form-label">К-сть пар</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.pairsCount %></label>
                   <input class="form-control" type="number" name="pairs_count" min="1" value="1" required />
                 </div>
                 <div class="col-12 col-md-3">
-                  <label class="form-label">Викладач</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.teacher %></label>
                   <select class="form-select" name="teacher_id">
-                    <option value="">Без викладача</option>
+                    <option value=""><%= scheduleGeneratorCopy.noTeacher %></option>
                     <% teachers.forEach(function(teacher) { %>
                       <option value="<%= teacher.id %>"><%= teacher.full_name %></option>
                     <% }); %>
                   </select>
                 </div>
                 <div class="col-12 col-md-3">
-                  <label class="form-label">Ключ дзеркала</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.mirrorKey %></label>
                   <input class="form-control" name="mirror_key" id="mirrorKeyInput" placeholder="A1" />
                   <div class="mirror-key-actions mt-2">
-                    <button class="btn btn-outline-secondary btn-sm" type="button" id="mirrorKeyGenerate">Згенерувати</button>
-                    <button class="btn btn-outline-secondary btn-sm" type="button" id="mirrorKeyCopy">Копіювати</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" id="mirrorKeyGenerate"><%= scheduleGeneratorCopy.generate %></button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" id="mirrorKeyCopy"><%= scheduleGeneratorCopy.copy %></button>
                   </div>
-                  <div class="form-text text-muted">Однаковий ключ для груп 1/2.</div>
+                  <div class="form-text text-muted"><%= scheduleGeneratorCopy.mirrorKeyHint %></div>
                 </div>
                 <div class="col-12 col-md-4">
-                  <label class="form-label">Тижні (необовʼязково)</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.weeksOptional %></label>
                   <input class="form-control" name="weeks_set" placeholder="1-2,5,7" />
                 </div>
                 <div class="col-6 col-md-4">
-                  <label class="form-label">Фіксований день</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.fixedDayShort %></label>
                   <select class="form-select" name="fixed_day">
-                    <option value="">Будь-який</option>
+                    <option value=""><%= scheduleGeneratorCopy.any %></option>
                     <% dayOptions.forEach(function(day) { %>
                       <option value="<%= day %>"><%= day %></option>
                     <% }); %>
                   </select>
                 </div>
                 <div class="col-6 col-md-4">
-                  <label class="form-label">Фіксований слот</label>
+                  <label class="form-label"><%= scheduleGeneratorCopy.fixedSlotShort %></label>
                   <select class="form-select" name="fixed_class_number">
-                    <option value="">Будь-який</option>
+                    <option value=""><%= scheduleGeneratorCopy.any %></option>
                     <% classOptions.forEach(function(n) { %>
                       <option value="<%= n %>"><%= n %></option>
                     <% }); %>
                   </select>
                 </div>
                 <div class="col-12 col-md-6 d-grid">
-                  <button class="btn btn-primary" type="submit">Додати до генератора</button>
+                  <button class="btn btn-primary" type="submit"><%= scheduleGeneratorCopy.addToGenerator %></button>
                 </div>
               </form>
             </div>
@@ -745,33 +1202,33 @@
           <div class="card glass-panel mb-4">
             <div class="card-body">
               <div class="d-flex align-items-center justify-content-between mb-2">
-                <div class="generator-section-title">Дзеркальні ключі</div>
+                  <div class="generator-section-title"><%= scheduleGeneratorCopy.mirrorKeysTitle %></div>
                 <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#mirrorAutoModal">
-                  Авто-пари A/B
+                  <%= scheduleGeneratorCopy.mirrorAutoAB %>
                 </button>
               </div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const mirrorSummary = mirrorSummaryByLocation && mirrorSummaryByLocation[location]; %>
                 <div class="d-grid gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                   <% if (!mirrorSummary || !mirrorSummary.length) { %>
-                    <div class="generator-empty">Немає дзеркальних ключів.</div>
+                    <div class="generator-empty"><%= scheduleGeneratorCopy.noMirrorKeys %></div>
                   <% } else { %>
                     <% mirrorSummary.forEach(function(group) { %>
                       <div class="glass-inset p-3 mirror-row <%= group.status === 'ok' ? '' : 'mirror-warn' %>">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                           <div class="fw-semibold"><%= group.key %></div>
                           <span class="badge <%= group.status === 'ok' ? 'bg-success' : group.status === 'warn' ? 'bg-warning text-dark' : 'bg-secondary' %>">
-                            <%= group.status === 'ok' ? 'OK' : group.status === 'warn' ? 'Проблема' : 'Немає пари' %>
+                            <%= group.status === 'ok' ? scheduleGeneratorCopy.statusOk : group.status === 'warn' ? scheduleGeneratorCopy.mirrorStatusProblem : scheduleGeneratorCopy.mirrorStatusNoPair %>
                           </span>
                         </div>
                         <div class="small text-muted">
-                          Група 1: <%= group.group1 %> · Група 2: <%= group.group2 %>
+                          <%= scheduleGeneratorCopy.groupOne %>: <%= group.group1 %> · <%= scheduleGeneratorCopy.groupTwo %>: <%= group.group2 %>
                         </div>
                         <% if (group.subjects && group.subjects.length) { %>
-                          <div class="small text-muted">Предмети: <%= group.subjects.join(', ') %></div>
+                          <div class="small text-muted"><%= scheduleGeneratorCopy.subjects %>: <%= group.subjects.join(', ') %></div>
                         <% } %>
                         <% if (group.courses && group.courses.length) { %>
-                          <div class="small text-muted">Курси: <%= group.courses.join(', ') %></div>
+                          <div class="small text-muted"><%= scheduleGeneratorCopy.courses %>: <%= group.courses.join(', ') %></div>
                         <% } %>
                       </div>
                     <% }); %>
@@ -783,45 +1240,43 @@
 
           <div class="card glass-panel mb-4">
             <div class="card-body">
-              <div class="generator-section-title mb-2">Конфлікти після генерації</div>
-              <% const conflictLabels = { missing_course_context: 'Немає активного семестру', missing_weeks_count: 'Не задано кількість тижнів', no_available_weeks: 'Немає доступних тижнів', no_allowed_days: 'Немає доступних днів', no_allowed_classes: 'Немає дозволених слотів', no_slot_found: 'Немає слота', partial_schedule: 'Часткова генерація', subject_day_mismatch: 'Предмет має різні дні', unknown: 'Невідома причина' }; %>
-              <% const rejectionLabels = { course_slot_busy: 'Слот зайнятий лекцією/курсом', lecture_slot_busy: 'Слот блокує лекція', subject_slot_busy: 'Предмет уже стоїть у цей слот', lecture_must_be_first: 'Семінар має бути після лекції', teacher_slot_busy: 'Викладач зайнятий', group_slot_busy: 'Група зайнята', group_day_limit: 'Ліміт пар/день у групи', teacher_week_limit: 'Ліміт викладача на тиждень', unknown: 'Інше' }; %>
+              <div class="generator-section-title mb-2"><%= scheduleGeneratorCopy.conflictsAfterGeneration %></div>
               <% ['kyiv', 'munich'].forEach(function(location) { %>
                 <% const conflicts = conflictDetails && conflictDetails[location]; %>
                 <div class="d-grid gap-2" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                   <% if (!conflicts || !conflicts.length) { %>
-                    <div class="generator-empty">Конфліктів немає.</div>
+                    <div class="generator-empty"><%= scheduleGeneratorCopy.noConflicts %></div>
                   <% } else { %>
                     <% conflicts.slice(0, 6).forEach(function(conflict) { %>
                       <div class="glass-inset p-3 conflict-row">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                          <div class="fw-semibold"><%= conflict.subject || 'Без предмета' %></div>
-                          <span class="badge bg-danger">Проблема</span>
+                          <div class="fw-semibold"><%= conflict.subject || scheduleGeneratorCopy.noSubject %></div>
+                          <span class="badge bg-danger"><%= scheduleGeneratorCopy.problem %></span>
                         </div>
                         <div class="small text-muted">
-                          <%= conflictLabels[conflict.reason] || conflict.reason || conflictLabels.unknown %>
+                          <%= scheduleGeneratorConflictLabels[conflict.reason] || conflict.reason || scheduleGeneratorConflictLabels.unknown %>
                           <% if (conflict.scheduled) { %> · <%= conflict.scheduled %><% } %>
                           <% if (conflict.target) { %> / <%= conflict.target %><% } %>
                         </div>
                         <% if (conflict.items && conflict.items.length) { %>
                           <div class="small text-muted mt-1">
                             <% conflict.items.forEach(function(item, idx) { %>
-                              <span><%= item.course %> · <%= item.group %> · <%= item.teacher || 'Без викладача' %></span><%= idx < conflict.items.length - 1 ? ' · ' : '' %>
+                              <span><%= item.course %> · <%= item.group %> · <%= item.teacher || scheduleGeneratorCopy.noTeacher %></span><%= idx < conflict.items.length - 1 ? ' · ' : '' %>
                             <% }); %>
                           </div>
                         <% } %>
                         <% if (conflict.diagnostics && conflict.diagnostics.top_rejections && conflict.diagnostics.top_rejections.length) { %>
                           <div class="small text-muted mt-1">
-                            Причини відсіву слотів:
+                            <%= scheduleGeneratorCopy.slotRejectionReasons %>:
                             <% conflict.diagnostics.top_rejections.forEach(function(reason, idx) { %>
-                              <span><%= rejectionLabels[reason.reason] || reason.reason %> (<%= reason.count %>)</span><%= idx < conflict.diagnostics.top_rejections.length - 1 ? ' · ' : '' %>
+                              <span><%= scheduleGeneratorRejectionLabels[reason.reason] || reason.reason %> (<%= reason.count %>)</span><%= idx < conflict.diagnostics.top_rejections.length - 1 ? ' · ' : '' %>
                             <% }); %>
                           </div>
                         <% } %>
                       </div>
                     <% }); %>
                     <% if (conflicts.length > 6) { %>
-                      <div class="small text-muted">Ще <%= conflicts.length - 6 %> конфліктів.</div>
+                      <div class="small text-muted"><%= scheduleGeneratorCopy.moreConflicts(conflicts.length - 6) %></div>
                     <% } %>
                   <% } %>
                 </div>
@@ -832,13 +1287,13 @@
           <div class="card glass-panel">
             <div class="card-body">
               <div class="d-flex align-items-center justify-content-between mb-2">
-                <div class="generator-section-title">План занять</div>
+                  <div class="generator-section-title"><%= scheduleGeneratorCopy.studyPlan %></div>
                 <% ['kyiv', 'munich'].forEach(function(location) { %>
                   <% const problemCount = problemItemLookupByLocation && problemItemLookupByLocation[location] ? Object.keys(problemItemLookupByLocation[location]).length : 0; %>
                   <div class="form-check form-switch m-0 problem-toggle" data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                     <input class="form-check-input" type="checkbox" id="problemToggle-<%= location %>" <%= problemCount ? '' : 'disabled' %> />
                     <label class="form-check-label small" for="problemToggle-<%= location %>">
-                      Показати проблемні (<%= problemCount %>)
+                      <%= scheduleGeneratorCopy.showProblematic(problemCount) %>
                     </label>
                   </div>
                 <% }); %>
@@ -848,17 +1303,17 @@
                   <table class="table generator-table align-middle">
                     <thead>
                       <tr>
-                        <th>Курс</th>
-                        <th>Предмет</th>
-                        <th>Тип</th>
-                        <th>Група</th>
-                        <th>Викладач</th>
-                        <th>Пар</th>
-                        <th>Тижні</th>
-                        <th>Дзеркало</th>
-                        <th>Фікс. день</th>
-                        <th>Фікс. слот</th>
-                        <th>Дії</th>
+                        <th><%= scheduleGeneratorCopy.course %></th>
+                        <th><%= scheduleGeneratorCopy.subject %></th>
+                        <th><%= scheduleGeneratorCopy.type %></th>
+                        <th><%= scheduleGeneratorCopy.group %></th>
+                        <th><%= scheduleGeneratorCopy.teacher %></th>
+                        <th><%= scheduleGeneratorCopy.pairsCount %></th>
+                        <th><%= scheduleGeneratorCopy.weeksOptional %></th>
+                        <th><%= scheduleGeneratorCopy.mirror %></th>
+                        <th><%= scheduleGeneratorCopy.fixedDayShort %></th>
+                        <th><%= scheduleGeneratorCopy.fixedSlotShort %></th>
+                        <th><%= scheduleGeneratorCopy.actions %></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -899,15 +1354,15 @@
                           </td>
                           <td>
                             <select class="form-select form-select-sm" name="lesson_type" form="gen-item-<%= item.id %>">
-                              <option value="lecture" <%= item.lesson_type === 'lecture' ? 'selected' : '' %>>Лекція</option>
-                              <option value="seminar" <%= item.lesson_type === 'seminar' ? 'selected' : '' %>>Семінар</option>
-                              <option value="lab" <%= item.lesson_type === 'lab' ? 'selected' : '' %>>Лаб</option>
-                              <option value="practice" <%= item.lesson_type === 'practice' ? 'selected' : '' %>>Практика</option>
+                              <option value="lecture" <%= item.lesson_type === 'lecture' ? 'selected' : '' %>><%= scheduleGeneratorCopy.lecture %></option>
+                              <option value="seminar" <%= item.lesson_type === 'seminar' ? 'selected' : '' %>><%= scheduleGeneratorCopy.seminar %></option>
+                              <option value="lab" <%= item.lesson_type === 'lab' ? 'selected' : '' %>><%= scheduleGeneratorCopy.lab %></option>
+                              <option value="practice" <%= item.lesson_type === 'practice' ? 'selected' : '' %>><%= scheduleGeneratorCopy.practice %></option>
                             </select>
                           </td>
                           <td>
                             <select class="form-select form-select-sm" name="group_number" form="gen-item-<%= item.id %>">
-                              <option value="all" <%= item.group_number === null || typeof item.group_number === 'undefined' ? 'selected' : '' %>>Усі</option>
+                              <option value="all" <%= item.group_number === null || typeof item.group_number === 'undefined' ? 'selected' : '' %>><%= scheduleGeneratorCopy.allGroups %></option>
                               <option value="1" <%= Number(item.group_number) === 1 ? 'selected' : '' %>>1</option>
                               <option value="2" <%= Number(item.group_number) === 2 ? 'selected' : '' %>>2</option>
                               <option value="3" <%= Number(item.group_number) === 3 ? 'selected' : '' %>>3</option>
@@ -943,7 +1398,7 @@
                                 type="button"
                                 data-target="mirror-key-<%= item.id %>"
                               >
-                                Копіювати
+                                  <%= scheduleGeneratorCopy.copy %>
                               </button>
                             </div>
                           </td>
@@ -967,21 +1422,21 @@
                             <form id="gen-item-<%= item.id %>" method="POST" action="/admin/schedule-generator/items/edit/<%= item.id %>">
                               <input type="hidden" name="run_id" value="<%= run.id %>" />
                             </form>
-                            <button class="btn btn-sm btn-outline-primary" type="submit" form="gen-item-<%= item.id %>">Save</button>
+                            <button class="btn btn-sm btn-outline-primary" type="submit" form="gen-item-<%= item.id %>"><%= scheduleGeneratorCopy.save %></button>
                             <% if (isFixed) { %>
                               <form method="POST" action="/admin/schedule-generator/items/unfreeze/<%= item.id %>">
                                 <input type="hidden" name="run_id" value="<%= run.id %>" />
-                                <button class="btn btn-sm btn-outline-secondary" type="submit">Unlock</button>
+                                <button class="btn btn-sm btn-outline-secondary" type="submit"><%= scheduleGeneratorCopy.unlock %></button>
                               </form>
                             <% } else { %>
                               <form method="POST" action="/admin/schedule-generator/items/freeze/<%= item.id %>">
                                 <input type="hidden" name="run_id" value="<%= run.id %>" />
-                                <button class="btn btn-sm btn-outline-secondary" type="submit">Lock</button>
+                                <button class="btn btn-sm btn-outline-secondary" type="submit"><%= scheduleGeneratorCopy.lock %></button>
                               </form>
                             <% } %>
                             <form method="POST" action="/admin/schedule-generator/items/delete/<%= item.id %>">
                               <input type="hidden" name="run_id" value="<%= run.id %>" />
-                              <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Видалити запис?');">Delete</button>
+                              <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('<%= scheduleGeneratorCopy.deleteRecordConfirm %>');"><%= scheduleGeneratorCopy.delete %></button>
                             </form>
                           </td>
                         </tr>
@@ -990,7 +1445,7 @@
                   </table>
                 </div>
               <% } else { %>
-                <div class="generator-empty">Додайте предмети, щоб створити план.</div>
+                <div class="generator-empty"><%= scheduleGeneratorCopy.addSubjectsToCreatePlan %></div>
               <% } %>
             </div>
           </div>
@@ -1006,25 +1461,24 @@
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
           <div class="modal-content glass-panel">
             <div class="modal-header">
-              <h5 class="modal-title">Авто-пари для дзеркала</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              <h5 class="modal-title"><%= scheduleGeneratorCopy.mirrorAutoTitle %></h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= scheduleGeneratorCopy.close %>"></button>
             </div>
             <form method="POST" action="/admin/schedule-generator/mirror-auto">
               <input type="hidden" name="run_id" value="<%= run.id %>" />
               <div class="modal-body">
                 <div class="text-muted small mb-3">
-                  Ми підберемо пари для груп 1/2 з однаковою кількістю пар і без фіксованих тижнів/слотів.
-                  Загальні предмети та предмети з уже заданими дзеркалами не включаємо.
+                  <%= scheduleGeneratorCopy.mirrorAutoHint %>
                 </div>
                 <div class="d-flex flex-wrap gap-2 mb-3">
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-mirror-select="all">Вибрати всі</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-mirror-select="none">Зняти всі</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-mirror-select="all"><%= scheduleGeneratorCopy.selectAll %></button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-mirror-select="none"><%= scheduleGeneratorCopy.clearAll %></button>
                 </div>
                 <% ['kyiv', 'munich'].forEach(function(location) { %>
                   <% const candidates = autoMirrorCandidatesByLocation && autoMirrorCandidatesByLocation[location]; %>
                   <div data-location-section="<%= location %>" style="<%= activeLocation === location ? '' : 'display: none;' %>">
                     <% if (!candidates || !candidates.length) { %>
-                      <div class="validation-empty">Немає кандидатів для автопар у цій локації.</div>
+                      <div class="validation-empty"><%= scheduleGeneratorCopy.noAutoMirrorCandidates %></div>
                     <% } else { %>
                       <div class="list-group mirror-auto-list">
                         <% candidates.forEach(function(pair) { %>
@@ -1040,10 +1494,10 @@
                             />
                             <div>
                               <div class="fw-semibold">
-                                Група 1: <%= pair.a.subject_name %> → Група 2: <%= pair.b.subject_name %>
+                                <%= scheduleGeneratorCopy.autoPairLabel(pair.a.subject_name, pair.b.subject_name) %>
                               </div>
                               <div class="small text-muted">
-                                <%= pair.course_name %> · <%= pair.lesson_type === 'seminar' ? 'Семінар' : pair.lesson_type %> · <%= pair.pairs_count %> пар
+                                <%= pair.course_name %> · <%= formatScheduleGeneratorLessonType(pair.lesson_type) %> · <%= pair.pairs_count %> <%= scheduleGeneratorCopy.pairsUnit %>
                               </div>
                             </div>
                           </label>
@@ -1054,16 +1508,16 @@
                     <% if (exclusions && exclusions.length) { %>
                       <% const shown = exclusions.slice(0, 60); %>
                       <details class="mirror-auto-exclusions mt-3">
-                        <summary>Чому не попало в авто‑пари (<%= exclusions.length %>)</summary>
+                        <summary><%= scheduleGeneratorCopy.whyNotInAutoPairs(exclusions.length) %></summary>
                         <div class="list-group mirror-exclusion-list mt-2">
                           <% shown.forEach(function(item) { %>
                             <div class="list-group-item">
                               <div class="fw-semibold">
                                 <%= item.subject_name %>
-                                <span class="small text-muted">· Група <%= item.group_number || '—' %></span>
+                                <span class="small text-muted">· <%= scheduleGeneratorCopy.group %> <%= item.group_number || '—' %></span>
                               </div>
                               <div class="small text-muted">
-                                <%= item.course_name %> · <%= item.lesson_type === 'seminar' ? 'Семінар' : item.lesson_type %> · <%= item.pairs_count %> пар
+                                <%= item.course_name %> · <%= formatScheduleGeneratorLessonType(item.lesson_type) %> · <%= item.pairs_count %> <%= scheduleGeneratorCopy.pairsUnit %>
                               </div>
                               <div class="d-flex flex-wrap gap-2 mt-2">
                                 <% item.reasons.forEach(function(reason) { %>
@@ -1074,7 +1528,7 @@
                           <% }); %>
                           <% if (exclusions.length > shown.length) { %>
                             <div class="small text-muted">
-                              Ще <%= exclusions.length - shown.length %> записів.
+                              <%= scheduleGeneratorCopy.moreRecords(exclusions.length - shown.length) %>
                             </div>
                           <% } %>
                         </div>
@@ -1084,8 +1538,8 @@
                 <% }); %>
               </div>
               <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Скасувати</button>
-                <button type="submit" class="btn btn-primary">Застосувати пари</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><%= scheduleGeneratorCopy.cancel %></button>
+                <button type="submit" class="btn btn-primary"><%= scheduleGeneratorCopy.applyPairs %></button>
               </div>
             </form>
           </div>
@@ -1283,7 +1737,7 @@
       const renderMergePreview = (payload) => {
         clearMergePreview();
         const total = Number(payload?.total || 0);
-        setMergePreviewMeta(total ? `Знайдено ${total} злиттів` : 'Немає предметів для злиття.');
+        setMergePreviewMeta(total ? `<%= scheduleGeneratorCopy.foundMerges(0) %>`.replace('0', String(total)) : '<%= scheduleGeneratorCopy.noMerges %>');
         if (!total || !mergePreviewList) return;
         (payload.merges || []).forEach((item) => {
           const card = document.createElement('div');
@@ -1291,32 +1745,32 @@
 
           const title = document.createElement('div');
           title.className = 'fw-semibold';
-          title.textContent = item.base_name || item.canonical_name || 'Без назви';
+          title.textContent = item.base_name || item.canonical_name || '<%= scheduleGeneratorCopy.untitled %>';
 
           const meta = document.createElement('div');
           meta.className = 'small text-muted';
           const courseLabel = item.course_name ? `${item.course_name} • ` : '';
           const lectureName = item.lecture?.name || '-';
           const seminarName = item.seminar?.name || '-';
-          meta.textContent = `${courseLabel}Лекція: ${lectureName} • Семінар: ${seminarName}`;
+          meta.textContent = `${courseLabel}<%= scheduleGeneratorCopy.lecture %>: ${lectureName} • <%= scheduleGeneratorCopy.seminar %>: ${seminarName}`;
 
           const canonical = document.createElement('div');
           canonical.className = 'small';
           const sourceLabel = item.canonical_source || 'base';
-          canonical.textContent = `Канонічний: ${item.canonical_name || ''} (${sourceLabel})`;
+          canonical.textContent = `<%= scheduleGeneratorCopy.canonical %>: ${item.canonical_name || ''} (${sourceLabel})`;
 
           card.append(title, meta, canonical);
 
           if (item.rename && item.rename.from && item.rename.to) {
             const rename = document.createElement('div');
             rename.className = 'small text-muted';
-            rename.textContent = `Перейменування: ${item.rename.from} → ${item.rename.to}`;
+            rename.textContent = `<%= scheduleGeneratorCopy.rename %>: ${item.rename.from} → ${item.rename.to}`;
             card.append(rename);
           }
           if (item.rename_conflict) {
             const warn = document.createElement('div');
             warn.className = 'small text-warning';
-            warn.textContent = 'Конфлікт перейменування: назва вже існує.';
+            warn.textContent = '<%= scheduleGeneratorCopy.renameConflict %>';
             card.append(warn);
           }
 
@@ -1328,8 +1782,8 @@
         mergePreviewBtn.addEventListener('click', async () => {
           const originalText = mergePreviewBtn.textContent;
           mergePreviewBtn.disabled = true;
-          mergePreviewBtn.textContent = 'Завантаження...';
-          setMergePreviewMeta('Завантажуємо список...');
+          mergePreviewBtn.textContent = '<%= scheduleGeneratorCopy.loading %>';
+          setMergePreviewMeta('<%= scheduleGeneratorCopy.loadingList %>');
           clearMergePreview();
           try {
             const params = new URLSearchParams();
@@ -1343,7 +1797,7 @@
             const data = await response.json();
             renderMergePreview(data);
           } catch (err) {
-            setMergePreviewMeta('Не вдалося отримати dry-run. Спробуйте ще раз.');
+            setMergePreviewMeta('<%= scheduleGeneratorCopy.dryRunFetchFailed %>');
           } finally {
             mergePreviewBtn.disabled = false;
             mergePreviewBtn.textContent = originalText;
