@@ -2960,6 +2960,21 @@ async function getCourseSubjectAccessScope(courseId, options = {}) {
   };
 }
 
+function resolveSubjectScopeSemesterIds(subjectScope, fallbackSemesterId = null) {
+  const directIds = Array.from(new Set(
+    (subjectScope && Array.isArray(subjectScope.owner_semester_ids) ? subjectScope.owner_semester_ids : [])
+      .map((value) => Number(value || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (directIds.length) {
+    return directIds;
+  }
+  const normalizedFallback = Number(fallbackSemesterId || 0);
+  return Number.isInteger(normalizedFallback) && normalizedFallback > 0
+    ? [normalizedFallback]
+    : [];
+}
+
 async function getHomeworkRowsForCourse(homeworkIds, courseId, options = {}) {
   const normalizedIds = Array.from(new Set(
     (Array.isArray(homeworkIds) ? homeworkIds : [homeworkIds])
@@ -10060,26 +10075,30 @@ async function buildAdminDataQualityDiagnostics({
     return result;
   }
 
-  const homeworkSemesterClause = hasSemester
-    ? 'AND (h.semester_id = ? OR h.semester_id IS NULL)'
+  const subjectScope = await getCourseSubjectAccessScope(normalizedCourseId, { visibleOnly: false });
+  const scopeSubjectIds = Array.isArray(subjectScope.subject_ids) ? subjectScope.subject_ids : [];
+  if (!scopeSubjectIds.length) {
+    return result;
+  }
+  const scopeOwnerCourseIds = Array.isArray(subjectScope.owner_course_ids) && subjectScope.owner_course_ids.length
+    ? subjectScope.owner_course_ids
+    : [normalizedCourseId];
+  const scopeSemesterIds = resolveSubjectScopeSemesterIds(subjectScope, hasSemester ? normalizedSemesterId : null);
+
+  const homeworkSemesterClause = scopeSemesterIds.length
+    ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
     : 'AND h.semester_id IS NULL';
-  const homeworkBaseParams = hasSemester
-    ? [normalizedCourseId, normalizedSemesterId]
-    : [normalizedCourseId];
+  const homeworkBaseParams = [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])];
 
-  const journalSemesterClause = hasSemester
-    ? 'AND (jc.semester_id = ? OR jc.semester_id IS NULL)'
+  const journalSemesterClause = scopeSemesterIds.length
+    ? 'AND (jc.semester_id = ANY(?::int[]) OR jc.semester_id IS NULL)'
     : 'AND jc.semester_id IS NULL';
-  const journalBaseParams = hasSemester
-    ? [normalizedCourseId, normalizedSemesterId]
-    : [normalizedCourseId];
+  const journalBaseParams = [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])];
 
-  const gradingSemesterClause = hasSemester
-    ? 'AND (sgs.semester_id = ? OR sgs.semester_id IS NULL)'
+  const gradingSemesterClause = scopeSemesterIds.length
+    ? 'AND (sgs.semester_id = ANY(?::int[]) OR sgs.semester_id IS NULL)'
     : 'AND sgs.semester_id IS NULL';
-  const gradingBaseParams = hasSemester
-    ? [normalizedCourseId, normalizedSemesterId]
-    : [normalizedCourseId];
+  const gradingBaseParams = [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])];
 
   let diagnosticsRows = null;
   let compatibilityFallbacks = 0;
@@ -10111,7 +10130,8 @@ async function buildAdminDataQualityDiagnostics({
             ) AS subject_ids
           FROM homework h
           LEFT JOIN journal_columns jc ON jc.source_homework_id = h.id
-          WHERE h.course_id = ?
+          WHERE h.subject_id = ANY(?::int[])
+            AND h.course_id = ANY(?::int[])
             ${homeworkSemesterClause}
             AND COALESCE(h.is_teacher_homework, 0) = 1
             AND COALESCE(h.status, 'published') = 'published'
@@ -10135,7 +10155,8 @@ async function buildAdminDataQualityDiagnostics({
           FROM homework h
           LEFT JOIN subjects s ON s.id = h.subject_id
           LEFT JOIN journal_columns jc ON jc.source_homework_id = h.id
-          WHERE h.course_id = ?
+          WHERE h.subject_id = ANY(?::int[])
+            AND h.course_id = ANY(?::int[])
             ${homeworkSemesterClause}
             AND COALESCE(h.is_teacher_homework, 0) = 1
             AND COALESCE(h.status, 'published') = 'published'
@@ -10161,7 +10182,8 @@ async function buildAdminDataQualityDiagnostics({
               COUNT(*)::int AS duplicates
             FROM homework h
             LEFT JOIN subjects s ON s.id = h.subject_id
-            WHERE h.course_id = ?
+            WHERE h.subject_id = ANY(?::int[])
+              AND h.course_id = ANY(?::int[])
               ${homeworkSemesterClause}
               AND COALESCE(h.is_teacher_homework, 0) = 1
               AND COALESCE(h.status, 'published') = 'published'
@@ -10200,7 +10222,8 @@ async function buildAdminDataQualityDiagnostics({
               ARRAY[]::int[]
             ) AS subject_ids
           FROM journal_columns jc
-          WHERE jc.course_id = ?
+          WHERE jc.subject_id = ANY(?::int[])
+            AND jc.course_id = ANY(?::int[])
             ${journalSemesterClause}
             AND COALESCE(jc.source_type, 'manual') = 'homework'
             AND jc.source_homework_id IS NULL
@@ -10217,7 +10240,8 @@ async function buildAdminDataQualityDiagnostics({
             COALESCE(jc.title, 'Колонка') AS title
           FROM journal_columns jc
           LEFT JOIN subjects s ON s.id = jc.subject_id
-          WHERE jc.course_id = ?
+          WHERE jc.subject_id = ANY(?::int[])
+            AND jc.course_id = ANY(?::int[])
             ${journalSemesterClause}
             AND COALESCE(jc.source_type, 'manual') = 'homework'
             AND jc.source_homework_id IS NULL
@@ -10240,7 +10264,8 @@ async function buildAdminDataQualityDiagnostics({
               COUNT(*)::int AS duplicates
             FROM journal_columns jc
             LEFT JOIN subjects s ON s.id = jc.subject_id
-            WHERE jc.course_id = ?
+            WHERE jc.subject_id = ANY(?::int[])
+              AND jc.course_id = ANY(?::int[])
               ${journalSemesterClause}
               AND COALESCE(jc.is_archived, 0) = 0
               AND COALESCE(jc.source_type, 'manual') = 'manual'
@@ -10277,14 +10302,14 @@ async function buildAdminDataQualityDiagnostics({
           FROM student_groups sg
           JOIN subjects s ON s.id = sg.subject_id
           JOIN users u ON u.id = sg.student_id
-          WHERE s.course_id = ?
+          WHERE s.id = ANY(?::int[])
             AND u.course_id = ?
             AND (sg.group_number < 1 OR sg.group_number > COALESCE(s.group_count, 1))
           GROUP BY sg.subject_id, s.name, COALESCE(s.group_count, 1), sg.group_number
           ORDER BY rows_count DESC, subject_name ASC
           LIMIT 8
         `,
-        [normalizedCourseId, normalizedCourseId]
+        [scopeSubjectIds, normalizedCourseId]
       ), []),
       withCompatibilityFallback(db.all(
         `
@@ -10299,7 +10324,7 @@ async function buildAdminDataQualityDiagnostics({
           FROM teacher_subjects ts
           JOIN subjects s ON s.id = ts.subject_id
           JOIN users u ON u.id = ts.user_id
-          WHERE s.course_id = ?
+          WHERE s.id = ANY(?::int[])
             AND u.course_id = ?
             AND ts.group_number IS NOT NULL
             AND (ts.group_number < 1 OR ts.group_number > COALESCE(s.group_count, 1))
@@ -10307,7 +10332,7 @@ async function buildAdminDataQualityDiagnostics({
           ORDER BY rows_count DESC, subject_name ASC
           LIMIT 8
         `,
-        [normalizedCourseId, normalizedCourseId]
+        [scopeSubjectIds, normalizedCourseId]
       ), []),
       withCompatibilityFallback(db.all(
         `
@@ -10324,7 +10349,8 @@ async function buildAdminDataQualityDiagnostics({
             COUNT(*) OVER()::int AS rows_total
           FROM subject_grading_settings sgs
           JOIN subjects s ON s.id = sgs.subject_id
-          WHERE sgs.course_id = ?
+          WHERE sgs.subject_id = ANY(?::int[])
+            AND sgs.course_id = ANY(?::int[])
             ${gradingSemesterClause}
             AND ABS((
               (CASE WHEN COALESCE(sgs.homework_enabled, 1) = 1 THEN COALESCE(sgs.homework_weight_points, 0) ELSE 0 END) +
@@ -11289,26 +11315,38 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   let teamworkDeadlines = [];
   const subjectIds = Array.from(new Set(workloadTargets.map((row) => Number(row.subject_id)).filter(Boolean)));
   if (subjectIds.length) {
-    const placeholders = subjectIds.map(() => '?').join(',');
-    const params = [courseId];
-    if (activeSemester) {
+    const params = [];
+    if (workloadOwnerCourseIds.length) {
+      params.push(workloadOwnerCourseIds);
+    } else {
+      params.push(courseId);
+    }
+    if (workloadOwnerSemesterIds.length) {
+      params.push(workloadOwnerSemesterIds);
+    } else if (activeSemester) {
       params.push(activeSemester.id);
     }
-    params.push(todayStr, deadlinesWindowEnd, ...subjectIds);
-    const semesterClause = activeSemester
-      ? 'AND (t.semester_id = ? OR t.semester_id IS NULL)'
-      : 'AND t.semester_id IS NULL';
+    params.push(todayStr, deadlinesWindowEnd, subjectIds);
+    const semesterClause = workloadOwnerSemesterIds.length
+      ? 'AND (t.semester_id = ANY(?::int[]) OR t.semester_id IS NULL)'
+      : (activeSemester
+        ? 'AND (t.semester_id = ? OR t.semester_id IS NULL)'
+        : 'AND t.semester_id IS NULL');
+    const courseClause = workloadOwnerCourseIds.length
+      ? 'AND t.course_id = ANY(?::int[])'
+      : 'AND t.course_id = ?';
     const rows = await db.all(
       `
         SELECT t.id, t.title, t.due_date, t.subject_id, s.name AS subject_name
         FROM teamwork_tasks t
         JOIN subjects s ON s.id = t.subject_id
-        WHERE t.course_id = ?
+        WHERE 1 = 1
+          ${courseClause}
           ${semesterClause}
           AND t.due_date IS NOT NULL
           AND t.due_date >= ?
           AND t.due_date <= ?
-          AND t.subject_id IN (${placeholders})
+          AND t.subject_id = ANY(?::int[])
         ORDER BY t.due_date ASC, t.created_at DESC
       `,
       params
@@ -12367,40 +12405,37 @@ app.delete('/api/reminders/:id', requireLogin, writeLimiter, async (req, res) =>
   }
 });
 
-const hasStudentHomeworkAccess = async ({ userId, courseId, activeSemester, homework }) => {
-  const normalizedUserId = Number(userId);
+const isCurrentOwnerSemesterRow = async (ownerCourseId, semesterId) => {
+  const normalizedSemesterId = Number(semesterId || 0);
+  if (!Number.isInteger(normalizedSemesterId) || normalizedSemesterId < 1) {
+    return true;
+  }
+  const normalizedOwnerCourseId = Number(ownerCourseId || 0);
+  if (!Number.isInteger(normalizedOwnerCourseId) || normalizedOwnerCourseId < 1) {
+    return false;
+  }
+  try {
+    const activeSemester = await getActiveSemester(normalizedOwnerCourseId);
+    return Boolean(activeSemester && Number(activeSemester.id || 0) === normalizedSemesterId);
+  } catch (_err) {
+    return false;
+  }
+};
+
+const hasCourseHomeworkAudienceAccess = async ({ courseId, activeSemester, homework, groupNumbers = [] }) => {
   const normalizedCourseId = Number(courseId || homework?.course_id || 1);
   const subjectId = Number(homework?.subject_id || 0);
+  const normalizedGroupNumbers = Array.from(new Set(
+    (Array.isArray(groupNumbers) ? groupNumbers : [groupNumbers])
+      .map((value) => Number(value || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
   const targetGroupNumber = Number(homework?.group_number || 0);
-  if (!Number.isFinite(normalizedUserId) || normalizedUserId < 1) return false;
+  if (!normalizedGroupNumbers.length) return false;
   if (!Number.isFinite(subjectId) || subjectId < 1) return false;
 
-  if (Number.isInteger(targetGroupNumber) && targetGroupNumber > 0) {
-    const exactAccess = await db.get(
-      `
-        SELECT 1
-        FROM student_groups
-        WHERE student_id = ? AND subject_id = ? AND group_number = ?
-        LIMIT 1
-      `,
-      [normalizedUserId, subjectId, targetGroupNumber]
-    );
-    if (exactAccess) {
-      return true;
-    }
-  }
-
-  const subjectEnrollment = await db.get(
-    `
-      SELECT group_number
-      FROM student_groups
-      WHERE student_id = ? AND subject_id = ?
-      LIMIT 1
-    `,
-    [normalizedUserId, subjectId]
-  );
-  if (!subjectEnrollment) {
-    return false;
+  if (Number.isInteger(targetGroupNumber) && targetGroupNumber > 0 && normalizedGroupNumbers.includes(targetGroupNumber)) {
+    return true;
   }
 
   let canUseSharedAudience = false;
@@ -12469,6 +12504,155 @@ const hasStudentHomeworkAccess = async ({ userId, courseId, activeSemester, home
 
   return canUseSharedAudience;
 };
+
+const hasStudentHomeworkAccess = async ({ userId, courseId, activeSemester, homework }) => {
+  const normalizedUserId = Number(userId);
+  const normalizedCourseId = Number(courseId || homework?.course_id || 1);
+  const subjectId = Number(homework?.subject_id || 0);
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId < 1) return false;
+  if (!Number.isFinite(subjectId) || subjectId < 1) return false;
+
+  const subjectEnrollmentRows = await db.all(
+    `
+      SELECT group_number
+      FROM student_groups
+      WHERE student_id = ? AND subject_id = ?
+    `,
+    [normalizedUserId, subjectId]
+  );
+  const subjectGroupNumbers = Array.from(new Set(
+    (subjectEnrollmentRows || [])
+      .map((row) => Number(row.group_number || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (!subjectGroupNumbers.length) {
+    return false;
+  }
+
+  return hasCourseHomeworkAudienceAccess({
+    courseId: normalizedCourseId,
+    activeSemester,
+    homework,
+    groupNumbers: subjectGroupNumbers,
+  });
+};
+
+const getAdminViewAsHomeworkGroups = async (req, subjectId) => {
+  const normalizedSubjectId = Number(subjectId || 0);
+  const fallbackGroupNumber = Number(req?.session?.viewAsGroupNumber || req?.session?.user?.schedule_group || 1);
+  if (!Number.isInteger(normalizedSubjectId) || normalizedSubjectId < 1) {
+    return Number.isInteger(fallbackGroupNumber) && fallbackGroupNumber > 0 ? [fallbackGroupNumber] : [1];
+  }
+  const viewAsMode = String(req?.session?.viewAsMode || 'manual').trim().toLowerCase();
+  if (viewAsMode !== 'self') {
+    return Number.isInteger(fallbackGroupNumber) && fallbackGroupNumber > 0 ? [fallbackGroupNumber] : [1];
+  }
+  const userId = Number(req?.session?.user?.id || 0);
+  const rows = await db.all(
+    `
+      SELECT group_number
+      FROM student_groups
+      WHERE student_id = ? AND subject_id = ?
+    `,
+    [userId, normalizedSubjectId]
+  );
+  const directGroups = Array.from(new Set(
+    (rows || [])
+      .map((row) => Number(row.group_number || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (directGroups.length) {
+    return directGroups;
+  }
+  return Number.isInteger(fallbackGroupNumber) && fallbackGroupNumber > 0 ? [fallbackGroupNumber] : [1];
+};
+
+async function getHomeworkReactionAccess(req, homeworkId) {
+  const normalizedHomeworkId = Number(homeworkId || 0);
+  const userId = Number(req?.session?.user?.id || 0);
+  if (!Number.isInteger(normalizedHomeworkId) || normalizedHomeworkId < 1 || !Number.isInteger(userId) || userId < 1) {
+    return { status: 'invalid', homework: null };
+  }
+  const nowIso = new Date().toISOString();
+  const homework = await db.get(
+    `
+      SELECT
+        h.id,
+        h.subject_id,
+        h.group_number,
+        h.day_of_week,
+        h.class_number,
+        h.class_date,
+        h.course_id,
+        h.semester_id
+      FROM homework h
+      WHERE h.id = ?
+        AND COALESCE(h.status, 'published') = 'published'
+        AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
+      LIMIT 1
+    `,
+    [normalizedHomeworkId, nowIso]
+  );
+  if (!homework) {
+    return { status: 'not_found', homework: null };
+  }
+  const storageCourseId = Number(homework.course_id || 0);
+  if (!(await isCurrentOwnerSemesterRow(storageCourseId, homework.semester_id))) {
+    return { status: 'not_found', homework: null };
+  }
+
+  const isAdminViewAsStudent = hasSessionRole(req, 'admin') && String(req?.session?.viewAs || '') === 'student';
+  const isTeacherMode = hasSessionRole(req, 'teacher') && !isAdminViewAsStudent;
+  if (isTeacherMode) {
+    const teacherRows = await db.all(
+      `
+        SELECT ts.group_number, s.group_count
+        FROM teacher_subjects ts
+        JOIN subjects s ON s.id = ts.subject_id
+        WHERE ts.user_id = ? AND ts.subject_id = ?
+      `,
+      [userId, homework.subject_id]
+    );
+    if (!teacherRows || !teacherRows.length) {
+      return { status: 'forbidden', homework: null };
+    }
+    const teacherAccess = buildTeacherSubjectAccess(teacherRows, Number(teacherRows[0].group_count || 1));
+    const targetGroupNumber = Number(homework.group_number || 0);
+    if (Number.isInteger(targetGroupNumber) && targetGroupNumber > 0 && !teacherAccess.allowAll && !teacherAccess.groups.has(targetGroupNumber)) {
+      return { status: 'forbidden', homework: null };
+    }
+    return { status: 'ok', homework };
+  }
+
+  const courseId = isAdminViewAsStudent
+    ? Number(req?.session?.viewAsCourseId || req?.session?.user?.course_id || 1)
+    : Number(req?.session?.user?.course_id || 1);
+  if (!Number.isInteger(courseId) || courseId < 1) {
+    return { status: 'forbidden', homework: null };
+  }
+  const subjectRow = await getSubjectForCourse(homework.subject_id, courseId, { includeHidden: true });
+  if (!subjectRow) {
+    return { status: 'not_found', homework: null };
+  }
+  const activeSemester = await getActiveSemester(courseId);
+  if (isAdminViewAsStudent) {
+    const groupNumbers = await getAdminViewAsHomeworkGroups(req, homework.subject_id);
+    const access = await hasCourseHomeworkAudienceAccess({
+      courseId,
+      activeSemester,
+      homework,
+      groupNumbers,
+    });
+    return access ? { status: 'ok', homework } : { status: 'forbidden', homework: null };
+  }
+  const access = await hasStudentHomeworkAccess({
+    userId,
+    courseId,
+    activeSemester,
+    homework,
+  });
+  return access ? { status: 'ok', homework } : { status: 'forbidden', homework: null };
+}
 
 app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, res) => {
   const homeworkId = Number(req.params.id);
@@ -23816,6 +24000,87 @@ app.get('/admin/api/messages/:id/reads', requireMessagesSectionAccess, readLimit
   }
 });
 
+async function getTeamworkReactionAccess(req, taskId) {
+  const normalizedTaskId = Number(taskId || 0);
+  const userId = Number(req?.session?.user?.id || 0);
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId < 1 || !Number.isInteger(userId) || userId < 1) {
+    return { status: 'invalid', task: null };
+  }
+  const task = await db.get(
+    `
+      SELECT
+        t.id,
+        t.subject_id,
+        t.course_id,
+        t.semester_id,
+        t.created_by,
+        t.lesson_scope,
+        t.seminar_group_numbers,
+        s.group_count AS subject_group_count
+      FROM teamwork_tasks t
+      JOIN subjects s ON s.id = t.subject_id
+      WHERE t.id = ?
+      LIMIT 1
+    `,
+    [normalizedTaskId]
+  );
+  if (!task) {
+    return { status: 'not_found', task: null };
+  }
+  if (!(await isCurrentOwnerSemesterRow(task.course_id, task.semester_id))) {
+    return { status: 'not_found', task: null };
+  }
+
+  if (hasSessionRole(req, 'teacher')) {
+    if (Number(task.created_by || 0) !== userId) {
+      return { status: 'forbidden', task: null };
+    }
+    const teacherRows = await db.all(
+      'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
+      [userId, task.subject_id]
+    );
+    return teacherRows && teacherRows.length
+      ? { status: 'ok', task }
+      : { status: 'forbidden', task: null };
+  }
+
+  const courseId = Number(req?.session?.user?.course_id || 1);
+  if (!Number.isInteger(courseId) || courseId < 1) {
+    return { status: 'forbidden', task: null };
+  }
+  const subjectRow = await getSubjectForCourse(task.subject_id, courseId, { includeHidden: true });
+  if (!subjectRow) {
+    return { status: 'not_found', task: null };
+  }
+  const studentRows = await db.all(
+    `
+      SELECT group_number
+      FROM student_groups
+      WHERE student_id = ? AND subject_id = ?
+    `,
+    [userId, task.subject_id]
+  );
+  const studentGroups = Array.from(new Set(
+    (studentRows || [])
+      .map((row) => Number(row.group_number || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (!studentGroups.length) {
+    return { status: 'forbidden', task: null };
+  }
+  const teacherRows = await db.all(
+    'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
+    [task.created_by, task.subject_id]
+  );
+  if (!teacherRows || !teacherRows.length) {
+    return { status: 'forbidden', task: null };
+  }
+  const teacherAccess = buildTeacherSubjectAccess(teacherRows, task.subject_group_count || 1);
+  const audience = buildTeamworkTaskAudience(task, teacherAccess, task.subject_group_count || 1);
+  const canViewTask = audience.allowAll || studentGroups.some((groupNum) => audience.groups.has(Number(groupNum)));
+  return canViewTask ? { status: 'ok', task } : { status: 'forbidden', task: null };
+}
+
 const allowedReactions = new Set(['🔥', '👍']);
 
 app.post('/homework/react', requireLogin, writeLimiter, async (req, res) => {
@@ -23826,6 +24091,13 @@ app.post('/homework/react', requireLogin, writeLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Invalid data' });
   }
   try {
+    const access = await getHomeworkReactionAccess(req, homeworkId);
+    if (access.status === 'not_found') {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    if (access.status !== 'ok') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     const existing = await db.get(
       'SELECT 1 FROM homework_reactions WHERE homework_id = ? AND user_id = ? AND emoji = ?',
       [homeworkId, userId, emoji]
@@ -23921,6 +24193,13 @@ app.post('/teamwork/react', requireLogin, writeLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Invalid data' });
   }
   try {
+    const access = await getTeamworkReactionAccess(req, taskId);
+    if (access.status === 'not_found') {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    if (access.status !== 'ok') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     const existing = await db.get(
       'SELECT 1 FROM teamwork_reactions WHERE task_id = ? AND user_id = ? AND emoji = ?',
       [taskId, userId, emoji]
@@ -24086,7 +24365,12 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     activeScheduleDays = [...daysOfWeek];
   }
 
-  const courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false });
+  let courseSubjectScope;
+  try {
+    courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.subjectScope');
+  }
   if (courseSubjectScope.subject_ids.length) {
     scheduleFilters.push('se.subject_id = ANY(?::int[])');
     scheduleParams.push(courseSubjectScope.subject_ids);
@@ -27382,7 +27666,12 @@ app.get('/admin/schedule-list', requireScheduleSectionAccess, async (req, res) =
     activeScheduleDays = [...daysOfWeek];
   }
 
-  const courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false });
+  let courseSubjectScope;
+  try {
+    courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleList.subjectScope');
+  }
   const scheduleFilters = [];
   const scheduleParams = [];
   if (courseSubjectScope.subject_ids.length) {
@@ -36225,7 +36514,12 @@ async function buildDeaneryCourseMonitoringRow(course) {
   if (!Number.isFinite(courseId) || courseId < 1) return null;
   const activeSemester = await getActiveSemester(courseId);
   const semesterId = activeSemester ? Number(activeSemester.id) : null;
-  const scopeParams = semesterId ? [courseId, semesterId] : [courseId];
+  const courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false });
+  const scopeSubjectIds = Array.isArray(courseSubjectScope.subject_ids) ? courseSubjectScope.subject_ids : [];
+  const scopeOwnerCourseIds = Array.isArray(courseSubjectScope.owner_course_ids) && courseSubjectScope.owner_course_ids.length
+    ? courseSubjectScope.owner_course_ids
+    : [courseId];
+  const scopeSemesterIds = resolveSubjectScopeSemesterIds(courseSubjectScope, semesterId);
   const safeGet = async (sql, params = [], fallback = {}) => {
     try {
       return await db.get(sql, params);
@@ -36237,35 +36531,58 @@ async function buildDeaneryCourseMonitoringRow(course) {
     }
   };
 
+  if (!scopeSubjectIds.length) {
+    return {
+      course_id: courseId,
+      course_name: String(course && course.name ? course.name : `Course ${courseId}`),
+      active_semester_id: semesterId,
+      active_semester_title: activeSemester ? String(activeSemester.title || '') : '',
+      active_semester_weeks: activeSemester ? Number(activeSemester.weeks_count || 0) : 0,
+      subjects_total: 0,
+      subjects_closed: 0,
+      subjects_open: 0,
+      subjects_closed_share: 0,
+      schedule_total: 0,
+      homework_total: 0,
+      columns_total: 0,
+      columns_locked: 0,
+      columns_locked_share: 0,
+    };
+  }
+
   const [subjectStatsRow, scheduleStatsRow, homeworkStatsRow, columnStatsRow] = await Promise.all([
     safeGet(
       `
         SELECT
-          COUNT(*) AS subjects_total,
-          COUNT(*) FILTER (WHERE COALESCE(sgs.is_closed, 0) = 1) AS subjects_closed
-        FROM subjects s
-        LEFT JOIN subject_grading_settings sgs ON sgs.subject_id = s.id
-        WHERE s.course_id = ?
+          COUNT(DISTINCT sgs.subject_id) FILTER (WHERE COALESCE(sgs.is_closed, 0) = 1) AS subjects_closed
+        FROM subject_grading_settings sgs
+        WHERE sgs.subject_id = ANY(?::int[])
+          AND sgs.course_id = ANY(?::int[])
+          ${scopeSemesterIds.length ? 'AND (sgs.semester_id = ANY(?::int[]) OR sgs.semester_id IS NULL)' : 'AND sgs.semester_id IS NULL'}
       `,
-      [courseId],
-      { subjects_total: 0, subjects_closed: 0 }
+      [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])],
+      { subjects_closed: 0 }
     ),
     safeGet(
       `
         SELECT COUNT(*) AS schedule_total
-        FROM schedule_entries
-        WHERE course_id = ?${semesterId ? ' AND semester_id = ?' : ''}
+        FROM schedule_entries se
+        WHERE se.subject_id = ANY(?::int[])
+          AND se.course_id = ANY(?::int[])
+          ${scopeSemesterIds.length ? 'AND (se.semester_id = ANY(?::int[]) OR se.semester_id IS NULL)' : 'AND se.semester_id IS NULL'}
       `,
-      scopeParams,
+      [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])],
       { schedule_total: 0 }
     ),
     safeGet(
       `
         SELECT COUNT(*) AS homework_total
-        FROM homework
-        WHERE course_id = ?${semesterId ? ' AND semester_id = ?' : ''}
+        FROM homework h
+        WHERE h.subject_id = ANY(?::int[])
+          AND h.course_id = ANY(?::int[])
+          ${scopeSemesterIds.length ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)' : 'AND h.semester_id IS NULL'}
       `,
-      scopeParams,
+      [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])],
       { homework_total: 0 }
     ),
     safeGet(
@@ -36273,15 +36590,17 @@ async function buildDeaneryCourseMonitoringRow(course) {
         SELECT
           COUNT(*) FILTER (WHERE COALESCE(is_archived, 0) = 0) AS columns_total,
           COUNT(*) FILTER (WHERE COALESCE(is_archived, 0) = 0 AND COALESCE(is_locked, 0) = 1) AS columns_locked
-        FROM journal_columns
-        WHERE course_id = ?${semesterId ? ' AND semester_id = ?' : ''}
+        FROM journal_columns jc
+        WHERE jc.subject_id = ANY(?::int[])
+          AND jc.course_id = ANY(?::int[])
+          ${scopeSemesterIds.length ? 'AND (jc.semester_id = ANY(?::int[]) OR jc.semester_id IS NULL)' : 'AND jc.semester_id IS NULL'}
       `,
-      scopeParams,
+      [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])],
       { columns_total: 0, columns_locked: 0 }
     ),
   ]);
 
-  const subjectsTotal = Number(subjectStatsRow && subjectStatsRow.subjects_total ? subjectStatsRow.subjects_total : 0);
+  const subjectsTotal = scopeSubjectIds.length;
   const subjectsClosed = Number(subjectStatsRow && subjectStatsRow.subjects_closed ? subjectStatsRow.subjects_closed : 0);
   const columnsTotal = Number(columnStatsRow && columnStatsRow.columns_total ? columnStatsRow.columns_total : 0);
   const columnsLocked = Number(columnStatsRow && columnStatsRow.columns_locked ? columnStatsRow.columns_locked : 0);
@@ -36307,94 +36626,136 @@ async function buildDeanerySubjectMonitoringRows(courseId, semesterId) {
   const safeCourseId = Number(courseId || 0);
   if (!Number.isFinite(safeCourseId) || safeCourseId < 1) return [];
   const safeSemesterId = Number.isFinite(Number(semesterId)) ? Number(semesterId) : null;
-  const homeworkSemesterClause = safeSemesterId ? 'AND h.semester_id = ?' : '';
-  const columnSemesterClause = safeSemesterId ? 'AND jc.semester_id = ?' : '';
-  const params = [
-    safeCourseId,
-    ...(safeSemesterId ? [safeSemesterId] : []),
-    safeCourseId,
-    ...(safeSemesterId ? [safeSemesterId] : []),
-    safeCourseId,
-  ];
-  let rows = [];
-  try {
-    rows = await db.all(
-      `
-        SELECT
-          s.id AS subject_id,
-          s.name AS subject_name,
-          COALESCE(s.group_count, 1) AS group_count,
-          COALESCE(sgs.is_closed, 0) AS is_closed,
-          sgs.closed_at,
-          u.full_name AS closed_by_name,
-          COALESCE(st.students_total, 0) AS students_total,
-          COALESCE(hw.homework_total, 0) AS homework_total,
-          COALESCE(cols.columns_total, 0) AS columns_total,
-          COALESCE(cols.columns_locked, 0) AS columns_locked
-        FROM subjects s
-        LEFT JOIN subject_grading_settings sgs ON sgs.subject_id = s.id
-        LEFT JOIN users u ON u.id = sgs.closed_by
-        LEFT JOIN (
-          SELECT sg.subject_id, COUNT(DISTINCT sg.student_id) AS students_total
-          FROM student_groups sg
-          GROUP BY sg.subject_id
-        ) st ON st.subject_id = s.id
-        LEFT JOIN (
-          SELECT h.subject_id, COUNT(*) AS homework_total
-          FROM homework h
-          WHERE h.course_id = ? ${homeworkSemesterClause}
-          GROUP BY h.subject_id
-        ) hw ON hw.subject_id = s.id
-        LEFT JOIN (
-          SELECT
-            jc.subject_id,
-            COUNT(*) FILTER (WHERE COALESCE(jc.is_archived, 0) = 0) AS columns_total,
-            COUNT(*) FILTER (WHERE COALESCE(jc.is_archived, 0) = 0 AND COALESCE(jc.is_locked, 0) = 1) AS columns_locked
-          FROM journal_columns jc
-          WHERE jc.course_id = ? ${columnSemesterClause}
-          GROUP BY jc.subject_id
-        ) cols ON cols.subject_id = s.id
-        WHERE s.course_id = ?
-        ORDER BY COALESCE(sgs.is_closed, 0) DESC, s.name ASC
-      `,
-      params
-    );
-  } catch (err) {
-    if (!isDbSchemaCompatibilityError(err)) {
+  const subjectScope = await getCourseSubjectAccessScope(safeCourseId, { visibleOnly: false });
+  const subjectList = Array.from(new Map(
+    (subjectScope.subjects || [])
+      .map((subjectRow) => [Number(subjectRow.id || 0), subjectRow])
+      .filter(([subjectId]) => Number.isInteger(subjectId) && subjectId > 0)
+  ).values());
+  if (!subjectList.length) {
+    return [];
+  }
+  const scopeSubjectIds = subjectList
+    .map((subjectRow) => Number(subjectRow.id || 0))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  const scopeOwnerCourseIds = Array.isArray(subjectScope.owner_course_ids) && subjectScope.owner_course_ids.length
+    ? subjectScope.owner_course_ids
+    : [safeCourseId];
+  const scopeSemesterIds = resolveSubjectScopeSemesterIds(subjectScope, safeSemesterId);
+  const safeAll = async (sql, params = [], fallback = []) => {
+    try {
+      return await db.all(sql, params);
+    } catch (err) {
+      if (isDbSchemaCompatibilityError(err)) {
+        return fallback;
+      }
       throw err;
     }
-    rows = await db.all(
+  };
+
+  const [gradingRows, studentRows, homeworkRows, columnRows] = await Promise.all([
+    safeAll(
+      `
+        SELECT DISTINCT ON (sgs.subject_id)
+          sgs.subject_id,
+          COALESCE(sgs.is_closed, 0) AS is_closed,
+          sgs.closed_at,
+          u.full_name AS closed_by_name
+        FROM subject_grading_settings sgs
+        LEFT JOIN users u ON u.id = sgs.closed_by
+        WHERE sgs.subject_id = ANY(?::int[])
+          AND sgs.course_id = ANY(?::int[])
+          ${scopeSemesterIds.length ? 'AND (sgs.semester_id = ANY(?::int[]) OR sgs.semester_id IS NULL)' : 'AND sgs.semester_id IS NULL'}
+        ORDER BY sgs.subject_id, sgs.id DESC
+      `,
+      [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])],
+      []
+    ),
+    safeAll(
+      `
+        SELECT sg.subject_id, COUNT(DISTINCT sg.student_id) AS students_total
+        FROM student_groups sg
+        JOIN users u ON u.id = sg.student_id
+        WHERE sg.subject_id = ANY(?::int[])
+          AND u.course_id = ?
+        GROUP BY sg.subject_id
+      `,
+      [scopeSubjectIds, safeCourseId],
+      []
+    ),
+    safeAll(
+      `
+        SELECT h.subject_id, COUNT(*) AS homework_total
+        FROM homework h
+        WHERE h.subject_id = ANY(?::int[])
+          AND h.course_id = ANY(?::int[])
+          ${scopeSemesterIds.length ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)' : 'AND h.semester_id IS NULL'}
+        GROUP BY h.subject_id
+      `,
+      [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])],
+      []
+    ),
+    safeAll(
       `
         SELECT
-          s.id AS subject_id,
-          s.name AS subject_name,
-          COALESCE(s.group_count, 1) AS group_count
-        FROM subjects s
-        WHERE s.course_id = ?
-        ORDER BY s.name ASC
+          jc.subject_id,
+          COUNT(*) FILTER (WHERE COALESCE(jc.is_archived, 0) = 0) AS columns_total,
+          COUNT(*) FILTER (WHERE COALESCE(jc.is_archived, 0) = 0 AND COALESCE(jc.is_locked, 0) = 1) AS columns_locked
+        FROM journal_columns jc
+        WHERE jc.subject_id = ANY(?::int[])
+          AND jc.course_id = ANY(?::int[])
+          ${scopeSemesterIds.length ? 'AND (jc.semester_id = ANY(?::int[]) OR jc.semester_id IS NULL)' : 'AND jc.semester_id IS NULL'}
+        GROUP BY jc.subject_id
       `,
-      [safeCourseId]
-    );
-  }
-  return (rows || []).map((row) => {
-    const columnsTotal = Number(row.columns_total || 0);
-    const columnsLocked = Number(row.columns_locked || 0);
-    const closedFlag = Number(row.is_closed || 0) === 1;
-    return {
-      subject_id: Number(row.subject_id || 0),
-      subject_name: String(row.subject_name || 'Предмет'),
-      group_count: Number(row.group_count || 1),
-      is_closed: closedFlag,
-      status_label: closedFlag ? 'Закрито' : 'Відкрито',
-      closed_at: row.closed_at || null,
-      closed_by_name: row.closed_by_name || '',
-      students_total: Number(row.students_total || 0),
-      homework_total: Number(row.homework_total || 0),
-      columns_total: columnsTotal,
-      columns_locked: columnsLocked,
-      columns_locked_share: columnsTotal ? Math.round((columnsLocked / columnsTotal) * 100) : 0,
-    };
-  });
+      [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])],
+      []
+    ),
+  ]);
+
+  const gradingMap = new Map(
+    (gradingRows || []).map((row) => [Number(row.subject_id || 0), row]).filter(([subjectId]) => subjectId > 0)
+  );
+  const studentMap = new Map(
+    (studentRows || []).map((row) => [Number(row.subject_id || 0), row]).filter(([subjectId]) => subjectId > 0)
+  );
+  const homeworkMap = new Map(
+    (homeworkRows || []).map((row) => [Number(row.subject_id || 0), row]).filter(([subjectId]) => subjectId > 0)
+  );
+  const columnMap = new Map(
+    (columnRows || []).map((row) => [Number(row.subject_id || 0), row]).filter(([subjectId]) => subjectId > 0)
+  );
+
+  return subjectList
+    .map((subjectRow) => {
+      const subjectId = Number(subjectRow.id || 0);
+      const gradingRow = gradingMap.get(subjectId) || {};
+      const studentRow = studentMap.get(subjectId) || {};
+      const homeworkRow = homeworkMap.get(subjectId) || {};
+      const columnRow = columnMap.get(subjectId) || {};
+      const columnsTotal = Number(columnRow.columns_total || 0);
+      const columnsLocked = Number(columnRow.columns_locked || 0);
+      const closedFlag = Number(gradingRow.is_closed || 0) === 1;
+      return {
+        subject_id: subjectId,
+        subject_name: String(subjectRow.name || 'Предмет'),
+        group_count: Number(subjectRow.group_count || 1),
+        is_closed: closedFlag,
+        status_label: closedFlag ? 'Закрито' : 'Відкрито',
+        closed_at: gradingRow.closed_at || null,
+        closed_by_name: gradingRow.closed_by_name || '',
+        students_total: Number(studentRow.students_total || 0),
+        homework_total: Number(homeworkRow.homework_total || 0),
+        columns_total: columnsTotal,
+        columns_locked: columnsLocked,
+        columns_locked_share: columnsTotal ? Math.round((columnsLocked / columnsTotal) * 100) : 0,
+      };
+    })
+    .sort((a, b) => {
+      if (Number(b.is_closed) !== Number(a.is_closed)) {
+        return Number(b.is_closed) - Number(a.is_closed);
+      }
+      return String(a.subject_name || '').localeCompare(String(b.subject_name || ''));
+    });
 }
 
 async function buildDeaneryMonitoringSnapshot(allowedCourses = [], selectedCourseId = null) {
@@ -36506,13 +36867,30 @@ app.get('/deanery', requireDeanery, async (req, res) => {
     return handleDbError(res, err, 'deanery.activeSemester');
   }
 
+  let courseSubjectScope;
+  try {
+    courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false });
+  } catch (err) {
+    return handleDbError(res, err, 'deanery.subjectScope');
+  }
   const scheduleFilters = [];
   const scheduleParams = [];
-  scheduleFilters.push('se.course_id = ?');
-  scheduleParams.push(courseId);
-  if (activeSemester) {
-    scheduleFilters.push('se.semester_id = ?');
-    scheduleParams.push(activeSemester.id);
+  if (courseSubjectScope.subject_ids.length) {
+    scheduleFilters.push('se.subject_id = ANY(?::int[])');
+    scheduleParams.push(courseSubjectScope.subject_ids);
+    if (courseSubjectScope.owner_course_ids.length) {
+      scheduleFilters.push('se.course_id = ANY(?::int[])');
+      scheduleParams.push(courseSubjectScope.owner_course_ids);
+    }
+    if (courseSubjectScope.owner_semester_ids.length) {
+      scheduleFilters.push('(se.semester_id = ANY(?::int[]) OR se.semester_id IS NULL)');
+      scheduleParams.push(courseSubjectScope.owner_semester_ids);
+    } else if (activeSemester) {
+      scheduleFilters.push('(se.semester_id = ? OR se.semester_id IS NULL)');
+      scheduleParams.push(activeSemester.id);
+    }
+  } else {
+    scheduleFilters.push('1 = 0');
   }
   if (group_number) {
     scheduleFilters.push('se.group_number = ?');
@@ -36547,8 +36925,8 @@ app.get('/deanery', requireDeanery, async (req, res) => {
   try {
     const [semesters, subjects, scheduleRows, deaneryMonitoring] = await Promise.all([
       db.all('SELECT * FROM semesters WHERE course_id = ? ORDER BY start_date DESC', [courseId]),
-      db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId]),
-      db.all(scheduleSql, scheduleParams),
+      Promise.resolve((courseSubjectScope.subjects || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))),
+      courseSubjectScope.subject_ids.length ? db.all(scheduleSql, scheduleParams) : Promise.resolve([]),
       buildDeaneryMonitoringSnapshot(allowedCourses, courseId),
     ]);
     const schedule = sortSchedule(scheduleRows, sort_schedule);

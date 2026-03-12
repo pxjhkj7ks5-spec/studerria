@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.19",
+      "date": "2026-03-12",
+      "items": [
+        "fix(shared-subject-reaction-access): locked homework and teamwork reactions behind real visibility checks so students, teachers, and admin view-as mode can only react to items available in their current subject binding and active owner semester",
+        "fix(shared-subject-monitoring-scope): moved My Day teamwork deadlines, deanery schedule and monitoring, and admin data-quality diagnostics onto `subject_course_bindings` plus owner-course scope so shared subjects no longer disappear or report incomplete analytics outside the owner course"
+      ]
+    },
+    {
       "version": "1.2.18",
       "date": "2026-03-12",
       "items": [
