@@ -11551,7 +11551,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
 	          ${semesterClause}
 	          ${studentHomeworkVisibilityClause}
 	          AND COALESCE(h.status, 'published') = 'published'
-          AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
+          AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
           AND (h.custom_due_date IS NOT NULL OR h.class_date IS NOT NULL)
           AND (${scope.clause})
         ORDER BY COALESCE(h.custom_due_date, h.class_date) ASC, h.created_at DESC
@@ -12869,7 +12869,7 @@ async function getHomeworkReactionAccess(req, homeworkId) {
       FROM homework h
       WHERE h.id = ?
         AND COALESCE(h.status, 'published') = 'published'
-        AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
+        AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
       LIMIT 1
     `,
     [normalizedHomeworkId, nowIso]
@@ -12946,7 +12946,7 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
   try {
     const homework = await getHomeworkForCourse(homeworkId, courseId || 1, {
       selectClause: 'h.id, h.subject_id, h.group_number, h.day_of_week, h.class_number, h.class_date, h.course_id, h.semester_id',
-      extraWhere: "COALESCE(h.status, 'published') = 'published' AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)",
+      extraWhere: `COALESCE(h.status, 'published') = 'published' AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}`,
       extraParams: [nowIso],
     });
     if (!homework) {
@@ -13017,7 +13017,7 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
   try {
     const homework = await getHomeworkForCourse(homeworkId, courseId, {
       selectClause: 'h.id, h.subject_id, h.group_number, h.day_of_week, h.class_number, h.course_id, h.semester_id, h.custom_due_date, h.class_date',
-      extraWhere: "COALESCE(h.status, 'published') = 'published' AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)",
+      extraWhere: `COALESCE(h.status, 'published') = 'published' AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}`,
       extraParams: [nowIso],
     });
     if (!homework) {
@@ -13433,7 +13433,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
             WHERE (${hwConditions})
               AND COALESCE(h.status, 'published') = 'published'
-              AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
+              AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
               AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
             ORDER BY h.created_at DESC
           `,
@@ -13633,7 +13633,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             JOIN courses c ON c.id = h.course_id
             WHERE (${cdConditions})
               AND COALESCE(h.status, 'published') = 'published'
-              AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
+              AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
               AND h.is_custom_deadline = 1
               AND h.custom_due_date IS NOT NULL
               AND h.custom_due_date >= ?
@@ -14053,7 +14053,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           JOIN subjects subj ON subj.id = h.subject_id
           WHERE (${conditions})
             AND COALESCE(h.status, 'published') = 'published'
-            AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
+            AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
             AND h.is_custom_deadline = 1
             AND h.custom_due_date IS NOT NULL
             AND h.custom_due_date >= ?
@@ -14186,7 +14186,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
             WHERE (${hwConditions})
               AND COALESCE(h.status, 'published') = 'published'
-              AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
+              AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
               AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
             ORDER BY h.created_at DESC
           `,
@@ -14442,12 +14442,13 @@ app.get('/schedule', requireLogin, async (req, res) => {
           .filter((value) => Number.isInteger(value) && value > 0)
       ));
       const params = [selectedWeek];
+      const scopeParams = [];
       if (studentGroups.length) {
         conditionParts.push(
           studentGroups.map(() => "(se.subject_id = ? AND (se.group_number = ? OR COALESCE(se.lesson_type, '') = 'lecture'))").join(' OR ')
         );
         studentGroups.forEach((sg) => {
-          params.push(sg.subject_id, sg.group_number);
+          scopeParams.push(sg.subject_id, sg.group_number);
         });
       }
 
@@ -14467,6 +14468,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
       }
       if (conditionParts.length) {
         sql += ` AND (${conditionParts.join(' OR ')})`;
+        params.push(...scopeParams);
       }
 
       db.all(sql, params, (scheduleErr, rows) => {
@@ -14836,6 +14838,16 @@ const buildExactSemesterCondition = (alias, semesterId) => {
     clause: `AND ${alias}.semester_id IS NULL`,
     params: [],
   };
+};
+
+const buildScheduledAtVisibleCondition = (columnExpr = 'scheduled_at') => {
+  const expr = String(columnExpr || 'scheduled_at').trim() || 'scheduled_at';
+  return `(NULLIF(TRIM(COALESCE(${expr}::text, '')), '') IS NULL OR ${expr}::timestamptz <= ?::timestamptz)`;
+};
+
+const buildScheduledAtReachedCondition = (columnExpr = 'scheduled_at') => {
+  const expr = String(columnExpr || 'scheduled_at').trim() || 'scheduled_at';
+  return `NULLIF(TRIM(COALESCE(${expr}::text, '')), '') IS NOT NULL AND ${expr}::timestamptz <= ?::timestamptz`;
 };
 
 const buildJournalClosedRedirectPath = (subjectId, message = JOURNAL_SUBJECT_CLOSED_ERROR) => {
@@ -24086,7 +24098,7 @@ app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
       const semesterFilter = activeSemester
         ? ` AND (m.semester_id = ? OR (${globalBroadcastScope} AND m.semester_id IS NULL))`
         : '';
-      const statusFilter = " AND COALESCE(m.status, 'published') = 'published' AND (m.scheduled_at IS NULL OR m.scheduled_at <= ?)";
+      const statusFilter = ` AND COALESCE(m.status, 'published') = 'published' AND ${buildScheduledAtVisibleCondition('m.scheduled_at')}`;
       const subjectFilter = !Number.isNaN(filterSubjectId) ? ' AND m.subject_id = ?' : '';
       const finalParams = [...params, courseId || 1];
       if (activeSemester) {
@@ -32598,14 +32610,14 @@ const publishScheduledItems = async () => {
       ? await db.run(
           `UPDATE messages
            SET status = 'published', published_at = ?
-           WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ?`,
+           WHERE status = 'scheduled' AND ${buildScheduledAtReachedCondition('scheduled_at')}`,
           [nowIso, nowIso]
         )
       : { changes: 0 };
     const hwResult = await db.run(
       `UPDATE homework
        SET status = 'published', published_at = ?
-       WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ?`,
+       WHERE status = 'scheduled' AND ${buildScheduledAtReachedCondition('scheduled_at')}`,
       [nowIso, nowIso]
     );
     const messages = Number(msgResult?.changes || 0);

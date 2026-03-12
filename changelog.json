@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.21",
+      "date": "2026-03-12",
+      "items": [
+        "fix(schedule-postgres-typing): cast scheduled homework and message publish windows through `timestamptz` so `/schedule`, homework actions, and scheduled publishing no longer crash when `scheduled_at` is stored as text in Postgres",
+        "fix(schedule-shared-subject-array-order): corrected the student schedule query parameter order for shared-subject owner course and semester arrays so bound-course timetable loads no longer fail with malformed array literals"
+      ]
+    },
+    {
       "version": "1.2.20",
       "date": "2026-03-12",
       "items": [
