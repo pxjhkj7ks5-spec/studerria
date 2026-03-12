@@ -397,6 +397,7 @@
   "admin.supportTicketUpdatedMessage": "Статус звернення оновлено.",
   "admin.supportTicketMissingMessage": "Звернення не знайдено в поточному курсі.",
   "admin.supportTicketValidationMessage": "Не вдалося зберегти звернення: перевірте статус і довжину примітки.",
+  "admin.supportTicketSchemaMessage": "Звернення не вдалося оновити через застарілу структуру БД. Потрібно догнати міграції прод-сервісу.",
   "registerCourse.backToRegister": "Назад до реєстрації",
   "navigation.closeMenu": "Закрити меню",
   "myDay.briefKicker": "Оперативний бриф",

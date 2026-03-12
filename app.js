@@ -9220,6 +9220,29 @@ const isDbSchemaCompatibilityError = (err) => {
 
 const isDataQualityCompatibilityError = (err) => isDbSchemaCompatibilityError(err);
 
+const tableColumnCache = new Map();
+
+async function getTableColumnSet(tableName, options = {}) {
+  const normalizedTableName = String(tableName || '').trim().toLowerCase();
+  if (!normalizedTableName) {
+    return new Set();
+  }
+  if (!options.refresh && tableColumnCache.has(normalizedTableName)) {
+    return tableColumnCache.get(normalizedTableName);
+  }
+  const result = await pool.query(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = $1
+    `,
+    [normalizedTableName]
+  );
+  const columns = new Set((result.rows || []).map((row) => String(row.column_name || '').trim()).filter(Boolean));
+  tableColumnCache.set(normalizedTableName, columns);
+  return columns;
+}
+
 const buildJournalEmptyAttendanceContext = () => ({
   date: formatLocalDate(new Date()),
   class_number: 1,
@@ -22679,30 +22702,61 @@ app.post('/admin/support-requests/:id/update', requireAdmin, writeLimiter, async
   }
 
   try {
+    const supportRequestColumns = await getTableColumnSet('support_requests', { refresh: true });
+    if (!supportRequestColumns.has('id')) {
+      return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
+    }
+
+    const selectFields = ['id'];
+    if (supportRequestColumns.has('course_id')) {
+      selectFields.push('course_id');
+    }
     const supportRequest = await db.get(
-      'SELECT id, course_id FROM support_requests WHERE id = ?',
+      `SELECT ${selectFields.join(', ')} FROM support_requests WHERE id = ?`,
       [requestId]
     );
     if (!supportRequest) {
       return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketMissingMessage'))}`);
     }
-    if (selectedCourseId > 0 && Number(supportRequest.course_id || 0) !== selectedCourseId) {
+    if (
+      supportRequestColumns.has('course_id')
+      && selectedCourseId > 0
+      && Number(supportRequest.course_id || 0) !== selectedCourseId
+    ) {
       return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketMissingMessage'))}`);
     }
     const resolvedAt = status === 'resolved' ? new Date().toISOString() : null;
     const resolvedBy = status === 'resolved' ? req.session.user.id : null;
+    const updateAssignments = [];
+    const updateParams = [];
+
+    if (supportRequestColumns.has('status')) {
+      updateAssignments.push('status = ?');
+      updateParams.push(status);
+    }
+    if (supportRequestColumns.has('admin_note')) {
+      updateAssignments.push('admin_note = ?');
+      updateParams.push(adminNote || null);
+    }
+    if (supportRequestColumns.has('updated_at')) {
+      updateAssignments.push('updated_at = NOW()');
+    }
+    if (supportRequestColumns.has('resolved_at')) {
+      updateAssignments.push('resolved_at = ?');
+      updateParams.push(resolvedAt);
+    }
+    if (supportRequestColumns.has('resolved_by')) {
+      updateAssignments.push('resolved_by = ?');
+      updateParams.push(resolvedBy);
+    }
+    if (!updateAssignments.length) {
+      return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
+    }
+    updateParams.push(requestId);
 
     await db.run(
-      `
-        UPDATE support_requests
-        SET status = ?,
-            admin_note = ?,
-            updated_at = NOW(),
-            resolved_at = ?,
-            resolved_by = ?
-        WHERE id = ?
-      `,
-      [status, adminNote || null, resolvedAt, resolvedBy, requestId]
+      `UPDATE support_requests SET ${updateAssignments.join(', ')} WHERE id = ?`,
+      updateParams
     );
 
     logAction(db, req, 'support_request_update', {
@@ -22711,6 +22765,9 @@ app.post('/admin/support-requests/:id/update', requireAdmin, writeLimiter, async
     });
     return res.redirect(`/admin?tab=admin-messages&ok=${encodeURIComponent(translate(lang, 'admin.supportTicketUpdatedMessage'))}`);
   } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
+    }
     return handleDbError(res, err, 'admin.supportRequests.update');
   }
 });

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.15",
+      "date": "2026-03-12",
+      "items": [
+        "fix(help-center-schema-compat): made admin support ticket updates schema-aware so production instances with lagging `support_requests` columns now degrade safely instead of throwing HTTP 500 on save"
+      ]
+    },
+    {
       "version": "1.2.14",
       "date": "2026-03-12",
       "items": [

@@ -398,6 +398,7 @@
   "admin.supportTicketUpdatedMessage": "Support request updated.",
   "admin.supportTicketMissingMessage": "Support request was not found in the current course.",
   "admin.supportTicketValidationMessage": "Could not save the request. Check the status and note length.",
+  "admin.supportTicketSchemaMessage": "The request could not be updated because the production DB schema is outdated. Apply the pending migrations.",
   "navigation.closeMenu": "Close menu",
   "myDay.briefKicker": "Leadership Brief",
   "myDay.pageTitle": "Home",
