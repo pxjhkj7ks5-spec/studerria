@@ -2727,15 +2727,585 @@ async function getRegistrationSubjects(courseId, admissionId) {
   }
 }
 
+function normalizeSubjectCatalogName(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeSubjectDraftName(value, maxLength = 140) {
+  return sanitizeCompactText(
+    String(value || '').replace(/\s+/g, ' ').trim(),
+    maxLength
+  );
+}
+
+async function getSubjectBindingCourseIds(subjectId) {
+  const normalizedSubjectId = Number(subjectId || 0);
+  if (!Number.isInteger(normalizedSubjectId) || normalizedSubjectId < 1) {
+    return [];
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT DISTINCT course_id
+        FROM subject_course_bindings
+        WHERE subject_id = ?
+        ORDER BY course_id ASC
+      `,
+      [normalizedSubjectId]
+    );
+    return (rows || [])
+      .map((row) => Number(row.course_id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0);
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    const row = await db.get('SELECT course_id FROM subjects WHERE id = ?', [normalizedSubjectId]);
+    const fallbackCourseId = Number(row && row.course_id ? row.course_id : 0);
+    return Number.isInteger(fallbackCourseId) && fallbackCourseId > 0 ? [fallbackCourseId] : [];
+  }
+}
+
+async function invalidateSubjectCachesForSubjectIds(subjectIds = []) {
+  const safeIds = Array.from(new Set(
+    (Array.isArray(subjectIds) ? subjectIds : [subjectIds])
+      .map((value) => Number(value || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (!safeIds.length) {
+    return;
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT DISTINCT course_id
+        FROM subject_course_bindings
+        WHERE subject_id = ANY(?::int[])
+      `,
+      [safeIds]
+    );
+    const touchedCourseIds = new Set(
+      (rows || [])
+        .map((row) => Number(row.course_id || 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
+    touchedCourseIds.forEach((courseId) => invalidateSubjectsCache(courseId));
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    const rows = await db.all(
+      `
+        SELECT DISTINCT course_id
+        FROM subjects
+        WHERE id = ANY(?::int[])
+      `,
+      [safeIds]
+    );
+    (rows || []).forEach((row) => {
+      const courseId = Number(row.course_id || 0);
+      if (Number.isInteger(courseId) && courseId > 0) {
+        invalidateSubjectsCache(courseId);
+      }
+    });
+  }
+}
+
+async function getSubjectForCourse(subjectId, courseId, options = {}) {
+  const normalizedSubjectId = Number(subjectId || 0);
+  const normalizedCourseId = Number(courseId || 0);
+  if (!Number.isInteger(normalizedSubjectId) || normalizedSubjectId < 1) {
+    return null;
+  }
+  if (!Number.isInteger(normalizedCourseId) || normalizedCourseId < 1) {
+    return null;
+  }
+  const includeHidden = options.includeHidden === true;
+  try {
+    return await db.get(
+      `
+        SELECT
+          s.*,
+          s.course_id AS owner_course_id,
+          scb.course_id AS bound_course_id,
+          COALESCE(cat.name, s.name) AS catalog_name
+        FROM subject_course_bindings scb
+        JOIN subjects s ON s.id = scb.subject_id
+        LEFT JOIN subject_catalog cat ON cat.id = s.catalog_id
+        WHERE s.id = ?
+          AND scb.course_id = ?
+          ${includeHidden ? '' : "AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')"}
+        LIMIT 1
+      `,
+      [normalizedSubjectId, normalizedCourseId]
+    );
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    return db.get(
+      `
+        SELECT
+          *,
+          course_id AS owner_course_id,
+          course_id AS bound_course_id,
+          name AS catalog_name
+        FROM subjects
+        WHERE id = ?
+          AND course_id = ?
+          ${includeHidden ? '' : "AND COALESCE(LOWER(TRIM(CAST(visible AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')"}
+        LIMIT 1
+      `,
+      [normalizedSubjectId, normalizedCourseId]
+    );
+  }
+}
+
+async function resolveSubjectCourseContext(subjectId, courseId, options = {}) {
+  const normalizedSubjectId = Number(subjectId || 0);
+  const normalizedCourseId = Number(courseId || 0);
+  if (!Number.isInteger(normalizedSubjectId) || normalizedSubjectId < 1) {
+    return null;
+  }
+  const includeHidden = options.includeHidden === true;
+  let scopedSubject = null;
+  if (Number.isInteger(normalizedCourseId) && normalizedCourseId > 0) {
+    scopedSubject = await getSubjectForCourse(normalizedSubjectId, normalizedCourseId, { includeHidden });
+  } else {
+    scopedSubject = await db.get(
+      `
+        SELECT
+          *,
+          course_id AS owner_course_id,
+          course_id AS bound_course_id,
+          name AS catalog_name
+        FROM subjects
+        WHERE id = ?
+          ${includeHidden ? '' : "AND COALESCE(LOWER(TRIM(CAST(visible AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')"}
+        LIMIT 1
+      `,
+      [normalizedSubjectId]
+    );
+  }
+  if (!scopedSubject) {
+    return null;
+  }
+  const ownerCourseId = Number(scopedSubject.owner_course_id || scopedSubject.course_id || normalizedCourseId || 0) || null;
+  const boundCourseIds = await getSubjectBindingCourseIds(normalizedSubjectId);
+  return {
+    ...scopedSubject,
+    owner_course_id: ownerCourseId,
+    bound_course_ids: boundCourseIds.length
+      ? boundCourseIds
+      : (ownerCourseId ? [ownerCourseId] : []),
+  };
+}
+
+async function getCourseSubjectAccessScope(courseId, options = {}) {
+  const normalizedCourseId = Number(courseId || 0);
+  if (!Number.isInteger(normalizedCourseId) || normalizedCourseId < 1) {
+    return {
+      course_id: null,
+      subjects: [],
+      subject_ids: [],
+      owner_course_ids: [],
+      owner_semester_ids: [],
+      owner_semester_map: new Map(),
+      subject_map: new Map(),
+    };
+  }
+  const subjects = await getSubjectsCached(normalizedCourseId, {
+    visibleOnly: options.visibleOnly === true,
+  });
+  const normalizedSubjects = Array.isArray(subjects) ? subjects : [];
+  const subjectIds = Array.from(new Set(
+    normalizedSubjects
+      .map((subject) => Number(subject.id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const ownerCourseIds = Array.from(new Set(
+    normalizedSubjects
+      .map((subject) => Number(subject.owner_course_id || subject.course_id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const ownerSemesterMap = new Map();
+  await Promise.all(ownerCourseIds.map(async (ownerCourseId) => {
+    try {
+      ownerSemesterMap.set(ownerCourseId, await getActiveSemester(ownerCourseId));
+    } catch (_err) {
+      ownerSemesterMap.set(ownerCourseId, null);
+    }
+  }));
+  const ownerSemesterIds = Array.from(new Set(
+    Array.from(ownerSemesterMap.values())
+      .map((semester) => Number(semester && semester.id ? semester.id : 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const subjectMap = new Map(
+    normalizedSubjects
+      .map((subject) => [Number(subject.id || 0), subject])
+      .filter(([subjectId]) => Number.isInteger(subjectId) && subjectId > 0)
+  );
+  return {
+    course_id: normalizedCourseId,
+    subjects: normalizedSubjects,
+    subject_ids: subjectIds,
+    owner_course_ids: ownerCourseIds,
+    owner_semester_ids: ownerSemesterIds,
+    owner_semester_map: ownerSemesterMap,
+    subject_map: subjectMap,
+  };
+}
+
+async function getHomeworkRowsForCourse(homeworkIds, courseId, options = {}) {
+  const normalizedIds = Array.from(new Set(
+    (Array.isArray(homeworkIds) ? homeworkIds : [homeworkIds])
+      .map((value) => Number(value || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const normalizedCourseId = Number(courseId || 0);
+  if (!normalizedIds.length || !Number.isInteger(normalizedCourseId) || normalizedCourseId < 1) {
+    return [];
+  }
+  const placeholders = normalizedIds.map(() => '?').join(',');
+  const selectClause = String(options.selectClause || 'h.*').trim() || 'h.*';
+  const extraWhere = typeof options.extraWhere === 'string' ? options.extraWhere.trim() : '';
+  const extraParams = Array.isArray(options.extraParams) ? options.extraParams : [];
+  try {
+    return await db.all(
+      `
+        SELECT DISTINCT ${selectClause}
+        FROM homework h
+        JOIN subject_course_bindings scb ON scb.subject_id = h.subject_id
+        WHERE h.id IN (${placeholders})
+          AND scb.course_id = ?
+          ${extraWhere ? `AND ${extraWhere}` : ''}
+      `,
+      [...normalizedIds, normalizedCourseId, ...extraParams]
+    );
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    return db.all(
+      `
+        SELECT ${selectClause}
+        FROM homework h
+        WHERE h.id IN (${placeholders})
+          AND h.course_id = ?
+          ${extraWhere ? `AND ${extraWhere}` : ''}
+      `,
+      [...normalizedIds, normalizedCourseId, ...extraParams]
+    );
+  }
+}
+
+async function getHomeworkForCourse(homeworkId, courseId, options = {}) {
+  const rows = await getHomeworkRowsForCourse([homeworkId], courseId, options);
+  return rows && rows[0] ? rows[0] : null;
+}
+
 async function getSubjectsCached(courseId, options = {}) {
   const key = `${courseId}|${options.visibleOnly ? 'visible' : 'all'}`;
   const cached = cacheGet(referenceCache.subjects, key);
   if (cached) return cached;
-  const sql = options.visibleOnly
-    ? 'SELECT * FROM subjects WHERE course_id = ? AND visible = 1 ORDER BY name'
-    : 'SELECT * FROM subjects WHERE course_id = ? ORDER BY name';
-  const rows = await db.all(sql, [courseId]);
-  return cacheSet(referenceCache.subjects, key, rows || []);
+  try {
+    const rows = await db.all(
+      `
+        SELECT
+          s.*,
+          s.course_id AS owner_course_id,
+          scb.course_id AS bound_course_id,
+          COALESCE(cat.name, s.name) AS catalog_name
+        FROM subject_course_bindings scb
+        JOIN subjects s ON s.id = scb.subject_id
+        LEFT JOIN subject_catalog cat ON cat.id = s.catalog_id
+        WHERE scb.course_id = ?
+          ${options.visibleOnly ? "AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')" : ''}
+        ORDER BY s.name ASC, s.id ASC
+      `,
+      [courseId]
+    );
+    return cacheSet(referenceCache.subjects, key, rows || []);
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    const sql = options.visibleOnly
+      ? 'SELECT *, course_id AS owner_course_id, course_id AS bound_course_id, name AS catalog_name FROM subjects WHERE course_id = ? AND visible = 1 ORDER BY name'
+      : 'SELECT *, course_id AS owner_course_id, course_id AS bound_course_id, name AS catalog_name FROM subjects WHERE course_id = ? ORDER BY name';
+    const rows = await db.all(sql, [courseId]);
+    return cacheSet(referenceCache.subjects, key, rows || []);
+  }
+}
+
+const txGet = async (client, sql, params = []) => {
+  const result = await client.query(convertPlaceholders(sql), params);
+  return result.rows && result.rows[0] ? result.rows[0] : null;
+};
+
+const txAll = async (client, sql, params = []) => {
+  const result = await client.query(convertPlaceholders(sql), params);
+  return result.rows || [];
+};
+
+function buildSubjectSettingsDraft(payload = {}, fallback = null) {
+  const fallbackGroupCount = Math.max(1, Math.min(3, Number(fallback && fallback.group_count ? fallback.group_count : 1) || 1));
+  const requestedGroupCount = Number(payload.group_count);
+  const groupCount = Number.isInteger(Math.round(requestedGroupCount))
+    && requestedGroupCount >= 1
+    && requestedGroupCount <= 3
+      ? Math.round(requestedGroupCount)
+      : fallbackGroupCount;
+
+  const fallbackDefaultGroup = Math.max(
+    1,
+    Math.min(groupCount, Number(fallback && fallback.default_group ? fallback.default_group : 1) || 1)
+  );
+  const requestedDefaultGroup = Number(payload.default_group);
+  const defaultGroup = Number.isInteger(Math.round(requestedDefaultGroup))
+    && requestedDefaultGroup >= 1
+    && requestedDefaultGroup <= groupCount
+      ? Math.round(requestedDefaultGroup)
+      : fallbackDefaultGroup;
+
+  const fallbackShowInTeamwork = fallback
+    ? (fallback.show_in_teamwork === true || Number(fallback.show_in_teamwork) === 1 ? 1 : 0)
+    : 1;
+  const fallbackVisible = fallback
+    ? (fallback.visible === false || Number(fallback.visible) === 0 ? 0 : 1)
+    : 1;
+  const fallbackRequired = fallback
+    ? (fallback.is_required === false || Number(fallback.is_required) === 0 ? 0 : 1)
+    : 1;
+  const fallbackGeneral = fallback
+    ? (fallback.is_general === false || Number(fallback.is_general) === 0 ? 0 : 1)
+    : 1;
+
+  const showInTeamwork = Object.prototype.hasOwnProperty.call(payload, 'show_in_teamwork')
+    ? (String(payload.show_in_teamwork) === '1' ? 1 : 0)
+    : fallbackShowInTeamwork;
+  const visible = Object.prototype.hasOwnProperty.call(payload, 'visible')
+    ? (String(payload.visible) === '0' ? 0 : 1)
+    : fallbackVisible;
+  const isRequired = Object.prototype.hasOwnProperty.call(payload, 'is_required')
+    ? (String(payload.is_required) === '0' ? 0 : 1)
+    : fallbackRequired;
+  const isGeneral = Object.prototype.hasOwnProperty.call(payload, 'is_general')
+    ? (String(payload.is_general) === '1' || String(payload.is_general) === 'on' ? 1 : 0)
+    : fallbackGeneral;
+
+  return {
+    group_count: groupCount,
+    default_group: defaultGroup,
+    show_in_teamwork: showInTeamwork,
+    visible,
+    is_required: isRequired,
+    is_general: isGeneral,
+  };
+}
+
+async function upsertSubjectCatalogEntry(client, rawName) {
+  const name = normalizeSubjectDraftName(rawName, 140);
+  const normalizedName = normalizeSubjectCatalogName(name);
+  if (!name || !normalizedName) {
+    return null;
+  }
+  const row = await txGet(
+    client,
+    `
+      INSERT INTO subject_catalog (name, normalized_name, created_at, updated_at)
+      VALUES (?, ?, NOW(), NOW())
+      ON CONFLICT (normalized_name)
+      DO UPDATE SET
+        name = EXCLUDED.name,
+        updated_at = NOW()
+      RETURNING id, name, normalized_name
+    `,
+    [name, normalizedName]
+  );
+  return row || null;
+}
+
+async function createSubjectInstanceWithBinding(client, payload = {}) {
+  const subjectName = normalizeSubjectDraftName(payload.name || payload.catalog_name, 140);
+  const ownerCourseId = Number(payload.ownerCourseId || 0);
+  const catalogId = Number(payload.catalogId || 0);
+  const isShared = payload.isShared === true || Number(payload.isShared) === 1;
+  if (!subjectName || !Number.isInteger(ownerCourseId) || ownerCourseId < 1) {
+    return null;
+  }
+  const settings = buildSubjectSettingsDraft(payload.settings, payload.fallbackSettings);
+  const inserted = await txGet(
+    client,
+    `
+      INSERT INTO subjects
+        (name, group_count, default_group, show_in_teamwork, visible, is_required, is_general, course_id, catalog_id, is_shared)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      RETURNING id
+    `,
+    [
+      subjectName,
+      settings.group_count,
+      settings.default_group,
+      settings.show_in_teamwork,
+      settings.visible,
+      settings.is_required,
+      settings.is_general,
+      ownerCourseId,
+      catalogId || null,
+      isShared,
+    ]
+  );
+  const subjectId = Number(inserted && inserted.id ? inserted.id : 0);
+  if (!subjectId) {
+    return null;
+  }
+  await txRun(
+    client,
+    `
+      INSERT INTO subject_course_bindings (subject_id, course_id, created_at, updated_at)
+      VALUES (?, ?, NOW(), NOW())
+      ON CONFLICT (subject_id, course_id)
+      DO UPDATE SET updated_at = NOW()
+    `,
+    [subjectId, ownerCourseId]
+  );
+  return {
+    id: subjectId,
+    ...settings,
+    course_id: ownerCourseId,
+    owner_course_id: ownerCourseId,
+    catalog_id: catalogId || null,
+    is_shared: isShared ? 1 : 0,
+    name: subjectName,
+  };
+}
+
+async function syncSubjectAdmissionVisibility(client, sourceSubjectId, targetSubjectId, targetCourseId) {
+  const normalizedSourceSubjectId = Number(sourceSubjectId || 0);
+  const normalizedTargetSubjectId = Number(targetSubjectId || 0);
+  const normalizedTargetCourseId = Number(targetCourseId || 0);
+  if (!normalizedSourceSubjectId || !normalizedTargetSubjectId || !normalizedTargetCourseId) {
+    return;
+  }
+  const admissionRows = await txAll(
+    client,
+    `
+      SELECT admission_id
+      FROM program_admission_courses
+      WHERE course_id = ?
+    `,
+    [normalizedTargetCourseId]
+  );
+  const admissionIds = Array.from(new Set(
+    (admissionRows || [])
+      .map((row) => Number(row.admission_id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (!admissionIds.length) {
+    return;
+  }
+  const visibilityRows = await txAll(
+    client,
+    `
+      SELECT admission_id, is_visible
+      FROM subject_visibility_by_admission
+      WHERE subject_id = ?
+        AND admission_id = ANY(?::int[])
+    `,
+    [normalizedSourceSubjectId, admissionIds]
+  );
+  const visibilityMap = new Map();
+  (visibilityRows || []).forEach((row) => {
+    const admissionId = Number(row.admission_id || 0);
+    if (!admissionId) return;
+    visibilityMap.set(admissionId, row.is_visible === true || Number(row.is_visible) === 1 ? 1 : 0);
+  });
+  for (const admissionId of admissionIds) {
+    if (visibilityMap.has(admissionId)) {
+      await txRun(
+        client,
+        `
+          INSERT INTO subject_visibility_by_admission
+            (admission_id, subject_id, is_visible, created_at, updated_at)
+          VALUES (?, ?, ?, NOW(), NOW())
+          ON CONFLICT (admission_id, subject_id)
+          DO UPDATE SET
+            is_visible = EXCLUDED.is_visible,
+            updated_at = NOW()
+        `,
+        [admissionId, normalizedTargetSubjectId, visibilityMap.get(admissionId)]
+      );
+    } else {
+      await txRun(
+        client,
+        'DELETE FROM subject_visibility_by_admission WHERE admission_id = ? AND subject_id = ?',
+        [admissionId, normalizedTargetSubjectId]
+      );
+    }
+  }
+}
+
+async function removeSubjectBindingFromCourse(client, subjectId, courseId) {
+  const normalizedSubjectId = Number(subjectId || 0);
+  const normalizedCourseId = Number(courseId || 0);
+  if (!normalizedSubjectId || !normalizedCourseId) {
+    return { remainingCourseIds: [] };
+  }
+  await txRun(
+    client,
+    `
+      DELETE FROM student_groups sg
+      USING users u
+      WHERE sg.student_id = u.id
+        AND sg.subject_id = ?
+        AND u.course_id = ?
+    `,
+    [normalizedSubjectId, normalizedCourseId]
+  );
+  await txRun(
+    client,
+    `
+      DELETE FROM user_subject_optouts uso
+      USING users u
+      WHERE uso.user_id = u.id
+        AND uso.subject_id = ?
+        AND u.course_id = ?
+    `,
+    [normalizedSubjectId, normalizedCourseId]
+  );
+  await txRun(
+    client,
+    'DELETE FROM subject_course_bindings WHERE subject_id = ? AND course_id = ?',
+    [normalizedSubjectId, normalizedCourseId]
+  );
+
+  const remainingRows = await txAll(
+    client,
+    `
+      SELECT course_id
+      FROM subject_course_bindings
+      WHERE subject_id = ?
+      ORDER BY course_id ASC
+    `,
+    [normalizedSubjectId]
+  );
+  const remainingCourseIds = (remainingRows || [])
+    .map((row) => Number(row.course_id || 0))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  const ownerRow = await txGet(client, 'SELECT course_id FROM subjects WHERE id = ?', [normalizedSubjectId]);
+  if (ownerRow && Number(ownerRow.course_id || 0) === normalizedCourseId && remainingCourseIds.length) {
+    await txRun(
+      client,
+      'UPDATE subjects SET course_id = ? WHERE id = ?',
+      [remainingCourseIds[0], normalizedSubjectId]
+    );
+  }
+  return { remainingCourseIds };
 }
 
 async function getSemestersCached(courseId) {
@@ -6270,10 +6840,17 @@ async function getTeacherSubjectCatalog() {
           s.group_count,
           s.is_general,
           s.course_id,
-          c.name AS course_name,
+          s.course_id AS owner_course_id,
+          COALESCE(binding_scope.course_labels, owner_course.name) AS course_name,
           COALESCE(pathways.pathway_labels, '') AS pathway_labels
         FROM subjects s
-        JOIN courses c ON c.id = s.course_id
+        JOIN courses owner_course ON owner_course.id = s.course_id
+        LEFT JOIN LATERAL (
+          SELECT STRING_AGG(DISTINCT c.name, ', ' ORDER BY c.name) AS course_labels
+          FROM subject_course_bindings scb
+          JOIN courses c ON c.id = scb.course_id
+          WHERE scb.subject_id = s.id
+        ) binding_scope ON true
         LEFT JOIN LATERAL (
           SELECT STRING_AGG(
             DISTINCT (
@@ -6287,10 +6864,11 @@ async function getTeacherSubjectCatalog() {
             ),
             ', '
           ) AS pathway_labels
-          FROM program_admission_courses pac
+          FROM subject_course_bindings scb
+          JOIN program_admission_courses pac ON pac.course_id = scb.course_id
           JOIN program_admissions a ON a.id = pac.admission_id
           JOIN study_programs p ON p.id = a.program_id
-          WHERE pac.course_id = s.course_id
+          WHERE scb.subject_id = s.id
             AND pac.is_visible = true
             AND a.is_active = true
             AND p.is_active = true
@@ -6298,10 +6876,12 @@ async function getTeacherSubjectCatalog() {
         WHERE s.visible = 1
           AND EXISTS (
             SELECT 1
-            FROM semesters sem
-            WHERE sem.course_id = s.course_id AND sem.is_active = 1
+            FROM subject_course_bindings scb
+            JOIN semesters sem ON sem.course_id = scb.course_id
+            WHERE scb.subject_id = s.id
+              AND sem.is_active = 1
           )
-        ORDER BY c.id, s.name
+        ORDER BY s.name ASC, s.id ASC
       `
     );
   } catch (err) {
@@ -6349,18 +6929,48 @@ function normalizeTemplateTagsInput(rawValue) {
 
 async function getTeacherAssignedSubjects(userId) {
   if (!Number.isFinite(Number(userId))) return [];
-  return db.all(
-    `
-      SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count, s.is_general,
-             s.course_id, c.name AS course_name
-      FROM teacher_subjects ts
-      JOIN subjects s ON s.id = ts.subject_id
-      JOIN courses c ON c.id = s.course_id
-      WHERE ts.user_id = ? AND s.visible = 1
-      ORDER BY c.id, s.name, ts.group_number NULLS FIRST
-    `,
-    [userId]
-  );
+  try {
+    return await db.all(
+      `
+        SELECT
+          ts.subject_id,
+          ts.group_number,
+          s.name AS subject_name,
+          s.group_count,
+          s.is_general,
+          s.show_in_teamwork,
+          scb.course_id,
+          s.course_id AS owner_course_id,
+          c.name AS course_name,
+          s.is_shared
+        FROM teacher_subjects ts
+        JOIN subjects s ON s.id = ts.subject_id
+        JOIN subject_course_bindings scb ON scb.subject_id = s.id
+        JOIN courses c ON c.id = scb.course_id
+        WHERE ts.user_id = ?
+          AND s.visible = 1
+        ORDER BY scb.course_id ASC, s.name ASC, ts.group_number NULLS FIRST
+      `,
+      [userId]
+    );
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    return db.all(
+      `
+        SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count, s.is_general,
+               s.show_in_teamwork,
+               s.course_id, s.course_id AS owner_course_id, c.name AS course_name, false AS is_shared
+        FROM teacher_subjects ts
+        JOIN subjects s ON s.id = ts.subject_id
+        JOIN courses c ON c.id = s.course_id
+        WHERE ts.user_id = ? AND s.visible = 1
+        ORDER BY c.id, s.name, ts.group_number NULLS FIRST
+      `,
+      [userId]
+    );
+  }
 }
 
 // Keep the teacher hub available on legacy DB variants where optional teacher tables lag behind.
@@ -6415,24 +7025,63 @@ async function getTeacherHomeworkTemplates(userId, options = {}) {
   const params = [Number(userId)];
   let where = 'WHERE t.user_id = ?';
   if (scopedCourseId) {
-    where += ' AND (t.course_id IS NULL OR t.course_id = ?)';
-    params.push(scopedCourseId);
+    where += `
+      AND (
+        t.course_id IS NULL
+        OR t.course_id = ?
+        OR EXISTS (
+          SELECT 1
+          FROM subject_course_bindings scb
+          WHERE scb.subject_id = t.subject_id
+            AND scb.course_id = ?
+        )
+      )
+    `;
+    params.push(scopedCourseId, scopedCourseId);
   }
-  const rows = await db.all(
-    `
-      SELECT
-        t.*,
-        s.name AS subject_name,
-        c.name AS course_name
-      FROM teacher_homework_templates t
-      LEFT JOIN subjects s ON s.id = t.subject_id
-      LEFT JOIN courses c ON c.id = COALESCE(t.course_id, s.course_id)
-      ${where}
-      ORDER BY t.updated_at DESC, t.id DESC
-      LIMIT ${limit}
-    `,
-    params
-  );
+  let rows = [];
+  try {
+    rows = await db.all(
+      `
+        SELECT
+          t.*,
+          s.name AS subject_name,
+          c.name AS course_name
+        FROM teacher_homework_templates t
+        LEFT JOIN subjects s ON s.id = t.subject_id
+        LEFT JOIN courses c ON c.id = COALESCE(t.course_id, s.course_id)
+        ${where}
+        ORDER BY t.updated_at DESC, t.id DESC
+        LIMIT ${limit}
+      `,
+      params
+    );
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    const fallbackParams = [Number(userId)];
+    let fallbackWhere = 'WHERE t.user_id = ?';
+    if (scopedCourseId) {
+      fallbackWhere += ' AND (t.course_id IS NULL OR t.course_id = ?)';
+      fallbackParams.push(scopedCourseId);
+    }
+    rows = await db.all(
+      `
+        SELECT
+          t.*,
+          s.name AS subject_name,
+          c.name AS course_name
+        FROM teacher_homework_templates t
+        LEFT JOIN subjects s ON s.id = t.subject_id
+        LEFT JOIN courses c ON c.id = COALESCE(t.course_id, s.course_id)
+        ${fallbackWhere}
+        ORDER BY t.updated_at DESC, t.id DESC
+        LIMIT ${limit}
+      `,
+      fallbackParams
+    );
+  }
   return (rows || []).map((row) => {
     const tagItems = normalizeTemplateTagsInput(row.tags);
     return {
@@ -6463,7 +7112,7 @@ async function resolveTeacherTemplateScope(userId, requestedCourseIdRaw, request
   if (Number.isInteger(requestedSubjectId) && requestedSubjectId > 0) {
     resolvedSubject = await db.get(
       `
-        SELECT s.id, s.course_id
+        SELECT s.id, s.course_id AS owner_course_id
         FROM teacher_subjects ts
         JOIN subjects s ON s.id = ts.subject_id
         WHERE ts.user_id = ? AND ts.subject_id = ?
@@ -6478,16 +7127,33 @@ async function resolveTeacherTemplateScope(userId, requestedCourseIdRaw, request
 
   let validatedCourseId = null;
   if (Number.isInteger(requestedCourseId) && requestedCourseId > 0) {
-    const hasCourseAccess = await db.get(
-      `
-        SELECT 1
-        FROM teacher_subjects ts
-        JOIN subjects s ON s.id = ts.subject_id
-        WHERE ts.user_id = ? AND s.course_id = ?
-        LIMIT 1
-      `,
-      [userId, requestedCourseId]
-    );
+    let hasCourseAccess = null;
+    try {
+      hasCourseAccess = await db.get(
+        `
+          SELECT 1
+          FROM teacher_subjects ts
+          JOIN subject_course_bindings scb ON scb.subject_id = ts.subject_id
+          WHERE ts.user_id = ? AND scb.course_id = ?
+          LIMIT 1
+        `,
+        [userId, requestedCourseId]
+      );
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+      hasCourseAccess = await db.get(
+        `
+          SELECT 1
+          FROM teacher_subjects ts
+          JOIN subjects s ON s.id = ts.subject_id
+          WHERE ts.user_id = ? AND s.course_id = ?
+          LIMIT 1
+        `,
+        [userId, requestedCourseId]
+      );
+    }
     if (!hasCourseAccess) {
       return { ok: false, error: 'Invalid%20course' };
     }
@@ -6497,13 +7163,15 @@ async function resolveTeacherTemplateScope(userId, requestedCourseIdRaw, request
   if (
     resolvedSubject
     && validatedCourseId
-    && Number(resolvedSubject.course_id) !== Number(validatedCourseId)
   ) {
-    return { ok: false, error: 'Subject%20does%20not%20match%20course' };
+    const boundSubject = await getSubjectForCourse(resolvedSubject.id, validatedCourseId, { includeHidden: true });
+    if (!boundSubject) {
+      return { ok: false, error: 'Subject%20does%20not%20match%20course' };
+    }
   }
 
   const courseId = resolvedSubject
-    ? Number(resolvedSubject.course_id)
+    ? (validatedCourseId || Number(resolvedSubject.owner_course_id || 0) || null)
     : (validatedCourseId || null);
   const subjectId = resolvedSubject ? Number(resolvedSubject.id) : null;
   return {
@@ -10258,36 +10926,72 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   const deadlinesWindowEnd = formatLocalDate(addDays(now, 14));
   const deadlinesWindowStart = formatLocalDate(addDays(now, -7));
 
-  const studentGroups = await db.all(
-    `
-      SELECT sg.subject_id, sg.group_number, s.name AS subject_name
-      FROM student_groups sg
-      JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
-    `,
-    [user.id, courseId]
-  );
+  let studentGroups = [];
+  try {
+    studentGroups = await db.all(
+      `
+        SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.course_id AS owner_course_id
+        FROM student_groups sg
+        JOIN subjects s ON s.id = sg.subject_id
+        JOIN subject_course_bindings scb ON scb.subject_id = s.id
+        WHERE sg.student_id = ? AND scb.course_id = ? AND s.visible = 1
+      `,
+      [user.id, courseId]
+    );
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    studentGroups = await db.all(
+      `
+        SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.course_id AS owner_course_id
+        FROM student_groups sg
+        JOIN subjects s ON s.id = sg.subject_id
+        WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
+      `,
+      [user.id, courseId]
+    );
+  }
 
   let workloadTargets = (studentGroups || []).map((row) => ({
     subject_id: Number(row.subject_id),
     group_number: Number(row.group_number),
     subject_name: row.subject_name,
+    owner_course_id: Number(row.owner_course_id || courseId || 0) || null,
   }));
 
   if (!workloadTargets.length && isStaffRole) {
-    const teacherTargets = await db.all(
-      `
-        SELECT ts.subject_id, ts.group_number, s.name AS subject_name
-        FROM teacher_subjects ts
-        JOIN subjects s ON s.id = ts.subject_id
-        WHERE ts.user_id = ? AND s.course_id = ? AND s.visible = 1
-      `,
-      [user.id, courseId]
-    );
+    let teacherTargets = [];
+    try {
+      teacherTargets = await db.all(
+        `
+          SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.course_id AS owner_course_id
+          FROM teacher_subjects ts
+          JOIN subjects s ON s.id = ts.subject_id
+          JOIN subject_course_bindings scb ON scb.subject_id = s.id
+          WHERE ts.user_id = ? AND scb.course_id = ? AND s.visible = 1
+        `,
+        [user.id, courseId]
+      );
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+      teacherTargets = await db.all(
+        `
+          SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.course_id AS owner_course_id
+          FROM teacher_subjects ts
+          JOIN subjects s ON s.id = ts.subject_id
+          WHERE ts.user_id = ? AND s.course_id = ? AND s.visible = 1
+        `,
+        [user.id, courseId]
+      );
+    }
     workloadTargets = (teacherTargets || []).map((row) => ({
       subject_id: Number(row.subject_id),
       group_number: row.group_number === null ? null : Number(row.group_number),
       subject_name: row.subject_name,
+      owner_course_id: Number(row.owner_course_id || courseId || 0) || null,
     }));
   }
 
@@ -10303,11 +11007,30 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
         subject_id: subjectId,
         group_number: normalizedGroup,
         subject_name: target.subject_name || '',
+        owner_course_id: Number(target.owner_course_id || courseId || 0) || null,
       });
     }
   });
   workloadTargets = Array.from(targetMap.values());
   const studentHasOwnSubjects = Boolean((studentGroups || []).length);
+  const workloadOwnerCourseIds = Array.from(new Set(
+    workloadTargets
+      .map((target) => Number(target.owner_course_id || courseId || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const workloadOwnerSemesterMap = new Map();
+  await Promise.all(workloadOwnerCourseIds.map(async (ownerCourseId) => {
+    try {
+      workloadOwnerSemesterMap.set(ownerCourseId, await getActiveSemester(ownerCourseId));
+    } catch (_err) {
+      workloadOwnerSemesterMap.set(ownerCourseId, null);
+    }
+  }));
+  const workloadOwnerSemesterIds = Array.from(new Set(
+    Array.from(workloadOwnerSemesterMap.values())
+      .map((semester) => Number(semester && semester.id ? semester.id : 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
   const whatIfSubjectMap = new Map();
   (studentGroups || []).forEach((row) => {
     const subjectId = Number(row.subject_id || 0);
@@ -10381,26 +11104,39 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     ) {
       weekForDate = clampAcademicWeek(Number(weekNumber) + 1);
     }
-    const scope = buildScope('se');
-    const params = [weekForDate, courseId, targetDayName];
-    if (activeSemester) {
-      params.push(activeSemester.id);
-    }
-    params.push(...scope.params);
-    const semesterClause = activeSemester
-      ? 'AND (se.semester_id = ? OR se.semester_id IS NULL)'
-      : 'AND se.semester_id IS NULL';
-    const rows = await db.all(
-      `
-        SELECT se.*, s.name AS subject_name
-        FROM schedule_entries se
-        JOIN subjects s ON s.id = se.subject_id
-        WHERE se.week_number = ?
-          AND se.course_id = ?
-          AND se.day_of_week = ?
-          ${semesterClause}
-          AND s.visible = 1
-          AND (${scope.clause})
+	    const scope = buildScope('se');
+	    const params = [weekForDate, targetDayName];
+	    if (workloadOwnerCourseIds.length) {
+	      params.push(workloadOwnerCourseIds);
+	    }
+	    if (workloadOwnerSemesterIds.length) {
+	      params.push(workloadOwnerSemesterIds);
+	    } else if (activeSemester) {
+	      params.push(activeSemester.id);
+	    }
+	    params.push(...scope.params);
+	    const semesterClause = workloadOwnerSemesterIds.length
+	      ? 'AND (se.semester_id = ANY(?::int[]) OR se.semester_id IS NULL)'
+	      : (activeSemester
+	        ? 'AND (se.semester_id = ? OR se.semester_id IS NULL)'
+	        : 'AND se.semester_id IS NULL');
+	    const courseClause = workloadOwnerCourseIds.length
+	      ? 'AND se.course_id = ANY(?::int[])'
+	      : 'AND se.course_id = ?';
+	    if (!workloadOwnerCourseIds.length) {
+	      params.splice(2, 0, courseId);
+	    }
+	    const rows = await db.all(
+	      `
+	        SELECT se.*, s.name AS subject_name
+	        FROM schedule_entries se
+	        JOIN subjects s ON s.id = se.subject_id
+	        WHERE se.week_number = ?
+	          AND se.day_of_week = ?
+	          ${courseClause}
+	          ${semesterClause}
+	          AND s.visible = 1
+	          AND (${scope.clause})
         ORDER BY se.class_number ASC
       `,
       params
@@ -10456,22 +11192,34 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   const canSubmitHomework = studentHasOwnSubjects;
   const includeStudentHomeworkInMyDay = Boolean(settingsCache.myday_show_student_homework);
   let homeworkItems = [];
-  if (workloadTargets.length) {
-    const scope = buildScope('h');
-    const params = [user.id, user.id, courseId];
-    if (activeSemester) {
-      params.push(activeSemester.id);
-    }
-    params.push(nowIso, ...scope.params);
-    const semesterClause = activeSemester
-      ? 'AND (h.semester_id = ? OR h.semester_id IS NULL)'
-      : 'AND h.semester_id IS NULL';
-    const studentHomeworkVisibilityClause = includeStudentHomeworkInMyDay
-      ? ''
-      : 'AND COALESCE(h.is_teacher_homework, 0) = 1';
-    const rows = await db.all(
-      `
-        SELECT
+	  if (workloadTargets.length) {
+	    const scope = buildScope('h');
+	    const params = [user.id, user.id];
+	    if (workloadOwnerCourseIds.length) {
+	      params.push(workloadOwnerCourseIds);
+	    } else {
+	      params.push(courseId);
+	    }
+	    if (workloadOwnerSemesterIds.length) {
+	      params.push(workloadOwnerSemesterIds);
+	    } else if (activeSemester) {
+	      params.push(activeSemester.id);
+	    }
+	    params.push(nowIso, ...scope.params);
+	    const semesterClause = workloadOwnerSemesterIds.length
+	      ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
+	      : (activeSemester
+	        ? 'AND (h.semester_id = ? OR h.semester_id IS NULL)'
+	        : 'AND h.semester_id IS NULL');
+	    const studentHomeworkVisibilityClause = includeStudentHomeworkInMyDay
+	      ? ''
+	      : 'AND COALESCE(h.is_teacher_homework, 0) = 1';
+	    const homeworkCourseClause = workloadOwnerCourseIds.length
+	      ? 'h.course_id = ANY(?::int[])'
+	      : 'h.course_id = ?';
+	    const rows = await db.all(
+	      `
+	        SELECT
           h.id,
           h.description,
           h.custom_due_date,
@@ -10483,19 +11231,19 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
           h.is_control,
           h.is_credit,
           h.is_teacher_homework,
-          h.meeting_url,
-          subj.name AS subject_name,
-          hc.id AS completion_id,
-          hs.id AS submission_id,
-          hs.submitted_at
-        FROM homework h
-        JOIN subjects subj ON subj.id = h.subject_id
-        LEFT JOIN homework_completions hc ON hc.homework_id = h.id AND hc.user_id = ?
-        LEFT JOIN homework_submissions hs ON hs.homework_id = h.id AND hs.student_id = ?
-        WHERE h.course_id = ?
-          ${semesterClause}
-          ${studentHomeworkVisibilityClause}
-          AND COALESCE(h.status, 'published') = 'published'
+	          h.meeting_url,
+	          subj.name AS subject_name,
+	          hc.id AS completion_id,
+	          hs.id AS submission_id,
+	          hs.submitted_at
+	        FROM homework h
+	        JOIN subjects subj ON subj.id = h.subject_id
+	        LEFT JOIN homework_completions hc ON hc.homework_id = h.id AND hc.user_id = ?
+	        LEFT JOIN homework_submissions hs ON hs.homework_id = h.id AND hs.student_id = ?
+	        WHERE ${homeworkCourseClause}
+	          ${semesterClause}
+	          ${studentHomeworkVisibilityClause}
+	          AND COALESCE(h.status, 'published') = 'published'
           AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
           AND (h.custom_due_date IS NOT NULL OR h.class_date IS NOT NULL)
           AND (${scope.clause})
@@ -11151,20 +11899,13 @@ async function buildMyDayWhatIfForecast({
   subjectId,
   targetScores = [60, 75, 90],
 }) {
-  const subjectRow = await db.get(
-    `
-      SELECT s.id, s.name
-      FROM student_groups sg
-      JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ?
-        AND s.course_id = ?
-        AND s.visible = 1
-        AND sg.subject_id = ?
-      LIMIT 1
-    `,
-    [userId, courseId, subjectId]
-  );
+  const subjectRow = await getSubjectForCourse(subjectId, courseId);
   if (!subjectRow) return null;
+  const studentGroupRow = await db.get(
+    'SELECT 1 FROM student_groups WHERE student_id = ? AND subject_id = ? LIMIT 1',
+    [userId, subjectId]
+  );
+  if (!studentGroupRow) return null;
 
   const gradingSettings = await ensureSubjectGradingSettings(subjectId, courseId, semesterId, userId);
   await syncJournalColumnsFromHomework(subjectId, courseId, semesterId, gradingSettings, userId);
@@ -11663,15 +12404,7 @@ const hasStudentHomeworkAccess = async ({ userId, courseId, activeSemester, home
   }
 
   let canUseSharedAudience = false;
-  const subjectMeta = await db.get(
-    `
-      SELECT is_general
-      FROM subjects
-      WHERE id = ? AND course_id = ?
-      LIMIT 1
-    `,
-    [subjectId, normalizedCourseId]
-  );
+  const subjectMeta = await resolveSubjectCourseContext(subjectId, normalizedCourseId, { includeHidden: true });
   if (subjectMeta && (subjectMeta.is_general === true || Number(subjectMeta.is_general) === 1)) {
     canUseSharedAudience = true;
   }
@@ -11679,7 +12412,28 @@ const hasStudentHomeworkAccess = async ({ userId, courseId, activeSemester, home
   const dayOfWeek = normalizeWeekdayName(homework?.day_of_week);
   const classNumber = Number(homework?.class_number || 0);
   if (!canUseSharedAudience && dayOfWeek && Number.isInteger(classNumber) && classNumber > 0) {
-    const params = [subjectId, normalizedCourseId, dayOfWeek, classNumber];
+    const storageCourseId = Number(
+      (subjectMeta && (subjectMeta.owner_course_id || subjectMeta.course_id))
+      || homework?.course_id
+      || normalizedCourseId
+      || 0
+    ) || normalizedCourseId;
+    const homeworkSemesterId = Number(homework?.semester_id || 0);
+    let storageSemester = null;
+    if (homeworkSemesterId > 0) {
+      storageSemester = await db.get(
+        'SELECT id, start_date FROM semesters WHERE id = ? LIMIT 1',
+        [homeworkSemesterId]
+      );
+    }
+    if (!storageSemester && storageCourseId > 0) {
+      try {
+        storageSemester = await getActiveSemester(storageCourseId);
+      } catch (_err) {
+        storageSemester = null;
+      }
+    }
+    const params = [subjectId, storageCourseId, dayOfWeek, classNumber];
     let sql = `
       SELECT 1
       FROM schedule_entries se
@@ -11689,17 +12443,18 @@ const hasStudentHomeworkAccess = async ({ userId, courseId, activeSemester, home
         AND se.class_number = ?
         AND COALESCE(se.lesson_type, '') = 'lecture'
     `;
-    const homeworkSemesterId = Number(homework?.semester_id || 0);
-    if (homeworkSemesterId > 0) {
+    const resolvedSemesterId = Number(storageSemester && storageSemester.id ? storageSemester.id : 0);
+    if (resolvedSemesterId > 0) {
       sql += ' AND (se.semester_id = ? OR se.semester_id IS NULL)';
-      params.push(homeworkSemesterId);
+      params.push(resolvedSemesterId);
     } else if (activeSemester && activeSemester.id) {
       sql += ' AND (se.semester_id = ? OR se.semester_id IS NULL)';
       params.push(activeSemester.id);
     }
     const classDateRaw = String(homework?.class_date || '').slice(0, 10);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(classDateRaw) && activeSemester && activeSemester.start_date) {
-      const classWeek = getAcademicWeekForSemester(new Date(`${classDateRaw}T12:00:00`), activeSemester);
+    const weekSemester = storageSemester && storageSemester.start_date ? storageSemester : activeSemester;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(classDateRaw) && weekSemester && weekSemester.start_date) {
+      const classWeek = getAcademicWeekForSemester(new Date(`${classDateRaw}T12:00:00`), weekSemester);
       if (Number.isFinite(classWeek) && classWeek > 0) {
         sql += ' AND (se.week_number = ? OR se.week_number IS NULL OR se.week_number = 0)';
         params.push(classWeek);
@@ -11724,14 +12479,11 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
   const activeSemester = await getActiveSemester(courseId || 1);
   const nowIso = new Date().toISOString();
   try {
-    const homework = await db.get(
-      `SELECT id, subject_id, group_number, day_of_week, class_number, class_date, course_id, semester_id
-       FROM homework
-       WHERE id = ? AND course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}
-         AND COALESCE(status, 'published') = 'published'
-         AND (scheduled_at IS NULL OR scheduled_at <= ?)`,
-      activeSemester ? [homeworkId, courseId || 1, activeSemester.id, nowIso] : [homeworkId, courseId || 1, nowIso]
-    );
+    const homework = await getHomeworkForCourse(homeworkId, courseId || 1, {
+      selectClause: 'h.id, h.subject_id, h.group_number, h.day_of_week, h.class_number, h.class_date, h.course_id, h.semester_id',
+      extraWhere: "COALESCE(h.status, 'published') = 'published' AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)",
+      extraParams: [nowIso],
+    });
     if (!homework) {
       return res.status(404).json({ error: 'Not found' });
     }
@@ -11798,19 +12550,11 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
   }
 
   try {
-    const homework = await db.get(
-      `
-        SELECT id, subject_id, group_number, day_of_week, class_number, course_id, semester_id, custom_due_date, class_date
-        FROM homework
-        WHERE id = ?
-          AND course_id = ?
-          AND COALESCE(status, 'published') = 'published'
-          AND (scheduled_at IS NULL OR scheduled_at <= ?)
-          ${activeSemester ? 'AND (semester_id = ? OR semester_id IS NULL)' : 'AND semester_id IS NULL'}
-        LIMIT 1
-      `,
-      activeSemester ? [homeworkId, courseId, nowIso, activeSemester.id] : [homeworkId, courseId, nowIso]
-    );
+    const homework = await getHomeworkForCourse(homeworkId, courseId, {
+      selectClause: 'h.id, h.subject_id, h.group_number, h.day_of_week, h.class_number, h.course_id, h.semester_id, h.custom_due_date, h.class_date',
+      extraWhere: "COALESCE(h.status, 'published') = 'published' AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)",
+      extraParams: [nowIso],
+    });
     if (!homework) {
       if (req.file) fs.unlink(req.file.path, () => {});
       return res.redirect(redirectWith('err', 'Homework not found'));
@@ -12002,6 +12746,12 @@ app.get('/schedule', requireLogin, async (req, res) => {
           courseWeekTime.set(cid, await getCourseWeekTimeMap(cid, sem.id));
         }
       }
+      const ownerSemesterMap = new Map();
+      for (const row of teacherSubjects) {
+        const ownerCourseId = Number(row.owner_course_id || row.course_id || 0);
+        if (!ownerCourseId || ownerSemesterMap.has(ownerCourseId)) continue;
+        ownerSemesterMap.set(ownerCourseId, await getActiveSemester(ownerCourseId));
+      }
       const primaryCourseId = selectedCourse ? selectedCourse.id : (courseIds[0] || null);
       const primarySemester = primaryCourseId ? semesterMap.get(primaryCourseId) : null;
       const totalWeeks = primarySemester && primarySemester.weeks_count ? Number(primarySemester.weeks_count) : 15;
@@ -12069,22 +12819,40 @@ app.get('/schedule', requireLogin, async (req, res) => {
       const scheduleRows = [];
 
       for (const cid of courseIds) {
-        const subjectIds = teacherSubjects.filter((s) => Number(s.course_id) === Number(cid)).map((s) => s.subject_id);
+        const scopedTeacherRows = teacherSubjects.filter((s) => Number(s.course_id) === Number(cid));
+        const subjectIds = Array.from(new Set(scopedTeacherRows.map((s) => Number(s.subject_id || 0)).filter((value) => value > 0)));
         if (!subjectIds.length) continue;
         const sem = semesterMap.get(cid);
         const weekTimeMap = courseWeekTime.get(cid);
         const useLocalTime = weekTimeMap ? weekTimeMap.get(selectedWeek) === true : false;
         const placeholders = subjectIds.map(() => '?').join(',');
-        const params = [selectedWeek, cid];
+        const ownerCourseIds = Array.from(new Set(
+          scopedTeacherRows
+            .map((row) => Number(row.owner_course_id || row.course_id || 0))
+            .filter((value) => Number.isInteger(value) && value > 0)
+        ));
+        const ownerSemesterIds = Array.from(new Set(
+          ownerCourseIds
+            .map((ownerCourseId) => {
+              const ownerSemester = ownerSemesterMap.get(ownerCourseId);
+              return ownerSemester && ownerSemester.id ? Number(ownerSemester.id) : null;
+            })
+            .filter((value) => Number.isInteger(value) && value > 0)
+        ));
+        const params = [selectedWeek];
         let sql = `
           SELECT se.*, s.name AS subject_name
           FROM schedule_entries se
           JOIN subjects s ON s.id = se.subject_id
-          WHERE se.week_number = ? AND se.course_id = ?
+          WHERE se.week_number = ?
         `;
-        if (sem) {
-          sql += ' AND se.semester_id = ?';
-          params.push(sem.id);
+        if (ownerCourseIds.length) {
+          sql += ' AND se.course_id = ANY(?::int[])';
+          params.push(ownerCourseIds);
+        }
+        if (ownerSemesterIds.length) {
+          sql += ' AND (se.semester_id IS NULL OR se.semester_id = ANY(?::int[]))';
+          params.push(ownerSemesterIds);
         }
         sql += ` AND se.subject_id IN (${placeholders})`;
         params.push(...subjectIds);
@@ -12115,31 +12883,32 @@ app.get('/schedule', requireLogin, async (req, res) => {
       const teacherTargets = [];
       const targetSeen = new Set();
       teacherSubjects.forEach((row) => {
-        const sem = semesterMap.get(row.course_id);
+        const dataCourseId = Number(row.owner_course_id || row.course_id || 0);
+        const sem = ownerSemesterMap.get(dataCourseId);
         const semId = sem ? sem.id : 0;
         if (row.group_number === null || typeof row.group_number === 'undefined') {
           const maxGroups = Number(row.group_count || 1);
           for (let g = 1; g <= maxGroups; g += 1) {
-            const key = `${row.subject_id}|${g}|${row.course_id}|${semId}`;
+            const key = `${row.subject_id}|${g}|${dataCourseId}|${semId}`;
             if (targetSeen.has(key)) continue;
             targetSeen.add(key);
             teacherTargets.push({
               subject_id: row.subject_id,
               group_number: g,
-              course_id: row.course_id,
+              course_id: dataCourseId,
               semester_id: semId,
             });
           }
           return;
         }
         const groupNum = Number(row.group_number);
-        const key = `${row.subject_id}|${groupNum}|${row.course_id}|${semId}`;
+        const key = `${row.subject_id}|${groupNum}|${dataCourseId}|${semId}`;
         if (targetSeen.has(key)) return;
         targetSeen.add(key);
         teacherTargets.push({
           subject_id: row.subject_id,
           group_number: groupNum,
-          course_id: row.course_id,
+          course_id: dataCourseId,
           semester_id: semId,
         });
       });
@@ -12600,11 +13369,13 @@ app.get('/schedule', requireLogin, async (req, res) => {
     (subjects || []).forEach((subject) => {
       const subjectId = Number(subject.subject_id);
       const groupCount = Math.max(1, Number(subject.group_count || 1));
+      const ownerCourseId = Number(subject.owner_course_id || subject.course_id || scheduleCourseId || 0) || null;
       for (let groupNumber = 1; groupNumber <= groupCount; groupNumber += 1) {
         groups.push({
           subject_id: subjectId,
           group_number: groupNumber,
           subject_name: subject.subject_name,
+          owner_course_id: ownerCourseId,
         });
       }
     });
@@ -12612,48 +13383,41 @@ app.get('/schedule', requireLogin, async (req, res) => {
   };
 
   const loadAllCourseSubjectGroups = (cb) => {
-    db.all(
-      `
-        SELECT id AS subject_id, name AS subject_name, group_count
-        FROM subjects
-        WHERE course_id = ? AND visible = 1
-        ORDER BY name
-      `,
-      [scheduleCourseId],
-      (err, subjects) => {
-        if (err) {
-          return cb(err);
-        }
-        return cb(null, expandSubjectGroupsForCourse(subjects || []));
+    (async () => {
+      try {
+        const subjects = await getSubjectsCached(scheduleCourseId, { visibleOnly: true });
+        const rows = (subjects || []).map((subject) => ({
+          subject_id: Number(subject.id || 0),
+          subject_name: subject.name,
+          group_count: subject.group_count,
+          owner_course_id: Number(subject.owner_course_id || subject.course_id || 0) || null,
+        }));
+        return cb(null, expandSubjectGroupsForCourse(rows));
+      } catch (err) {
+        return cb(err);
       }
-    );
+    })();
   };
 
   const loadCourseSubjectGroupsForSingleGroup = (requestedGroupNumber, cb) => {
-    db.all(
-      `
-        SELECT id AS subject_id, name AS subject_name, group_count
-        FROM subjects
-        WHERE course_id = ? AND visible = 1
-        ORDER BY name
-      `,
-      [scheduleCourseId],
-      (err, subjects) => {
-        if (err) {
-          return cb(err);
-        }
+    (async () => {
+      try {
+        const subjects = await getSubjectsCached(scheduleCourseId, { visibleOnly: true });
         const fallbackGroup = parsePreferredGroupNumber(requestedGroupNumber) || 1;
         const groups = (subjects || []).map((subject) => {
           const maxGroups = Math.max(1, Number(subject.group_count || 1));
           return {
-            subject_id: Number(subject.subject_id),
+            subject_id: Number(subject.id || 0),
             group_number: Math.min(fallbackGroup, maxGroups),
-            subject_name: subject.subject_name,
+            subject_name: subject.name,
+            owner_course_id: Number(subject.owner_course_id || subject.course_id || 0) || null,
           };
         });
         return cb(null, groups);
+      } catch (err) {
+        return cb(err);
       }
-    );
+    })();
   };
 
   const loadStudentGroups = (cb) => {
@@ -12663,10 +13427,13 @@ app.get('/schedule', requireLogin, async (req, res) => {
       }
       return db.all(
         `
-          SELECT sg.subject_id, sg.group_number, s.name AS subject_name
+          SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.course_id AS owner_course_id
           FROM student_groups sg
           JOIN subjects s ON s.id = sg.subject_id
-          WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
+          JOIN subject_course_bindings scb ON scb.subject_id = s.id
+          WHERE sg.student_id = ?
+            AND scb.course_id = ?
+            AND s.visible = 1
         `,
         [userId, scheduleCourseId],
         cb
@@ -12675,10 +13442,13 @@ app.get('/schedule', requireLogin, async (req, res) => {
     if (viewAsMode === 'self') {
       return db.all(
         `
-          SELECT sg.subject_id, sg.group_number, s.name AS subject_name
+          SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.course_id AS owner_course_id
           FROM student_groups sg
           JOIN subjects s ON s.id = sg.subject_id
-          WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
+          JOIN subject_course_bindings scb ON scb.subject_id = s.id
+          WHERE sg.student_id = ?
+            AND scb.course_id = ?
+            AND s.visible = 1
         `,
         [userId, scheduleCourseId],
         (err, rows) => {
@@ -12694,9 +13464,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
     }
     db.all(
       `
-        SELECT id AS subject_id, name AS subject_name, group_count
-        FROM subjects
-        WHERE course_id = ? AND visible = 1
+        SELECT s.id AS subject_id, s.name AS subject_name, s.group_count, s.course_id AS owner_course_id
+        FROM subjects s
+        JOIN subject_course_bindings scb ON scb.subject_id = s.id
+        WHERE scb.course_id = ? AND s.visible = 1
         ORDER BY name
       `,
       [scheduleCourseId],
@@ -12711,13 +13482,14 @@ app.get('/schedule', requireLogin, async (req, res) => {
             subject_id: s.subject_id,
             group_number: groupNumber,
             subject_name: s.subject_name,
+            owner_course_id: Number(s.owner_course_id || 0) || null,
           }));
         return cb(null, groups);
       }
     );
   };
 
-  loadStudentGroups((groupErr, studentGroups) => {
+  loadStudentGroups(async (groupErr, studentGroups) => {
       if (groupErr) {
         return res.status(500).send('Database error');
       }
@@ -12742,6 +13514,13 @@ app.get('/schedule', requireLogin, async (req, res) => {
         });
       }
 
+      const ownerSemesterMap = new Map();
+      for (const row of (studentGroups || [])) {
+        const ownerCourseId = Number(row.owner_course_id || 0);
+        if (!ownerCourseId || ownerSemesterMap.has(ownerCourseId)) continue;
+        ownerSemesterMap.set(ownerCourseId, await getActiveSemester(ownerCourseId));
+      }
+
       const buildHomeworkTargets = (baseGroups = [], scheduleRows = []) => {
         const map = new Map();
         const baseGroupsBySubject = new Map();
@@ -12759,6 +13538,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
               subject_id: subjectId,
               group_number: groupNumber,
               subject_name: item.subject_name || '',
+              owner_course_id: Number(item.owner_course_id || 0) || null,
+              semester_id: Number((ownerSemesterMap.get(Number(item.owner_course_id || 0)) || {}).id || 0),
             });
           }
         });
@@ -12779,6 +13560,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
               subject_id: subjectId,
               group_number: groupNumber,
               subject_name: row.subject_name || '',
+              owner_course_id: Number(row.owner_course_id || 0) || null,
+              semester_id: Number((ownerSemesterMap.get(Number(row.owner_course_id || 0)) || {}).id || 0),
             });
           }
         });
@@ -12793,20 +13576,17 @@ app.get('/schedule', requireLogin, async (req, res) => {
           return cb({}, [], []);
         }
         const conditions = homeworkTargets
-          .map(() => '(h.subject_id = ? AND h.group_number = ?)')
+          .map(() => '(h.subject_id = ? AND h.group_number = ? AND h.course_id = ? AND COALESCE(h.semester_id, 0) = ?)')
           .join(' OR ');
         const params = [];
         homeworkTargets.forEach((sg) => {
-          params.push(sg.subject_id, sg.group_number);
+          params.push(sg.subject_id, sg.group_number, sg.owner_course_id || scheduleCourseId, sg.semester_id || 0);
         });
-        params.push(scheduleCourseId, activeSemester ? activeSemester.id : null, nowIso, weekStartDate, weekEndDate);
         const sql = `
           SELECT h.*, subj.name AS subject_name
           FROM homework h
           JOIN subjects subj ON subj.id = h.subject_id
           WHERE (${conditions})
-            AND h.course_id = ?
-            AND (h.semester_id = ? OR h.semester_id IS NULL)
             AND COALESCE(h.status, 'published') = 'published'
             AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
             AND h.is_custom_deadline = 1
@@ -12815,7 +13595,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             AND h.custom_due_date <= ?
           ORDER BY h.custom_due_date ASC, h.created_at DESC
         `;
-        db.all(sql, params, (err, rows) => {
+        db.all(sql, [...params, nowIso, weekStartDate, weekEndDate], (err, rows) => {
           if (err) {
             return cb({}, [], []);
           }
@@ -12918,11 +13698,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
         }
 
         const hwConditions = homeworkTargets
-          .map(() => '(h.subject_id = ? AND h.group_number = ?)')
+          .map(() => '(h.subject_id = ? AND h.group_number = ? AND h.course_id = ? AND COALESCE(h.semester_id, 0) = ?)')
           .join(' OR ');
         const hwParams = [];
         homeworkTargets.forEach((sg) => {
-          hwParams.push(sg.subject_id, sg.group_number);
+          hwParams.push(sg.subject_id, sg.group_number, sg.owner_course_id || scheduleCourseId, sg.semester_id || 0);
         });
 
         db.all(
@@ -12940,14 +13720,12 @@ app.get('/schedule', requireLogin, async (req, res) => {
             LEFT JOIN subgroups s ON s.homework_id = h.id
             LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
             WHERE (${hwConditions})
-              AND h.course_id = ?
-              AND (h.semester_id = ? OR h.semester_id IS NULL)
               AND COALESCE(h.status, 'published') = 'published'
               AND (h.scheduled_at IS NULL OR h.scheduled_at <= ?)
               AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
             ORDER BY h.created_at DESC
           `,
-          [userId, ...hwParams, scheduleCourseId, activeSemester ? activeSemester.id : null, nowIso],
+          [userId, ...hwParams, nowIso],
           (err, rows) => {
             if (err) {
               return res.status(500).send('Database error');
@@ -13185,30 +13963,53 @@ app.get('/schedule', requireLogin, async (req, res) => {
       };
 
       const conditionParts = [];
-      const params = [selectedWeek, scheduleCourseId, activeSemester ? activeSemester.id : null];
+      const ownerCourseIds = Array.from(new Set(
+        (studentGroups || [])
+          .map((row) => Number(row.owner_course_id || 0))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      ));
+      const ownerSemesterIds = Array.from(new Set(
+        ownerCourseIds
+          .map((ownerCourseId) => {
+            const ownerSemester = ownerSemesterMap.get(ownerCourseId);
+            return ownerSemester && ownerSemester.id ? Number(ownerSemester.id) : null;
+          })
+          .filter((value) => Number.isInteger(value) && value > 0)
+      ));
+      const params = [selectedWeek];
       if (studentGroups.length) {
         conditionParts.push(
-          studentGroups.map(() => '(se.subject_id = ? AND se.group_number = ?)').join(' OR ')
+          studentGroups.map(() => "(se.subject_id = ? AND (se.group_number = ? OR COALESCE(se.lesson_type, '') = 'lecture'))").join(' OR ')
         );
         studentGroups.forEach((sg) => {
           params.push(sg.subject_id, sg.group_number);
         });
       }
-      conditionParts.push("COALESCE(se.lesson_type, '') = 'lecture'");
 
-      const sql = `
+      let sql = `
         SELECT se.*, s.name AS subject_name
         FROM schedule_entries se
         JOIN subjects s ON s.id = se.subject_id
-        WHERE se.week_number = ? AND se.course_id = ? AND se.semester_id = ? AND s.visible = 1
-          AND (${conditionParts.join(' OR ')})
+        WHERE se.week_number = ? AND s.visible = 1
       `;
+      if (ownerCourseIds.length) {
+        sql += ' AND se.course_id = ANY(?::int[])';
+        params.push(ownerCourseIds);
+      }
+      if (ownerSemesterIds.length) {
+        sql += ' AND (se.semester_id IS NULL OR se.semester_id = ANY(?::int[]))';
+        params.push(ownerSemesterIds);
+      }
+      if (conditionParts.length) {
+        sql += ` AND (${conditionParts.join(' OR ')})`;
+      }
 
       db.all(sql, params, (scheduleErr, rows) => {
         if (scheduleErr) {
           return res.status(500).send('Database error');
         }
         rows.forEach((row) => {
+          row.owner_course_id = Number(row.course_id || 0) || null;
           row.class_date = getDateForWeekDay(selectedWeek, row.day_of_week, activeSemester ? activeSemester.start_date : null);
           row.use_local_time = useLocalTime;
           if (scheduleByDay[row.day_of_week]) {
@@ -21045,12 +21846,12 @@ app.get('/subjects', requireLogin, async (req, res) => {
     if (selectedSubject) {
       const selectedCourseId = Number(selectedSubject.course_id || fallbackCourseId || 1);
       const activeSemester = await getActiveSemester(selectedCourseId);
-      const params = [selectedSubject.subject_id, selectedCourseId];
+      const params = [selectedSubject.subject_id];
       let materialsSql = `
         SELECT sm.*, u.full_name AS created_by_name
         FROM subject_materials sm
         JOIN users u ON u.id = sm.created_by
-        WHERE sm.subject_id = ? AND sm.course_id = ?
+        WHERE sm.subject_id = ?
       `;
 
       if (activeSemester && activeSemester.id) {
@@ -21387,22 +22188,12 @@ app.get('/teamwork', requireLogin, async (req, res) => {
 
   try {
     const subjectRows = isTeacherMode
-      ? await db.all(
-          `
-            SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count,
-                   s.course_id, c.name AS course_name
-            FROM teacher_subjects ts
-            JOIN subjects s ON s.id = ts.subject_id
-            JOIN courses c ON c.id = s.course_id
-            WHERE ts.user_id = ? AND s.show_in_teamwork = 1 AND s.visible = 1
-            ORDER BY c.id, s.name
-          `,
-          [userId]
-        )
+      ? (await getTeacherAssignedSubjects(userId))
+          .filter((row) => row && (row.show_in_teamwork === true || Number(row.show_in_teamwork || 0) === 1))
       : await db.all(
           `
             SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.group_count,
-                   s.course_id, c.name AS course_name
+                   s.course_id, s.course_id AS owner_course_id, c.name AS course_name
             FROM student_groups sg
             JOIN subjects s ON s.id = sg.subject_id
             JOIN courses c ON c.id = s.course_id
@@ -21419,11 +22210,13 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         subjectMap.set(subjectKey, {
           subject_id: subjectKey,
           subject_name: row.subject_name,
-          course_id: Number(row.course_id || fallbackCourseId || 1),
+          course_id: Number(row.owner_course_id || row.course_id || fallbackCourseId || 1),
+          owner_course_id: Number(row.owner_course_id || row.course_id || fallbackCourseId || 1),
           course_name: row.course_name || '',
           group_count: Number(row.group_count || 1),
           has_all_groups: false,
           group_numbers: new Set(),
+          bound_course_ids: [],
         });
       }
       const existing = subjectMap.get(subjectKey);
@@ -21436,6 +22229,24 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         }
       }
     });
+
+    const availableCourses = await getCoursesCached();
+    const courseById = new Map(
+      (availableCourses || []).map((course) => [Number(course.id || 0), String(course.name || `Course ${course.id}`)])
+    );
+    for (const item of subjectMap.values()) {
+      const boundCourseIds = await getSubjectBindingCourseIds(item.subject_id);
+      const effectiveCourseIds = boundCourseIds.length
+        ? boundCourseIds
+        : [Number(item.owner_course_id || item.course_id || fallbackCourseId || 1)];
+      item.bound_course_ids = effectiveCourseIds.filter((value) => Number.isInteger(value) && value > 0);
+      const courseNames = item.bound_course_ids
+        .map((courseId) => courseById.get(Number(courseId)) || `Course ${courseId}`)
+        .filter(Boolean);
+      if (courseNames.length) {
+        item.course_name = courseNames.join(', ');
+      }
+    }
 
     const subjects = Array.from(subjectMap.values())
       .map((item) => {
@@ -21469,7 +22280,10 @@ app.get('/teamwork', requireLogin, async (req, res) => {
       });
     }
 
-    const selectedCourseId = Number(selectedSubject.course_id || fallbackCourseId || 1);
+    const selectedCourseId = Number(selectedSubject.owner_course_id || selectedSubject.course_id || fallbackCourseId || 1);
+    const selectedBoundCourseIds = Array.isArray(selectedSubject.bound_course_ids) && selectedSubject.bound_course_ids.length
+      ? selectedSubject.bound_course_ids
+      : [selectedCourseId];
     const activeSemester = await getActiveSemester(selectedCourseId);
     const taskFilters = ['t.subject_id = ?', 't.course_id = ?'];
     const taskParams = [selectedSubject.subject_id, selectedCourseId];
@@ -21590,10 +22404,10 @@ app.get('/teamwork', requireLogin, async (req, res) => {
           SELECT u.id, u.full_name, sg.group_number
           FROM users u
           JOIN student_groups sg ON sg.student_id = u.id
-          WHERE sg.subject_id = ? AND u.course_id = ?${activeUserFilter}
+          WHERE sg.subject_id = ? AND u.course_id = ANY(?::int[])${activeUserFilter}
           ORDER BY u.full_name ASC
         `,
-        [selectedSubject.subject_id, selectedCourseId]
+        [selectedSubject.subject_id, selectedBoundCourseIds]
       ),
       db.all(
         `
@@ -23272,11 +24086,23 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     activeScheduleDays = [...daysOfWeek];
   }
 
-  scheduleFilters.push('se.course_id = ?');
-  scheduleParams.push(courseId);
-  if (activeSemester) {
-    scheduleFilters.push('se.semester_id = ?');
-    scheduleParams.push(activeSemester.id);
+  const courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false });
+  if (courseSubjectScope.subject_ids.length) {
+    scheduleFilters.push('se.subject_id = ANY(?::int[])');
+    scheduleParams.push(courseSubjectScope.subject_ids);
+    if (courseSubjectScope.owner_course_ids.length) {
+      scheduleFilters.push('se.course_id = ANY(?::int[])');
+      scheduleParams.push(courseSubjectScope.owner_course_ids);
+    }
+    if (courseSubjectScope.owner_semester_ids.length) {
+      scheduleFilters.push('(se.semester_id = ANY(?::int[]) OR se.semester_id IS NULL)');
+      scheduleParams.push(courseSubjectScope.owner_semester_ids);
+    } else if (activeSemester) {
+      scheduleFilters.push('(se.semester_id = ? OR se.semester_id IS NULL)');
+      scheduleParams.push(activeSemester.id);
+    }
+  } else {
+    scheduleFilters.push('1 = 0');
   }
 
   if (group_number) {
@@ -23338,27 +24164,38 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     return handleDbError(res, err, 'admin.reference');
   }
   db.all(scheduleSql, scheduleParams, (scheduleErr, scheduleRows) => {
-    if (scheduleErr) {
-      return handleDbError(res, scheduleErr, 'admin.schedule');
-    }
-    const schedule = sortSchedule(scheduleRows, sort_schedule);
+	    if (scheduleErr) {
+	      return handleDbError(res, scheduleErr, 'admin.schedule');
+	    }
+	    const schedule = sortSchedule(scheduleRows, sort_schedule);
 
-    const homeworkFilters = [];
-    const homeworkParams = [];
-    homeworkFilters.push('h.course_id = ?');
-    homeworkParams.push(courseId);
-  if (activeSemester) {
-    homeworkFilters.push('h.semester_id = ?');
-    homeworkParams.push(activeSemester.id);
-  }
-    if (group_number) {
-      homeworkFilters.push('h.group_number = ?');
-      homeworkParams.push(group_number);
-    }
-    if (subject) {
-      homeworkFilters.push('h.subject LIKE ?');
-      homeworkParams.push(`%${subject}%`);
-    }
+	    const homeworkFilters = [];
+	    const homeworkParams = [];
+	    if (courseSubjectScope.subject_ids.length) {
+	      homeworkFilters.push('h.subject_id = ANY(?::int[])');
+	      homeworkParams.push(courseSubjectScope.subject_ids);
+	      if (courseSubjectScope.owner_course_ids.length) {
+	        homeworkFilters.push('h.course_id = ANY(?::int[])');
+	        homeworkParams.push(courseSubjectScope.owner_course_ids);
+	      }
+	      if (courseSubjectScope.owner_semester_ids.length) {
+	        homeworkFilters.push('(h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)');
+	        homeworkParams.push(courseSubjectScope.owner_semester_ids);
+	      } else if (activeSemester) {
+	        homeworkFilters.push('(h.semester_id = ? OR h.semester_id IS NULL)');
+	        homeworkParams.push(activeSemester.id);
+	      }
+	    } else {
+	      homeworkFilters.push('1 = 0');
+	    }
+	    if (group_number) {
+	      homeworkFilters.push('h.group_number = ?');
+	      homeworkParams.push(group_number);
+	    }
+	    if (subject) {
+	      homeworkFilters.push("(subj.name LIKE ? OR COALESCE(h.subject, '') LIKE ?)");
+	      homeworkParams.push(`%${subject}%`, `%${subject}%`);
+	    }
     if (q) {
       homeworkFilters.push('(h.description LIKE ? OR h.created_by LIKE ?)');
       homeworkParams.push(`%${q}%`, `%${q}%`);
@@ -23474,14 +24311,15 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
             }
             getSubjectsCached(courseId)
               .then((subjects) => {
-                db.all(
-                  `
-                    SELECT sg.student_id, sg.subject_id, sg.group_number, s.name AS subject_name
-                    FROM student_groups sg
-                    JOIN subjects s ON s.id = sg.subject_id
-                    WHERE s.course_id = ?
-                  `,
-                  [courseId],
+	                db.all(
+	                  `
+	                    SELECT sg.student_id, sg.subject_id, sg.group_number, s.name AS subject_name
+	                    FROM student_groups sg
+	                    JOIN subjects s ON s.id = sg.subject_id
+	                    JOIN subject_course_bindings scb ON scb.subject_id = s.id
+	                    WHERE scb.course_id = ?
+	                  `,
+	                  [courseId],
                   (sgErr, studentGroups) => {
                     if (sgErr) {
                       return handleDbError(res, sgErr, 'admin.studentGroups');
@@ -24270,9 +25108,9 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
         `
           SELECT sva.subject_id, sva.is_visible
           FROM subject_visibility_by_admission sva
-          JOIN subjects s ON s.id = sva.subject_id
+          JOIN subject_course_bindings scb ON scb.subject_id = sva.subject_id
           WHERE sva.admission_id = ?
-            AND s.course_id = ?
+            AND scb.course_id = ?
         `,
         [selectedAdmissionId, selectedCourseId]
       );
@@ -24350,7 +25188,8 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
                   AND sva.subject_id IS NOT NULL
               )::int AS override_count
             FROM program_admissions a
-            LEFT JOIN subjects s ON s.course_id = ?
+            LEFT JOIN subject_course_bindings scb ON scb.course_id = ?
+            LEFT JOIN subjects s ON s.id = scb.subject_id
             LEFT JOIN subject_visibility_by_admission sva
               ON sva.admission_id = a.id
              AND sva.subject_id = s.id
@@ -24849,43 +25688,165 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       }];
     }
 
-    const subjectCatalogRows = await db.all(
-      `
-        SELECT
-          s.id,
-          s.name,
-          s.course_id,
-          COALESCE(s.group_count, 1) AS group_count,
-          s.visible AS visible
-        FROM subjects s
-        ORDER BY s.course_id ASC, s.name ASC
-      `
-    );
-    const subjectCatalogMap = new Map();
-    (subjectCatalogRows || []).forEach((row) => {
-      const courseId = Number(row.course_id || 0);
-      if (!courseId) return;
-      const course = courseById.get(courseId);
-      if (!course) return;
-      if (!subjectCatalogMap.has(courseId)) {
-        subjectCatalogMap.set(courseId, {
-          course_id: courseId,
-          course_name: sanitizeCompactText(course.name || '', 120),
-          course_location: normalizeCourseCampus(course.location),
-          is_teacher_course: course.is_teacher_course === true || Number(course.is_teacher_course) === 1,
-          subjects: [],
+    let subjectCatalogEntries = [];
+    try {
+      const subjectCatalogRows = await db.all(
+        `
+          SELECT
+            cat.id AS catalog_id,
+            cat.name AS catalog_name,
+            cat.normalized_name,
+            s.id AS subject_id,
+            s.name AS subject_name,
+            s.group_count,
+            s.default_group,
+            s.show_in_teamwork,
+            s.visible,
+            s.is_required,
+            s.is_general,
+            s.is_shared,
+            s.course_id AS owner_course_id,
+            binding_scope.course_ids,
+            binding_scope.course_count,
+            binding_scope.course_names
+          FROM subject_catalog cat
+          LEFT JOIN subjects s ON s.catalog_id = cat.id
+          LEFT JOIN LATERAL (
+            SELECT
+              ARRAY_AGG(scb.course_id ORDER BY scb.course_id) AS course_ids,
+              COUNT(*)::int AS course_count,
+              STRING_AGG(c.name, ', ' ORDER BY c.name) AS course_names
+            FROM subject_course_bindings scb
+            JOIN courses c ON c.id = scb.course_id
+            WHERE scb.subject_id = s.id
+          ) binding_scope ON true
+          ORDER BY cat.name ASC, s.is_shared DESC NULLS LAST, s.id ASC
+        `
+      );
+      const subjectCatalogMap = new Map();
+      (subjectCatalogRows || []).forEach((row) => {
+        const catalogId = Number(row.catalog_id || 0);
+        if (!catalogId) return;
+        if (!subjectCatalogMap.has(catalogId)) {
+          subjectCatalogMap.set(catalogId, {
+            id: catalogId,
+            name: sanitizeCompactText(row.catalog_name || '', 140),
+            normalized_name: String(row.normalized_name || ''),
+            instances: [],
+          });
+        }
+        if (!row.subject_id) {
+          return;
+        }
+        const entry = subjectCatalogMap.get(catalogId);
+        const courseIds = parseDbIntegerArray(row.course_ids);
+        const courseLabels = courseIds
+          .map((courseId) => {
+            const course = courseById.get(Number(courseId || 0));
+            if (!course) return null;
+            return {
+              id: Number(course.id || 0),
+              name: sanitizeCompactText(course.name || '', 120),
+              location: normalizeCourseCampus(course.location),
+              is_teacher_course: course.is_teacher_course === true || Number(course.is_teacher_course) === 1,
+            };
+          })
+          .filter(Boolean);
+        entry.instances.push({
+          id: Number(row.subject_id || 0),
+          name: sanitizeCompactText(row.subject_name || row.catalog_name || '', 140),
+          group_count: Math.max(1, Number(row.group_count || 1)),
+          default_group: Math.max(1, Number(row.default_group || 1)),
+          show_in_teamwork: row.show_in_teamwork === true || Number(row.show_in_teamwork) === 1,
+          is_visible: ['1', 'true', 't', 'yes', 'on', ''].includes(String(row.visible ?? '1').trim().toLowerCase()),
+          is_required: !(row.is_required === false || Number(row.is_required) === 0),
+          is_general: !(row.is_general === false || Number(row.is_general) === 0) ? true : false,
+          is_shared: row.is_shared === true || Number(row.is_shared) === 1,
+          owner_course_id: Number(row.owner_course_id || 0) || null,
+          course_ids: courseIds,
+          course_count: Number(row.course_count || courseIds.length || 0),
+          course_names: String(row.course_names || ''),
+          course_labels: courseLabels,
         });
-      }
-      subjectCatalogMap.get(courseId).subjects.push({
-        id: Number(row.id || 0),
-        name: sanitizeCompactText(row.name || '', 140),
-        group_count: Number(row.group_count || 1),
-        is_visible: ['1', 'true', 't', 'yes', 'on', ''].includes(String(row.visible ?? '1').trim().toLowerCase()),
       });
-    });
-    const subjectCatalogCourses = (courses || [])
-      .map((course) => subjectCatalogMap.get(Number(course.id || 0)))
-      .filter((item) => item && Array.isArray(item.subjects) && item.subjects.length);
+      subjectCatalogEntries = Array.from(subjectCatalogMap.values())
+        .map((entry) => {
+          const uniqueCourseIds = new Set();
+          (entry.instances || []).forEach((instance) => {
+            (instance.course_ids || []).forEach((courseId) => uniqueCourseIds.add(Number(courseId || 0)));
+          });
+          return {
+            ...entry,
+            total_instances: Number((entry.instances || []).length || 0),
+            total_courses: Array.from(uniqueCourseIds.values()).filter((value) => Number.isInteger(value) && value > 0).length,
+          };
+        })
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uk'));
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+      const legacyRows = await db.all(
+        `
+          SELECT
+            LOWER(TRIM(name)) AS normalized_name,
+            id AS catalog_id,
+            name AS catalog_name,
+            id AS subject_id,
+            name AS subject_name,
+            group_count,
+            default_group,
+            show_in_teamwork,
+            visible,
+            is_required,
+            is_general,
+            false AS is_shared,
+            course_id AS owner_course_id
+          FROM subjects
+          ORDER BY name ASC, id ASC
+        `
+      );
+      const legacyMap = new Map();
+      (legacyRows || []).forEach((row) => {
+        const catalogKey = String(row.normalized_name || '').trim() || String(row.catalog_name || '').trim().toLowerCase();
+        if (!catalogKey) return;
+        if (!legacyMap.has(catalogKey)) {
+          legacyMap.set(catalogKey, {
+            id: Number(row.catalog_id || 0) || null,
+            name: sanitizeCompactText(row.catalog_name || '', 140),
+            normalized_name: catalogKey,
+            instances: [],
+          });
+        }
+        const course = courseById.get(Number(row.owner_course_id || 0));
+        legacyMap.get(catalogKey).instances.push({
+          id: Number(row.subject_id || 0),
+          name: sanitizeCompactText(row.subject_name || row.catalog_name || '', 140),
+          group_count: Math.max(1, Number(row.group_count || 1)),
+          default_group: Math.max(1, Number(row.default_group || 1)),
+          show_in_teamwork: row.show_in_teamwork === true || Number(row.show_in_teamwork) === 1,
+          is_visible: ['1', 'true', 't', 'yes', 'on', ''].includes(String(row.visible ?? '1').trim().toLowerCase()),
+          is_required: !(row.is_required === false || Number(row.is_required) === 0),
+          is_general: !(row.is_general === false || Number(row.is_general) === 0) ? true : false,
+          is_shared: false,
+          owner_course_id: Number(row.owner_course_id || 0) || null,
+          course_ids: Number(row.owner_course_id || 0) > 0 ? [Number(row.owner_course_id || 0)] : [],
+          course_count: Number(row.owner_course_id || 0) > 0 ? 1 : 0,
+          course_names: course ? sanitizeCompactText(course.name || '', 120) : '',
+          course_labels: course ? [{
+            id: Number(course.id || 0),
+            name: sanitizeCompactText(course.name || '', 120),
+            location: normalizeCourseCampus(course.location),
+            is_teacher_course: course.is_teacher_course === true || Number(course.is_teacher_course) === 1,
+          }] : [],
+        });
+      });
+      subjectCatalogEntries = Array.from(legacyMap.values()).map((entry) => ({
+        ...entry,
+        total_instances: Number((entry.instances || []).length || 0),
+        total_courses: Number((entry.instances || []).length || 0),
+      }));
+    }
 
     const pageRole = hasSessionRole(req, 'admin')
       ? 'admin'
@@ -24922,7 +25883,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       selectedCohortHealth,
       cohortAlerts,
       subjectVisibilityItems: configurableSubjectVisibility,
-      subjectCatalogCourses,
+      subjectCatalogEntries,
       migrationCourseOptions,
       hiddenSubjectCount,
       visibilitySummary,
@@ -24971,6 +25932,21 @@ function getPathwaysRouteMessages(req) {
     invalidCourse: 'Некоректний курс',
     subjectVisibilitySaved: 'Видимість предметів збережено',
     subjectVisibilityCopied: 'Видимість предметів скопійовано',
+    subjectCatalogNameRequired: 'Назва предмета обов\'язкова',
+    subjectCatalogEntryAdded: 'Предмет додано до глобальної бази',
+    subjectCatalogEntryExists: 'Такий предмет уже є в глобальній базі',
+    selectAtLeastOneCatalogSubject: 'Оберіть хоча б один предмет із глобальної бази',
+    selectAtLeastOneTargetCourse: 'Оберіть хоча б один цільовий курс',
+    subjectCatalogAssignmentsSaved: (bindings, subjects, existing, conflicts) => {
+      const parts = [];
+      parts.push(`Прив’язок: ${bindings}`);
+      parts.push(`нових предметів: ${subjects}`);
+      if (existing > 0) parts.push(`вже були в курсах: ${existing}`);
+      if (conflicts > 0) parts.push(`конфліктів: ${conflicts}`);
+      return parts.join(' · ');
+    },
+    subjectBindingRemoved: 'Предмет прибрано з курсу',
+    subjectInstanceNotFound: 'Прив’язку предмета не знайдено',
   } : {
     databaseError: 'Database error',
     programNameRequired: 'Program name is required',
@@ -25004,8 +25980,385 @@ function getPathwaysRouteMessages(req) {
     invalidCourse: 'Invalid course',
     subjectVisibilitySaved: 'Subject visibility saved',
     subjectVisibilityCopied: 'Subject visibility copied',
+    subjectCatalogNameRequired: 'Subject name is required',
+    subjectCatalogEntryAdded: 'Subject added to the global catalog',
+    subjectCatalogEntryExists: 'This subject already exists in the global catalog',
+    selectAtLeastOneCatalogSubject: 'Select at least one catalog subject',
+    selectAtLeastOneTargetCourse: 'Select at least one target course',
+    subjectCatalogAssignmentsSaved: (bindings, subjects, existing, conflicts) => {
+      const parts = [];
+      parts.push(`Bindings: ${bindings}`);
+      parts.push(`new subjects: ${subjects}`);
+      if (existing > 0) parts.push(`already assigned: ${existing}`);
+      if (conflicts > 0) parts.push(`conflicts: ${conflicts}`);
+      return parts.join(' · ');
+    },
+    subjectBindingRemoved: 'Subject removed from the course',
+    subjectInstanceNotFound: 'Subject binding not found',
   };
 }
+
+app.post('/admin/pathways/catalog/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+  const admissionId = parsePositiveIntStrict(req.body.admission_id);
+  const name = normalizeSubjectDraftName(req.body.catalog_name || req.body.name, 140);
+
+  if (!name) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: msg.subjectCatalogNameRequired,
+    }));
+  }
+
+  try {
+    await withTransaction(async (client) => {
+      const existing = await txGet(
+        client,
+        'SELECT id FROM subject_catalog WHERE normalized_name = ? LIMIT 1',
+        [normalizeSubjectCatalogName(name)]
+      );
+      if (existing && existing.id) {
+        const conflict = new Error('Catalog exists');
+        conflict.redirectPath = buildAdminPathwaysUrl({
+          courseId,
+          track: trackFilter,
+          programId,
+          admissionId,
+          error: msg.subjectCatalogEntryExists,
+        });
+        throw conflict;
+      }
+      await upsertSubjectCatalogEntry(client, name);
+    });
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      ok: msg.subjectCatalogEntryAdded,
+    }));
+  } catch (err) {
+    if (err && err.redirectPath) {
+      return res.redirect(err.redirectPath);
+    }
+    return handleDbError(res, err, 'admin.pathways.catalog.add');
+  }
+});
+
+app.post('/admin/pathways/catalog/assign', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+  const admissionId = parsePositiveIntStrict(req.body.admission_id);
+  const preferredSourceCourseId = parsePositiveIntStrict(req.body.source_course_id, courseId);
+  const sharedSubject = parseBooleanFlag(req.body.shared_subject, false);
+  const syncPathways = parseBooleanFlag(req.body.sync_pathways, true);
+  const rawCatalogIds = Array.isArray(req.body.catalog_ids)
+    ? req.body.catalog_ids
+    : (req.body.catalog_ids ? [req.body.catalog_ids] : []);
+  const rawTargetCourseIds = Array.isArray(req.body.target_course_ids)
+    ? req.body.target_course_ids
+    : (req.body.target_course_ids ? [req.body.target_course_ids] : []);
+  const catalogIds = Array.from(new Set(
+    rawCatalogIds
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const targetCourseIds = Array.from(new Set(
+    rawTargetCourseIds
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+
+  if (!catalogIds.length) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: msg.selectAtLeastOneCatalogSubject,
+    }));
+  }
+  if (!targetCourseIds.length) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: msg.selectAtLeastOneTargetCourse,
+    }));
+  }
+
+  try {
+    const summary = await withTransaction(async (client) => {
+      const validCatalogRows = await txAll(
+        client,
+        `
+          SELECT id, name
+          FROM subject_catalog
+          WHERE id = ANY(?::int[])
+          ORDER BY name ASC
+        `,
+        [catalogIds]
+      );
+      const validTargetRows = await txAll(
+        client,
+        `
+          SELECT id
+          FROM courses
+          WHERE id = ANY(?::int[])
+        `,
+        [targetCourseIds]
+      );
+      const validTargetSet = new Set((validTargetRows || []).map((row) => Number(row.id || 0)).filter((value) => value > 0));
+      const validTargetCourseIds = targetCourseIds.filter((value) => validTargetSet.has(Number(value)));
+      const touchedSubjectIds = new Set();
+      const touchedCourseIds = new Set(validTargetCourseIds);
+      let createdBindings = 0;
+      let createdSubjects = 0;
+      let existingAssignments = 0;
+      let conflictAssignments = 0;
+
+      for (const catalogRow of validCatalogRows || []) {
+        const scopedCatalogId = Number(catalogRow.id || 0);
+        if (!scopedCatalogId) continue;
+        const instanceRows = await txAll(
+          client,
+          `
+            SELECT
+              s.id,
+              s.name,
+              s.catalog_id,
+              s.group_count,
+              s.default_group,
+              s.show_in_teamwork,
+              s.visible,
+              s.is_required,
+              s.is_general,
+              s.is_shared,
+              s.course_id AS owner_course_id,
+              ARRAY_AGG(scb.course_id ORDER BY scb.course_id) AS course_ids
+            FROM subjects s
+            LEFT JOIN subject_course_bindings scb ON scb.subject_id = s.id
+            WHERE s.catalog_id = ?
+            GROUP BY s.id
+            ORDER BY s.id ASC
+          `,
+          [scopedCatalogId]
+        );
+        const instances = (instanceRows || []).map((row) => ({
+          ...row,
+          course_ids: parseDbIntegerArray(row.course_ids),
+        })).sort((a, b) => {
+          const aHasPreferred = (a.course_ids || []).includes(preferredSourceCourseId) ? 1 : 0;
+          const bHasPreferred = (b.course_ids || []).includes(preferredSourceCourseId) ? 1 : 0;
+          if (aHasPreferred !== bHasPreferred) return bHasPreferred - aHasPreferred;
+          const aHasTargets = (a.course_ids || []).some((value) => validTargetSet.has(Number(value || 0))) ? 1 : 0;
+          const bHasTargets = (b.course_ids || []).some((value) => validTargetSet.has(Number(value || 0))) ? 1 : 0;
+          if (aHasTargets !== bHasTargets) return bHasTargets - aHasTargets;
+          const aShared = a.is_shared === true || Number(a.is_shared) === 1 ? 1 : 0;
+          const bShared = b.is_shared === true || Number(b.is_shared) === 1 ? 1 : 0;
+          if (aShared !== bShared) return bShared - aShared;
+          return Number(a.id || 0) - Number(b.id || 0);
+        });
+        const sourceInstance = instances[0] || null;
+        const subjectByCourse = new Map();
+        (instances || []).forEach((instance) => {
+          (instance.course_ids || []).forEach((targetCourseId) => {
+            const normalizedTargetCourseId = Number(targetCourseId || 0);
+            if (!normalizedTargetCourseId || subjectByCourse.has(normalizedTargetCourseId)) return;
+            subjectByCourse.set(normalizedTargetCourseId, Number(instance.id || 0));
+          });
+        });
+
+        if (sharedSubject) {
+          let sharedInstance = sourceInstance;
+          if (!sharedInstance) {
+            const createdSubject = await createSubjectInstanceWithBinding(client, {
+              name: catalogRow.name,
+              catalogId: scopedCatalogId,
+              ownerCourseId: validTargetCourseIds[0],
+              settings: buildSubjectSettingsDraft(req.body),
+              isShared: true,
+            });
+            if (!createdSubject || !createdSubject.id) {
+              continue;
+            }
+            sharedInstance = createdSubject;
+            createdSubjects += 1;
+            createdBindings += 1;
+            touchedSubjectIds.add(Number(createdSubject.id));
+            subjectByCourse.set(Number(validTargetCourseIds[0]), Number(createdSubject.id));
+          } else if (!(sharedInstance.is_shared === true || Number(sharedInstance.is_shared) === 1)) {
+            await txRun(client, 'UPDATE subjects SET is_shared = TRUE WHERE id = ?', [sharedInstance.id]);
+          }
+
+          for (const targetCourseId of validTargetCourseIds) {
+            const existingSubjectId = subjectByCourse.get(Number(targetCourseId));
+            if (existingSubjectId) {
+              if (Number(existingSubjectId) === Number(sharedInstance.id)) {
+                existingAssignments += 1;
+                continue;
+              }
+              conflictAssignments += 1;
+              continue;
+            }
+            await txRun(
+              client,
+              `
+                INSERT INTO subject_course_bindings (subject_id, course_id, created_at, updated_at)
+                VALUES (?, ?, NOW(), NOW())
+                ON CONFLICT (subject_id, course_id)
+                DO UPDATE SET updated_at = NOW()
+              `,
+              [sharedInstance.id, targetCourseId]
+            );
+            touchedSubjectIds.add(Number(sharedInstance.id));
+            createdBindings += 1;
+          }
+          continue;
+        }
+
+        const sourceSettings = sourceInstance || null;
+        for (const targetCourseId of validTargetCourseIds) {
+          if (subjectByCourse.has(Number(targetCourseId))) {
+            existingAssignments += 1;
+            continue;
+          }
+          const createdSubject = await createSubjectInstanceWithBinding(client, {
+            name: catalogRow.name,
+            catalogId: scopedCatalogId,
+            ownerCourseId: targetCourseId,
+            settings: buildSubjectSettingsDraft(req.body, sourceSettings),
+            fallbackSettings: sourceSettings,
+            isShared: false,
+          });
+          const createdSubjectId = Number(createdSubject && createdSubject.id ? createdSubject.id : 0);
+          if (!createdSubjectId) {
+            continue;
+          }
+          createdSubjects += 1;
+          createdBindings += 1;
+          touchedSubjectIds.add(createdSubjectId);
+          if (syncPathways && sourceSettings && sourceSettings.id) {
+            await syncSubjectAdmissionVisibility(client, Number(sourceSettings.id), createdSubjectId, targetCourseId);
+          }
+        }
+      }
+
+      return {
+        createdBindings,
+        createdSubjects,
+        existingAssignments,
+        conflictAssignments,
+        touchedSubjectIds: Array.from(touchedSubjectIds.values()),
+        touchedCourseIds: Array.from(touchedCourseIds.values()),
+      };
+    });
+
+    if (Array.isArray(summary.touchedSubjectIds) && summary.touchedSubjectIds.length) {
+      await invalidateSubjectCachesForSubjectIds(summary.touchedSubjectIds);
+    }
+    (summary.touchedCourseIds || []).forEach((targetCourseId) => invalidateSubjectsCache(targetCourseId));
+    invalidateRegistrationPathwaysCache();
+
+    logAction(db, req, 'pathways_subject_catalog_assign', {
+      catalog_ids: catalogIds,
+      target_course_ids: targetCourseIds,
+      shared_subject: sharedSubject ? 1 : 0,
+      created_bindings: summary.createdBindings,
+      created_subjects: summary.createdSubjects,
+      existing_assignments: summary.existingAssignments,
+      conflict_assignments: summary.conflictAssignments,
+    });
+
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      ok: msg.subjectCatalogAssignmentsSaved(
+        summary.createdBindings,
+        summary.createdSubjects,
+        summary.existingAssignments,
+        summary.conflictAssignments
+      ),
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.catalog.assign');
+  }
+});
+
+app.post('/admin/pathways/subjects/:subjectId/course/:courseId/remove', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const subjectId = parsePositiveIntStrict(req.params.subjectId);
+  const targetCourseId = parsePositiveIntStrict(req.params.courseId);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+  const admissionId = parsePositiveIntStrict(req.body.admission_id);
+
+  if (!subjectId || !targetCourseId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      error: msg.subjectInstanceNotFound,
+    }));
+  }
+
+  try {
+    await withTransaction(async (client) => {
+      const scopedBinding = await txGet(
+        client,
+        `
+          SELECT subject_id
+          FROM subject_course_bindings
+          WHERE subject_id = ? AND course_id = ?
+          LIMIT 1
+        `,
+        [subjectId, targetCourseId]
+      );
+      if (!scopedBinding) {
+        const notFound = new Error('Binding not found');
+        notFound.redirectPath = buildAdminPathwaysUrl({
+          courseId,
+          track: trackFilter,
+          programId,
+          admissionId,
+          error: msg.subjectInstanceNotFound,
+        });
+        throw notFound;
+      }
+      await removeSubjectBindingFromCourse(client, subjectId, targetCourseId);
+    });
+
+    await invalidateSubjectCachesForSubjectIds([subjectId]);
+    invalidateSubjectsCache(targetCourseId);
+    invalidateRegistrationPathwaysCache();
+
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      ok: msg.subjectBindingRemoved,
+    }));
+  } catch (err) {
+    if (err && err.redirectPath) {
+      return res.redirect(err.redirectPath);
+    }
+    return handleDbError(res, err, 'admin.pathways.subjects.unbind');
+  }
+});
 
 app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);
@@ -25773,9 +27126,9 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
         DELETE FROM subject_visibility_by_admission
         WHERE admission_id = ?
           AND subject_id IN (
-            SELECT id
-            FROM subjects
-            WHERE course_id = ?
+            SELECT scb.subject_id
+            FROM subject_course_bindings scb
+            WHERE scb.course_id = ?
           )
       `,
       [admissionId, selectedCourseId]
@@ -25792,9 +27145,10 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
           NOW(),
           NOW()
         FROM subject_visibility_by_admission sva
-        JOIN subjects s ON s.id = sva.subject_id
+        JOIN subject_course_bindings scb ON scb.subject_id = sva.subject_id
+        JOIN subjects s ON s.id = scb.subject_id
         WHERE sva.admission_id = ?
-          AND s.course_id = ?
+          AND scb.course_id = ?
           AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
         ON CONFLICT (admission_id, subject_id)
         DO UPDATE SET
@@ -26028,11 +27382,25 @@ app.get('/admin/schedule-list', requireScheduleSectionAccess, async (req, res) =
     activeScheduleDays = [...daysOfWeek];
   }
 
-  const scheduleFilters = ['se.course_id = ?'];
-  const scheduleParams = [courseId];
-  if (activeSemester) {
-    scheduleFilters.push('se.semester_id = ?');
-    scheduleParams.push(activeSemester.id);
+  const courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false });
+  const scheduleFilters = [];
+  const scheduleParams = [];
+  if (courseSubjectScope.subject_ids.length) {
+    scheduleFilters.push('se.subject_id = ANY(?::int[])');
+    scheduleParams.push(courseSubjectScope.subject_ids);
+    if (courseSubjectScope.owner_course_ids.length) {
+      scheduleFilters.push('se.course_id = ANY(?::int[])');
+      scheduleParams.push(courseSubjectScope.owner_course_ids);
+    }
+    if (courseSubjectScope.owner_semester_ids.length) {
+      scheduleFilters.push('(se.semester_id = ANY(?::int[]) OR se.semester_id IS NULL)');
+      scheduleParams.push(courseSubjectScope.owner_semester_ids);
+    } else if (activeSemester) {
+      scheduleFilters.push('(se.semester_id = ? OR se.semester_id IS NULL)');
+      scheduleParams.push(activeSemester.id);
+    }
+  } else {
+    scheduleFilters.push('1 = 0');
   }
   if (group_number) {
     scheduleFilters.push('se.group_number = ?');
@@ -29784,10 +31152,11 @@ app.post('/admin/schedule-generator/items/add', requireScheduleGeneratorSectionA
   }
 
   try {
-    const subjectRow = await db.get('SELECT id, group_count, is_general FROM subjects WHERE id = ? AND course_id = ?', [subjectId, courseId]);
+    const subjectRow = await resolveSubjectCourseContext(subjectId, courseId, { includeHidden: true });
     if (!subjectRow) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Subject%20not%20found`);
     }
+    const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || courseId || 1);
     if (groupNumber && Number(groupNumber) > Number(subjectRow.group_count || 1)) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
     }
@@ -29796,18 +31165,18 @@ app.post('/admin/schedule-generator/items/add', requireScheduleGeneratorSectionA
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Run%20not%20found`);
     }
     const runConfig = parseGeneratorConfig(run.config);
-    const courseRow = await db.get('SELECT location FROM courses WHERE id = ?', [courseId]);
+    const courseRow = await db.get('SELECT location FROM courses WHERE id = ?', [storageCourseId]);
     const courseLocation = String(courseRow?.location || 'kyiv').toLowerCase() === 'munich' ? 'munich' : 'kyiv';
     const configuredSemesterId = runConfig.course_semesters_by_location
-      ? runConfig.course_semesters_by_location[courseLocation]?.[courseId]
-        || runConfig.course_semesters_by_location[courseLocation]?.[String(courseId)]
+      ? runConfig.course_semesters_by_location[courseLocation]?.[storageCourseId]
+        || runConfig.course_semesters_by_location[courseLocation]?.[String(storageCourseId)]
       : null;
     let semester = null;
     if (configuredSemesterId) {
-      semester = await db.get('SELECT id FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, courseId]);
+      semester = await db.get('SELECT id FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, storageCourseId]);
     }
     if (!semester) {
-      semester = await getActiveSemester(courseId);
+      semester = await getActiveSemester(storageCourseId);
     }
     if (!semester) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Semester%20not%20found`);
@@ -29827,7 +31196,7 @@ app.post('/admin/schedule-generator/items/add', requireScheduleGeneratorSectionA
       for (let g = 1; g <= totalGroups; g += 1) {
         stmt.run(
           runId,
-          courseId,
+          storageCourseId,
           semester.id,
           subjectId,
           teacherIdRaw || null,
@@ -29850,7 +31219,7 @@ app.post('/admin/schedule-generator/items/add', requireScheduleGeneratorSectionA
         `,
         [
           runId,
-          courseId,
+          storageCourseId,
           semester.id,
           subjectId,
           teacherIdRaw || null,
@@ -29968,10 +31337,11 @@ app.post('/admin/schedule-generator/items/edit/:id', requireScheduleGeneratorSec
   }
 
   try {
-    const subjectRow = await db.get('SELECT id, group_count FROM subjects WHERE id = ? AND course_id = ?', [subjectId, courseId]);
+    const subjectRow = await resolveSubjectCourseContext(subjectId, courseId, { includeHidden: true });
     if (!subjectRow) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Subject%20not%20found`);
     }
+    const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || courseId || 1);
     if (groupNumber && Number(groupNumber) > Number(subjectRow.group_count || 1)) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
     }
@@ -29980,18 +31350,18 @@ app.post('/admin/schedule-generator/items/edit/:id', requireScheduleGeneratorSec
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Run%20not%20found`);
     }
     const runConfig = parseGeneratorConfig(run.config);
-    const courseRow = await db.get('SELECT location FROM courses WHERE id = ?', [courseId]);
+    const courseRow = await db.get('SELECT location FROM courses WHERE id = ?', [storageCourseId]);
     const courseLocation = String(courseRow?.location || 'kyiv').toLowerCase() === 'munich' ? 'munich' : 'kyiv';
     const configuredSemesterId = runConfig.course_semesters_by_location
-      ? runConfig.course_semesters_by_location[courseLocation]?.[courseId]
-        || runConfig.course_semesters_by_location[courseLocation]?.[String(courseId)]
+      ? runConfig.course_semesters_by_location[courseLocation]?.[storageCourseId]
+        || runConfig.course_semesters_by_location[courseLocation]?.[String(storageCourseId)]
       : null;
     let semester = null;
     if (configuredSemesterId) {
-      semester = await db.get('SELECT id FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, courseId]);
+      semester = await db.get('SELECT id FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, storageCourseId]);
     }
     if (!semester) {
-      semester = await getActiveSemester(courseId);
+      semester = await getActiveSemester(storageCourseId);
     }
     if (!semester) {
       return res.redirect(`/admin/schedule-generator?run=${runId}&err=Semester%20not%20found`);
@@ -30003,7 +31373,7 @@ app.post('/admin/schedule-generator/items/edit/:id', requireScheduleGeneratorSec
         WHERE id = ? AND run_id = ?
       `,
       [
-        courseId,
+        storageCourseId,
         semester.id,
         subjectId,
         teacherIdRaw || null,
@@ -34050,7 +35420,6 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
 
   const { schedule_group: group, username, id: userId } = req.session.user;
   const createdAt = new Date().toISOString();
-  const activeSemester = await getActiveSemester(courseId || 1);
   const isStaff = getSessionRoleList(req).some((role) => ['admin', 'deanery', 'starosta', 'teacher'].includes(role));
   let homeworkStatus = isStaff ? String(req.body.status || 'published').toLowerCase() : 'published';
   if (!['draft', 'scheduled', 'published'].includes(homeworkStatus)) {
@@ -34080,16 +35449,16 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   }
 
   try {
-    const subjectRow = await db.get(
-      'SELECT name, course_id, group_count, is_general FROM subjects WHERE id = ?',
-      [subjectId]
-    );
-    if (!subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
+    const selectedCourseId = Number(courseId || 1);
+    const subjectRow = await resolveSubjectCourseContext(subjectId, selectedCourseId);
+    if (!subjectRow) {
       if (req.file) {
         fs.unlink(req.file.path, () => {});
       }
       return res.status(400).send('Invalid subject');
     }
+    const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || selectedCourseId || 1);
+    const activeSemester = await getActiveSemester(storageCourseId || 1);
     const maxGroups = Number(subjectRow.group_count || 1);
     let targetGroups = [];
     if (isTeacher) {
@@ -34105,7 +35474,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
         return res.status(400).send('Invalid subject');
       }
 
-      const scheduleGroupParams = [subjectId, courseId || 1, day_of_week, classNum];
+      const scheduleGroupParams = [subjectId, storageCourseId, day_of_week, classNum];
       let scheduleGroupSql = `
         SELECT DISTINCT group_number, COALESCE(lesson_type, '') AS lesson_type
         FROM schedule_entries
@@ -34195,7 +35564,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
           fileName,
           username,
           createdAt,
-          courseId || 1,
+          storageCourseId,
           activeSemester ? activeSemester.id : null,
           homeworkStatus,
           scheduledAt,
@@ -34250,13 +35619,13 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
         is_teacher_homework: isTeacher ? 1 : 0,
         is_credit: isCredit,
       },
-      courseId || 1,
+      storageCourseId,
       activeSemester ? activeSemester.id : null
     );
     if (isTeacher) {
       await maybeCreateTeacherTemplateFromHomework(req, {
         userId,
-        courseId: courseId || 1,
+        courseId: selectedCourseId,
         subjectId,
         subjectName: subjectRow.name,
         title: req.body.template_title,
@@ -34271,7 +35640,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
     }
     const journalSynced = await trySyncJournalColumnsAfterHomeworkCreate({
       subjectId,
-      courseId: courseId || 1,
+      courseId: storageCourseId,
       semesterId: activeSemester ? activeSemester.id : null,
       actorUserId: userId,
       isTeacherHomework: isTeacher,
@@ -34287,7 +35656,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
           subject_id: subjectId,
           reason: 'sync_failed_or_subject_closed',
         },
-        courseId || 1,
+        storageCourseId,
         activeSemester ? activeSemester.id : null
       );
     }
@@ -34329,7 +35698,6 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
   const isTeacher = hasSessionRole(req, 'teacher');
   const courseId = isTeacher && !Number.isNaN(Number(req.body.course_id)) ? Number(req.body.course_id) : sessionCourseId;
   const createdAt = new Date().toISOString();
-  const activeSemester = await getActiveSemester(courseId || 1);
   const isStaff = getSessionRoleList(req).some((role) => ['admin', 'deanery', 'starosta', 'teacher'].includes(role));
   let homeworkStatus = isStaff ? String(req.body.status || 'published').toLowerCase() : 'published';
   if (!['draft', 'scheduled', 'published'].includes(homeworkStatus)) {
@@ -34359,13 +35727,16 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
   }
 
   try {
-    const subjectRow = await db.get('SELECT name, course_id, group_count, is_general FROM subjects WHERE id = ?', [subjectId]);
-    if (!subjectRow || (subjectRow.course_id && subjectRow.course_id !== (courseId || 1))) {
+    const selectedCourseId = Number(courseId || 1);
+    const subjectRow = await resolveSubjectCourseContext(subjectId, selectedCourseId);
+    if (!subjectRow) {
       if (req.file) {
         fs.unlink(req.file.path, () => {});
       }
       return res.status(400).send('Invalid subject');
     }
+    const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || selectedCourseId || 1);
+    const activeSemester = await getActiveSemester(storageCourseId || 1);
     let targetGroups = [];
     if (isTeacher) {
       const teacherRows = await db.all(
@@ -34447,7 +35818,7 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
           fileName,
           username,
           createdAt,
-          courseId || 1,
+          storageCourseId,
           activeSemester ? activeSemester.id : null,
           1,
           dueDate,
@@ -34479,13 +35850,13 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
         is_teacher_homework: isTeacher ? 1 : 0,
         is_credit: isCredit,
       },
-      courseId || 1,
+      storageCourseId,
       activeSemester ? activeSemester.id : null
     );
     if (isTeacher) {
       await maybeCreateTeacherTemplateFromHomework(req, {
         userId,
-        courseId: courseId || 1,
+        courseId: selectedCourseId,
         subjectId,
         subjectName: subjectRow.name,
         title: req.body.template_title,
@@ -34500,7 +35871,7 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
     }
     const journalSynced = await trySyncJournalColumnsAfterHomeworkCreate({
       subjectId,
-      courseId: courseId || 1,
+      courseId: storageCourseId,
       semesterId: activeSemester ? activeSemester.id : null,
       actorUserId: userId,
       isTeacherHomework: isTeacher,
@@ -34517,7 +35888,7 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
           reason: 'sync_failed_or_subject_closed',
           is_custom_deadline: true,
         },
-        courseId || 1,
+        storageCourseId,
         activeSemester ? activeSemester.id : null
       );
     }
@@ -35288,20 +36659,18 @@ app.post('/admin/schedule/add', requireScheduleSectionAccess, async (req, res) =
   if (!subject_id || !day_of_week || !week_numbers || Number.isNaN(classNum) || Number.isNaN(semesterId)) {
     return res.redirect(withStatus('err=Missing%20fields'));
   }
-  const dayAllowed = await isCourseDayActive(courseId, day_of_week);
-  if (!dayAllowed) {
-    return res.redirect(withStatus('err=Invalid%20day'));
-  }
   if (classNum < 1 || classNum > 7) {
     return res.redirect(withStatus('err=Invalid%20class%20number'));
   }
   try {
-    const subjectRow = await db.get(
-      'SELECT course_id, group_count, is_general FROM subjects WHERE id = ?',
-      [subject_id]
-    );
-    if (!subjectRow || (subjectRow.course_id && Number(subjectRow.course_id) !== Number(courseId))) {
+    const subjectRow = await resolveSubjectCourseContext(subject_id, courseId, { includeHidden: true });
+    if (!subjectRow) {
       return res.redirect(withStatus('err=Invalid%20subject'));
+    }
+    const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || courseId || 1);
+    const dayAllowed = await isCourseDayActive(storageCourseId, day_of_week);
+    if (!dayAllowed) {
+      return res.redirect(withStatus('err=Invalid%20day'));
     }
     const maxGroups = Number(subjectRow.group_count || 1);
     const isGeneral = subjectRow.is_general === true || Number(subjectRow.is_general) === 1;
@@ -35318,10 +36687,14 @@ app.post('/admin/schedule/add', requireScheduleSectionAccess, async (req, res) =
       )
     ).sort((a, b) => a - b);
 
-    const semRow = await db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
+    let semRow = await db.get('SELECT id, weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, storageCourseId]);
+    if (!semRow) {
+      semRow = await getActiveSemester(storageCourseId);
+    }
     if (!semRow) {
       return res.redirect(withStatus('err=Invalid%20semester'));
     }
+    const resolvedSemesterId = Number(semRow.id || semesterId || 0) || null;
     const maxWeeks = Number(semRow.weeks_count) || 15;
     const weeks = week_numbers
       .split(',')
@@ -35353,7 +36726,7 @@ app.post('/admin/schedule/add', requireScheduleSectionAccess, async (req, res) =
     );
     uniqueWeeks.forEach((week) => {
       targetGroups.forEach((group) => {
-        stmt.run(subject_id, group, day_of_week, classNum, week, courseId, semesterId, lessonType);
+        stmt.run(subject_id, group, day_of_week, classNum, week, storageCourseId, resolvedSemesterId, lessonType);
       });
     });
     stmt.finalize((err) => {
@@ -35366,7 +36739,7 @@ app.post('/admin/schedule/add', requireScheduleSectionAccess, async (req, res) =
         day_of_week,
         class_number: classNum,
         weeks: uniqueWeeks,
-        semester_id: semesterId,
+        semester_id: resolvedSemesterId,
       });
       logActivity(db, req, 'schedule_add', 'schedule', null, {
         subject_id,
@@ -35374,7 +36747,7 @@ app.post('/admin/schedule/add', requireScheduleSectionAccess, async (req, res) =
         day_of_week,
         class_number: classNum,
         weeks: uniqueWeeks,
-        semester_id: semesterId,
+        semester_id: resolvedSemesterId,
       });
       return res.redirect(withStatus('ok=Class%20added'));
     });
@@ -35399,18 +36772,27 @@ app.post('/admin/schedule/edit/:id', requireScheduleSectionAccess, async (req, r
   if (!subject_id || !day_of_week || Number.isNaN(groupNum) || Number.isNaN(classNum) || Number.isNaN(weekNum) || Number.isNaN(semesterId)) {
     return res.redirect(withStatus('err=Missing%20fields'));
   }
-  const dayAllowed = await isCourseDayActive(courseId, day_of_week);
-  if (!dayAllowed) {
-    return res.redirect(withStatus('err=Invalid%20day'));
-  }
   if (classNum < 1 || classNum > 7) {
     return res.redirect(withStatus('err=Invalid%20class%20or%20week'));
   }
   try {
-    const semRow = await db.get('SELECT weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
+    const subjectRow = await resolveSubjectCourseContext(subject_id, courseId, { includeHidden: true });
+    if (!subjectRow) {
+      return res.redirect(withStatus('err=Invalid%20subject'));
+    }
+    const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || courseId || 1);
+    const dayAllowed = await isCourseDayActive(storageCourseId, day_of_week);
+    if (!dayAllowed) {
+      return res.redirect(withStatus('err=Invalid%20day'));
+    }
+    let semRow = await db.get('SELECT id, weeks_count FROM semesters WHERE id = ? AND course_id = ?', [semesterId, storageCourseId]);
+    if (!semRow) {
+      semRow = await getActiveSemester(storageCourseId);
+    }
     if (!semRow) {
       return res.redirect(withStatus('err=Invalid%20semester'));
     }
+    const resolvedSemesterId = Number(semRow.id || semesterId || 0) || null;
     const maxWeeks = Number(semRow.weeks_count) || 15;
     if (weekNum < 1 || weekNum > maxWeeks) {
       return res.redirect(withStatus('err=Invalid%20class%20or%20week'));
@@ -35421,19 +36803,19 @@ app.post('/admin/schedule/edit/:id', requireScheduleSectionAccess, async (req, r
         SET subject_id = ?, group_number = ?, day_of_week = ?, class_number = ?, week_number = ?, semester_id = ?, lesson_type = ?
         WHERE id = ? AND course_id = ?
       `,
-      [subject_id, groupNum, day_of_week, classNum, weekNum, semesterId, lessonType, id, courseId],
+      [subject_id, groupNum, day_of_week, classNum, weekNum, resolvedSemesterId, lessonType, id, storageCourseId],
       (err) => {
         if (err) {
           return res.redirect(withStatus('err=Database%20error'));
         }
-        logAction(db, req, 'schedule_edit', { id, subject_id, group_number: groupNum, day_of_week, class_number: classNum, week_number: weekNum, semester_id: semesterId });
+        logAction(db, req, 'schedule_edit', { id, subject_id, group_number: groupNum, day_of_week, class_number: classNum, week_number: weekNum, semester_id: resolvedSemesterId });
         logActivity(db, req, 'schedule_edit', 'schedule', Number(id) || null, {
           subject_id,
           group_number: groupNum,
           day_of_week,
           class_number: classNum,
           week_number: weekNum,
-          semester_id: semesterId,
+          semester_id: resolvedSemesterId,
         });
         return res.redirect(withStatus('ok=Class%20updated'));
       }
@@ -35444,24 +36826,45 @@ app.post('/admin/schedule/edit/:id', requireScheduleSectionAccess, async (req, r
   }
 });
 
-app.post('/admin/schedule/delete/:id', requireScheduleSectionAccess, (req, res) => {
+app.post('/admin/schedule/delete/:id', requireScheduleSectionAccess, async (req, res) => {
   const { id } = req.params;
   const courseId = getStaffCourse(req);
   const referer = req.get('referer');
   const fallbackBase = getStaffPanelBase(req, courseId);
   const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : fallbackBase;
   const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
-  db.run('DELETE FROM schedule_entries WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
-    if (err) {
-      return res.redirect(withStatus(redirectBase, 'err=Database%20error'));
+  try {
+    let scopedRow = null;
+    try {
+      scopedRow = await db.get(
+        `
+          SELECT se.id, se.course_id AS storage_course_id
+          FROM schedule_entries se
+          JOIN subject_course_bindings scb ON scb.subject_id = se.subject_id
+          WHERE se.id = ? AND scb.course_id = ?
+          LIMIT 1
+        `,
+        [id, courseId]
+      );
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+    }
+    if (scopedRow) {
+      await db.run('DELETE FROM schedule_entries WHERE id = ? AND course_id = ?', [id, Number(scopedRow.storage_course_id || 0) || courseId]);
+    } else {
+      await db.run('DELETE FROM schedule_entries WHERE id = ? AND course_id = ?', [id, courseId]);
     }
     logActivity(db, req, 'schedule_delete', 'schedule', Number(id) || null, null, courseId);
     logAction(db, req, 'schedule_delete', { id });
     return res.redirect(withStatus(redirectBase, 'ok=Class%20deleted'));
-  });
+  } catch (err) {
+    return res.redirect(withStatus(redirectBase, 'err=Database%20error'));
+  }
 });
 
-app.post('/admin/schedule/delete-multiple', requireScheduleSectionAccess, (req, res) => {
+app.post('/admin/schedule/delete-multiple', requireScheduleSectionAccess, async (req, res) => {
   const ids = req.body.delete_ids;
   const returnTo = req.body.return_to || req.query.return_to || '';
   const referer = req.get('referer');
@@ -35476,93 +36879,110 @@ app.post('/admin/schedule/delete-multiple', requireScheduleSectionAccess, (req, 
     return res.redirect(withStatus(redirectBase, 'err=No%20items%20selected'));
   }
   const list = Array.isArray(ids) ? ids : [ids];
-  const placeholders = list.map(() => '?').join(',');
-  db.run(`DELETE FROM schedule_entries WHERE course_id = ? AND id IN (${placeholders})`, [courseId, ...list], (err) => {
-    if (err) {
-      return res.redirect(withStatus(redirectBase, 'err=Database%20error'));
+  const normalizedIds = list
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (!normalizedIds.length) {
+    return res.redirect(withStatus(redirectBase, 'err=No%20items%20selected'));
+  }
+  try {
+    let scopedIds = [];
+    try {
+      const rows = await db.all(
+        `
+          SELECT DISTINCT se.id
+          FROM schedule_entries se
+          JOIN subject_course_bindings scb ON scb.subject_id = se.subject_id
+          WHERE scb.course_id = ?
+            AND se.id = ANY(?::int[])
+        `,
+        [courseId, normalizedIds]
+      );
+      scopedIds = (rows || []).map((row) => Number(row.id || 0)).filter((value) => value > 0);
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+      scopedIds = [...normalizedIds];
     }
-    logActivity(db, req, 'schedule_delete_multiple', 'schedule', null, { ids: list }, courseId);
-    logAction(db, req, 'schedule_delete_multiple', { ids: list });
+    if (!scopedIds.length) {
+      return res.redirect(withStatus(redirectBase, 'err=No%20items%20selected'));
+    }
+    const placeholders = scopedIds.map(() => '?').join(',');
+    await db.run(`DELETE FROM schedule_entries WHERE id IN (${placeholders})`, scopedIds);
+    logActivity(db, req, 'schedule_delete_multiple', 'schedule', null, { ids: scopedIds }, courseId);
+    logAction(db, req, 'schedule_delete_multiple', { ids: scopedIds });
     return res.redirect(withStatus(redirectBase, 'ok=Selected%20classes%20deleted'));
-  });
+  } catch (err) {
+    return res.redirect(withStatus(redirectBase, 'err=Database%20error'));
+  }
 });
 
-app.post('/admin/schedule/clear-all', requireScheduleSectionAccess, (req, res) => {
+app.post('/admin/schedule/clear-all', requireScheduleSectionAccess, async (req, res) => {
   const courseId = getStaffCourse(req);
   const referer = req.get('referer');
   const fallbackBase = getStaffPanelBase(req, courseId);
   const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : fallbackBase;
   const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
-  db.run('DELETE FROM schedule_entries WHERE course_id = ?', [courseId], (err) => {
-    if (err) {
-      return res.redirect(withStatus(redirectBase, 'err=Database%20error'));
+  try {
+    try {
+      await db.run(
+        `
+          DELETE FROM schedule_entries
+          WHERE subject_id IN (
+            SELECT subject_id
+            FROM subject_course_bindings
+            WHERE course_id = ?
+          )
+        `,
+        [courseId]
+      );
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+      await db.run('DELETE FROM schedule_entries WHERE course_id = ?', [courseId]);
     }
     logActivity(db, req, 'schedule_clear_all', 'schedule', null, null, courseId);
     logAction(db, req, 'schedule_clear_all');
     return res.redirect(withStatus(redirectBase, 'ok=Schedule%20cleared'));
-  });
+  } catch (err) {
+    return res.redirect(withStatus(redirectBase, 'err=Database%20error'));
+  }
 });
 
-app.post('/admin/homework/delete/:id', requireHomeworkSectionAccess, (req, res) => {
-  const { id } = req.params;
-  db.get('SELECT file_path FROM homework WHERE id = ?', [id], (err, row) => {
-    if (err) {
-      return res.redirect('/admin?err=Database%20error');
-    }
-    db.all('SELECT id FROM subgroups WHERE homework_id = ?', [id], (sgErr, subgroups) => {
-      if (sgErr) {
-        return res.redirect('/admin?err=Database%20error');
-      }
-      const subgroupIds = subgroups.map((sg) => sg.id);
-      const placeholders = subgroupIds.map(() => '?').join(',');
-      const deleteMembers = subgroupIds.length
-        ? `DELETE FROM subgroup_members WHERE subgroup_id IN (${placeholders})`
-        : null;
-
-      const afterMembers = () => {
-        const deleteSubgroups = subgroupIds.length
-          ? `DELETE FROM subgroups WHERE id IN (${placeholders})`
-          : null;
-        const afterSubgroups = () => {
-          db.run('DELETE FROM homework WHERE id = ?', [id], (delErr) => {
-            if (delErr) {
-              return res.redirect('/admin?err=Database%20error');
-            }
-            if (row && row.file_path) {
-              const relativePath = row.file_path.replace(/^\/+/, '');
-              const absPath = path.join(__dirname, relativePath);
-              fs.unlink(absPath, () => {});
-            }
-            logActivity(db, req, 'homework_delete', 'homework', Number(id) || null, null);
-            logAction(db, req, 'homework_delete', { id });
-            return res.redirect('/admin?ok=Homework%20deleted');
-          });
-        };
-
-        if (deleteSubgroups) {
-          db.run(deleteSubgroups, subgroupIds, (delSgErr) => {
-            if (delSgErr) {
-              return res.redirect('/admin?err=Database%20error');
-            }
-            return afterSubgroups();
-          });
-        } else {
-          return afterSubgroups();
-        }
-      };
-
-      if (deleteMembers) {
-        db.run(deleteMembers, subgroupIds, (delMemErr) => {
-          if (delMemErr) {
-            return res.redirect('/admin?err=Database%20error');
-          }
-          return afterMembers();
-        });
-      } else {
-        return afterMembers();
-      }
+app.post('/admin/homework/delete/:id', requireHomeworkSectionAccess, async (req, res) => {
+  const homeworkId = Number(req.params.id);
+  const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  if (!Number.isFinite(homeworkId) || homeworkId < 1) {
+    return res.redirect('/admin?err=Invalid%20homework');
+  }
+  try {
+    const row = await getHomeworkForCourse(homeworkId, courseId, {
+      selectClause: 'h.id, h.file_path',
     });
-  });
+    if (!row) {
+      return res.redirect('/admin?err=Homework%20not%20found');
+    }
+    const subgroups = await db.all('SELECT id FROM subgroups WHERE homework_id = ?', [homeworkId]);
+    const subgroupIds = (subgroups || []).map((sg) => Number(sg.id || 0)).filter((value) => value > 0);
+    if (subgroupIds.length) {
+      const placeholders = subgroupIds.map(() => '?').join(',');
+      await db.run(`DELETE FROM subgroup_members WHERE subgroup_id IN (${placeholders})`, subgroupIds);
+      await db.run(`DELETE FROM subgroups WHERE id IN (${placeholders})`, subgroupIds);
+    }
+    await db.run('DELETE FROM homework WHERE id = ?', [homeworkId]);
+    if (row.file_path) {
+      const relativePath = String(row.file_path).replace(/^\/+/, '');
+      const absPath = path.join(__dirname, relativePath);
+      fs.unlink(absPath, () => {});
+    }
+    logActivity(db, req, 'homework_delete', 'homework', homeworkId, null, courseId);
+    logAction(db, req, 'homework_delete', { id: homeworkId });
+    return res.redirect('/admin?ok=Homework%20deleted');
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
 });
 
 app.post('/admin/homework/delete-multiple', requireHomeworkSectionAccess, writeLimiter, async (req, res) => {
@@ -35572,12 +36992,10 @@ app.post('/admin/homework/delete-multiple', requireHomeworkSectionAccess, writeL
     return res.redirect('/admin?err=No%20homework%20selected');
   }
   const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
-  const placeholders = ids.map(() => '?').join(',');
   try {
-    const scoped = await db.all(
-      `SELECT id, file_path FROM homework WHERE id IN (${placeholders}) AND course_id = ?`,
-      [...ids, courseId]
-    );
+    const scoped = await getHomeworkRowsForCourse(ids, courseId, {
+      selectClause: 'h.id, h.file_path',
+    });
     if (!scoped.length) {
       return res.redirect('/admin?err=No%20homework%20found');
     }
@@ -35608,13 +37026,9 @@ app.post('/admin/homework/delete-multiple', requireHomeworkSectionAccess, writeL
 });
 
 app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
-  const { name, group_count, default_group, show_in_teamwork, visible, is_required, is_general } = req.body;
-  const count = Number(group_count);
-  const def = Number(default_group);
-  const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
-  const visibleFlag = String(visible) === '0' ? 0 : 1;
-  const requiredFlag = String(is_required) === '0' ? 0 : 1;
-  const generalFlag = String(is_general) === '1' || String(is_general) === 'on' ? 1 : 0;
+  const name = normalizeSubjectDraftName(req.body.name, 140);
+  const count = Number(req.body.group_count);
+  const def = Number(req.body.default_group);
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
@@ -35622,19 +37036,95 @@ app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
   if (Number.isNaN(def) || def < 1 || def > count) {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
-  db.run(
-    'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, is_required, is_general, course_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [name, count, def, teamworkFlag, visibleFlag, requiredFlag, generalFlag, courseId],
-    (err) => {
-    if (err) {
-      return res.redirect('/admin?err=Database%20error');
+  const settings = buildSubjectSettingsDraft(req.body);
+  withTransaction(async (client) => {
+    const catalog = await upsertSubjectCatalogEntry(client, name);
+    if (!catalog || !catalog.id) {
+      throw new Error('Invalid subject catalog entry');
     }
-    logAction(db, req, 'subject_add', { name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag, is_required: requiredFlag, is_general: generalFlag });
-    logActivity(db, req, 'subject_add', 'subject', null, { name, group_count: count, default_group: def, visible: visibleFlag, is_required: requiredFlag, is_general: generalFlag }, courseId);
+    const existing = await txGet(
+      client,
+      `
+        SELECT s.id
+        FROM subjects s
+        JOIN subject_course_bindings scb ON scb.subject_id = s.id
+        WHERE scb.course_id = ?
+          AND s.catalog_id = ?
+        LIMIT 1
+      `,
+      [courseId, Number(catalog.id)]
+    );
+    if (existing && existing.id) {
+      const conflict = new Error('Subject already exists');
+      conflict.redirectPath = '/admin?err=Subject%20already%20exists%20in%20this%20course';
+      throw conflict;
+    }
+    const inserted = await createSubjectInstanceWithBinding(client, {
+      name,
+      catalogId: Number(catalog.id),
+      ownerCourseId: courseId,
+      settings,
+      isShared: false,
+    });
+    return Number(inserted && inserted.id ? inserted.id : 0) || null;
+  }).then((subjectId) => {
+    logAction(db, req, 'subject_add', {
+      subject_id: subjectId,
+      name,
+      group_count: settings.group_count,
+      default_group: settings.default_group,
+      show_in_teamwork: settings.show_in_teamwork,
+      visible: settings.visible,
+      is_required: settings.is_required,
+      is_general: settings.is_general,
+    });
+    logActivity(
+      db,
+      req,
+      'subject_add',
+      'subject',
+      Number(subjectId) || null,
+      {
+        name,
+        group_count: settings.group_count,
+        default_group: settings.default_group,
+        visible: settings.visible,
+        is_required: settings.is_required,
+        is_general: settings.is_general,
+      },
+      courseId
+    );
     invalidateSubjectsCache(courseId);
     return res.redirect('/admin?ok=Subject%20added');
+  }).catch((err) => {
+    if (err && err.redirectPath) {
+      return res.redirect(err.redirectPath);
     }
-  );
+    if (isDbSchemaCompatibilityError(err)) {
+      db.run(
+        'INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, is_required, is_general, course_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          name,
+          settings.group_count,
+          settings.default_group,
+          settings.show_in_teamwork,
+          settings.visible,
+          settings.is_required,
+          settings.is_general,
+          courseId,
+        ],
+        (fallbackErr) => {
+          if (fallbackErr) {
+            return res.redirect('/admin?err=Database%20error');
+          }
+          invalidateSubjectsCache(courseId);
+          return res.redirect('/admin?ok=Subject%20added');
+        }
+      );
+      return;
+    }
+    return res.redirect('/admin?err=Database%20error');
+  });
 });
 
 app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimiter, async (req, res) => {
@@ -35662,22 +37152,7 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
   }
 
   try {
-    const sourceSubject = await db.get(
-      `
-        SELECT
-          id,
-          name,
-          group_count,
-          default_group,
-          show_in_teamwork,
-          visible,
-          is_required,
-          is_general
-        FROM subjects
-        WHERE id = ? AND course_id = ?
-      `,
-      [sourceSubjectId, sourceCourseId]
-    );
+    const sourceSubject = await getSubjectForCourse(sourceSubjectId, sourceCourseId, { includeHidden: true });
     if (!sourceSubject) {
       return res.redirect('/admin?err=Source%20subject%20not%20found');
     }
@@ -35760,6 +37235,7 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
     let skippedMissingCourses = 0;
     let pathwaysSyncedCount = 0;
     let pathwaysResetCount = 0;
+    const touchedSubjectIds = new Set();
 
     for (const targetCourseId of targetCourseIds) {
       if (!validTargetSet.has(Number(targetCourseId))) {
@@ -35768,10 +37244,11 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
       }
       const existing = await db.get(
         `
-          SELECT id
-          FROM subjects
-          WHERE course_id = ?
-            AND LOWER(TRIM(name)) = LOWER(TRIM(?))
+          SELECT s.id
+          FROM subjects s
+          JOIN subject_course_bindings scb ON scb.subject_id = s.id
+          WHERE scb.course_id = ?
+            AND LOWER(TRIM(s.name)) = LOWER(TRIM(?))
           LIMIT 1
         `,
         [targetCourseId, targetName]
@@ -35803,7 +37280,7 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
                 visible = ?,
                 is_required = ?,
                 is_general = ?
-              WHERE id = ? AND course_id = ?
+              WHERE id = ?
             `,
             [
               targetName,
@@ -35814,27 +37291,46 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
               required,
               general,
               existingSubjectId,
-              targetCourseId,
             ]
           );
         } else {
           await db.run(
-            'UPDATE subjects SET name = ? WHERE id = ? AND course_id = ?',
-            [targetName, existingSubjectId, targetCourseId]
+            'UPDATE subjects SET name = ? WHERE id = ?',
+            [targetName, existingSubjectId]
           );
         }
+        await db.run(
+          `
+            INSERT INTO subject_course_bindings (subject_id, course_id, created_at, updated_at)
+            VALUES (?, ?, NOW(), NOW())
+            ON CONFLICT (subject_id, course_id)
+            DO UPDATE SET updated_at = NOW()
+          `,
+          [existingSubjectId, targetCourseId]
+        );
+        touchedSubjectIds.add(Number(existingSubjectId));
         updatedCount += 1;
       } else {
-        const inserted = await db.get(
-          `
-            INSERT INTO subjects
-              (name, group_count, default_group, show_in_teamwork, visible, is_required, is_general, course_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id
-          `,
-          [targetName, groupCount, defaultGroup, showInTeamwork, visible, required, general, targetCourseId]
-        );
-        targetSubjectId = parsePositiveIntStrict(inserted && inserted.id);
+        const createdSubject = await withTransaction(async (client) => {
+          return createSubjectInstanceWithBinding(client, {
+            name: targetName,
+            catalogId: Number(sourceSubject.catalog_id || 0) || null,
+            ownerCourseId: targetCourseId,
+            settings: {
+              group_count: groupCount,
+              default_group: defaultGroup,
+              show_in_teamwork: showInTeamwork,
+              visible,
+              is_required: required,
+              is_general: general,
+            },
+            isShared: false,
+          });
+        });
+        targetSubjectId = parsePositiveIntStrict(createdSubject && createdSubject.id);
+        if (targetSubjectId) {
+          touchedSubjectIds.add(Number(targetSubjectId));
+        }
         createdCount += 1;
       }
 
@@ -35843,7 +37339,7 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
         continue;
       }
 
-      if (syncPathways) {
+      if (syncPathways && targetSubjectId) {
         const admissions = admissionsByCourse.get(Number(targetCourseId)) || [];
         for (const admissionId of admissions) {
           if (sourceVisibilityByAdmission.has(Number(admissionId))) {
@@ -35875,6 +37371,9 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
     }
 
     insertedCourseIds.forEach((courseId) => invalidateSubjectsCache(courseId));
+    if (touchedSubjectIds.size) {
+      await invalidateSubjectCachesForSubjectIds(Array.from(touchedSubjectIds.values()));
+    }
     if (syncPathways && (pathwaysSyncedCount > 0 || pathwaysResetCount > 0)) {
       invalidateRegistrationPathwaysCache();
     }
@@ -35925,13 +37424,9 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
 
 app.post('/admin/subjects/edit/:id', requireSubjectsSectionAccess, (req, res) => {
   const { id } = req.params;
-  const { name, group_count, default_group, show_in_teamwork, visible, is_required, is_general } = req.body;
-  const count = Number(group_count);
-  const def = Number(default_group);
-  const teamworkFlag = String(show_in_teamwork) === '1' ? 1 : 0;
-  const visibleFlag = String(visible) === '0' ? 0 : 1;
-  const requiredFlag = String(is_required) === '0' ? 0 : 1;
-  const generalFlag = String(is_general) === '1' || String(is_general) === 'on' ? 1 : 0;
+  const name = normalizeSubjectDraftName(req.body.name, 140);
+  const count = Number(req.body.group_count);
+  const def = Number(req.body.default_group);
   const courseId = getAdminCourse(req);
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
     return res.redirect('/admin?err=Invalid%20subject%20data');
@@ -35939,19 +37434,87 @@ app.post('/admin/subjects/edit/:id', requireSubjectsSectionAccess, (req, res) =>
   if (Number.isNaN(def) || def < 1 || def > count) {
     return res.redirect('/admin?err=Invalid%20default%20group');
   }
-  db.run(
-    'UPDATE subjects SET name = ?, group_count = ?, default_group = ?, show_in_teamwork = ?, visible = ?, is_required = ?, is_general = ? WHERE id = ? AND course_id = ?',
-    [name, count, def, teamworkFlag, visibleFlag, requiredFlag, generalFlag, id, courseId],
-    (err) => {
-      if (err) {
-        return res.redirect('/admin?err=Database%20error');
-      }
-      logAction(db, req, 'subject_edit', { id, name, group_count: count, default_group: def, show_in_teamwork: teamworkFlag, visible: visibleFlag, is_required: requiredFlag, is_general: generalFlag });
-      logActivity(db, req, 'subject_edit', 'subject', Number(id) || null, { name, group_count: count, default_group: def, visible: visibleFlag, is_required: requiredFlag, is_general: generalFlag }, courseId);
-      invalidateSubjectsCache(courseId);
-      return res.redirect('/admin?ok=Subject%20updated');
+  const settings = buildSubjectSettingsDraft(req.body);
+  withTransaction(async (client) => {
+    const scopedSubject = await txGet(
+      client,
+      `
+        SELECT s.id, s.catalog_id
+        FROM subjects s
+        JOIN subject_course_bindings scb ON scb.subject_id = s.id
+        WHERE s.id = ? AND scb.course_id = ?
+        LIMIT 1
+      `,
+      [id, courseId]
+    );
+    if (!scopedSubject) {
+      const notFound = new Error('Subject not found');
+      notFound.redirectPath = '/admin?err=Subject%20not%20found';
+      throw notFound;
     }
-  );
+    const catalog = await upsertSubjectCatalogEntry(client, name);
+    await txRun(
+      client,
+      `
+        UPDATE subjects
+        SET
+          name = ?,
+          group_count = ?,
+          default_group = ?,
+          show_in_teamwork = ?,
+          visible = ?,
+          is_required = ?,
+          is_general = ?,
+          catalog_id = ?
+        WHERE id = ?
+      `,
+      [
+        name,
+        settings.group_count,
+        settings.default_group,
+        settings.show_in_teamwork,
+        settings.visible,
+        settings.is_required,
+        settings.is_general,
+        Number(catalog && catalog.id ? catalog.id : scopedSubject.catalog_id || 0) || null,
+        id,
+      ]
+    );
+  }).then(async () => {
+    logAction(db, req, 'subject_edit', {
+      id,
+      name,
+      group_count: settings.group_count,
+      default_group: settings.default_group,
+      show_in_teamwork: settings.show_in_teamwork,
+      visible: settings.visible,
+      is_required: settings.is_required,
+      is_general: settings.is_general,
+    });
+    logActivity(
+      db,
+      req,
+      'subject_edit',
+      'subject',
+      Number(id) || null,
+      {
+        name,
+        group_count: settings.group_count,
+        default_group: settings.default_group,
+        visible: settings.visible,
+        is_required: settings.is_required,
+        is_general: settings.is_general,
+      },
+      courseId
+    );
+    await invalidateSubjectCachesForSubjectIds([id]);
+    return res.redirect('/admin?ok=Subject%20updated');
+  }).catch((err) => {
+    if (err && err.redirectPath) {
+      return res.redirect(err.redirectPath);
+    }
+    return res.redirect('/admin?err=Database%20error');
+  });
 });
 
 app.post('/admin/api/subjects/:subjectId/clone', requireScheduleSectionAccess, async (req, res) => {
@@ -35962,22 +37525,23 @@ app.post('/admin/api/subjects/:subjectId/clone', requireScheduleSectionAccess, a
   }
   const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
   try {
-    const subject = await db.get('SELECT * FROM subjects WHERE id = ? AND course_id = ?', [subjectId, courseId]);
+    const subject = await getSubjectForCourse(subjectId, courseId, { includeHidden: true });
     if (!subject) return res.status(404).json({ error: 'Subject not found' });
     const copySettings = copy_settings !== false;
-    const row = await db.get(
-      `INSERT INTO subjects (name, group_count, default_group, show_in_teamwork, visible, is_general, course_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-      [
-        new_name.trim(),
-        copySettings ? subject.group_count : 1,
-        copySettings ? subject.default_group : 1,
-        copySettings ? subject.show_in_teamwork : 1,
-        copySettings ? subject.visible : 1,
-        copySettings ? (subject.is_general === false || subject.is_general === 0 ? 0 : 1) : 1,
-        courseId,
-      ]
-    );
+    const subjectName = normalizeSubjectDraftName(new_name, 140);
+    const row = await withTransaction(async (client) => {
+      const catalog = await upsertSubjectCatalogEntry(client, subjectName);
+      return createSubjectInstanceWithBinding(client, {
+        name: subjectName,
+        catalogId: Number(catalog && catalog.id ? catalog.id : subject.catalog_id || 0) || null,
+        ownerCourseId: courseId,
+        settings: copySettings
+          ? buildSubjectSettingsDraft({}, subject)
+          : buildSubjectSettingsDraft({}),
+        isShared: false,
+      });
+    });
+    await invalidateSubjectCachesForSubjectIds([row && row.id ? row.id : null]);
     invalidateSubjectsCache(courseId);
     return res.json({ ok: true, id: row?.id });
   } catch (err) {
@@ -36049,19 +37613,14 @@ app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkSectionAccess, 
   const homeworkId = Number(req.params.homeworkId);
   if (Number.isNaN(homeworkId)) return res.status(400).json({ error: 'Invalid homework' });
   const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
-  let activeSemester = null;
-  try {
-    activeSemester = await getActiveSemester(courseId);
-  } catch (err) {
-    return res.status(500).json({ error: 'Semester error' });
-  }
   const { target = {}, copy_attachments = true, copy_links = true } = req.body || {};
   try {
-    const hw = await db.get(
-      `SELECT * FROM homework WHERE id = ? AND course_id = ? AND semester_id = ?`,
-      [homeworkId, courseId, activeSemester ? activeSemester.id : null]
-    );
+    const hw = await db.get('SELECT * FROM homework WHERE id = ?', [homeworkId]);
     if (!hw) return res.status(404).json({ error: 'Not found' });
+    const subjectScope = await resolveSubjectCourseContext(hw.subject_id, courseId, { includeHidden: true });
+    if (!subjectScope) return res.status(404).json({ error: 'Not found' });
+    const storageCourseId = Number(subjectScope.owner_course_id || subjectScope.course_id || courseId || 1);
+    const activeSemester = await getActiveSemester(storageCourseId);
     const createdAt = new Date().toISOString();
     let classDate = null;
     let customDue = null;
@@ -36111,7 +37670,7 @@ app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkSectionAccess, 
         copy_attachments ? hw.file_name : null,
         hw.created_by,
         createdAt,
-        courseId,
+        storageCourseId,
         activeSemester ? activeSemester.id : null,
         isCustom,
         customDue,
@@ -36129,19 +37688,35 @@ app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkSectionAccess, 
 app.post('/admin/subjects/delete/:id', requireSubjectsSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
-  db.run('DELETE FROM student_groups WHERE subject_id = ?', [id], (delErr) => {
-    if (delErr) {
-      return res.redirect('/admin?err=Database%20error');
+  withTransaction(async (client) => {
+    const scopedSubject = await txGet(
+      client,
+      `
+        SELECT s.id
+        FROM subjects s
+        JOIN subject_course_bindings scb ON scb.subject_id = s.id
+        WHERE s.id = ? AND scb.course_id = ?
+        LIMIT 1
+      `,
+      [id, courseId]
+    );
+    if (!scopedSubject) {
+      const notFound = new Error('Subject not found');
+      notFound.redirectPath = '/admin?err=Subject%20not%20found';
+      throw notFound;
     }
-    db.run('DELETE FROM subjects WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
-      if (err) {
-        return res.redirect('/admin?err=Database%20error');
-      }
-      logAction(db, req, 'subject_delete', { id });
-      logActivity(db, req, 'subject_delete', 'subject', Number(id) || null, null, courseId);
-      invalidateSubjectsCache(courseId);
-      return res.redirect('/admin?ok=Subject%20deleted');
-    });
+    return removeSubjectBindingFromCourse(client, id, courseId);
+  }).then(async () => {
+    logAction(db, req, 'subject_unbind_course', { id, course_id: courseId });
+    logActivity(db, req, 'subject_unbind_course', 'subject', Number(id) || null, { course_id: courseId }, courseId);
+    await invalidateSubjectCachesForSubjectIds([id]);
+    invalidateSubjectsCache(courseId);
+    return res.redirect('/admin?ok=Subject%20removed%20from%20course');
+  }).catch((err) => {
+    if (err && err.redirectPath) {
+      return res.redirect(err.redirectPath);
+    }
+    return res.redirect('/admin?err=Database%20error');
   });
 });
 
@@ -36453,8 +38028,8 @@ app.post('/admin/api/courses/:courseId/study-days/:weekday/subjects', requireSch
   try {
     const course = await db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: 'Course not found' });
-    const subject = await db.get('SELECT id, course_id FROM subjects WHERE id = ?', [subjectId]);
-    if (!subject || Number(subject.course_id) !== courseId) {
+    const subject = await getSubjectForCourse(subjectId, courseId, { includeHidden: true });
+    if (!subject) {
       return res.status(400).json({ error: 'Invalid subject' });
     }
     await ensureCourseStudyDays(courseId);
@@ -36569,18 +38144,9 @@ app.post('/admin/api/homework/bulk', requireHomeworkSectionAccess, writeLimiter,
     return res.status(400).json({ error: 'Invalid input' });
   }
   const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
-  let activeSemester = null;
-  try {
-    activeSemester = await getActiveSemester(courseId);
-  } catch (err) {
-    return res.status(500).json({ error: 'Semester error' });
-  }
-  const placeholders = list.map(() => '?').join(',');
-  const scoped = await db.all(
-    `SELECT id, day_of_week, class_date, custom_due_date, week_number FROM homework
-     WHERE id IN (${placeholders}) AND course_id = ? AND semester_id = ?`,
-    [...list, courseId, activeSemester ? activeSemester.id : null]
-  );
+  const scoped = await getHomeworkRowsForCourse(list, courseId, {
+    selectClause: 'h.id, h.subject_id, h.course_id, h.semester_id, h.day_of_week, h.class_date, h.custom_due_date, h.week_number',
+  });
   const scopedIds = scoped.map((row) => row.id);
   if (!scopedIds.length) {
     return res.status(404).json({ error: 'No items found' });
@@ -36588,6 +38154,28 @@ app.post('/admin/api/homework/bulk', requireHomeworkSectionAccess, writeLimiter,
   const scopedPlaceholders = scopedIds.map(() => '?').join(',');
 
   try {
+    const semesterContextCache = new Map();
+    const resolveScopedSemester = async (row) => {
+      const storageCourseId = Number(row && row.course_id ? row.course_id : courseId || 1);
+      const explicitSemesterId = Number(row && row.semester_id ? row.semester_id : 0);
+      const cacheKey = explicitSemesterId > 0 ? `semester:${explicitSemesterId}` : `course:${storageCourseId}`;
+      if (semesterContextCache.has(cacheKey)) {
+        return semesterContextCache.get(cacheKey);
+      }
+      let semester = null;
+      if (explicitSemesterId > 0) {
+        semester = await db.get(
+          'SELECT id, course_id, start_date, weeks_count FROM semesters WHERE id = ? LIMIT 1',
+          [explicitSemesterId]
+        );
+      }
+      if (!semester && storageCourseId > 0) {
+        semester = await getActiveSemester(storageCourseId);
+      }
+      semesterContextCache.set(cacheKey, semester || null);
+      return semester || null;
+    };
+
     if (action === 'add_tags' || action === 'remove_tags') {
       const tagNames = Array.isArray(payload?.tags) ? payload.tags.map((t) => String(t).trim()).filter(Boolean) : [];
       if (!tagNames.length) return res.status(400).json({ error: 'No tags' });
@@ -36651,7 +38239,16 @@ app.post('/admin/api/homework/bulk', requireHomeworkSectionAccess, writeLimiter,
       }
       for (const row of scoped) {
         if (!row.day_of_week) continue;
-        const newDate = getDateForWeekDay(targetWeek, row.day_of_week, activeSemester ? activeSemester.start_date : null);
+        const storageSemester = await resolveScopedSemester(row);
+        const weeksCount = Number(storageSemester && storageSemester.weeks_count ? storageSemester.weeks_count : 0);
+        if (weeksCount > 0 && targetWeek > weeksCount) {
+          return res.status(400).json({ error: 'Invalid week' });
+        }
+        const newDate = getDateForWeekDay(
+          targetWeek,
+          row.day_of_week,
+          storageSemester && storageSemester.start_date ? storageSemester.start_date : null
+        );
         await db.run(
           'UPDATE homework SET class_date = ?, week_number = ?, custom_due_date = NULL, is_custom_deadline = 0 WHERE id = ?',
           [newDate, targetWeek, row.id]
@@ -36705,30 +38302,37 @@ app.post('/admin/api/homework/bulk', requireHomeworkSectionAccess, writeLimiter,
 
 app.get('/admin/api/schedule/validate', requireScheduleSectionAccess, async (req, res) => {
   const courseId = getStaffCourse(req);
-  let activeSemester = null;
-  try {
-    activeSemester = await getActiveSemester(courseId);
-  } catch (err) {
-    return res.status(500).json({ error: 'Semester error' });
-  }
   const week = req.query.week ? Number(req.query.week) : null;
   if (req.query.week && (Number.isNaN(week) || week < 1)) {
     return res.status(400).json({ error: 'Invalid week' });
   }
-  const filters = ['se.course_id = ?', 'se.semester_id = ?'];
-  const params = [courseId, activeSemester ? activeSemester.id : null];
-  if (week) {
-    filters.push('se.week_number = ?');
-    params.push(week);
-  }
-  const where = `WHERE ${filters.join(' AND ')}`;
   try {
     const studyDays = await getCourseStudyDays(courseId);
     const activeDaySet = new Set(
       (studyDays || []).filter((d) => d.is_active).map((d) => d.day_name)
     );
-    const subjects = await getSubjectsCached(courseId);
-    const subjectMap = new Map((subjects || []).map((s) => [s.id, { id: s.id, name: s.name, group_count: s.group_count }]));
+    const subjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false });
+    const subjectMap = new Map(
+      (subjectScope.subjects || []).map((s) => [s.id, { id: s.id, name: s.name, group_count: s.group_count }])
+    );
+    if (!subjectScope.subject_ids.length) {
+      return res.json({ issues: [], summary: { errors: 0, warnings: 0 } });
+    }
+    const filters = ['se.subject_id = ANY(?::int[])'];
+    const params = [subjectScope.subject_ids];
+    if (subjectScope.owner_course_ids.length) {
+      filters.push('se.course_id = ANY(?::int[])');
+      params.push(subjectScope.owner_course_ids);
+    }
+    if (subjectScope.owner_semester_ids.length) {
+      filters.push('(se.semester_id = ANY(?::int[]) OR se.semester_id IS NULL)');
+      params.push(subjectScope.owner_semester_ids);
+    }
+    if (week) {
+      filters.push('se.week_number = ?');
+      params.push(week);
+    }
+    const where = `WHERE ${filters.join(' AND ')}`;
     const rows = await db.all(
       `SELECT se.*
        FROM schedule_entries se
@@ -37119,11 +38723,11 @@ app.post('/admin/student-groups/set', requireUsersSectionAccess, (req, res) => {
   if (!student_id || !subject_id || Number.isNaN(groupNum)) {
     return res.redirect('/admin?err=Invalid%20group%20assignment');
   }
-  db.get('SELECT group_count FROM subjects WHERE id = ? AND course_id = ?', [subject_id, courseId], (err, subject) => {
-    if (err || !subject) {
+  getSubjectForCourse(subject_id, courseId, { includeHidden: true }).then((subject) => {
+    if (!subject) {
       return res.redirect('/admin?err=Database%20error');
     }
-    if (groupNum < 1 || groupNum > subject.group_count) {
+    if (groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
       return res.redirect('/admin?err=Group%20out%20of%20range');
     }
     db.run(
@@ -37144,6 +38748,8 @@ app.post('/admin/student-groups/set', requireUsersSectionAccess, (req, res) => {
         return res.redirect('/admin?ok=Group%20updated');
       }
     );
+  }).catch(() => {
+    return res.redirect('/admin?err=Database%20error');
   });
 });
 
@@ -37184,44 +38790,42 @@ app.post('/admin/students/groups/set', requireUsersOrStudentsSectionAccess, (req
       if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
         return res.redirect('/admin?tab=admin-students&err=Forbidden%20student%20scope');
       }
-      db.get(
-        'SELECT group_count FROM subjects WHERE id = ? AND course_id = ?',
-        [subject_id, courseId],
-        (err, subject) => {
-          if (err || !subject) {
-            return res.redirect('/admin?tab=admin-students&err=Database%20error');
-          }
-          if (groupNum < 1 || groupNum > subject.group_count) {
-            return res.redirect('/admin?tab=admin-students&err=Group%20out%20of%20range');
-          }
-          db.run(
-            `
-              INSERT INTO student_groups (student_id, subject_id, group_number)
-              VALUES (?, ?, ?)
-              ON CONFLICT(student_id, subject_id)
-              DO UPDATE SET group_number = excluded.group_number
-            `,
-            [student_id, subject_id, groupNum],
-            (setErr) => {
-              if (setErr) {
-                return res.redirect('/admin?tab=admin-students&err=Database%20error');
-              }
-              logAction(db, req, 'student_group_set', { student_id, subject_id, group_number: groupNum });
-              logActivity(
-                db,
-                req,
-                'group_set',
-                'student_group',
-                null,
-                { student_id, subject_id, group_number: groupNum, scope: 'students' },
-                courseId
-              );
-              broadcast('users_updated');
-              return res.redirect('/admin?tab=admin-students&ok=Group%20updated');
-            }
-          );
+      getSubjectForCourse(subject_id, courseId, { includeHidden: true }).then((subject) => {
+        if (!subject) {
+          return res.redirect('/admin?tab=admin-students&err=Database%20error');
         }
-      );
+        if (groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
+          return res.redirect('/admin?tab=admin-students&err=Group%20out%20of%20range');
+        }
+        db.run(
+          `
+            INSERT INTO student_groups (student_id, subject_id, group_number)
+            VALUES (?, ?, ?)
+            ON CONFLICT(student_id, subject_id)
+            DO UPDATE SET group_number = excluded.group_number
+          `,
+          [student_id, subject_id, groupNum],
+          (setErr) => {
+            if (setErr) {
+              return res.redirect('/admin?tab=admin-students&err=Database%20error');
+            }
+            logAction(db, req, 'student_group_set', { student_id, subject_id, group_number: groupNum });
+            logActivity(
+              db,
+              req,
+              'group_set',
+              'student_group',
+              null,
+              { student_id, subject_id, group_number: groupNum, scope: 'students' },
+              courseId
+            );
+            broadcast('users_updated');
+            return res.redirect('/admin?tab=admin-students&ok=Group%20updated');
+          }
+        );
+      }).catch(() => {
+        return res.redirect('/admin?tab=admin-students&err=Database%20error');
+      });
     }
   );
 });

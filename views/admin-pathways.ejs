@@ -6,11 +6,39 @@
   const selectedProgram = (programs || []).find((item) => Number(item.id) === selectedProgramValue) || null;
   const selectedAdmission = (admissions || []).find((item) => Number(item.id) === selectedAdmissionValue) || null;
   const copyAdmissions = Array.isArray(admissionCopyOptions) ? admissionCopyOptions : [];
-  const subjectCatalogList = Array.isArray(subjectCatalogCourses) ? subjectCatalogCourses : [];
+  const subjectCatalogList = Array.isArray(subjectCatalogEntries) ? subjectCatalogEntries : [];
   const campusBindingList = Array.isArray(registrationCampusBindings) ? registrationCampusBindings : [];
   const ambiguousCampusList = Array.isArray(ambiguousCampusBindings) ? ambiguousCampusBindings : [];
   const migrationCourseList = Array.isArray(migrationCourseOptions) ? migrationCourseOptions : [];
   const admissionCards = Array.isArray(admissionHealthCards) ? admissionHealthCards : [];
+  const catalogChecklistPropsJson = JSON.stringify({
+    targetSelector: '#pathwayCatalogAssignForm',
+    checkboxSelector: 'input[type="checkbox"][name="catalog_ids"]',
+    rowSelector: '[data-catalog-row]',
+    rowTextSelector: '[data-catalog-text]',
+    searchEnabled: true,
+    searchPlaceholder: isUk ? 'Знайти предмет' : 'Find subject',
+    labels: {
+      all: isUk ? 'Усі' : 'All',
+      none: isUk ? 'Нічого' : 'None',
+      invert: isUk ? 'Інвертувати' : 'Invert',
+      selected: isUk ? 'Вибрано' : 'Selected',
+    },
+  }).replace(/'/g, '&#39;');
+  const catalogCourseChecklistPropsJson = JSON.stringify({
+    targetSelector: '#pathwayCatalogAssignForm',
+    checkboxSelector: 'input[type="checkbox"][name="target_course_ids"]',
+    rowSelector: '[data-catalog-course-row]',
+    rowTextSelector: '[data-catalog-course-text]',
+    searchEnabled: true,
+    searchPlaceholder: isUk ? 'Знайти курс' : 'Find course',
+    labels: {
+      all: isUk ? 'Усі' : 'All',
+      none: isUk ? 'Нічого' : 'None',
+      invert: isUk ? 'Інвертувати' : 'Invert',
+      selected: isUk ? 'Вибрано' : 'Selected',
+    },
+  }).replace(/'/g, '&#39;');
   const cohortHealth = selectedCohortHealth || null;
   const cohortAlertsList = Array.isArray(cohortAlerts) ? cohortAlerts : [];
   const migrationSummaryValue = migrationSummary || {
@@ -153,10 +181,33 @@
     assignUsersToAdmission: 'Призначити користувачів до цього року вступу',
     migrationSafeModeCaption: 'Безпечний режим: оновлюються лише трек, програма та рік вступу. Наявна прив\'язка до курсу зберігається.',
     selectProgramAndAdmissionFirst: 'Спершу оберіть програму та рік вступу.',
-    catalogTitle: 'Каталог предметів',
-    catalogSubtitle: 'Лише для перегляду: список усіх предметів у всіх курсах. Це довідковий зріз для розбору проблем із контекстом і видимістю.',
-    coursesWithSubjects: 'Курсів з предметами',
-    subjectsCountSuffix: 'предметів',
+    catalogTitle: 'Глобальна база предметів',
+    catalogSubtitle: 'Створюйте базові предмети один раз, а потім додавайте їх на один або кілька курсів. Якщо ввімкнути спільний предмет, один instance ділитиме розклад, ДЗ, матеріали, викладачів і налаштування між усіма вибраними курсами.',
+    catalogCreateTitle: 'Новий базовий предмет',
+    catalogCreateSubtitle: 'Це лише запис у глобальній базі. Сам предмет у курси потрапляє окремим кроком нижче.',
+    catalogName: 'Назва предмета',
+    catalogCreateAction: 'Додати в базу',
+    catalogAssignTitle: 'Призначення на курси',
+    catalogAssignSubtitle: 'Оберіть один або кілька предметів із бази та один або кілька курсів. Спільний предмет за замовчуванням вимкнений.',
+    catalogEntriesCount: 'Предметів у базі',
+    instancesCount: 'Інстансів',
+    coursesCount: 'Курсів',
+    assignToCourses: 'Додати на вибрані курси',
+    sharedSubject: 'Спільний предмет',
+    sharedSubjectHint: 'Один subject instance для всіх вибраних курсів: спільні розклад, ДЗ, матеріали, викладачі й налаштування.',
+    separateSubjectHint: 'Окремі subject instance по кожному курсу: база спільна лише як каталог назви.',
+    targetCourses: 'Цільові курси',
+    sourceCourse: 'Базовий курс для копіювання налаштувань',
+    catalogEmptyState: 'У глобальній базі ще немає предметів.',
+    catalogNoInstances: 'Цей базовий предмет ще не призначено на жоден курс.',
+    catalogInstanceShared: 'Спільний',
+    catalogInstanceSeparate: 'Окремий',
+    catalogCourseRemove: 'Прибрати з курсу',
+    catalogOwnerCourse: 'Основний курс',
+    catalogVisibleHidden: 'Приховано',
+    catalogVisibleShown: 'Видимо',
+    yes: 'Так',
+    no: 'Ні',
     hiddenInBaseCourse: 'Приховано в базовому курсі',
     noSubjectsFound: 'Предметів ще не знайдено.',
     all: 'Усі',
@@ -310,10 +361,33 @@
     assignUsersToAdmission: 'Assign users to this admission',
     migrationSafeModeCaption: 'Safe mode: only track, program, and admission are updated. The existing course binding is preserved.',
     selectProgramAndAdmissionFirst: 'Select program and admission year first.',
-    catalogTitle: 'Subject catalog',
-    catalogSubtitle: 'Read-only list of all subjects across every course. This remains the long-tail reference view for debugging scope mismatches.',
-    coursesWithSubjects: 'Courses with subjects',
-    subjectsCountSuffix: 'subjects',
+    catalogTitle: 'Global subject base',
+    catalogSubtitle: 'Create base subjects once and then assign them to one or many courses. When shared subject is enabled, one instance shares schedule, homework, materials, teachers, and settings across all selected courses.',
+    catalogCreateTitle: 'New base subject',
+    catalogCreateSubtitle: 'This adds only the record to the global base. Course assignment happens in the next form.',
+    catalogName: 'Subject name',
+    catalogCreateAction: 'Add to base',
+    catalogAssignTitle: 'Course assignment',
+    catalogAssignSubtitle: 'Pick one or many subjects from the base and one or many courses. Shared subject is off by default.',
+    catalogEntriesCount: 'Subjects in base',
+    instancesCount: 'Instances',
+    coursesCount: 'Courses',
+    assignToCourses: 'Assign to selected courses',
+    sharedSubject: 'Shared subject',
+    sharedSubjectHint: 'One subject instance for all selected courses: shared schedule, homework, materials, teachers, and settings.',
+    separateSubjectHint: 'Separate subject instances per course: only the catalog name stays shared.',
+    targetCourses: 'Target courses',
+    sourceCourse: 'Base course for settings copy',
+    catalogEmptyState: 'No subjects in the global base yet.',
+    catalogNoInstances: 'This base subject is not assigned to any course yet.',
+    catalogInstanceShared: 'Shared',
+    catalogInstanceSeparate: 'Separate',
+    catalogCourseRemove: 'Remove from course',
+    catalogOwnerCourse: 'Owner course',
+    catalogVisibleHidden: 'Hidden',
+    catalogVisibleShown: 'Visible',
+    yes: 'Yes',
+    no: 'No',
     hiddenInBaseCourse: 'Hidden in base course',
     noSubjectsFound: 'No subjects found yet.',
     all: 'All',
@@ -675,10 +749,23 @@
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         gap: 12px;
       }
+      .catalog-forms {
+        display: grid;
+        grid-template-columns: minmax(280px, 0.9fr) minmax(360px, 1.1fr);
+        gap: 12px;
+      }
       .catalog-card {
         display: flex;
         flex-direction: column;
         gap: 12px;
+      }
+      .catalog-select-row,
+      .catalog-target-row,
+      .catalog-instance-row {
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.22);
+        padding: 12px 14px;
       }
       .catalog-card-header {
         display: flex;
@@ -686,27 +773,78 @@
         align-items: flex-start;
         gap: 10px;
       }
-      .catalog-subject-list {
+      .catalog-subject-list,
+      .catalog-target-list {
         display: grid;
         gap: 8px;
         max-height: 320px;
         overflow: auto;
         padding-right: 4px;
       }
-      .catalog-subject-row {
+      .catalog-select-row {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      .catalog-instance-row {
+        display: grid;
+        gap: 10px;
+      }
+      .catalog-target-row {
         display: flex;
         justify-content: space-between;
         gap: 10px;
         align-items: center;
-        border-radius: 12px;
-        border: 1px solid rgba(148, 163, 184, 0.24);
-        background: rgba(15, 23, 42, 0.28);
-        padding: 10px 12px;
       }
-      .catalog-subject-row.is-hidden {
+      .catalog-instance-row.is-hidden {
         opacity: 0.64;
       }
-      body.theme-light .catalog-subject-row {
+      .catalog-instance-head,
+      .catalog-select-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .catalog-select-copy {
+        display: grid;
+        gap: 4px;
+      }
+      .catalog-course-chip-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .catalog-course-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+        padding: 6px 10px;
+        font-size: 0.8rem;
+      }
+      .catalog-course-chip button,
+      .catalog-course-chip[type="submit"] {
+        all: unset;
+      }
+      .catalog-course-chip:hover {
+        border-color: rgba(125, 211, 252, 0.45);
+      }
+      .catalog-course-chip-remove {
+        font-size: 0.92rem;
+        opacity: 0.78;
+      }
+      .catalog-chip-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      body.theme-light .catalog-select-row,
+      body.theme-light .catalog-target-row,
+      body.theme-light .catalog-instance-row {
         background: rgba(255, 255, 255, 0.92);
         border-color: rgba(15, 23, 42, 0.12);
       }
@@ -719,6 +857,24 @@
       }
       .catalog-count {
         white-space: nowrap;
+      }
+      .catalog-empty {
+        padding: 20px;
+        text-align: center;
+      }
+      .catalog-settings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+      }
+      .catalog-shared-note {
+        font-size: 0.79rem;
+        line-height: 1.45;
+      }
+      @media (max-width: 991px) {
+        .catalog-forms {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
     <link rel="stylesheet" href="/css/studerria-ui.css" />
@@ -1438,35 +1594,203 @@
             <h2 class="section-title"><%= ui.catalogTitle %></h2>
             <p class="section-subtitle"><%= ui.catalogSubtitle %></p>
           </div>
-          <span class="chip"><%= ui.coursesWithSubjects %>: <%= subjectCatalogList.length %></span>
+          <span class="chip"><%= ui.catalogEntriesCount %>: <%= subjectCatalogList.length %></span>
         </div>
+
+        <div class="catalog-forms mb-3">
+          <form class="soft-panel h-100" method="POST" action="/admin/pathways/catalog/add">
+            <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+            <input type="hidden" name="track" value="<%= activeTrack %>" />
+            <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+            <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+            <div class="section-header mb-2">
+              <div>
+                <h3 class="section-title h5 mb-1"><%= ui.catalogCreateTitle %></h3>
+                <p class="section-subtitle mb-0"><%= ui.catalogCreateSubtitle %></p>
+              </div>
+            </div>
+            <div class="row g-2 align-items-end">
+              <div class="col-12">
+                <label class="form-label small"><%= ui.catalogName %></label>
+                <input class="form-control compact-input" type="text" name="catalog_name" maxlength="140" placeholder="Data Science" required />
+              </div>
+              <div class="col-12 d-grid">
+                <button class="btn btn-primary btn-pill" type="submit"><%= ui.catalogCreateAction %></button>
+              </div>
+            </div>
+          </form>
+
+          <form id="pathwayCatalogAssignForm" class="soft-panel h-100" method="POST" action="/admin/pathways/catalog/assign">
+            <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+            <input type="hidden" name="source_course_id" value="<%= selectedCourseValue %>" />
+            <input type="hidden" name="track" value="<%= activeTrack %>" />
+            <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+            <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+            <input type="hidden" name="sync_pathways" value="1" />
+            <div class="section-header mb-2">
+              <div>
+                <h3 class="section-title h5 mb-1"><%= ui.catalogAssignTitle %></h3>
+                <p class="section-subtitle mb-0"><%= ui.catalogAssignSubtitle %></p>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+              <span class="muted"><%= ui.bulkActions %></span>
+              <span
+                data-react-island="checklist-toolbar"
+                data-island-props='<%- catalogChecklistPropsJson %>'
+              ></span>
+            </div>
+
+            <div class="catalog-settings-grid mb-3">
+              <div>
+                <label class="form-label small"><%= ui.groups %></label>
+                <select class="form-select compact-select" name="group_count">
+                  <option value="1" selected>1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label small"><%= ui.defaultGroup || 'Default group' %></label>
+                <select class="form-select compact-select" name="default_group">
+                  <option value="1" selected>1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label small">Teamwork</label>
+                <select class="form-select compact-select" name="show_in_teamwork">
+                  <option value="1" selected><%= ui.yes %></option>
+                  <option value="0"><%= ui.no %></option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label small"><%= ui.visibleLabel %></label>
+                <select class="form-select compact-select" name="visible">
+                  <option value="1" selected><%= ui.yes %></option>
+                  <option value="0"><%= ui.no %></option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label small">Required</label>
+                <select class="form-select compact-select" name="is_required">
+                  <option value="1" selected><%= ui.yes %></option>
+                  <option value="0"><%= ui.no %></option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label small">General</label>
+                <select class="form-select compact-select" name="is_general">
+                  <option value="1" selected><%= ui.yes %></option>
+                  <option value="0"><%= ui.no %></option>
+                </select>
+              </div>
+            </div>
+
+            <div class="soft-panel mb-3">
+              <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" id="pathwaysSharedSubject" name="shared_subject" value="1" />
+                <label class="form-check-label" for="pathwaysSharedSubject"><%= ui.sharedSubject %></label>
+              </div>
+              <div class="catalog-shared-note muted"><%= ui.sharedSubjectHint %></div>
+              <div class="catalog-shared-note muted mt-1"><%= ui.separateSubjectHint %></div>
+            </div>
+
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+              <span class="muted"><%= ui.targetCourses %></span>
+              <span
+                data-react-island="checklist-toolbar"
+                data-island-props='<%- catalogCourseChecklistPropsJson %>'
+              ></span>
+            </div>
+            <div class="catalog-target-list mb-3">
+              <% (courses || []).forEach((course) => { %>
+                <label class="catalog-target-row" data-catalog-course-row data-catalog-course-text="<%= `${course.name || ''} ${course.id || ''}` %>">
+                  <span data-catalog-course-text>
+                    <span class="row-label"><%= course.name %></span>
+                    <span class="catalog-subject-meta d-block">#<%= course.id %><%= course.location ? ` · ${formatCampusLabel(course.location)}` : '' %></span>
+                  </span>
+                  <input class="form-check-input" type="checkbox" name="target_course_ids" value="<%= course.id %>" />
+                </label>
+              <% }) %>
+            </div>
+
+            <div class="catalog-subject-meta mb-3"><%= ui.sourceCourse %>: <%= selectedCourseLabel || ui.noCourseSelected %></div>
+            <div class="d-grid">
+              <button class="btn btn-primary btn-pill" type="submit"><%= ui.assignToCourses %></button>
+            </div>
+          </form>
+        </div>
+
         <div class="catalog-grid">
-          <% (subjectCatalogList || []).forEach((course) => { %>
+          <% (subjectCatalogList || []).forEach((catalogEntry) => { %>
             <article class="soft-panel catalog-card">
               <div class="catalog-card-header">
-                <div>
-                  <div class="row-label"><%= buildCourseLabel(course) %></div>
-                  <div class="muted"><%= buildCourseMetaLine(course) %></div>
+                <label class="catalog-select-row flex-grow-1" data-catalog-row data-catalog-text="<%= `${catalogEntry.name || ''} ${(catalogEntry.instances || []).map((instance) => instance.course_names || '').join(' ')}` %>">
+                  <input class="form-check-input mt-1" type="checkbox" name="catalog_ids" value="<%= catalogEntry.id %>" form="pathwayCatalogAssignForm" />
+                  <span class="catalog-select-copy" data-catalog-text>
+                    <span class="row-label"><%= catalogEntry.name %></span>
+                    <span class="catalog-subject-meta">
+                      <%= ui.instancesCount %>: <%= Number(catalogEntry.total_instances || 0) %> · <%= ui.coursesCount %>: <%= Number(catalogEntry.total_courses || 0) %>
+                    </span>
+                  </span>
+                </label>
+                <div class="catalog-chip-group">
+                  <span class="chip catalog-count"><%= Number(catalogEntry.total_instances || 0) %> <%= ui.instancesCount.toLowerCase() %></span>
+                  <span class="chip catalog-count"><%= Number(catalogEntry.total_courses || 0) %> <%= ui.coursesCount.toLowerCase() %></span>
                 </div>
-                <span class="chip catalog-count"><%= Number((course.subjects || []).length) %> <%= ui.subjectsCountSuffix %></span>
               </div>
               <div class="catalog-subject-list">
-                <% (course.subjects || []).forEach((subject) => { %>
-                  <div class="catalog-subject-row <%= subject.is_visible ? '' : 'is-hidden' %>">
+                <% (catalogEntry.instances || []).forEach((subject) => { %>
+                  <div class="catalog-instance-row <%= subject.is_visible ? '' : 'is-hidden' %>">
+                    <div class="catalog-instance-head">
+                      <div>
+                        <div class="row-label">
+                          <%= subject.is_shared ? ui.catalogInstanceShared : ui.catalogInstanceSeparate %> · #<%= subject.id %>
+                        </div>
+                        <div class="catalog-subject-meta">
+                          <%= ui.groups %>: <%= Number(subject.group_count || 1) %> ·
+                          <%= ui.defaultGroup || 'Default group' %>: <%= Number(subject.default_group || 1) %> ·
+                          Teamwork: <%= subject.show_in_teamwork ? ui.yes : ui.no %> ·
+                          <%= subject.is_visible ? ui.catalogVisibleShown : ui.catalogVisibleHidden %>
+                        </div>
+                      </div>
+                      <span class="status-pill status-pill--<%= subject.is_shared ? 'focus' : 'info' %>">
+                        <%= subject.is_shared ? ui.catalogInstanceShared : ui.catalogInstanceSeparate %>
+                      </span>
+                    </div>
                     <div>
-                      <div class="row-label"><%= subject.name %></div>
                       <div class="catalog-subject-meta">
-                        <%= ui.groups %>: <%= Number(subject.group_count || 1) %><%= subject.is_visible ? '' : ` / ${ui.hiddenInBaseCourse}` %>
+                        <%= ui.catalogOwnerCourse %>:
+                        <%= ((subject.course_labels || []).find((label) => Number(label.id) === Number(subject.owner_course_id || 0)) || {}).name || ('#' + Number(subject.owner_course_id || 0)) %>
                       </div>
                     </div>
-                    <span class="chip">#<%= subject.id %></span>
+                    <div class="catalog-course-chip-wrap">
+                      <% (subject.course_labels || []).forEach((courseLabel) => { %>
+                        <form method="POST" action="/admin/pathways/subjects/<%= subject.id %>/course/<%= courseLabel.id %>/remove">
+                          <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                          <input type="hidden" name="track" value="<%= activeTrack %>" />
+                          <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                          <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                          <button class="catalog-course-chip" type="submit">
+                            <span><%= courseLabel.name %></span>
+                            <span class="catalog-course-chip-remove" aria-hidden="true">×</span>
+                          </button>
+                        </form>
+                      <% }) %>
+                    </div>
                   </div>
                 <% }) %>
+                <% if (!(catalogEntry.instances || []).length) { %>
+                  <div class="soft-panel muted catalog-empty"><%= ui.catalogNoInstances %></div>
+                <% } %>
               </div>
             </article>
           <% }) %>
           <% if (!subjectCatalogList.length) { %>
-            <div class="soft-panel muted"><%= ui.noSubjectsFound %></div>
+            <div class="soft-panel muted catalog-empty"><%= ui.catalogEmptyState %></div>
           <% } %>
         </div>
       </section>

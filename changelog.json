@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.17",
+      "date": "2026-03-12",
+      "items": [
+        "feat(pathways-global-subject-catalog): added a global subject catalog with shared or separate assignment to one or many courses, backfilled existing subjects into the new catalog, and moved this management flow into the lower Pathways block",
+        "fix(shared-subject-bound-flows): updated schedule, teamwork, homework, My Day, schedule-list, bulk admin actions, student homework submit/complete flows, study-day bindings, student-group assignment, and schedule-generator subject checks so shared subjects now resolve through `subject_course_bindings` instead of breaking outside the owner course"
+      ]
+    },
+    {
       "version": "1.2.16",
       "date": "2026-03-12",
       "items": [

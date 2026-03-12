@@ -33,6 +33,7 @@ const registrationPathways = require('./032_registration_pathways');
 const teacherHomeworkTemplates = require('./033_teacher_homework_templates');
 const pathwaysBulkAssignAndInsightsIndexes = require('./034_pathways_bulk_assign_and_insights_indexes');
 const supportRequests = require('./035_support_requests');
+const subjectCatalogAndBindings = require('./036_subject_catalog_and_bindings');
 
 module.exports = [
   init,
@@ -70,4 +71,5 @@ module.exports = [
   teacherHomeworkTemplates,
   pathwaysBulkAssignAndInsightsIndexes,
   supportRequests,
+  subjectCatalogAndBindings,
 ];
