@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.16",
+      "date": "2026-03-12",
+      "items": [
+        "tune(help-center-hero-simplification): removed the extra hero action and metrics block from FAQ & Help so the top section is cleaner and no longer carries the oversized right-side panel"
+      ]
+    },
+    {
       "version": "1.2.15",
       "date": "2026-03-12",
       "items": [

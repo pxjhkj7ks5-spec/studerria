@@ -63,26 +63,6 @@
             <p class="studerria-help-lead"><%= helpPage.hero.lead %></p>
             <p class="studerria-help-note"><%= helpPage.hero.note %></p>
           </div>
-          <div class="studerria-help-actions">
-            <div class="studerria-help-action-row">
-              <a class="btn btn-primary" href="#support-form"><%= helpPage.actions.support %></a>
-              <a class="btn btn-outline-secondary" href="#faq-grid"><%= helpPage.actions.faq %></a>
-            </div>
-            <div class="studerria-help-metrics" aria-label="Support metrics">
-              <article class="studerria-help-metric">
-                <span class="studerria-help-metric-label"><%= t('help.metrics.open') %></span>
-                <strong class="studerria-help-metric-value"><%= supportStats && typeof supportStats.open !== 'undefined' ? supportStats.open : 0 %></strong>
-              </article>
-              <article class="studerria-help-metric">
-                <span class="studerria-help-metric-label"><%= t('help.metrics.resolved') %></span>
-                <strong class="studerria-help-metric-value"><%= supportStats && typeof supportStats.resolved !== 'undefined' ? supportStats.resolved : 0 %></strong>
-              </article>
-              <article class="studerria-help-metric">
-                <span class="studerria-help-metric-label"><%= t('help.metrics.response') %></span>
-                <strong class="studerria-help-metric-value"><%= supportStats && supportStats.response ? supportStats.response : '—' %></strong>
-              </article>
-            </div>
-          </div>
         </div>
       </article>
 
