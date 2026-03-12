@@ -3723,6 +3723,18 @@
 
         <% if (sectionAllowed('admin-messages') && settings && settings.allow_messages) { %>
         <div id="admin-messages" class="admin-panel" data-admin-title="Communications / Messages">
+          <%
+            const adminSupportLocale = lang === 'uk' ? 'uk-UA' : 'en-US';
+            const formatAdminSupportStamp = (value) => {
+              if (!value) return '—';
+              const date = new Date(value);
+              if (Number.isNaN(date.getTime())) return value;
+              return date.toLocaleString(adminSupportLocale, {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              });
+            };
+          %>
           <div class="card mb-4">
             <div class="card-body">
               <h5 class="card-title mb-3"><%= t('admin.sendMessage') %></h5>
@@ -3869,6 +3881,74 @@
               </div>
             </div>
           </div>
+
+          <% if (supportInboxVisible) { %>
+            <div class="card mb-4">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                  <div>
+                    <h5 class="card-title mb-1"><%= t('admin.supportInboxTitle') %></h5>
+                    <div class="small text-muted"><%= t('admin.supportInboxSubtitle') %></div>
+                  </div>
+                  <span class="badge bg-primary-subtle text-primary-emphasis rounded-pill"><%= (supportRequests || []).length %></span>
+                </div>
+
+                <% if ((supportRequests || []).length) { %>
+                  <div class="d-grid gap-3">
+                    <% (supportRequests || []).forEach(function(request) { %>
+                      <article class="border rounded-4 p-3">
+                        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-2">
+                          <div>
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                              <span class="badge <%= request.status === 'resolved' ? 'bg-success' : (request.status === 'in_progress' ? 'bg-info text-dark' : 'bg-warning text-dark') %>">
+                                <%= t(`help.status.${request.status === 'in_progress' ? 'inProgress' : request.status}`) %>
+                              </span>
+                              <span class="badge bg-secondary-subtle text-secondary-emphasis">
+                                <%= t(`help.topic.${request.category}`) %>
+                              </span>
+                            </div>
+                            <h6 class="mb-1"><%= request.subject %></h6>
+                            <div class="small text-muted">
+                              <strong><%= t('admin.supportTicketUser') %>:</strong> <%= request.user_name %>
+                            </div>
+                            <div class="small text-muted">
+                              <strong><%= t('admin.supportTicketUpdated') %>:</strong> <%= formatAdminSupportStamp(request.updated_at || request.created_at) %>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="mb-3">
+                          <div class="small text-muted mb-1"><%= t('admin.supportTicketMessage') %></div>
+                          <div style="white-space: pre-wrap;"><%= request.body %></div>
+                        </div>
+
+                        <form method="POST" action="/admin/support-requests/<%= request.id %>/update" class="row g-2 align-items-start">
+                          <div class="col-12 col-lg-3">
+                            <label class="form-label"><%= t('admin.supportTicketStatus') %></label>
+                            <select class="form-select" name="status">
+                              <option value="new" <%= request.status === 'new' ? 'selected' : '' %>><%= t('help.status.new') %></option>
+                              <option value="in_progress" <%= request.status === 'in_progress' ? 'selected' : '' %>><%= t('help.status.inProgress') %></option>
+                              <option value="resolved" <%= request.status === 'resolved' ? 'selected' : '' %>><%= t('help.status.resolved') %></option>
+                            </select>
+                          </div>
+                          <div class="col-12 col-lg-7">
+                            <label class="form-label"><%= t('admin.supportTicketNote') %></label>
+                            <textarea class="form-control" name="admin_note" rows="3" maxlength="1000"><%= request.admin_note || '' %></textarea>
+                          </div>
+                          <div class="col-12 col-lg-2 d-grid">
+                            <label class="form-label d-none d-lg-block">&nbsp;</label>
+                            <button class="btn btn-primary" type="submit"><%= t('admin.supportTicketSave') %></button>
+                          </div>
+                        </form>
+                      </article>
+                    <% }); %>
+                  </div>
+                <% } else { %>
+                  <p class="text-muted mb-0"><%= t('admin.supportInboxEmpty') %></p>
+                <% } %>
+              </div>
+            </div>
+          <% } %>
         </div>
       </div>
       <% } %>

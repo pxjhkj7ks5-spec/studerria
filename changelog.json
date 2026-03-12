@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.13",
+      "date": "2026-03-12",
+      "items": [
+        "feat(help-center-faq-page): added a new Personal -> FAQ & Help page with a liquid-glass FAQ knowledge base, direct support form, and personal request history for students and staff",
+        "feat(help-center-admin-inbox): added persistent support request storage plus an admin inbox inside Communications so incoming tickets can be reviewed, annotated, and resolved"
+      ]
+    },
+    {
       "version": "1.2.12",
       "date": "2026-03-11",
       "items": [

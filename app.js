@@ -6701,6 +6701,179 @@ function sortHomework(homework, sortKey) {
   return copy;
 }
 
+const SUPPORT_REQUEST_CATEGORIES = ['account', 'schedule', 'journal', 'subjects', 'teamwork', 'other'];
+const SUPPORT_REQUEST_STATUSES = ['new', 'in_progress', 'resolved'];
+
+function normalizeSupportRequestCategory(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return SUPPORT_REQUEST_CATEGORIES.includes(normalized) ? normalized : 'other';
+}
+
+function normalizeSupportRequestStatus(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return SUPPORT_REQUEST_STATUSES.includes(normalized) ? normalized : 'new';
+}
+
+async function listSupportRequestsForUser(userId, limit = 12) {
+  if (!Number.isFinite(Number(userId))) {
+    return [];
+  }
+  const safeLimit = Math.min(Math.max(Number(limit) || 12, 1), 50);
+  return db.all(
+    `
+      SELECT sr.*
+      FROM support_requests sr
+      WHERE sr.user_id = ?
+      ORDER BY sr.updated_at DESC, sr.created_at DESC
+      LIMIT ${safeLimit}
+    `,
+    [userId]
+  );
+}
+
+async function listSupportRequestsForCourse(courseId, limit = 40) {
+  if (!Number.isFinite(Number(courseId))) {
+    return [];
+  }
+  const safeLimit = Math.min(Math.max(Number(limit) || 40, 1), 120);
+  return db.all(
+    `
+      SELECT sr.*, u.full_name AS user_name
+      FROM support_requests sr
+      JOIN users u ON u.id = sr.user_id
+      WHERE sr.course_id = ?
+      ORDER BY sr.updated_at DESC, sr.created_at DESC
+      LIMIT ${safeLimit}
+    `,
+    [courseId]
+  );
+}
+
+function buildHelpPageContent(lang) {
+  const isUk = lang === 'uk';
+  return {
+    hero: {
+      kicker: isUk ? 'Особисте / Підтримка' : 'Personal / Support',
+      title: 'FAQ & Help',
+      subtitle: isUk
+        ? 'Часті питання, короткі відповіді й пряме звернення до техпідтримки.'
+        : 'Frequent questions, quick answers, and a direct line to technical support.',
+      lead: isUk
+        ? 'У цьому просторі можна швидко знайти відповідь по доступу, розкладу, журналу, предметах і teamwork або одразу створити звернення для адміністратора.'
+        : 'Use this space to quickly resolve account, schedule, journal, subject, or teamwork questions, or create a ticket for the administrator right away.',
+      note: isUk
+        ? 'Нові заявки зберігаються в персональній історії та потрапляють в inbox адміністратора.'
+        : 'New requests are saved in your personal history and delivered to the administrator inbox.',
+    },
+    actions: {
+      faq: isUk ? 'Перейти до FAQ' : 'Browse FAQ',
+      support: isUk ? 'Створити звернення' : 'Create request',
+    },
+    faqTitle: isUk ? 'Часті питання' : 'Frequently asked questions',
+    faqSubtitle: isUk
+      ? 'Найтиповіші сценарії, які найчастіше виникають у персональному просторі.'
+      : 'The most common scenarios that appear in the personal workspace.',
+    faqGroups: [
+      {
+        kicker: isUk ? 'Доступ' : 'Access',
+        title: isUk ? 'Акаунт і профіль' : 'Account and profile',
+        items: [
+          {
+            question: isUk ? 'Не вдається увійти в акаунт. Що робити?' : 'I cannot sign in. What should I do?',
+            answer: isUk
+              ? 'Спочатку перевірте правильність ПІБ і пароля. Якщо доступ усе одно не працює, створіть звернення з темою "Акаунт", і адміністратор перевірить ваш профіль та активність сесії.'
+              : 'First check that your full name and password are correct. If access still fails, create an "Account" request and the administrator will review your profile and session state.',
+          },
+          {
+            question: isUk ? 'Де змінити ПІБ, пароль або мову?' : 'Where can I update my name, password, or language?',
+            answer: isUk
+              ? 'Відкрийте "Особисте → Профіль". Там можна змінити ПІБ, пароль і мову інтерфейсу без переходу в інші розділи.'
+              : 'Open "Personal → Profile". That page lets you change your full name, password, and interface language without leaving the personal section.',
+          },
+          {
+            question: isUk ? 'Як обрати предметні групи заново?' : 'How do I choose subject groups again?',
+            answer: isUk
+              ? 'У профілі є окрема дія для повторного вибору груп. Вона поверне вас у крок налаштування предметів і дозволить оновити вибір без створення нового акаунта.'
+              : 'Your profile includes a dedicated action to reselect subject groups. It returns you to the subject setup step so you can update choices without creating a new account.',
+          },
+        ],
+      },
+      {
+        kicker: isUk ? 'Навчання' : 'Study flow',
+        title: isUk ? 'Розклад і журнал' : 'Schedule and journal',
+        items: [
+          {
+            question: isUk ? 'У розкладі немає пари або дедлайну.' : 'A class or deadline is missing from the schedule.',
+            answer: isUk
+              ? 'Спочатку перевірте правильний тиждень і курс. Якщо елемент все одно відсутній, надішліть звернення з темою "Розклад" і вкажіть день, пару, предмет та курс.'
+              : 'First confirm you are on the correct week and course. If the item is still missing, submit a "Schedule" request and include the day, class slot, subject, and course.',
+          },
+          {
+            question: isUk ? 'Чому журнал порожній або не відкривається?' : 'Why is the journal empty or unavailable?',
+            answer: isUk
+              ? 'Причиною може бути роль, ще не налаштований предмет або тимчасова помилка даних. У заявці з темою "Журнал" коротко опишіть, який предмет і яка дія не спрацювала.'
+              : 'This can happen because of role access, an unconfigured subject, or a temporary data issue. In a "Journal" request, briefly note which subject and which action failed.',
+          },
+          {
+            question: isUk ? 'Куди повідомити про неправильний предмет або групу?' : 'Where do I report the wrong subject or group?',
+            answer: isUk
+              ? 'Найкраще створити звернення з темою "Предмети" і додати, який саме курс, предмет або група відображаються неправильно.'
+              : 'The best option is to create a "Subjects" request and mention which course, subject, or group is displayed incorrectly.',
+          },
+        ],
+      },
+      {
+        kicker: isUk ? 'Колаборація' : 'Collaboration',
+        title: isUk ? 'Матеріали й teamwork' : 'Materials and teamwork',
+        items: [
+          {
+            question: isUk ? 'Не відкривається файл або посилання на матеріал.' : 'A material file or link does not open.',
+            answer: isUk
+              ? 'Перевірте, чи проблема повторюється на іншому предметі або сторінці. Якщо ні, вкажіть предмет і назву матеріалу в зверненні, щоб адміністратор перевірив саме це вкладення.'
+              : 'Check whether the problem repeats on a different subject or page. If not, include the subject and the material name in your request so the administrator can verify that exact attachment.',
+          },
+          {
+            question: isUk ? 'Не вдається створити або приєднатись до команди.' : 'I cannot create or join a team.',
+            answer: isUk
+              ? 'Таке трапляється, коли є обмеження по ролі, групі або поточному складу команди. Виберіть тему "Teamwork" і опишіть завдання та крок, на якому з’явилась проблема.'
+              : 'This usually happens because of role, group, or membership limits. Choose the "Teamwork" topic and describe the task plus the step where the issue appeared.',
+          },
+          {
+            question: isUk ? 'Хочу повідомити про загальний баг або UX-проблему.' : 'I want to report a general bug or UX issue.',
+            answer: isUk
+              ? 'Створіть звернення з темою "Інше" і дайте короткий сценарій: де ви були, що натиснули, що очікували й що отримали фактично.'
+              : 'Create an "Other" request and share a short scenario: where you were, what you clicked, what you expected, and what actually happened.',
+          },
+        ],
+      },
+    ],
+    stepsTitle: isUk ? 'Як працює підтримка' : 'How support works',
+    stepsSubtitle: isUk
+      ? 'Проста схема, щоб звернення одразу було придатне для роботи.'
+      : 'A simple flow so each request is immediately actionable.',
+    steps: [
+      {
+        title: isUk ? '1. Оберіть тему' : '1. Pick a topic',
+        body: isUk
+          ? 'Вкажіть категорію, щоб адміністратор одразу зрозумів, куди віднести проблему.'
+          : 'Choose a category so the administrator immediately understands the type of issue.',
+      },
+      {
+        title: isUk ? '2. Додайте контекст' : '2. Add context',
+        body: isUk
+          ? 'Короткий заголовок і опис сценарію сильно пришвидшують обробку заявки.'
+          : 'A short subject plus a clear scenario description makes the ticket much faster to resolve.',
+      },
+      {
+        title: isUk ? '3. Слідкуйте за статусом' : '3. Track the status',
+        body: isUk
+          ? 'Статус, час оновлення й примітка адміністратора з’являться в історії ваших звернень нижче.'
+          : 'The status, latest update time, and administrator note will appear in your request history below.',
+      },
+    ],
+  };
+}
+
 app.get('/', (req, res) => {
   if (req.session && req.session.user) {
     return res.redirect('/home');
@@ -6756,6 +6929,76 @@ app.get('/about', requireLogin, (req, res) => {
     aboutCards,
     homeHref: '/home',
   });
+});
+
+app.get('/help', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'help.init');
+  }
+
+  try {
+    const lang = getPreferredLang(req);
+    const helpPage = buildHelpPageContent(lang);
+    const supportRequests = await listSupportRequestsForUser(req.session.user.id, 12);
+    const supportStats = {
+      open: (supportRequests || []).filter((request) => request.status !== 'resolved').length,
+      resolved: (supportRequests || []).filter((request) => request.status === 'resolved').length,
+      response: lang === 'uk' ? 'до 1 робочого дня' : 'within 1 business day',
+    };
+
+    return res.render('help', {
+      helpPage,
+      supportRequests,
+      supportStats,
+      supportCategoryOptions: SUPPORT_REQUEST_CATEGORIES,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'help');
+  }
+});
+
+app.post('/help/support', requireLogin, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'help.support.init');
+  }
+
+  const lang = getPreferredLang(req);
+  const category = normalizeSupportRequestCategory(req.body.topic);
+  const subject = String(req.body.subject || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const body = String(req.body.body || '')
+    .replace(/\r\n/g, '\n')
+    .trim();
+
+  if (subject.length < 4 || subject.length > 120 || body.length < 12 || body.length > 2000) {
+    return res.redirect(`/help?err=${encodeURIComponent(translate(lang, 'help.flash.validationError'))}`);
+  }
+
+  try {
+    const courseId = Number(req.session.user.course_id || 0);
+    await db.get(
+      `
+        INSERT INTO support_requests (user_id, course_id, category, subject, body)
+        VALUES (?, ?, ?, ?, ?)
+        RETURNING id
+      `,
+      [
+        req.session.user.id,
+        Number.isFinite(courseId) && courseId > 0 ? courseId : null,
+        category,
+        subject,
+        body,
+      ]
+    );
+    return res.redirect(`/help?ok=${encodeURIComponent(translate(lang, 'help.flash.requestCreated'))}`);
+  } catch (err) {
+    return handleDbError(res, err, 'help.support.create');
+  }
 });
 
 app.get('/vision', (req, res) => {
@@ -22416,6 +22659,60 @@ app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimite
   );
 });
 
+app.post('/admin/support-requests/:id/update', requireAdmin, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.supportRequests.init');
+  }
+
+  const lang = getPreferredLang(req);
+  const requestId = Number(req.params.id);
+  const adminNote = String(req.body.admin_note || '')
+    .replace(/\r\n/g, '\n')
+    .trim();
+  const status = normalizeSupportRequestStatus(req.body.status);
+  const selectedCourseId = Number(getAdminCourse(req) || req.session.user.course_id || 0);
+
+  if (Number.isNaN(requestId) || adminNote.length > 1000) {
+    return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketValidationMessage'))}`);
+  }
+
+  try {
+    const supportRequest = await db.get(
+      'SELECT id, course_id FROM support_requests WHERE id = ?',
+      [requestId]
+    );
+    if (!supportRequest) {
+      return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketMissingMessage'))}`);
+    }
+    if (selectedCourseId > 0 && Number(supportRequest.course_id || 0) !== selectedCourseId) {
+      return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketMissingMessage'))}`);
+    }
+
+    await db.run(
+      `
+        UPDATE support_requests
+        SET status = ?,
+            admin_note = ?,
+            updated_at = NOW(),
+            resolved_at = CASE WHEN ? = 'resolved' THEN NOW() ELSE NULL END,
+            resolved_by = CASE WHEN ? = 'resolved' THEN ? ELSE NULL END
+        WHERE id = ?
+      `,
+      [status, adminNote || null, status, status, req.session.user.id, requestId]
+    );
+
+    logAction(db, req, 'support_request_update', {
+      request_id: requestId,
+      status,
+    });
+    return res.redirect(`/admin?tab=admin-messages&ok=${encodeURIComponent(translate(lang, 'admin.supportTicketUpdatedMessage'))}`);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.supportRequests.update');
+  }
+});
+
 app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
   if (!settingsCache.allow_messages) {
     return res.json({ messages: [], unread_count: 0 });
@@ -22809,6 +23106,8 @@ const buildAdminTemplateLocals = (overrides = {}) => ({
   },
   teamworkTasks: [],
   adminMessages: [],
+  supportRequests: [],
+  supportInboxVisible: false,
   courses: [],
   teacherRequests: [],
   semesters: [],
@@ -23526,6 +23825,14 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         primary_role: primaryRole,
       };
     });
+    let supportRequests = [];
+    if (isAdminPanelOwner) {
+      try {
+        supportRequests = await listSupportRequestsForCourse(courseId, 40);
+      } catch (supportErr) {
+        console.error('Database error (admin.supportRequests)', supportErr);
+      }
+    }
 
     try {
         res.render('admin', buildAdminTemplateLocals({
@@ -23544,6 +23851,8 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       dashboardStats,
                                       teamworkTasks,
                                       adminMessages: messages,
+                                      supportRequests,
+                                      supportInboxVisible: isAdminPanelOwner,
                                       courses,
                                       teacherRequests,
         semesters,

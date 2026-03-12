@@ -133,6 +133,14 @@ const navConfig = {
           matchPaths: ['/profile'],
         },
         {
+          id: 'help',
+          label: 'FAQ & Help',
+          href: '/help',
+          section: 'main',
+          rolesAllowed: APP_ROLES,
+          matchPaths: ['/help'],
+        },
+        {
           id: 'messages',
           label: 'Повідомлення',
           href: '/schedule?panel=messages',
