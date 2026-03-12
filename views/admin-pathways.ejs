@@ -11,6 +11,7 @@
   const ambiguousCampusList = Array.isArray(ambiguousCampusBindings) ? ambiguousCampusBindings : [];
   const migrationCourseList = Array.isArray(migrationCourseOptions) ? migrationCourseOptions : [];
   const admissionCards = Array.isArray(admissionHealthCards) ? admissionHealthCards : [];
+  const isUk = String(lang || '').toLowerCase() === 'uk';
   const catalogChecklistPropsJson = JSON.stringify({
     targetSelector: '#pathwayCatalogAssignForm',
     checkboxSelector: 'input[type="checkbox"][name="catalog_ids"]',
@@ -50,7 +51,6 @@
   };
   const legacyAdmissionOrdinal = Number(selectedAdmissionLegacyOrdinal || 0);
   const legacySuggestedCount = Number(legacySuggestedCourseCount || 0);
-  const isUk = String(lang || '').toLowerCase() === 'uk';
   const ui = isUk ? {
     pageTitle: 'Адмін · траєкторії',
     heroKicker: 'Центр керування траєкторіями',

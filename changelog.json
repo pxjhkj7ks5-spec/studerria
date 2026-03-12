@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.18",
+      "date": "2026-03-12",
+      "items": [
+        "fix(pathways-template-render): moved the `isUk` locale flag initialization before the new global subject catalog checklist props in the Pathways EJS shell so `/admin/pathways` no longer crashes on first render with an internal server error"
+      ]
+    },
+    {
       "version": "1.2.17",
       "date": "2026-03-12",
       "items": [
