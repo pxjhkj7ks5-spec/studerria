@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.14",
+      "date": "2026-03-12",
+      "items": [
+        "fix(help-center-admin-reply): removed the ambiguous SQL CASE placeholders in support request updates so admins can now save notes and change ticket statuses without triggering a database error"
+      ]
+    },
+    {
       "version": "1.2.13",
       "date": "2026-03-12",
       "items": [

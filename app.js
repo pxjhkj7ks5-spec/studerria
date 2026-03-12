@@ -22689,6 +22689,8 @@ app.post('/admin/support-requests/:id/update', requireAdmin, writeLimiter, async
     if (selectedCourseId > 0 && Number(supportRequest.course_id || 0) !== selectedCourseId) {
       return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketMissingMessage'))}`);
     }
+    const resolvedAt = status === 'resolved' ? new Date().toISOString() : null;
+    const resolvedBy = status === 'resolved' ? req.session.user.id : null;
 
     await db.run(
       `
@@ -22696,11 +22698,11 @@ app.post('/admin/support-requests/:id/update', requireAdmin, writeLimiter, async
         SET status = ?,
             admin_note = ?,
             updated_at = NOW(),
-            resolved_at = CASE WHEN ? = 'resolved' THEN NOW() ELSE NULL END,
-            resolved_by = CASE WHEN ? = 'resolved' THEN ? ELSE NULL END
+            resolved_at = ?,
+            resolved_by = ?
         WHERE id = ?
       `,
-      [status, adminNote || null, status, status, req.session.user.id, requestId]
+      [status, adminNote || null, resolvedAt, resolvedBy, requestId]
     );
 
     logAction(db, req, 'support_request_update', {
