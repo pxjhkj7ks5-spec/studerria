@@ -2975,6 +2975,243 @@ function resolveSubjectScopeSemesterIds(subjectScope, fallbackSemesterId = null)
     : [];
 }
 
+async function getCourseSharedStorageScope(courseId, options = {}) {
+  const normalizedCourseId = Number(courseId || 0);
+  const subjectScope = await getCourseSubjectAccessScope(normalizedCourseId, {
+    visibleOnly: options.visibleOnly === true,
+  });
+  const ownerCourseIds = Array.isArray(subjectScope.owner_course_ids) && subjectScope.owner_course_ids.length
+    ? subjectScope.owner_course_ids
+    : (Number.isInteger(normalizedCourseId) && normalizedCourseId > 0 ? [normalizedCourseId] : []);
+  return {
+    ...subjectScope,
+    owner_course_ids: ownerCourseIds,
+    owner_semester_ids: resolveSubjectScopeSemesterIds(subjectScope, options.fallbackSemesterId ?? null),
+  };
+}
+
+async function buildSubjectOptionStorageScope(subjectOptions = [], options = {}) {
+  const normalizedOptions = Array.isArray(subjectOptions) ? subjectOptions : [];
+  const fallbackCourseId = Number(options.fallbackCourseId || 0);
+  const subjectIds = Array.from(new Set(
+    normalizedOptions
+      .map((item) => Number(item && item.subject_id ? item.subject_id : 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const ownerCourseIds = Array.from(new Set(
+    normalizedOptions
+      .map((item) => Number(item && (item.owner_course_id || item.course_id || fallbackCourseId || 0)))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const effectiveOwnerCourseIds = ownerCourseIds.length
+    ? ownerCourseIds
+    : (Number.isInteger(fallbackCourseId) && fallbackCourseId > 0 ? [fallbackCourseId] : []);
+  const ownerSemesterMap = new Map();
+  await Promise.all(effectiveOwnerCourseIds.map(async (ownerCourseId) => {
+    try {
+      ownerSemesterMap.set(ownerCourseId, await getActiveSemester(ownerCourseId));
+    } catch (_err) {
+      ownerSemesterMap.set(ownerCourseId, null);
+    }
+  }));
+  const directSemesterIds = Array.from(new Set(
+    Array.from(ownerSemesterMap.values())
+      .map((semester) => Number(semester && semester.id ? semester.id : 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  return {
+    subject_ids: subjectIds,
+    owner_course_ids: effectiveOwnerCourseIds,
+    owner_semester_ids: resolveSubjectScopeSemesterIds(
+      { owner_semester_ids: directSemesterIds },
+      options.fallbackSemesterId ?? null
+    ),
+    owner_semester_map: ownerSemesterMap,
+  };
+}
+
+async function buildCourseDashboardStats(courseId, semesterId = null) {
+  const safeCourseId = Number(courseId || 0);
+  const safeSemesterId = Number(semesterId || 0);
+  const hasSemester = Number.isInteger(safeSemesterId) && safeSemesterId > 0;
+  const usersPromise = db.get('SELECT COUNT(*) AS count FROM users WHERE course_id = ?', [safeCourseId]);
+  if (!Number.isInteger(safeCourseId) || safeCourseId < 1) {
+    const usersRow = await usersPromise;
+    return {
+      users: Number(usersRow?.count || 0),
+      subjects: 0,
+      homework: 0,
+      teamworkTasks: 0,
+      teamworkGroups: 0,
+      teamworkMembers: 0,
+    };
+  }
+
+  const courseScope = await getCourseSharedStorageScope(safeCourseId, {
+    visibleOnly: false,
+    fallbackSemesterId: hasSemester ? safeSemesterId : null,
+  });
+  if (!courseScope.subject_ids.length) {
+    const usersRow = await usersPromise;
+    return {
+      users: Number(usersRow?.count || 0),
+      subjects: 0,
+      homework: 0,
+      teamworkTasks: 0,
+      teamworkGroups: 0,
+      teamworkMembers: 0,
+    };
+  }
+
+  const homeworkSemesterClause = courseScope.owner_semester_ids.length
+    ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
+    : 'AND h.semester_id IS NULL';
+  const taskSemesterClause = courseScope.owner_semester_ids.length
+    ? 'AND (t.semester_id = ANY(?::int[]) OR t.semester_id IS NULL)'
+    : 'AND t.semester_id IS NULL';
+  const homeworkParams = [
+    courseScope.subject_ids,
+    courseScope.owner_course_ids,
+    ...(courseScope.owner_semester_ids.length ? [courseScope.owner_semester_ids] : []),
+  ];
+  const teamworkParams = [
+    courseScope.subject_ids,
+    courseScope.owner_course_ids,
+    ...(courseScope.owner_semester_ids.length ? [courseScope.owner_semester_ids] : []),
+  ];
+
+  const [
+    usersRow,
+    homeworkRow,
+    teamworkTasksRow,
+    teamworkGroupsRow,
+    teamworkMembersRow,
+  ] = await Promise.all([
+    usersPromise,
+    db.get(
+      `
+        SELECT COUNT(*) AS count
+        FROM homework h
+        WHERE h.subject_id = ANY(?::int[])
+          AND h.course_id = ANY(?::int[])
+          ${homeworkSemesterClause}
+      `,
+      homeworkParams
+    ),
+    db.get(
+      `
+        SELECT COUNT(*) AS count
+        FROM teamwork_tasks t
+        WHERE t.subject_id = ANY(?::int[])
+          AND t.course_id = ANY(?::int[])
+          ${taskSemesterClause}
+      `,
+      teamworkParams
+    ),
+    db.get(
+      `
+        SELECT COUNT(*) AS count
+        FROM teamwork_groups g
+        JOIN teamwork_tasks t ON t.id = g.task_id
+        WHERE t.subject_id = ANY(?::int[])
+          AND t.course_id = ANY(?::int[])
+          ${taskSemesterClause}
+      `,
+      teamworkParams
+    ),
+    db.get(
+      `
+        SELECT COUNT(*) AS count
+        FROM teamwork_members m
+        JOIN teamwork_tasks t ON t.id = m.task_id
+        WHERE t.subject_id = ANY(?::int[])
+          AND t.course_id = ANY(?::int[])
+          ${taskSemesterClause}
+      `,
+      teamworkParams
+    ),
+  ]);
+
+  return {
+    users: Number(usersRow?.count || 0),
+    subjects: courseScope.subject_ids.length,
+    homework: Number(homeworkRow?.count || 0),
+    teamworkTasks: Number(teamworkTasksRow?.count || 0),
+    teamworkGroups: Number(teamworkGroupsRow?.count || 0),
+    teamworkMembers: Number(teamworkMembersRow?.count || 0),
+  };
+}
+
+async function buildCourseWeeklyWorkloadSeries({
+  courseId,
+  semesterId = null,
+  startIso,
+}) {
+  const safeCourseId = Number(courseId || 0);
+  const safeSemesterId = Number(semesterId || 0);
+  const hasSemester = Number.isInteger(safeSemesterId) && safeSemesterId > 0;
+  if (!Number.isInteger(safeCourseId) || safeCourseId < 1 || !String(startIso || '').trim()) {
+    return { homeworkRows: [], teamworkRows: [] };
+  }
+  const courseScope = await getCourseSharedStorageScope(safeCourseId, {
+    visibleOnly: false,
+    fallbackSemesterId: hasSemester ? safeSemesterId : null,
+  });
+  if (!courseScope.subject_ids.length) {
+    return { homeworkRows: [], teamworkRows: [] };
+  }
+  const homeworkSemesterClause = courseScope.owner_semester_ids.length
+    ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
+    : 'AND h.semester_id IS NULL';
+  const taskSemesterClause = courseScope.owner_semester_ids.length
+    ? 'AND (t.semester_id = ANY(?::int[]) OR t.semester_id IS NULL)'
+    : 'AND t.semester_id IS NULL';
+  const homeworkParams = [
+    courseScope.subject_ids,
+    courseScope.owner_course_ids,
+    String(startIso).trim(),
+    ...(courseScope.owner_semester_ids.length ? [courseScope.owner_semester_ids] : []),
+  ];
+  const teamworkParams = [
+    courseScope.subject_ids,
+    courseScope.owner_course_ids,
+    String(startIso).trim(),
+    ...(courseScope.owner_semester_ids.length ? [courseScope.owner_semester_ids] : []),
+  ];
+  const [homeworkRows, teamworkRows] = await Promise.all([
+    db.all(
+      `
+        SELECT DATE(h.created_at::timestamp) AS day, COUNT(*) AS count
+        FROM homework h
+        WHERE h.subject_id = ANY(?::int[])
+          AND h.course_id = ANY(?::int[])
+          AND h.created_at::timestamp >= ?
+          ${homeworkSemesterClause}
+        GROUP BY DATE(h.created_at::timestamp)
+        ORDER BY day
+      `,
+      homeworkParams
+    ),
+    db.all(
+      `
+        SELECT DATE(t.created_at::timestamp) AS day, COUNT(*) AS count
+        FROM teamwork_tasks t
+        WHERE t.subject_id = ANY(?::int[])
+          AND t.course_id = ANY(?::int[])
+          AND t.created_at::timestamp >= ?
+          ${taskSemesterClause}
+        GROUP BY DATE(t.created_at::timestamp)
+        ORDER BY day
+      `,
+      teamworkParams
+    ),
+  ]);
+  return {
+    homeworkRows: homeworkRows || [],
+    teamworkRows: teamworkRows || [],
+  };
+}
+
 async function getHomeworkRowsForCourse(homeworkIds, courseId, options = {}) {
   const normalizedIds = Array.from(new Set(
     (Array.isArray(homeworkIds) ? homeworkIds : [homeworkIds])
@@ -9487,20 +9724,13 @@ async function getMyDayReviewSubjects({ userId, courseId, roleKeys = [] }) {
   const normalizedRoles = normalizeRoleList(roleKeys);
   const hasFullAccess = normalizedRoles.some((roleKey) => roleKey === 'admin' || roleKey === 'deanery');
   if (hasFullAccess) {
-    const rows = await db.all(
-      `
-        SELECT s.id AS subject_id, s.name AS subject_name, s.group_count
-        FROM subjects s
-        WHERE s.course_id = ? AND s.visible = 1
-        ORDER BY s.name ASC
-      `,
-      [courseId]
-    );
-    return (rows || []).map((row) => {
+    const courseScope = await getCourseSharedStorageScope(courseId, { visibleOnly: true });
+    return (courseScope.subjects || []).map((row) => {
       const groupCount = Math.max(1, Number(row.group_count || 1));
       return {
-        subject_id: Number(row.subject_id),
-        subject_name: row.subject_name || 'Предмет',
+        subject_id: Number(row.id || 0),
+        subject_name: row.name || 'Предмет',
+        owner_course_id: Number(row.owner_course_id || row.course_id || courseId || 0) || null,
         has_all_groups: true,
         group_numbers: Array.from({ length: groupCount }, (_v, index) => index + 1),
       };
@@ -9511,18 +9741,8 @@ async function getMyDayReviewSubjects({ userId, courseId, roleKeys = [] }) {
     return [];
   }
 
-  const rows = await db.all(
-    `
-      SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count
-      FROM teacher_subjects ts
-      JOIN subjects s ON s.id = ts.subject_id
-      WHERE ts.user_id = ?
-        AND s.course_id = ?
-        AND s.visible = 1
-      ORDER BY s.name ASC
-    `,
-    [userId, courseId]
-  );
+  const rows = (await getTeacherAssignedSubjects(userId))
+    .filter((row) => Number(row.course_id || 0) === Number(courseId || 0));
   if (!rows || !rows.length) {
     return [];
   }
@@ -9535,6 +9755,7 @@ async function getMyDayReviewSubjects({ userId, courseId, roleKeys = [] }) {
         subject_id: subjectId,
         subject_name: row.subject_name || 'Предмет',
         group_count: Math.max(1, Number(row.group_count || 1)),
+        owner_course_id: Number(row.owner_course_id || row.course_id || courseId || 0) || null,
         has_all_groups: false,
         group_numbers_set: new Set(),
       });
@@ -9556,6 +9777,7 @@ async function getMyDayReviewSubjects({ userId, courseId, roleKeys = [] }) {
     return {
       subject_id: item.subject_id,
       subject_name: item.subject_name,
+      owner_course_id: item.owner_course_id,
       has_all_groups: item.has_all_groups,
       group_numbers: groupNumbers,
     };
@@ -9747,15 +9969,21 @@ async function buildAdminHomeworkReviewSla({
     return emptyResult;
   }
 
-  const placeholders = subjectIds.map(() => '?').join(',');
-  const params = [now.toISOString(), REVIEW_QUEUE_OVERDUE_HOURS, courseId];
-  const semesterClause = semesterId
-    ? 'AND (h.semester_id = ? OR h.semester_id IS NULL)'
+  const reviewScope = await buildSubjectOptionStorageScope(subjectOptions, {
+    fallbackCourseId: courseId,
+    fallbackSemesterId: semesterId,
+  });
+  const semesterClause = reviewScope.owner_semester_ids.length
+    ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
     : 'AND h.semester_id IS NULL';
-  if (semesterId) {
-    params.push(semesterId);
-  }
-  params.push(...subjectIds);
+  const params = [
+    now.toISOString(),
+    REVIEW_QUEUE_OVERDUE_HOURS,
+    reviewScope.subject_ids,
+    reviewScope.owner_course_ids,
+    ...(reviewScope.owner_semester_ids.length ? [reviewScope.owner_semester_ids] : []),
+    courseId,
+  ];
 
   const rows = await db.all(
     `
@@ -9770,6 +9998,7 @@ async function buildAdminHomeworkReviewSla({
         )::int AS overdue_ungraded_total,
         MIN(hs.submitted_at) FILTER (WHERE jg.id IS NULL) AS oldest_ungraded_at
       FROM homework_submissions hs
+      JOIN users u ON u.id = hs.student_id
       JOIN homework h ON h.id = hs.homework_id
       JOIN subjects s ON s.id = h.subject_id
       LEFT JOIN journal_columns jc
@@ -9779,10 +10008,11 @@ async function buildAdminHomeworkReviewSla({
         ON jg.column_id = jc.id
        AND jg.student_id = hs.student_id
        AND jg.deleted_at IS NULL
-      WHERE h.course_id = ?
+      WHERE h.subject_id = ANY(?::int[])
+        AND h.course_id = ANY(?::int[])
         ${semesterClause}
+        AND u.course_id = ?
         AND COALESCE(h.is_teacher_homework, 0) = 1
-        AND h.subject_id IN (${placeholders})
       GROUP BY h.subject_id, s.name
       ORDER BY overdue_ungraded_total DESC, ungraded_total DESC, subject_name ASC
     `,
@@ -10598,11 +10828,19 @@ async function buildCoursePulseAnalytics({
     return emptyResult;
   }
 
-  const homeworkSemesterClause = hasSemester
-    ? 'AND (h.semester_id = ? OR h.semester_id IS NULL)'
+  const courseScope = await getCourseSharedStorageScope(safeCourseId, {
+    visibleOnly: false,
+    fallbackSemesterId: hasSemester ? safeSemesterId : null,
+  });
+  if (!courseScope.subject_ids.length) {
+    return emptyResult;
+  }
+
+  const homeworkSemesterClause = courseScope.owner_semester_ids.length
+    ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
     : 'AND h.semester_id IS NULL';
-  const journalSemesterClause = hasSemester
-    ? 'AND (jc.semester_id = ? OR jc.semester_id IS NULL)'
+  const journalSemesterClause = courseScope.owner_semester_ids.length
+    ? 'AND (jc.semester_id = ANY(?::int[]) OR jc.semester_id IS NULL)'
     : 'AND jc.semester_id IS NULL';
   const attendanceSemesterClause = hasSemester
     ? 'AND (ar.semester_id = ? OR ar.semester_id IS NULL)'
@@ -10634,11 +10872,14 @@ async function buildCoursePulseAnalytics({
             sg.student_id,
             COUNT(*)::int AS overdue_count
           FROM student_groups sg
+          JOIN users su ON su.id = sg.student_id
           JOIN homework h
             ON h.subject_id = sg.subject_id
            AND (h.group_number = sg.group_number OR h.group_number IS NULL)
-          WHERE h.course_id = ?
+          WHERE h.subject_id = ANY(?::int[])
+            AND h.course_id = ANY(?::int[])
             ${homeworkSemesterClause}
+            AND su.course_id = ?
             AND COALESCE(h.is_teacher_homework, 0) = 1
             AND COALESCE(h.status, 'published') = 'published'
             AND COALESCE(NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''), NULLIF(TRIM(COALESCE(h.class_date, '')), '')) < ?
@@ -10656,7 +10897,13 @@ async function buildCoursePulseAnalytics({
           COALESCE(SUM(overdue_count), 0)::int AS overdue_total
         FROM overdue
       `,
-      hasSemester ? [safeCourseId, safeSemesterId, today] : [safeCourseId, today]
+      [
+        courseScope.subject_ids,
+        courseScope.owner_course_ids,
+        ...(courseScope.owner_semester_ids.length ? [courseScope.owner_semester_ids] : []),
+        safeCourseId,
+        today,
+      ]
     ),
     db.get(
       `
@@ -10668,6 +10915,7 @@ async function buildCoursePulseAnalytics({
               AND hs.submitted_at <= (?::timestamptz - (48 * INTERVAL '1 hour'))
           )::int AS overdue_ungraded_total
         FROM homework_submissions hs
+        JOIN users su ON su.id = hs.student_id
         JOIN homework h ON h.id = hs.homework_id
         LEFT JOIN journal_columns jc
           ON jc.source_homework_id = h.id
@@ -10676,11 +10924,19 @@ async function buildCoursePulseAnalytics({
           ON jg.column_id = jc.id
          AND jg.student_id = hs.student_id
          AND jg.deleted_at IS NULL
-        WHERE h.course_id = ?
+        WHERE h.subject_id = ANY(?::int[])
+          AND h.course_id = ANY(?::int[])
           ${homeworkSemesterClause}
+          AND su.course_id = ?
           AND COALESCE(h.is_teacher_homework, 0) = 1
       `,
-      hasSemester ? [now.toISOString(), safeCourseId, safeSemesterId] : [now.toISOString(), safeCourseId]
+      [
+        now.toISOString(),
+        courseScope.subject_ids,
+        courseScope.owner_course_ids,
+        ...(courseScope.owner_semester_ids.length ? [courseScope.owner_semester_ids] : []),
+        safeCourseId,
+      ]
     ),
     db.get(
       `
@@ -10709,19 +10965,22 @@ async function buildCoursePulseAnalytics({
           COUNT(*) FILTER (WHERE jg.graded_at >= ?)::int AS recent_count,
           COUNT(*) FILTER (WHERE jg.graded_at >= ? AND jg.graded_at < ?)::int AS previous_count
         FROM journal_grades jg
+        JOIN users su ON su.id = jg.student_id
         JOIN journal_columns jc ON jc.id = jg.column_id
         LEFT JOIN subjects s ON s.id = jc.subject_id
-        WHERE jc.course_id = ?
+        WHERE jc.subject_id = ANY(?::int[])
+          AND jc.course_id = ANY(?::int[])
           ${journalSemesterClause}
           AND COALESCE(jc.is_archived, 0) = 0
           AND jg.deleted_at IS NULL
+          AND su.course_id = ?
         GROUP BY jc.subject_id, s.name
         HAVING
           COUNT(*) FILTER (WHERE jg.graded_at >= ?) > 0
           OR COUNT(*) FILTER (WHERE jg.graded_at >= ? AND jg.graded_at < ?) > 0
         ORDER BY subject_name ASC
       `,
-      hasSemester
+      courseScope.owner_semester_ids.length
         ? [
             recentIso,
             previousIso,
@@ -10729,8 +10988,10 @@ async function buildCoursePulseAnalytics({
             recentIso,
             previousIso,
             recentIso,
+            courseScope.subject_ids,
+            courseScope.owner_course_ids,
+            courseScope.owner_semester_ids,
             safeCourseId,
-            safeSemesterId,
             recentIso,
             previousIso,
             recentIso,
@@ -10742,6 +11003,8 @@ async function buildCoursePulseAnalytics({
             recentIso,
             previousIso,
             recentIso,
+            courseScope.subject_ids,
+            courseScope.owner_course_ids,
             safeCourseId,
             recentIso,
             previousIso,
@@ -10756,12 +11019,15 @@ async function buildCoursePulseAnalytics({
           COUNT(*)::int AS overdue_homework_total,
           COUNT(DISTINCT sg.student_id)::int AS at_risk_students
         FROM student_groups sg
+        JOIN users su ON su.id = sg.student_id
         JOIN homework h
           ON h.subject_id = sg.subject_id
          AND (h.group_number = sg.group_number OR h.group_number IS NULL)
         LEFT JOIN subjects s ON s.id = h.subject_id
-        WHERE h.course_id = ?
+        WHERE h.subject_id = ANY(?::int[])
+          AND h.course_id = ANY(?::int[])
           ${homeworkSemesterClause}
+          AND su.course_id = ?
           AND COALESCE(h.is_teacher_homework, 0) = 1
           AND COALESCE(h.status, 'published') = 'published'
           AND COALESCE(NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''), NULLIF(TRIM(COALESCE(h.class_date, '')), '')) < ?
@@ -10774,7 +11040,13 @@ async function buildCoursePulseAnalytics({
         GROUP BY h.subject_id, s.name
         ORDER BY overdue_homework_total DESC, subject_name ASC
       `,
-      hasSemester ? [safeCourseId, safeSemesterId, today] : [safeCourseId, today]
+      [
+        courseScope.subject_ids,
+        courseScope.owner_course_ids,
+        ...(courseScope.owner_semester_ids.length ? [courseScope.owner_semester_ids] : []),
+        safeCourseId,
+        today,
+      ]
     ),
     db.all(
       `
@@ -10786,6 +11058,7 @@ async function buildCoursePulseAnalytics({
               AND hs.submitted_at <= (?::timestamptz - (48 * INTERVAL '1 hour'))
           )::int AS sla_overdue_ungraded
         FROM homework_submissions hs
+        JOIN users su ON su.id = hs.student_id
         JOIN homework h ON h.id = hs.homework_id
         LEFT JOIN subjects s ON s.id = h.subject_id
         LEFT JOIN journal_columns jc
@@ -10795,13 +11068,21 @@ async function buildCoursePulseAnalytics({
           ON jg.column_id = jc.id
          AND jg.student_id = hs.student_id
          AND jg.deleted_at IS NULL
-        WHERE h.course_id = ?
+        WHERE h.subject_id = ANY(?::int[])
+          AND h.course_id = ANY(?::int[])
           ${homeworkSemesterClause}
+          AND su.course_id = ?
           AND COALESCE(h.is_teacher_homework, 0) = 1
         GROUP BY h.subject_id, s.name
         ORDER BY sla_overdue_ungraded DESC, subject_name ASC
       `,
-      hasSemester ? [now.toISOString(), safeCourseId, safeSemesterId] : [now.toISOString(), safeCourseId]
+      [
+        now.toISOString(),
+        courseScope.subject_ids,
+        courseScope.owner_course_ids,
+        ...(courseScope.owner_semester_ids.length ? [courseScope.owner_semester_ids] : []),
+        safeCourseId,
+      ]
     ),
   ]);
 
@@ -24708,11 +24989,24 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
               if (res.headersSent) {
                 return;
               }
-          const teamworkFilters = ['t.course_id = ?'];
-          const teamworkParams = [courseId];
-          if (activeSemester) {
-            teamworkFilters.push('t.semester_id = ?');
-            teamworkParams.push(activeSemester.id);
+          const teamworkFilters = [];
+          const teamworkParams = [];
+          if (courseSubjectScope.subject_ids.length) {
+            teamworkFilters.push('t.subject_id = ANY(?::int[])');
+            teamworkParams.push(courseSubjectScope.subject_ids);
+            if (courseSubjectScope.owner_course_ids.length) {
+              teamworkFilters.push('t.course_id = ANY(?::int[])');
+              teamworkParams.push(courseSubjectScope.owner_course_ids);
+            }
+            if (courseSubjectScope.owner_semester_ids.length) {
+              teamworkFilters.push('(t.semester_id = ANY(?::int[]) OR t.semester_id IS NULL)');
+              teamworkParams.push(courseSubjectScope.owner_semester_ids);
+            } else if (activeSemester) {
+              teamworkFilters.push('(t.semester_id = ? OR t.semester_id IS NULL)');
+              teamworkParams.push(activeSemester.id);
+            }
+          } else {
+            teamworkFilters.push('1 = 0');
           }
           if (teamwork_subject) {
             teamworkFilters.push('s.name ILIKE ?');
@@ -24815,62 +25109,20 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                               if (res.headersSent) {
                                 return;
                               }
-                              const statsParams = activeSemester ? [courseId, activeSemester.id] : [courseId];
                               (async () => {
                                 try {
                                   const [
-                                    usersRow,
-                                    subjectsRow,
-                                    homeworkRow,
-                                    teamworkTasksRow,
-                                    teamworkGroupsRow,
-                                    teamworkMembersRow,
+                                    dashboardStats,
                                     allSemestersRows,
                                     settingsUpdateRow,
                                   ] = await Promise.all([
-                                    db.get('SELECT COUNT(*) AS count FROM users WHERE course_id = ?', [courseId]),
-                                    db.get('SELECT COUNT(*) AS count FROM subjects WHERE course_id = ?', [courseId]),
-                                    db.get(
-                                      `SELECT COUNT(*) AS count FROM homework WHERE course_id = ?${
-                                        activeSemester ? ' AND semester_id = ?' : ''
-                                      }`,
-                                      statsParams
-                                    ),
-                                    db.get(
-                                      `SELECT COUNT(*) AS count FROM teamwork_tasks WHERE course_id = ?${
-                                        activeSemester ? ' AND semester_id = ?' : ''
-                                      }`,
-                                      statsParams
-                                    ),
-                                    db.get(
-                                      `SELECT COUNT(*) AS count
-                                       FROM teamwork_groups g
-                                       JOIN teamwork_tasks t ON t.id = g.task_id
-                                       WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
-                                      statsParams
-                                    ),
-                                    db.get(
-                                      `SELECT COUNT(*) AS count
-                                       FROM teamwork_members m
-                                       JOIN teamwork_tasks t ON t.id = m.task_id
-                                       WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
-                                      statsParams
-                                    ),
+                                    buildCourseDashboardStats(courseId, activeSemester ? Number(activeSemester.id) : null),
                                     db.all('SELECT id, title, weeks_count, course_id, start_date FROM semesters ORDER BY start_date DESC'),
                                     db.get(
                                       'SELECT actor_name, created_at FROM history_log WHERE action = ? ORDER BY created_at DESC LIMIT 1',
                                       ['system_settings_update']
                                     ),
                                   ]);
-
-    const dashboardStats = {
-      users: Number(usersRow?.count || 0),
-      subjects: Number(subjectsRow?.count || 0),
-      homework: Number(homeworkRow?.count || 0),
-      teamworkTasks: Number(teamworkTasksRow?.count || 0),
-      teamworkGroups: Number(teamworkGroupsRow?.count || 0),
-      teamworkMembers: Number(teamworkMembersRow?.count || 0),
-    };
 
     const semestersByCourse = {};
     (allSemestersRows || []).forEach((row) => {
@@ -24917,26 +25169,12 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
       subjects: [],
     };
     try {
-      const weeklyParams = activeSemester
-        ? [courseId, weekStart.toISOString(), activeSemester.id]
-        : [courseId, weekStart.toISOString()];
-      const [weeklyHomeworkRows, weeklyTeamworkRows, weeklyUsersRows] = await Promise.all([
-        db.all(
-          `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
-           FROM homework
-           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-           GROUP BY DATE(created_at::timestamp)
-           ORDER BY day`,
-          weeklyParams
-        ),
-        db.all(
-          `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
-           FROM teamwork_tasks
-           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-           GROUP BY DATE(created_at::timestamp)
-           ORDER BY day`,
-          weeklyParams
-        ),
+      const [weeklySeries, weeklyUsersRows] = await Promise.all([
+        buildCourseWeeklyWorkloadSeries({
+          courseId,
+          semesterId: activeSemester ? Number(activeSemester.id) : null,
+          startIso: weekStart.toISOString(),
+        }),
         db.all(
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
            FROM users
@@ -24946,6 +25184,8 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
           [courseId, weekStart.toISOString()]
         ),
       ]);
+      const weeklyHomeworkRows = weeklySeries.homeworkRows || [];
+      const weeklyTeamworkRows = weeklySeries.teamworkRows || [];
 
       const homeworkMap = {};
       (weeklyHomeworkRows || []).forEach((row) => {
@@ -33765,49 +34005,7 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
     return handleDbError(res, err, 'admin.overview.semester');
   }
   try {
-    const statsParams = activeSemester ? [courseId, activeSemester.id] : [courseId];
-    const [
-      usersRow,
-      subjectsRow,
-      homeworkRow,
-      teamworkTasksRow,
-      teamworkGroupsRow,
-      teamworkMembersRow,
-    ] = await Promise.all([
-      db.get('SELECT COUNT(*) AS count FROM users WHERE course_id = ?', [courseId]),
-      db.get('SELECT COUNT(*) AS count FROM subjects WHERE course_id = ?', [courseId]),
-      db.get(
-        `SELECT COUNT(*) AS count FROM homework WHERE course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
-        statsParams
-      ),
-      db.get(
-        `SELECT COUNT(*) AS count FROM teamwork_tasks WHERE course_id = ?${activeSemester ? ' AND semester_id = ?' : ''}`,
-        statsParams
-      ),
-      db.get(
-        `SELECT COUNT(*) AS count
-         FROM teamwork_groups g
-         JOIN teamwork_tasks t ON t.id = g.task_id
-         WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
-        statsParams
-      ),
-      db.get(
-        `SELECT COUNT(*) AS count
-         FROM teamwork_members m
-         JOIN teamwork_tasks t ON t.id = m.task_id
-         WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}`,
-        statsParams
-      ),
-                                  ]);
-
-    const dashboardStats = {
-      users: Number(usersRow?.count || 0),
-      subjects: Number(subjectsRow?.count || 0),
-      homework: Number(homeworkRow?.count || 0),
-      teamworkTasks: Number(teamworkTasksRow?.count || 0),
-      teamworkGroups: Number(teamworkGroupsRow?.count || 0),
-      teamworkMembers: Number(teamworkMembersRow?.count || 0),
-    };
+    const dashboardStats = await buildCourseDashboardStats(courseId, activeSemester ? Number(activeSemester.id) : null);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -33823,27 +34021,32 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
     let weeklyTeamwork = weeklyLabels.map(() => 0);
     let weeklyUserRoles = ['student', 'starosta', 'deanery', 'admin'];
     let weeklyUserSeries = weeklyUserRoles.map(() => weeklyLabels.map(() => 0));
+    let coursePulse = {
+      generated_at: new Date().toISOString(),
+      course_id: Number(courseId || 0),
+      semester_id: activeSemester ? Number(activeSemester.id) : null,
+      summary: {
+        students_total: 0,
+        students_at_risk: 0,
+        high_risk_students: 0,
+        risk_students_share: 0,
+        overdue_homework_total: 0,
+        sla_submissions_total: 0,
+        sla_ungraded_total: 0,
+        sla_overdue_ungraded_total: 0,
+        sla_overdue_share: 0,
+        attendance_absent_share: 0,
+        attendance_late_share: 0,
+      },
+      subjects: [],
+    };
     try {
-      const weeklyParams = activeSemester
-        ? [courseId, weekStart.toISOString(), activeSemester.id]
-        : [courseId, weekStart.toISOString()];
-      const [weeklyHomeworkRows, weeklyTeamworkRows, weeklyUsersRows] = await Promise.all([
-        db.all(
-          `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
-           FROM homework
-           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-           GROUP BY DATE(created_at::timestamp)
-           ORDER BY day`,
-          weeklyParams
-        ),
-        db.all(
-          `SELECT DATE(created_at::timestamp) AS day, COUNT(*) AS count
-           FROM teamwork_tasks
-           WHERE course_id = ? AND created_at::timestamp >= ?${activeSemester ? ' AND semester_id = ?' : ''}
-           GROUP BY DATE(created_at::timestamp)
-           ORDER BY day`,
-          weeklyParams
-        ),
+      const [weeklySeries, weeklyUsersRows] = await Promise.all([
+        buildCourseWeeklyWorkloadSeries({
+          courseId,
+          semesterId: activeSemester ? Number(activeSemester.id) : null,
+          startIso: weekStart.toISOString(),
+        }),
         db.all(
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
            FROM users
@@ -33853,6 +34056,8 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
           [courseId, weekStart.toISOString()]
         ),
       ]);
+      const weeklyHomeworkRows = weeklySeries.homeworkRows || [];
+      const weeklyTeamworkRows = weeklySeries.teamworkRows || [];
 
       const homeworkMap = {};
       (weeklyHomeworkRows || []).forEach((row) => {
@@ -33993,7 +34198,8 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
                     SELECT sg.student_id, sg.subject_id, sg.group_number
                     FROM student_groups sg
                     JOIN subjects s ON s.id = sg.subject_id
-                    WHERE s.course_id = ?
+                    JOIN subject_course_bindings scb ON scb.subject_id = s.id
+                    WHERE scb.course_id = ?
                   `,
                   [courseId],
                   (sgErr, studentGroups) => {
@@ -36272,6 +36478,15 @@ app.get('/starosta', requireStaff, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'starosta.activeSemester');
   }
+  let courseSubjectScope;
+  try {
+    courseSubjectScope = await getCourseSharedStorageScope(courseId, {
+      visibleOnly: false,
+      fallbackSemesterId: activeSemester ? Number(activeSemester.id) : null,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.subjectScope');
+  }
 
   const courses = allowedCourses;
   let semesters = [];
@@ -36297,26 +36512,38 @@ app.get('/starosta', requireStaff, async (req, res) => {
 
   let subjects = [];
   try {
-    subjects = await db.all('SELECT * FROM subjects WHERE course_id = ? ORDER BY name', [courseId]);
+    subjects = (courseSubjectScope.subjects || [])
+      .slice()
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
   } catch (err) {
     return handleDbError(res, err, 'starosta.subjects');
   }
 
   const homeworkFilters = [];
   const homeworkParams = [];
-  homeworkFilters.push('h.course_id = ?');
-  homeworkParams.push(courseId);
-  if (activeSemester) {
-    homeworkFilters.push('h.semester_id = ?');
-    homeworkParams.push(activeSemester.id);
+  if (courseSubjectScope.subject_ids.length) {
+    homeworkFilters.push('h.subject_id = ANY(?::int[])');
+    homeworkParams.push(courseSubjectScope.subject_ids);
+    if (courseSubjectScope.owner_course_ids.length) {
+      homeworkFilters.push('h.course_id = ANY(?::int[])');
+      homeworkParams.push(courseSubjectScope.owner_course_ids);
+    }
+    if (courseSubjectScope.owner_semester_ids.length) {
+      homeworkFilters.push('(h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)');
+      homeworkParams.push(courseSubjectScope.owner_semester_ids);
+    } else {
+      homeworkFilters.push('h.semester_id IS NULL');
+    }
+  } else {
+    homeworkFilters.push('1 = 0');
   }
   if (group_number) {
     homeworkFilters.push('h.group_number = ?');
     homeworkParams.push(group_number);
   }
   if (subject) {
-    homeworkFilters.push('h.subject LIKE ?');
-    homeworkParams.push(`%${subject}%`);
+    homeworkFilters.push("(subj.name LIKE ? OR COALESCE(h.subject, '') LIKE ?)");
+    homeworkParams.push(`%${subject}%`, `%${subject}%`);
   }
   if (q) {
     homeworkFilters.push('(h.description LIKE ? OR h.created_by LIKE ?)');
@@ -36383,21 +36610,31 @@ app.get('/starosta', requireStaff, async (req, res) => {
 
   let teamworkTasks = [];
   try {
-    teamworkTasks = await db.all(
-      `
-        SELECT t.id, t.title, t.created_at, s.name AS subject_name,
-               COUNT(DISTINCT g.id) AS group_count,
-               COUNT(DISTINCT m.user_id) AS member_count
-        FROM teamwork_tasks t
-        JOIN subjects s ON s.id = t.subject_id
-        LEFT JOIN teamwork_groups g ON g.task_id = t.id
-        LEFT JOIN teamwork_members m ON m.task_id = t.id
-        WHERE t.course_id = ?${activeSemester ? ' AND t.semester_id = ?' : ''}
-        GROUP BY t.id, t.title, t.created_at, s.name
-        ORDER BY t.created_at DESC
-      `,
-      activeSemester ? [courseId, activeSemester.id] : [courseId]
-    );
+    if (!courseSubjectScope.subject_ids.length) {
+      teamworkTasks = [];
+    } else {
+      const teamworkParams = [courseSubjectScope.subject_ids, courseSubjectScope.owner_course_ids];
+      if (courseSubjectScope.owner_semester_ids.length) {
+        teamworkParams.push(courseSubjectScope.owner_semester_ids);
+      }
+      teamworkTasks = await db.all(
+        `
+          SELECT t.id, t.title, t.created_at, s.name AS subject_name,
+                 COUNT(DISTINCT g.id) AS group_count,
+                 COUNT(DISTINCT m.user_id) AS member_count
+          FROM teamwork_tasks t
+          JOIN subjects s ON s.id = t.subject_id
+          LEFT JOIN teamwork_groups g ON g.task_id = t.id
+          LEFT JOIN teamwork_members m ON m.task_id = t.id
+          WHERE t.subject_id = ANY(?::int[])
+            AND t.course_id = ANY(?::int[])
+            ${courseSubjectScope.owner_semester_ids.length ? 'AND (t.semester_id = ANY(?::int[]) OR t.semester_id IS NULL)' : 'AND t.semester_id IS NULL'}
+          GROUP BY t.id, t.title, t.created_at, s.name
+          ORDER BY t.created_at DESC
+        `,
+        teamworkParams
+      );
+    }
   } catch (err) {
     return handleDbError(res, err, 'starosta.teamwork');
   }

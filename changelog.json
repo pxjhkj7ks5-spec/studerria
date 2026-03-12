@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.20",
+      "date": "2026-03-12",
+      "items": [
+        "fix(shared-subject-staff-and-analytics-scope): moved Starosta teamwork and homework views, teacher review SLA, course pulse analytics, and admin workload counters onto shared-subject owner scope so shared subjects now stay visible and count correctly outside the owner course",
+        "fix(shared-subject-overview-and-admin-lists): fixed the overview course pulse state bootstrap, aligned the admin teamwork list with shared subject bindings, and updated admin users student-group payloads so bound courses stop dropping shared subject data in staff screens"
+      ]
+    },
+    {
       "version": "1.2.19",
       "date": "2026-03-12",
       "items": [
