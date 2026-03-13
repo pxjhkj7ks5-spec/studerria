@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.36",
+      "date": "2026-03-13",
+      "items": [
+        "fix(messages-global-purge): add an admin-only `Clear all` action that hard-deletes the full message archive across every course and semester, and ship a cleanup migration that removes the known stale February broadcast announcements still leaking into the inbox modal"
+      ]
+    },
+    {
       "version": "1.2.35",
       "date": "2026-03-13",
       "items": [

@@ -3999,10 +3999,23 @@
                       Clear visible
                     </button>
                   </form>
+                  <% if (role === 'admin') { %>
+                    <form method="POST" action="/admin/messages/clear-all" class="m-0">
+                      <button
+                        class="btn btn-sm btn-danger"
+                        type="submit"
+                        data-confirm="Delete every message in the system across all courses and semesters?"
+                        data-confirm-level="danger"
+                        data-confirm-typed="DELETE ALL"
+                      >
+                        Clear all
+                      </button>
+                    </form>
+                  <% } %>
                 </div>
               </div>
               <div class="text-muted small mb-3">
-                Use Refresh to reload the current message scope, or Clear visible to hard-delete everything currently listed here.
+                Use Refresh to reload the current message scope, Clear visible to wipe the current list, or Clear all to nuke the entire message archive.
               </div>
               <div class="table-responsive">
                 <table class="table table-striped align-middle">

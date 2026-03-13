@@ -35,6 +35,7 @@ const pathwaysBulkAssignAndInsightsIndexes = require('./034_pathways_bulk_assign
 const supportRequests = require('./035_support_requests');
 const subjectCatalogAndBindings = require('./036_subject_catalog_and_bindings');
 const supportRequestMessages = require('./037_support_request_messages');
+const messageArchiveCleanup = require('./038_message_archive_cleanup');
 
 module.exports = [
   init,
@@ -74,4 +75,5 @@ module.exports = [
   supportRequests,
   subjectCatalogAndBindings,
   supportRequestMessages,
+  messageArchiveCleanup,
 ];

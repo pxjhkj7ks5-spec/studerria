@@ -24170,6 +24170,39 @@ app.post('/admin/messages/clear', requireMessagesSectionAccess, writeLimiter, as
   }
 });
 
+app.post('/admin/messages/clear-all', requireMessagesSectionAccess, writeLimiter, async (req, res) => {
+  const courseId = getStaffCourse(req);
+  const panelBase = getStaffPanelBase(req, courseId);
+  const redirectBase = `${panelBase}${panelBase.includes('?') ? '&' : '?'}tab=admin-messages`;
+  const redirectWith = (kind, message) => `${redirectBase}&${kind}=${encodeURIComponent(String(message || ''))}`;
+
+  if (!hasSessionRole(req, 'admin')) {
+    return res.redirect(redirectWith('err', 'Only admins can clear all messages'));
+  }
+  if (!settingsCache.allow_messages) {
+    return res.redirect(redirectWith('err', 'Messages disabled'));
+  }
+
+  try {
+    const rows = await db.all('SELECT id FROM messages');
+    const deleteIds = (rows || [])
+      .map((row) => Number(row.id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    if (!deleteIds.length) {
+      return res.redirect(redirectWith('ok', 'No messages to clear'));
+    }
+
+    const deletedCount = await deleteMessageRecordsByIds(deleteIds);
+    logAction(db, req, 'message_clear_all', {
+      deleted_count: deletedCount,
+    });
+    broadcast('messages_updated');
+    return res.redirect(redirectWith('ok', `Cleared all ${deletedCount} messages`));
+  } catch (err) {
+    return res.redirect(redirectWith('err', 'Database error'));
+  }
+});
+
 app.post('/admin/support-requests/:id/update', requireSupportSectionAccess, writeLimiter, async (req, res) => {
   try {
     await ensureDbReady();
