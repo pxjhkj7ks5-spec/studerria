@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.27",
+      "date": "2026-03-13",
+      "items": [
+        "fix(session-generator-wide-layout): rebalanced the desktop session-generator columns so the manual planner gets materially more width, the control stack no longer compresses the slot board, and the group timeline only docks beside the board on truly wide screens",
+        "fix(session-generator-filter-wrap): made the active-assignment header and planner filters wrap responsively so full-width admin views stop collapsing labels, selects, and reset controls into the timetable area"
+      ]
+    },
+    {
       "version": "1.2.26",
       "date": "2026-03-13",
       "items": [
