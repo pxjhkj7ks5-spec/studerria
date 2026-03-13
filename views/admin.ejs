@@ -162,9 +162,6 @@
       body.theme-light #confirmActionModal .modal-content {
         background: rgba(255, 255, 255, 0.96);
       }
-      #confirmTypedInput {
-        text-transform: uppercase;
-      }
       body.confirm-modal-open .modal-backdrop.show {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
@@ -4567,9 +4564,10 @@
                 class="form-control"
                 id="confirmTypedInput"
                 autocomplete="off"
-                autocapitalize="characters"
+                autocapitalize="none"
                 autocorrect="off"
                 spellcheck="false"
+                inputmode="text"
                 enterkeyhint="done"
               />
               <div class="small text-muted mt-1">Повторіть фразу для підтвердження.</div>
@@ -4938,6 +4936,8 @@
       const confirmTypedWrapper = document.getElementById('confirmTypedWrapper');
       const confirmTypedInput = document.getElementById('confirmTypedInput');
       let confirmResolve = null;
+      let confirmTypedComposing = false;
+      let confirmSyncFrame = 0;
       const normalizeConfirmTypedValue = (value) => String(value || '').trim().toUpperCase();
       const getRequiredConfirmPhrase = () => {
         if (!confirmTypedInput) return '';
@@ -4956,6 +4956,16 @@
         if (matches || !current) {
           confirmTypedInput.classList.remove('is-invalid');
         }
+      };
+      const queueConfirmActionStateSync = () => {
+        if (confirmSyncFrame) {
+          window.cancelAnimationFrame(confirmSyncFrame);
+        }
+        confirmSyncFrame = window.requestAnimationFrame(() => {
+          confirmSyncFrame = 0;
+          if (confirmTypedComposing) return;
+          syncConfirmActionState();
+        });
       };
 
       const openConfirmModal = ({ message, title = 'Confirm action', level = 'danger', typed = '' } = {}) =>
@@ -4978,13 +4988,14 @@
               confirmTypedWrapper.style.display = 'block';
               confirmTypedInput.value = '';
               confirmTypedInput.dataset.typedValue = typedValue;
+              confirmTypedInput.setAttribute('autocapitalize', 'none');
             } else {
               confirmTypedWrapper.style.display = 'none';
               confirmTypedInput.value = '';
               confirmTypedInput.dataset.typedValue = '';
             }
           }
-          syncConfirmActionState();
+          queueConfirmActionStateSync();
           confirmModal.show();
         });
 
@@ -5003,7 +5014,14 @@
           confirmResolve = null;
         });
         if (confirmTypedInput) {
-          confirmTypedInput.addEventListener('input', syncConfirmActionState);
+          confirmTypedInput.addEventListener('compositionstart', () => {
+            confirmTypedComposing = true;
+          });
+          confirmTypedInput.addEventListener('compositionend', () => {
+            confirmTypedComposing = false;
+            queueConfirmActionStateSync();
+          });
+          confirmTypedInput.addEventListener('input', queueConfirmActionStateSync);
           confirmTypedInput.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter') return;
             if (confirmActionButton.disabled) return;
@@ -5024,6 +5042,11 @@
             confirmTypedInput.value = '';
             confirmTypedInput.dataset.typedValue = '';
             confirmTypedInput.classList.remove('is-invalid');
+          }
+          confirmTypedComposing = false;
+          if (confirmSyncFrame) {
+            window.cancelAnimationFrame(confirmSyncFrame);
+            confirmSyncFrame = 0;
           }
           syncConfirmActionState();
           if (confirmResolve) confirmResolve(false);
