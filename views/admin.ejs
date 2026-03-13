@@ -4935,6 +4935,7 @@
       const confirmActionButton = document.getElementById('confirmActionButton');
       const confirmTypedWrapper = document.getElementById('confirmTypedWrapper');
       const confirmTypedInput = document.getElementById('confirmTypedInput');
+      const useNativeConfirmFlow = true;
       let confirmResolve = null;
       let confirmTypedComposing = false;
       let confirmSyncFrame = 0;
@@ -4970,7 +4971,13 @@
 
       const openConfirmModal = ({ message, title = 'Confirm action', level = 'danger', typed = '' } = {}) =>
         new Promise((resolve) => {
-          if (!confirmModal) {
+          const requiredTypedValue = normalizeConfirmTypedValue(typed);
+          if (useNativeConfirmFlow || !confirmModal) {
+            if (requiredTypedValue) {
+              const reply = window.prompt(`${message || 'Are you sure?'}\n\nType ${requiredTypedValue} to confirm.`, '');
+              resolve(normalizeConfirmTypedValue(reply) === requiredTypedValue);
+              return;
+            }
             resolve(window.confirm(message || 'Are you sure?'));
             return;
           }
@@ -4983,11 +4990,10 @@
             confirmActionButton.textContent = level === 'warning' ? 'Confirm' : 'Delete';
           }
           if (confirmTypedWrapper && confirmTypedInput) {
-            const typedValue = normalizeConfirmTypedValue(typed);
-            if (typedValue) {
+            if (requiredTypedValue) {
               confirmTypedWrapper.style.display = 'block';
               confirmTypedInput.value = '';
-              confirmTypedInput.dataset.typedValue = typedValue;
+              confirmTypedInput.dataset.typedValue = requiredTypedValue;
               confirmTypedInput.setAttribute('autocapitalize', 'none');
             } else {
               confirmTypedWrapper.style.display = 'none';

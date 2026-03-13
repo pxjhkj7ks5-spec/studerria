@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.35",
+      "date": "2026-03-13",
+      "items": [
+        "fix(confirm-flow-native-fallback): route admin destructive confirmations through native `confirm/prompt` so laggy custom Bootstrap confirmation sheets no longer block typing or clicks in the admin workspace"
+      ]
+    },
+    {
       "version": "1.2.34",
       "date": "2026-03-13",
       "items": [
