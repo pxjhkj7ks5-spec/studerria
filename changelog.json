@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.22",
+      "date": "2026-03-13",
+      "items": [
+        "feat(admin-support-chat-section): moved support tickets into a dedicated admin section with a conversation-style layout, request list, selected thread view, and inline reply composer instead of keeping tickets under the Messages inbox",
+        "feat(support-request-thread-history): added `support_request_messages` with backfill from existing requests and admin notes so ticket history is preserved as a real thread while new replies append to the conversation"
+      ]
+    },
+    {
       "version": "1.2.21",
       "date": "2026-03-12",
       "items": [

@@ -694,6 +694,178 @@
         color: var(--text-muted);
         font-size: 0.85rem;
       }
+      .support-hub {
+        display: grid;
+        grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+        gap: 1rem;
+      }
+      .support-thread-list {
+        display: grid;
+        gap: 0.85rem;
+        max-height: 72vh;
+        overflow: auto;
+        padding-right: 0.2rem;
+      }
+      .support-thread-link {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        border-radius: 22px;
+        padding: 1rem 1rem 0.95rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.16);
+        transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease;
+      }
+      .support-thread-link:hover {
+        transform: translateY(-1px);
+        color: inherit;
+      }
+      .support-thread-link.active {
+        border-color: rgba(59, 130, 246, 0.42);
+        box-shadow: 0 18px 34px rgba(59, 130, 246, 0.18);
+      }
+      body.theme-light .support-thread-link {
+        background: rgba(255, 255, 255, 0.68);
+        border-color: rgba(15, 23, 42, 0.08);
+      }
+      body.theme-light .support-thread-link.active {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.86) 0%, rgba(232, 240, 255, 0.9) 100%);
+      }
+      body.theme-dark .support-thread-link {
+        background: rgba(17, 24, 39, 0.62);
+        border-color: rgba(148, 163, 184, 0.18);
+      }
+      .support-thread-head,
+      .support-thread-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+      .support-thread-title {
+        margin: 0.35rem 0 0;
+        font-size: 1rem;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+      .support-thread-preview {
+        margin: 0.45rem 0 0;
+        color: rgba(100, 116, 139, 0.9);
+        font-size: 0.92rem;
+        line-height: 1.45;
+      }
+      body.theme-dark .support-thread-preview {
+        color: rgba(226, 232, 240, 0.74);
+      }
+      .support-thread-user {
+        font-size: 0.86rem;
+        color: rgba(100, 116, 139, 0.9);
+      }
+      body.theme-dark .support-thread-user {
+        color: rgba(203, 213, 225, 0.72);
+      }
+      .support-chat-shell {
+        display: grid;
+        gap: 1rem;
+      }
+      .support-chat-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .support-chat-subject {
+        margin: 0.4rem 0 0;
+        font-size: 1.35rem;
+        font-weight: 650;
+      }
+      .support-chat-copy {
+        margin: 0.45rem 0 0;
+        color: rgba(100, 116, 139, 0.9);
+      }
+      body.theme-dark .support-chat-copy {
+        color: rgba(226, 232, 240, 0.76);
+      }
+      .support-chat-scroll {
+        display: grid;
+        gap: 0.9rem;
+        max-height: 54vh;
+        overflow: auto;
+        padding-right: 0.35rem;
+      }
+      .support-message {
+        max-width: min(78%, 42rem);
+        padding: 0.95rem 1rem;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
+      }
+      .support-message--user {
+        justify-self: start;
+        border-bottom-left-radius: 10px;
+      }
+      .support-message--admin {
+        justify-self: end;
+        border-bottom-right-radius: 10px;
+        background: linear-gradient(180deg, rgba(59, 130, 246, 0.16) 0%, rgba(37, 99, 235, 0.2) 100%);
+        border-color: rgba(59, 130, 246, 0.24);
+      }
+      body.theme-light .support-message {
+        background: rgba(255, 255, 255, 0.72);
+        border-color: rgba(15, 23, 42, 0.08);
+      }
+      body.theme-light .support-message--admin {
+        background: linear-gradient(180deg, rgba(219, 234, 254, 0.96) 0%, rgba(191, 219, 254, 0.94) 100%);
+      }
+      .support-message-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.45rem;
+        font-size: 0.8rem;
+        color: rgba(100, 116, 139, 0.92);
+      }
+      body.theme-dark .support-message-meta {
+        color: rgba(226, 232, 240, 0.76);
+      }
+      .support-message-body {
+        margin: 0;
+        white-space: pre-wrap;
+        line-height: 1.55;
+      }
+      .support-chat-reply textarea {
+        min-height: 120px;
+      }
+      .support-chat-empty {
+        display: grid;
+        place-items: center;
+        min-height: 420px;
+        text-align: center;
+        border-radius: 28px;
+        border: 1px dashed rgba(148, 163, 184, 0.3);
+        padding: 2rem;
+        color: rgba(100, 116, 139, 0.9);
+      }
+      body.theme-dark .support-chat-empty {
+        color: rgba(226, 232, 240, 0.72);
+        border-color: rgba(148, 163, 184, 0.22);
+      }
+      @media (max-width: 991.98px) {
+        .support-hub {
+          grid-template-columns: 1fr;
+        }
+        .support-thread-list,
+        .support-chat-scroll {
+          max-height: none;
+        }
+        .support-message {
+          max-width: 100%;
+        }
+      }
 </style>
       <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
@@ -875,6 +1047,9 @@
             <div class="admin-sidebar-title">Communications</div>
             <% if (sectionAllowed('admin-messages') && settings && settings.allow_messages) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-messages">Messages</button>
+            <% } %>
+            <% if (sectionAllowed('admin-support') && supportSectionVisible) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-support"><%= t('admin.supportSectionNav') %></button>
             <% } %>
           </div>
           <div class="admin-sidebar-section">
@@ -3723,18 +3898,6 @@
 
         <% if (sectionAllowed('admin-messages') && settings && settings.allow_messages) { %>
         <div id="admin-messages" class="admin-panel" data-admin-title="Communications / Messages">
-          <%
-            const adminSupportLocale = lang === 'uk' ? 'uk-UA' : 'en-US';
-            const formatAdminSupportStamp = (value) => {
-              if (!value) return '—';
-              const date = new Date(value);
-              if (Number.isNaN(date.getTime())) return value;
-              return date.toLocaleString(adminSupportLocale, {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              });
-            };
-          %>
           <div class="card mb-4">
             <div class="card-body">
               <h5 class="card-title mb-3"><%= t('admin.sendMessage') %></h5>
@@ -3882,76 +4045,163 @@
             </div>
           </div>
 
-          <% if (supportInboxVisible) { %>
-            <div class="card mb-4">
-              <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
-                  <div>
-                    <h5 class="card-title mb-1"><%= t('admin.supportInboxTitle') %></h5>
-                    <div class="small text-muted"><%= t('admin.supportInboxSubtitle') %></div>
-                  </div>
-                  <span class="badge bg-primary-subtle text-primary-emphasis rounded-pill"><%= (supportRequests || []).length %></span>
-                </div>
-
-                <% if ((supportRequests || []).length) { %>
-                  <div class="d-grid gap-3">
-                    <% (supportRequests || []).forEach(function(request) { %>
-                      <article class="border rounded-4 p-3">
-                        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-2">
-                          <div>
-                            <div class="d-flex flex-wrap gap-2 mb-2">
-                              <span class="badge <%= request.status === 'resolved' ? 'bg-success' : (request.status === 'in_progress' ? 'bg-info text-dark' : 'bg-warning text-dark') %>">
-                                <%= t(`help.status.${request.status === 'in_progress' ? 'inProgress' : request.status}`) %>
-                              </span>
-                              <span class="badge bg-secondary-subtle text-secondary-emphasis">
-                                <%= t(`help.topic.${request.category}`) %>
-                              </span>
-                            </div>
-                            <h6 class="mb-1"><%= request.subject %></h6>
-                            <div class="small text-muted">
-                              <strong><%= t('admin.supportTicketUser') %>:</strong> <%= request.user_name %>
-                            </div>
-                            <div class="small text-muted">
-                              <strong><%= t('admin.supportTicketUpdated') %>:</strong> <%= formatAdminSupportStamp(request.updated_at || request.created_at) %>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div class="mb-3">
-                          <div class="small text-muted mb-1"><%= t('admin.supportTicketMessage') %></div>
-                          <div style="white-space: pre-wrap;"><%= request.body %></div>
-                        </div>
-
-                        <form method="POST" action="/admin/support-requests/<%= request.id %>/update" class="row g-2 align-items-start">
-                          <div class="col-12 col-lg-3">
-                            <label class="form-label"><%= t('admin.supportTicketStatus') %></label>
-                            <select class="form-select" name="status">
-                              <option value="new" <%= request.status === 'new' ? 'selected' : '' %>><%= t('help.status.new') %></option>
-                              <option value="in_progress" <%= request.status === 'in_progress' ? 'selected' : '' %>><%= t('help.status.inProgress') %></option>
-                              <option value="resolved" <%= request.status === 'resolved' ? 'selected' : '' %>><%= t('help.status.resolved') %></option>
-                            </select>
-                          </div>
-                          <div class="col-12 col-lg-7">
-                            <label class="form-label"><%= t('admin.supportTicketNote') %></label>
-                            <textarea class="form-control" name="admin_note" rows="3" maxlength="1000"><%= request.admin_note || '' %></textarea>
-                          </div>
-                          <div class="col-12 col-lg-2 d-grid">
-                            <label class="form-label d-none d-lg-block">&nbsp;</label>
-                            <button class="btn btn-primary" type="submit"><%= t('admin.supportTicketSave') %></button>
-                          </div>
-                        </form>
-                      </article>
-                    <% }); %>
-                  </div>
-                <% } else { %>
-                  <p class="text-muted mb-0"><%= t('admin.supportInboxEmpty') %></p>
-                <% } %>
-              </div>
-            </div>
-          <% } %>
         </div>
       </div>
       <% } %>
+
+        <% if (sectionAllowed('admin-support') && supportSectionVisible) { %>
+        <div id="admin-support" class="admin-panel" data-admin-title="Communications / Support">
+          <%
+            const supportLocale = lang === 'uk' ? 'uk-UA' : 'en-US';
+            const formatSupportStamp = (value) => {
+              if (!value) return '—';
+              const date = new Date(value);
+              if (Number.isNaN(date.getTime())) return value;
+              return date.toLocaleString(supportLocale, {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              });
+            };
+            const supportThread = selectedSupportRequest || null;
+            const supportMessages = supportThread && Array.isArray(supportThread.messages) ? supportThread.messages : [];
+            const activeSupportId = supportThread ? Number(supportThread.id || 0) : 0;
+            const supportBaseHref = `/admin?tab=admin-support&course=${encodeURIComponent(String(selectedCourseId || ''))}`;
+            const supportStatusClass = (status) => (
+              status === 'resolved'
+                ? 'bg-success'
+                : (status === 'in_progress' ? 'bg-info text-dark' : 'bg-warning text-dark')
+            );
+            const supportPreviewText = (request) => {
+              const raw = String((request.admin_note && String(request.admin_note).trim()) || request.body || '')
+                .replace(/\s+/g, ' ')
+                .trim();
+              if (!raw) return '—';
+              return raw.length > 120 ? `${raw.slice(0, 117)}...` : raw;
+            };
+            const supportMessageAuthor = (message) => {
+              const fallback = message.author_role === 'admin'
+                ? t('admin.supportAuthorAdmin')
+                : t('admin.supportAuthorUser');
+              return message.author_name || fallback;
+            };
+          %>
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="support-chat-head mb-4">
+                <div>
+                  <h5 class="card-title mb-1"><%= t('admin.supportSectionTitle') %></h5>
+                  <p class="support-chat-copy mb-0"><%= t('admin.supportSectionSubtitle') %></p>
+                </div>
+                <span class="badge bg-primary-subtle text-primary-emphasis rounded-pill"><%= (supportRequests || []).length %></span>
+              </div>
+
+              <div class="support-hub">
+                <div>
+                  <% if ((supportRequests || []).length) { %>
+                    <div class="support-thread-list">
+                      <% (supportRequests || []).forEach(function(request) { %>
+                        <a
+                          class="support-thread-link <%= Number(request.id || 0) === activeSupportId ? 'active' : '' %>"
+                          href="<%= `${supportBaseHref}&support_request=${encodeURIComponent(String(request.id || ''))}` %>"
+                        >
+                          <div class="support-thread-head">
+                            <span class="badge <%= supportStatusClass(request.status) %>">
+                              <%= t(`help.status.${request.status === 'in_progress' ? 'inProgress' : request.status}`) %>
+                            </span>
+                            <span class="small text-muted"><%= formatSupportStamp(request.updated_at || request.created_at) %></span>
+                          </div>
+                          <h6 class="support-thread-title"><%= request.subject %></h6>
+                          <div class="support-thread-user"><%= request.user_name %> · <%= t(`help.topic.${request.category}`) %></div>
+                          <p class="support-thread-preview"><%= supportPreviewText(request) %></p>
+                        </a>
+                      <% }); %>
+                    </div>
+                  <% } else { %>
+                    <div class="support-chat-empty">
+                      <div>
+                        <h5 class="mb-2"><%= t('admin.supportSectionEmpty') %></h5>
+                        <p class="mb-0"><%= t('admin.supportSectionEmptyCopy') %></p>
+                      </div>
+                    </div>
+                  <% } %>
+                </div>
+
+                <div>
+                  <% if (supportThread) { %>
+                    <div class="support-chat-shell">
+                      <div class="support-chat-head">
+                        <div>
+                          <div class="d-flex flex-wrap gap-2 mb-2">
+                            <span class="badge <%= supportStatusClass(supportThread.status) %>">
+                              <%= t(`help.status.${supportThread.status === 'in_progress' ? 'inProgress' : supportThread.status}`) %>
+                            </span>
+                            <span class="badge bg-secondary-subtle text-secondary-emphasis">
+                              <%= t(`help.topic.${supportThread.category}`) %>
+                            </span>
+                          </div>
+                          <h2 class="support-chat-subject"><%= supportThread.subject %></h2>
+                          <p class="support-chat-copy mb-0">
+                            <strong><%= t('admin.supportTicketUser') %>:</strong> <%= supportThread.user_name %>
+                            ·
+                            <strong><%= t('admin.supportTicketUpdated') %>:</strong> <%= formatSupportStamp(supportThread.updated_at || supportThread.created_at) %>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div class="support-chat-scroll">
+                        <% supportMessages.forEach(function(message) { %>
+                          <article class="support-message support-message--<%= message.author_role === 'admin' ? 'admin' : 'user' %>">
+                            <div class="support-message-meta">
+                              <span><%= supportMessageAuthor(message) %></span>
+                              <span><%= formatSupportStamp(message.created_at) %></span>
+                            </div>
+                            <p class="support-message-body"><%= message.body %></p>
+                          </article>
+                        <% }); %>
+                      </div>
+
+                      <div class="card support-chat-reply">
+                        <div class="card-body">
+                          <form method="POST" action="/admin/support-requests/<%= supportThread.id %>/update" class="row g-3 align-items-start">
+                            <div class="col-12 col-lg-3">
+                              <label class="form-label"><%= t('admin.supportTicketStatus') %></label>
+                              <select class="form-select" name="status">
+                                <option value="new" <%= supportThread.status === 'new' ? 'selected' : '' %>><%= t('help.status.new') %></option>
+                                <option value="in_progress" <%= supportThread.status === 'in_progress' ? 'selected' : '' %>><%= t('help.status.inProgress') %></option>
+                                <option value="resolved" <%= supportThread.status === 'resolved' ? 'selected' : '' %>><%= t('help.status.resolved') %></option>
+                              </select>
+                            </div>
+                            <div class="col-12 col-lg-9">
+                              <label class="form-label"><%= t('admin.supportReplyLabel') %></label>
+                              <textarea
+                                class="form-control"
+                                name="reply_body"
+                                rows="5"
+                                maxlength="1000"
+                                placeholder="<%= t('admin.supportReplyPlaceholder') %>"
+                              ></textarea>
+                            </div>
+                            <div class="col-12 d-flex justify-content-end">
+                              <button class="btn btn-primary" type="submit"><%= t('admin.supportReplySend') %></button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
+                  <% } else { %>
+                    <div class="support-chat-empty">
+                      <div>
+                        <h5 class="mb-2"><%= t('admin.supportSectionSelectTitle') %></h5>
+                        <p class="mb-0"><%= t('admin.supportSectionSelectCopy') %></p>
+                      </div>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <% } %>
         </div>
       </div>
     </main>

@@ -313,6 +313,7 @@ const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-activity', label: 'Активність' },
   { id: 'admin-teamwork', label: 'Командна робота' },
   { id: 'admin-messages', label: 'Повідомлення' },
+  { id: 'admin-support', label: 'Звернення' },
 ];
 
 const DEFAULT_ROLE_PERMISSIONS = {
@@ -1835,6 +1836,7 @@ const requireHistorySectionAccess = requireAdminSectionAccess('admin-history');
 const requireActivitySectionAccess = requireAdminSectionAccess('admin-activity');
 const requireTeamworkSectionAccess = requireAdminSectionAccess('admin-teamwork');
 const requireMessagesSectionAccess = requireAdminSectionAccess('admin-messages');
+const requireSupportSectionAccess = requireAdminSectionAccess('admin-support');
 
 app.use(async (req, res, next) => {
   if (!req.session || !req.session.user) {
@@ -7623,6 +7625,7 @@ function sortHomework(homework, sortKey) {
 
 const SUPPORT_REQUEST_CATEGORIES = ['account', 'schedule', 'journal', 'subjects', 'teamwork', 'other'];
 const SUPPORT_REQUEST_STATUSES = ['new', 'in_progress', 'resolved'];
+const SUPPORT_REQUEST_MESSAGE_ROLES = ['user', 'admin'];
 
 function normalizeSupportRequestCategory(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -7632,6 +7635,108 @@ function normalizeSupportRequestCategory(value) {
 function normalizeSupportRequestStatus(value) {
   const normalized = String(value || '').trim().toLowerCase();
   return SUPPORT_REQUEST_STATUSES.includes(normalized) ? normalized : 'new';
+}
+
+function normalizeSupportRequestMessageRole(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return SUPPORT_REQUEST_MESSAGE_ROLES.includes(normalized) ? normalized : 'user';
+}
+
+function buildSupportRequestFallbackMessages(requestRow = {}) {
+  const messages = [];
+  const requestId = Number(requestRow.id || 0);
+  const userBody = String(requestRow.body || '').trim();
+  if (userBody) {
+    messages.push({
+      id: requestId ? `request-${requestId}-user` : 'request-user',
+      request_id: requestId || null,
+      author_role: 'user',
+      author_user_id: Number.isFinite(Number(requestRow.user_id)) ? Number(requestRow.user_id) : null,
+      author_name: String(requestRow.user_name || '').trim() || 'User',
+      body: userBody,
+      created_at: requestRow.created_at || null,
+    });
+  }
+  const adminBody = String(requestRow.admin_note || '').trim();
+  if (adminBody) {
+    messages.push({
+      id: requestId ? `request-${requestId}-admin` : 'request-admin',
+      request_id: requestId || null,
+      author_role: 'admin',
+      author_user_id: Number.isFinite(Number(requestRow.resolved_by)) ? Number(requestRow.resolved_by) : null,
+      author_name: String(requestRow.resolved_by_name || '').trim() || 'Admin',
+      body: adminBody,
+      created_at: requestRow.resolved_at || requestRow.updated_at || requestRow.created_at || null,
+    });
+  }
+  return messages;
+}
+
+async function insertSupportRequestMessage({
+  requestId,
+  authorUserId = null,
+  authorRole = 'user',
+  body = '',
+}) {
+  const normalizedRequestId = Number(requestId || 0);
+  const normalizedAuthorUserId = Number(authorUserId || 0);
+  const normalizedBody = String(body || '')
+    .replace(/\r\n/g, '\n')
+    .trim();
+  if (!Number.isInteger(normalizedRequestId) || normalizedRequestId < 1 || !normalizedBody) {
+    return false;
+  }
+  try {
+    await db.run(
+      `
+        INSERT INTO support_request_messages (request_id, author_user_id, author_role, body)
+        VALUES (?, ?, ?, ?)
+      `,
+      [
+        normalizedRequestId,
+        Number.isInteger(normalizedAuthorUserId) && normalizedAuthorUserId > 0 ? normalizedAuthorUserId : null,
+        normalizeSupportRequestMessageRole(authorRole),
+        normalizedBody,
+      ]
+    );
+    return true;
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return false;
+    }
+    throw err;
+  }
+}
+
+async function listSupportRequestMessages(requestId) {
+  const normalizedRequestId = Number(requestId || 0);
+  if (!Number.isInteger(normalizedRequestId) || normalizedRequestId < 1) {
+    return [];
+  }
+  try {
+    return await db.all(
+      `
+        SELECT
+          srm.id,
+          srm.request_id,
+          srm.author_user_id,
+          srm.author_role,
+          srm.body,
+          srm.created_at,
+          COALESCE(u.full_name, CASE WHEN srm.author_role = 'admin' THEN 'Admin' ELSE 'User' END) AS author_name
+        FROM support_request_messages srm
+        LEFT JOIN users u ON u.id = srm.author_user_id
+        WHERE srm.request_id = ?
+        ORDER BY srm.created_at ASC, srm.id ASC
+      `,
+      [normalizedRequestId]
+    );
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
 }
 
 async function listSupportRequestsForUser(userId, limit = 12) {
@@ -7667,6 +7772,39 @@ async function listSupportRequestsForCourse(courseId, limit = 40) {
     `,
     [courseId]
   );
+}
+
+async function getSupportRequestThreadForCourse(requestId, courseId) {
+  const normalizedRequestId = Number(requestId || 0);
+  const normalizedCourseId = Number(courseId || 0);
+  if (!Number.isInteger(normalizedRequestId) || normalizedRequestId < 1) {
+    return null;
+  }
+  const row = await db.get(
+    `
+      SELECT
+        sr.*,
+        u.full_name AS user_name,
+        resolver.full_name AS resolved_by_name
+      FROM support_requests sr
+      JOIN users u ON u.id = sr.user_id
+      LEFT JOIN users resolver ON resolver.id = sr.resolved_by
+      WHERE sr.id = ?
+        ${Number.isInteger(normalizedCourseId) && normalizedCourseId > 0 ? 'AND sr.course_id = ?' : ''}
+      LIMIT 1
+    `,
+    Number.isInteger(normalizedCourseId) && normalizedCourseId > 0
+      ? [normalizedRequestId, normalizedCourseId]
+      : [normalizedRequestId]
+  );
+  if (!row) {
+    return null;
+  }
+  const messages = await listSupportRequestMessages(normalizedRequestId);
+  return {
+    ...row,
+    messages: messages.length ? messages : buildSupportRequestFallbackMessages(row),
+  };
 }
 
 function buildHelpPageContent(lang) {
@@ -7901,7 +8039,7 @@ app.post('/help/support', requireLogin, writeLimiter, async (req, res) => {
 
   try {
     const courseId = Number(req.session.user.course_id || 0);
-    await db.get(
+    const createdRequest = await db.get(
       `
         INSERT INTO support_requests (user_id, course_id, category, subject, body)
         VALUES (?, ?, ?, ?, ?)
@@ -7915,6 +8053,14 @@ app.post('/help/support', requireLogin, writeLimiter, async (req, res) => {
         body,
       ]
     );
+    if (createdRequest && createdRequest.id) {
+      await insertSupportRequestMessage({
+        requestId: createdRequest.id,
+        authorUserId: req.session.user.id,
+        authorRole: 'user',
+        body,
+      });
+    }
     return res.redirect(`/help?ok=${encodeURIComponent(translate(lang, 'help.flash.requestCreated'))}`);
   } catch (err) {
     return handleDbError(res, err, 'help.support.create');
@@ -23973,7 +24119,7 @@ app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimite
   );
 });
 
-app.post('/admin/support-requests/:id/update', requireAdmin, writeLimiter, async (req, res) => {
+app.post('/admin/support-requests/:id/update', requireSupportSectionAccess, writeLimiter, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -23982,39 +24128,48 @@ app.post('/admin/support-requests/:id/update', requireAdmin, writeLimiter, async
 
   const lang = getPreferredLang(req);
   const requestId = Number(req.params.id);
-  const adminNote = String(req.body.admin_note || '')
+  const replyBody = String(req.body.reply_body || req.body.admin_note || '')
     .replace(/\r\n/g, '\n')
     .trim();
   const status = normalizeSupportRequestStatus(req.body.status);
   const selectedCourseId = Number(getAdminCourse(req) || req.session.user.course_id || 0);
+  const redirectCourseQuery = selectedCourseId > 0 ? `&course=${selectedCourseId}` : '';
+  const redirectThreadQuery = Number.isInteger(requestId) && requestId > 0 ? `&support_request=${requestId}` : '';
+  const redirectBase = `/admin?tab=admin-support${redirectCourseQuery}${redirectThreadQuery}`;
 
-  if (Number.isNaN(requestId) || adminNote.length > 1000) {
-    return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketValidationMessage'))}`);
+  if (Number.isNaN(requestId) || replyBody.length > 1000) {
+    return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketValidationMessage'))}`);
   }
 
   try {
     const supportRequestColumns = await getTableColumnSet('support_requests', { refresh: true });
     if (!supportRequestColumns.has('id')) {
-      return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
+      return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
     }
 
     const selectFields = ['id'];
     if (supportRequestColumns.has('course_id')) {
       selectFields.push('course_id');
     }
+    if (supportRequestColumns.has('status')) {
+      selectFields.push('status');
+    }
+    if (supportRequestColumns.has('admin_note')) {
+      selectFields.push('admin_note');
+    }
     const supportRequest = await db.get(
       `SELECT ${selectFields.join(', ')} FROM support_requests WHERE id = ?`,
       [requestId]
     );
     if (!supportRequest) {
-      return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketMissingMessage'))}`);
+      return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketMissingMessage'))}`);
     }
     if (
       supportRequestColumns.has('course_id')
       && selectedCourseId > 0
       && Number(supportRequest.course_id || 0) !== selectedCourseId
     ) {
-      return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketMissingMessage'))}`);
+      return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketMissingMessage'))}`);
     }
     const resolvedAt = status === 'resolved' ? new Date().toISOString() : null;
     const resolvedBy = status === 'resolved' ? req.session.user.id : null;
@@ -24025,9 +24180,9 @@ app.post('/admin/support-requests/:id/update', requireAdmin, writeLimiter, async
       updateAssignments.push('status = ?');
       updateParams.push(status);
     }
-    if (supportRequestColumns.has('admin_note')) {
+    if (supportRequestColumns.has('admin_note') && replyBody) {
       updateAssignments.push('admin_note = ?');
-      updateParams.push(adminNote || null);
+      updateParams.push(replyBody);
     }
     if (supportRequestColumns.has('updated_at')) {
       updateAssignments.push('updated_at = NOW()');
@@ -24041,7 +24196,7 @@ app.post('/admin/support-requests/:id/update', requireAdmin, writeLimiter, async
       updateParams.push(resolvedBy);
     }
     if (!updateAssignments.length) {
-      return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
+      return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
     }
     updateParams.push(requestId);
 
@@ -24049,15 +24204,24 @@ app.post('/admin/support-requests/:id/update', requireAdmin, writeLimiter, async
       `UPDATE support_requests SET ${updateAssignments.join(', ')} WHERE id = ?`,
       updateParams
     );
+    if (replyBody) {
+      await insertSupportRequestMessage({
+        requestId,
+        authorUserId: req.session.user.id,
+        authorRole: 'admin',
+        body: replyBody,
+      });
+    }
 
     logAction(db, req, 'support_request_update', {
       request_id: requestId,
       status,
+      replied: Boolean(replyBody),
     });
-    return res.redirect(`/admin?tab=admin-messages&ok=${encodeURIComponent(translate(lang, 'admin.supportTicketUpdatedMessage'))}`);
+    return res.redirect(`${redirectBase}&ok=${encodeURIComponent(translate(lang, 'admin.supportTicketUpdatedMessage'))}`);
   } catch (err) {
     if (isDbSchemaCompatibilityError(err)) {
-      return res.redirect(`/admin?tab=admin-messages&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
+      return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
     }
     return handleDbError(res, err, 'admin.supportRequests.update');
   }
@@ -24552,7 +24716,8 @@ const buildAdminTemplateLocals = (overrides = {}) => ({
   teamworkTasks: [],
   adminMessages: [],
   supportRequests: [],
-  supportInboxVisible: false,
+  selectedSupportRequest: null,
+  supportSectionVisible: false,
   courses: [],
   teacherRequests: [],
   semesters: [],
@@ -25259,9 +25424,22 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
       };
     });
     let supportRequests = [];
+    let selectedSupportRequest = null;
     if (isAdminPanelOwner) {
       try {
         supportRequests = await listSupportRequestsForCourse(courseId, 40);
+        const requestedSupportRequestId = Number(req.query.support_request || 0);
+        const defaultSupportRequestId = Number(
+          requestedSupportRequestId > 0
+            ? requestedSupportRequestId
+            : ((supportRequests && supportRequests[0] && supportRequests[0].id) || 0)
+        );
+        if (defaultSupportRequestId > 0) {
+          selectedSupportRequest = await getSupportRequestThreadForCourse(defaultSupportRequestId, courseId);
+          if (!selectedSupportRequest && supportRequests && supportRequests[0] && Number(supportRequests[0].id || 0) > 0) {
+            selectedSupportRequest = await getSupportRequestThreadForCourse(Number(supportRequests[0].id), courseId);
+          }
+        }
       } catch (supportErr) {
         console.error('Database error (admin.supportRequests)', supportErr);
       }
@@ -25285,7 +25463,8 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       teamworkTasks,
                                       adminMessages: messages,
                                       supportRequests,
-                                      supportInboxVisible: isAdminPanelOwner,
+                                      selectedSupportRequest,
+                                      supportSectionVisible: isAdminPanelOwner,
                                       courses,
                                       teacherRequests,
         semesters,
