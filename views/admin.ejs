@@ -970,12 +970,15 @@
     <main class="admin-layout">
       <aside class="admin-sidebar">
         <div class="admin-sidebar-inner">
-          <% if (deaneryMonitoringData) { %>
-            <div class="admin-sidebar-section">
-              <div class="admin-sidebar-title">Monitoring</div>
+          <div class="admin-sidebar-section">
+            <div class="admin-sidebar-title">Overview</div>
+            <% if (sectionAllowed('admin-overview')) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-overview">Overview</button>
+            <% } %>
+            <% if (deaneryMonitoringData) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-deanery-monitoring">Deanery Monitor</button>
-            </div>
-          <% } %>
+            <% } %>
+          </div>
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">System</div>
             <% if (sectionAllowed('admin-settings')) { %>
@@ -1090,11 +1093,15 @@
       <div id="toastContainer" data-toast-success="<%= msg && msg.success ? msg.success : '' %>" data-toast-error="<%= msg && msg.error ? msg.error : '' %>"></div>
 
       <% const adminSectionOptionsList = typeof adminSectionOptions !== 'undefined' && Array.isArray(adminSectionOptions) ? adminSectionOptions : []; %>
+      <% const dashboardStatsData = typeof dashboardStats !== 'undefined' && dashboardStats ? dashboardStats : null; %>
       <% const rbacRolesList = typeof rbacRoles !== 'undefined' && Array.isArray(rbacRoles) ? rbacRoles : []; %>
       <% const rbacPermissionOptionsList = typeof rbacPermissionOptions !== 'undefined' && Array.isArray(rbacPermissionOptions) ? rbacPermissionOptions : []; %>
       <% const courseKindOptionsList = typeof courseKindOptions !== 'undefined' && Array.isArray(courseKindOptions) ? courseKindOptions : []; %>
       <% const userRoleAssignmentsMap = typeof userRoleAssignments !== 'undefined' && userRoleAssignments ? userRoleAssignments : {}; %>
       <% const userPrimaryRoleMapData = typeof userPrimaryRoleMap !== 'undefined' && userPrimaryRoleMap ? userPrimaryRoleMap : {}; %>
+      <% const activeAdminTabRaw = typeof activeAdminTab === 'string' ? activeAdminTab.trim() : ''; %>
+      <% const activeAdminTabNormalized = activeAdminTabRaw === 'admin-role-access' ? 'admin-role-studio' : activeAdminTabRaw; %>
+      <% const initialAdminTab = (/^[a-z0-9-]+$/i.test(activeAdminTabNormalized) && (((adminSectionOptionsList || []).some((section) => section && section.id === activeAdminTabNormalized)) || activeAdminTabNormalized === 'admin-deanery-monitoring')) ? activeAdminTabNormalized : ''; %>
       <% const roleLabelMapData = Object.assign({
         admin: 'Адмін',
         teacher: 'Викладач',
@@ -1114,7 +1121,53 @@
         <% groupMap[g.student_id][g.subject_id] = g.group_number; %>
       <% }); %>
 
+      <% if (initialAdminTab) { %>
+        <style>
+          .admin-panels .admin-panel { display: none; }
+          .admin-panels #<%= initialAdminTab %> { display: block; }
+        </style>
+      <% } %>
+
       <div class="admin-panels">
+        <% if (sectionAllowed('admin-overview')) { %>
+          <div id="admin-overview" class="admin-panel" data-admin-title="Overview">
+            <div class="card mb-4">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                  <div>
+                    <h5 class="card-title mb-1">Overview</h5>
+                    <div class="small text-muted">Швидкий стан по курсу та найближчих діях.</div>
+                  </div>
+                  <div class="admin-overview-actions d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-primary btn-sm" href="/admin/schedule-generator">Генератор розкладу</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="/admin/session-generator">Генератор сесій</a>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-admin-nav="admin-import-export">Import/Export</button>
+                    <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-list">Schedule list</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-summary">Semester summary</a>
+                  </div>
+                </div>
+                <div class="admin-overview-grid">
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Users</div>
+                    <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.users : '—' %></div>
+                  </div>
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Subjects</div>
+                    <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.subjects : '—' %></div>
+                  </div>
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Homework</div>
+                    <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.homework : '—' %></div>
+                  </div>
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Teamwork tasks</div>
+                    <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.teamworkTasks : '—' %></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% } %>
         <% if (deaneryMonitoringData) { %>
           <% const monitorSummary = deaneryMonitoringData.summary || {}; %>
           <% const monitorSelectedCourse = deaneryMonitoringData.selected_course || null; %>

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.24",
+      "date": "2026-03-13",
+      "items": [
+        "tune(admin-overview-tab-restore): restored Overview as its own admin tab while keeping it off the support workspace, and added server-side initial tab rendering so `/admin?tab=admin-support` opens straight into support without the overview block stacking above it"
+      ]
+    },
+    {
       "version": "1.2.23",
       "date": "2026-03-13",
       "items": [
