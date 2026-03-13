@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.28",
+      "date": "2026-03-13",
+      "items": [
+        "fix(session-generator-slot-heights): rebuilt the day slot stack so session slots no longer inherit the tallest neighbor in each row, giving free and lightly populated pairs their own compact height instead of oversized empty cards",
+        "tune(session-generator-slot-density): tightened slot padding and updated the narrow-screen fallback for the new flexible slot layout so the timetable stays cleaner across full-width and mobile admin views"
+      ]
+    },
+    {
       "version": "1.2.27",
       "date": "2026-03-13",
       "items": [
