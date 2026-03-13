@@ -29633,6 +29633,151 @@ const formatSessionTeacherConflictMessage = (report) => {
   return parts.join(' ').trim();
 };
 
+const buildSessionGeneratorSemesterFilter = (columnName, semesterId) => {
+  if (semesterId) {
+    return {
+      clause: ` AND (${columnName} = ? OR ${columnName} IS NULL)`,
+      params: [semesterId],
+    };
+  }
+  return {
+    clause: ` AND ${columnName} IS NULL`,
+    params: [],
+  };
+};
+
+async function purgeSessionGeneratorHomework({
+  courseId,
+  semesterId,
+  targetDates = [],
+  actorUserId = null,
+  purgeResidualSessionColumns = false,
+}) {
+  const normalizedCourseId = Number(courseId || 0);
+  const normalizedSemesterId = Number(semesterId || 0) || null;
+  const normalizedTargetDates = Array.from(new Set((Array.isArray(targetDates) ? targetDates : [])
+    .map((value) => toDateOnly(value))
+    .filter((value) => isValidDateString(value))))
+    .sort();
+  const homeworkSemesterFilter = buildSessionGeneratorSemesterFilter('semester_id', normalizedSemesterId);
+  let homeworkSql = `
+    SELECT id, subject_id
+    FROM homework
+    WHERE course_id = ?
+      AND LOWER(TRIM(COALESCE(description, ''))) LIKE '[сесія]%'
+      AND COALESCE(is_teacher_homework, 0) = 1
+      AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
+      ${homeworkSemesterFilter.clause}
+  `;
+  const homeworkParams = [normalizedCourseId, ...homeworkSemesterFilter.params];
+  if (normalizedTargetDates.length) {
+    homeworkSql += ' AND class_date = ANY(?)';
+    homeworkParams.push(normalizedTargetDates);
+  }
+  const homeworkRows = await db.all(homeworkSql, homeworkParams);
+  const homeworkIds = Array.from(new Set((homeworkRows || [])
+    .map((row) => Number(row.id))
+    .filter((id) => Number.isFinite(id) && id > 0)));
+  const touchedSubjectIds = new Set((homeworkRows || [])
+    .map((row) => Number(row.subject_id))
+    .filter((subjectId) => Number.isFinite(subjectId) && subjectId > 0));
+  const deletedColumnIds = new Set();
+
+  if (homeworkIds.length) {
+    const linkedColumnRows = await db.all(
+      `
+        SELECT id, subject_id
+        FROM journal_columns
+        WHERE source_homework_id = ANY(?)
+      `,
+      [homeworkIds]
+    );
+    (linkedColumnRows || []).forEach((row) => {
+      const columnId = Number(row.id || 0);
+      if (Number.isFinite(columnId) && columnId > 0) {
+        deletedColumnIds.add(columnId);
+      }
+      const subjectId = Number(row.subject_id || 0);
+      if (Number.isFinite(subjectId) && subjectId > 0) {
+        touchedSubjectIds.add(subjectId);
+      }
+    });
+    await db.run(
+      'DELETE FROM journal_columns WHERE source_homework_id = ANY(?)',
+      [homeworkIds]
+    );
+    await db.run(
+      'DELETE FROM homework WHERE id = ANY(?)',
+      [homeworkIds]
+    );
+  }
+
+  if (purgeResidualSessionColumns) {
+    const columnSemesterFilter = buildSessionGeneratorSemesterFilter('jc.semester_id', normalizedSemesterId);
+    const residualColumnRows = await db.all(
+      `
+        SELECT DISTINCT jc.id, jc.subject_id
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.course_id = ?
+          AND COALESCE(jc.is_archived, 0) = 0
+          ${columnSemesterFilter.clause}
+          AND (
+            LOWER(TRIM(COALESCE(jc.title, ''))) LIKE '[сесія]%'
+            OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE '[сесія]%'
+          )
+      `,
+      [normalizedCourseId, ...columnSemesterFilter.params]
+    );
+    const residualColumnIds = Array.from(new Set((residualColumnRows || [])
+      .map((row) => Number(row.id))
+      .filter((columnId) => Number.isFinite(columnId) && columnId > 0 && !deletedColumnIds.has(columnId))));
+    (residualColumnRows || []).forEach((row) => {
+      const subjectId = Number(row.subject_id || 0);
+      if (Number.isFinite(subjectId) && subjectId > 0) {
+        touchedSubjectIds.add(subjectId);
+      }
+    });
+    if (residualColumnIds.length) {
+      residualColumnIds.forEach((columnId) => deletedColumnIds.add(columnId));
+      await db.run(
+        'DELETE FROM journal_columns WHERE id = ANY(?)',
+        [residualColumnIds]
+      );
+    }
+  }
+
+  let syncedSubjects = 0;
+  for (const subjectId of touchedSubjectIds) {
+    try {
+      const gradingSettings = await ensureSubjectGradingSettings(
+        Number(subjectId),
+        normalizedCourseId,
+        normalizedSemesterId,
+        actorUserId || null
+      );
+      await syncJournalColumnsFromHomework(
+        Number(subjectId),
+        normalizedCourseId,
+        normalizedSemesterId,
+        gradingSettings,
+        actorUserId || null
+      );
+      syncedSubjects += 1;
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+    }
+  }
+
+  return {
+    deletedHomeworkCount: homeworkIds.length,
+    deletedJournalColumnsCount: deletedColumnIds.size,
+    syncedSubjects,
+  };
+};
+
 const buildSessionConflictSlotMap = (report) => {
   const slotMap = {};
   const conflicts = Array.isArray(report && report.conflicts) ? report.conflicts : [];
@@ -31173,69 +31318,118 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
       return redirectToGenerator('err', 'Немає дат сесії для видалення. Перевірте тижні сесії.');
     }
 
-    let sql = `
-      SELECT id, subject_id
-      FROM homework
-      WHERE course_id = ?
-        AND class_date = ANY(?)
-        AND COALESCE(is_teacher_homework, 0) = 1
-        AND LOWER(TRIM(COALESCE(description, ''))) LIKE '[сесія]%'
-        AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
-    `;
-    const sqlParams = [selectedCourseId, targetDates];
-    if (selectedSemesterId) {
-      sql += ' AND (semester_id = ? OR semester_id IS NULL)';
-      sqlParams.push(selectedSemesterId);
-    } else {
-      sql += ' AND semester_id IS NULL';
-    }
-    const rows = await db.all(sql, sqlParams);
-    const targetHomeworkIds = Array.from(new Set((rows || [])
-      .map((row) => Number(row.id))
-      .filter((id) => Number.isFinite(id) && id > 0)));
-    if (!targetHomeworkIds.length) {
+    const cleanupResult = await purgeSessionGeneratorHomework({
+      courseId: selectedCourseId,
+      semesterId: selectedSemesterId,
+      targetDates,
+      actorUserId: Number(req.session.user?.id || 0) || null,
+      purgeResidualSessionColumns: false,
+    });
+    if (!Number(cleanupResult.deletedHomeworkCount || 0)) {
       return redirectToGenerator('ok', 'У вибраному вікні сесії немає подій для видалення.');
-    }
-    const touchedSubjectIds = new Set((rows || [])
-      .map((row) => Number(row.subject_id))
-      .filter((subjectId) => Number.isFinite(subjectId) && subjectId > 0));
-    await db.run(
-      'DELETE FROM journal_columns WHERE source_homework_id = ANY(?)',
-      [targetHomeworkIds]
-    );
-    await db.run(
-      'DELETE FROM homework WHERE id = ANY(?)',
-      [targetHomeworkIds]
-    );
-    let syncedSubjects = 0;
-    for (const subjectId of touchedSubjectIds) {
-      try {
-        const gradingSettings = await ensureSubjectGradingSettings(
-          Number(subjectId),
-          selectedCourseId,
-          selectedSemesterId,
-          Number(req.session.user?.id || 0) || null
-        );
-        await syncJournalColumnsFromHomework(
-          Number(subjectId),
-          selectedCourseId,
-          selectedSemesterId,
-          gradingSettings,
-          Number(req.session.user?.id || 0) || null
-        );
-        syncedSubjects += 1;
-      } catch (err) {
-        if (!isDbSchemaCompatibilityError(err)) {
-          throw err;
-        }
-      }
     }
     return redirectToGenerator(
       'ok',
-      `Видалено ${targetHomeworkIds.length} подій сесії у вибраному вікні. Синхронізовано предметів у журналі: ${syncedSubjects}.`
+      `Видалено ${cleanupResult.deletedHomeworkCount} подій сесії у вибраному вікні. Очищено колонок журналу: ${cleanupResult.deletedJournalColumnsCount}. Синхронізовано предметів у журналі: ${cleanupResult.syncedSubjects}.`
     );
   } catch (err) {
     return handleDbError(res, err, 'admin.sessionGenerator.delete');
+  }
+});
+
+app.post('/admin/session-generator/delete-all-active', requireScheduleGeneratorSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.sessionGenerator.deleteAll.init');
+  }
+  try {
+    const body = req.body || {};
+    const activeLocation = normalizeGeneratorLocation(body.location || 'kyiv');
+    const selectedCourseId = parseSessionGeneratorInt(body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const selectedSemesterRaw = parseSessionGeneratorInt(body.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const draftId = parseSessionGeneratorInt(body.draft_id, null, 1, Number.MAX_SAFE_INTEGER);
+    const form = {
+      location: activeLocation,
+      course_id: selectedCourseId,
+      semester_id: selectedSemesterRaw,
+      window_mode: 'weeks',
+      start_date: isValidDateString(body.start_date)
+        ? String(body.start_date)
+        : buildSessionGeneratorDefaultStartDate(null),
+      session_days: parseSessionGeneratorInt(body.session_days, SESSION_GENERATOR_DEFAULTS.session_days, 3, 60),
+      session_weeks_count: parseSessionGeneratorInt(
+        body.session_weeks_count,
+        SESSION_GENERATOR_DEFAULTS.session_weeks_count,
+        1,
+        12
+      ),
+      session_weeks_set: String(body.session_weeks_set || '').trim(),
+      include_weekends: parseSessionGeneratorFlag(body.include_weekends, SESSION_GENERATOR_DEFAULTS.include_weekends),
+      respect_study_days: parseSessionGeneratorFlag(body.respect_study_days, SESSION_GENERATOR_DEFAULTS.respect_study_days),
+    };
+    const redirectToGenerator = (messageKind, messageText) => {
+      const params = new URLSearchParams();
+      const safeSet = (key, value) => {
+        if (value === undefined || value === null || value === '') return;
+        params.set(key, String(value));
+      };
+      safeSet('location', activeLocation);
+      safeSet('course_id', selectedCourseId);
+      safeSet('semester_id', form.semester_id || selectedSemesterRaw);
+      safeSet('draft_id', draftId);
+      safeSet('window_mode', form.window_mode);
+      safeSet('start_date', form.start_date);
+      safeSet('session_days', form.session_days);
+      safeSet('session_weeks_count', form.session_weeks_count);
+      safeSet('session_weeks_set', form.session_weeks_set);
+      params.set('include_weekends', form.include_weekends ? '1' : '0');
+      params.set('respect_study_days', form.respect_study_days ? '1' : '0');
+      if (messageText) {
+        params.set(messageKind, String(messageText));
+      }
+      return res.redirect(`/admin/session-generator?${params.toString()}`);
+    };
+
+    if (!selectedCourseId) {
+      return redirectToGenerator('err', 'Оберіть курс для повного очищення сесії.');
+    }
+
+    const semesters = await getSemestersCached(selectedCourseId);
+    let activeSemester = null;
+    if (selectedSemesterRaw) {
+      activeSemester = (semesters || []).find((row) => Number(row.id) === Number(selectedSemesterRaw)) || null;
+    }
+    if (!activeSemester) {
+      activeSemester = await getActiveSemester(selectedCourseId);
+    }
+    if (!activeSemester && semesters && semesters.length) {
+      activeSemester = semesters[0];
+    }
+    if (!activeSemester) {
+      return redirectToGenerator('err', 'Активний семестр не знайдено.');
+    }
+    const selectedSemesterId = Number(activeSemester.id);
+    form.semester_id = selectedSemesterId;
+
+    const cleanupResult = await purgeSessionGeneratorHomework({
+      courseId: selectedCourseId,
+      semesterId: selectedSemesterId,
+      actorUserId: Number(req.session.user?.id || 0) || null,
+      purgeResidualSessionColumns: true,
+    });
+    const deletedHomeworkCount = Number(cleanupResult.deletedHomeworkCount || 0);
+    const deletedJournalColumnsCount = Number(cleanupResult.deletedJournalColumnsCount || 0);
+    if (!deletedHomeworkCount && !deletedJournalColumnsCount) {
+      return redirectToGenerator('ok', 'Активних сесій для очищення не знайдено.');
+    }
+
+    return redirectToGenerator(
+      'ok',
+      `Повністю очищено активну сесію: подій ${deletedHomeworkCount}, колонок журналу ${deletedJournalColumnsCount}. Синхронізовано предметів у журналі: ${cleanupResult.syncedSubjects}.`
+    );
+  } catch (err) {
+    return handleDbError(res, err, 'admin.sessionGenerator.deleteAll');
   }
 });
 

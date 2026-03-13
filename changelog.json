@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.25",
+      "date": "2026-03-13",
+      "items": [
+        "feat(session-generator-full-active-purge): added a dedicated destructive action in the session generator to remove all active `[Сесія]` events for the selected course and semester, including linked and residual session journal columns, so exam-session cleanup no longer depends on the currently selected week window"
+      ]
+    },
+    {
       "version": "1.2.24",
       "date": "2026-03-13",
       "items": [

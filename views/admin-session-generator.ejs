@@ -79,6 +79,10 @@
         deleteTitle: 'Delete session',
         deleteHint: 'Deletes only events with the [Session] prefix inside the selected weeks.',
         deleteButton: 'Delete session in selected window',
+        deleteAllConfirm: 'Delete all active session events for the selected course and semester, including linked journal columns?',
+        deleteAllTitle: 'Delete all active sessions',
+        deleteAllHint: 'Fully clears all active [Session] events for the selected semester and removes linked session columns from the journal.',
+        deleteAllButton: 'Delete all active sessions',
         typeShortExam: 'Exam',
         typeShortConsultation: 'Consult',
         typeShortCredit: 'Credit',
@@ -178,6 +182,10 @@
         deleteTitle: 'Видалення сесії',
         deleteHint: 'Видаляє лише події з префіксом [Сесія] у межах вибраних тижнів.',
         deleteButton: 'Видалити сесію у вибраному вікні',
+        deleteAllConfirm: 'Видалити всі активні сесійні події для вибраного курсу й семестру разом із повʼязаними колонками журналу?',
+        deleteAllTitle: 'Повне очищення активної сесії',
+        deleteAllHint: 'Повністю прибирає всі активні [Сесія]-події для вибраного семестру та чистить повʼязані сесійні колонки в журналі.',
+        deleteAllButton: 'Видалити всі активні сесії',
         typeShortExam: 'Екз',
         typeShortConsultation: 'Конс',
         typeShortCredit: 'Залік',
@@ -1301,6 +1309,25 @@
               <input type="hidden" name="include_weekends" value="<%= form && form.include_weekends ? 1 : 0 %>" />
               <input type="hidden" name="respect_study_days" value="<%= form && form.respect_study_days ? 1 : 0 %>" />
               <button class="btn btn-outline-danger" type="submit"><%= sessionGeneratorText.deleteButton %></button>
+            </div>
+          </form>
+
+          <form method="POST" action="/admin/session-generator/delete-all-active" class="card liquid-panel mb-4" onsubmit='return window.confirm(<%- JSON.stringify(sessionGeneratorText.deleteAllConfirm) %>);'>
+            <div class="card-body d-grid gap-2">
+              <div class="fw-semibold text-danger"><%= sessionGeneratorText.deleteAllTitle %></div>
+              <div class="session-subtle"><%= sessionGeneratorText.deleteAllHint %></div>
+              <input type="hidden" name="location" value="<%= activeLocation %>" />
+              <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
+              <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
+              <input type="hidden" name="draft_id" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
+              <input type="hidden" name="window_mode" value="weeks" />
+              <input type="hidden" name="start_date" value="<%= form && form.start_date ? form.start_date : '' %>" />
+              <input type="hidden" name="session_days" value="<%= form && form.session_days ? form.session_days : '' %>" />
+              <input type="hidden" name="session_weeks_count" value="<%= form && form.session_weeks_count ? form.session_weeks_count : '' %>" />
+              <input type="hidden" name="session_weeks_set" value="<%= form && form.session_weeks_set ? form.session_weeks_set : '' %>" />
+              <input type="hidden" name="include_weekends" value="<%= form && form.include_weekends ? 1 : 0 %>" />
+              <input type="hidden" name="respect_study_days" value="<%= form && form.respect_study_days ? 1 : 0 %>" />
+              <button class="btn btn-danger" type="submit"><%= sessionGeneratorText.deleteAllButton %></button>
             </div>
           </form>
         </div>
