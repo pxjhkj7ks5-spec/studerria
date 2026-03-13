@@ -12,6 +12,7 @@
   const MOBILE_ROOT_OPEN_CLASS = 'is-mobile-open';
   const MOBILE_BODY_OPEN_CLASS = 'studerria-mobile-nav-open';
   const VIEWPORT_METRICS_BOOT_FLAG = '__studerriaViewportMetricsBound';
+  const MESSAGE_SOCKET_BOOT_FLAG = '__studerriaMessagesSocketBound';
   const PANEL_MAP = {
     messages: 'messagesModal',
     'custom-deadlines': 'customDeadlineModal',
@@ -420,6 +421,8 @@
       applyUnreadState(count);
     });
 
+    window.addEventListener('studerria:messages-updated', fetchUnreadState);
+
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         fetchUnreadState();
@@ -432,6 +435,36 @@
     window.setInterval(fetchUnreadState, 60000);
   }
 
+  function initMessagesSocket() {
+    if (window[MESSAGE_SOCKET_BOOT_FLAG] === true) {
+      return;
+    }
+    window[MESSAGE_SOCKET_BOOT_FLAG] = true;
+
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const socket = new window.WebSocket(`${protocol}://${window.location.host}`);
+
+      socket.addEventListener('message', (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (!payload || payload.type !== 'messages_updated') {
+            return;
+          }
+          window.dispatchEvent(new window.CustomEvent('studerria:messages-updated'));
+        } catch (_error) {
+          // Ignore malformed realtime payloads and keep the existing polling fallback.
+        }
+      });
+
+      socket.addEventListener('close', () => {
+        window.setTimeout(connect, 3000);
+      });
+    };
+
+    connect();
+  }
+
   function initNav(root) {
     if (!(root instanceof HTMLElement) || root.dataset.navReady === '1') {
       return;
@@ -440,6 +473,7 @@
 
     initViewportMetrics();
     initUnreadIndicators(root);
+    initMessagesSocket();
     syncMobileThemeLabels(root);
     window.addEventListener('studerria:theme-toggled', () => syncMobileThemeLabels(root));
 

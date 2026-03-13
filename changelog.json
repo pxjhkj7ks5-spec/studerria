@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.29",
+      "date": "2026-03-13",
+      "items": [
+        "fix(message-delete-live-sync): emit `messages_updated` after manual admin message sends and deletes, and reload the student messages inbox plus unread indicators in real time so removed admin messages disappear for users without a manual refresh"
+      ]
+    },
+    {
       "version": "1.2.28",
       "date": "2026-03-13",
       "items": [

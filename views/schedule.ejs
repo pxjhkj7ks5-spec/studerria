@@ -4400,6 +4400,13 @@
         });
       }
 
+      window.addEventListener('studerria:messages-updated', () => {
+        refreshUnreadBadges();
+        if (messagesModalEl && messagesModalEl.classList.contains('show')) {
+          loadMessages({ markAsRead: true, showLoading: false });
+        }
+      });
+
       const changelogTrigger = document.querySelector('.footer-link[data-bs-target="#changelogModal"]');
       const changelogModalEl = document.getElementById('changelogModal');
       if (changelogTrigger && changelogModalEl && window.bootstrap && window.bootstrap.Modal) {
@@ -4512,4 +4519,3 @@
     <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>
-

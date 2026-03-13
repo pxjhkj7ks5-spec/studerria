@@ -23972,6 +23972,7 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
         course_scope: 'all',
         course_id: null,
       });
+      broadcast('messages_updated');
       return res.redirect('/admin?ok=Message%20sent');
     }
 
@@ -24010,6 +24011,7 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
         group_number: groupNum,
         user_ids: users,
       });
+      broadcast('messages_updated');
       return res.redirect('/admin?ok=Message%20sent');
     }
     logAction(db, req, 'message_send', {
@@ -24018,6 +24020,7 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
       subject_id: subjectId,
       group_number: groupNum,
     });
+    broadcast('messages_updated');
     return res.redirect('/admin?ok=Message%20sent');
   } catch (err) {
     return res.redirect('/admin?err=Database%20error');
@@ -24059,6 +24062,7 @@ app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimite
                     return res.redirect('/admin?err=Database%20error');
                   }
                   logAction(db, req, 'message_delete', { id, deleted_count: deleteIds.length });
+                  broadcast('messages_updated');
                   return res.redirect('/admin?ok=Message%20deleted');
                 });
               });
@@ -24108,6 +24112,7 @@ app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimite
                     deleted_count: deleteIds.length,
                     broadcast: true,
                   });
+                  broadcast('messages_updated');
                   return res.redirect('/admin?ok=Message%20deleted');
                 });
               });
