@@ -393,6 +393,7 @@
       const token = ++requestToken;
       try {
         const response = await fetch('/messages.json', {
+          cache: 'no-store',
           credentials: 'same-origin',
           headers: {
             Accept: 'application/json',

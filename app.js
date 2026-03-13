@@ -24233,6 +24233,9 @@ app.post('/admin/support-requests/:id/update', requireSupportSectionAccess, writ
 });
 
 app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
   if (!settingsCache.allow_messages) {
     return res.json({ messages: [], unread_count: 0 });
   }

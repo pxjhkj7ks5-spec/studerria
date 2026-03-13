@@ -4265,7 +4265,12 @@
         if (!targets.length) return;
         const requestToken = ++unreadBadgeRequestToken;
         try {
-          const res = await fetch('/messages.json');
+          const res = await fetch('/messages.json', {
+            cache: 'no-store',
+            headers: {
+              Accept: 'application/json',
+            },
+          });
           if (!res.ok) throw new Error('bad');
           const data = await res.json();
           if (requestToken !== unreadBadgeRequestToken) return;
@@ -4287,7 +4292,12 @@
             : '';
           const shouldSyncBadgeFromResponse = !subjectId;
           const requestToken = ++messageListRequestToken;
-          const res = await fetch(`/messages.json${subjectId}`);
+          const res = await fetch(`/messages.json${subjectId}`, {
+            cache: 'no-store',
+            headers: {
+              Accept: 'application/json',
+            },
+          });
           if (!res.ok) throw new Error('bad');
           const data = await res.json();
           if (requestToken !== messageListRequestToken) return;

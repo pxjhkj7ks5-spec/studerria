@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.30",
+      "date": "2026-03-13",
+      "items": [
+        "fix(message-inbox-cache-busting): disable caching for `/messages.json` and force the student inbox plus unread badge fetches to use `no-store` so previously deleted admin messages stop lingering from stale browser responses"
+      ]
+    },
+    {
       "version": "1.2.29",
       "date": "2026-03-13",
       "items": [
