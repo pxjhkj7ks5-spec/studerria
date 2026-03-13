@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.31",
+      "date": "2026-03-13",
+      "items": [
+        "feat(messages-admin-refresh-clear): add explicit Refresh and typed-confirm Clear visible controls in the admin Messages workspace, plus a bulk-delete backend action that hard-clears the entire message list currently visible in the selected course scope"
+      ]
+    },
+    {
       "version": "1.2.30",
       "date": "2026-03-13",
       "items": [

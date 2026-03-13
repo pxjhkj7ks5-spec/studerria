@@ -3903,6 +3903,7 @@
 
         <% if (sectionAllowed('admin-messages') && settings && settings.allow_messages) { %>
         <div id="admin-messages" class="admin-panel" data-admin-title="Communications / Messages">
+          <% const messagesPanelHref = `${adminHomeHref}${adminHomeHref.includes('?') ? '&' : '?'}tab=admin-messages`; %>
           <div class="card mb-4">
             <div class="card-body">
               <h5 class="card-title mb-3"><%= t('admin.sendMessage') %></h5>
@@ -3980,7 +3981,26 @@
 
           <div class="card mb-4">
             <div class="card-body">
-              <h5 class="card-title mb-3">Existing messages</h5>
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h5 class="card-title mb-0">Existing messages</h5>
+                <div class="d-flex flex-wrap gap-2">
+                  <a class="btn btn-sm btn-outline-secondary" href="<%= messagesPanelHref %>">Refresh</a>
+                  <form method="POST" action="/admin/messages/clear" class="m-0">
+                    <button
+                      class="btn btn-sm btn-outline-danger"
+                      type="submit"
+                      data-confirm="Clear all messages visible in this tab? This also removes all-course broadcasts shown here."
+                      data-confirm-level="danger"
+                      data-confirm-typed="CLEAR"
+                    >
+                      Clear visible
+                    </button>
+                  </form>
+                </div>
+              </div>
+              <div class="text-muted small mb-3">
+                Use Refresh to reload the current message scope, or Clear visible to hard-delete everything currently listed here.
+              </div>
               <div class="table-responsive">
                 <table class="table table-striped align-middle">
                   <thead>

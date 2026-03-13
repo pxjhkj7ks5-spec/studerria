@@ -24027,6 +24027,21 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
   }
 });
 
+async function deleteMessageRecordsByIds(ids) {
+  const deleteIds = Array.from(
+    new Set((Array.isArray(ids) ? ids : []).map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))
+  );
+  if (!deleteIds.length) {
+    return 0;
+  }
+  const placeholders = deleteIds.map(() => '?').join(',');
+  await db.run(`DELETE FROM message_reads WHERE message_id IN (${placeholders})`, deleteIds);
+  await db.run(`DELETE FROM message_targets WHERE message_id IN (${placeholders})`, deleteIds);
+  await db.run(`DELETE FROM message_reactions WHERE message_id IN (${placeholders})`, deleteIds);
+  await db.run(`DELETE FROM messages WHERE id IN (${placeholders})`, deleteIds);
+  return deleteIds.length;
+}
+
 app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimiter, (req, res) => {
   if (!settingsCache.allow_messages) {
     return res.redirect('/admin?err=Messages%20disabled');
@@ -24052,22 +24067,14 @@ app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimite
         (message.subject_id === null || typeof message.subject_id === 'undefined') &&
         (message.group_number === null || typeof message.group_number === 'undefined');
       if (!isBroadcast) {
-        const placeholders = deleteIds.map(() => '?').join(',');
         const remove = () => {
-          db.run(`DELETE FROM message_reads WHERE message_id IN (${placeholders})`, deleteIds, () => {
-            db.run(`DELETE FROM message_targets WHERE message_id IN (${placeholders})`, deleteIds, () => {
-              db.run(`DELETE FROM message_reactions WHERE message_id IN (${placeholders})`, deleteIds, () => {
-                db.run(`DELETE FROM messages WHERE id IN (${placeholders})`, deleteIds, (err) => {
-                  if (err) {
-                    return res.redirect('/admin?err=Database%20error');
-                  }
-                  logAction(db, req, 'message_delete', { id, deleted_count: deleteIds.length });
-                  broadcast('messages_updated');
-                  return res.redirect('/admin?ok=Message%20deleted');
-                });
-              });
-            });
-          });
+          deleteMessageRecordsByIds(deleteIds)
+            .then((deletedCount) => {
+              logAction(db, req, 'message_delete', { id, deleted_count: deletedCount });
+              broadcast('messages_updated');
+              return res.redirect('/admin?ok=Message%20deleted');
+            })
+            .catch(() => res.redirect('/admin?err=Database%20error'));
         };
         return remove();
       }
@@ -24099,29 +24106,68 @@ app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimite
               if (!deleteIds.includes(row.id)) deleteIds.push(row.id);
             });
           }
-          const placeholders = deleteIds.map(() => '?').join(',');
-          db.run(`DELETE FROM message_reads WHERE message_id IN (${placeholders})`, deleteIds, () => {
-            db.run(`DELETE FROM message_targets WHERE message_id IN (${placeholders})`, deleteIds, () => {
-              db.run(`DELETE FROM message_reactions WHERE message_id IN (${placeholders})`, deleteIds, () => {
-                db.run(`DELETE FROM messages WHERE id IN (${placeholders})`, deleteIds, (err) => {
-                  if (err) {
-                    return res.redirect('/admin?err=Database%20error');
-                  }
-                  logAction(db, req, 'message_delete', {
-                    id,
-                    deleted_count: deleteIds.length,
-                    broadcast: true,
-                  });
-                  broadcast('messages_updated');
-                  return res.redirect('/admin?ok=Message%20deleted');
-                });
+          deleteMessageRecordsByIds(deleteIds)
+            .then((deletedCount) => {
+              logAction(db, req, 'message_delete', {
+                id,
+                deleted_count: deletedCount,
+                broadcast: true,
               });
-            });
-          });
+              broadcast('messages_updated');
+              return res.redirect('/admin?ok=Message%20deleted');
+            })
+            .catch(() => res.redirect('/admin?err=Database%20error'));
         }
       );
     }
   );
+});
+
+app.post('/admin/messages/clear', requireMessagesSectionAccess, writeLimiter, async (req, res) => {
+  const courseId = getStaffCourse(req);
+  const panelBase = getStaffPanelBase(req, courseId);
+  const redirectBase = `${panelBase}${panelBase.includes('?') ? '&' : '?'}tab=admin-messages`;
+  const redirectWith = (kind, message) => `${redirectBase}&${kind}=${encodeURIComponent(String(message || ''))}`;
+
+  if (!settingsCache.allow_messages) {
+    return res.redirect(redirectWith('err', 'Messages disabled'));
+  }
+
+  try {
+    const activeSemester = await getActiveSemester(courseId);
+    const visibleMessages = await db.all(
+      `
+        SELECT m.id
+        FROM messages m
+        WHERE (
+          m.course_id = ?
+          OR (m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL AND m.course_id IS NULL)
+        )${activeSemester
+          ? ` AND (
+              m.semester_id = ?
+              OR (m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL AND m.semester_id IS NULL)
+            )`
+          : ''}
+      `,
+      activeSemester ? [courseId, activeSemester.id] : [courseId]
+    );
+
+    const deleteIds = (visibleMessages || []).map((row) => Number(row.id)).filter((id) => Number.isInteger(id) && id > 0);
+    if (!deleteIds.length) {
+      return res.redirect(redirectWith('ok', 'No messages to clear'));
+    }
+
+    const deletedCount = await deleteMessageRecordsByIds(deleteIds);
+    logAction(db, req, 'message_clear_visible', {
+      course_id: courseId,
+      deleted_count: deletedCount,
+      semester_id: activeSemester ? Number(activeSemester.id) : null,
+    });
+    broadcast('messages_updated');
+    return res.redirect(redirectWith('ok', `Cleared ${deletedCount} messages`));
+  } catch (err) {
+    return res.redirect(redirectWith('err', 'Database error'));
+  }
 });
 
 app.post('/admin/support-requests/:id/update', requireSupportSectionAccess, writeLimiter, async (req, res) => {
