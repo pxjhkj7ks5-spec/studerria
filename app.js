@@ -24285,7 +24285,10 @@ app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
   if (!settingsCache.allow_messages) {
     return res.json({ messages: [], unread_count: 0 });
   }
-  const { id: userId, course_id: courseId } = req.session.user;
+  const userId = Number(req.session.user.id || 0);
+  const courseId = hasSessionRole(req, 'admin')
+    ? getAdminCourse(req)
+    : Number(req.session.user.course_id || 1);
   const activeSemester = await getActiveSemester(courseId || 1);
   const filterSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
   db.all(

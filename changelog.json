@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.34",
+      "date": "2026-03-13",
+      "items": [
+        "fix(messages-admin-course-scope): make `/messages.json` use the admin-selected course instead of the account default course so Clear visible, delete actions, and the schedule messages modal finally operate on the same message set"
+      ]
+    },
+    {
       "version": "1.2.33",
       "date": "2026-03-13",
       "items": [
