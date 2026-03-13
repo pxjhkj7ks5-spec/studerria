@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.32",
+      "date": "2026-03-13",
+      "items": [
+        "fix(messages-admin-render-fallback): restore the admin Messages panel after the new refresh/clear controls by passing `adminHomeHref` into all admin-shell renders and adding a safe EJS fallback when that local is missing"
+      ]
+    },
+    {
       "version": "1.2.31",
       "date": "2026-03-13",
       "items": [

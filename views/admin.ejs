@@ -3903,7 +3903,13 @@
 
         <% if (sectionAllowed('admin-messages') && settings && settings.allow_messages) { %>
         <div id="admin-messages" class="admin-panel" data-admin-title="Communications / Messages">
-          <% const messagesPanelHref = `${adminHomeHref}${adminHomeHref.includes('?') ? '&' : '?'}tab=admin-messages`; %>
+          <%
+            const fallbackAdminHomeHref = role === 'deanery'
+              ? `/deanery?course=${selectedCourseId || 1}`
+              : `/admin?course=${selectedCourseId || 1}`;
+            const resolvedAdminHomeHref = adminHomeHref || fallbackAdminHomeHref;
+            const messagesPanelHref = `${resolvedAdminHomeHref}${resolvedAdminHomeHref.includes('?') ? '&' : '?'}tab=admin-messages`;
+          %>
           <div class="card mb-4">
             <div class="card-body">
               <h5 class="card-title mb-3"><%= t('admin.sendMessage') %></h5>
