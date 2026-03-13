@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.26",
+      "date": "2026-03-13",
+      "items": [
+        "tune(session-generator-planner-ux): rebuilt the manual session planner with a sticky active-assignment bar, unified filter dock, free-slot focus mode, clearer slot cards, per-day load chips, and a selected-group exam timeline sidebar so full-session planning needs fewer repeated clicks",
+        "feat(session-generator-speed-tools): added inline slot warnings, keyboard shortcuts for assessment types and delete, improved drag-fill behavior, and an auto-consultation helper that drafts consultations one day before each exam without touching the publish flow or database schema"
+      ]
+    },
+    {
       "version": "1.2.25",
       "date": "2026-03-13",
       "items": [

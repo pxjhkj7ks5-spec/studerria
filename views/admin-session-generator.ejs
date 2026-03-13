@@ -83,6 +83,27 @@
         deleteAllTitle: 'Delete all active sessions',
         deleteAllHint: 'Fully clears all active [Session] events for the selected semester and removes linked session columns from the journal.',
         deleteAllButton: 'Delete all active sessions',
+        activeSelectionLabel: 'Active assignment',
+        activeSelectionEmpty: 'Choose a subject and group to start assigning.',
+        activeSelectionHint: 'The current selection stays active until you change it.',
+        activeSelectionShortcuts: 'Shortcuts: E exam, C consultation, Z credit, Del remove.',
+        filterReset: 'Reset filters',
+        filterFreeOnly: 'Show only free slots',
+        loadLow: 'Low load',
+        loadMedium: 'Medium load',
+        loadHigh: 'High load',
+        loadAssessments: 'assessments',
+        warningTeacherConflict: 'teacher conflict',
+        warningSameDayGroup: 'same-day group clash',
+        warningGroupOverload: 'group overload',
+        warningShortGap: 'short gap',
+        groupTimelineTitle: 'Group exam timeline',
+        groupTimelineHint: 'Pick a specific group in the assignment bar or filters to see the exam order.',
+        groupTimelineEmpty: 'No draft assessments for this group yet.',
+        autoConsultations: 'Auto add consultations',
+        autoConsultationsEmpty: 'No exam events found for auto consultations.',
+        autoConsultationsDone: 'Consultation helper: added %ADDED%, skipped %SKIPPED%.',
+        keyboardHint: 'Quick keys: E / C / Z / Del',
         typeShortExam: 'Exam',
         typeShortConsultation: 'Consult',
         typeShortCredit: 'Credit',
@@ -186,6 +207,27 @@
         deleteAllTitle: 'Повне очищення активної сесії',
         deleteAllHint: 'Повністю прибирає всі активні [Сесія]-події для вибраного семестру та чистить повʼязані сесійні колонки в журналі.',
         deleteAllButton: 'Видалити всі активні сесії',
+        activeSelectionLabel: 'Активне призначення',
+        activeSelectionEmpty: 'Оберіть предмет і групу, щоб почати призначення.',
+        activeSelectionHint: 'Поточний вибір зберігається, поки ви його не зміните.',
+        activeSelectionShortcuts: 'Шорткати: E екзамен, C консультація, Z залік, Del видалити.',
+        filterReset: 'Скинути фільтри',
+        filterFreeOnly: 'Показати лише вільні слоти',
+        loadLow: 'Низьке навантаження',
+        loadMedium: 'Середнє навантаження',
+        loadHigh: 'Високе навантаження',
+        loadAssessments: 'контролі',
+        warningTeacherConflict: 'конфлікт викладача',
+        warningSameDayGroup: 'дубль групи в день',
+        warningGroupOverload: 'перевантаження групи',
+        warningShortGap: 'короткий розрив',
+        groupTimelineTitle: 'Таймлайн екзаменів групи',
+        groupTimelineHint: 'Оберіть конкретну групу в активному призначенні або у фільтрах, щоб побачити порядок екзаменів.',
+        groupTimelineEmpty: 'Для цієї групи ще немає чернеткових контролів.',
+        autoConsultations: 'Автододати консультації',
+        autoConsultationsEmpty: 'Для автоконсультацій не знайдено екзаменів.',
+        autoConsultationsDone: 'Помічник консультацій: додано %ADDED%, пропущено %SKIPPED%.',
+        keyboardHint: 'Швидкі клавіші: E / C / Z / Del',
         typeShortExam: 'Екз',
         typeShortConsultation: 'Конс',
         typeShortCredit: 'Залік',
@@ -618,6 +660,172 @@
       .manual-slots-col {
         min-width: 0;
       }
+      .planner-dock {
+        position: sticky;
+        top: 0.85rem;
+        z-index: 7;
+        display: grid;
+        gap: 0.75rem;
+        margin-bottom: 0.85rem;
+      }
+      .active-selection-bar {
+        display: grid;
+        gap: 0.6rem;
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+        box-shadow:
+          0 18px 36px rgba(0,0,0,0.18),
+          inset 0 1px 0 rgba(255,255,255,0.16);
+        padding: 0.8rem 0.9rem;
+        backdrop-filter: blur(18px) saturate(140%);
+      }
+      body.theme-light .active-selection-bar {
+        border-color: rgba(20,28,38,0.08);
+        background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,252,255,0.78));
+      }
+      .active-selection-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.8rem;
+      }
+      .active-selection-label {
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.62);
+      }
+      body.theme-light .active-selection-label {
+        color: rgba(20,28,38,0.52);
+      }
+      .active-selection-summary {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        min-width: 0;
+      }
+      .active-selection-type {
+        min-width: 3.2rem;
+        justify-content: center;
+      }
+      .active-selection-copy {
+        min-width: 0;
+      }
+      .active-selection-title {
+        font-weight: 700;
+        line-height: 1.15;
+      }
+      .active-selection-subtitle {
+        margin-top: 0.15rem;
+        font-size: 0.83rem;
+        color: rgba(255,255,255,0.7);
+      }
+      body.theme-light .active-selection-subtitle {
+        color: rgba(20,28,38,0.6);
+      }
+      .active-selection-hint {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        align-items: center;
+      }
+      .planner-filter-bar {
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.05);
+        padding: 0.75rem 0.8rem;
+      }
+      body.theme-light .planner-filter-bar {
+        border-color: rgba(20,28,38,0.08);
+        background: rgba(255,255,255,0.78);
+      }
+      .planner-filter-grid {
+        display: grid;
+        gap: 0.65rem;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+      }
+      .planner-filter-item label {
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.58);
+      }
+      body.theme-light .planner-filter-item label {
+        color: rgba(20,28,38,0.54);
+      }
+      .planner-filter-actions {
+        display: flex;
+        align-items: end;
+        justify-content: flex-end;
+      }
+      .planner-filter-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        min-height: 100%;
+        border-radius: 14px;
+        padding: 0.5rem 0.65rem;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.04);
+        font-size: 0.82rem;
+      }
+      body.theme-light .planner-filter-toggle {
+        border-color: rgba(20,28,38,0.08);
+        background: rgba(20,28,38,0.03);
+      }
+      .planner-filter-toggle input {
+        margin: 0;
+      }
+      .planner-shell-grid {
+        display: grid;
+        gap: 0.9rem;
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+        align-items: start;
+      }
+      .planner-main-column,
+      .planner-side-column {
+        min-width: 0;
+      }
+      .planner-side-card {
+        position: sticky;
+        top: 0.85rem;
+      }
+      .group-timeline-list {
+        display: grid;
+        gap: 0.6rem;
+      }
+      .group-timeline-item {
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.04);
+        padding: 0.7rem;
+        display: grid;
+        gap: 0.24rem;
+      }
+      body.theme-light .group-timeline-item {
+        border-color: rgba(20,28,38,0.08);
+        background: rgba(255,255,255,0.74);
+      }
+      .group-timeline-date {
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: rgba(255,255,255,0.62);
+      }
+      body.theme-light .group-timeline-date {
+        color: rgba(20,28,38,0.54);
+      }
+      .group-timeline-title {
+        font-weight: 650;
+        line-height: 1.2;
+      }
+      .group-timeline-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        align-items: center;
+      }
       .manual-type-group {
         display: grid !important;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -742,6 +950,35 @@
         gap: 0.6rem;
         margin-bottom: 0.55rem;
       }
+      .slot-day-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.35rem;
+      }
+      .day-load-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.38rem;
+        border-radius: 999px;
+        padding: 0.28rem 0.58rem;
+        border: 1px solid rgba(255,255,255,0.14);
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+      .day-load-chip[data-load-level="low"] {
+        background: rgba(113, 228, 182, 0.16);
+        border-color: rgba(113, 228, 182, 0.36);
+      }
+      .day-load-chip[data-load-level="medium"] {
+        background: rgba(255, 205, 97, 0.16);
+        border-color: rgba(255, 205, 97, 0.34);
+      }
+      .day-load-chip[data-load-level="high"] {
+        background: rgba(255, 113, 140, 0.16);
+        border-color: rgba(255, 113, 140, 0.34);
+      }
       .slot-row-grid {
         display: grid;
         gap: 0.45rem;
@@ -779,6 +1016,9 @@
       .slot-cell.is-filter-hidden {
         opacity: 0.28;
       }
+      .slot-cell.is-dimmed-occupied {
+        opacity: 0.22;
+      }
       .slot-cell.is-drag-target {
         border-color: rgba(113, 228, 182, 0.62);
         box-shadow: inset 0 0 0 1px rgba(113, 228, 182, 0.42);
@@ -792,6 +1032,10 @@
         border-color: rgba(113, 228, 182, 0.72);
         background: rgba(113, 228, 182, 0.14);
       }
+      .slot-cell.is-free-highlight {
+        border-color: rgba(113, 228, 182, 0.7);
+        box-shadow: inset 0 0 0 1px rgba(113, 228, 182, 0.3);
+      }
       .slot-cell-top {
         font-weight: 700;
         font-size: 0.78rem;
@@ -801,26 +1045,108 @@
         color: rgba(255,255,255,0.62);
       }
       body.theme-light .slot-cell-time { color: rgba(20,28,38,0.54); }
-      .slot-cell-content {
+      .slot-cell-content,
+      .slot-busy-stack,
+      .slot-assignment-stack,
+      .slot-warning-stack {
+        display: grid;
+        gap: 0.28rem;
+      }
+      .slot-cell-empty {
         font-size: 0.78rem;
+        line-height: 1.2;
+        color: rgba(255,255,255,0.58);
+      }
+      body.theme-light .slot-cell-empty {
+        color: rgba(20,28,38,0.5);
+      }
+      .slot-busy-item,
+      .slot-assignment-item {
+        border-radius: 10px;
+        padding: 0.42rem 0.45rem;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.08);
+      }
+      body.theme-light .slot-busy-item,
+      body.theme-light .slot-assignment-item {
+        border-color: rgba(20,28,38,0.06);
+        background: rgba(255,255,255,0.72);
+      }
+      .slot-busy-subject,
+      .slot-assignment-subject {
+        font-size: 0.78rem;
+        font-weight: 650;
         line-height: 1.15;
+        margin-bottom: 0.2rem;
+      }
+      .slot-busy-meta,
+      .slot-assignment-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        align-items: center;
+        font-size: 0.68rem;
+        color: rgba(255,255,255,0.68);
+      }
+      body.theme-light .slot-busy-meta,
+      body.theme-light .slot-assignment-meta {
+        color: rgba(20,28,38,0.58);
+      }
+      .group-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        border-radius: 999px;
+        padding: 0.15rem 0.45rem;
+        background: rgba(88, 174, 255, 0.12);
+        border: 1px solid rgba(88, 174, 255, 0.24);
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
       }
       .slot-cell-assignment {
         margin-top: 0.15rem;
-        font-size: 0.72rem;
-        line-height: 1.15;
         color: rgba(255,255,255,0.88);
         word-break: break-word;
       }
       body.theme-light .slot-cell-assignment { color: rgba(20,28,38,0.78); }
       .slot-cell-conflict {
         margin-top: 0.18rem;
-        font-size: 0.68rem;
-        line-height: 1.15;
-        color: rgba(255, 191, 201, 0.92);
+        display: grid;
+        gap: 0.22rem;
       }
-      body.theme-light .slot-cell-conflict {
-        color: rgba(163, 36, 58, 0.92);
+      .slot-warning-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.32rem;
+        width: fit-content;
+        border-radius: 999px;
+        padding: 0.14rem 0.42rem;
+        background: rgba(255, 113, 140, 0.14);
+        border: 1px solid rgba(255, 113, 140, 0.26);
+        font-size: 0.64rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        color: rgba(255, 219, 225, 0.98);
+      }
+      body.theme-light .slot-warning-chip {
+        color: rgba(131, 26, 48, 0.94);
+      }
+      .slot-warning-chip.warn {
+        background: rgba(255, 200, 102, 0.16);
+        border-color: rgba(255, 200, 102, 0.28);
+        color: rgba(255, 243, 209, 0.98);
+      }
+      body.theme-light .slot-warning-chip.warn {
+        color: rgba(120, 77, 10, 0.92);
+      }
+      .slot-warning-detail {
+        font-size: 0.66rem;
+        line-height: 1.2;
+        color: rgba(255, 210, 218, 0.92);
+      }
+      body.theme-light .slot-warning-detail {
+        color: rgba(163, 36, 58, 0.88);
       }
       .live-conflict-ok {
         box-shadow: inset 3px 0 0 rgba(113, 228, 182, 0.85);
@@ -845,6 +1171,17 @@
           grid-template-columns: repeat(3, minmax(0, 1fr));
         }
       }
+      @media (max-width: 1399px) {
+        .planner-shell-grid {
+          grid-template-columns: 1fr;
+        }
+        .planner-side-card {
+          position: static;
+        }
+        .planner-filter-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
       @media (max-width: 767px) {
         .session-hero {
           padding: 0.9rem;
@@ -856,6 +1193,16 @@
         .timeline-day-header {
           flex-direction: column;
           align-items: flex-start;
+        }
+        .planner-shell-grid,
+        .planner-filter-grid {
+          grid-template-columns: 1fr;
+        }
+        .planner-filter-actions {
+          justify-content: stretch;
+        }
+        .planner-filter-actions .btn {
+          width: 100%;
         }
         .slot-row-grid {
           grid-template-columns: 1fr;
@@ -1112,6 +1459,9 @@
             })
             .filter(function(subject) { return Number.isFinite(subject.id) && subject.id > 0; })
             .sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || ''), sessionGeneratorLocale); }); %>
+          <% const manualGroupLimit = manualSubjectRows.reduce(function(maxValue, subject) {
+            return Math.max(maxValue, Math.max(1, Number(subject.group_count || 1)));
+          }, 1); %>
 
           <div class="card liquid-panel mb-4">
             <div class="card-body">
@@ -1149,9 +1499,11 @@
                       <%= sessionGeneratorText.plannerSteps %>
                     </div>
                     <div class="d-grid gap-2">
+                      <button class="btn btn-primary btn-sm" type="button" id="manualAutoConsultationsBtn"><%= sessionGeneratorText.autoConsultations %></button>
                       <button class="btn btn-outline-secondary btn-sm" type="button" id="manualPlanClearBtn"><%= sessionGeneratorText.clearManualPlan %></button>
                       <button class="btn btn-outline-secondary btn-sm" type="button" id="manualConflictsRecheckBtn"><%= sessionGeneratorText.refreshLiveConflicts %></button>
                     </div>
+                    <div class="session-subtle"><%= sessionGeneratorText.keyboardHint %></div>
                     <div class="liquid-alert info" id="manualLiveConflictStatus">
                       <%= sessionGeneratorText.liveConflictIdle %>
                     </div>
@@ -1164,85 +1516,143 @@
                   <% if (!(slotBoard && slotBoard.length)) { %>
                     <div class="timeline-empty"><%= sessionGeneratorText.noSlots %></div>
                   <% } else { %>
-                    <div class="row g-2 mb-2">
-                      <div class="col-12 col-md-6">
-                        <label class="form-label small mb-1" for="slotFilterTeacher"><%= sessionGeneratorText.filterTeacher %></label>
-                        <select class="form-select form-select-sm" id="slotFilterTeacher">
-                          <option value=""><%= sessionGeneratorText.allTeachers %></option>
-                          <% (sessionTeacherFilterOptions || []).forEach(function(teacher) { %>
-                            <option value="<%= teacher.id %>"><%= teacher.name %></option>
-                          <% }); %>
-                        </select>
-                      </div>
-                      <div class="col-12 col-md-6">
-                        <label class="form-label small mb-1" for="slotFilterSubject"><%= sessionGeneratorText.filterSubject %></label>
-                        <select class="form-select form-select-sm" id="slotFilterSubject">
-                          <option value=""><%= sessionGeneratorText.allSubjects %></option>
-                          <% manualSubjectRows.forEach(function(subject) { %>
-                            <option value="<%= subject.id %>"><%= subject.name %></option>
-                          <% }); %>
-                        </select>
-                      </div>
-                      <div class="col-12 col-md-6">
-                        <label class="form-label small mb-1" for="slotFilterGroup"><%= sessionGeneratorText.filterGroup %></label>
-                        <select class="form-select form-select-sm" id="slotFilterGroup">
-                          <option value=""><%= sessionGeneratorText.allGroups %></option>
-                          <% for (let groupIdx = 1; groupIdx <= 6; groupIdx += 1) { %>
-                            <option value="<%= groupIdx %>"><%= sessionGeneratorText.groupPrefix %> <%= groupIdx %></option>
-                          <% } %>
-                        </select>
-                      </div>
-                      <div class="col-12 col-md-6">
-                        <label class="form-label small mb-1" for="slotFilterType"><%= sessionGeneratorText.filterEventType %></label>
-                        <select class="form-select form-select-sm" id="slotFilterType">
-                          <option value=""><%= sessionGeneratorText.allTypes %></option>
-                          <option value="exam"><%= sessionGeneratorText.exam %></option>
-                          <option value="consultation"><%= sessionGeneratorText.consultation %></option>
-                          <option value="credit"><%= sessionGeneratorText.credit %></option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="d-grid gap-2" id="sessionSlotBoardRoot">
-                      <% (slotBoard || []).forEach(function(day) { %>
-                        <div class="slot-day-card">
-                          <div class="slot-day-head">
-                            <div>
-                              <div class="timeline-day-title"><%= day.day_short || '' %> · <%= day.date || '' %></div>
-                              <div class="timeline-day-subtitle"><%= day.day_name || '' %> · <%= sessionGeneratorText.week %> <%= day.week_number || '—' %></div>
+                    <div class="planner-shell-grid">
+                      <div class="planner-main-column">
+                        <div class="planner-dock">
+                          <div class="active-selection-bar" id="activeAssignmentBar">
+                            <div class="active-selection-head">
+                              <div>
+                                <div class="active-selection-label"><%= sessionGeneratorText.activeSelectionLabel %></div>
+                                <div class="active-selection-subtitle"><%= sessionGeneratorText.activeSelectionHint %></div>
+                              </div>
+                              <span class="mark-pill muted"><%= sessionGeneratorText.keyboardHint %></span>
                             </div>
-                            <span class="mark-pill muted"><%= formatSessionFreeBusyLabel(day.free_count, day.busy_count) %></span>
+                            <div class="active-selection-summary">
+                              <span class="mark-pill info active-selection-type" id="activeAssignmentTypeChip"><%= sessionGeneratorText.typeShortExam %></span>
+                              <div class="active-selection-copy">
+                                <div class="active-selection-title" id="activeAssignmentTitle"><%= sessionGeneratorText.activeSelectionEmpty %></div>
+                                <div class="active-selection-subtitle" id="activeAssignmentSubtitle"><%= sessionGeneratorText.activeSelectionShortcuts %></div>
+                              </div>
+                            </div>
                           </div>
-                          <div class="slot-row-grid">
-                            <% (day.slots || []).forEach(function(slot) { %>
-                              <button
-                                class="slot-cell <%= slot.is_busy ? 'is-busy' : 'is-free' %>"
-                                type="button"
-                                data-slot-btn
-                                data-slot-date="<%= day.date || '' %>"
-                                data-slot-day="<%= day.day_name || '' %>"
-                                data-slot-week="<%= day.week_number || '' %>"
-                                data-slot-class="<%= slot.class_number || '' %>"
-                                data-slot-time="<%= slot.time_label || '' %>"
-                                data-slot-busy-meta="<%= encodeURIComponent(JSON.stringify(slot.busy || [])) %>"
-                              >
-                                <div class="slot-cell-top"><%= sessionGeneratorText.pair %> <%= slot.class_number %></div>
-                                <div class="slot-cell-time"><%= slot.time_label || '' %></div>
-                                <% if (slot.is_busy && slot.busy && slot.busy.length) { %>
-                                  <div class="slot-cell-content">
-                                    <% slot.busy.slice(0, 2).forEach(function(busy, idx) { %>
-                                      <div><%= busy.subject_name || sessionGeneratorText.pairFallback %> · <%= sessionGeneratorText.groupPrefix.charAt(0) %><%= busy.group_number || '-' %><%= idx === 1 && slot.busy.length > 2 ? '…' : '' %></div>
-                                    <% }); %>
-                                  </div>
-                                <% } else { %>
-                                  <div class="slot-cell-content text-muted"><%= sessionGeneratorText.freeSlot %></div>
-                                <% } %>
-                                <div class="slot-cell-assignment" data-slot-assignment></div>
-                                <div class="slot-cell-conflict" data-slot-conflict></div>
-                              </button>
-                            <% }); %>
+
+                          <div class="planner-filter-bar">
+                            <div class="planner-filter-grid">
+                              <div class="planner-filter-item">
+                                <label class="form-label small mb-1" for="slotFilterTeacher"><%= sessionGeneratorText.filterTeacher %></label>
+                                <select class="form-select form-select-sm" id="slotFilterTeacher">
+                                  <option value=""><%= sessionGeneratorText.allTeachers %></option>
+                                  <% (sessionTeacherFilterOptions || []).forEach(function(teacher) { %>
+                                    <option value="<%= teacher.id %>"><%= teacher.name %></option>
+                                  <% }); %>
+                                </select>
+                              </div>
+                              <div class="planner-filter-item">
+                                <label class="form-label small mb-1" for="slotFilterSubject"><%= sessionGeneratorText.filterSubject %></label>
+                                <select class="form-select form-select-sm" id="slotFilterSubject">
+                                  <option value=""><%= sessionGeneratorText.allSubjects %></option>
+                                  <% manualSubjectRows.forEach(function(subject) { %>
+                                    <option value="<%= subject.id %>"><%= subject.name %></option>
+                                  <% }); %>
+                                </select>
+                              </div>
+                              <div class="planner-filter-item">
+                                <label class="form-label small mb-1" for="slotFilterGroup"><%= sessionGeneratorText.filterGroup %></label>
+                                <select class="form-select form-select-sm" id="slotFilterGroup">
+                                  <option value=""><%= sessionGeneratorText.allGroups %></option>
+                                  <% for (let groupIdx = 1; groupIdx <= manualGroupLimit; groupIdx += 1) { %>
+                                    <option value="<%= groupIdx %>"><%= sessionGeneratorText.groupPrefix %> <%= groupIdx %></option>
+                                  <% } %>
+                                </select>
+                              </div>
+                              <div class="planner-filter-item">
+                                <label class="form-label small mb-1" for="slotFilterType"><%= sessionGeneratorText.filterEventType %></label>
+                                <select class="form-select form-select-sm" id="slotFilterType">
+                                  <option value=""><%= sessionGeneratorText.allTypes %></option>
+                                  <option value="exam"><%= sessionGeneratorText.exam %></option>
+                                  <option value="consultation"><%= sessionGeneratorText.consultation %></option>
+                                  <option value="credit"><%= sessionGeneratorText.credit %></option>
+                                </select>
+                              </div>
+                              <label class="planner-filter-toggle">
+                                <input class="form-check-input" type="checkbox" id="slotFilterFreeOnly" />
+                                <span><%= sessionGeneratorText.filterFreeOnly %></span>
+                              </label>
+                              <div class="planner-filter-actions">
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="slotFiltersResetBtn"><%= sessionGeneratorText.filterReset %></button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      <% }); %>
+
+                        <div class="d-grid gap-2" id="sessionSlotBoardRoot">
+                          <% (slotBoard || []).forEach(function(day) { %>
+                            <div class="slot-day-card">
+                              <div class="slot-day-head">
+                                <div>
+                                  <div class="timeline-day-title"><%= day.day_short || '' %> · <%= day.date || '' %></div>
+                                  <div class="timeline-day-subtitle"><%= day.day_name || '' %> · <%= sessionGeneratorText.week %> <%= day.week_number || '—' %></div>
+                                </div>
+                                <div class="slot-day-meta">
+                                  <span class="day-load-chip" data-day-load-chip data-day-date="<%= day.date || '' %>"><%= sessionGeneratorText.loadLow %></span>
+                                  <span class="mark-pill muted"><%= formatSessionFreeBusyLabel(day.free_count, day.busy_count) %></span>
+                                </div>
+                              </div>
+                              <div class="slot-row-grid">
+                                <% (day.slots || []).forEach(function(slot) { %>
+                                  <button
+                                    class="slot-cell <%= slot.is_busy ? 'is-busy' : 'is-free' %>"
+                                    type="button"
+                                    data-slot-btn
+                                    data-slot-date="<%= day.date || '' %>"
+                                    data-slot-day="<%= day.day_name || '' %>"
+                                    data-slot-week="<%= day.week_number || '' %>"
+                                    data-slot-class="<%= slot.class_number || '' %>"
+                                    data-slot-time="<%= slot.time_label || '' %>"
+                                    data-slot-busy-meta="<%= encodeURIComponent(JSON.stringify(slot.busy || [])) %>"
+                                  >
+                                    <div class="slot-cell-top"><%= sessionGeneratorText.pair %> <%= slot.class_number %></div>
+                                    <div class="slot-cell-time"><%= slot.time_label || '' %></div>
+                                    <% if (slot.is_busy && slot.busy && slot.busy.length) { %>
+                                      <div class="slot-cell-content slot-busy-stack">
+                                        <% slot.busy.slice(0, 2).forEach(function(busy, idx) { %>
+                                          <div class="slot-busy-item">
+                                            <div class="slot-busy-subject"><%= busy.subject_name || sessionGeneratorText.pairFallback %></div>
+                                            <div class="slot-busy-meta">
+                                              <span class="group-badge"><%= busy.group_number ? (sessionGeneratorText.groupPrefix + ' ' + busy.group_number) : sessionGeneratorText.allSimple %></span>
+                                              <% if (busy.teacher_names && busy.teacher_names.length) { %>
+                                                <span><%= busy.teacher_names[0] %><%= idx === 1 && slot.busy.length > 2 ? '…' : '' %></span>
+                                              <% } %>
+                                            </div>
+                                          </div>
+                                        <% }); %>
+                                      </div>
+                                    <% } else { %>
+                                      <div class="slot-cell-content slot-cell-empty"><%= sessionGeneratorText.freeSlot %></div>
+                                    <% } %>
+                                    <div class="slot-cell-assignment" data-slot-assignment></div>
+                                    <div class="slot-cell-conflict" data-slot-conflict></div>
+                                  </button>
+                                <% }); %>
+                              </div>
+                            </div>
+                          <% }); %>
+                        </div>
+                      </div>
+
+                      <aside class="planner-side-column">
+                        <div class="card liquid-panel planner-side-card">
+                          <div class="card-body">
+                            <div class="panel-title-row">
+                              <h5><%= sessionGeneratorText.groupTimelineTitle %></h5>
+                              <span class="session-subtle" id="groupTimelineLabel"><%= sessionGeneratorText.groupTimelineHint %></span>
+                            </div>
+                            <div class="group-timeline-list" id="groupTimelineRoot">
+                              <div class="timeline-empty"><%= sessionGeneratorText.groupTimelineHint %></div>
+                            </div>
+                          </div>
+                        </div>
+                      </aside>
                     </div>
                   <% } %>
                 </div>
@@ -1365,10 +1775,18 @@
         const liveConflictStatus = document.getElementById('manualLiveConflictStatus');
         const manualBlockReasonBox = document.getElementById('manualBlockReasonBox');
         const manualConflictsRecheckBtn = document.getElementById('manualConflictsRecheckBtn');
+        const manualAutoConsultationsBtn = document.getElementById('manualAutoConsultationsBtn');
         const slotFilterTeacher = document.getElementById('slotFilterTeacher');
         const slotFilterSubject = document.getElementById('slotFilterSubject');
         const slotFilterGroup = document.getElementById('slotFilterGroup');
         const slotFilterType = document.getElementById('slotFilterType');
+        const slotFilterFreeOnly = document.getElementById('slotFilterFreeOnly');
+        const slotFiltersResetBtn = document.getElementById('slotFiltersResetBtn');
+        const activeAssignmentTypeChip = document.getElementById('activeAssignmentTypeChip');
+        const activeAssignmentTitle = document.getElementById('activeAssignmentTitle');
+        const activeAssignmentSubtitle = document.getElementById('activeAssignmentSubtitle');
+        const groupTimelineRoot = document.getElementById('groupTimelineRoot');
+        const groupTimelineLabel = document.getElementById('groupTimelineLabel');
         document.querySelectorAll('[data-location]').forEach((btn) => {
           btn.addEventListener('click', () => {
             if (!locationInput || !form) return;
@@ -1562,6 +1980,138 @@
             .filter((value) => Number.isFinite(value) && value > 0)));
         };
 
+        const formatAssignmentTypeLabel = (type) => type === 'credit'
+          ? sessionGeneratorText.credit
+          : (type === 'consultation' ? sessionGeneratorText.consultation : sessionGeneratorText.exam);
+        const formatAssignmentTypeChipLabel = (type) =>
+          String(sessionGeneratorTypeShortLabels[type] || sessionGeneratorTypeShortLabels.exam || '').toUpperCase();
+        const resolveAssignmentTone = (type) => type === 'credit'
+          ? 'danger'
+          : (type === 'consultation' ? 'muted' : 'info');
+        const formatIsoDateLabel = (isoDate) => {
+          if (!isoDate) return '—';
+          const date = new Date(`${isoDate}T00:00:00`);
+          if (Number.isNaN(date.getTime())) return isoDate;
+          return date.toLocaleDateString(<%- JSON.stringify(sessionGeneratorLocale === 'en' ? 'en-US' : 'uk-UA') %>, {
+            day: 'numeric',
+            month: 'short',
+          });
+        };
+        const diffClientDays = (left, right) => {
+          if (!left || !right) return null;
+          const leftDate = new Date(`${left}T00:00:00Z`);
+          const rightDate = new Date(`${right}T00:00:00Z`);
+          if (Number.isNaN(leftDate.getTime()) || Number.isNaN(rightDate.getTime())) return null;
+          return Math.round((leftDate.getTime() - rightDate.getTime()) / (24 * 60 * 60 * 1000));
+        };
+        const shiftIsoDate = (isoDate, deltaDays) => {
+          if (!isoDate) return '';
+          const date = new Date(`${isoDate}T00:00:00Z`);
+          if (Number.isNaN(date.getTime())) return '';
+          date.setUTCDate(date.getUTCDate() + Number(deltaDays || 0));
+          return date.toISOString().slice(0, 10);
+        };
+        const isAssessmentAssignment = (assignment) => String(assignment && assignment.type ? assignment.type : '') !== 'consultation';
+        const getAssessmentAssignments = (rows) => (Array.isArray(rows) ? rows : manualAssignments)
+          .filter((row) => isAssessmentAssignment(row));
+        const getSelectedTimelineGroupNumber = () => {
+          const activeGroup = Number(manualGroupSelect && manualGroupSelect.value ? manualGroupSelect.value : 0);
+          if (Number.isFinite(activeGroup) && activeGroup > 0) return activeGroup;
+          const filteredGroup = Number(slotFilterGroup && slotFilterGroup.value ? slotFilterGroup.value : 0);
+          if (Number.isFinite(filteredGroup) && filteredGroup > 0) return filteredGroup;
+          return 0;
+        };
+        const getLoadLevelMeta = (count) => {
+          if (count >= 5) return { level: 'high', label: sessionGeneratorText.loadHigh };
+          if (count >= 3) return { level: 'medium', label: sessionGeneratorText.loadMedium };
+          return { level: 'low', label: sessionGeneratorText.loadLow };
+        };
+        const setPlannerNotice = (text) => {
+          if (!manualBlockReasonBox || !text) return;
+          manualBlockReasonBox.textContent = text;
+        };
+        const getHypotheticalAssessmentRows = (candidate) => {
+          if (!candidate || !isAssessmentAssignment(candidate) || !Number(candidate.group_number || 0)) {
+            return getAssessmentAssignments();
+          }
+          const rows = getAssessmentAssignments([...manualAssignments, candidate]);
+          const dedup = new Map();
+          rows.forEach((row) => {
+            dedup.set(assignmentKey(row), row);
+          });
+          return Array.from(dedup.values());
+        };
+        const buildWarningsForCandidate = (candidate, rows, slotConflict) => {
+          const warnings = [];
+          if (slotConflict && Number(slotConflict.conflicts_total || 0) > 0) {
+            warnings.push({
+              key: 'teacher',
+              label: sessionGeneratorText.warningTeacherConflict,
+              detail: String(slotConflict.reason_text || ''),
+              tone: 'danger',
+            });
+          }
+          if (!candidate || !isAssessmentAssignment(candidate)) {
+            return warnings;
+          }
+          const groupNumber = Number(candidate.group_number || 0);
+          if (!Number.isFinite(groupNumber) || groupNumber < 1) {
+            return warnings;
+          }
+          const pool = Array.isArray(rows) ? rows : getAssessmentAssignments();
+          const sameDayCount = pool.filter((row) =>
+            Number(row.group_number || 0) === groupNumber && String(row.date || '') === String(candidate.date || '')
+          ).length;
+          if (sameDayCount > 1) {
+            warnings.push({
+              key: 'same-day',
+              label: sessionGeneratorText.warningSameDayGroup,
+              detail: '',
+              tone: 'warn',
+            });
+          }
+          const overloadCount = pool.filter((row) => {
+            if (Number(row.group_number || 0) !== groupNumber) return false;
+            const delta = diffClientDays(String(row.date || ''), String(candidate.date || ''));
+            return delta !== null && Math.abs(delta) <= 2;
+          }).length;
+          if (overloadCount >= 3) {
+            warnings.push({
+              key: 'overload',
+              label: sessionGeneratorText.warningGroupOverload,
+              detail: '',
+              tone: 'warn',
+            });
+          }
+          return warnings;
+        };
+        const renderWarningHtml = (warnings) => {
+          if (!warnings.length) return '';
+          const uniqueWarnings = [];
+          const seen = new Set();
+          warnings.forEach((warning) => {
+            const key = String(warning && warning.key ? warning.key : warning && warning.label ? warning.label : '');
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            uniqueWarnings.push(warning);
+          });
+          const chips = uniqueWarnings
+            .map((warning) => `<span class="slot-warning-chip ${warning.tone === 'warn' ? 'warn' : ''}">⚠ ${escapeHtml(warning.label || '')}</span>`)
+            .join('');
+          const detail = uniqueWarnings.find((warning) => warning && warning.detail);
+          const detailHtml = detail ? `<div class="slot-warning-detail">${escapeHtml(detail.detail)}</div>` : '';
+          return `<div class="slot-warning-stack">${chips}${detailHtml}</div>`;
+        };
+        const renderAssignmentCardHtml = (item) => `
+          <div class="slot-assignment-item">
+            <div class="slot-assignment-subject">${escapeHtml(item.subject_name || '')}</div>
+            <div class="slot-assignment-meta">
+              <span class="mark-pill ${resolveAssignmentTone(item.type)}">${escapeHtml(formatAssignmentTypeChipLabel(item.type))}</span>
+              <span class="group-badge">${escapeHtml(item.group_label || sessionGeneratorText.allGroups)}</span>
+            </div>
+          </div>
+        `;
+
         const buildCandidateFromSlot = (button) => {
           if (!button || !manualSubjectSelect) return null;
           const subjectId = Number(manualSubjectSelect.value || 0);
@@ -1645,6 +2195,74 @@
           manualGroupSelect.disabled = false;
         };
 
+        const updateActiveAssignmentBar = () => {
+          if (!activeAssignmentTypeChip || !activeAssignmentTitle || !activeAssignmentSubtitle) return;
+          const subjectId = Number(manualSubjectSelect && manualSubjectSelect.value ? manualSubjectSelect.value : 0);
+          const subject = manualSubjectMap.get(subjectId);
+          const subjectLabel = subject && subject.name ? subject.name : sessionGeneratorText.activeSelectionEmpty;
+          const groupValue = Number(manualGroupSelect && manualGroupSelect.value ? manualGroupSelect.value : 0);
+          const groupLabel = subject
+            ? formatClientGroupLabel(groupValue > 0 ? groupValue : null, Math.max(1, Number(subject.group_count || 1)))
+            : sessionGeneratorText.allGroups;
+          activeAssignmentTypeChip.textContent = formatAssignmentTypeChipLabel(manualSelectedType);
+          activeAssignmentTypeChip.className = `mark-pill active-selection-type ${resolveAssignmentTone(manualSelectedType)}`;
+          activeAssignmentTitle.textContent = `${formatAssignmentTypeLabel(manualSelectedType)} · ${subjectLabel}`;
+          activeAssignmentSubtitle.textContent = `${groupLabel} · ${sessionGeneratorText.activeSelectionShortcuts}`;
+        };
+
+        const updateDayLoadIndicators = () => {
+          const loadByDate = new Map();
+          getAssessmentAssignments().forEach((row) => {
+            const date = String(row.date || '');
+            if (!date) return;
+            loadByDate.set(date, Number(loadByDate.get(date) || 0) + 1);
+          });
+          document.querySelectorAll('[data-day-load-chip]').forEach((chip) => {
+            const date = String(chip.getAttribute('data-day-date') || '');
+            const count = Number(loadByDate.get(date) || 0);
+            const meta = getLoadLevelMeta(count);
+            chip.setAttribute('data-load-level', meta.level);
+            chip.textContent = `${meta.label} · ${count}`;
+            chip.title = `${count} ${sessionGeneratorText.loadAssessments}`;
+          });
+        };
+
+        const renderGroupTimeline = () => {
+          if (!groupTimelineRoot || !groupTimelineLabel) return;
+          const groupNumber = getSelectedTimelineGroupNumber();
+          if (!Number.isFinite(groupNumber) || groupNumber < 1) {
+            groupTimelineLabel.textContent = sessionGeneratorText.groupTimelineHint;
+            groupTimelineRoot.innerHTML = `<div class="timeline-empty">${escapeHtml(sessionGeneratorText.groupTimelineHint)}</div>`;
+            return;
+          }
+          groupTimelineLabel.textContent = `${sessionGeneratorText.groupPrefix} ${groupNumber}`;
+          const rows = sortAssignments(getAssessmentAssignments().filter((row) => {
+            const rowGroup = Number(row.group_number || 0);
+            return rowGroup === 0 || rowGroup === groupNumber;
+          }));
+          if (!rows.length) {
+            groupTimelineRoot.innerHTML = `<div class="timeline-empty">${escapeHtml(sessionGeneratorText.groupTimelineEmpty)}</div>`;
+            return;
+          }
+          const itemsHtml = rows.map((row, index) => {
+            const previous = index > 0 ? rows[index - 1] : null;
+            const gap = previous ? diffClientDays(String(row.date || ''), String(previous.date || '')) : null;
+            const hasShortGap = gap !== null && gap < 2;
+            return `
+              <div class="group-timeline-item">
+                <div class="group-timeline-date">${escapeHtml(formatIsoDateLabel(row.date || ''))}</div>
+                <div class="group-timeline-title">${escapeHtml(row.subject_name || '')}</div>
+                <div class="group-timeline-meta">
+                  <span class="mark-pill ${resolveAssignmentTone(row.type)}">${escapeHtml(formatAssignmentTypeChipLabel(row.type))}</span>
+                  <span class="group-badge">${escapeHtml(row.group_label || sessionGeneratorText.allGroups)}</span>
+                  ${hasShortGap ? `<span class="slot-warning-chip warn">⚠ ${escapeHtml(sessionGeneratorText.warningShortGap)}</span>` : ''}
+                </div>
+              </div>
+            `;
+          }).join('');
+          groupTimelineRoot.innerHTML = itemsHtml;
+        };
+
         const updateBlockReasonMessage = (button) => {
           if (!manualBlockReasonBox) return;
           if (!button) {
@@ -1673,6 +2291,11 @@
           if (slotConflict && slotConflict.reason_text) {
             reasons.push(`${sessionGeneratorText.teacherConflictPrefix} ${slotConflict.reason_text}`);
           }
+          const hypotheticalRows = getHypotheticalAssessmentRows(candidate);
+          const candidateWarnings = buildWarningsForCandidate(candidate, hypotheticalRows, slotConflict);
+          candidateWarnings.forEach((warning) => {
+            reasons.push(warning.detail ? `${warning.label}: ${warning.detail}` : warning.label);
+          });
           if (explicitSessionDates.length && !explicitSessionDates.includes(candidate.date)) {
             reasons.push(sessionGeneratorText.blockReasonOutOfWindow);
           }
@@ -1696,37 +2319,49 @@
             button.classList.toggle('is-filter-hidden', !matchesFilters);
             button.classList.remove('is-conflict');
             button.classList.remove('is-recommended');
+            button.classList.remove('is-dimmed-occupied');
+            button.classList.remove('is-free-highlight');
+            const showOnlyFree = !!(slotFilterFreeOnly && slotFilterFreeOnly.checked);
+            const slotIsFree = button.classList.contains('is-free');
+            if (showOnlyFree) {
+              button.classList.toggle('is-dimmed-occupied', !slotIsFree);
+              button.classList.toggle('is-free-highlight', slotIsFree);
+            }
             if (!holder) return;
             if (!slotRows.length) {
               holder.innerHTML = '';
               button.classList.remove('is-assigned');
             } else {
               button.classList.add('is-assigned');
-              const rowsHtml = slotRows.slice(0, 2).map((item) => `
-                <div><span class="mark-pill ${item.type === 'credit' ? 'danger' : (item.type === 'consultation' ? 'muted' : 'info')}">${escapeHtml(sessionGeneratorTypeShortLabels[item.type] || sessionGeneratorTypeShortLabels.exam)}</span> ${escapeHtml(item.subject_name)} · ${escapeHtml(item.group_label || sessionGeneratorText.allGroups)}</div>
-              `).join('');
+              const rowsHtml = slotRows.slice(0, 2).map((item) => renderAssignmentCardHtml(item)).join('');
               const moreHtml = slotRows.length > 2
                 ? `<div class="small text-muted">${escapeHtml(formatClientMoreLabel(slotRows.length - 2))}</div>`
                 : '';
-              holder.innerHTML = rowsHtml + moreHtml;
+              holder.innerHTML = `<div class="slot-assignment-stack">${rowsHtml}${moreHtml}</div>`;
             }
             const slotConflict = liveConflictState && liveConflictState.slot_conflicts
               ? liveConflictState.slot_conflicts[currentSlotKey]
               : null;
+            const slotWarnings = [];
+            slotRows.forEach((row) => {
+              slotWarnings.push(...buildWarningsForCandidate(row, getAssessmentAssignments(), slotConflict));
+            });
             if (conflictHolder) {
-              if (slotConflict && slotConflict.reason_text) {
-                conflictHolder.textContent = slotConflict.reason_text;
-              } else {
-                conflictHolder.textContent = '';
-              }
+              conflictHolder.innerHTML = renderWarningHtml(slotWarnings);
             }
-            button.classList.toggle('is-conflict', !!(slotConflict && slotConflict.conflicts_total > 0));
+            button.classList.toggle('is-conflict', slotWarnings.length > 0);
             const hasSubjectSelection = Number(manualSubjectSelect && manualSubjectSelect.value ? manualSubjectSelect.value : 0) > 0;
-            const slotIsFree = String(button.className || '').includes('is-free');
-            if (hasSubjectSelection && slotIsFree && !slotConflict) {
+            if (hasSubjectSelection && slotIsFree && !slotWarnings.length && matchesFilters) {
               button.classList.add('is-recommended');
             }
           });
+        };
+
+        const renderPlannerSurface = () => {
+          updateActiveAssignmentBar();
+          updateDayLoadIndicators();
+          renderSlotAssignments();
+          renderGroupTimeline();
         };
 
         const syncPublishState = () => {
@@ -1843,7 +2478,7 @@
               slot_conflicts: {},
             };
             setLiveConflictStatusText(sessionGeneratorText.liveConflictEmpty, 'ok');
-            renderSlotAssignments();
+            renderPlannerSurface();
             if (force) {
               updateBlockReasonMessage(lastHoveredSlotKey && slotMetaByKey.get(lastHoveredSlotKey)
                 ? slotMetaByKey.get(lastHoveredSlotKey).button
@@ -1902,7 +2537,7 @@
             if (myToken !== liveConflictRequestToken) return;
             setLiveConflictStatusText(sessionGeneratorText.liveConflictUpdateFailed, 'err');
           }
-          renderSlotAssignments();
+          renderPlannerSurface();
           if (force) {
             updateBlockReasonMessage(lastHoveredSlotKey && slotMetaByKey.get(lastHoveredSlotKey)
               ? slotMetaByKey.get(lastHoveredSlotKey).button
@@ -1937,7 +2572,7 @@
             manualAssignments.push(candidate);
           }
           manualAssignments = dedupeAssignments(manualAssignments);
-          renderSlotAssignments();
+          renderPlannerSurface();
           syncPublishState();
           persistDraftSoon();
           runLiveConflictCheckSoon();
@@ -1977,6 +2612,93 @@
           slotButtons.forEach((button) => button.classList.remove('is-drag-target'));
         };
 
+        const removeAssignmentsAtSlot = (slotKeyValue) => {
+          if (!slotKeyValue) return false;
+          const slotMeta = slotMetaByKey.get(slotKeyValue);
+          if (!slotMeta || !slotMeta.button) return false;
+          const candidate = buildCandidateFromSlot(slotMeta.button);
+          const beforeCount = manualAssignments.length;
+          if (candidate) {
+            const candidateKey = assignmentKey(candidate);
+            manualAssignments = manualAssignments.filter((item) => assignmentKey(item) !== candidateKey);
+          }
+          if (manualAssignments.length === beforeCount) {
+            manualAssignments = manualAssignments.filter((item) => slotKey(item.date, item.class_number) !== slotKeyValue);
+          }
+          if (manualAssignments.length === beforeCount) {
+            return false;
+          }
+          manualAssignments = dedupeAssignments(manualAssignments);
+          renderPlannerSurface();
+          syncPublishState();
+          persistDraftSoon();
+          runLiveConflictCheckSoon();
+          updateBlockReasonMessage(slotMeta.button);
+          return true;
+        };
+
+        const autoAddConsultationsFromDraft = () => {
+          const examRows = sortAssignments(manualAssignments.filter((row) => String(row.type || '') === 'exam'));
+          if (!examRows.length) {
+            setPlannerNotice(sessionGeneratorText.autoConsultationsEmpty);
+            return;
+          }
+          const nextAssignments = [...manualAssignments];
+          const existingKeys = new Set(nextAssignments.map((row) => assignmentKey(row)));
+          let added = 0;
+          let skipped = 0;
+          examRows.forEach((examRow) => {
+            const consultationDate = shiftIsoDate(examRow.date, -1);
+            const consultationSlotKey = slotKey(consultationDate, examRow.class_number);
+            const consultationSlotMeta = slotMetaByKey.get(consultationSlotKey);
+            if (!consultationSlotMeta) {
+              skipped += 1;
+              return;
+            }
+            const consultationRow = normalizeAssignmentRow({
+              ...examRow,
+              type: 'consultation',
+              date: consultationDate,
+              day_name: consultationSlotMeta.day_name || examRow.day_name || '',
+            });
+            if (!consultationRow) {
+              skipped += 1;
+              return;
+            }
+            const consultationKey = assignmentKey(consultationRow);
+            if (existingKeys.has(consultationKey)) {
+              skipped += 1;
+              return;
+            }
+            existingKeys.add(consultationKey);
+            nextAssignments.push(consultationRow);
+            added += 1;
+          });
+          if (!added && !skipped) {
+            setPlannerNotice(sessionGeneratorText.autoConsultationsEmpty);
+            return;
+          }
+          manualAssignments = dedupeAssignments(nextAssignments);
+          renderPlannerSurface();
+          syncPublishState();
+          persistDraftSoon();
+          runLiveConflictCheckSoon();
+          setPlannerNotice(
+            String(sessionGeneratorText.autoConsultationsDone || '')
+              .replace('%ADDED%', String(added))
+              .replace('%SKIPPED%', String(skipped))
+          );
+        };
+
+        const canHandlePlannerShortcut = (event) => {
+          if (!event || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return false;
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return true;
+          if (target.isContentEditable) return false;
+          const tagName = String(target.tagName || '').toLowerCase();
+          return !['input', 'textarea', 'select'].includes(tagName);
+        };
+
         manualTypeButtons.forEach((button) => {
           button.addEventListener('click', () => {
             const type = String(button.dataset.manualType || '').trim();
@@ -1984,27 +2706,32 @@
               ? 'credit'
               : (type === 'consultation' ? 'consultation' : 'exam');
             syncManualTypeButtons();
-            renderSlotAssignments();
+            renderPlannerSurface();
           });
         });
         if (manualSubjectSelect) {
           manualSubjectSelect.addEventListener('change', () => {
             updateManualGroupOptions();
-            renderSlotAssignments();
+            renderPlannerSurface();
           });
         }
         if (manualGroupSelect) {
           manualGroupSelect.addEventListener('change', () => {
-            renderSlotAssignments();
+            renderPlannerSurface();
           });
         }
         if (manualPlanClearBtn) {
           manualPlanClearBtn.addEventListener('click', () => {
             manualAssignments = [];
-            renderSlotAssignments();
+            renderPlannerSurface();
             syncPublishState();
             persistDraftSoon();
             runLiveConflictCheckSoon();
+          });
+        }
+        if (manualAutoConsultationsBtn) {
+          manualAutoConsultationsBtn.addEventListener('click', () => {
+            autoAddConsultationsFromDraft();
           });
         }
         if (manualConflictsRecheckBtn) {
@@ -2012,12 +2739,22 @@
             runLiveConflictCheck(true);
           });
         }
-        [slotFilterTeacher, slotFilterSubject, slotFilterGroup, slotFilterType].forEach((filterSelect) => {
+        [slotFilterTeacher, slotFilterSubject, slotFilterGroup, slotFilterType, slotFilterFreeOnly].forEach((filterSelect) => {
           if (!filterSelect) return;
           filterSelect.addEventListener('change', () => {
-            renderSlotAssignments();
+            renderPlannerSurface();
           });
         });
+        if (slotFiltersResetBtn) {
+          slotFiltersResetBtn.addEventListener('click', () => {
+            if (slotFilterTeacher) slotFilterTeacher.value = '';
+            if (slotFilterSubject) slotFilterSubject.value = '';
+            if (slotFilterGroup) slotFilterGroup.value = '';
+            if (slotFilterType) slotFilterType.value = '';
+            if (slotFilterFreeOnly) slotFilterFreeOnly.checked = false;
+            renderPlannerSurface();
+          });
+        }
 
         slotButtons.forEach((button) => {
           button.addEventListener('pointerdown', (event) => {
@@ -2050,6 +2787,16 @@
             }
           });
         });
+        window.addEventListener('pointermove', (event) => {
+          if (!dragState.active) return;
+          if (dragState.pointerId !== null && dragState.pointerId !== event.pointerId) return;
+          const hovered = document.elementFromPoint(event.clientX, event.clientY);
+          const button = hovered instanceof Element ? hovered.closest('[data-slot-btn]') : null;
+          if (!button) return;
+          applyDragToSlot(button);
+          lastHoveredSlotKey = slotKey(button.dataset.slotDate, button.dataset.slotClass);
+          updateBlockReasonMessage(button);
+        });
         window.addEventListener('pointerup', (event) => {
           if (!dragState.active) return;
           if (dragState.pointerId !== null && dragState.pointerId !== event.pointerId) return;
@@ -2058,6 +2805,25 @@
         window.addEventListener('pointercancel', () => {
           stopDragMode();
         });
+        window.addEventListener('keydown', (event) => {
+          if (!canHandlePlannerShortcut(event)) return;
+          const rawKey = String(event.key || '').toLowerCase();
+          if (rawKey === 'e' || rawKey === 'c' || rawKey === 'z') {
+            manualSelectedType = rawKey === 'z'
+              ? 'credit'
+              : (rawKey === 'c' ? 'consultation' : 'exam');
+            syncManualTypeButtons();
+            renderPlannerSurface();
+            event.preventDefault();
+            return;
+          }
+          if (rawKey === 'delete' || rawKey === 'backspace') {
+            const removed = removeAssignmentsAtSlot(lastHoveredSlotKey);
+            if (removed) {
+              event.preventDefault();
+            }
+          }
+        });
 
         manualAssignments = dedupeAssignments(manualAssignmentsSeed);
         if (manualSubjectSelect && !manualSubjectSelect.value && manualSubjects.length) {
@@ -2065,7 +2831,7 @@
         }
         updateManualGroupOptions();
         syncManualTypeButtons();
-        renderSlotAssignments();
+        renderPlannerSurface();
         syncPublishState();
         setLiveConflictStatusText(sessionGeneratorText.liveConflictUpdating, null);
         runLiveConflictCheck();
