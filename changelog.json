@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.23",
+      "date": "2026-03-13",
+      "items": [
+        "tune(admin-dashboard-overview-removal): removed the embedded Overview card, its sidebar shortcut, and the header CTA from the main admin dashboard so the landing screen opens directly into the remaining working sections without the extra summary block"
+      ]
+    },
+    {
       "version": "1.2.22",
       "date": "2026-03-13",
       "items": [
