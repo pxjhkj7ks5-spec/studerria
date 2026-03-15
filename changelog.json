@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.39",
+      "date": "2026-03-15",
+      "items": [
+        "fix(schedule-render-teacher-template-fallback): initialize `teacherHomeworkTemplates` for every `/schedule` render path and add an EJS fallback so student and admin view-as schedule screens no longer crash with `teacherHomeworkTemplates is not defined`"
+      ]
+    },
+    {
       "version": "1.2.38",
       "date": "2026-03-15",
       "items": [

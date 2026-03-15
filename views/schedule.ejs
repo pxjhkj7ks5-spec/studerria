@@ -2901,7 +2901,7 @@
       const allowCrossGroupHomeworkFallback = <%- JSON.stringify(role === 'admin' || viewAs === 'student') %>;
       const homeworkModal = document.getElementById('homeworkModal');
       const homeworkData = <%- JSON.stringify(homework || []) %>;
-      const teacherHomeworkTemplates = <%- JSON.stringify(teacherHomeworkTemplates || []) %>;
+      const teacherHomeworkTemplates = <%- JSON.stringify(typeof teacherHomeworkTemplates !== 'undefined' ? teacherHomeworkTemplates : []) %>;
       const customDeadlineItems = <%- JSON.stringify(customDeadlineItems || []) %>;
       const listEl = document.getElementById('homeworkList');
       const homeworkSubmitForm = document.getElementById('homeworkSubmitForm');

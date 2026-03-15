@@ -14272,12 +14272,13 @@ app.get('/schedule', requireLogin, async (req, res) => {
     ? 'teacher'
     : (req.session.viewAs || req.session.role || '');
   const canUseCustomDeadlinesUi = canRenderCustomDeadlinesUi(req, scheduleViewRole);
+  let teacherHomeworkTemplates = [];
   if (hasSessionRole(req, 'teacher')) {
     try {
       await ensureDbReady();
       const teacherSubjects = await getTeacherAssignedSubjects(userId);
       const teacherCourses = buildTeacherCourseList(teacherSubjects);
-      const teacherHomeworkTemplates = await getTeacherHomeworkTemplates(userId, { limit: 300 });
+      teacherHomeworkTemplates = await getTeacherHomeworkTemplates(userId, { limit: 300 });
       const courseFilter = req.query.course ? Number(req.query.course) : null;
       const selectedCourse = teacherCourses.find((c) => Number(c.id) === Number(courseFilter)) || null;
       const courseIds = selectedCourse ? [selectedCourse.id] : teacherCourses.map((c) => c.id);
