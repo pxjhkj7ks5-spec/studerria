@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.37",
+      "date": "2026-03-15",
+      "items": [
+        "chore(codex-test-request-rule): document that explicit requests like `зроби тест` or `додай тест` authorize Codex to add or update the relevant tests and run only the minimal necessary test command without extra clarification"
+      ]
+    },
+    {
       "version": "1.2.36",
       "date": "2026-03-13",
       "items": [
