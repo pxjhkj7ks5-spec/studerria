@@ -1510,6 +1510,15 @@
                         <option value=""><%= sessionGeneratorText.allSubjectGroups %></option>
                       </select>
                     </div>
+                    <div>
+                      <label class="form-label" for="manualRoomSelect"><%= lang === 'en' ? 'Room' : 'Кабінет' %></label>
+                      <select class="form-select" id="manualRoomSelect">
+                        <option value=""><%= lang === 'en' ? 'No room selected' : 'Без кабінету' %></option>
+                        <% (rooms || []).forEach(function(room) { %>
+                          <option value="<%= room.id %>"><%= room.room_label || room.label || room.code || `Room ${room.id}` %><%= Number(room.is_active || 0) === 1 ? '' : (lang === 'en' ? ' (archived)' : ' (архів)') %></option>
+                        <% }) %>
+                      </select>
+                    </div>
                     <div class="liquid-alert info">
                       <%= sessionGeneratorText.plannerSteps %>
                     </div>
@@ -1638,6 +1647,9 @@
                                               <% if (busy.teacher_names && busy.teacher_names.length) { %>
                                                 <span><%= busy.teacher_names[0] %><%= idx === 1 && slot.busy.length > 2 ? '…' : '' %></span>
                                               <% } %>
+                                              <% if (busy.room_label) { %>
+                                                <span><%= busy.room_label %></span>
+                                              <% } %>
                                             </div>
                                           </div>
                                         <% }); %>
@@ -1674,6 +1686,103 @@
               </div>
             </div>
           </div>
+
+          <article class="card liquid-panel mb-4">
+            <div class="card-body d-grid gap-3">
+              <div class="panel-title-row">
+                <h5><%= lang === 'en' ? 'Room fund' : 'Кабінетний фонд' %></h5>
+                <span class="session-subtle"><%= lang === 'en' ? 'Manage reusable rooms for this course and assign them inside the planner.' : 'Створюйте кабінети для курсу і призначайте їх прямо в планувальнику.' %></span>
+              </div>
+              <form method="POST" action="/admin/session-generator/rooms/save" class="row g-2" id="sessionRoomForm">
+                <input type="hidden" name="location" value="<%= activeLocation %>" />
+                <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
+                <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
+                <input type="hidden" name="draft_id" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
+                <input type="hidden" name="room_id" id="sessionRoomId" value="" />
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="sessionRoomBuilding"><%= lang === 'en' ? 'Building' : 'Корпус' %></label>
+                  <input class="form-control" id="sessionRoomBuilding" name="building" maxlength="80" />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="sessionRoomCode"><%= lang === 'en' ? 'Code' : 'Код' %></label>
+                  <input class="form-control" id="sessionRoomCode" name="code" maxlength="60" />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="sessionRoomLabel"><%= lang === 'en' ? 'Label' : 'Назва' %></label>
+                  <input class="form-control" id="sessionRoomLabel" name="label" maxlength="120" required />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="sessionRoomType"><%= lang === 'en' ? 'Type' : 'Тип' %></label>
+                  <select class="form-select" id="sessionRoomType" name="room_type">
+                    <% (roomTypeOptions || []).forEach(function(typeValue) { %>
+                      <option value="<%= typeValue %>"><%= typeValue %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="sessionRoomCapacity"><%= lang === 'en' ? 'Capacity' : 'Місткість' %></label>
+                  <input class="form-control" id="sessionRoomCapacity" name="capacity" type="number" min="1" max="999" />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="sessionRoomActive"><%= lang === 'en' ? 'Status' : 'Статус' %></label>
+                  <select class="form-select" id="sessionRoomActive" name="is_active">
+                    <option value="1"><%= lang === 'en' ? 'Active' : 'Активний' %></option>
+                    <option value="0"><%= lang === 'en' ? 'Archived' : 'Архівний' %></option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="sessionRoomNotes"><%= lang === 'en' ? 'Notes' : 'Нотатки' %></label>
+                  <textarea class="form-control" id="sessionRoomNotes" name="notes" rows="2" maxlength="500"></textarea>
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                  <button class="btn btn-outline-primary" type="submit"><%= lang === 'en' ? 'Save room' : 'Зберегти кабінет' %></button>
+                  <button class="btn btn-outline-secondary" type="button" id="sessionRoomResetBtn"><%= lang === 'en' ? 'Reset form' : 'Очистити форму' %></button>
+                </div>
+              </form>
+              <% if ((rooms || []).length) { %>
+                <div class="d-grid gap-2">
+                  <% (rooms || []).forEach(function(room) { %>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border rounded-4 p-3">
+                      <div>
+                        <div class="fw-semibold"><%= room.room_label || room.label || room.code || `Room ${room.id}` %></div>
+                        <div class="session-subtle">
+                          <%= room.room_type || 'classroom' %>
+                          <% if (room.capacity) { %> · <%= room.capacity %> <%=(lang === 'en' ? 'seats' : 'місць')%><% } %>
+                          <% if (Number(room.is_active || 0) !== 1) { %> · <%= lang === 'en' ? 'archived' : 'архів' %><% } %>
+                        </div>
+                      </div>
+                      <div class="d-flex flex-wrap gap-2">
+                        <button
+                          class="btn btn-outline-secondary btn-sm"
+                          type="button"
+                          data-room-edit
+                          data-room-id="<%= room.id %>"
+                          data-room-building="<%= room.building || '' %>"
+                          data-room-code="<%= room.code || '' %>"
+                          data-room-label="<%= room.label || '' %>"
+                          data-room-type="<%= room.room_type || 'classroom' %>"
+                          data-room-capacity="<%= room.capacity || '' %>"
+                          data-room-notes="<%= room.notes || '' %>"
+                          data-room-active="<%= Number(room.is_active || 0) === 1 ? 1 : 0 %>"
+                        >
+                          <%= lang === 'en' ? 'Edit' : 'Редагувати' %>
+                        </button>
+                        <form method="POST" action="/admin/session-generator/rooms/<%= room.id %>/delete">
+                          <input type="hidden" name="location" value="<%= activeLocation %>" />
+                          <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
+                          <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
+                          <input type="hidden" name="draft_id" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
+                          <button class="btn btn-outline-danger btn-sm" type="submit"><%= lang === 'en' ? 'Archive' : 'Архівувати' %></button>
+                        </form>
+                      </div>
+                    </div>
+                  <% }) %>
+                </div>
+              <% } else { %>
+                <div class="liquid-alert info"><%= lang === 'en' ? 'No rooms yet for this course.' : 'Для цього курсу ще немає кабінетів.' %></div>
+              <% } %>
+            </div>
+          </article>
 
           <form method="POST" action="/admin/session-generator/publish" class="card liquid-panel mb-4">
             <div class="card-body d-grid gap-2">
@@ -1821,16 +1930,34 @@
         const manualTypeButtons = Array.from(document.querySelectorAll('[data-manual-type]'));
         const manualSubjectSelect = document.getElementById('manualSubjectSelect');
         const manualGroupSelect = document.getElementById('manualGroupSelect');
+        const manualRoomSelect = document.getElementById('manualRoomSelect');
         const manualPlanClearBtn = document.getElementById('manualPlanClearBtn');
         const manualAssignmentsInput = document.getElementById('manualAssignmentsInput');
         const publishBtn = document.getElementById('sessionPublishBtn');
         const checkConflictsBtn = document.getElementById('sessionCheckConflictsBtn');
         const publishSourceHint = document.getElementById('sessionPublishSourceHint');
         const publishCount = document.getElementById('sessionPublishCount');
+        const sessionRoomForm = document.getElementById('sessionRoomForm');
+        const sessionRoomIdInput = document.getElementById('sessionRoomId');
+        const sessionRoomBuildingInput = document.getElementById('sessionRoomBuilding');
+        const sessionRoomCodeInput = document.getElementById('sessionRoomCode');
+        const sessionRoomLabelInput = document.getElementById('sessionRoomLabel');
+        const sessionRoomTypeInput = document.getElementById('sessionRoomType');
+        const sessionRoomCapacityInput = document.getElementById('sessionRoomCapacity');
+        const sessionRoomNotesInput = document.getElementById('sessionRoomNotes');
+        const sessionRoomActiveInput = document.getElementById('sessionRoomActive');
+        const sessionRoomResetBtn = document.getElementById('sessionRoomResetBtn');
+        const roomEditButtons = Array.from(document.querySelectorAll('[data-room-edit]'));
         const slotButtons = Array.from(document.querySelectorAll('[data-slot-btn]'));
 
         const sessionGeneratorText = <%- JSON.stringify(sessionGeneratorText) %>;
         const sessionGeneratorTypeShortLabels = <%- JSON.stringify(sessionGeneratorTypeShortLabels) %>;
+        const sessionGeneratorRoomText = <%- JSON.stringify({
+          room: lang === 'en' ? 'Room' : 'Кабінет',
+          noRoom: lang === 'en' ? 'No room selected' : 'Без кабінету',
+          roomConflict: lang === 'en' ? 'room conflict' : 'конфлікт кабінету',
+        }) %>;
+        const roomMapPayload = <%- JSON.stringify(rooms || []) %>;
         const formatClientGroupLabel = (groupNumber, groupCount) => groupNumber
           ? `${sessionGeneratorText.groupPrefix} ${groupNumber}`
           : (groupCount > 1 ? `${sessionGeneratorText.allGroups} (${groupCount})` : sessionGeneratorText.allSimple);
@@ -1844,6 +1971,7 @@
         const manualSubjects = <%- JSON.stringify(manualSubjectRows || []) %>;
         const manualAssignmentsSeed = <%- JSON.stringify(manualAssignmentsInitial || []) %>;
         const sessionTeacherMapPayload = <%- JSON.stringify(sessionTeacherMapPayload || {}) %>;
+        const roomById = new Map((roomMapPayload || []).map((room) => [Number(room.id), room]));
         const manualSubjectMap = new Map((manualSubjects || []).map((subject) => [Number(subject.id), subject]));
         let manualSelectedType = 'exam';
         let manualAssignments = [];
@@ -1871,6 +1999,17 @@
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#039;');
+        const formatRoomLabelById = (roomId) => {
+          const normalizedRoomId = Number(roomId || 0);
+          if (!Number.isInteger(normalizedRoomId) || normalizedRoomId < 1) {
+            return '';
+          }
+          const room = roomById.get(normalizedRoomId);
+          if (!room) {
+            return `${sessionGeneratorRoomText.room} #${normalizedRoomId}`;
+          }
+          return String(room.room_label || room.label || room.code || `${sessionGeneratorRoomText.room} #${normalizedRoomId}`);
+        };
 
         const slotKey = (date, classNumber) => `${String(date || '')}|${Number(classNumber || 0)}`;
 
@@ -1925,11 +2064,17 @@
           const groupNumber = Number.isFinite(groupNumberRaw) && groupNumberRaw > 0
             ? Math.floor(groupNumberRaw)
             : null;
+          const roomIdRaw = Number(row.room_id || 0);
+          const roomId = Number.isFinite(roomIdRaw) && roomIdRaw > 0
+            ? Math.floor(roomIdRaw)
+            : null;
           if (groupNumber && groupNumber > groupCount) return null;
           return {
             subject_id: subjectId,
             subject_name: String(subject.name || ''),
             group_number: groupNumber,
+            room_id: roomId,
+            room_label: formatRoomLabelById(roomId),
             group_label: groupNumber
               ? formatClientGroupLabel(groupNumber, groupCount)
               : formatClientGroupLabel(null, groupCount),
@@ -1949,6 +2094,7 @@
             String(item && item.subject_id ? item.subject_id : ''),
             String(item && item.type ? item.type : ''),
             String(group),
+            String(item && item.room_id ? item.room_id : ''),
           ].join('|');
         };
 
@@ -2061,7 +2207,9 @@
           if (slotConflict && Number(slotConflict.conflicts_total || 0) > 0) {
             warnings.push({
               key: 'teacher',
-              label: sessionGeneratorText.warningTeacherConflict,
+              label: candidate && Number(candidate.room_id || 0) > 0
+                ? sessionGeneratorRoomText.roomConflict
+                : sessionGeneratorText.warningTeacherConflict,
               detail: String(slotConflict.reason_text || ''),
               tone: 'danger',
             });
@@ -2123,6 +2271,7 @@
             <div class="slot-assignment-meta">
               <span class="mark-pill ${resolveAssignmentTone(item.type)}">${escapeHtml(formatAssignmentTypeChipLabel(item.type))}</span>
               <span class="group-badge">${escapeHtml(item.group_label || sessionGeneratorText.allGroups)}</span>
+              ${item.room_label ? `<span class="group-badge">${escapeHtml(item.room_label)}</span>` : ''}
             </div>
           </div>
         `;
@@ -2139,10 +2288,14 @@
           const groupNumber = manualGroupSelect && manualGroupSelect.value
             ? Number(manualGroupSelect.value)
             : null;
+          const roomId = manualRoomSelect && manualRoomSelect.value
+            ? Number(manualRoomSelect.value)
+            : null;
           const normalized = normalizeAssignmentRow({
             subject_id: subjectId,
             subject_name: subject.name,
             group_number: Number.isFinite(groupNumber) && groupNumber > 0 ? groupNumber : null,
+            room_id: Number.isFinite(roomId) && roomId > 0 ? roomId : null,
             type: manualSelectedType,
             date,
             day_name: dayName,
@@ -2225,6 +2378,26 @@
           activeAssignmentSubtitle.textContent = `${groupLabel} · ${sessionGeneratorText.activeSelectionShortcuts}`;
         };
 
+        const syncActiveAssignmentRoomMeta = () => {
+          if (!activeAssignmentTitle || !activeAssignmentSubtitle) return;
+          const subjectId = Number(manualSubjectSelect && manualSubjectSelect.value ? manualSubjectSelect.value : 0);
+          const subject = manualSubjectMap.get(subjectId);
+          const subjectLabel = subject && subject.name ? subject.name : sessionGeneratorText.activeSelectionEmpty;
+          const groupValue = Number(manualGroupSelect && manualGroupSelect.value ? manualGroupSelect.value : 0);
+          const roomValue = Number(manualRoomSelect && manualRoomSelect.value ? manualRoomSelect.value : 0);
+          const groupLabel = subject
+            ? formatClientGroupLabel(groupValue > 0 ? groupValue : null, Math.max(1, Number(subject.group_count || 1)))
+            : sessionGeneratorText.allGroups;
+          const subtitleParts = [groupLabel];
+          const roomLabel = formatRoomLabelById(roomValue);
+          if (roomLabel) {
+            subtitleParts.push(`${sessionGeneratorRoomText.room}: ${roomLabel}`);
+          }
+          subtitleParts.push(sessionGeneratorText.activeSelectionShortcuts);
+          activeAssignmentTitle.textContent = `${formatAssignmentTypeLabel(manualSelectedType)} | ${subjectLabel}`;
+          activeAssignmentSubtitle.textContent = subtitleParts.join(' | ');
+        };
+
         const updateDayLoadIndicators = () => {
           const loadByDate = new Map();
           getAssessmentAssignments().forEach((row) => {
@@ -2305,6 +2478,7 @@
             : null;
           if (slotConflict && slotConflict.reason_text) {
             reasons.push(`${sessionGeneratorText.teacherConflictPrefix} ${slotConflict.reason_text}`);
+            reasons[reasons.length - 1] = slotConflict.reason_text;
           }
           const hypotheticalRows = getHypotheticalAssessmentRows(candidate);
           const candidateWarnings = buildWarningsForCandidate(candidate, hypotheticalRows, slotConflict);
@@ -2374,6 +2548,7 @@
 
         const renderPlannerSurface = () => {
           updateActiveAssignmentBar();
+          syncActiveAssignmentRoomMeta();
           updateDayLoadIndicators();
           renderSlotAssignments();
           renderGroupTimeline();
@@ -2392,6 +2567,7 @@
             date: row.date || '',
             class_number: Number(row.class_number || 0),
             group_number: row.group_number ? Number(row.group_number) : null,
+            room_id: row.room_id ? Number(row.room_id) : null,
             note: row.note || '',
           }))) : '';
           if (publishSourceHint) {
@@ -2735,6 +2911,14 @@
             renderPlannerSurface();
           });
         }
+        if (manualRoomSelect) {
+          manualRoomSelect.addEventListener('change', () => {
+            renderPlannerSurface();
+            updateBlockReasonMessage(lastHoveredSlotKey && slotMetaByKey.get(lastHoveredSlotKey)
+              ? slotMetaByKey.get(lastHoveredSlotKey).button
+              : null);
+          });
+        }
         if (manualPlanClearBtn) {
           manualPlanClearBtn.addEventListener('click', () => {
             manualAssignments = [];
@@ -2770,6 +2954,44 @@
             renderPlannerSurface();
           });
         }
+        const resetRoomForm = () => {
+          if (sessionRoomIdInput) sessionRoomIdInput.value = '';
+          if (sessionRoomBuildingInput) sessionRoomBuildingInput.value = '';
+          if (sessionRoomCodeInput) sessionRoomCodeInput.value = '';
+          if (sessionRoomLabelInput) sessionRoomLabelInput.value = '';
+          if (sessionRoomTypeInput) sessionRoomTypeInput.value = 'classroom';
+          if (sessionRoomCapacityInput) sessionRoomCapacityInput.value = '';
+          if (sessionRoomNotesInput) sessionRoomNotesInput.value = '';
+          if (sessionRoomActiveInput) sessionRoomActiveInput.value = '1';
+        };
+        const populateRoomFormFromButton = (button) => {
+          if (!button) return;
+          if (sessionRoomIdInput) sessionRoomIdInput.value = String(button.dataset.roomId || '');
+          if (sessionRoomBuildingInput) sessionRoomBuildingInput.value = String(button.dataset.roomBuilding || '');
+          if (sessionRoomCodeInput) sessionRoomCodeInput.value = String(button.dataset.roomCode || '');
+          if (sessionRoomLabelInput) sessionRoomLabelInput.value = String(button.dataset.roomLabel || '');
+          if (sessionRoomTypeInput) sessionRoomTypeInput.value = String(button.dataset.roomType || 'classroom');
+          if (sessionRoomCapacityInput) sessionRoomCapacityInput.value = String(button.dataset.roomCapacity || '');
+          if (sessionRoomNotesInput) sessionRoomNotesInput.value = String(button.dataset.roomNotes || '');
+          if (sessionRoomActiveInput) sessionRoomActiveInput.value = String(button.dataset.roomActive || '1');
+          if (sessionRoomLabelInput) {
+            sessionRoomLabelInput.focus();
+            sessionRoomLabelInput.select();
+          }
+          if (sessionRoomForm) {
+            sessionRoomForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        };
+        if (sessionRoomResetBtn) {
+          sessionRoomResetBtn.addEventListener('click', () => {
+            resetRoomForm();
+          });
+        }
+        roomEditButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            populateRoomFormFromButton(button);
+          });
+        });
 
         slotButtons.forEach((button) => {
           button.addEventListener('pointerdown', (event) => {
@@ -2841,6 +3063,7 @@
         });
 
         manualAssignments = dedupeAssignments(manualAssignmentsSeed);
+        resetRoomForm();
         if (manualSubjectSelect && !manualSubjectSelect.value && manualSubjects.length) {
           manualSubjectSelect.value = String(manualSubjects[0].id);
         }

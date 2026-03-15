@@ -42,6 +42,11 @@
       const teacherCompetencyPicker = cockpit.teacher_competency_picker || {};
       const teacherCompetencySubjects = Array.isArray(teacherCompetencyPicker.subjects) ? teacherCompetencyPicker.subjects : [];
       const teacherSelectedCompetencySubjectId = Number(teacherCompetencyPicker.selected_subject_id || 0);
+      const attendanceHealth = cockpit.attendance_health || null;
+      const latestRatingSnapshot = cockpit.latest_rating_snapshot || null;
+      const supportSummary = cockpit.support_summary || null;
+      const supportThreads = Array.isArray(cockpit.support_threads) ? cockpit.support_threads : [];
+      const teacherQuickActions = Array.isArray(cockpit.teacher_quick_actions) ? cockpit.teacher_quick_actions : [];
       const effectiveHomeViewRole = typeof homeViewRole === 'string' && homeViewRole ? homeViewRole : role;
       const isStudentLikeMyDayView = effectiveHomeViewRole === 'student'
         || effectiveHomeViewRole === 'admin'
@@ -191,6 +196,62 @@
         </div>
       </section>
 
+      <section class="mission-strip">
+        <article class="cockpit-card mission-card">
+          <div class="mission-card-kicker"><%= lang === 'en' ? 'Attendance' : 'Відвідуваність' %></div>
+          <% if (attendanceHealth) { %>
+            <div class="mission-card-value"><%= attendanceHealth.reliability === null || typeof attendanceHealth.reliability === 'undefined' ? '-' : `${attendanceHealth.reliability}%` %></div>
+            <div class="mission-card-meta">
+              <span><%= lang === 'en' ? 'Present' : 'Присутність' %>: <%= Number(attendanceHealth.present || 0) %></span>
+              <span><%= lang === 'en' ? 'Late' : 'Запізнення' %>: <%= Number(attendanceHealth.late || 0) %></span>
+              <span><%= lang === 'en' ? 'Absent' : 'Відсутність' %>: <%= Number(attendanceHealth.absent || 0) %></span>
+            </div>
+          <% } else { %>
+            <div class="mission-card-empty"><%= lang === 'en' ? 'No attendance signal yet.' : 'Поки немає сигналу по відвідуваності.' %></div>
+          <% } %>
+        </article>
+        <article class="cockpit-card mission-card">
+          <div class="mission-card-kicker"><%= lang === 'en' ? 'Latest rating' : 'Останній рейтинг' %></div>
+          <% if (latestRatingSnapshot) { %>
+            <div class="mission-card-value"><%= latestRatingSnapshot.scope_label || '-' %></div>
+            <div class="mission-card-meta">
+              <span><%= latestRatingSnapshot.period_label || '' %></span>
+              <% if (latestRatingSnapshot.top_entry) { %>
+                <span><%= lang === 'en' ? 'Leader' : 'Лідер' %>: <%= latestRatingSnapshot.top_entry.full_name %></span>
+              <% } %>
+            </div>
+            <a class="btn btn-inline-link mt-2" href="<%= latestRatingSnapshot.action_href || '/journal/insights' %>"><%= lang === 'en' ? 'Open insights' : 'Відкрити insights' %></a>
+          <% } else { %>
+            <div class="mission-card-empty"><%= lang === 'en' ? 'No published rating yet.' : 'Опублікованого рейтингу ще немає.' %></div>
+          <% } %>
+        </article>
+        <article class="cockpit-card mission-card">
+          <div class="mission-card-kicker"><%= lang === 'en' ? 'Support' : 'Підтримка' %></div>
+          <% if (supportSummary) { %>
+            <div class="mission-card-value"><%= Number(supportSummary.open || 0) %></div>
+            <div class="mission-card-meta">
+              <span><%= lang === 'en' ? 'Open threads' : 'Активні треди' %></span>
+              <% if (supportThreads[0]) { %>
+                <span><%= supportThreads[0].subject %></span>
+              <% } %>
+            </div>
+            <a class="btn btn-inline-link mt-2" href="/help"><%= lang === 'en' ? 'Open help' : 'Відкрити help' %></a>
+          <% } else { %>
+            <div class="mission-card-empty"><%= lang === 'en' ? 'No support threads right now.' : 'Наразі немає активних звернень.' %></div>
+          <% } %>
+        </article>
+        <% if (teacherQuickActions.length) { %>
+          <article class="cockpit-card mission-card">
+            <div class="mission-card-kicker"><%= lang === 'en' ? 'Teacher actions' : 'Teacher actions' %></div>
+            <div class="mission-links">
+              <% teacherQuickActions.forEach((action) => { %>
+                <a class="btn btn-inline-link" href="<%= action.href %>"><%= action.label %></a>
+              <% }) %>
+            </div>
+          </article>
+        <% } %>
+      </section>
+
       <section class="cockpit-grid">
         <% if (isStudentLikeMyDayView) { %>
           <article class="cockpit-card section-card order-1 dual-focus-card" id="deadlinesClassesBlock">
@@ -282,6 +343,7 @@
                             <span><%= t('myDay.item.classLabel') %> <%= item.class_number || '-' %></span>
                             <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
                             <% if (item.group_number) { %><span><%= t('myDay.item.groupLabel') %> <%= item.group_number %></span><% } %>
+                            <% if (item.room_label) { %><span><%= lang === 'en' ? 'Room' : 'Кабінет' %>: <%= item.room_label %></span><% } %>
                           </div>
                         </div>
                         <div class="item-side">
@@ -325,6 +387,7 @@
                             <span><%= t('myDay.item.classLabel') %> <%= item.class_number || '-' %></span>
                             <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
                             <% if (item.group_number) { %><span><%= t('myDay.item.groupLabel') %> <%= item.group_number %></span><% } %>
+                            <% if (item.room_label) { %><span><%= lang === 'en' ? 'Room' : 'Кабінет' %>: <%= item.room_label %></span><% } %>
                           </div>
                         </div>
                         <div class="item-side">
@@ -463,6 +526,7 @@
                       <span><%= t('myDay.item.classLabel') %> <%= item.class_number || '-' %></span>
                       <span><%= item.start || '--:--' %> - <%= item.end || '--:--' %></span>
                       <% if (item.group_number) { %><span><%= t('myDay.item.groupLabel') %> <%= item.group_number %></span><% } %>
+                      <% if (item.room_label) { %><span><%= lang === 'en' ? 'Room' : 'Кабінет' %>: <%= item.room_label %></span><% } %>
                     </div>
                   </div>
                   <div class="item-side">

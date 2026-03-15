@@ -36,6 +36,8 @@ const supportRequests = require('./035_support_requests');
 const subjectCatalogAndBindings = require('./036_subject_catalog_and_bindings');
 const supportRequestMessages = require('./037_support_request_messages');
 const messageArchiveCleanup = require('./038_message_archive_cleanup');
+const roomsAndAssetLibrary = require('./039_rooms_and_asset_library');
+const ratingPublicationSnapshots = require('./040_rating_publication_snapshots');
 
 module.exports = [
   init,
@@ -76,4 +78,6 @@ module.exports = [
   subjectCatalogAndBindings,
   supportRequestMessages,
   messageArchiveCleanup,
+  roomsAndAssetLibrary,
+  ratingPublicationSnapshots,
 ];

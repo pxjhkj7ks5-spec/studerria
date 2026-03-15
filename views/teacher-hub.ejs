@@ -176,6 +176,46 @@
         border-color: rgba(15, 23, 42, 0.12);
         background: rgba(255, 255, 255, 0.88);
       }
+      .hub-list {
+        display: grid;
+        gap: 10px;
+      }
+      .hub-list-item {
+        border-radius: 14px;
+        padding: 12px 14px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.24);
+      }
+      body.theme-light .hub-list-item {
+        background: rgba(255, 255, 255, 0.86);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .hub-list-title {
+        font-weight: 650;
+      }
+      .hub-list-meta {
+        margin-top: 4px;
+        font-size: 0.84rem;
+        color: rgba(203, 213, 225, 0.76);
+      }
+      body.theme-light .hub-list-meta {
+        color: rgba(15, 23, 42, 0.6);
+      }
+      .hub-panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .hub-panel-head p {
+        margin: 0;
+        font-size: 0.82rem;
+        color: rgba(203, 213, 225, 0.72);
+      }
+      body.theme-light .hub-panel-head p {
+        color: rgba(15, 23, 42, 0.58);
+      }
     </style>
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/dynamic-bg.css" />
@@ -192,6 +232,20 @@
     }) %>
 
     <main class="container hub-shell">
+      <%
+        const hubLocale = lang === 'en' ? 'en-US' : 'uk-UA';
+        const formatHubDate = (value) => {
+          if (!value) return lang === 'en' ? 'No date' : 'Без дати';
+          const parsed = new Date(value);
+          if (Number.isNaN(parsed.getTime())) return String(value);
+          return parsed.toLocaleString(hubLocale, {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+        };
+      %>
       <% if (error) { %>
         <div class="alert alert-danger glass mb-3"><%= error %></div>
       <% } %>
@@ -228,6 +282,10 @@
               <div class="stat-card">
                 <div class="stat-label"><%= t('teacherHub.stat.savedTemplates') %></div>
                 <div class="stat-value"><%= Number(stats && stats.templates ? stats.templates : 0) %></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label"><%= lang === 'en' ? 'Assets' : 'Assets' %></div>
+                <div class="stat-value"><%= Number(stats && stats.assets ? stats.assets : 0) %></div>
               </div>
               <div class="stat-card">
                 <div class="stat-label"><%= t('teacherHub.stat.homeworkCreated') %></div>
@@ -267,6 +325,117 @@
                   <span class="course-chip"><%= course.name %></span>
                 <% }) %>
               </div>
+            <% } %>
+          </article>
+        </div>
+      </section>
+
+      <section class="row g-3 mt-1">
+        <div class="col-12 col-xl-6">
+          <article class="glass hub-panel h-100">
+            <div class="hub-panel-head">
+              <div>
+                <h5 class="mb-1"><%= lang === 'en' ? 'Upcoming sessions' : 'Найближчі сесії' %></h5>
+                <p><%= lang === 'en' ? 'What requires action from the next timetable window.' : 'Що варто закрити до найближчих пар.' %></p>
+              </div>
+              <a class="btn btn-hub btn-sm" href="/schedule"><%= lang === 'en' ? 'Open schedule' : 'До розкладу' %></a>
+            </div>
+            <% if ((upcomingClasses || []).length) { %>
+              <div class="hub-list">
+                <% upcomingClasses.forEach(function(item) { %>
+                  <div class="hub-list-item">
+                    <div class="hub-list-title"><%= item.subject_name || (lang === 'en' ? 'Class' : 'Пара') %></div>
+                    <div class="hub-list-meta">
+                      <%= item.day_context === 'tomorrow' ? (lang === 'en' ? 'Tomorrow' : 'Завтра') : (lang === 'en' ? 'Today' : 'Сьогодні') %>
+                      · <%= item.start || '--:--' %>-<%= item.end || '--:--' %>
+                      <% if (item.class_number) { %> · <%= lang === 'en' ? 'Class' : 'Пара' %> <%= item.class_number %><% } %>
+                      <% if (item.group_number) { %> · <%= lang === 'en' ? 'Group' : 'Група' %> <%= item.group_number %><% } %>
+                      <% if (item.room_label) { %> · <%= item.room_label %><% } %>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <div class="hub-list-item"><%= lang === 'en' ? 'No upcoming classes yet.' : 'Наразі немає найближчих пар.' %></div>
+            <% } %>
+          </article>
+        </div>
+        <div class="col-12 col-xl-6">
+          <article class="glass hub-panel h-100">
+            <div class="hub-panel-head">
+              <div>
+                <h5 class="mb-1"><%= lang === 'en' ? 'Review queue' : 'Черга перевірки' %></h5>
+                <p><%= lang === 'en' ? 'Homework and templates waiting for your review pass.' : 'Домашки й шаблони, які чекають на перевірку.' %></p>
+              </div>
+              <a class="btn btn-hub btn-sm" href="/home#reviewQueueBlock"><%= lang === 'en' ? 'Open queue' : 'Відкрити' %></a>
+            </div>
+            <div class="stat-grid">
+              <div class="stat-card">
+                <div class="stat-label"><%= lang === 'en' ? 'Total' : 'Всього' %></div>
+                <div class="stat-value"><%= Number(reviewQueue && reviewQueue.total ? reviewQueue.total : 0) %></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label"><%= lang === 'en' ? 'Overdue' : 'Прострочено' %></div>
+                <div class="stat-value"><%= Number(reviewQueue && reviewQueue.counts && reviewQueue.counts.overdue ? reviewQueue.counts.overdue : 0) %></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label"><%= lang === 'en' ? 'No comment' : 'Без коментаря' %></div>
+                <div class="stat-value"><%= Number(reviewQueue && reviewQueue.counts && reviewQueue.counts.no_comment ? reviewQueue.counts.no_comment : 0) %></div>
+              </div>
+            </div>
+          </article>
+        </div>
+        <div class="col-12 col-xl-6">
+          <article class="glass hub-panel h-100">
+            <div class="hub-panel-head">
+              <div>
+                <h5 class="mb-1"><%= lang === 'en' ? 'Recent templates' : 'Останні шаблони' %></h5>
+                <p><%= lang === 'en' ? 'Reusable starts for upcoming homework and session tasks.' : 'База для швидкого створення домашок і сесійних задач.' %></p>
+              </div>
+              <a class="btn btn-hub btn-sm" href="/teacher/workspace"><%= lang === 'en' ? 'Workspace' : 'Workspace' %></a>
+            </div>
+            <% if ((recentTemplates || []).length) { %>
+              <div class="hub-list">
+                <% recentTemplates.forEach(function(template) { %>
+                  <div class="hub-list-item">
+                    <div class="hub-list-title"><%= template.title %></div>
+                    <div class="hub-list-meta">
+                      <% if (template.subject_name) { %><%= template.subject_name %><% } %>
+                      <% if (template.course_name) { %> · <%= template.course_name %><% } %>
+                      <% if (template.asset_count) { %> · <%= template.asset_count %> <%= lang === 'en' ? 'files' : 'файлів' %><% } %>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <div class="hub-list-item"><%= lang === 'en' ? 'No templates yet.' : 'Шаблони ще не створені.' %></div>
+            <% } %>
+          </article>
+        </div>
+        <div class="col-12 col-xl-6">
+          <article class="glass hub-panel h-100">
+            <div class="hub-panel-head">
+              <div>
+                <h5 class="mb-1"><%= lang === 'en' ? 'Asset library' : 'Бібліотека assets' %></h5>
+                <p><%= lang === 'en' ? 'Reusable files linked to templates and homework.' : 'Файли, які можна повторно використовувати в шаблонах і домашках.' %></p>
+              </div>
+              <a class="btn btn-hub btn-sm" href="/teacher/workspace"><%= lang === 'en' ? 'Manage files' : 'Керувати' %></a>
+            </div>
+            <% if ((teacherAssets || []).length) { %>
+              <div class="hub-list">
+                <% teacherAssets.forEach(function(asset) { %>
+                  <div class="hub-list-item">
+                    <div class="hub-list-title"><%= asset.name || asset.original_name || (lang === 'en' ? 'File' : 'Файл') %></div>
+                    <div class="hub-list-meta">
+                      <% if (asset.course_id) { %>#<%= asset.course_id %><% } %>
+                      <% if (asset.mime_type) { %> · <%= asset.mime_type %><% } %>
+                      <% if (asset.created_at) { %> · <%= formatHubDate(asset.created_at) %><% } %>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <div class="hub-list-item"><%= lang === 'en' ? 'No assets uploaded yet.' : 'Файли ще не завантажені.' %></div>
             <% } %>
           </article>
         </div>

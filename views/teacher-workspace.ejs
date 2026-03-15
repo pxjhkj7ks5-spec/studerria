@@ -341,6 +341,71 @@
       body.theme-light .app-footer {
         color: rgba(15, 23, 42, 0.6);
       }
+      .asset-picker {
+        display: grid;
+        gap: 10px;
+        max-height: 220px;
+        overflow: auto;
+        padding: 10px;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.18);
+      }
+      body.theme-light .asset-picker {
+        background: rgba(255, 255, 255, 0.82);
+        border-color: rgba(15, 23, 42, 0.1);
+      }
+      .asset-picker-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .asset-picker-copy {
+        display: grid;
+        gap: 2px;
+      }
+      .asset-picker-copy small,
+      .asset-library-meta,
+      .recent-homework-meta {
+        color: rgba(203, 213, 225, 0.72);
+      }
+      body.theme-light .asset-picker-copy small,
+      body.theme-light .asset-library-meta,
+      body.theme-light .recent-homework-meta {
+        color: rgba(15, 23, 42, 0.58);
+      }
+      .asset-library-list,
+      .recent-homework-list {
+        display: grid;
+        gap: 10px;
+      }
+      .asset-library-item,
+      .recent-homework-item {
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.18);
+      }
+      body.theme-light .asset-library-item,
+      body.theme-light .recent-homework-item {
+        background: rgba(255, 255, 255, 0.84);
+        border-color: rgba(15, 23, 42, 0.1);
+      }
+      .template-asset-row {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .template-asset-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(125, 211, 252, 0.22);
+        background: rgba(56, 189, 248, 0.12);
+        font-size: 0.8rem;
+      }
     </style>
     <link rel="stylesheet" href="/css/design-system.css" />
     <link rel="stylesheet" href="/css/studerria-ui.css" />
@@ -380,6 +445,63 @@
 
       <section class="row g-3">
         <div class="col-12 col-xl-5">
+          <article class="glass workspace-panel mb-3">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h5 class="mb-1">Asset library</h5>
+                <p class="hint mb-0">Upload reusable files once and link them to templates or homework.</p>
+              </div>
+              <span class="badge bg-secondary"><%= (assets || []).length %></span>
+            </div>
+            <form method="POST" action="/teacher/workspace/assets" enctype="multipart/form-data" class="row g-2 mb-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="assetCourseId">Course scope</label>
+                <select class="form-select" id="assetCourseId" name="course_id">
+                  <option value="">All my courses</option>
+                  <% (teacherCourses || []).forEach(function(course) { %>
+                    <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="assetName">Asset name</label>
+                <input id="assetName" name="name" class="form-control" maxlength="160" placeholder="Week 14 brief" />
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="assetUpload">File</label>
+                <input id="assetUpload" name="asset" class="form-control" type="file" required />
+              </div>
+              <div class="col-12">
+                <button class="btn btn-primary" type="submit">Upload asset</button>
+              </div>
+            </form>
+            <% if ((assets || []).length) { %>
+              <div class="asset-library-list">
+                <% assets.slice(0, 8).forEach(function(asset) { %>
+                  <div class="asset-library-item">
+                    <div class="d-flex justify-content-between gap-2 align-items-start">
+                      <div>
+                        <div class="fw-semibold"><%= asset.name || asset.original_name || 'Asset' %></div>
+                        <div class="asset-library-meta small">
+                          <% if (asset.mime_type) { %><%= asset.mime_type %><% } %>
+                          <% if (asset.original_name) { %> · <%= asset.original_name %><% } %>
+                        </div>
+                      </div>
+                      <form method="POST" action="/teacher/workspace/assets/<%= asset.id %>/delete">
+                        <input type="hidden" name="course_id" value="<%= selectedCourseId || asset.course_id || '' %>" />
+                        <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
+                      </form>
+                    </div>
+                    <div class="mt-2">
+                      <a href="<%= asset.file_path %>" target="_blank" rel="noopener noreferrer">Open file</a>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <div class="alert alert-info mb-0">No assets yet. Upload files you want to reuse across templates.</div>
+            <% } %>
+          </article>
           <article class="glass workspace-panel h-100">
             <h5 class="mb-3">New template</h5>
             <form method="POST" action="/teacher/workspace/templates" autocomplete="off">
@@ -469,6 +591,24 @@
                     </div>
                   </div>
                 </div>
+                <div class="col-12">
+                  <label class="form-label">Attached assets</label>
+                  <% if ((assets || []).length) { %>
+                    <div class="asset-picker">
+                      <% assets.forEach(function(asset) { %>
+                        <label class="asset-picker-item">
+                          <input class="form-check-input" type="checkbox" name="asset_ids" value="<%= asset.id %>" />
+                          <span class="asset-picker-copy">
+                            <strong><%= asset.name || asset.original_name || 'Asset' %></strong>
+                            <small><%= asset.original_name || asset.mime_type || 'File' %></small>
+                          </span>
+                        </label>
+                      <% }) %>
+                    </div>
+                  <% } else { %>
+                    <div class="alert alert-info mb-0">Upload files to make them reusable in templates.</div>
+                  <% } %>
+                </div>
               </div>
               <button class="btn btn-primary mt-3" type="submit">Save template</button>
             </form>
@@ -536,6 +676,14 @@
                         <span class="template-chip">#<%= tag %></span>
                       <% }) %>
                     </div>
+                    <% if (Number(template.asset_count || 0) > 0) { %>
+                      <div class="template-asset-row">
+                        <span class="template-asset-chip"><%= template.asset_count %> files</span>
+                        <% (template.assets || []).slice(0, 3).forEach(function(asset) { %>
+                          <span class="template-asset-chip"><%= asset.name || asset.original_name || 'Asset' %></span>
+                        <% }) %>
+                      </div>
+                    <% } %>
                     <div class="template-footer">
                       <div class="template-links">
                         <% if (template.link_url) { %>
@@ -571,6 +719,36 @@
               </div>
             <% } else { %>
               <div class="alert alert-info mb-0">No templates yet. Create your first template on the left.</div>
+            <% } %>
+          </article>
+        </div>
+      </section>
+
+      <section class="row g-3 mt-1">
+        <div class="col-12">
+          <article class="glass workspace-panel">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h5 class="mb-1">Recent homework created from workspace</h5>
+                <p class="hint mb-0">Latest published teacher tasks so you can reuse or verify delivery context.</p>
+              </div>
+              <a class="btn btn-outline-secondary btn-sm" href="/schedule">Open schedule</a>
+            </div>
+            <% if ((recentHomework || []).length) { %>
+              <div class="recent-homework-list">
+                <% recentHomework.forEach(function(item) { %>
+                  <div class="recent-homework-item">
+                    <div class="fw-semibold"><%= item.description %></div>
+                    <div class="recent-homework-meta small mt-1">
+                      <% if (item.subject_name) { %><%= item.subject_name %><% } %>
+                      <% if (item.group_number) { %> · Group <%= item.group_number %><% } %>
+                      <% if (item.custom_due_date || item.class_date) { %> · <%= String(item.custom_due_date || item.class_date).slice(0, 10) %><% } %>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <div class="alert alert-info mb-0">No recent teacher homework yet.</div>
             <% } %>
           </article>
         </div>
@@ -669,6 +847,24 @@
                         <label class="form-check-label" for="editTemplateCredit">Credit</label>
                       </div>
                     </div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Attached assets</label>
+                    <% if ((assets || []).length) { %>
+                      <div class="asset-picker" id="editTemplateAssetPicker">
+                        <% assets.forEach(function(asset) { %>
+                          <label class="asset-picker-item">
+                            <input class="form-check-input" type="checkbox" name="asset_ids" value="<%= asset.id %>" data-edit-template-asset />
+                            <span class="asset-picker-copy">
+                              <strong><%= asset.name || asset.original_name || 'Asset' %></strong>
+                              <small><%= asset.original_name || asset.mime_type || 'File' %></small>
+                            </span>
+                          </label>
+                        <% }) %>
+                      </div>
+                    <% } else { %>
+                      <div class="alert alert-info mb-0">No assets available yet.</div>
+                    <% } %>
                   </div>
                 </div>
               </div>
@@ -917,6 +1113,7 @@
       const editMeetingInput = document.getElementById('editTemplateMeetingUrl');
       const editControlInput = document.getElementById('editTemplateControl');
       const editCreditInput = document.getElementById('editTemplateCredit');
+      const editAssetInputs = Array.from(document.querySelectorAll('[data-edit-template-asset]'));
       const syncEditSubjects = bindCourseSubjectFilter(editCourseSelect, editSubjectSelect);
       const cloneModalEl = document.getElementById('cloneTemplateModal');
       const cloneModal = cloneModalEl && window.bootstrap ? new window.bootstrap.Modal(cloneModalEl) : null;
@@ -1233,6 +1430,14 @@
         if (editCreditInput) {
           editCreditInput.checked = Number(template.is_credit || 0) === 1;
         }
+        const selectedAssetIds = new Set(
+          (Array.isArray(template.assets) ? template.assets : [])
+            .map((asset) => Number(asset && asset.id ? asset.id : 0))
+            .filter((value) => Number.isInteger(value) && value > 0)
+        );
+        editAssetInputs.forEach((input) => {
+          input.checked = selectedAssetIds.has(Number(input.value || 0));
+        });
         editModal.show();
       }
 

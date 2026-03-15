@@ -212,6 +212,61 @@ body.theme-light .drawer-menu-btn {
   color: rgba(15, 23, 42, 0.88);
 }
 
+.mission-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 1.25rem;
+}
+
+.mission-card {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.mission-card-kicker {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted-dark);
+}
+
+body.theme-light .mission-card-kicker {
+  color: var(--muted-light);
+}
+
+.mission-card-value {
+  font-size: clamp(1.2rem, 1rem + 0.9vw, 1.8rem);
+  font-weight: 700;
+}
+
+.mission-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.75rem;
+  font-size: 0.88rem;
+  color: var(--muted-dark);
+}
+
+body.theme-light .mission-card-meta {
+  color: var(--muted-light);
+}
+
+.mission-card-empty {
+  color: var(--muted-dark);
+  font-size: 0.9rem;
+}
+
+body.theme-light .mission-card-empty {
+  color: var(--muted-light);
+}
+
+.mission-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .schedule-drawer {
   position: fixed;
   left: 0;

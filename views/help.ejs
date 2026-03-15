@@ -40,6 +40,12 @@
             ? 'status-chip status-chip--info'
             : 'status-chip status-chip--pending')
       );
+      const supportSummary = supportStats || {};
+      const threadRoleLabel = (roleName) => (
+        roleName === 'admin'
+          ? (lang === 'uk' ? 'Підтримка' : 'Support')
+          : (lang === 'uk' ? 'Ви' : 'You')
+      );
     %>
 
     <section class="studerria-help-shell" aria-labelledby="studerria-help-title">
@@ -173,6 +179,15 @@
           <p class="studerria-help-section-copy"><%= t('help.historySubtitle') %></p>
         </div>
 
+        <div class="studerria-help-history-summary">
+          <span class="status-chip status-chip--info"><%= lang === 'uk' ? 'Активні' : 'Open' %>: <%= Number(supportSummary.open || 0) %></span>
+          <span class="status-chip status-chip--active"><%= lang === 'uk' ? 'Закриті' : 'Resolved' %>: <%= Number(supportSummary.resolved || 0) %></span>
+          <span class="status-chip status-chip--neutral"><%= lang === 'uk' ? 'Всього' : 'Total' %>: <%= Number(supportSummary.total || historyList.length || 0) %></span>
+          <% if (supportSummary.response) { %>
+            <span class="status-chip status-chip--muted"><%= lang === 'uk' ? 'SLA' : 'SLA' %>: <%= supportSummary.response %></span>
+          <% } %>
+        </div>
+
         <% if (historyList.length) { %>
           <div class="studerria-help-history-list">
             <% historyList.forEach(function(request) { %>
@@ -190,12 +205,40 @@
                     <span><%= t('help.historyUpdated') %>: <%= formatStamp(request.updated_at || request.created_at) %></span>
                   </div>
                 </div>
-                <p class="studerria-help-history-body"><%= request.body %></p>
-                <% if (request.admin_note) { %>
+                <div class="studerria-help-thread">
+                  <% (request.messages || []).forEach(function(message) { %>
+                    <div class="studerria-help-thread-message <%= message.author_role === 'admin' ? 'is-admin' : 'is-user' %>">
+                      <div class="studerria-help-thread-head">
+                        <strong><%= threadRoleLabel(message.author_role) %></strong>
+                        <span><%= formatStamp(message.created_at) %></span>
+                      </div>
+                      <p class="studerria-help-history-body"><%= message.body %></p>
+                    </div>
+                  <% }) %>
+                </div>
+                <% if (request.last_message_preview) { %>
                   <div class="studerria-help-history-note">
-                    <span><%= t('help.adminNote') %></span>
-                    <p><%= request.admin_note %></p>
+                    <span><%= lang === 'uk' ? 'Останнє оновлення' : 'Latest update' %></span>
+                    <p><%= request.last_message_preview %></p>
                   </div>
+                <% } %>
+                <% if (request.needs_reply) { %>
+                  <form method="POST" action="/help/support/<%= request.id %>/reply" class="studerria-help-reply-form">
+                    <label class="form-label" for="supportReply<%= request.id %>"><%= lang === 'uk' ? 'Уточнити контекст' : 'Add reply' %></label>
+                    <textarea
+                      class="form-control"
+                      id="supportReply<%= request.id %>"
+                      name="body"
+                      rows="3"
+                      maxlength="2000"
+                      minlength="2"
+                      placeholder="<%= lang === 'uk' ? 'Наприклад: проблема відтворюється і після зміни групи...' : 'For example: the issue still reproduces after the group change...' %>"
+                      required
+                    ></textarea>
+                    <div class="studerria-help-reply-actions">
+                      <button class="btn btn-primary btn-sm" type="submit"><%= lang === 'uk' ? 'Відправити відповідь' : 'Send reply' %></button>
+                    </div>
+                  </form>
                 <% } %>
               </article>
             <% }); %>

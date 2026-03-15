@@ -11,6 +11,11 @@ const { WebSocketServer } = require('ws');
 const bcrypt = require('bcryptjs');
 const pkg = require('./package.json');
 const navMiddleware = require('./middleware/nav');
+const supportHelpers = require('./lib/support');
+const teacherTemplateHelpers = require('./lib/teacherTemplates');
+const journalInsightHelpers = require('./lib/journalInsights');
+const roomHelpers = require('./lib/rooms');
+const pathwayHelpers = require('./lib/pathways');
 const versionFile = path.join(__dirname, 'version.json');
 const changelogFile = path.join(__dirname, 'changelog.json');
 let appVersion = pkg.version || '0.0.0';
@@ -7336,10 +7341,17 @@ async function getTeacherHomeworkTemplates(userId, options = {}) {
       fallbackParams
     );
   }
+  const templateIds = (rows || [])
+    .map((row) => Number(row.id))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  const templateAssetMap = await listTemplateAssetsByTemplateIds(templateIds);
+
   return (rows || []).map((row) => {
     const tagItems = normalizeTemplateTagsInput(row.tags);
+    const templateId = Number(row.id);
+    const assets = templateAssetMap.get(templateId) || [];
     return {
-      id: Number(row.id),
+      id: templateId,
       user_id: Number(row.user_id),
       course_id: Number.isFinite(Number(row.course_id)) ? Number(row.course_id) : null,
       subject_id: Number.isFinite(Number(row.subject_id)) ? Number(row.subject_id) : null,
@@ -7355,8 +7367,279 @@ async function getTeacherHomeworkTemplates(userId, options = {}) {
       course_name: row.course_name ? String(row.course_name) : '',
       created_at: row.created_at,
       updated_at: row.updated_at,
+      assets,
+      asset_count: assets.length,
     };
   });
+}
+
+async function listTeacherAssets(userId, options = {}) {
+  const normalizedUserId = Number(userId || 0);
+  if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) return [];
+  const requestedCourseId = Number(options.courseId || 0);
+  const scopedCourseId = Number.isInteger(requestedCourseId) && requestedCourseId > 0 ? requestedCourseId : null;
+  const params = [normalizedUserId];
+  let where = 'WHERE a.user_id = ?';
+  if (scopedCourseId) {
+    where += ' AND (a.course_id IS NULL OR a.course_id = ?)';
+    params.push(scopedCourseId);
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT a.*
+        FROM assets a
+        ${where}
+        ORDER BY a.created_at DESC, a.id DESC
+        LIMIT 300
+      `,
+      params
+    );
+    return (rows || []).map((row) => ({
+      id: Number(row.id),
+      user_id: Number(row.user_id),
+      course_id: Number.isFinite(Number(row.course_id)) ? Number(row.course_id) : null,
+      name: teacherTemplateHelpers.buildAssetDisplayName(row),
+      original_name: row.original_name ? String(row.original_name) : '',
+      file_path: String(row.file_path || ''),
+      mime_type: row.mime_type ? String(row.mime_type) : '',
+      file_size: Number.isFinite(Number(row.file_size)) ? Number(row.file_size) : null,
+      kind: row.kind ? String(row.kind) : 'attachment',
+      created_at: row.created_at || null,
+      updated_at: row.updated_at || null,
+    }));
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function listTemplateAssetsByTemplateIds(templateIds = []) {
+  const safeTemplateIds = Array.from(new Set((templateIds || [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0)));
+  const assetMap = new Map();
+  if (!safeTemplateIds.length) return assetMap;
+  try {
+    const rows = await db.all(
+      `
+        SELECT
+          ttam.template_id,
+          ttam.sort_order,
+          a.id,
+          a.user_id,
+          a.course_id,
+          a.name,
+          a.original_name,
+          a.file_path,
+          a.mime_type,
+          a.file_size,
+          a.kind,
+          a.created_at,
+          a.updated_at
+        FROM teacher_template_asset_map ttam
+        JOIN assets a ON a.id = ttam.asset_id
+        WHERE ttam.template_id = ANY(?::int[])
+        ORDER BY ttam.template_id ASC, ttam.sort_order ASC, a.created_at DESC, a.id DESC
+      `,
+      [safeTemplateIds]
+    );
+    (rows || []).forEach((row) => {
+      const templateId = Number(row.template_id || 0);
+      if (!Number.isInteger(templateId) || templateId < 1) return;
+      if (!assetMap.has(templateId)) {
+        assetMap.set(templateId, []);
+      }
+      assetMap.get(templateId).push({
+        id: Number(row.id),
+        user_id: Number(row.user_id),
+        course_id: Number.isFinite(Number(row.course_id)) ? Number(row.course_id) : null,
+        name: teacherTemplateHelpers.buildAssetDisplayName(row),
+        original_name: row.original_name ? String(row.original_name) : '',
+        file_path: String(row.file_path || ''),
+        mime_type: row.mime_type ? String(row.mime_type) : '',
+        file_size: Number.isFinite(Number(row.file_size)) ? Number(row.file_size) : null,
+        kind: row.kind ? String(row.kind) : 'attachment',
+        sort_order: Number.isFinite(Number(row.sort_order)) ? Number(row.sort_order) : 0,
+      });
+    });
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+  return assetMap;
+}
+
+async function listHomeworkAssetsByHomeworkIds(homeworkIds = []) {
+  const safeHomeworkIds = Array.from(new Set((homeworkIds || [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0)));
+  const assetMap = new Map();
+  if (!safeHomeworkIds.length) return assetMap;
+  try {
+    const rows = await db.all(
+      `
+        SELECT
+          ham.homework_id,
+          ham.sort_order,
+          a.id,
+          a.name,
+          a.original_name,
+          a.file_path,
+          a.mime_type,
+          a.file_size,
+          a.kind
+        FROM homework_asset_map ham
+        JOIN assets a ON a.id = ham.asset_id
+        WHERE ham.homework_id = ANY(?::int[])
+        ORDER BY ham.homework_id ASC, ham.sort_order ASC, a.created_at DESC, a.id DESC
+      `,
+      [safeHomeworkIds]
+    );
+    (rows || []).forEach((row) => {
+      const homeworkId = Number(row.homework_id || 0);
+      if (!Number.isInteger(homeworkId) || homeworkId < 1) return;
+      if (!assetMap.has(homeworkId)) {
+        assetMap.set(homeworkId, []);
+      }
+      assetMap.get(homeworkId).push({
+        id: Number(row.id),
+        name: teacherTemplateHelpers.buildAssetDisplayName(row),
+        original_name: row.original_name ? String(row.original_name) : '',
+        file_path: String(row.file_path || ''),
+        mime_type: row.mime_type ? String(row.mime_type) : '',
+        file_size: Number.isFinite(Number(row.file_size)) ? Number(row.file_size) : null,
+        kind: row.kind ? String(row.kind) : 'attachment',
+        sort_order: Number.isFinite(Number(row.sort_order)) ? Number(row.sort_order) : 0,
+      });
+    });
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+  return assetMap;
+}
+
+async function createAssetFromUpload({ file, userId, courseId = null, name = '', kind = 'attachment' } = {}) {
+  if (!file || !file.path || !file.filename) return null;
+  const normalizedUserId = Number(userId || 0);
+  if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) return null;
+  try {
+    const inserted = await db.get(
+      `
+        INSERT INTO assets
+          (user_id, course_id, name, original_name, file_path, mime_type, file_size, kind, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        RETURNING id
+      `,
+      [
+        normalizedUserId,
+        Number.isInteger(Number(courseId)) && Number(courseId) > 0 ? Number(courseId) : null,
+        name ? String(name).trim().slice(0, 160) : null,
+        file.originalname ? String(file.originalname).slice(0, 255) : null,
+        `/uploads/${file.filename}`,
+        file.mimetype ? String(file.mimetype).slice(0, 120) : null,
+        Number.isFinite(Number(file.size)) ? Number(file.size) : null,
+        String(kind || 'attachment').slice(0, 60),
+      ]
+    );
+    return inserted && inserted.id ? Number(inserted.id) : null;
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+async function syncTemplateAssetMap(templateId, userId, rawAssetIds = []) {
+  const normalizedTemplateId = Number(templateId || 0);
+  const normalizedUserId = Number(userId || 0);
+  if (!Number.isInteger(normalizedTemplateId) || normalizedTemplateId < 1) return;
+  if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) return;
+  const assetIds = teacherTemplateHelpers.normalizeTemplateAssetIds(rawAssetIds, 48);
+  try {
+    await db.run('DELETE FROM teacher_template_asset_map WHERE template_id = ?', [normalizedTemplateId]);
+    if (!assetIds.length) {
+      return;
+    }
+    const rows = await db.all(
+      `
+        SELECT id
+        FROM assets
+        WHERE user_id = ?
+          AND id = ANY(?::int[])
+      `,
+      [normalizedUserId, assetIds]
+    );
+    const allowedIds = Array.from(new Set((rows || [])
+      .map((row) => Number(row.id))
+      .filter((value) => Number.isInteger(value) && value > 0)));
+    for (let index = 0; index < allowedIds.length; index += 1) {
+      await db.run(
+        `
+          INSERT INTO teacher_template_asset_map (template_id, asset_id, sort_order, created_at)
+          VALUES (?, ?, ?, NOW())
+        `,
+        [normalizedTemplateId, allowedIds[index], index]
+      );
+    }
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+}
+
+async function copyTemplateAssetsToHomework(templateId, homeworkIds = [], extraAssetIds = []) {
+  const normalizedTemplateId = Number(templateId || 0);
+  const normalizedHomeworkIds = Array.from(new Set((homeworkIds || [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0)));
+  if (!normalizedHomeworkIds.length) return;
+  try {
+    let templateAssetIds = [];
+    if (Number.isInteger(normalizedTemplateId) && normalizedTemplateId > 0) {
+      const rows = await db.all(
+        `
+          SELECT asset_id
+          FROM teacher_template_asset_map
+          WHERE template_id = ?
+          ORDER BY sort_order ASC, asset_id ASC
+        `,
+        [normalizedTemplateId]
+      );
+      templateAssetIds = (rows || [])
+        .map((row) => Number(row.asset_id))
+        .filter((value) => Number.isInteger(value) && value > 0);
+    }
+    const assetIds = teacherTemplateHelpers.buildAppliedHomeworkAssetIds({
+      templateAssetIds,
+      uploadedAssetIds: extraAssetIds,
+    });
+    if (!assetIds.length) return;
+    for (const homeworkId of normalizedHomeworkIds) {
+      await db.run('DELETE FROM homework_asset_map WHERE homework_id = ?', [homeworkId]);
+      for (let index = 0; index < assetIds.length; index += 1) {
+        await db.run(
+          `
+            INSERT INTO homework_asset_map (homework_id, asset_id, sort_order, created_at)
+            VALUES (?, ?, ?, NOW())
+            ON CONFLICT (homework_id, asset_id) DO NOTHING
+          `,
+          [homeworkId, assetIds[index], index]
+        );
+      }
+    }
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
 }
 
 async function resolveTeacherTemplateScope(userId, requestedCourseIdRaw, requestedSubjectIdRaw) {
@@ -7437,20 +7720,11 @@ async function resolveTeacherTemplateScope(userId, requestedCourseIdRaw, request
 }
 
 function normalizeHomeworkTemplateTitleInput(rawTitle, fallbackDescription, fallbackSubjectName) {
-  const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
-  const explicitTitle = clean(rawTitle);
-  if (explicitTitle) {
-    return explicitTitle.slice(0, 160);
-  }
-  const fallbackLine = clean(String(fallbackDescription || '').split('\n')[0]);
-  if (fallbackLine) {
-    return fallbackLine.slice(0, 160);
-  }
-  const subjectLabel = clean(fallbackSubjectName);
-  if (subjectLabel) {
-    return `${subjectLabel} homework`.slice(0, 160);
-  }
-  return 'Homework template';
+  return teacherTemplateHelpers.normalizeHomeworkTemplateTitleInput(
+    rawTitle,
+    fallbackDescription,
+    fallbackSubjectName
+  );
 }
 
 async function maybeCreateTeacherTemplateFromHomework(req, payload = {}) {
@@ -7509,6 +7783,29 @@ async function maybeCreateTeacherTemplateFromHomework(req, payload = {}) {
       ]
     );
     const templateId = inserted && inserted.id ? Number(inserted.id) : null;
+    if (templateId) {
+      const selectedAssetIds = teacherTemplateHelpers.normalizeTemplateAssetIds(req.body && req.body.asset_ids, 48);
+      let uploadedAssetIds = teacherTemplateHelpers.normalizeTemplateAssetIds(payload.uploadedAssetIds, 16);
+      if (!uploadedAssetIds.length && req.file) {
+        let uploadedAssetId = null;
+        uploadedAssetId = await createAssetFromUpload({
+          file: req.file,
+          userId,
+          courseId,
+          name: payload.title || (req.body && req.body.template_title) || title,
+          kind: 'template_capture',
+        });
+        uploadedAssetIds = uploadedAssetId ? [uploadedAssetId] : [];
+      }
+      await syncTemplateAssetMap(
+        templateId,
+        userId,
+        teacherTemplateHelpers.buildAppliedHomeworkAssetIds({
+          templateAssetIds: selectedAssetIds,
+          uploadedAssetIds,
+        })
+      );
+    }
     logAction(db, req, 'teacher_homework_template_create', {
       template_id: templateId,
       title,
@@ -7623,53 +7920,24 @@ function sortHomework(homework, sortKey) {
   return copy;
 }
 
-const SUPPORT_REQUEST_CATEGORIES = ['account', 'schedule', 'journal', 'subjects', 'teamwork', 'other'];
-const SUPPORT_REQUEST_STATUSES = ['new', 'in_progress', 'resolved'];
-const SUPPORT_REQUEST_MESSAGE_ROLES = ['user', 'admin'];
+const SUPPORT_REQUEST_CATEGORIES = supportHelpers.SUPPORT_REQUEST_CATEGORIES;
+const SUPPORT_REQUEST_STATUSES = supportHelpers.SUPPORT_REQUEST_STATUSES;
+const SUPPORT_REQUEST_MESSAGE_ROLES = supportHelpers.SUPPORT_REQUEST_MESSAGE_ROLES;
 
 function normalizeSupportRequestCategory(value) {
-  const normalized = String(value || '').trim().toLowerCase();
-  return SUPPORT_REQUEST_CATEGORIES.includes(normalized) ? normalized : 'other';
+  return supportHelpers.normalizeSupportRequestCategory(value);
 }
 
 function normalizeSupportRequestStatus(value) {
-  const normalized = String(value || '').trim().toLowerCase();
-  return SUPPORT_REQUEST_STATUSES.includes(normalized) ? normalized : 'new';
+  return supportHelpers.normalizeSupportRequestStatus(value);
 }
 
 function normalizeSupportRequestMessageRole(value) {
-  const normalized = String(value || '').trim().toLowerCase();
-  return SUPPORT_REQUEST_MESSAGE_ROLES.includes(normalized) ? normalized : 'user';
+  return supportHelpers.normalizeSupportRequestMessageRole(value);
 }
 
 function buildSupportRequestFallbackMessages(requestRow = {}) {
-  const messages = [];
-  const requestId = Number(requestRow.id || 0);
-  const userBody = String(requestRow.body || '').trim();
-  if (userBody) {
-    messages.push({
-      id: requestId ? `request-${requestId}-user` : 'request-user',
-      request_id: requestId || null,
-      author_role: 'user',
-      author_user_id: Number.isFinite(Number(requestRow.user_id)) ? Number(requestRow.user_id) : null,
-      author_name: String(requestRow.user_name || '').trim() || 'User',
-      body: userBody,
-      created_at: requestRow.created_at || null,
-    });
-  }
-  const adminBody = String(requestRow.admin_note || '').trim();
-  if (adminBody) {
-    messages.push({
-      id: requestId ? `request-${requestId}-admin` : 'request-admin',
-      request_id: requestId || null,
-      author_role: 'admin',
-      author_user_id: Number.isFinite(Number(requestRow.resolved_by)) ? Number(requestRow.resolved_by) : null,
-      author_name: String(requestRow.resolved_by_name || '').trim() || 'Admin',
-      body: adminBody,
-      created_at: requestRow.resolved_at || requestRow.updated_at || requestRow.created_at || null,
-    });
-  }
-  return messages;
+  return supportHelpers.buildSupportRequestFallbackMessages(requestRow);
 }
 
 async function insertSupportRequestMessage({
@@ -7987,6 +8255,267 @@ app.get('/about', requireLogin, (req, res) => {
     aboutCards,
     homeHref: '/home',
   });
+});
+
+function buildHelpPageExperienceContent(lang) {
+  const isUk = lang === 'uk';
+  return {
+    hero: {
+      kicker: isUk ? 'FAQ / Підтримка' : 'FAQ / Support',
+      title: 'FAQ & Help',
+      subtitle: isUk
+        ? 'Пояснення по щоденних сценаріях Studerria та жива історія ваших звернень.'
+        : 'Support around real Studerria journeys plus a live history of your requests.',
+      lead: isUk
+        ? 'Сторінка зібрана навколо того, що користувач робить щодня: входить в акаунт, проходить реєстрацію, перевіряє розклад, журнал, матеріали, teacher workspace та support threads.'
+        : 'This page is organized around what people actually do every day: sign in, finish registration, check schedule, journal, materials, teacher workspace, and support threads.',
+      note: isUk
+        ? 'Кожне звернення нижче зберігає повну нитку повідомлень. Якщо контекст змінився, відповідайте прямо в треді.'
+        : 'Every request keeps the full conversation thread. If the context changed, reply directly in the thread.',
+    },
+    faqTitle: isUk ? 'Питання по реальних сценаріях' : 'Answers by real workflow',
+    faqSubtitle: isUk
+      ? 'Менше довідки про модулі, більше конкретних дій для студентів, викладачів і адміністрації.'
+      : 'Less module theory, more concrete answers for students, teachers, and operations.',
+    faqGroups: [
+      {
+        kicker: isUk ? 'Доступ' : 'Access',
+        title: isUk ? 'Вхід, профіль, базовий доступ' : 'Sign-in, profile, core access',
+        items: [
+          {
+            question: isUk ? 'Не вдається увійти або профіль виглядає порожнім.' : 'I cannot sign in or the profile looks empty.',
+            answer: isUk
+              ? 'Спершу перевірте ПІБ і пароль. Якщо увійти вдалося, але курс, роль або модулі відсутні, створіть звернення з темою "Акаунт" і вкажіть, що саме зникло: курс, роль, групи або доступ до журналу.'
+              : 'First verify your name and password. If sign-in works but the course, role, or modules are missing, create an "Account" request and list what is absent: course, role, groups, or journal access.',
+          },
+          {
+            question: isUk ? 'Де змінити ПІБ, пароль або мову інтерфейсу?' : 'Where do I change my name, password, or language?',
+            answer: isUk
+              ? 'У "Профілі". Це єдина точка, де варто оновлювати персональні дані, щоб вони однаково відображались у щоденнику, повідомленнях і support історії.'
+              : 'Use "Profile". It is the single place to update personal data so it stays consistent across My Day, messages, and support history.',
+          },
+        ],
+      },
+      {
+        kicker: isUk ? 'Pathways' : 'Pathways',
+        title: isUk ? 'Реєстрація, pathways і база предметів' : 'Registration, pathways, and subject base',
+        items: [
+          {
+            question: isUk ? 'На кроці вибору предметів список порожній або неповний.' : 'The subject selection step is empty or incomplete.',
+            answer: isUk
+              ? 'Це зазвичай означає, що для вашого курсу або року вступу ще не завершені visibility-налаштування. Якщо бачите лише частину предметів, завершіть доступні вибори та створіть звернення з темою "Предмети" з назвою курсу й року вступу.'
+              : 'This usually means visibility rules for your course or admission year are not finished yet. If only part of the catalog is visible, complete the available choices and open a "Subjects" request with your course and admission year.',
+          },
+          {
+            question: isUk ? 'Можна змінити групи або пройти реєстрацію заново без нового акаунта?' : 'Can I reselect groups or restart registration without a new account?',
+            answer: isUk
+              ? 'Так. У профілі є повторний вхід у сценарій вибору предметів. Це безпечніше, ніж створювати дубль акаунта, бо Studerria збереже одну історію журналу, повідомлень і support.'
+              : 'Yes. Use the profile action that reopens the subject selection flow. It is safer than creating a duplicate account because Studerria keeps one journal, message, and support history.',
+          },
+        ],
+      },
+      {
+        kicker: isUk ? 'Розклад' : 'Schedule',
+        title: isUk ? 'Розклад, сесії та кабінети' : 'Schedule, sessions, and rooms',
+        items: [
+          {
+            question: isUk ? 'У розкладі немає пари, дедлайну або кабінету.' : 'A class, deadline, or room is missing in the schedule.',
+            answer: isUk
+              ? 'Перевірте правильний тиждень і курс. Якщо пара або room label все одно не показується, напишіть у зверненні день, пару, предмет, групу та який саме кабінет очікувався. Це найшвидший шлях до виправлення конфлікту або room mapping.'
+              : 'Check the correct week and course first. If the class or room label is still missing, include the day, slot, subject, group, and expected room in your request. That is the fastest way to resolve a conflict or missing room mapping.',
+          },
+          {
+            question: isUk ? 'Сесія опублікована, але виглядає конфліктною.' : 'The session plan is published but still looks conflicted.',
+            answer: isUk
+              ? 'Укажіть дату, пару, предмет і кабінет. Для сесій важливі два типи конфліктів: викладач і room occupancy. У підтримці це потрібно описувати окремо, щоб команда одразу перевірила правильний шар даних.'
+              : 'Include the date, slot, subject, and room. Session issues usually come from two layers: teacher clashes and room occupancy. Describe both so the team can check the correct data layer immediately.',
+          },
+        ],
+      },
+      {
+        kicker: isUk ? 'Журнал' : 'Journal',
+        title: isUk ? 'Журнал, відвідуваність і рейтинги' : 'Journal, attendance, and ratings',
+        items: [
+          {
+            question: isUk ? 'Журнал порожній або не відкривається по предмету.' : 'The journal is empty or does not open for a subject.',
+            answer: isUk
+              ? 'Найчастіше бракує звʼязки між викладачем, предметом або курсом. У зверненні вкажіть предмет, курс і що саме не працює: оцінки, attendance чи insights.'
+              : 'Most often the teacher-subject-course mapping is incomplete. In your request, include the subject, course, and the broken area: grades, attendance, or insights.',
+          },
+          {
+            question: isUk ? 'Де шукати published rating або attendance signal?' : 'Where do I find the published rating or attendance signal?',
+            answer: isUk
+              ? 'Рейтинги залишаються в Journal Insights, але їхній останній snapshot дублюється на My Day та в повідомленнях. Attendance лишається джерелом істини в журналі, а на головній показується стислий health summary.'
+              : 'Ratings stay in Journal Insights, but the latest snapshot is echoed in My Day and messages. Attendance remains editable in the journal, while the homepage shows a compact health summary.',
+          },
+        ],
+      },
+      {
+        kicker: isUk ? 'Матеріали' : 'Materials',
+        title: isUk ? 'Матеріали, teamwork і Teacher Hub' : 'Materials, teamwork, and Teacher Hub',
+        items: [
+          {
+            question: isUk ? 'Не відкривається вкладення або шаблон викладача без файлів.' : 'An attachment does not open or a teacher template lost its files.',
+            answer: isUk
+              ? 'У Teacher Workspace шаблони та домашні завдання можуть використовувати reusable assets. Якщо asset відсутній, повідомте назву шаблону або дедлайну, курс і предмет. Не треба перевантажувати весь пакет заново, якщо проблема лише в одному asset.'
+              : 'Teacher Workspace templates and homework can use reusable assets. If one asset is missing, report the template or deadline title, course, and subject. You do not need to reupload the whole package if only one asset failed.',
+          },
+          {
+            question: isUk ? 'Не вдається створити або приєднатися до teamwork-команди.' : 'I cannot create or join a teamwork team.',
+            answer: isUk
+              ? 'Опишіть крок, на якому процес зупинився, і до якого предмета або завдання це привʼязано. Це дозволяє швидко відрізнити проблему з ролями від проблеми з дедлайном або subject scope.'
+              : 'Describe the exact step where the flow stopped and which subject or task it belongs to. That helps separate a role issue from a deadline or subject-scope issue.',
+          },
+        ],
+      },
+      {
+        kicker: isUk ? 'Support' : 'Support',
+        title: isUk ? 'Як працює підтримка' : 'How support works',
+        items: [
+          {
+            question: isUk ? 'Коли відповідати в існуючий тред, а коли створювати новий?' : 'When should I reply in a thread instead of opening a new request?',
+            answer: isUk
+              ? 'Якщо це та сама проблема, відповідайте в наявний тред. Нове звернення варто створювати лише тоді, коли змінюється тема: наприклад, окремо login issue і окремо room conflict у сесії.'
+              : 'Reply in the existing thread if it is the same issue. Open a new request only when the topic changes, for example a login issue versus a session room conflict.',
+          },
+          {
+            question: isUk ? 'Який SLA у support?' : 'What is the support SLA?',
+            answer: isUk
+              ? 'Базовий орієнтир: до одного робочого дня на першу відповідь. Якщо ситуація блокує розклад, журнал або реєстрацію, вкажіть це в темі листа прямо в першому повідомленні.'
+              : 'The default target is within one business day for the first reply. If the issue blocks schedule, journal, or registration, say that in the subject of the first message.',
+          },
+        ],
+      },
+    ],
+    stepsTitle: isUk ? 'Як підготувати сильне звернення' : 'How to write a strong request',
+    stepsSubtitle: isUk
+      ? 'Мета не просто отримати відповідь, а скоротити шлях від проблеми до рішення.'
+      : 'The goal is not only to get a reply, but to shorten the path from issue to resolution.',
+    steps: [
+      {
+        title: isUk ? '1. Назвіть точний сценарій' : '1. Name the exact workflow',
+        body: isUk
+          ? 'Наприклад: "реєстрація предметів", "session room conflict", "journal attendance". Це швидше за загальні теми на кшталт "щось не працює".'
+          : 'For example: "subject registration", "session room conflict", or "journal attendance". This is much faster than a generic "something is broken".',
+      },
+      {
+        title: isUk ? '2. Додайте дані для відтворення' : '2. Add reproduction data',
+        body: isUk
+          ? 'Курс, предмет, група, дата, пара, room label або template title. Чим менше команді доведеться здогадуватись, тим швидше буде відповідь.'
+          : 'Include course, subject, group, date, slot, room label, or template title. The less the team has to guess, the faster the response.',
+      },
+      {
+        title: isUk ? '3. Не створюйте дублікати' : '3. Avoid duplicate tickets',
+        body: isUk
+          ? 'Якщо проблема та сама, просто відповідайте в треді нижче. Так зберігається повний контекст і не губиться історія перевірки.'
+          : 'If it is the same issue, reply in the existing thread below. That preserves the full context and avoids losing verification history.',
+      },
+    ],
+  };
+}
+
+app.get('/help', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'help.v2.init');
+  }
+
+  try {
+    const lang = getPreferredLang(req);
+    const helpPage = buildHelpPageExperienceContent(lang);
+    const supportRows = await listSupportRequestsForUser(req.session.user.id, 12);
+    const supportRequests = await Promise.all((supportRows || []).map(async (row) => {
+      const messages = await listSupportRequestMessages(row.id);
+      return supportHelpers.buildSupportRequestPreview(row, messages);
+    }));
+    const supportStats = supportHelpers.summarizeSupportRequests(supportRequests, {
+      responseLabel: lang === 'uk' ? 'до 1 робочого дня' : 'within 1 business day',
+    });
+    const decodeMessage = (value) => {
+      if (!value) return '';
+      try {
+        return decodeURIComponent(String(value));
+      } catch (_err) {
+        return String(value);
+      }
+    };
+
+    return res.render('help', {
+      helpPage,
+      supportRequests,
+      supportStats,
+      supportCategoryOptions: SUPPORT_REQUEST_CATEGORIES,
+      messages: {
+        error: decodeMessage(req.query.err),
+        success: decodeMessage(req.query.ok),
+      },
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'help.v2');
+  }
+});
+
+app.post('/help/support/:id/reply', requireLogin, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'help.support.reply.init');
+  }
+
+  const lang = getPreferredLang(req);
+  const requestId = Number(req.params.id || 0);
+  const replyBody = String(req.body.body || '')
+    .replace(/\r\n/g, '\n')
+    .trim();
+
+  if (!Number.isInteger(requestId) || requestId < 1 || replyBody.length < 2 || replyBody.length > 2000) {
+    return res.redirect(`/help?err=${encodeURIComponent(lang === 'uk' ? 'Перевірте текст відповіді' : 'Check the reply text')}`);
+  }
+
+  try {
+    const supportRequest = await db.get(
+      `
+        SELECT id, user_id
+        FROM support_requests
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [requestId]
+    );
+    if (!supportRequest || Number(supportRequest.user_id || 0) !== Number(req.session.user.id || 0)) {
+      return res.redirect(`/help?err=${encodeURIComponent(lang === 'uk' ? 'Звернення не знайдено' : 'Request not found')}`);
+    }
+
+    await insertSupportRequestMessage({
+      requestId,
+      authorUserId: req.session.user.id,
+      authorRole: 'user',
+      body: replyBody,
+    });
+    await db.run(
+      `
+        UPDATE support_requests
+        SET
+          status = 'in_progress',
+          updated_at = NOW(),
+          resolved_at = NULL,
+          resolved_by = NULL
+        WHERE id = ?
+      `,
+      [requestId]
+    );
+
+    logAction(db, req, 'support_request_reply', {
+      request_id: requestId,
+    });
+    return res.redirect(`/help?ok=${encodeURIComponent(lang === 'uk' ? 'Відповідь додано' : 'Reply sent')}`);
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return res.redirect(`/help?err=${encodeURIComponent(lang === 'uk' ? 'Потік підтримки недоступний у цій схемі БД' : 'Support thread storage is unavailable in this DB schema')}`);
+    }
+    return handleDbError(res, err, 'help.support.reply');
+  }
 });
 
 app.get('/help', requireLogin, async (req, res) => {
@@ -8564,6 +9093,82 @@ app.get('/register/subjects', async (req, res) => {
       return res.redirect('/register/teacher-subjects');
     }
 
+    const [subjects, allCourseSubjects] = await Promise.all([
+      getRegistrationSubjects(user.course_id, user.admission_id),
+      getSubjectsCached(user.course_id, { visibleOnly: false }),
+    ]);
+    const isRequired = (subject) =>
+      subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
+    const requiredAuto = (subjects || []).filter((subject) => isRequired(subject) && Number(subject.group_count) === 1);
+    await Promise.all(
+      requiredAuto.map((subject) =>
+        db.run(
+          `
+            INSERT INTO student_groups (student_id, subject_id, group_number)
+            VALUES (?, ?, 1)
+            ON CONFLICT(student_id, subject_id) DO NOTHING
+          `,
+          [req.session.pendingUserId, subject.id]
+        )
+      )
+    );
+
+    const optoutRows = await db.all(
+      'SELECT subject_id FROM user_subject_optouts WHERE user_id = ?',
+      [req.session.pendingUserId]
+    );
+    const optouts = (optoutRows || []).map((row) => Number(row.subject_id));
+    const selectedGroupRows = await db.all(
+      'SELECT subject_id, group_number FROM student_groups WHERE student_id = ?',
+      [req.session.pendingUserId]
+    );
+    const selectedGroups = {};
+    (selectedGroupRows || []).forEach((row) => {
+      const subjectId = Number(row.subject_id);
+      const groupNumber = Number(row.group_number);
+      if (!Number.isInteger(subjectId) || subjectId < 1) return;
+      if (!Number.isInteger(groupNumber) || groupNumber < 1) return;
+      selectedGroups[subjectId] = groupNumber;
+    });
+
+    const lang = getPreferredLang(req);
+    const pathwayRegistrationHint = pathwayHelpers.buildSubjectVisibilityCopy({
+      visibleSubjects: Array.isArray(subjects) ? subjects.length : 0,
+      totalSubjects: Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0,
+      lang,
+    });
+
+    return res.render('register-subjects', {
+      subjects,
+      optouts,
+      selectedGroups,
+      pathwayRegistrationHint,
+      error: req.query.error || '',
+    });
+  } catch (err) {
+    console.error('Register subjects step failed', err);
+    return res.status(500).send('Database error');
+  }
+});
+
+app.get('/register/subjects', async (req, res) => {
+  if (!req.session.pendingUserId) {
+    return res.redirect('/register');
+  }
+  try {
+    await ensureDbReady();
+    const user = await db.get(
+      'SELECT course_id, admission_id FROM users WHERE id = ?',
+      [req.session.pendingUserId]
+    );
+    if (!user || !user.course_id) {
+      return res.redirect('/register/course');
+    }
+    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [user.course_id]);
+    if (course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+      return res.redirect('/register/teacher-subjects');
+    }
+
     const subjects = await getRegistrationSubjects(user.course_id, user.admission_id);
     const isRequired = (subject) =>
       subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
@@ -8816,12 +9421,13 @@ app.get('/teacher', requireLogin, async (req, res) => {
     }
   };
   try {
-    const [teacherSubjects, templatesCount, createdHomeworkCount, recentHomeworkCount] = await Promise.all([
+    const [teacherSubjects, templatesCount, assetRows, createdHomeworkCount, recentHomeworkCount] = await Promise.all([
       getTeacherHubSubjects(userId),
       getTeacherHubCount(
         'SELECT COUNT(*) AS count FROM teacher_homework_templates WHERE user_id = ?',
         [userId]
       ),
+      listTeacherAssets(userId, {}),
       getTeacherHubCount(
         'SELECT COUNT(*) AS count FROM homework WHERE created_by_id = ? AND is_teacher_homework = 1',
         [userId]
@@ -8843,6 +9449,9 @@ app.get('/teacher', requireLogin, async (req, res) => {
         .map((row) => Number(row.subject_id))
         .filter((value) => Number.isInteger(value) && value > 0)
     );
+    const roleKeys = normalizeRoleList(req.session.roles || []);
+    const teacherCockpit = await buildMyDayData(req.session.user, 'teacher', roleKeys, {});
+    const recentTemplates = await getTeacherHomeworkTemplates(userId, { limit: 5 });
 
     return res.render('teacher-hub', {
       role: 'teacher',
@@ -8852,10 +9461,15 @@ app.get('/teacher', requireLogin, async (req, res) => {
         subjects: uniqueSubjectIds.size,
         courses: teacherCourses.length,
         templates: templatesCount,
+        assets: (assetRows || []).length,
         created_homework: createdHomeworkCount,
         recent_homework: recentHomeworkCount,
       },
       teacherCourses,
+      recentTemplates,
+      teacherAssets: (assetRows || []).slice(0, 6),
+      upcomingClasses: (teacherCockpit && Array.isArray(teacherCockpit.next_classes)) ? teacherCockpit.next_classes.slice(0, 5) : [],
+      reviewQueue: teacherCockpit && teacherCockpit.review_queue ? teacherCockpit.review_queue : null,
       error: decodeMessage(req.query.error),
       success: decodeMessage(req.query.ok),
     });
@@ -8958,10 +9572,33 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       ? Number(selectedCourse.id)
       : (teacherCourses.length === 1 ? Number(teacherCourses[0].id) : null);
 
-    const templates = await getTeacherHomeworkTemplates(userId, {
-      courseId: selectedCourseId,
-      limit: 300,
-    });
+    const [templates, assets, recentHomework] = await Promise.all([
+      getTeacherHomeworkTemplates(userId, {
+        courseId: selectedCourseId,
+        limit: 300,
+      }),
+      listTeacherAssets(userId, { courseId: selectedCourseId }),
+      db.all(
+        `
+          SELECT
+            h.id,
+            h.description,
+            h.class_date,
+            h.custom_due_date,
+            h.subject_id,
+            h.group_number,
+            s.name AS subject_name
+          FROM homework h
+          LEFT JOIN subjects s ON s.id = h.subject_id
+          WHERE h.created_by_id = ?
+            AND COALESCE(h.is_teacher_homework, 0) = 1
+            ${selectedCourseId ? 'AND h.course_id = ?' : ''}
+          ORDER BY COALESCE(h.custom_due_date, h.class_date) DESC NULLS LAST, h.created_at DESC
+          LIMIT 8
+        `,
+        selectedCourseId ? [userId, selectedCourseId] : [userId]
+      ),
+    ]);
 
     const subjectMap = new Map();
     teacherSubjects.forEach((subject) => {
@@ -8992,11 +9629,98 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       teacherSubjects: scopedTeacherSubjects,
       teacherSubjectsAll: allTeacherSubjects,
       templates,
+      assets,
+      recentHomework,
       error: decodeMessage(req.query.error),
       success: decodeMessage(req.query.ok),
     });
   } catch (err) {
     return handleDbError(res, err, 'teacher.workspace');
+  }
+});
+
+app.post('/teacher/workspace/assets', requireLogin, uploadLimiter, upload.single('asset'), async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.workspace.assets.create.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.redirect('/schedule');
+  }
+  const userId = Number(req.session.user.id || 0);
+  const requestedCourseId = Number(req.body.course_id || req.session.user.course_id || 0);
+  const courseQuery = Number.isInteger(requestedCourseId) && requestedCourseId > 0 ? `?course=${requestedCourseId}` : '';
+  if (!req.file) {
+    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Select%20a%20file`);
+  }
+  try {
+    const assetId = await createAssetFromUpload({
+      file: req.file,
+      userId,
+      courseId: requestedCourseId || null,
+      name: req.body.name,
+      kind: 'template_attachment',
+    });
+    if (!assetId) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Asset%20storage%20is%20unavailable`);
+    }
+    logAction(db, req, 'teacher_workspace_asset_create', {
+      asset_id: assetId,
+      course_id: requestedCourseId || null,
+      original_name: req.file.originalname ? String(req.file.originalname) : '',
+    });
+    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}ok=Asset%20uploaded`);
+  } catch (err) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Database%20error`);
+  }
+});
+
+app.post('/teacher/workspace/assets/:id/delete', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.workspace.assets.delete.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
+  }
+  const assetId = Number(req.params.id);
+  const requestedCourseId = Number(req.body.course_id || req.session.user.course_id || 0);
+  const courseQuery = Number.isInteger(requestedCourseId) && requestedCourseId > 0 ? `?course=${requestedCourseId}` : '';
+  if (!Number.isInteger(assetId) || assetId < 1) {
+    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Invalid%20asset`);
+  }
+  try {
+    const asset = await db.get(
+      'SELECT id, user_id, file_path, original_name FROM assets WHERE id = ? LIMIT 1',
+      [assetId]
+    );
+    if (!asset || Number(asset.user_id) !== Number(req.session.user.id)) {
+      return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Asset%20not%20found`);
+    }
+    const usage = await db.get(
+      `
+        SELECT
+          (SELECT COUNT(*) FROM teacher_template_asset_map WHERE asset_id = ?) AS template_count,
+          (SELECT COUNT(*) FROM homework_asset_map WHERE asset_id = ?) AS homework_count
+      `,
+      [assetId, assetId]
+    );
+    if (Number(usage?.template_count || 0) > 0 || Number(usage?.homework_count || 0) > 0) {
+      return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Asset%20is%20still%20linked%20to%20templates%20or%20homework`);
+    }
+    await db.run('DELETE FROM assets WHERE id = ?', [assetId]);
+    logAction(db, req, 'teacher_workspace_asset_delete', {
+      asset_id: assetId,
+      original_name: asset.original_name ? String(asset.original_name) : '',
+    });
+    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}ok=Asset%20deleted`);
+  } catch (err) {
+    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Database%20error`);
   }
 });
 
@@ -9017,6 +9741,7 @@ app.post('/teacher/workspace/templates', requireLogin, async (req, res) => {
   const isControl = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_control || '').toLowerCase()) ? 1 : 0;
   const isCredit = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_credit || '').toLowerCase()) ? 1 : 0;
   const tags = normalizeTemplateTagsInput(req.body.tags).join(', ');
+  const assetIds = teacherTemplateHelpers.normalizeTemplateAssetIds(req.body.asset_ids, 48);
   const linkUrl = normalizeExternalUrl(req.body.link_url) || null;
   const meetingUrl = normalizeExternalUrl(req.body.meeting_url) || null;
 
@@ -9064,6 +9789,9 @@ app.post('/teacher/workspace/templates', requireLogin, async (req, res) => {
         isCredit,
       ]
     );
+    if (inserted && inserted.id) {
+      await syncTemplateAssetMap(inserted.id, userId, assetIds);
+    }
 
     logAction(db, req, 'teacher_homework_template_create', {
       template_id: inserted && inserted.id ? Number(inserted.id) : null,
@@ -9113,6 +9841,7 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, async (req, re
   const title = String(req.body.title || '').trim();
   const description = String(req.body.description || '').trim();
   const tags = normalizeTemplateTagsInput(req.body.tags).join(', ');
+  const assetIds = teacherTemplateHelpers.normalizeTemplateAssetIds(req.body.asset_ids, 48);
   const linkUrl = normalizeExternalUrl(req.body.link_url) || null;
   const meetingUrl = normalizeExternalUrl(req.body.meeting_url) || null;
   const isControl = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_control || '').toLowerCase()) ? 1 : 0;
@@ -9175,6 +9904,7 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, async (req, re
         templateId,
       ]
     );
+    await syncTemplateAssetMap(templateId, userId, assetIds);
 
     logAction(db, req, 'teacher_homework_template_update', {
       template_id: templateId,
@@ -9346,6 +10076,17 @@ app.post('/teacher/workspace/templates/:id/clone', requireLogin, async (req, res
         ]
       );
       if (inserted && inserted.id) {
+        await db.run(
+          `
+            INSERT INTO teacher_template_asset_map (template_id, asset_id, sort_order, created_at)
+            SELECT ?, asset_id, sort_order, NOW()
+            FROM teacher_template_asset_map
+            WHERE template_id = ?
+          `,
+          [Number(inserted.id), templateId]
+        ).catch((err) => {
+          if (!isDbSchemaCompatibilityError(err)) throw err;
+        });
         createdCount += 1;
       }
     }
@@ -9538,6 +10279,17 @@ app.post('/teacher/workspace/templates/bulk-clone', requireLogin, async (req, re
           ]
         );
         if (inserted && inserted.id) {
+          await db.run(
+            `
+              INSERT INTO teacher_template_asset_map (template_id, asset_id, sort_order, created_at)
+              SELECT ?, asset_id, sort_order, NOW()
+              FROM teacher_template_asset_map
+              WHERE template_id = ?
+            `,
+            [Number(inserted.id), Number(source.id)]
+          ).catch((err) => {
+            if (!isDbSchemaCompatibilityError(err)) throw err;
+          });
           createdCount += 1;
         }
       }
@@ -11581,9 +12333,15 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
 	    }
 	    const rows = await db.all(
 	      `
-	        SELECT se.*, s.name AS subject_name
+	        SELECT
+            se.*,
+            s.name AS subject_name,
+            r.label AS room_name,
+            r.code AS room_code,
+            r.building AS room_building
 	        FROM schedule_entries se
 	        JOIN subjects s ON s.id = se.subject_id
+          LEFT JOIN rooms r ON r.id = se.room_id
 	        WHERE se.week_number = ?
 	          AND se.day_of_week = ?
 	          ${courseClause}
@@ -11608,6 +12366,11 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
         day_context: dateValue === todayStr ? 'today' : 'tomorrow',
         start: slot.start || '',
         end: slot.end || '',
+        room_label: row.room_id ? roomHelpers.buildRoomLabel({
+          label: row.room_name,
+          code: row.room_code,
+          building: row.room_building,
+        }) : '',
       };
     });
   };
@@ -12181,6 +12944,143 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     open_reminders: openReminders,
   };
 
+  const preferredMyDayLang = String(user.language || '').toLowerCase() === 'en' ? 'en' : 'uk';
+  let attendanceHealth = null;
+  try {
+    const attendanceCounts = {
+      present: 0,
+      late: 0,
+      absent: 0,
+      excused: 0,
+    };
+    const attendanceSubjectIds = Array.from(new Set(
+      workloadTargets
+        .map((target) => Number(target.subject_id || 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ));
+    if (attendanceSubjectIds.length) {
+      const attendanceCourseIds = workloadOwnerCourseIds.length ? workloadOwnerCourseIds : [courseId];
+      const attendanceSemesterIds = workloadOwnerSemesterIds.length
+        ? workloadOwnerSemesterIds
+        : (activeSemester && activeSemester.id ? [Number(activeSemester.id)] : []);
+      const attendanceRows = await db.all(
+        `
+          SELECT ar.status, COUNT(*) AS count
+          FROM attendance_records ar
+          WHERE ar.subject_id = ANY(?::int[])
+            AND ar.course_id = ANY(?::int[])
+            ${attendanceSemesterIds.length ? 'AND (ar.semester_id = ANY(?::int[]) OR ar.semester_id IS NULL)' : ''}
+            ${
+              normalizedRole === 'teacher'
+                ? 'AND ar.class_date >= ?'
+                : 'AND ar.student_id = ?'
+            }
+          GROUP BY ar.status
+        `,
+        normalizedRole === 'teacher'
+          ? (
+            attendanceSemesterIds.length
+              ? [attendanceSubjectIds, attendanceCourseIds, attendanceSemesterIds, formatLocalDate(addDays(now, -30))]
+              : [attendanceSubjectIds, attendanceCourseIds, formatLocalDate(addDays(now, -30))]
+          )
+          : (
+            attendanceSemesterIds.length
+              ? [attendanceSubjectIds, attendanceCourseIds, attendanceSemesterIds, Number(user.id)]
+              : [attendanceSubjectIds, attendanceCourseIds, Number(user.id)]
+          )
+      );
+      (attendanceRows || []).forEach((row) => {
+        const status = normalizeAttendanceStatus(row.status);
+        if (!status) return;
+        attendanceCounts[status] = Number(row.count || 0);
+      });
+      attendanceHealth = journalInsightHelpers.buildAttendanceHealthSummary({
+        role: normalizedRole,
+        counts: attendanceCounts,
+      });
+    }
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+
+  let latestRatingSnapshot = null;
+  try {
+    const ratingCourseIds = workloadOwnerCourseIds.length ? workloadOwnerCourseIds : [courseId];
+    const ratingRows = await db.all(
+      `
+        SELECT *
+        FROM rating_publication_snapshots
+        WHERE course_id = ANY(?::int[])
+        ORDER BY published_at DESC, id DESC
+        LIMIT 16
+      `,
+      [ratingCourseIds]
+    );
+    const workloadKeys = new Set(
+      workloadTargets.map((target) => `${Number(target.subject_id || 0)}|${target.group_number === null ? 'all' : Number(target.group_number || 0)}`)
+    );
+    const matchedSnapshot = (ratingRows || []).find((row) => {
+      const scopeType = String(row.scope_type || '').trim().toLowerCase();
+      if (scopeType === 'course' || String(row.target_kind || '').trim().toLowerCase() === 'course') {
+        return true;
+      }
+      const subjectId = Number(row.subject_id || 0);
+      if (!Number.isInteger(subjectId) || subjectId < 1) return false;
+      const groupNumber = Number(row.group_number || 0);
+      if (workloadKeys.has(`${subjectId}|${groupNumber > 0 ? groupNumber : 'all'}`)) return true;
+      if (groupNumber > 0 && workloadKeys.has(`${subjectId}|all`)) return true;
+      return false;
+    });
+    if (matchedSnapshot) {
+      latestRatingSnapshot = journalInsightHelpers.formatRatingSnapshotCard(matchedSnapshot, preferredMyDayLang);
+    }
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+
+  let supportPreviewItems = [];
+  let supportSummary = null;
+  try {
+    const supportRows = await listSupportRequestsForUser(user.id, 6);
+    const detailedSupportRows = await Promise.all((supportRows || []).map(async (row) => {
+      const messages = await listSupportRequestMessages(row.id);
+      return supportHelpers.buildSupportRequestPreview(row, messages);
+    }));
+    supportPreviewItems = detailedSupportRows;
+    supportSummary = supportHelpers.summarizeSupportRequests(detailedSupportRows, {
+      responseLabel: preferredMyDayLang === 'en' ? 'within 1 business day' : 'до 1 робочого дня',
+    });
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+
+  const teacherQuickActions = normalizedRole === 'teacher'
+    ? [
+        {
+          label: preferredMyDayLang === 'en' ? 'Teacher Hub' : 'Teacher Hub',
+          href: '/teacher',
+        },
+        {
+          label: preferredMyDayLang === 'en' ? 'Templates & assets' : 'Шаблони й assets',
+          href: '/teacher/workspace',
+        },
+        {
+          label: preferredMyDayLang === 'en' ? 'Journal insights' : 'Journal insights',
+          href: '/journal/insights',
+        },
+        {
+          label: preferredMyDayLang === 'en' ? 'Help threads' : 'Help threads',
+          href: '/help',
+        },
+      ]
+    : [];
+
   const inboxItems = [];
   if (overdueCount > 0) {
     inboxItems.push({
@@ -12225,6 +13125,36 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       meta: 'Не забудь перевірити особистий список',
       action_href: '/home#inboxBlock',
       action_label: 'Перевірити',
+    });
+  }
+  if (latestRatingSnapshot && latestRatingSnapshot.top_entry) {
+    inboxItems.push({
+      kind: 'update',
+      title: preferredMyDayLang === 'en'
+        ? `Latest rating: ${latestRatingSnapshot.scope_label}`
+        : `Останній рейтинг: ${latestRatingSnapshot.scope_label}`,
+      meta: latestRatingSnapshot.top_entry
+        ? (
+          preferredMyDayLang === 'en'
+            ? `Leader: ${latestRatingSnapshot.top_entry.full_name}`
+            : `Лідер: ${latestRatingSnapshot.top_entry.full_name}`
+        )
+        : '',
+      action_href: '/journal/insights',
+      action_label: preferredMyDayLang === 'en' ? 'Open insights' : 'До insights',
+    });
+  }
+  if (supportSummary && Number(supportSummary.open || 0) > 0) {
+    inboxItems.push({
+      kind: 'focus',
+      title: preferredMyDayLang === 'en'
+        ? `Support in progress: ${supportSummary.open}`
+        : `Активні звернення: ${supportSummary.open}`,
+      meta: preferredMyDayLang === 'en'
+        ? 'Reply in the help thread if context changed'
+        : 'Відпиши у треді help, якщо контекст змінився',
+      action_href: '/help',
+      action_label: preferredMyDayLang === 'en' ? 'Open help' : 'Відкрити help',
     });
   }
   if (!inboxItems.length) {
@@ -12351,6 +13281,11 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     what_if_subjects: whatIfSubjects,
     what_if_default_subject_id: defaultWhatIfSubjectId,
     review_queue: reviewQueue,
+    attendance_health: attendanceHealth,
+    latest_rating_snapshot: latestRatingSnapshot,
+    support_summary: supportSummary,
+    support_threads: supportPreviewItems,
+    teacher_quick_actions: teacherQuickActions,
     brief,
     scope_count: workloadTargets.length,
     role: normalizedRole,
@@ -13452,9 +14387,15 @@ app.get('/schedule', requireLogin, async (req, res) => {
         ));
         const params = [selectedWeek];
         let sql = `
-          SELECT se.*, s.name AS subject_name
+          SELECT
+            se.*,
+            s.name AS subject_name,
+            r.label AS room_name,
+            r.code AS room_code,
+            r.building AS room_building
           FROM schedule_entries se
           JOIN subjects s ON s.id = se.subject_id
+          LEFT JOIN rooms r ON r.id = se.room_id
           WHERE se.week_number = ?
         `;
         if (ownerCourseIds.length) {
@@ -13476,12 +14417,17 @@ app.get('/schedule', requireLogin, async (req, res) => {
           row.course_name = courseNameMap.get(Number(cid)) || '';
           row.class_date = getDateForWeekDay(selectedWeek, row.day_of_week, sem ? sem.start_date : null);
           row.use_local_time = useLocalTime;
+          row.room_label = row.room_id ? roomHelpers.buildRoomLabel({
+            label: row.room_name,
+            code: row.room_code,
+            building: row.room_building,
+          }) : '';
           scheduleRows.push(row);
         });
       }
 
       scheduleRows.forEach((row) => {
-        const key = `${row.course_id}|${row.subject_id}|${row.day_of_week}|${row.class_number}`;
+        const key = `${row.course_id}|${row.subject_id}|${row.day_of_week}|${row.class_number}|${row.room_id || 0}`;
         if (!groupedMap.has(key)) {
           groupedMap.set(key, {
             ...row,
@@ -14301,7 +15247,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               messageSubjects: studentGroups || [],
               userId,
               selectedCourseId: scheduleCourseId,
-              teacherHomeworkTemplates: [],
+              teacherHomeworkTemplates,
               canCreateHomework,
               canUseCustomDeadlinesUi,
             })
@@ -14321,12 +15267,16 @@ app.get('/schedule', requireLogin, async (req, res) => {
             SELECT
               h.*,
               subj.name AS subject_name,
+              r.label AS room_name,
+              r.code AS room_code,
+              r.building AS room_building,
               hs.submitted_at AS submission_submitted_at,
               s.id AS subgroup_id,
               s.name AS subgroup_name,
               m.member_username AS subgroup_member
             FROM homework h
             JOIN subjects subj ON subj.id = h.subject_id
+            LEFT JOIN rooms r ON r.id = h.room_id
             LEFT JOIN homework_submissions hs ON hs.homework_id = h.id AND hs.student_id = ?
             LEFT JOIN subgroups s ON s.homework_id = h.id
             LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
@@ -14359,6 +15309,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
                   link_url: row.link_url,
                   file_path: row.file_path,
                   file_name: normalizeUploadedOriginalName(row.file_name),
+                  room_label: row.room_id ? roomHelpers.buildRoomLabel({
+                    label: row.room_name,
+                    code: row.room_code,
+                    building: row.room_building,
+                  }) : '',
                   created_by: row.created_by,
                   created_at: row.created_at,
                   submitted_at: row.submission_submitted_at || null,
@@ -14497,7 +15452,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 messageSubjects: studentGroups || [],
                 userId,
                 selectedCourseId: scheduleCourseId,
-                teacherHomeworkTemplates: [],
+                teacherHomeworkTemplates,
                 canCreateHomework,
                 canUseCustomDeadlinesUi,
               });
@@ -14559,9 +15514,22 @@ app.get('/schedule', requireLogin, async (req, res) => {
                             hw.reactions = reactionMap[hw.id] || {};
                             hw.reacted = reactedMap[hw.id] || {};
                           });
-                          loadCustomDeadlines(homeworkTargets, (customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
-                            finalizeRender(tagOptions, customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems)
-                          );
+                          listHomeworkAssetsByHomeworkIds(homeworkIds)
+                            .then((homeworkAssetMap) => {
+                              homework.forEach((hw) => {
+                                hw.assets = homeworkAssetMap.get(hw.id) || [];
+                              });
+                            })
+                            .catch((err) => {
+                              if (!isDbSchemaCompatibilityError(err)) {
+                                console.error('Homework asset map load failed', err);
+                              }
+                            })
+                            .finally(() => {
+                              loadCustomDeadlines(homeworkTargets, (customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
+                                finalizeRender(tagOptions, customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems)
+                              );
+                            });
                         }
                       );
                     }
@@ -14598,11 +15566,17 @@ app.get('/schedule', requireLogin, async (req, res) => {
         });
       }
 
-      let sql = `
-        SELECT se.*, s.name AS subject_name
-        FROM schedule_entries se
-        JOIN subjects s ON s.id = se.subject_id
-        WHERE se.week_number = ? AND s.visible = 1
+        let sql = `
+          SELECT
+            se.*,
+            s.name AS subject_name,
+            r.label AS room_name,
+            r.code AS room_code,
+            r.building AS room_building
+          FROM schedule_entries se
+          JOIN subjects s ON s.id = se.subject_id
+          LEFT JOIN rooms r ON r.id = se.room_id
+          WHERE se.week_number = ? AND s.visible = 1
       `;
       if (ownerCourseIds.length) {
         sql += ' AND se.course_id = ANY(?::int[])';
@@ -14625,6 +15599,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
           row.owner_course_id = Number(row.course_id || 0) || null;
           row.class_date = getDateForWeekDay(selectedWeek, row.day_of_week, activeSemester ? activeSemester.start_date : null);
           row.use_local_time = useLocalTime;
+          row.room_label = row.room_id ? roomHelpers.buildRoomLabel({
+            label: row.room_name,
+            code: row.room_code,
+            building: row.room_building,
+          }) : '';
           if (scheduleByDay[row.day_of_week]) {
             scheduleByDay[row.day_of_week].push(row);
           }
@@ -18435,6 +19414,202 @@ app.get('/journal/insights/export.csv', requireLogin, async (req, res) => {
     return res.send(csv);
   } catch (err) {
     return handleDbError(res, err, 'journal.insights.export');
+  }
+});
+
+// Structured rating snapshot publisher. This route intentionally shadows the
+// legacy publisher defined below so published rankings are reusable in My Day and Help.
+app.post('/journal/insights/publish-rating', requireLogin, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return res.redirect(buildJournalInsightsUrl({
+      courseId: parsePositiveIntStrict(req.body.course_id, req.session?.user?.course_id),
+      subjectId: parsePositiveIntStrict(req.body.subject_id),
+      scopeType: req.body.scope_type || 'subject',
+      groupNumber: parsePositiveIntStrict(req.body.group_number),
+      studentId: parsePositiveIntStrict(req.body.student_id),
+      period: req.body.period || 'semester',
+      compareMode: req.body.compare_mode || 'none',
+      error: 'Database error',
+    }));
+  }
+
+  try {
+    const journalScope = await getJournalAccessScope(req);
+    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+    if (!journalScope.canUseJournal || !teacherJournalMode) {
+      return res.status(403).send('Forbidden (journal)');
+    }
+
+    const context = await buildJournalInsightsContext({
+      req,
+      journalScope,
+      teacherJournalMode,
+      payloadSource: req.body || {},
+    });
+
+    const baseRedirect = {
+      courseId: Number(context.selectedCourseId || 0),
+      subjectId: Number(context.selectedSubject?.subject_id || 0),
+      scopeType: context.scopeType,
+      groupNumber: Number(context.selectedGroupNumber || 0),
+      studentId: Number(context.selectedStudentId || 0),
+      period: context.period,
+      compareMode: context.compareMode || 'none',
+    };
+
+    if (!context.canPublishRating || !context.publishTarget) {
+      return res.redirect(buildJournalInsightsUrl({
+        ...baseRedirect,
+        error: context.publishDisabledReason || 'Rating cannot be published for current scope',
+      }));
+    }
+
+    const topNRaw = Number(req.body.top_n);
+    const topN = Number.isFinite(topNRaw)
+      ? Math.max(3, Math.min(30, Math.round(topNRaw)))
+      : 10;
+    const ratingRows = (context.ranking || []).slice(0, topN);
+    if (!ratingRows.length) {
+      return res.redirect(buildJournalInsightsUrl({
+        ...baseRedirect,
+        error: 'No ranking data to publish',
+      }));
+    }
+
+    const lang = getPreferredLang(req);
+    const createdAtIso = new Date().toISOString();
+    const targetCourseId = Number(context.publishTarget.course_id || context.selectedCourseId || req.session.user.course_id || 0) || null;
+    const targetSemesterId = context.publishTarget.semester_id ? Number(context.publishTarget.semester_id) : null;
+    const targetSubjectId = context.publishTarget.subject_id
+      ? Number(context.publishTarget.subject_id)
+      : ((context.selectedSubject && Number(context.selectedSubject.subject_id || 0)) || null);
+    const targetGroupNumber = context.publishTarget.group_number
+      ? Number(context.publishTarget.group_number)
+      : (Number(context.selectedGroupNumber || 0) || null);
+    const ratingPayload = journalInsightHelpers.buildRatingSnapshotPayload({
+      context: {
+        scopeLabel: context.scopeLabel,
+        periodLabel: context.periodLabel,
+        scopeType: context.scopeType,
+        period: context.period,
+        compareMode: context.compareMode || 'none',
+        targetKind: context.publishTarget.kind,
+        courseId: targetCourseId,
+        semesterId: targetSemesterId,
+        subjectId: targetSubjectId,
+        groupNumber: targetGroupNumber,
+        participantsCount: Number(context?.summary?.participants_count || 0),
+      },
+      ratingRows,
+      topN,
+      publishedAtIso: createdAtIso,
+      lang,
+    });
+
+    let publishedMessage = null;
+    if (context.publishTarget.kind === 'course') {
+      publishedMessage = await db.get(
+        `
+          INSERT INTO messages
+            (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
+          VALUES
+            (NULL, NULL, 1, ?, ?, ?, ?, ?, 'published', NULL, ?)
+          RETURNING id
+        `,
+        [
+          ratingPayload.messageBody,
+          Number(req.session.user.id),
+          createdAtIso,
+          targetCourseId,
+          targetSemesterId,
+          createdAtIso,
+        ]
+      );
+    } else {
+      publishedMessage = await db.get(
+        `
+          INSERT INTO messages
+            (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
+          VALUES
+            (?, ?, 0, ?, ?, ?, ?, ?, 'published', NULL, ?)
+          RETURNING id
+        `,
+        [
+          targetSubjectId,
+          targetGroupNumber,
+          ratingPayload.messageBody,
+          Number(req.session.user.id),
+          createdAtIso,
+          targetCourseId,
+          targetSemesterId,
+          createdAtIso,
+        ]
+      );
+    }
+
+    await db.run(
+      `
+        INSERT INTO rating_publication_snapshots
+          (
+            course_id,
+            semester_id,
+            subject_id,
+            group_number,
+            scope_type,
+            scope_label,
+            period,
+            period_label,
+            compare_mode,
+            target_kind,
+            top_n,
+            summary_json,
+            ranking_json,
+            message_id,
+            published_by,
+            published_at
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?)
+      `,
+      [
+        ratingPayload.snapshot.course_id,
+        ratingPayload.snapshot.semester_id,
+        ratingPayload.snapshot.subject_id,
+        ratingPayload.snapshot.group_number,
+        ratingPayload.snapshot.scope_type,
+        ratingPayload.snapshot.scope_label,
+        ratingPayload.snapshot.period,
+        ratingPayload.snapshot.period_label,
+        ratingPayload.snapshot.compare_mode,
+        ratingPayload.snapshot.target_kind,
+        ratingPayload.snapshot.top_n,
+        JSON.stringify(ratingPayload.snapshot.summary_json || {}),
+        JSON.stringify(ratingPayload.snapshot.ranking_json || []),
+        publishedMessage && publishedMessage.id ? Number(publishedMessage.id) : null,
+        Number(req.session.user.id),
+        createdAtIso,
+      ]
+    );
+
+    logAction(db, req, 'journal_insights_publish_rating', {
+      scope_type: context.scopeType,
+      scope_label: context.scopeLabel,
+      period: context.period,
+      compare_mode: context.compareMode || 'none',
+      rating_size: ratingRows.length,
+      target_kind: context.publishTarget.kind,
+      target_subject_id: context.publishTarget.subject_id || null,
+      target_group_number: context.publishTarget.group_number || null,
+      target_course_id: context.publishTarget.course_id || context.selectedCourseId || null,
+    });
+
+    return res.redirect(buildJournalInsightsUrl({
+      ...baseRedirect,
+      ok: 'Rating published',
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'journal.insights.publish.snapshot');
   }
 });
 
@@ -28880,6 +30055,48 @@ const parseSessionGeneratorInt = (value, fallback, min, max) => {
   return rounded;
 };
 
+async function listRoomsForCourse(courseId, options = {}) {
+  const normalizedCourseId = Number(courseId || 0);
+  if (!Number.isInteger(normalizedCourseId) || normalizedCourseId < 1) {
+    return [];
+  }
+  const includeInactive = options && options.includeInactive === true;
+  try {
+    const rows = await db.all(
+      `
+        SELECT *
+        FROM rooms
+        WHERE course_id = ?
+          ${includeInactive ? '' : 'AND is_active = true'}
+        ORDER BY is_active DESC, building ASC NULLS LAST, label ASC NULLS LAST, code ASC NULLS LAST, id ASC
+      `,
+      [normalizedCourseId]
+    );
+    return (rows || []).map((row) => roomHelpers.normalizeRoomRecord(row));
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+const buildSessionGeneratorReturnHref = (payload = {}, messageKind = '', messageText = '') => {
+  const params = new URLSearchParams();
+  const push = (key, value) => {
+    if (value === undefined || value === null || value === '') return;
+    params.set(key, String(value));
+  };
+  push('location', normalizeGeneratorLocation(payload.location || 'kyiv'));
+  push('course_id', parseSessionGeneratorInt(payload.course_id, null, 1, Number.MAX_SAFE_INTEGER));
+  push('semester_id', parseSessionGeneratorInt(payload.semester_id, null, 1, Number.MAX_SAFE_INTEGER));
+  push('draft_id', parseSessionGeneratorInt(payload.draft_id, null, 1, Number.MAX_SAFE_INTEGER));
+  if (messageKind && messageText) {
+    params.set(messageKind, String(messageText));
+  }
+  return `/admin/session-generator${params.toString() ? `?${params.toString()}` : ''}`;
+};
+
 const parseSessionManualAssignments = (rawValue) => {
   if (rawValue === undefined || rawValue === null || rawValue === '') return [];
   let payload = rawValue;
@@ -28908,6 +30125,10 @@ const parseSessionManualAssignments = (rawValue) => {
       const groupNumber = Number.isFinite(groupNumberRaw) && groupNumberRaw > 0
         ? Math.floor(groupNumberRaw)
         : null;
+      const roomIdRaw = Number(row && row.room_id);
+      const roomId = Number.isFinite(roomIdRaw) && roomIdRaw > 0
+        ? Math.floor(roomIdRaw)
+        : null;
       const note = row && row.note ? String(row.note).trim().slice(0, 255) : '';
       if (!Number.isFinite(subjectId) || subjectId < 1) return null;
       if (!Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) return null;
@@ -28919,6 +30140,7 @@ const parseSessionManualAssignments = (rawValue) => {
         type,
         date,
         group_number: groupNumber,
+        room_id: roomId,
         note,
       };
     })
@@ -29251,6 +30473,12 @@ const buildSessionSlotBoard = ({
       subject_name: row.subject_name || 'Пара',
       lesson_type: row.lesson_type || '',
       group_number: row.group_number,
+      room_id: Number.isFinite(Number(row.room_id)) && Number(row.room_id) > 0 ? Number(row.room_id) : null,
+      room_label: row.room_id ? roomHelpers.buildRoomLabel({
+        label: row.room_name,
+        code: row.room_code,
+        building: row.room_building,
+      }) : '',
       teacher_ids: teachers.map((teacher) => Number(teacher.id)).filter((id) => Number.isFinite(id) && id > 0),
       teacher_names: teachers.map((teacher) => String(teacher.name || '')).filter(Boolean),
     });
@@ -29909,6 +31137,191 @@ const buildSessionConflictSlotMap = (report) => {
   return slotMap;
 };
 
+const formatSessionConflictSummary = (report) => {
+  if (!report) return 'Невідома помилка перевірки конфліктів.';
+  const conflicts = Array.isArray(report.conflicts) ? report.conflicts : [];
+  const unresolvedRows = Array.isArray(report.unresolvedRows) ? report.unresolvedRows : [];
+  if (!conflicts.length && !unresolvedRows.length) {
+    return `Конфліктів викладачів або кабінетів не знайдено (${Number(report.checkedRows || 0)} перевірених подій).`;
+  }
+  const samples = conflicts.slice(0, 4).map((row) => {
+    const resourceLabel = String(row.resource_kind || '') === 'room'
+      ? (row.room_label || 'Кабінет')
+      : (row.teacher_name || 'Викладач');
+    if (row.type === 'draft') {
+      return `${resourceLabel}: ${row.date}, пара ${row.class_number} (дубль у плані)`;
+    }
+    const busy = row.details && row.details.busy ? row.details.busy : null;
+    const courseLabel = busy && busy.course_name ? busy.course_name : (busy && busy.course_id ? `Курс ${busy.course_id}` : 'інший курс');
+    const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'інша подія';
+    const groupLabel = busy && Number.isFinite(Number(busy.group_number)) && Number(busy.group_number) > 0
+      ? `, група ${busy.group_number}`
+      : '';
+    return `${resourceLabel}: ${row.date}, пара ${row.class_number} (${courseLabel} · ${subjectLabel}${groupLabel})`;
+  });
+  const teacherConflicts = conflicts.filter((row) => String(row.resource_kind || 'teacher') !== 'room').length;
+  const roomConflicts = conflicts.filter((row) => String(row.resource_kind || '') === 'room').length;
+  const parts = [];
+  if (conflicts.length) parts.push(`Знайдено конфліктів: ${conflicts.length}.`);
+  if (teacherConflicts) parts.push(`Викладачі: ${teacherConflicts}.`);
+  if (roomConflicts) parts.push(`Кабінети: ${roomConflicts}.`);
+  if (samples.length) parts.push(`Приклади: ${samples.join('; ')}.`);
+  if (unresolvedRows.length) parts.push(`Без прив’язаного викладача: ${unresolvedRows.length} подій.`);
+  return parts.join(' ').trim();
+};
+
+const buildSessionConflictSlotMapV2 = (report) => {
+  const slotMap = {};
+  const conflicts = Array.isArray(report && report.conflicts) ? report.conflicts : [];
+  conflicts.forEach((conflict) => {
+    const date = String(conflict && conflict.date ? conflict.date : '');
+    const classNumber = Number(conflict && conflict.class_number ? conflict.class_number : 0);
+    if (!date || !Number.isFinite(classNumber) || classNumber < 1) return;
+    const key = `${date}|${classNumber}`;
+    if (!slotMap[key]) {
+      slotMap[key] = {
+        date,
+        class_number: classNumber,
+        conflicts_total: 0,
+        draft_conflicts: 0,
+        occupied_conflicts: 0,
+        reasons: [],
+      };
+    }
+    const slotRow = slotMap[key];
+    const resourceLabel = String(conflict.resource_kind || '') === 'room'
+      ? (conflict.room_label || 'Кабінет')
+      : (conflict.teacher_name || 'Викладач');
+    slotRow.conflicts_total += 1;
+    if (conflict.type === 'draft') {
+      slotRow.draft_conflicts += 1;
+      slotRow.reasons.push(`${resourceLabel}: дубль у ручному плані`);
+      return;
+    }
+    slotRow.occupied_conflicts += 1;
+    const busy = conflict.details && conflict.details.busy ? conflict.details.busy : null;
+    const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'інша подія';
+    const courseLabel = busy && busy.course_name ? busy.course_name : 'інший курс';
+    slotRow.reasons.push(`${resourceLabel}: зайнятий (${courseLabel} · ${subjectLabel})`);
+  });
+  Object.values(slotMap).forEach((slotRow) => {
+    const uniqueReasons = Array.from(new Set((slotRow.reasons || []).map((text) => String(text).trim()).filter(Boolean)));
+    slotRow.reasons = uniqueReasons.slice(0, 4);
+    slotRow.reason_text = uniqueReasons.slice(0, 2).join('; ');
+  });
+  return slotMap;
+};
+
+async function buildSessionRoomConflictState({
+  selectedCourseId,
+  selectedSemesterId = null,
+  assessments = [],
+} = {}) {
+  const normalizedCourseId = Number(selectedCourseId || 0);
+  const normalizedSemesterId = Number(selectedSemesterId || 0) || null;
+  const draftAssignments = Array.isArray(assessments) ? assessments : [];
+  const roomIds = Array.from(new Set(
+    draftAssignments
+      .map((row) => Number(row.room_id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const rooms = normalizedCourseId ? await listRoomsForCourse(normalizedCourseId, { includeInactive: true }) : [];
+  const roomsById = new Map((rooms || []).map((room) => [Number(room.id), room]));
+  if (!roomIds.length || !normalizedCourseId) {
+    return {
+      conflicts: [],
+      roomsById,
+      checkedRows: 0,
+    };
+  }
+
+  let activeSemester = null;
+  try {
+    const semesters = await getSemestersCached(normalizedCourseId);
+    activeSemester = normalizedSemesterId
+      ? ((semesters || []).find((row) => Number(row.id) === normalizedSemesterId) || null)
+      : null;
+    if (!activeSemester) {
+      activeSemester = await getActiveSemester(normalizedCourseId);
+    }
+    if (!activeSemester && semesters && semesters.length) {
+      activeSemester = semesters[0];
+    }
+  } catch (_err) {
+    activeSemester = null;
+  }
+
+  let busyRows = [];
+  if (activeSemester && activeSemester.start_date) {
+    const weekNumbers = Array.from(new Set(
+      draftAssignments
+        .map((row) => getSemesterWeekNumberForDate(row.date, activeSemester))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    )).sort((a, b) => a - b);
+    if (weekNumbers.length) {
+      try {
+        busyRows = await db.all(
+          `
+            SELECT
+              se.id,
+              se.course_id,
+              COALESCE(c.name, ('Курс ' || se.course_id::TEXT)) AS course_name,
+              se.subject_id,
+              COALESCE(s.name, 'Подія') AS subject_name,
+              se.group_number,
+              se.room_id,
+              se.week_number,
+              se.day_of_week,
+              se.class_number
+            FROM schedule_entries se
+            LEFT JOIN subjects s ON s.id = se.subject_id
+            LEFT JOIN courses c ON c.id = se.course_id
+            WHERE se.course_id = ?
+              AND se.room_id = ANY(?::int[])
+              AND se.week_number = ANY(?::int[])
+              AND (${normalizedSemesterId ? '(se.semester_id = ? OR se.semester_id IS NULL)' : 'se.semester_id IS NULL'})
+          `,
+          normalizedSemesterId
+            ? [normalizedCourseId, roomIds, weekNumbers, normalizedSemesterId]
+            : [normalizedCourseId, roomIds, weekNumbers]
+        );
+      } catch (err) {
+        if (!isDbSchemaCompatibilityError(err)) {
+          throw err;
+        }
+        busyRows = [];
+      }
+    }
+  }
+
+  const normalizedBusyRows = (busyRows || []).map((row) => ({
+    room_id: Number(row.room_id || 0) || null,
+    class_number: Number(row.class_number || 0) || null,
+    date: getDateForWeekDay(
+      Number(row.week_number || 0),
+      normalizeWeekdayName(row.day_of_week),
+      activeSemester ? activeSemester.start_date : null
+    ),
+    course_id: Number(row.course_id || 0) || null,
+    course_name: row.course_name || '',
+    subject_id: Number(row.subject_id || 0) || null,
+    subject_name: row.subject_name || '',
+    group_number: Number(row.group_number || 0) || null,
+    source_ref: `schedule:${row.id}`,
+  })).filter((row) => row.room_id && row.class_number && isValidDateString(row.date));
+
+  return {
+    conflicts: roomHelpers.buildRoomConflictReport({
+      assignments: draftAssignments,
+      busyRows: normalizedBusyRows,
+      roomsById,
+      selectedCourseId: normalizedCourseId,
+    }),
+    roomsById,
+    checkedRows: draftAssignments.filter((row) => Number(row.room_id || 0) > 0).length,
+  };
+}
+
 const sessionEventTitleLabel = (event) => {
   if (!event) return '';
   if (event.kind === 'consultation') return 'Консультація';
@@ -30315,6 +31728,127 @@ const buildSessionGeneratorPreview = ({
   };
 };
 
+app.post('/admin/session-generator/rooms/save', requireScheduleGeneratorSectionAccess, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.sessionGenerator.rooms.save.init');
+  }
+
+  const courseId = parseSessionGeneratorInt(req.body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
+  const redirect = (messageKind, messageText) => res.redirect(buildSessionGeneratorReturnHref(req.body || {}, messageKind, messageText));
+  if (!courseId) {
+    return redirect('err', 'Оберіть курс перед редагуванням кабінетного фонду.');
+  }
+
+  const normalizedRoom = roomHelpers.normalizeRoomInput(req.body || {}, {
+    courseId,
+    campus: normalizeGeneratorLocation(req.body.location || 'kyiv'),
+  });
+  if (!normalizedRoom.ok) {
+    return redirect('err', normalizedRoom.error || 'Перевірте дані кабінету.');
+  }
+
+  try {
+    const roomId = parseSessionGeneratorInt(req.body.room_id, null, 1, Number.MAX_SAFE_INTEGER);
+    if (roomId) {
+      const existingRoom = await db.get(
+        'SELECT id FROM rooms WHERE id = ? AND course_id = ? LIMIT 1',
+        [roomId, courseId]
+      );
+      if (!existingRoom) {
+        return redirect('err', 'Кабінет не знайдено.');
+      }
+      await db.run(
+        `
+          UPDATE rooms
+          SET
+            campus = ?,
+            building = ?,
+            code = ?,
+            label = ?,
+            room_type = ?,
+            capacity = ?,
+            notes = ?,
+            is_active = ?,
+            updated_at = NOW()
+          WHERE id = ? AND course_id = ?
+        `,
+        [
+          normalizedRoom.value.campus,
+          normalizedRoom.value.building || null,
+          normalizedRoom.value.code || null,
+          normalizedRoom.value.label || null,
+          normalizedRoom.value.room_type,
+          normalizedRoom.value.capacity,
+          normalizedRoom.value.notes || null,
+          Boolean(Number(normalizedRoom.value.is_active || 0)),
+          roomId,
+          courseId,
+        ]
+      );
+      return redirect('ok', 'Кабінет оновлено.');
+    }
+
+    await db.run(
+      `
+        INSERT INTO rooms
+          (course_id, campus, building, code, label, room_type, capacity, notes, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        courseId,
+        normalizedRoom.value.campus,
+        normalizedRoom.value.building || null,
+        normalizedRoom.value.code || null,
+        normalizedRoom.value.label || null,
+        normalizedRoom.value.room_type,
+        normalizedRoom.value.capacity,
+        normalizedRoom.value.notes || null,
+        Boolean(Number(normalizedRoom.value.is_active || 0)),
+      ]
+    );
+    return redirect('ok', 'Кабінет додано.');
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return redirect('err', 'Таблиця rooms ще недоступна у цій схемі БД.');
+    }
+    return handleDbError(res, err, 'admin.sessionGenerator.rooms.save');
+  }
+});
+
+app.post('/admin/session-generator/rooms/:id/delete', requireScheduleGeneratorSectionAccess, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.sessionGenerator.rooms.delete.init');
+  }
+
+  const roomId = parseSessionGeneratorInt(req.params.id, null, 1, Number.MAX_SAFE_INTEGER);
+  const courseId = parseSessionGeneratorInt(req.body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
+  const redirect = (messageKind, messageText) => res.redirect(buildSessionGeneratorReturnHref(req.body || {}, messageKind, messageText));
+  if (!roomId || !courseId) {
+    return redirect('err', 'Не вдалося визначити кабінет для архівації.');
+  }
+
+  try {
+    await db.run(
+      `
+        UPDATE rooms
+        SET is_active = false, updated_at = NOW()
+        WHERE id = ? AND course_id = ?
+      `,
+      [roomId, courseId]
+    );
+    return redirect('ok', 'Кабінет архівовано.');
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return redirect('err', 'Таблиця rooms ще недоступна у цій схемі БД.');
+    }
+    return handleDbError(res, err, 'admin.sessionGenerator.rooms.delete');
+  }
+});
+
 app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
@@ -30617,10 +32151,15 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
                    se.class_number,
                    se.group_number,
                    se.subject_id,
+                   se.room_id,
                    COALESCE(se.lesson_type, '') AS lesson_type,
-                   s.name AS subject_name
+                   s.name AS subject_name,
+                   r.label AS room_name,
+                   r.code AS room_code,
+                   r.building AS room_building
             FROM schedule_entries se
             JOIN subjects s ON s.id = se.subject_id
+            LEFT JOIN rooms r ON r.id = se.room_id
             WHERE se.course_id = ?
               AND se.semester_id = ?
               AND se.week_number IN (${placeholders})
@@ -30639,6 +32178,7 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       teacherMapBySubject,
     });
     const subjectById = new Map((subjects || []).map((subject) => [Number(subject.id), subject]));
+    const rooms = selectedCourseId ? await listRoomsForCourse(selectedCourseId, { includeInactive: true }) : [];
     const allowedDateSet = new Set((explicitSessionDates || []).filter((date) => isValidDateString(date)));
     const draftAssignmentsRaw = normalizeSessionGeneratorDraftAssignments((draftRecord && draftRecord.assignments) || []);
     const manualAssignmentsInitial = draftAssignmentsRaw
@@ -30657,6 +32197,10 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
           ? Math.floor(groupNumberRaw)
           : null;
         if (groupNumber && groupNumber > groupCount) return null;
+        const roomIdRaw = Number(item.room_id || 0);
+        const roomId = Number.isFinite(roomIdRaw) && roomIdRaw > 0
+          ? Math.floor(roomIdRaw)
+          : null;
         return {
           subject_id: subjectId,
           type: item.type === 'credit'
@@ -30665,6 +32209,7 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
           date,
           class_number: classNumber,
           group_number: groupNumber,
+          room_id: roomId,
           note: item.note ? String(item.note).slice(0, 255) : '',
         };
       })
@@ -30738,6 +32283,8 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       plannerItems,
       draftMeta,
       manualAssignmentsInitial,
+      rooms,
+      roomTypeOptions: roomHelpers.ROOM_TYPES,
       sessionTeacherFilterOptions,
       sessionTeacherMapPayload,
       sessionMarkLegend: SESSION_GENERATOR_MARK_LEGEND,
@@ -30884,6 +32431,7 @@ app.post('/admin/session-generator/conflicts/live', requireScheduleGeneratorSect
           day_name: dayName,
           class_number: classNumber,
           group_number: safeGroupNumber,
+          room_id: Number(item.room_id || 0) || null,
           note: item.note || '',
           marks: [item.type === 'credit' ? 'CR' : 'EX'],
         };
@@ -30897,19 +32445,34 @@ app.post('/admin/session-generator/conflicts/live', requireScheduleGeneratorSect
           selectedCourseId,
         })
       : { conflicts: [], unresolvedRows: [], checkedRows: 0 };
-    const slotConflicts = buildSessionConflictSlotMap(conflictReport);
-    const summary = formatSessionTeacherConflictMessage(conflictReport);
+    const roomConflictState = assessments.length
+      ? await buildSessionRoomConflictState({
+          selectedCourseId,
+          selectedSemesterId,
+          assessments,
+        })
+      : { conflicts: [], checkedRows: 0 };
+    const combinedReport = {
+      conflicts: [
+        ...(Array.isArray(conflictReport.conflicts) ? conflictReport.conflicts : []),
+        ...(Array.isArray(roomConflictState.conflicts) ? roomConflictState.conflicts : []),
+      ],
+      unresolvedRows: Array.isArray(conflictReport.unresolvedRows) ? conflictReport.unresolvedRows : [],
+      checkedRows: Number(conflictReport.checkedRows || 0) + Number(roomConflictState.checkedRows || 0),
+    };
+    const slotConflicts = buildSessionConflictSlotMapV2(combinedReport);
+    const summary = formatSessionConflictSummary(combinedReport);
 
     return res.json({
       ok: true,
       summary,
-      checked_rows: Number(conflictReport.checkedRows || 0),
-      conflicts_total: (conflictReport.conflicts || []).length,
-      unresolved_total: (conflictReport.unresolvedRows || []).length,
+      checked_rows: Number(combinedReport.checkedRows || 0),
+      conflicts_total: (combinedReport.conflicts || []).length,
+      unresolved_total: (combinedReport.unresolvedRows || []).length,
       out_of_window_total: outOfWindowRows.length,
       out_of_window_samples: outOfWindowRows.slice(0, 6),
       slot_conflicts: slotConflicts,
-      conflicts: (conflictReport.conflicts || []).slice(0, 30),
+      conflicts: (combinedReport.conflicts || []).slice(0, 30),
       semester_id: selectedSemesterId || null,
     });
   } catch (err) {
@@ -31113,6 +32676,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
           day_name: dayName,
           class_number: Number(item.class_number),
           group_number: safeGroupNumber,
+          room_id: Number(item.room_id || 0) || null,
           group_label: safeGroupNumber ? `Група ${safeGroupNumber}` : (groupCount > 1 ? `Всі групи (${groupCount})` : 'Всі'),
           note: item.note || '',
           marks: [item.type === 'credit' ? 'CR' : 'EX'],
@@ -31147,11 +32711,24 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       expandedAssignments,
       selectedCourseId,
     });
-    const conflictSummary = formatSessionTeacherConflictMessage(conflictReport);
+    const roomConflictState = await buildSessionRoomConflictState({
+      selectedCourseId,
+      selectedSemesterId,
+      assessments,
+    });
+    const combinedReport = {
+      conflicts: [
+        ...(Array.isArray(conflictReport.conflicts) ? conflictReport.conflicts : []),
+        ...(Array.isArray(roomConflictState.conflicts) ? roomConflictState.conflicts : []),
+      ],
+      unresolvedRows: Array.isArray(conflictReport.unresolvedRows) ? conflictReport.unresolvedRows : [],
+      checkedRows: Number(conflictReport.checkedRows || 0) + Number(roomConflictState.checkedRows || 0),
+    };
+    const conflictSummary = formatSessionConflictSummary(combinedReport);
     if (publishAction === 'check_conflicts') {
-      return redirectToGenerator(conflictReport.conflicts.length ? 'err' : 'ok', conflictSummary);
+      return redirectToGenerator(combinedReport.conflicts.length ? 'err' : 'ok', conflictSummary);
     }
-    if (conflictReport.conflicts.length) {
+    if (combinedReport.conflicts.length) {
       return redirectToGenerator('err', conflictSummary);
     }
     const username = String(req.session.user?.username || '');
@@ -31167,6 +32744,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       const classNumber = Number(assignment.class_number);
       const assessmentDate = toDateOnly(assignment.date);
       const dayName = normalizeWeekdayName(assignment.day_name);
+      const roomId = Number(assignment.room_id || 0) || null;
       if (
         !Number.isFinite(subjectId) || subjectId < 1
         || !Number.isFinite(groupNumber) || groupNumber < 1
@@ -31231,9 +32809,9 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
               group_name, subject, day, time, class_number, subject_id, group_number, day_of_week,
               created_by_id, description, class_date, meeting_url, link_url, file_path, file_name,
               created_by, created_at, course_id, semester_id, status, scheduled_at, published_at,
-              is_control, is_teacher_homework, is_credit
+              is_control, is_teacher_homework, is_credit, room_id
             )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', NULL, ?, ?, 1, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', NULL, ?, ?, 1, ?, ?)
         `,
         [
           `Група ${groupNumber}`,
@@ -31258,6 +32836,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
           createdAt,
           isControlFlag,
           isCredit,
+          roomId,
         ]
       );
       createdCount += 1;
@@ -31287,7 +32866,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       }
     }
 
-    const unresolvedSuffix = conflictReport.unresolvedRows.length
+    const unresolvedSuffix = combinedReport.unresolvedRows.length
       ? ` Перевірка конфліктів неповна: для ${conflictReport.unresolvedRows.length} подій не знайдено привʼязаного викладача (teacher_subjects).`
       : '';
     const message = createdCount > 0
@@ -36364,6 +37943,8 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   const classNum = Number(class_number);
   const groupNum = Number(group_number);
   const subjectId = Number(subject_id);
+  const inputRoomId = Number(req.body.room_id);
+  const rawTemplateSourceId = Number(req.body.template_source_id);
   const isControl = String(is_control || '').toLowerCase() === '1' ? 1 : 0;
   const isCredit = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_credit || '').toLowerCase()) ? 1 : 0;
   const sessionCourseId = req.session.user?.course_id || 1;
@@ -36433,6 +38014,29 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
     }
     const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || selectedCourseId || 1);
     const activeSemester = await getActiveSemester(storageCourseId || 1);
+    let safeRoomId = null;
+    if (Number.isInteger(inputRoomId) && inputRoomId > 0) {
+      const roomRow = await db.get(
+        'SELECT id FROM rooms WHERE id = ? AND course_id = ? AND is_active = true LIMIT 1',
+        [inputRoomId, storageCourseId]
+      ).catch((err) => {
+        if (isDbSchemaCompatibilityError(err)) return null;
+        throw err;
+      });
+      if (roomRow && Number(roomRow.id) > 0) {
+        safeRoomId = Number(roomRow.id);
+      }
+    }
+    let templateSourceId = null;
+    if (isTeacher && Number.isInteger(rawTemplateSourceId) && rawTemplateSourceId > 0) {
+      const sourceTemplate = await db.get(
+        'SELECT id FROM teacher_homework_templates WHERE id = ? AND user_id = ? LIMIT 1',
+        [rawTemplateSourceId, userId]
+      );
+      if (sourceTemplate && Number(sourceTemplate.id) > 0) {
+        templateSourceId = Number(sourceTemplate.id);
+      }
+    }
     const maxGroups = Number(subjectRow.group_count || 1);
     let targetGroups = [];
     if (isTeacher) {
@@ -36516,8 +38120,8 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
       const row = await db.get(
         `
           INSERT INTO homework
-          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, status, scheduled_at, published_at, is_control, is_teacher_homework, is_credit)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, status, scheduled_at, published_at, is_control, is_teacher_homework, is_credit, room_id, source_template_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           RETURNING id
         `,
         [
@@ -36546,6 +38150,8 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
           isControl,
           isTeacher ? 1 : 0,
           isCredit,
+          safeRoomId,
+          templateSourceId,
         ]
       );
       if (!row || !row.id) {
@@ -36574,6 +38180,22 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
           );
         }
       }
+    }
+    let uploadedAssetIds = [];
+    if (isTeacher && req.file) {
+      const uploadedAssetId = await createAssetFromUpload({
+        file: req.file,
+        userId,
+        courseId: storageCourseId,
+        name: description,
+        kind: 'homework_attachment',
+      });
+      if (uploadedAssetId) {
+        uploadedAssetIds = [uploadedAssetId];
+      }
+    }
+    if (templateSourceId || uploadedAssetIds.length) {
+      await copyTemplateAssetsToHomework(templateSourceId, createdIds, uploadedAssetIds);
     }
 
     const logGroup = targetGroups.length === 1 ? targetGroups[0] : null;
@@ -36609,6 +38231,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
         tags,
         isControl,
         isCredit,
+        uploadedAssetIds,
         source: 'schedule_homework_add',
       });
     }
@@ -36651,6 +38274,8 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
   const filePath = req.file ? `/uploads/${req.file.filename}` : null;
   const fileName = req.file ? req.file.originalname : null;
   const subjectId = Number(subject_id);
+  const inputRoomId = Number(req.body.room_id);
+  const rawTemplateSourceId = Number(req.body.template_source_id);
   const groupInput = req.body.group_number ? Number(req.body.group_number) : null;
   const dueDate = String(custom_due_date || '').slice(0, 10);
   const isCredit = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_credit || '').toLowerCase()) ? 1 : 0;
@@ -36711,6 +38336,29 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
     }
     const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || selectedCourseId || 1);
     const activeSemester = await getActiveSemester(storageCourseId || 1);
+    let safeRoomId = null;
+    if (Number.isInteger(inputRoomId) && inputRoomId > 0) {
+      const roomRow = await db.get(
+        'SELECT id FROM rooms WHERE id = ? AND course_id = ? AND is_active = true LIMIT 1',
+        [inputRoomId, storageCourseId]
+      ).catch((err) => {
+        if (isDbSchemaCompatibilityError(err)) return null;
+        throw err;
+      });
+      if (roomRow && Number(roomRow.id) > 0) {
+        safeRoomId = Number(roomRow.id);
+      }
+    }
+    let templateSourceId = null;
+    if (isTeacher && Number.isInteger(rawTemplateSourceId) && rawTemplateSourceId > 0) {
+      const sourceTemplate = await db.get(
+        'SELECT id FROM teacher_homework_templates WHERE id = ? AND user_id = ? LIMIT 1',
+        [rawTemplateSourceId, userId]
+      );
+      if (sourceTemplate && Number(sourceTemplate.id) > 0) {
+        templateSourceId = Number(sourceTemplate.id);
+      }
+    }
     let targetGroups = [];
     if (isTeacher) {
       const teacherRows = await db.all(
@@ -36770,8 +38418,8 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
       const row = await db.get(
         `
           INSERT INTO homework
-          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at, is_teacher_homework, is_credit)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at, is_teacher_homework, is_credit, room_id, source_template_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           RETURNING id
         `,
         [
@@ -36801,6 +38449,8 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
           publishedAt,
           isTeacher ? 1 : 0,
           isCredit,
+          safeRoomId,
+          templateSourceId,
         ]
       );
       if (!row || !row.id) {
@@ -36827,6 +38477,22 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
       storageCourseId,
       activeSemester ? activeSemester.id : null
     );
+    let uploadedAssetIds = [];
+    if (isTeacher && req.file) {
+      const uploadedAssetId = await createAssetFromUpload({
+        file: req.file,
+        userId,
+        courseId: storageCourseId,
+        name: description,
+        kind: 'homework_attachment',
+      });
+      if (uploadedAssetId) {
+        uploadedAssetIds = [uploadedAssetId];
+      }
+    }
+    if (templateSourceId || uploadedAssetIds.length) {
+      await copyTemplateAssetsToHomework(templateSourceId, [createdId], uploadedAssetIds);
+    }
     if (isTeacher) {
       await maybeCreateTeacherTemplateFromHomework(req, {
         userId,
@@ -36840,6 +38506,7 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
         tags: '',
         isControl: 0,
         isCredit,
+        uploadedAssetIds,
         source: 'schedule_homework_custom_deadline',
       });
     }

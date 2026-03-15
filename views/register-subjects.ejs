@@ -379,6 +379,15 @@
                 <p class="mb-0"><%= t('registerSubjects.instructionsPrimary') %></p>
                 <p class="mb-0"><%= t('registerSubjects.instructionsSecondary') %></p>
               </div>
+              <% if (pathwayRegistrationHint) { %>
+                <div class="alert alert-info flash-alert mb-3" role="status">
+                  <span class="flash-alert__icon" aria-hidden="true">i</span>
+                  <div class="flash-alert__body">
+                    <span class="flash-alert__title"><%= lang === 'en' ? 'Pathway check' : 'Перевірка pathway' %></span>
+                    <p class="flash-alert__text"><%= pathwayRegistrationHint %></p>
+                  </div>
+                </div>
+              <% } %>
 
               <% if (subjectRegistrationErrorText) { %>
                 <div class="alert alert-danger flash-alert mb-3" role="alert">

@@ -2000,6 +2000,8 @@
                     data-lessontype="<%= cls.lesson_type || '' %>"
                     data-courseid="<%= cls.course_id || '' %>"
                     data-date="<%= cls.class_date %>"
+                    data-room-id="<%= cls.room_id || '' %>"
+                    data-room-label="<%= cls.room_label || '' %>"
                     data-is-general="<%= cls.is_general ? 1 : 0 %>"
                     data-use-local-time="<%= cls.use_local_time ? 1 : 0 %>"
                     data-detail="<%= tooltipParts.join(' • ') %>"
@@ -2012,6 +2014,9 @@
                             <span class="lesson-pill"><%= typeLabel %></span>
                           <% } %>
                         </div>
+                        <% if (cls.room_label) { %>
+                          <div class="schedule-meta classMeta"><%= lang === 'en' ? 'Room' : 'Кабінет' %>: <%= cls.room_label %></div>
+                        <% } %>
                         <div class="schedule-meta classMeta"><%= groupLabel %> · <%= scheduleViewText.classLabel %> <%= cls.class_number %><%= courseLabel %></div>
                       </div>
                       <div class="schedule-aside">
@@ -2338,6 +2343,8 @@
                 <input type="hidden" id="hwClassNum" name="class_number" />
                 <input type="hidden" id="hwDate" name="class_date" />
                 <input type="hidden" id="hwCourseId" name="course_id" />
+                <input type="hidden" id="hwRoomId" name="room_id" />
+                <input type="hidden" id="hwTemplateSourceId" name="template_source_id" />
                 <input type="hidden" id="hwTags" name="tags" />
               </form>
             <% } else { %>
@@ -2679,6 +2686,10 @@
         messagesSubjectFallback: t('schedule.messages.subjectFallback'),
         messagesAdminFallback: t('schedule.messages.adminFallback'),
       }) %>;
+      const scheduleUiText = <%- JSON.stringify({
+        roomLabel: lang === 'en' ? 'Room' : 'Кабінет',
+        assetsLabel: lang === 'en' ? 'Files' : 'Файли',
+      }) %>;
       function wireSelectOpenState(root = document) {
         root.querySelectorAll('select.form-select').forEach((select) => {
           select.addEventListener('pointerdown', () => {
@@ -2910,6 +2921,8 @@
       const hwControlToggle = document.getElementById('hwControl');
       const hwTemplateSelect = document.getElementById('hwTemplateSelect');
       const hwTemplateApplyBtn = document.getElementById('hwTemplateApply');
+      const hwRoomField = document.getElementById('hwRoomId');
+      const hwTemplateSourceField = document.getElementById('hwTemplateSourceId');
       const hwTextInput = document.getElementById('hwText');
       const hwLinkInput = document.getElementById('hwLink');
       const hwMeetingInput = document.getElementById('hwMeeting');
@@ -3038,6 +3051,8 @@
           if (item.link_url) tooltipParts.push(scheduleText.homeworkLinkAvailable);
           if (item.meeting_url) tooltipParts.push(scheduleText.homeworkMeetingAvailable);
           if (item.file_path) tooltipParts.push(scheduleText.homeworkFileAvailable);
+          if (item.room_label) tooltipParts.push(`${scheduleUiText.roomLabel}: ${item.room_label}`);
+          if (item.assets && item.assets.length) tooltipParts.push(`${scheduleUiText.assetsLabel}: ${item.assets.length}`);
           if (tooltipParts.length) {
             li.setAttribute('data-bs-toggle', 'tooltip');
             li.setAttribute('data-bs-placement', 'top');
@@ -3066,6 +3081,13 @@
             }
           }
           li.appendChild(meta);
+
+          if (item.room_label) {
+            const roomMeta = document.createElement('div');
+            roomMeta.className = 'text-muted small mb-2';
+            roomMeta.textContent = `${scheduleUiText.roomLabel}: ${item.room_label}`;
+            li.appendChild(roomMeta);
+          }
 
           const dueDate = item.custom_due_date || item.class_date;
           const hasSubmitted = canSubmitHomework && Boolean(item.submitted_at);
@@ -3169,6 +3191,22 @@
             fileLink.textContent = item.file_name || scheduleText.customDeadlinesFileFallback;
             fileLink.className = 'd-inline-block';
             li.appendChild(fileLink);
+          }
+          if (item.assets && item.assets.length) {
+            const assetWrap = document.createElement('div');
+            assetWrap.className = 'mt-2 d-flex flex-column gap-1';
+            const assetLabel = document.createElement('div');
+            assetLabel.className = 'text-muted small';
+            assetLabel.textContent = `${scheduleUiText.assetsLabel}:`;
+            assetWrap.appendChild(assetLabel);
+            item.assets.forEach((asset) => {
+              const assetLink = document.createElement('a');
+              assetLink.href = asset.file_path;
+              assetLink.textContent = asset.name || asset.original_name || scheduleText.customDeadlinesFileFallback;
+              assetLink.className = 'small';
+              assetWrap.appendChild(assetLink);
+            });
+            li.appendChild(assetWrap);
           }
 
           if (canSubmitHomework && homeworkSubmitModal && item.id) {
@@ -3323,6 +3361,9 @@
         if (hwControlToggle) {
           hwControlToggle.checked = Number(template.is_control || 0) === 1;
         }
+        if (hwTemplateSourceField) {
+          hwTemplateSourceField.value = String(templateId);
+        }
         if (hwTemplateTitleInput && !hwTemplateTitleInput.value.trim()) {
           hwTemplateTitleInput.value = deriveTemplateTitle(String(template.title || template.description || ''));
         }
@@ -3344,12 +3385,24 @@
         const lessonType = String(button.getAttribute('data-lessontype') || '').toLowerCase();
         const courseId = Number(button.getAttribute('data-courseid'));
         const classDate = button.getAttribute('data-date');
+        const roomId = Number(button.getAttribute('data-room-id'));
+        const roomLabel = String(button.getAttribute('data-room-label') || '').trim();
         const isGeneral = button.getAttribute('data-is-general') === '1';
 
         document.getElementById('homeworkModalTitle').textContent = subject;
         document.getElementById('homeworkModalMeta').textContent = `${day} · ${time}`;
 
+        document.getElementById('homeworkModalMeta').textContent = `${day} В· ${time}`;
+        if (roomLabel) {
+          document.getElementById('homeworkModalMeta').textContent = `${day} В· ${time} В· ${scheduleUiText.roomLabel}: ${roomLabel}`;
+        }
         const hwDayField = document.getElementById('hwDay');
+        const homeworkMetaEl = document.getElementById('homeworkModalMeta');
+        if (homeworkMetaEl) {
+          homeworkMetaEl.textContent = roomLabel
+            ? `${day} | ${time} | ${scheduleUiText.roomLabel}: ${roomLabel}`
+            : `${day} | ${time}`;
+        }
         if (hwDayField) hwDayField.value = day;
         const hwTimeField = document.getElementById('hwTime');
         if (hwTimeField) hwTimeField.value = timeBase;
@@ -3364,6 +3417,12 @@
         const courseField = document.getElementById('hwCourseId');
         if (courseField) {
           courseField.value = Number.isNaN(courseId) ? '' : String(courseId);
+        }
+        if (hwRoomField) {
+          hwRoomField.value = Number.isNaN(roomId) ? '' : String(roomId || '');
+        }
+        if (hwTemplateSourceField) {
+          hwTemplateSourceField.value = '';
         }
         if (hwControlToggle) {
           hwControlToggle.checked = false;
@@ -3446,6 +3505,12 @@
         }
         if (hwTemplateTitleWrap) {
           hwTemplateTitleWrap.classList.add('d-none');
+        }
+        if (hwRoomField) {
+          hwRoomField.value = '';
+        }
+        if (hwTemplateSourceField) {
+          hwTemplateSourceField.value = '';
         }
         if (location.hash.startsWith('#class=')) {
           history.replaceState(null, '', location.pathname + location.search);
