@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.42",
+      "date": "2026-03-16",
+      "items": [
+        "feat(template-inline-file-uploads): allow uploading reusable files directly from the create and edit template forms in Teacher Workspace, automatically saving them to the asset library and linking them to the template"
+      ]
+    },
+    {
       "version": "1.2.41",
       "date": "2026-03-16",
       "items": [

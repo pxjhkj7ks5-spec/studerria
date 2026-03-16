@@ -7556,6 +7556,51 @@ async function createAssetFromUpload({ file, userId, courseId = null, name = '',
   }
 }
 
+function unlinkUploadedFiles(files = []) {
+  (Array.isArray(files) ? files : []).forEach((file) => {
+    if (!file || !file.path) return;
+    fs.unlink(file.path, () => {});
+  });
+}
+
+async function deleteAssetsByIds(rawAssetIds = []) {
+  const assetIds = teacherTemplateHelpers.normalizeTemplateAssetIds(rawAssetIds, 64);
+  if (!assetIds.length) return;
+  try {
+    await db.run('DELETE FROM assets WHERE id = ANY(?::int[])', [assetIds]);
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+}
+
+async function cleanupFailedUploadedAssets({ files = [], assetIds = [] } = {}) {
+  await deleteAssetsByIds(assetIds);
+  unlinkUploadedFiles(files);
+}
+
+async function createAssetsFromUploads({ files = [], userId, courseId = null, kind = 'attachment' } = {}) {
+  const uploadedFiles = Array.isArray(files) ? files.filter(Boolean) : [];
+  const createdAssetIds = [];
+  for (const file of uploadedFiles) {
+    const assetId = await createAssetFromUpload({
+      file,
+      userId,
+      courseId,
+      kind,
+    });
+    if (!assetId) {
+      const error = new Error('Asset storage unavailable');
+      error.code = 'ASSET_STORAGE_UNAVAILABLE';
+      error.assetIds = createdAssetIds.slice();
+      throw error;
+    }
+    createdAssetIds.push(assetId);
+  }
+  return createdAssetIds;
+}
+
 async function syncTemplateAssetMap(templateId, userId, rawAssetIds = []) {
   const normalizedTemplateId = Number(templateId || 0);
   const normalizedUserId = Number(userId || 0);
@@ -9734,13 +9779,16 @@ app.post('/teacher/workspace/assets/:id/delete', requireLogin, async (req, res) 
   }
 });
 
-app.post('/teacher/workspace/templates', requireLogin, async (req, res) => {
+app.post('/teacher/workspace/templates', requireLogin, uploadLimiter, upload.array('template_files', 8), async (req, res) => {
+  const uploadedFiles = Array.isArray(req.files) ? req.files : [];
   try {
     await ensureDbReady();
   } catch (err) {
+    unlinkUploadedFiles(uploadedFiles);
     return handleDbError(res, err, 'teacher.workspace.templates.create.init');
   }
   if (!hasSessionRole(req, 'teacher')) {
+    unlinkUploadedFiles(uploadedFiles);
     return res.redirect('/schedule');
   }
   const { id: userId, course_id: fallbackCourseId } = req.session.user;
@@ -9754,17 +9802,33 @@ app.post('/teacher/workspace/templates', requireLogin, async (req, res) => {
   const assetIds = teacherTemplateHelpers.normalizeTemplateAssetIds(req.body.asset_ids, 48);
   const linkUrl = normalizeExternalUrl(req.body.link_url) || null;
   const meetingUrl = normalizeExternalUrl(req.body.meeting_url) || null;
+  const fallbackCourseQuery = Number.isInteger(requestedCourseId) && requestedCourseId > 0
+    ? `&course=${requestedCourseId}`
+    : (Number.isInteger(Number(fallbackCourseId)) && Number(fallbackCourseId) > 0 ? `&course=${Number(fallbackCourseId)}` : '');
 
   if (!title || !description) {
-    return res.redirect('/teacher/workspace?error=Title%20and%20description%20are%20required');
+    unlinkUploadedFiles(uploadedFiles);
+    return res.redirect(`/teacher/workspace?error=Title%20and%20description%20are%20required${fallbackCourseQuery}`);
   }
 
+  let uploadedAssetIds = [];
   try {
     const resolvedScope = await resolveTeacherTemplateScope(userId, requestedCourseId, requestedSubjectId);
     if (!resolvedScope.ok) {
-      return res.redirect(`/teacher/workspace?error=${resolvedScope.error || 'Invalid%20template%20scope'}`);
+      unlinkUploadedFiles(uploadedFiles);
+      return res.redirect(`/teacher/workspace?error=${resolvedScope.error || 'Invalid%20template%20scope'}${fallbackCourseQuery}`);
     }
     const { courseId, subjectId, validatedCourseId } = resolvedScope;
+    uploadedAssetIds = await createAssetsFromUploads({
+      files: uploadedFiles,
+      userId,
+      courseId: courseId || validatedCourseId || fallbackCourseId || null,
+      kind: 'template_attachment',
+    });
+    const combinedAssetIds = teacherTemplateHelpers.buildAppliedHomeworkAssetIds({
+      templateAssetIds: assetIds,
+      uploadedAssetIds,
+    });
 
     const inserted = await db.get(
       `
@@ -9800,7 +9864,7 @@ app.post('/teacher/workspace/templates', requireLogin, async (req, res) => {
       ]
     );
     if (inserted && inserted.id) {
-      await syncTemplateAssetMap(inserted.id, userId, assetIds);
+      await syncTemplateAssetMap(inserted.id, userId, combinedAssetIds);
     }
 
     logAction(db, req, 'teacher_homework_template_create', {
@@ -9811,6 +9875,8 @@ app.post('/teacher/workspace/templates', requireLogin, async (req, res) => {
       tags: tags ? tags.split(',').map((item) => item.trim()).filter(Boolean) : [],
       is_control: isControl,
       is_credit: isCredit,
+      asset_ids: combinedAssetIds,
+      uploaded_asset_ids: uploadedAssetIds,
     });
 
     const redirectCourseId = courseId || (validatedCourseId || null);
@@ -9820,25 +9886,33 @@ app.post('/teacher/workspace/templates', requireLogin, async (req, res) => {
     return res.redirect(`/teacher/workspace?ok=Template%20saved${courseQuery}`);
   } catch (err) {
     console.error('Teacher workspace template create failed', err);
-    const fallbackCourseQuery = Number.isInteger(requestedCourseId) && requestedCourseId > 0
-      ? `&course=${requestedCourseId}`
-      : (Number.isInteger(fallbackCourseId) && fallbackCourseId > 0 ? `&course=${fallbackCourseId}` : '');
-    return res.redirect(`/teacher/workspace?error=Database%20error${fallbackCourseQuery}`);
+    await cleanupFailedUploadedAssets({
+      files: uploadedFiles,
+      assetIds: uploadedAssetIds.length ? uploadedAssetIds : (err && Array.isArray(err.assetIds) ? err.assetIds : []),
+    });
+    const errorMessage = err && err.code === 'ASSET_STORAGE_UNAVAILABLE'
+      ? 'Asset%20storage%20is%20unavailable'
+      : 'Database%20error';
+    return res.redirect(`/teacher/workspace?error=${errorMessage}${fallbackCourseQuery}`);
   }
 });
 
-app.post('/teacher/workspace/templates/:id/update', requireLogin, async (req, res) => {
+app.post('/teacher/workspace/templates/:id/update', requireLogin, uploadLimiter, upload.array('template_files', 8), async (req, res) => {
+  const uploadedFiles = Array.isArray(req.files) ? req.files : [];
   try {
     await ensureDbReady();
   } catch (err) {
+    unlinkUploadedFiles(uploadedFiles);
     return handleDbError(res, err, 'teacher.workspace.templates.update.init');
   }
   if (!hasSessionRole(req, 'teacher')) {
+    unlinkUploadedFiles(uploadedFiles);
     return res.redirect('/schedule');
   }
   const { id: userId } = req.session.user;
   const templateId = Number(req.params.id);
   if (!Number.isInteger(templateId) || templateId < 1) {
+    unlinkUploadedFiles(uploadedFiles);
     return res.redirect('/teacher/workspace?error=Invalid%20template');
   }
 
@@ -9859,9 +9933,11 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, async (req, re
   const fallbackCourseQuery = fallbackCourseId ? `&course=${fallbackCourseId}` : '';
 
   if (!title || !description) {
+    unlinkUploadedFiles(uploadedFiles);
     return res.redirect(`/teacher/workspace?error=Title%20and%20description%20are%20required${fallbackCourseQuery}`);
   }
 
+  let uploadedAssetIds = [];
   try {
     const existing = await db.get(
       `
@@ -9873,17 +9949,30 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, async (req, re
       [templateId]
     );
     if (!existing) {
+      unlinkUploadedFiles(uploadedFiles);
       return res.redirect(`/teacher/workspace?error=Template%20not%20found${fallbackCourseQuery}`);
     }
     if (Number(existing.user_id) !== Number(userId)) {
+      unlinkUploadedFiles(uploadedFiles);
       return res.status(403).send('Forbidden');
     }
 
     const resolvedScope = await resolveTeacherTemplateScope(userId, requestedCourseId, requestedSubjectId);
     if (!resolvedScope.ok) {
+      unlinkUploadedFiles(uploadedFiles);
       return res.redirect(`/teacher/workspace?error=${resolvedScope.error || 'Invalid%20template%20scope'}${fallbackCourseQuery}`);
     }
     const { courseId, subjectId, validatedCourseId } = resolvedScope;
+    uploadedAssetIds = await createAssetsFromUploads({
+      files: uploadedFiles,
+      userId,
+      courseId: courseId || validatedCourseId || fallbackCourseId || null,
+      kind: 'template_attachment',
+    });
+    const combinedAssetIds = teacherTemplateHelpers.buildAppliedHomeworkAssetIds({
+      templateAssetIds: assetIds,
+      uploadedAssetIds,
+    });
 
     await db.run(
       `
@@ -9914,7 +10003,7 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, async (req, re
         templateId,
       ]
     );
-    await syncTemplateAssetMap(templateId, userId, assetIds);
+    await syncTemplateAssetMap(templateId, userId, combinedAssetIds);
 
     logAction(db, req, 'teacher_homework_template_update', {
       template_id: templateId,
@@ -9925,6 +10014,8 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, async (req, re
       tags: tags ? tags.split(',').map((item) => item.trim()).filter(Boolean) : [],
       is_control: isControl,
       is_credit: isCredit,
+      asset_ids: combinedAssetIds,
+      uploaded_asset_ids: uploadedAssetIds,
     });
 
     const redirectCourseId = courseId || validatedCourseId || fallbackCourseId || null;
@@ -9932,7 +10023,14 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, async (req, re
     return res.redirect(`/teacher/workspace?ok=Template%20updated${courseQuery}`);
   } catch (err) {
     console.error('Teacher workspace template update failed', err);
-    return res.redirect(`/teacher/workspace?error=Database%20error${fallbackCourseQuery}`);
+    await cleanupFailedUploadedAssets({
+      files: uploadedFiles,
+      assetIds: uploadedAssetIds.length ? uploadedAssetIds : (err && Array.isArray(err.assetIds) ? err.assetIds : []),
+    });
+    const errorMessage = err && err.code === 'ASSET_STORAGE_UNAVAILABLE'
+      ? 'Asset%20storage%20is%20unavailable'
+      : 'Database%20error';
+    return res.redirect(`/teacher/workspace?error=${errorMessage}${fallbackCourseQuery}`);
   }
 });
 
