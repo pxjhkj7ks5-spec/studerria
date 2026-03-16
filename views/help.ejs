@@ -223,6 +223,20 @@
                   </div>
                 <% } %>
                 <% if (request.needs_reply) { %>
+                  <div class="studerria-help-thread-toolbar">
+                    <p class="studerria-help-thread-toolbar-copy"><%= t('help.closePrompt') %></p>
+                    <form
+                      method="POST"
+                      action="/help/support/<%= request.id %>/close"
+                      class="studerria-help-close-form"
+                      data-confirm="<%= t('help.closeConfirm') %>"
+                      onsubmit="return confirm(this.dataset.confirm || '')"
+                    >
+                      <button class="btn btn-outline-secondary glass btn-sm studerria-help-close-button" type="submit">
+                        <%= t('help.closeAction') %>
+                      </button>
+                    </form>
+                  </div>
                   <form method="POST" action="/help/support/<%= request.id %>/reply" class="studerria-help-reply-form">
                     <label class="form-label" for="supportReply<%= request.id %>"><%= lang === 'uk' ? 'Уточнити контекст' : 'Add reply' %></label>
                     <textarea

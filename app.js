@@ -8042,6 +8042,27 @@ async function listSupportRequestsForCourse(courseId, limit = 40) {
   );
 }
 
+async function getSupportRequestForUser(requestId, userId) {
+  const normalizedRequestId = Number(requestId || 0);
+  const normalizedUserId = Number(userId || 0);
+  if (!Number.isInteger(normalizedRequestId) || normalizedRequestId < 1) {
+    return null;
+  }
+  if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) {
+    return null;
+  }
+  return db.get(
+    `
+      SELECT id, user_id, status
+      FROM support_requests
+      WHERE id = ?
+        AND user_id = ?
+      LIMIT 1
+    `,
+    [normalizedRequestId, normalizedUserId]
+  );
+}
+
 async function getSupportRequestThreadForCourse(requestId, courseId) {
   const normalizedRequestId = Number(requestId || 0);
   const normalizedCourseId = Number(courseId || 0);
@@ -8474,17 +8495,9 @@ app.post('/help/support/:id/reply', requireLogin, writeLimiter, async (req, res)
   }
 
   try {
-    const supportRequest = await db.get(
-      `
-        SELECT id, user_id
-        FROM support_requests
-        WHERE id = ?
-        LIMIT 1
-      `,
-      [requestId]
-    );
-    if (!supportRequest || Number(supportRequest.user_id || 0) !== Number(req.session.user.id || 0)) {
-      return res.redirect(`/help?err=${encodeURIComponent(lang === 'uk' ? 'Звернення не знайдено' : 'Request not found')}`);
+    const supportRequest = await getSupportRequestForUser(requestId, req.session.user.id);
+    if (!supportRequest) {
+      return res.redirect(`/help?err=${encodeURIComponent(translate(lang, 'help.flash.requestMissing'))}`);
     }
 
     await insertSupportRequestMessage({
@@ -8515,6 +8528,51 @@ app.post('/help/support/:id/reply', requireLogin, writeLimiter, async (req, res)
       return res.redirect(`/help?err=${encodeURIComponent(lang === 'uk' ? 'Потік підтримки недоступний у цій схемі БД' : 'Support thread storage is unavailable in this DB schema')}`);
     }
     return handleDbError(res, err, 'help.support.reply');
+  }
+});
+
+app.post('/help/support/:id/close', requireLogin, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'help.support.close.init');
+  }
+
+  const lang = getPreferredLang(req);
+  const requestId = Number(req.params.id || 0);
+  if (!Number.isInteger(requestId) || requestId < 1) {
+    return res.redirect(`/help?err=${encodeURIComponent(translate(lang, 'help.flash.requestMissing'))}`);
+  }
+
+  try {
+    const supportRequest = await getSupportRequestForUser(requestId, req.session.user.id);
+    if (!supportRequest) {
+      return res.redirect(`/help?err=${encodeURIComponent(translate(lang, 'help.flash.requestMissing'))}`);
+    }
+    if (normalizeSupportRequestStatus(supportRequest.status) === 'resolved') {
+      return res.redirect(`/help?ok=${encodeURIComponent(translate(lang, 'help.flash.requestAlreadyClosed'))}`);
+    }
+
+    await db.run(
+      `
+        UPDATE support_requests
+        SET
+          status = 'resolved',
+          updated_at = NOW(),
+          resolved_at = NOW(),
+          resolved_by = NULL
+        WHERE id = ?
+      `,
+      [requestId]
+    );
+
+    logAction(db, req, 'support_request_close', {
+      request_id: requestId,
+      closed_by: 'user',
+    });
+    return res.redirect(`/help?ok=${encodeURIComponent(translate(lang, 'help.flash.requestClosed'))}`);
+  } catch (err) {
+    return handleDbError(res, err, 'help.support.close');
   }
 });
 
@@ -25391,7 +25449,8 @@ app.post('/admin/support-requests/:id/update', requireSupportSectionAccess, writ
   const replyBody = String(req.body.reply_body || req.body.admin_note || '')
     .replace(/\r\n/g, '\n')
     .trim();
-  const status = normalizeSupportRequestStatus(req.body.status);
+  const closeRequested = String(req.body.close_request || '') === '1';
+  const status = closeRequested ? 'resolved' : normalizeSupportRequestStatus(req.body.status);
   const selectedCourseId = Number(getAdminCourse(req) || req.session.user.course_id || 0);
   const redirectCourseQuery = selectedCourseId > 0 ? `&course=${selectedCourseId}` : '';
   const redirectThreadQuery = Number.isInteger(requestId) && requestId > 0 ? `&support_request=${requestId}` : '';

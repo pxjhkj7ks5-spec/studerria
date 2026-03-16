@@ -837,6 +837,13 @@
       .support-chat-reply textarea {
         min-height: 120px;
       }
+      .support-chat-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.75rem;
+      }
       .support-chat-empty {
         display: grid;
         place-items: center;
@@ -4222,7 +4229,18 @@
                                 placeholder="<%= t('admin.supportReplyPlaceholder') %>"
                               ></textarea>
                             </div>
-                            <div class="col-12 d-flex justify-content-end">
+                            <div class="col-12 support-chat-actions">
+                              <% if (supportThread.status !== 'resolved') { %>
+                                <button
+                                  class="btn btn-outline-secondary glass"
+                                  type="submit"
+                                  name="close_request"
+                                  value="1"
+                                  onclick="return confirm('<%= t('admin.supportCloseConfirm') %>')"
+                                >
+                                  <%= t('admin.supportClose') %>
+                                </button>
+                              <% } %>
                               <button class="btn btn-primary" type="submit"><%= t('admin.supportReplySend') %></button>
                             </div>
                           </form>

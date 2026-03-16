@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.40",
+      "date": "2026-03-16",
+      "items": [
+        "feat(support-request-close-action): add explicit close controls for support threads in FAQ & Help and the admin support workspace so requests can be closed directly instead of only changing the status dropdown"
+      ]
+    },
+    {
       "version": "1.2.39",
       "date": "2026-03-15",
       "items": [
