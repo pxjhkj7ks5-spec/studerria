@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   buildPathwayReadinessSummary,
+  buildRegistrationReadinessAlert,
   buildSubjectVisibilityCopy,
   describeCatalogBinding,
 } = require('../lib/pathways');
@@ -27,4 +28,22 @@ test('catalog binding description distinguishes shared subjects', () => {
     describeCatalogBinding({ isShared: true, bindingCount: 3 }),
     'Shared catalog subject linked to 3 courses'
   );
+});
+
+test('registration readiness alert explains blocked mapping state', () => {
+  const summary = buildPathwayReadinessSummary({
+    mappedCourses: 0,
+    visibleSubjects: 2,
+    totalSubjects: 4,
+    campusBindings: 0,
+  });
+  const alert = buildRegistrationReadinessAlert({
+    summary,
+    mappedCourses: 0,
+    visibleSubjects: 2,
+    totalSubjects: 4,
+    campusBindings: 0,
+  });
+  assert.equal(alert.status, 'blocked');
+  assert.match(alert.title, /mapping|мап/i);
 });

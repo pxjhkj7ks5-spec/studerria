@@ -78,6 +78,11 @@
   })();
   const showNoSubjectsNotice = !allSubjects.length;
   const showAutoAssignedNotice = !showNoSubjectsNotice && !selectableSubjects.length;
+  const pathwayReadiness = registrationPathwayReadiness || null;
+  const pathwayReadinessAlert = registrationPathwayAlert || null;
+  const pathwayReadinessMetrics = pathwayReadinessAlert && pathwayReadinessAlert.metrics
+    ? pathwayReadinessAlert.metrics
+    : null;
   const registerGroupsUi = {
     statusSelected: t('registerSubjects.statusSelected'),
     statusPending: t('registerSubjects.statusPending'),
@@ -322,6 +327,143 @@
         color: #bfdbfe;
       }
 
+      .reg-groups-readiness {
+        display: grid;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding: 1.1rem;
+        border-radius: 24px;
+      }
+
+      .reg-groups-readiness__head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+
+      .reg-groups-readiness__title {
+        margin: 0.28rem 0 0;
+        font-size: 1.08rem;
+        font-weight: 700;
+      }
+
+      .reg-groups-readiness__body {
+        margin: 0.45rem 0 0;
+        color: var(--page-muted);
+        line-height: 1.55;
+      }
+
+      .reg-groups-readiness__badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 34px;
+        padding: 0.35rem 0.82rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        border: 1px solid transparent;
+        white-space: nowrap;
+      }
+
+      .reg-groups-readiness__badge.is-ready {
+        background: rgba(16, 185, 129, 0.12);
+        color: #047857;
+        border-color: rgba(4, 120, 87, 0.14);
+      }
+
+      .reg-groups-readiness__badge.is-needs_attention {
+        background: rgba(245, 158, 11, 0.14);
+        color: #b45309;
+        border-color: rgba(180, 83, 9, 0.14);
+      }
+
+      .reg-groups-readiness__badge.is-blocked {
+        background: rgba(244, 63, 94, 0.14);
+        color: #be123c;
+        border-color: rgba(190, 24, 93, 0.14);
+      }
+
+      body.theme-dark .reg-groups-readiness__badge.is-ready {
+        color: #6ee7b7;
+        border-color: rgba(110, 231, 183, 0.2);
+      }
+
+      body.theme-dark .reg-groups-readiness__badge.is-needs_attention {
+        color: #fde68a;
+        border-color: rgba(253, 230, 138, 0.2);
+      }
+
+      body.theme-dark .reg-groups-readiness__badge.is-blocked {
+        color: #fda4af;
+        border-color: rgba(253, 164, 175, 0.22);
+      }
+
+      .reg-groups-readiness__metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+        gap: 0.75rem;
+      }
+
+      .reg-groups-readiness__metric {
+        padding: 0.82rem 0.9rem;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        background: rgba(255, 255, 255, 0.34);
+      }
+
+      body.theme-dark .reg-groups-readiness__metric {
+        background: rgba(15, 23, 42, 0.26);
+        border-color: rgba(148, 163, 184, 0.18);
+      }
+
+      .reg-groups-readiness__metric-label {
+        display: block;
+        margin-bottom: 0.2rem;
+        font-size: 0.74rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--page-muted);
+      }
+
+      .reg-groups-readiness__metric-value {
+        font-size: 1.05rem;
+        font-weight: 700;
+      }
+
+      .reg-groups-readiness__issues {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+      }
+
+      .reg-groups-readiness__issue {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 0.35rem 0.78rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(255, 255, 255, 0.38);
+      }
+
+      body.theme-dark .reg-groups-readiness__issue {
+        background: rgba(15, 23, 42, 0.28);
+        border-color: rgba(148, 163, 184, 0.2);
+      }
+
+      .reg-groups-readiness__hint {
+        margin: 0;
+        font-size: 0.88rem;
+        color: var(--page-muted);
+        line-height: 1.5;
+      }
+
       .app-footer {
         font-size: 0.8rem;
       }
@@ -334,6 +476,10 @@
 
         .theme-toggle-min {
           height: 40px;
+        }
+
+        .reg-groups-readiness__head {
+          flex-direction: column;
         }
       }
     </style>
@@ -379,7 +525,49 @@
                 <p class="mb-0"><%= t('registerSubjects.instructionsPrimary') %></p>
                 <p class="mb-0"><%= t('registerSubjects.instructionsSecondary') %></p>
               </div>
-              <% if (pathwayRegistrationHint) { %>
+              <% if (pathwayReadinessAlert && pathwayReadinessMetrics) { %>
+                <section class="reg-groups-surface reg-groups-readiness" aria-labelledby="pathwayReadinessTitle">
+                  <div class="reg-groups-readiness__head">
+                    <div>
+                      <span class="reg-groups-kicker"><%= lang === 'en' ? 'Cohort readiness' : 'Готовність когорти' %></span>
+                      <h2 class="reg-groups-readiness__title" id="pathwayReadinessTitle"><%= pathwayReadinessAlert.title %></h2>
+                      <p class="reg-groups-readiness__body"><%= pathwayReadinessAlert.body %></p>
+                    </div>
+                    <span class="reg-groups-readiness__badge is-<%= pathwayReadinessAlert.status %>"><%= pathwayReadinessAlert.status_label %></span>
+                  </div>
+
+                  <div class="reg-groups-readiness__metrics">
+                    <div class="reg-groups-readiness__metric">
+                      <span class="reg-groups-readiness__metric-label"><%= lang === 'en' ? 'Visible subjects' : 'Видимі предмети' %></span>
+                      <div class="reg-groups-readiness__metric-value"><%= Number(pathwayReadinessMetrics.visible_subjects || 0) %>/<%= Number(pathwayReadinessMetrics.total_subjects || 0) %></div>
+                    </div>
+                    <div class="reg-groups-readiness__metric">
+                      <span class="reg-groups-readiness__metric-label"><%= lang === 'en' ? 'Mapped courses' : 'Замаплені курси' %></span>
+                      <div class="reg-groups-readiness__metric-value"><%= Number(pathwayReadinessMetrics.mapped_courses || 0) %></div>
+                    </div>
+                    <div class="reg-groups-readiness__metric">
+                      <span class="reg-groups-readiness__metric-label"><%= lang === 'en' ? 'Campus routes' : 'Маршрути кампусів' %></span>
+                      <div class="reg-groups-readiness__metric-value"><%= Number(pathwayReadinessMetrics.campus_bindings || 0) %></div>
+                    </div>
+                    <div class="reg-groups-readiness__metric">
+                      <span class="reg-groups-readiness__metric-label"><%= lang === 'en' ? 'Open issues' : 'Відкриті питання' %></span>
+                      <div class="reg-groups-readiness__metric-value"><%= Array.isArray(pathwayReadinessAlert.issues) ? pathwayReadinessAlert.issues.length : 0 %></div>
+                    </div>
+                  </div>
+
+                  <% if (Array.isArray(pathwayReadinessAlert.issues) && pathwayReadinessAlert.issues.length) { %>
+                    <div class="reg-groups-readiness__issues" aria-label="<%= lang === 'en' ? 'Readiness issues' : 'Проблеми готовності' %>">
+                      <% pathwayReadinessAlert.issues.forEach((issueLabel) => { %>
+                        <span class="reg-groups-readiness__issue"><%= issueLabel %></span>
+                      <% }) %>
+                    </div>
+                  <% } %>
+
+                  <% if (pathwayRegistrationHint) { %>
+                    <p class="reg-groups-readiness__hint"><%= pathwayRegistrationHint %></p>
+                  <% } %>
+                </section>
+              <% } else if (pathwayRegistrationHint) { %>
                 <div class="alert alert-info flash-alert mb-3" role="status">
                   <span class="flash-alert__icon" aria-hidden="true">i</span>
                   <div class="flash-alert__body">

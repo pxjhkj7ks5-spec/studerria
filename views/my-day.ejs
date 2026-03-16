@@ -119,6 +119,51 @@
         if (level === 'medium') return { label: t('myDay.progressRisk.medium'), className: 'progress-risk-medium' };
         return { label: t('myDay.progressRisk.stable'), className: 'progress-risk-low' };
       };
+      const getAttendanceStatusLabel = (summary) => {
+        const statusKey = String(summary && summary.status_key ? summary.status_key : 'stable');
+        if (lang === 'en') {
+          if (statusKey === 'attention') return 'Attention';
+          if (statusKey === 'watch') return 'Watch';
+          return 'Stable';
+        }
+        if (statusKey === 'attention') return 'Увага';
+        if (statusKey === 'watch') return 'Контроль';
+        return 'Стабільно';
+      };
+      const getAttendanceNote = (summary) => {
+        const noteKey = String(summary && summary.note_key ? summary.note_key : '');
+        if (lang === 'en') {
+          if (noteKey === 'teacher_follow_up') return 'Absences are climbing. Open the journal and review the latest marks.';
+          if (noteKey === 'teacher_watch') return 'There are enough late or missed marks to warrant a quick review.';
+          if (noteKey === 'student_follow_up') return 'Absences are above the safe range. Check the journal and clarify missing reasons.';
+          if (noteKey === 'student_watch') return 'A few recent misses or late arrivals need attention before they stack up.';
+          if (noteKey === 'teacher_steady') return 'Attendance signal is calm across the current review window.';
+          return 'Attendance looks steady right now.';
+        }
+        if (noteKey === 'teacher_follow_up') return 'Пропуски ростуть. Відкрий журнал і перевір останні відмітки.';
+        if (noteKey === 'teacher_watch') return 'Є достатньо запізнень або пропусків, щоб швидко переглянути останні позначки.';
+        if (noteKey === 'student_follow_up') return 'Рівень пропусків уже вийшов із безпечної зони. Перевір журнал і уточни причини.';
+        if (noteKey === 'student_watch') return 'Останні пропуски або запізнення вже варто взяти під контроль, поки вони не накопичилися.';
+        if (noteKey === 'teacher_steady') return 'Сигнал по відвідуваності зараз рівний у межах поточного вікна.';
+        return 'Зараз відвідуваність виглядає стабільною.';
+      };
+      const getAttendanceWindowLabel = (summary) => {
+        const primaryWindowDays = Number(summary && summary.primary_window_days ? summary.primary_window_days : 0);
+        if (primaryWindowDays > 0) {
+          return lang === 'en' ? `Window: last ${primaryWindowDays} days` : `Вікно: останні ${primaryWindowDays} днів`;
+        }
+        return lang === 'en' ? 'Window: current semester' : 'Вікно: поточний семестр';
+      };
+      const getAttendanceRecentLabel = (summary) => {
+        const recent = summary && summary.recent && typeof summary.recent === 'object' ? summary.recent : null;
+        const recentWindowDays = Number(summary && summary.recent_window_days ? summary.recent_window_days : 14) || 14;
+        if (!recent || Number(recent.total || 0) < 1) {
+          return lang === 'en' ? `Last ${recentWindowDays}d: no new marks` : `Останні ${recentWindowDays} дн.: без нових позначок`;
+        }
+        return lang === 'en'
+          ? `Last ${recentWindowDays}d: absent ${Number(recent.absent || 0)}, late ${Number(recent.late || 0)}`
+          : `Останні ${recentWindowDays} дн.: відсутність ${Number(recent.absent || 0)}, запізнення ${Number(recent.late || 0)}`;
+      };
     %>
 
     <%- include('partials/topbar', { role, username, t, activePage: 'my-day', pageTitle: t('myDay.pageTitle') }) %>
@@ -197,15 +242,30 @@
       </section>
 
       <section class="mission-strip">
-        <article class="cockpit-card mission-card">
+        <article class="cockpit-card mission-card mission-card-attendance<%= attendanceHealth ? ` is-${attendanceHealth.tone}` : '' %>">
           <div class="mission-card-kicker"><%= lang === 'en' ? 'Attendance' : 'Відвідуваність' %></div>
           <% if (attendanceHealth) { %>
-            <div class="mission-card-value"><%= attendanceHealth.reliability === null || typeof attendanceHealth.reliability === 'undefined' ? '-' : `${attendanceHealth.reliability}%` %></div>
+            <div class="mission-card-topline">
+              <div class="mission-card-value"><%= attendanceHealth.reliability === null || typeof attendanceHealth.reliability === 'undefined' ? '-' : `${attendanceHealth.reliability}%` %></div>
+              <span class="mission-card-badge mission-card-badge-<%= attendanceHealth.tone || 'calm' %>"><%= getAttendanceStatusLabel(attendanceHealth) %></span>
+            </div>
             <div class="mission-card-meta">
               <span><%= lang === 'en' ? 'Present' : 'Присутність' %>: <%= Number(attendanceHealth.present || 0) %></span>
               <span><%= lang === 'en' ? 'Late' : 'Запізнення' %>: <%= Number(attendanceHealth.late || 0) %></span>
               <span><%= lang === 'en' ? 'Absent' : 'Відсутність' %>: <%= Number(attendanceHealth.absent || 0) %></span>
             </div>
+            <div class="mission-card-foot">
+              <span><%= lang === 'en' ? 'Flagged' : 'Ризикові' %>: <%= Number(attendanceHealth.flagged_total || 0) %></span>
+              <span><%= getAttendanceWindowLabel(attendanceHealth) %></span>
+              <% if (attendanceHealth.last_marked_at) { %>
+                <span><%= lang === 'en' ? 'Last mark' : 'Остання відмітка' %>: <%= formatShortDate(attendanceHealth.last_marked_at) %></span>
+              <% } %>
+            </div>
+            <p class="mission-card-note"><%= getAttendanceNote(attendanceHealth) %></p>
+            <div class="mission-card-foot">
+              <span><%= getAttendanceRecentLabel(attendanceHealth) %></span>
+            </div>
+            <a class="btn btn-inline-link mt-1" href="/journal"><%= lang === 'en' ? 'Open journal' : 'Відкрити журнал' %></a>
           <% } else { %>
             <div class="mission-card-empty"><%= lang === 'en' ? 'No attendance signal yet.' : 'Поки немає сигналу по відвідуваності.' %></div>
           <% } %>

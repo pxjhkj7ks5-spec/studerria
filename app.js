@@ -9148,9 +9148,11 @@ app.get('/register/subjects', async (req, res) => {
       return res.redirect('/register/teacher-subjects');
     }
 
-    const [subjects, allCourseSubjects] = await Promise.all([
+    const [subjects, allCourseSubjects, baseVisibleSubjects, admissionMappedCourses] = await Promise.all([
       getRegistrationSubjects(user.course_id, user.admission_id),
       getSubjectsCached(user.course_id, { visibleOnly: false }),
+      getSubjectsCached(user.course_id, { visibleOnly: true }),
+      getAdmissionRegistrationCourses(user.admission_id),
     ]);
     const isRequired = (subject) =>
       subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
@@ -9187,10 +9189,35 @@ app.get('/register/subjects', async (req, res) => {
     });
 
     const lang = getPreferredLang(req);
+    const campusChoices = buildAdmissionCampusChoicesFromCourses(admissionMappedCourses);
+    const readyCampusBindings = campusChoices.filter(
+      (choice) => !choice.is_ambiguous && Number(choice.course_id || 0) > 0
+    ).length;
+    const registrationPathwayReadiness = pathwayHelpers.buildPathwayReadinessSummary({
+      mappedCourses: Array.isArray(admissionMappedCourses) ? admissionMappedCourses.length : 0,
+      visibleSubjects: Array.isArray(subjects) ? subjects.length : 0,
+      totalSubjects: Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0,
+      campusBindings: readyCampusBindings,
+      pendingUsers: 0,
+    });
     const pathwayRegistrationHint = pathwayHelpers.buildSubjectVisibilityCopy({
       visibleSubjects: Array.isArray(subjects) ? subjects.length : 0,
       totalSubjects: Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0,
       lang,
+    });
+    const registrationPathwayAlert = pathwayHelpers.buildRegistrationReadinessAlert({
+      summary: registrationPathwayReadiness,
+      lang,
+      mappedCourses: Array.isArray(admissionMappedCourses) ? admissionMappedCourses.length : 0,
+      visibleSubjects: Array.isArray(subjects) ? subjects.length : 0,
+      totalSubjects: Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0,
+      campusBindings: readyCampusBindings,
+      ambiguousCampuses: campusChoices.filter((choice) => choice.is_ambiguous).length,
+      baseHiddenSubjects: Math.max(
+        0,
+        Number(Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0)
+          - Number(Array.isArray(baseVisibleSubjects) ? baseVisibleSubjects.length : 0)
+      ),
     });
 
     return res.render('register-subjects', {
@@ -9198,6 +9225,8 @@ app.get('/register/subjects', async (req, res) => {
       optouts,
       selectedGroups,
       pathwayRegistrationHint,
+      registrationPathwayReadiness,
+      registrationPathwayAlert,
       error: req.query.error || '',
     });
   } catch (err) {
@@ -13061,6 +13090,12 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       absent: 0,
       excused: 0,
     };
+    const recentAttendanceCounts = {
+      present: 0,
+      late: 0,
+      absent: 0,
+      excused: 0,
+    };
     const attendanceSubjectIds = Array.from(new Set(
       workloadTargets
         .map((target) => Number(target.subject_id || 0))
@@ -13071,40 +13106,88 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       const attendanceSemesterIds = workloadOwnerSemesterIds.length
         ? workloadOwnerSemesterIds
         : (activeSemester && activeSemester.id ? [Number(activeSemester.id)] : []);
+      const attendanceSemesterClause = attendanceSemesterIds.length
+        ? 'AND (ar.semester_id = ANY(?::int[]) OR ar.semester_id IS NULL)'
+        : '';
+      const attendanceBaseParams = [attendanceSubjectIds, attendanceCourseIds];
+      if (attendanceSemesterIds.length) {
+        attendanceBaseParams.push(attendanceSemesterIds);
+      }
+      const scopedStudentClause = normalizedRole === 'teacher' ? '' : 'AND ar.student_id = ?';
+      const scopedStudentParams = normalizedRole === 'teacher' ? [] : [Number(user.id)];
+      const scopedTeacherWindowClause = normalizedRole === 'teacher' ? 'AND ar.class_date >= ?' : '';
+      const scopedTeacherWindowParams = normalizedRole === 'teacher'
+        ? [formatLocalDate(addDays(now, -30))]
+        : [];
       const attendanceRows = await db.all(
         `
           SELECT ar.status, COUNT(*) AS count
           FROM attendance_records ar
           WHERE ar.subject_id = ANY(?::int[])
             AND ar.course_id = ANY(?::int[])
-            ${attendanceSemesterIds.length ? 'AND (ar.semester_id = ANY(?::int[]) OR ar.semester_id IS NULL)' : ''}
-            ${
-              normalizedRole === 'teacher'
-                ? 'AND ar.class_date >= ?'
-                : 'AND ar.student_id = ?'
-            }
+            ${attendanceSemesterClause}
+            ${scopedStudentClause}
+            ${scopedTeacherWindowClause}
           GROUP BY ar.status
         `,
-        normalizedRole === 'teacher'
-          ? (
-            attendanceSemesterIds.length
-              ? [attendanceSubjectIds, attendanceCourseIds, attendanceSemesterIds, formatLocalDate(addDays(now, -30))]
-              : [attendanceSubjectIds, attendanceCourseIds, formatLocalDate(addDays(now, -30))]
-          )
-          : (
-            attendanceSemesterIds.length
-              ? [attendanceSubjectIds, attendanceCourseIds, attendanceSemesterIds, Number(user.id)]
-              : [attendanceSubjectIds, attendanceCourseIds, Number(user.id)]
-          )
+        [
+          ...attendanceBaseParams,
+          ...scopedStudentParams,
+          ...scopedTeacherWindowParams,
+        ]
       );
       (attendanceRows || []).forEach((row) => {
         const status = normalizeAttendanceStatus(row.status);
         if (!status) return;
         attendanceCounts[status] = Number(row.count || 0);
       });
+      const recentAttendanceRows = await db.all(
+        `
+          SELECT ar.status, COUNT(*) AS count
+          FROM attendance_records ar
+          WHERE ar.subject_id = ANY(?::int[])
+            AND ar.course_id = ANY(?::int[])
+            ${attendanceSemesterClause}
+            ${scopedStudentClause}
+            AND ar.class_date >= ?
+          GROUP BY ar.status
+        `,
+        [
+          ...attendanceBaseParams,
+          ...scopedStudentParams,
+          formatLocalDate(addDays(now, -14)),
+        ]
+      );
+      (recentAttendanceRows || []).forEach((row) => {
+        const status = normalizeAttendanceStatus(row.status);
+        if (!status) return;
+        recentAttendanceCounts[status] = Number(row.count || 0);
+      });
+      const latestAttendanceRow = await db.get(
+        `
+          SELECT MAX(ar.class_date) AS last_marked_at
+          FROM attendance_records ar
+          WHERE ar.subject_id = ANY(?::int[])
+            AND ar.course_id = ANY(?::int[])
+            ${attendanceSemesterClause}
+            ${scopedStudentClause}
+            ${scopedTeacherWindowClause}
+        `,
+        [
+          ...attendanceBaseParams,
+          ...scopedStudentParams,
+          ...scopedTeacherWindowParams,
+        ]
+      );
       attendanceHealth = journalInsightHelpers.buildAttendanceHealthSummary({
         role: normalizedRole,
         counts: attendanceCounts,
+        recentCounts: recentAttendanceCounts,
+        lastMarkedAt: latestAttendanceRow && latestAttendanceRow.last_marked_at
+          ? latestAttendanceRow.last_marked_at
+          : null,
+        primaryWindowDays: normalizedRole === 'teacher' ? 30 : null,
+        recentWindowDays: 14,
       });
     }
   } catch (err) {

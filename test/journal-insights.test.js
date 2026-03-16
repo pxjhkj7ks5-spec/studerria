@@ -44,7 +44,12 @@ test('rating snapshot card exposes top entry', () => {
 test('attendance summary marks risky absence share', () => {
   const summary = buildAttendanceHealthSummary({
     counts: { present: 6, late: 1, absent: 3, excused: 0 },
+    recentCounts: { present: 1, late: 1, absent: 2, excused: 0 },
+    lastMarkedAt: '2026-03-15',
   });
   assert.equal(summary.absent_share, 30);
   assert.equal(summary.tone, 'risk');
+  assert.equal(summary.status_key, 'attention');
+  assert.equal(summary.recent.flagged_total, 3);
+  assert.equal(summary.last_marked_at, '2026-03-15');
 });
