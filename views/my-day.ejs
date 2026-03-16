@@ -44,6 +44,8 @@
       const teacherSelectedCompetencySubjectId = Number(teacherCompetencyPicker.selected_subject_id || 0);
       const attendanceHealth = cockpit.attendance_health || null;
       const latestRatingSnapshot = cockpit.latest_rating_snapshot || null;
+      const announcementSummary = cockpit.announcement_summary || null;
+      const announcementItems = Array.isArray(cockpit.announcement_items) ? cockpit.announcement_items : [];
       const supportSummary = cockpit.support_summary || null;
       const supportThreads = Array.isArray(cockpit.support_threads) ? cockpit.support_threads : [];
       const teacherQuickActions = Array.isArray(cockpit.teacher_quick_actions) ? cockpit.teacher_quick_actions : [];
@@ -163,6 +165,57 @@
         return lang === 'en'
           ? `Last ${recentWindowDays}d: absent ${Number(recent.absent || 0)}, late ${Number(recent.late || 0)}`
           : `Останні ${recentWindowDays} дн.: відсутність ${Number(recent.absent || 0)}, запізнення ${Number(recent.late || 0)}`;
+      };
+      const getAnnouncementTone = (summary) => {
+        if (summary && Number(summary.fresh_unread || 0) > 0) return 'risk';
+        if (summary && Number(summary.fresh || 0) > 0) return 'focus';
+        return 'calm';
+      };
+      const getAnnouncementStatusLabel = (summary) => {
+        if (lang === 'en') {
+          if (summary && Number(summary.fresh_unread || 0) > 0) return 'Unread';
+          if (summary && Number(summary.fresh || 0) > 0) return 'Recent';
+          return 'Quiet';
+        }
+        if (summary && Number(summary.fresh_unread || 0) > 0) return 'Нове';
+        if (summary && Number(summary.fresh || 0) > 0) return 'Свіже';
+        return 'Спокійно';
+      };
+      const getAnnouncementKindLabel = (item) => {
+        const kind = String(item && item.message_kind ? item.message_kind : 'announcement');
+        if (lang === 'en') {
+          if (kind === 'broadcast') return 'All-course broadcast';
+          if (kind === 'group') return 'Group update';
+          if (kind === 'subject') return 'Subject update';
+          if (kind === 'direct') return 'Direct update';
+          return 'Announcement';
+        }
+        if (kind === 'broadcast') return 'Загальне оголошення';
+        if (kind === 'group') return 'Оновлення групи';
+        if (kind === 'subject') return 'Оновлення предмета';
+        if (kind === 'direct') return 'Адресне повідомлення';
+        return 'Оголошення';
+      };
+      const getAnnouncementMeta = (item) => {
+        const parts = [];
+        if (item && item.subject_name) parts.push(item.subject_name);
+        if (item && Number(item.group_number || 0) > 0) {
+          parts.push(`${lang === 'en' ? 'Group' : 'Група'} ${Number(item.group_number)}`);
+        }
+        if (item && (item.published_at || item.created_at)) {
+          parts.push(formatDateTime(item.published_at || item.created_at));
+        }
+        return parts.join(' · ');
+      };
+      const getSupportMissionStatusLabel = (summary) => {
+        if (lang === 'en') {
+          if (summary && Number(summary.open || 0) > 0) return 'Open';
+          if (summary && Number(summary.total || 0) > 0) return 'Resolved';
+          return 'Quiet';
+        }
+        if (summary && Number(summary.open || 0) > 0) return 'Відкрито';
+        if (summary && Number(summary.total || 0) > 0) return 'Закрито';
+        return 'Спокійно';
       };
     %>
 
@@ -300,6 +353,33 @@
             <div class="mission-card-empty"><%= lang === 'en' ? 'No support threads right now.' : 'Наразі немає активних звернень.' %></div>
           <% } %>
         </article>
+        <% if (settings && settings.allow_messages) { %>
+          <article class="cockpit-card mission-card mission-card-announcements<%= announcementSummary ? ` is-${getAnnouncementTone(announcementSummary)}` : '' %>">
+            <div class="mission-card-kicker"><%= lang === 'en' ? 'Announcements' : 'Оголошення' %></div>
+            <% if (announcementSummary) { %>
+              <div class="mission-card-topline">
+                <div class="mission-card-value"><%= Number(announcementSummary.fresh_unread || 0) || Number(announcementSummary.fresh || 0) || 0 %></div>
+                <span class="mission-card-badge mission-card-badge-<%= getAnnouncementTone(announcementSummary) %>"><%= getAnnouncementStatusLabel(announcementSummary) %></span>
+              </div>
+              <div class="mission-card-meta">
+                <span><%= lang === 'en' ? 'Fresh' : 'Свіжі' %>: <%= Number(announcementSummary.fresh || 0) %></span>
+                <span><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= Number(announcementSummary.unread || 0) %></span>
+                <span><%= lang === 'en' ? 'Direct' : 'Адресні' %>: <%= Number(announcementSummary.direct || 0) %></span>
+              </div>
+              <% if (announcementItems[0]) { %>
+                <p class="mission-card-note"><strong><%= getAnnouncementKindLabel(announcementItems[0]) %></strong>: <%= announcementItems[0].body_preview || announcementItems[0].body %></p>
+                <div class="mission-card-foot">
+                  <span><%= getAnnouncementMeta(announcementItems[0]) %></span>
+                </div>
+              <% } else { %>
+                <p class="mission-card-note"><%= lang === 'en' ? 'Fresh broadcasts and direct updates appear here. Older items stay in the schedule inbox.' : 'Тут з’являються свіжі оголошення та адресні оновлення. Старіші елементи залишаються в inbox розкладу.' %></p>
+              <% } %>
+              <a class="btn btn-inline-link mt-1" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open inbox' : 'Відкрити inbox' %></a>
+            <% } else { %>
+              <div class="mission-card-empty"><%= lang === 'en' ? 'No recent announcements right now.' : 'Наразі немає свіжих оголошень.' %></div>
+            <% } %>
+          </article>
+        <% } %>
         <% if (teacherQuickActions.length) { %>
           <article class="cockpit-card mission-card">
             <div class="mission-card-kicker"><%= lang === 'en' ? 'Teacher actions' : 'Teacher actions' %></div>

@@ -2685,6 +2685,12 @@
         messagesAllStudents: t('schedule.messages.allStudents'),
         messagesSubjectFallback: t('schedule.messages.subjectFallback'),
         messagesAdminFallback: t('schedule.messages.adminFallback'),
+        messagesKindAnnouncement: lang === 'en' ? 'Announcement' : 'Оголошення',
+        messagesKindBroadcast: lang === 'en' ? 'All-course broadcast' : 'Загальне оголошення',
+        messagesKindGroup: lang === 'en' ? 'Group update' : 'Оновлення групи',
+        messagesKindSubject: lang === 'en' ? 'Subject update' : 'Оновлення предмета',
+        messagesKindDirect: lang === 'en' ? 'Direct update' : 'Адресне повідомлення',
+        messagesUnreadBadge: lang === 'en' ? 'Unread' : 'Нове',
       }) %>;
       const scheduleUiText = <%- JSON.stringify({
         roomLabel: lang === 'en' ? 'Room' : 'Кабінет',
@@ -4378,9 +4384,30 @@
           }
           messagesList.innerHTML = messages
             .map((m) => {
-              const meta = m.target_all
+              let meta = m.target_all
                 ? scheduleText.messagesAllStudents
                 : `${m.subject_name || scheduleText.messagesSubjectFallback} · ${scheduleText.groupSingle} ${m.group_number}`;
+              const kindLabel = m.message_kind === 'broadcast'
+                ? scheduleText.messagesKindBroadcast
+                : (m.message_kind === 'group'
+                  ? scheduleText.messagesKindGroup
+                  : (m.message_kind === 'subject'
+                    ? scheduleText.messagesKindSubject
+                    : (m.message_kind === 'direct'
+                      ? scheduleText.messagesKindDirect
+                      : scheduleText.messagesKindAnnouncement)));
+              const metaParts = [];
+              if (m.subject_name) {
+                metaParts.push(m.subject_name);
+              } else if (m.target_all) {
+                metaParts.push(scheduleText.messagesAllStudents);
+              } else {
+                metaParts.push(scheduleText.messagesSubjectFallback);
+              }
+              if (Number(m.group_number || 0) > 0) {
+                metaParts.push(`${scheduleText.groupSingle} ${m.group_number}`);
+              }
+              meta = metaParts.join(' · ');
               const unreadClass = m.read_id ? '' : 'fw-semibold';
               const reactions = m.reactions || {};
               const reacted = m.reacted || {};
@@ -4393,6 +4420,10 @@
               };
               return `
                 <li class="list-group-item">
+                  <div class="d-flex flex-wrap gap-2 mb-2">
+                    <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">${kindLabel}</span>
+                    ${m.read_id ? '' : `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">${scheduleText.messagesUnreadBadge}</span>`}
+                  </div>
                   <div class="${unreadClass} mb-1">${m.body}</div>
                   <div class="text-muted small">${meta} · ${m.created_by || scheduleText.messagesAdminFallback} · ${new Date(m.created_at).toLocaleString(scheduleLocale)}</div>
                   <div class="d-flex gap-2 mt-2 msg-reactions">

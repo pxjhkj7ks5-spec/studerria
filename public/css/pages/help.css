@@ -196,6 +196,7 @@ body.theme-dark .flash-alert.alert-success .flash-alert__icon {
 
 .studerria-help-faq,
 .studerria-help-form-card,
+.studerria-help-messages-card,
 .studerria-help-history {
   padding: 1.35rem;
 }
@@ -346,6 +347,47 @@ body.theme-dark .flash-alert.alert-success .flash-alert__icon {
   flex-wrap: wrap;
   gap: 0.55rem;
   margin-bottom: 1rem;
+}
+
+.studerria-help-announcement-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.studerria-help-announcement-item {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--studerria-border-soft, rgba(255, 255, 255, 0.1)) 75%, transparent);
+  background: color-mix(in srgb, var(--studerria-surface-base, rgba(255, 255, 255, 0.05)) 90%, transparent);
+}
+
+.studerria-help-announcement-item.is-unread {
+  border-color: color-mix(in srgb, var(--studerria-accent, #6ea8fe) 34%, transparent);
+  background: color-mix(in srgb, var(--studerria-accent, #6ea8fe) 10%, transparent);
+}
+
+.studerria-help-announcement-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.studerria-help-announcement-date,
+.studerria-help-announcement-meta {
+  margin: 0;
+  color: var(--studerria-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.studerria-help-announcement-body {
+  margin: 0;
+  color: var(--studerria-text-primary);
+  line-height: 1.65;
+  white-space: pre-wrap;
 }
 
 .studerria-help-thread {

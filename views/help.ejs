@@ -33,6 +33,7 @@
         });
       };
       const historyList = Array.isArray(supportRequests) ? supportRequests : [];
+      const announcementList = Array.isArray(announcementFeed) ? announcementFeed : [];
       const requestChipClass = (status) => (
         status === 'resolved'
           ? 'status-chip status-chip--active'
@@ -41,11 +42,36 @@
             : 'status-chip status-chip--pending')
       );
       const supportSummary = supportStats || {};
+      const announcementDigest = announcementSummary || {};
       const threadRoleLabel = (roleName) => (
         roleName === 'admin'
           ? (lang === 'uk' ? 'Підтримка' : 'Support')
           : (lang === 'uk' ? 'Ви' : 'You')
       );
+      const messageKindLabel = (item) => {
+        const kind = String(item && item.message_kind ? item.message_kind : 'announcement');
+        if (lang === 'en') {
+          if (kind === 'broadcast') return 'All-course broadcast';
+          if (kind === 'group') return 'Group update';
+          if (kind === 'subject') return 'Subject update';
+          if (kind === 'direct') return 'Direct update';
+          return 'Announcement';
+        }
+        if (kind === 'broadcast') return 'Загальне оголошення';
+        if (kind === 'group') return 'Оновлення групи';
+        if (kind === 'subject') return 'Оновлення предмета';
+        if (kind === 'direct') return 'Адресне повідомлення';
+        return 'Оголошення';
+      };
+      const messageMetaLine = (item) => {
+        const parts = [];
+        if (item && item.subject_name) parts.push(item.subject_name);
+        if (item && Number(item.group_number || 0) > 0) {
+          parts.push(`${lang === 'en' ? 'Group' : 'Група'} ${Number(item.group_number)}`);
+        }
+        if (item && item.created_by) parts.push(item.created_by);
+        return parts.join(' · ');
+      };
     %>
 
     <section class="studerria-help-shell" aria-labelledby="studerria-help-title">
@@ -161,6 +187,49 @@
               <button class="btn btn-primary" type="submit"><%= t('help.formSubmit') %></button>
             </form>
           </article>
+          <% if (showAnnouncementDigest) { %>
+            <article class="glass-panel studerria-help-messages-card" id="announcement-digest">
+              <div class="studerria-help-section-head">
+                <div>
+                  <p class="studerria-help-section-kicker"><%= lang === 'en' ? 'Inbox' : 'Inbox' %></p>
+                  <h2 class="studerria-help-section-title"><%= lang === 'en' ? 'Announcements' : 'Оголошення' %></h2>
+                </div>
+                <p class="studerria-help-section-copy"><%= lang === 'en' ? 'Broadcasts and direct updates stay separate from support threads. The full archive still opens from the schedule inbox.' : 'Broadcast-оголошення та адресні оновлення тепер окремо від support threads. Повний архів і далі відкривається з inbox у розкладі.' %></p>
+              </div>
+
+              <div class="studerria-help-history-summary">
+                <span class="status-chip status-chip--info"><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= Number(announcementDigest.unread || 0) %></span>
+                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Fresh' : 'Свіжі' %>: <%= Number(announcementDigest.fresh || 0) %></span>
+                <span class="status-chip status-chip--muted"><%= lang === 'en' ? 'Direct' : 'Адресні' %>: <%= Number(announcementDigest.direct || 0) %></span>
+              </div>
+
+              <% if (announcementList.length) { %>
+                <div class="studerria-help-announcement-list">
+                  <% announcementList.forEach(function(item) { %>
+                    <article class="studerria-help-announcement-item <%= !item.read_id ? 'is-unread' : '' %>">
+                      <div class="studerria-help-announcement-head">
+                        <div class="studerria-help-history-meta">
+                          <span class="status-chip status-chip--neutral"><%= messageKindLabel(item) %></span>
+                          <% if (!item.read_id) { %>
+                            <span class="status-chip status-chip--info"><%= lang === 'en' ? 'Unread' : 'Нове' %></span>
+                          <% } %>
+                        </div>
+                        <span class="studerria-help-announcement-date"><%= formatStamp(item.published_at || item.created_at) %></span>
+                      </div>
+                      <p class="studerria-help-announcement-body"><%= item.body_preview || item.body %></p>
+                      <% if (messageMetaLine(item)) { %>
+                        <p class="studerria-help-announcement-meta"><%= messageMetaLine(item) %></p>
+                      <% } %>
+                    </article>
+                  <% }); %>
+                </div>
+              <% } else { %>
+                <p class="studerria-help-empty"><%= lang === 'en' ? 'No fresh announcements right now. Older items remain available from the schedule inbox.' : 'Зараз немає свіжих оголошень. Старіші елементи залишаються доступними в inbox розкладу.' %></p>
+              <% } %>
+
+              <a class="btn btn-outline-secondary glass" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open schedule inbox' : 'Відкрити inbox розкладу' %></a>
+            </article>
+          <% } %>
         </div>
       </section>
 

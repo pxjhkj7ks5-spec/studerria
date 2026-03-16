@@ -12,6 +12,7 @@ const bcrypt = require('bcryptjs');
 const pkg = require('./package.json');
 const navMiddleware = require('./middleware/nav');
 const supportHelpers = require('./lib/support');
+const messageHelpers = require('./lib/messages');
 const teacherTemplateHelpers = require('./lib/teacherTemplates');
 const journalInsightHelpers = require('./lib/journalInsights');
 const roomHelpers = require('./lib/rooms');
@@ -8141,6 +8142,152 @@ async function getSupportRequestThreadForCourse(requestId, courseId) {
   };
 }
 
+async function attachVisibleMessageReactions(rows, userId) {
+  const items = Array.isArray(rows) ? rows : [];
+  const normalizedUserId = Number(userId || 0);
+  if (!items.length || !Number.isInteger(normalizedUserId) || normalizedUserId < 1) {
+    return items;
+  }
+
+  const messageIds = items
+    .map((row) => Number(row.id || 0))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  if (!messageIds.length) {
+    return items;
+  }
+
+  const placeholders = messageIds.map(() => '?').join(',');
+  const reactionRows = await db.all(
+    `
+      SELECT message_id, emoji, COUNT(*) AS count
+      FROM message_reactions
+      WHERE message_id IN (${placeholders})
+      GROUP BY message_id, emoji
+    `,
+    messageIds
+  );
+  const myReactionRows = await db.all(
+    `
+      SELECT message_id, emoji
+      FROM message_reactions
+      WHERE message_id IN (${placeholders}) AND user_id = ?
+    `,
+    [...messageIds, normalizedUserId]
+  );
+
+  const reactionMap = {};
+  (reactionRows || []).forEach((row) => {
+    if (!reactionMap[row.message_id]) reactionMap[row.message_id] = {};
+    reactionMap[row.message_id][row.emoji] = Number(row.count || 0);
+  });
+
+  const reactedMap = {};
+  (myReactionRows || []).forEach((row) => {
+    if (!reactedMap[row.message_id]) reactedMap[row.message_id] = {};
+    reactedMap[row.message_id][row.emoji] = true;
+  });
+
+  return items.map((row) => ({
+    ...row,
+    reactions: reactionMap[row.id] || {},
+    reacted: reactedMap[row.id] || {},
+  }));
+}
+
+async function listVisibleMessagesForUser({
+  userId,
+  courseId,
+  activeSemester = null,
+  subjectId = null,
+  limit = 50,
+  includeReactions = false,
+  staleDays = 30,
+} = {}) {
+  const normalizedUserId = Number(userId || 0);
+  const normalizedCourseId = Number(courseId || 0) || 1;
+  const normalizedSubjectId = Number(subjectId || 0);
+  const hasSubjectFilter = Number.isInteger(normalizedSubjectId) && normalizedSubjectId > 0;
+  const normalizedSemesterId = Number(activeSemester && activeSemester.id ? activeSemester.id : activeSemester || 0);
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 50);
+
+  if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) {
+    return { messages: [], unread_count: 0 };
+  }
+
+  const groups = await db.all(
+    `
+      SELECT sg.subject_id, sg.group_number
+      FROM student_groups sg
+      JOIN subjects s ON s.id = sg.subject_id
+      WHERE sg.student_id = ? AND s.course_id = ?
+    `,
+    [normalizedUserId, normalizedCourseId]
+  );
+
+  const conditions = ['m.target_all = 1'];
+  const conditionParams = [];
+  if (groups.length) {
+    const groupConditions = groups.map(() => '(m.subject_id = ? AND m.group_number = ?)').join(' OR ');
+    groups.forEach((groupRow) => conditionParams.push(groupRow.subject_id, groupRow.group_number));
+    conditions.push(groupConditions);
+  }
+  conditions.push('EXISTS (SELECT 1 FROM message_targets mt WHERE mt.message_id = m.id AND mt.user_id = ?)');
+  conditionParams.push(normalizedUserId);
+
+  const baseWhere = conditions.length ? `WHERE ${conditions.map((condition) => `(${condition})`).join(' OR ')}` : '';
+  const globalBroadcastScope = '(m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL)';
+  const courseFilter = ` AND (m.course_id = ? OR (${globalBroadcastScope} AND m.course_id IS NULL))`;
+  const semesterFilter = normalizedSemesterId > 0
+    ? ` AND (m.semester_id = ? OR (${globalBroadcastScope} AND m.semester_id IS NULL))`
+    : '';
+  const statusFilter = ` AND COALESCE(m.status, 'published') = 'published' AND ${buildScheduledAtVisibleCondition('m.scheduled_at')}`;
+  const subjectFilter = hasSubjectFilter ? ' AND m.subject_id = ?' : '';
+
+  let rows = await db.all(
+    `
+      SELECT
+        m.*,
+        s.name AS subject_name,
+        u.full_name AS created_by,
+        mr.id AS read_id,
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM message_targets mt2
+            WHERE mt2.message_id = m.id AND mt2.user_id = ?
+          ) THEN 1
+          ELSE 0
+        END AS is_direct_target
+      FROM messages m
+      LEFT JOIN subjects s ON s.id = m.subject_id
+      LEFT JOIN users u ON u.id = m.created_by_id
+      LEFT JOIN message_reads mr ON mr.message_id = m.id AND mr.user_id = ?
+      ${baseWhere}${courseFilter}${semesterFilter}${subjectFilter}${statusFilter}
+      ORDER BY COALESCE(m.published_at, m.created_at) DESC, m.id DESC
+      LIMIT ${safeLimit}
+    `,
+    [
+      normalizedUserId,
+      normalizedUserId,
+      ...conditionParams,
+      normalizedCourseId,
+      ...(normalizedSemesterId > 0 ? [normalizedSemesterId] : []),
+      ...(hasSubjectFilter ? [normalizedSubjectId] : []),
+      new Date().toISOString(),
+    ]
+  );
+
+  rows = (rows || []).map((row) => messageHelpers.buildVisibleMessagePreview(row, { staleDays }));
+  if (includeReactions && rows.length) {
+    rows = await attachVisibleMessageReactions(rows, normalizedUserId);
+  }
+
+  return {
+    messages: rows,
+    unread_count: rows.filter((row) => !row.read_id).length,
+  };
+}
+
 function buildHelpPageContent(lang) {
   const isUk = lang === 'uk';
   return {
@@ -8442,6 +8589,10 @@ app.get('/help', requireLogin, async (req, res) => {
   try {
     const lang = getPreferredLang(req);
     const helpPage = buildHelpPageExperienceContent(lang);
+    const courseId = hasSessionRole(req, 'admin')
+      ? getAdminCourse(req)
+      : Number(req.session.user.course_id || 1);
+    const activeSemester = await getActiveSemester(courseId || 1);
     const supportRows = await listSupportRequestsForUser(req.session.user.id, 12);
     const supportRequests = await Promise.all((supportRows || []).map(async (row) => {
       const messages = await listSupportRequestMessages(row.id);
@@ -8450,6 +8601,28 @@ app.get('/help', requireLogin, async (req, res) => {
     const supportStats = supportHelpers.summarizeSupportRequests(supportRequests, {
       responseLabel: lang === 'uk' ? 'до 1 робочого дня' : 'within 1 business day',
     });
+    let announcementFeed = [];
+    let announcementSummary = null;
+    if (settingsCache.allow_messages) {
+      try {
+        const visibleMessages = await listVisibleMessagesForUser({
+          userId: req.session.user.id,
+          courseId: courseId || 1,
+          activeSemester,
+          limit: 8,
+          staleDays: 45,
+        });
+        announcementFeed = (visibleMessages.messages || [])
+          .filter((item) => !item.is_stale || !item.read_id)
+          .slice(0, 6);
+        announcementSummary = messageHelpers.summarizeVisibleMessages(visibleMessages.messages, { staleDays: 45 });
+      } catch (err) {
+        if (!isDbSchemaCompatibilityError(err)) {
+          throw err;
+        }
+      }
+    }
+
     const decodeMessage = (value) => {
       if (!value) return '';
       try {
@@ -8463,6 +8636,9 @@ app.get('/help', requireLogin, async (req, res) => {
       helpPage,
       supportRequests,
       supportStats,
+      announcementFeed,
+      announcementSummary,
+      showAnnouncementDigest: Boolean(settingsCache.allow_messages),
       supportCategoryOptions: SUPPORT_REQUEST_CATEGORIES,
       messages: {
         error: decodeMessage(req.query.err),
@@ -8594,7 +8770,14 @@ app.get('/help', requireLogin, async (req, res) => {
       helpPage,
       supportRequests,
       supportStats,
+      announcementFeed: [],
+      announcementSummary: null,
+      showAnnouncementDigest: Boolean(settingsCache.allow_messages),
       supportCategoryOptions: SUPPORT_REQUEST_CATEGORIES,
+      messages: {
+        error: '',
+        success: '',
+      },
     });
   } catch (err) {
     return handleDbError(res, err, 'help');
@@ -13251,6 +13434,28 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     }
   }
 
+  let announcementItems = [];
+  let announcementSummary = null;
+  if (settingsCache.allow_messages) {
+    try {
+      const visibleMessages = await listVisibleMessagesForUser({
+        userId: user.id,
+        courseId,
+        activeSemester,
+        limit: 8,
+        staleDays: 45,
+      });
+      announcementItems = (visibleMessages.messages || [])
+        .filter((item) => !item.is_stale || !item.read_id)
+        .slice(0, 3);
+      announcementSummary = messageHelpers.summarizeVisibleMessages(visibleMessages.messages, { staleDays: 45 });
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+    }
+  }
+
   const teacherQuickActions = normalizedRole === 'teacher'
     ? [
         {
@@ -13335,7 +13540,33 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       action_label: preferredMyDayLang === 'en' ? 'Open insights' : 'До insights',
     });
   }
-  if (supportSummary && Number(supportSummary.open || 0) > 0) {
+  if (announcementSummary && Number(announcementSummary.fresh_unread || 0) > 0) {
+    inboxItems.push({
+      kind: 'focus',
+      title: preferredMyDayLang === 'en'
+        ? `Unread updates: ${announcementSummary.fresh_unread}`
+        : `Непрочитані оновлення: ${announcementSummary.fresh_unread}`,
+      meta: preferredMyDayLang === 'en'
+        ? 'Announcements stay in the schedule inbox. Support stays in Help.'
+        : 'Оголошення живуть в inbox розкладу, підтримка окремо в Help.',
+      action_href: '/schedule?panel=messages',
+      action_label: preferredMyDayLang === 'en' ? 'Open inbox' : 'Відкрити inbox',
+    });
+  } else if (announcementSummary && Number(announcementSummary.fresh || 0) > 0) {
+    inboxItems.push({
+      kind: 'update',
+      title: preferredMyDayLang === 'en'
+        ? `Recent announcements: ${announcementSummary.fresh}`
+        : `Свіжі оголошення: ${announcementSummary.fresh}`,
+      meta: preferredMyDayLang === 'en'
+        ? 'Check the latest broadcasts and direct updates.'
+        : 'Перевір свіжі оголошення та адресні повідомлення.',
+      action_href: '/schedule?panel=messages',
+      action_label: preferredMyDayLang === 'en' ? 'Open inbox' : 'Відкрити inbox',
+    });
+  }
+
+  if (false && supportSummary && Number(supportSummary.open || 0) > 0) {
     inboxItems.push({
       kind: 'focus',
       title: preferredMyDayLang === 'en'
@@ -13474,6 +13705,8 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     review_queue: reviewQueue,
     attendance_health: attendanceHealth,
     latest_rating_snapshot: latestRatingSnapshot,
+    announcement_summary: announcementSummary,
+    announcement_items: announcementItems,
     support_summary: supportSummary,
     support_threads: supportPreviewItems,
     teacher_quick_actions: teacherQuickActions,
@@ -25692,106 +25925,23 @@ app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
     : Number(req.session.user.course_id || 1);
   const activeSemester = await getActiveSemester(courseId || 1);
   const filterSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
-  db.all(
-    `
-      SELECT sg.subject_id, sg.group_number
-      FROM student_groups sg
-      JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ? AND s.course_id = ?
-    `,
-    [userId, courseId || 1],
-    (sgErr, groups) => {
-      if (sgErr) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      const conditions = [];
-      const params = [];
-      conditions.push('m.target_all = 1');
-      if (groups.length) {
-        const groupConditions = groups.map(() => '(m.subject_id = ? AND m.group_number = ?)').join(' OR ');
-        groups.forEach((g) => params.push(g.subject_id, g.group_number));
-        conditions.push(groupConditions);
-      }
-      conditions.push('EXISTS (SELECT 1 FROM message_targets mt WHERE mt.message_id = m.id AND mt.user_id = ?)');
-      params.push(userId);
-      const baseWhere = conditions.length ? `WHERE ${conditions.map((c) => `(${c})`).join(' OR ')}` : '';
-      const globalBroadcastScope = '(m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL)';
-      const courseFilter = ` AND (m.course_id = ? OR (${globalBroadcastScope} AND m.course_id IS NULL))`;
-      const semesterFilter = activeSemester
-        ? ` AND (m.semester_id = ? OR (${globalBroadcastScope} AND m.semester_id IS NULL))`
-        : '';
-      const statusFilter = ` AND COALESCE(m.status, 'published') = 'published' AND ${buildScheduledAtVisibleCondition('m.scheduled_at')}`;
-      const subjectFilter = !Number.isNaN(filterSubjectId) ? ' AND m.subject_id = ?' : '';
-      const finalParams = [...params, courseId || 1];
-      if (activeSemester) {
-        finalParams.push(activeSemester.id);
-      }
-      if (!Number.isNaN(filterSubjectId)) {
-        finalParams.push(filterSubjectId);
-      }
-      finalParams.push(new Date().toISOString());
-      db.all(
-        `
-          SELECT m.*, s.name AS subject_name, u.full_name AS created_by, mr.id AS read_id
-          FROM messages m
-          LEFT JOIN subjects s ON s.id = m.subject_id
-          LEFT JOIN users u ON u.id = m.created_by_id
-          LEFT JOIN message_reads mr ON mr.message_id = m.id AND mr.user_id = ?
-          ${baseWhere}${courseFilter}${semesterFilter}${subjectFilter}${statusFilter}
-          ORDER BY m.created_at DESC
-          LIMIT 50
-        `,
-        [userId, ...finalParams],
-        (msgErr, rows) => {
-          if (msgErr) {
-            return res.status(500).json({ error: 'Database error' });
-          }
-          const unreadCount = rows.filter((r) => !r.read_id).length;
-          if (!rows.length) {
-            return res.json({ messages: rows, unread_count: unreadCount });
-          }
-          const messageIds = rows.map((r) => r.id);
-          const placeholders = messageIds.map(() => '?').join(',');
-          db.all(
-            `SELECT message_id, emoji, COUNT(*) AS count
-             FROM message_reactions
-             WHERE message_id IN (${placeholders})
-             GROUP BY message_id, emoji`,
-            messageIds,
-            (reactErr, reactRows) => {
-              const reactionMap = {};
-              if (!reactErr && reactRows) {
-                reactRows.forEach((row) => {
-                  if (!reactionMap[row.message_id]) reactionMap[row.message_id] = {};
-                  reactionMap[row.message_id][row.emoji] = Number(row.count || 0);
-                });
-              }
-              db.all(
-                `SELECT message_id, emoji
-                 FROM message_reactions
-                 WHERE message_id IN (${placeholders}) AND user_id = ?`,
-                [...messageIds, userId],
-                (myErr, myRows) => {
-                  const reactedMap = {};
-                  if (!myErr && myRows) {
-                    myRows.forEach((row) => {
-                      if (!reactedMap[row.message_id]) reactedMap[row.message_id] = {};
-                      reactedMap[row.message_id][row.emoji] = true;
-                    });
-                  }
-                  rows.forEach((row) => {
-                    row.reactions = reactionMap[row.id] || {};
-                    row.reacted = reactedMap[row.id] || {};
-                  });
-                  return res.json({ messages: rows, unread_count: unreadCount });
-                }
-              );
-            }
-          );
-        }
-      );
+  try {
+    const payload = await listVisibleMessagesForUser({
+      userId,
+      courseId: courseId || 1,
+      activeSemester,
+      subjectId: filterSubjectId,
+      limit: 50,
+      includeReactions: true,
+      staleDays: 45,
+    });
+    return res.json(payload);
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return res.json({ messages: [], unread_count: 0 });
     }
-  );
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 app.post('/messages/read', requireLogin, writeLimiter, (req, res) => {

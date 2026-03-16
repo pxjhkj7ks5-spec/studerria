@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.45",
+      "date": "2026-03-16",
+      "items": [
+        "feat(help-announcement-digest): add a fresh announcement digest to FAQ & Help so broadcasts and direct updates stay separate from support threads while the full archive still opens from the schedule inbox",
+        "tune(my-day-inbox-separation): remove support threads from the generic My Day inbox, surface recent announcements in a dedicated mission card, and route inbox CTAs straight to `/schedule?panel=messages`",
+        "refactor(messages-visible-query): extract visible message shaping into `lib/messages.js`, reuse a shared user-facing message query for `/messages.json`, `/help`, and `/home`, and label message kinds directly inside the schedule inbox modal"
+      ]
+    },
+    {
       "version": "1.2.44",
       "date": "2026-03-16",
       "items": [
