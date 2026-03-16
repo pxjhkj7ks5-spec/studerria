@@ -8194,30 +8194,6 @@ function buildHelpPageContent(lang) {
         ],
       },
     ],
-    stepsTitle: isUk ? 'Як працює підтримка' : 'How support works',
-    stepsSubtitle: isUk
-      ? 'Проста схема, щоб звернення одразу було придатне для роботи.'
-      : 'A simple flow so each request is immediately actionable.',
-    steps: [
-      {
-        title: isUk ? '1. Оберіть тему' : '1. Pick a topic',
-        body: isUk
-          ? 'Вкажіть категорію, щоб адміністратор одразу зрозумів, куди віднести проблему.'
-          : 'Choose a category so the administrator immediately understands the type of issue.',
-      },
-      {
-        title: isUk ? '2. Додайте контекст' : '2. Add context',
-        body: isUk
-          ? 'Короткий заголовок і опис сценарію сильно пришвидшують обробку заявки.'
-          : 'A short subject plus a clear scenario description makes the ticket much faster to resolve.',
-      },
-      {
-        title: isUk ? '3. Слідкуйте за статусом' : '3. Track the status',
-        body: isUk
-          ? 'Статус, час оновлення й примітка адміністратора з’являться в історії ваших звернень нижче.'
-          : 'The status, latest update time, and administrator note will appear in your request history below.',
-      },
-    ],
   };
 }
 
@@ -8406,30 +8382,6 @@ function buildHelpPageExperienceContent(lang) {
               : 'The default target is within one business day for the first reply. If the issue blocks schedule, journal, or registration, say that in the subject of the first message.',
           },
         ],
-      },
-    ],
-    stepsTitle: isUk ? 'Як підготувати сильне звернення' : 'How to write a strong request',
-    stepsSubtitle: isUk
-      ? 'Мета не просто отримати відповідь, а скоротити шлях від проблеми до рішення.'
-      : 'The goal is not only to get a reply, but to shorten the path from issue to resolution.',
-    steps: [
-      {
-        title: isUk ? '1. Назвіть точний сценарій' : '1. Name the exact workflow',
-        body: isUk
-          ? 'Наприклад: "реєстрація предметів", "session room conflict", "journal attendance". Це швидше за загальні теми на кшталт "щось не працює".'
-          : 'For example: "subject registration", "session room conflict", or "journal attendance". This is much faster than a generic "something is broken".',
-      },
-      {
-        title: isUk ? '2. Додайте дані для відтворення' : '2. Add reproduction data',
-        body: isUk
-          ? 'Курс, предмет, група, дата, пара, room label або template title. Чим менше команді доведеться здогадуватись, тим швидше буде відповідь.'
-          : 'Include course, subject, group, date, slot, room label, or template title. The less the team has to guess, the faster the response.',
-      },
-      {
-        title: isUk ? '3. Не створюйте дублікати' : '3. Avoid duplicate tickets',
-        body: isUk
-          ? 'Якщо проблема та сама, просто відповідайте в треді нижче. Так зберігається повний контекст і не губиться історія перевірки.'
-          : 'If it is the same issue, reply in the existing thread below. That preserves the full context and avoids losing verification history.',
       },
     ],
   };

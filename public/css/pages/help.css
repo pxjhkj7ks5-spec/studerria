@@ -6,7 +6,6 @@
 .studerria-help-hero,
 .studerria-help-faq,
 .studerria-help-form-card,
-.studerria-help-steps,
 .studerria-help-history {
   position: relative;
   overflow: hidden;
@@ -100,7 +99,6 @@
 
 .studerria-help-faq,
 .studerria-help-form-card,
-.studerria-help-steps,
 .studerria-help-history {
   padding: 1.35rem;
 }
@@ -120,7 +118,6 @@
 
 .studerria-help-faq-groups,
 .studerria-help-side,
-.studerria-help-step-list,
 .studerria-help-history-list {
   display: grid;
   gap: 1rem;
@@ -208,17 +205,6 @@
 
 .studerria-help-form-note {
   font-size: 0.88rem;
-}
-
-.studerria-help-step {
-  padding: 1rem;
-  border-radius: 1rem;
-  border: 1px solid color-mix(in srgb, var(--studerria-border-soft, rgba(255, 255, 255, 0.1)) 75%, transparent);
-  background: color-mix(in srgb, var(--studerria-surface-base, rgba(255, 255, 255, 0.05)) 85%, transparent);
-}
-
-.studerria-help-step h3 {
-  font-size: 1rem;
 }
 
 .studerria-help-history-top {

@@ -149,24 +149,6 @@
               <button class="btn btn-primary" type="submit"><%= t('help.formSubmit') %></button>
             </form>
           </article>
-
-          <article class="glass-panel studerria-help-steps">
-            <div class="studerria-help-section-head">
-              <div>
-                <p class="studerria-help-section-kicker"><%= t('help.pageTitle') %></p>
-                <h2 class="studerria-help-section-title"><%= helpPage.stepsTitle %></h2>
-              </div>
-              <p class="studerria-help-section-copy"><%= helpPage.stepsSubtitle %></p>
-            </div>
-            <div class="studerria-help-step-list">
-              <% (helpPage.steps || []).forEach(function(step) { %>
-                <article class="studerria-help-step">
-                  <h3><%= step.title %></h3>
-                  <p><%= step.body %></p>
-                </article>
-              <% }); %>
-            </div>
-          </article>
         </div>
       </section>
 

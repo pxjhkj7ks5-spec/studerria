@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.41",
+      "date": "2026-03-16",
+      "items": [
+        "tune(help-support-page-focus): remove the extra 'How to write a strong request' card from FAQ & Help so the page stays focused on the support form and request history"
+      ]
+    },
+    {
       "version": "1.2.40",
       "date": "2026-03-16",
       "items": [
