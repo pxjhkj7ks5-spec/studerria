@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.43",
+      "date": "2026-03-16",
+      "items": [
+        "tune(support-flash-and-admin-actions): restyle FAQ & Help flash messages into the shared liquid alert pattern and add explicit close/reopen actions in the admin support thread header"
+      ]
+    },
+    {
       "version": "1.2.42",
       "date": "2026-03-16",
       "items": [

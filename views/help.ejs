@@ -50,10 +50,22 @@
 
     <section class="studerria-help-shell" aria-labelledby="studerria-help-title">
       <% if (messages && messages.error) { %>
-        <div class="alert alert-danger glass-panel mb-0" role="alert"><%= messages.error %></div>
+        <div class="alert flash-alert alert-danger mb-0" role="alert">
+          <span class="flash-alert__icon" aria-hidden="true">!</span>
+          <div class="flash-alert__body">
+            <span class="flash-alert__title"><%= t('help.flash.errorTitle') %></span>
+            <p class="flash-alert__text"><%= messages.error %></p>
+          </div>
+        </div>
       <% } %>
       <% if (messages && messages.success) { %>
-        <div class="alert alert-success glass-panel mb-0" role="status"><%= messages.success %></div>
+        <div class="alert flash-alert alert-success mb-0" role="status">
+          <span class="flash-alert__icon" aria-hidden="true">✓</span>
+          <div class="flash-alert__body">
+            <span class="flash-alert__title"><%= t('help.flash.successTitle') %></span>
+            <p class="flash-alert__text"><%= messages.success %></p>
+          </div>
+        </div>
       <% } %>
 
       <article class="glass-panel studerria-help-hero">

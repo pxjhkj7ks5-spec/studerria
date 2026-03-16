@@ -785,6 +785,15 @@
       body.theme-dark .support-chat-copy {
         color: rgba(226, 232, 240, 0.76);
       }
+      .support-chat-head-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+      }
+      .support-chat-head-actions form {
+        margin: 0;
+      }
       .support-chat-scroll {
         display: grid;
         gap: 0.9rem;
@@ -4194,6 +4203,31 @@
                             <strong><%= t('admin.supportTicketUpdated') %>:</strong> <%= formatSupportStamp(supportThread.updated_at || supportThread.created_at) %>
                           </p>
                         </div>
+                        <div class="support-chat-head-actions">
+                          <% if (supportThread.status !== 'resolved') { %>
+                            <form method="POST" action="/admin/support-requests/<%= supportThread.id %>/update">
+                              <input type="hidden" name="status" value="resolved" />
+                              <button
+                                class="btn btn-outline-secondary glass btn-sm"
+                                type="submit"
+                                onclick="return confirm('<%= t('admin.supportCloseConfirm') %>')"
+                              >
+                                <%= t('admin.supportClose') %>
+                              </button>
+                            </form>
+                          <% } else { %>
+                            <form method="POST" action="/admin/support-requests/<%= supportThread.id %>/update">
+                              <input type="hidden" name="status" value="in_progress" />
+                              <button
+                                class="btn btn-outline-secondary glass btn-sm"
+                                type="submit"
+                                onclick="return confirm('<%= t('admin.supportReopenConfirm') %>')"
+                              >
+                                <%= t('admin.supportReopen') %>
+                              </button>
+                            </form>
+                          <% } %>
+                        </div>
                       </div>
 
                       <div class="support-chat-scroll">
@@ -4230,17 +4264,6 @@
                               ></textarea>
                             </div>
                             <div class="col-12 support-chat-actions">
-                              <% if (supportThread.status !== 'resolved') { %>
-                                <button
-                                  class="btn btn-outline-secondary glass"
-                                  type="submit"
-                                  name="close_request"
-                                  value="1"
-                                  onclick="return confirm('<%= t('admin.supportCloseConfirm') %>')"
-                                >
-                                  <%= t('admin.supportClose') %>
-                                </button>
-                              <% } %>
                               <button class="btn btn-primary" type="submit"><%= t('admin.supportReplySend') %></button>
                             </div>
                           </form>
