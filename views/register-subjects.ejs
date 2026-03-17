@@ -83,6 +83,10 @@
   const pathwayReadinessMetrics = pathwayReadinessAlert && pathwayReadinessAlert.metrics
     ? pathwayReadinessAlert.metrics
     : null;
+  const registrationExperience = registrationExperienceSummary || null;
+  const registrationExperienceStages = registrationExperience && Array.isArray(registrationExperience.stages)
+    ? registrationExperience.stages
+    : [];
   const registerGroupsUi = {
     statusSelected: t('registerSubjects.statusSelected'),
     statusPending: t('registerSubjects.statusPending'),
@@ -464,6 +468,13 @@
         line-height: 1.5;
       }
 
+      .reg-groups-readiness__metric-note {
+        margin-top: 0.38rem;
+        font-size: 0.8rem;
+        color: var(--page-muted);
+        line-height: 1.45;
+      }
+
       .app-footer {
         font-size: 0.8rem;
       }
@@ -563,6 +574,26 @@
                     </div>
                   <% } %>
 
+                  <% if (registrationExperience && registrationExperienceStages.length) { %>
+                    <div>
+                      <p class="reg-groups-readiness__hint">
+                        <strong><%= lang === 'en' ? 'What students see now:' : 'Що зараз бачать студенти:' %></strong>
+                        <%= registrationExperience.title %>
+                      </p>
+                    </div>
+                    <div class="reg-groups-readiness__metrics">
+                      <% registrationExperienceStages.forEach((stage) => { %>
+                        <div class="reg-groups-readiness__metric">
+                          <span class="reg-groups-readiness__metric-label"><%= stage.label %></span>
+                          <div class="reg-groups-readiness__metric-value"><%= stage.value %></div>
+                          <% if (stage.hint) { %>
+                            <div class="reg-groups-readiness__metric-note"><%= stage.hint %></div>
+                          <% } %>
+                        </div>
+                      <% }) %>
+                    </div>
+                  <% } %>
+
                   <% if (pathwayRegistrationHint) { %>
                     <p class="reg-groups-readiness__hint"><%= pathwayRegistrationHint %></p>
                   <% } %>
@@ -593,7 +624,7 @@
                     <span class="flash-alert__icon" aria-hidden="true">i</span>
                     <div class="flash-alert__body">
                       <span class="flash-alert__title"><%= t('registerSubjects.noSubjectsTitle') %></span>
-                      <p class="flash-alert__text"><%= t('registerSubjects.noSubjects') %></p>
+                      <p class="flash-alert__text"><%= registrationExperience && registrationExperience.body ? registrationExperience.body : t('registerSubjects.noSubjects') %></p>
                     </div>
                   </div>
                 <% } else if (showAutoAssignedNotice) { %>

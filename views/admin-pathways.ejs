@@ -11,6 +11,9 @@
   const ambiguousCampusList = Array.isArray(ambiguousCampusBindings) ? ambiguousCampusBindings : [];
   const migrationCourseList = Array.isArray(migrationCourseOptions) ? migrationCourseOptions : [];
   const admissionCards = Array.isArray(admissionHealthCards) ? admissionHealthCards : [];
+  const registrationExperience = registrationExperienceSummary || null;
+  const catalogSummary = subjectCatalogSummary || null;
+  const catalogSummaryMetrics = catalogSummary && catalogSummary.metrics ? catalogSummary.metrics : null;
   const isUk = String(lang || '').toLowerCase() === 'uk';
   const catalogChecklistPropsJson = JSON.stringify({
     targetSelector: '#pathwayCatalogAssignForm',
@@ -1000,6 +1003,37 @@
         </section>
       <% } %>
 
+      <section class="glass section mb-3" id="pathways-registration-impact">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><%= isUk ? 'Вплив на реєстрацію' : 'Registration impact' %></h2>
+            <p class="section-subtitle"><%= isUk ? 'Панель коротко показує, що саме зараз побачить студент у вибраній когорті: чи відкриється курс, чи буде список предметів і чи не ламається маршрут кампусом.' : 'This panel shows what students see in the selected cohort right now: whether the course route opens, whether subjects are visible, and whether campus routing stays stable.' %></p>
+          </div>
+          <span class="chip"><%= selectedAdmissionValue > 0 ? (registrationExperience ? registrationExperience.title : (isUk ? 'Немає даних' : 'No data')) : ui.selectAdmissionFirst %></span>
+        </div>
+        <% if (selectedAdmissionValue > 0 && registrationExperience) { %>
+          <div class="pathways-banner pathways-banner--<%= registrationExperience.tone || 'muted' %>">
+            <strong><%= registrationExperience.title %></strong>
+            <span><%= registrationExperience.body %></span>
+          </div>
+          <% if (Array.isArray(registrationExperience.stages) && registrationExperience.stages.length) { %>
+            <div class="scope-summary-grid mt-3">
+              <% registrationExperience.stages.forEach((stage) => { %>
+                <div class="scope-summary-card">
+                  <span class="scope-summary-card__label"><%= stage.label %></span>
+                  <strong><%= stage.value %></strong>
+                  <% if (stage.hint) { %>
+                    <span class="catalog-subject-meta d-block mt-1"><%= stage.hint %></span>
+                  <% } %>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        <% } else { %>
+          <div class="soft-panel muted"><%= ui.selectAdmissionFirst %></div>
+        <% } %>
+      </section>
+
       <section class="glass section mb-3" id="pathways-scope">
         <div class="section-header">
           <div>
@@ -1597,6 +1631,31 @@
           <span class="chip"><%= ui.catalogEntriesCount %>: <%= subjectCatalogList.length %></span>
         </div>
 
+        <% if (catalogSummary && catalogSummaryMetrics) { %>
+          <div class="pathways-banner pathways-banner--<%= catalogSummary.tone || 'muted' %>">
+            <strong><%= catalogSummary.title %></strong>
+            <span><%= catalogSummary.body %></span>
+          </div>
+          <div class="scope-summary-grid mt-3 mb-3">
+            <div class="scope-summary-card">
+              <span class="scope-summary-card__label"><%= isUk ? 'Shared інстанси' : 'Shared instances' %></span>
+              <strong><%= Number(catalogSummaryMetrics.shared_instances || 0) %></strong>
+            </div>
+            <div class="scope-summary-card">
+              <span class="scope-summary-card__label"><%= isUk ? 'Separate інстанси' : 'Separate instances' %></span>
+              <strong><%= Number(catalogSummaryMetrics.separate_instances || 0) %></strong>
+            </div>
+            <div class="scope-summary-card">
+              <span class="scope-summary-card__label"><%= isUk ? 'Мультикурсові зв’язки' : 'Multi-course bindings' %></span>
+              <strong><%= Number(catalogSummaryMetrics.multi_course_instances || 0) %></strong>
+            </div>
+            <div class="scope-summary-card">
+              <span class="scope-summary-card__label"><%= isUk ? 'Непризначені бази' : 'Unassigned base subjects' %></span>
+              <strong><%= Number(catalogSummaryMetrics.unassigned_entries || 0) %></strong>
+            </div>
+          </div>
+        <% } %>
+
         <div class="catalog-forms mb-3">
           <form class="soft-panel h-100" method="POST" action="/admin/pathways/catalog/add">
             <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
@@ -1766,6 +1825,9 @@
                         <%= ui.catalogOwnerCourse %>:
                         <%= ((subject.course_labels || []).find((label) => Number(label.id) === Number(subject.owner_course_id || 0)) || {}).name || ('#' + Number(subject.owner_course_id || 0)) %>
                       </div>
+                      <% if (subject.binding_description) { %>
+                        <div class="catalog-subject-meta"><%= subject.binding_description %></div>
+                      <% } %>
                     </div>
                     <div class="catalog-course-chip-wrap">
                       <% (subject.course_labels || []).forEach((courseLabel) => { %>

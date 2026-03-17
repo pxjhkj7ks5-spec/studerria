@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.46",
+      "date": "2026-03-17",
+      "items": [
+        "feat(pathways-registration-impact): add a focused registration-impact layer for cohort admin workspaces and subject registration so both admins and students can see whether course routing, subject visibility, campus routing, and migration are actually ready",
+        "tune(subject-base-binding-clarity): summarize shared vs separate catalog bindings in admin pathways, surface per-instance binding descriptions directly in the global subject base, and highlight unassigned or multi-course subject setups before they create registration confusion",
+        "refactor(register-subjects-single-source): remove the duplicate `GET /register/subjects` route and keep the registration readiness flow anchored to one render path with the new pathway helper summaries"
+      ]
+    },
+    {
       "version": "1.2.45",
       "date": "2026-03-16",
       "items": [

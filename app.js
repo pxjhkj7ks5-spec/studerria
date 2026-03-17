@@ -9402,6 +9402,21 @@ app.get('/register/subjects', async (req, res) => {
           - Number(Array.isArray(baseVisibleSubjects) ? baseVisibleSubjects.length : 0)
       ),
     });
+    const registrationExperienceSummary = pathwayHelpers.buildRegistrationExperienceSummary({
+      summary: registrationPathwayReadiness,
+      lang,
+      mappedCourses: Array.isArray(admissionMappedCourses) ? admissionMappedCourses.length : 0,
+      visibleSubjects: Array.isArray(subjects) ? subjects.length : 0,
+      totalSubjects: Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0,
+      campusBindings: readyCampusBindings,
+      ambiguousCampuses: campusChoices.filter((choice) => choice.is_ambiguous).length,
+      pendingUsers: 0,
+      baseHiddenSubjects: Math.max(
+        0,
+        Number(Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0)
+          - Number(Array.isArray(baseVisibleSubjects) ? baseVisibleSubjects.length : 0)
+      ),
+    });
 
     return res.render('register-subjects', {
       subjects,
@@ -9410,70 +9425,7 @@ app.get('/register/subjects', async (req, res) => {
       pathwayRegistrationHint,
       registrationPathwayReadiness,
       registrationPathwayAlert,
-      error: req.query.error || '',
-    });
-  } catch (err) {
-    console.error('Register subjects step failed', err);
-    return res.status(500).send('Database error');
-  }
-});
-
-app.get('/register/subjects', async (req, res) => {
-  if (!req.session.pendingUserId) {
-    return res.redirect('/register');
-  }
-  try {
-    await ensureDbReady();
-    const user = await db.get(
-      'SELECT course_id, admission_id FROM users WHERE id = ?',
-      [req.session.pendingUserId]
-    );
-    if (!user || !user.course_id) {
-      return res.redirect('/register/course');
-    }
-    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [user.course_id]);
-    if (course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
-      return res.redirect('/register/teacher-subjects');
-    }
-
-    const subjects = await getRegistrationSubjects(user.course_id, user.admission_id);
-    const isRequired = (subject) =>
-      subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
-    const requiredAuto = (subjects || []).filter((subject) => isRequired(subject) && Number(subject.group_count) === 1);
-    await Promise.all(
-      requiredAuto.map((subject) =>
-        db.run(
-          `
-            INSERT INTO student_groups (student_id, subject_id, group_number)
-            VALUES (?, ?, 1)
-            ON CONFLICT(student_id, subject_id) DO NOTHING
-          `,
-          [req.session.pendingUserId, subject.id]
-        )
-      )
-    );
-
-    const optoutRows = await db.all(
-      'SELECT subject_id FROM user_subject_optouts WHERE user_id = ?',
-      [req.session.pendingUserId]
-    );
-    const optouts = (optoutRows || []).map((row) => Number(row.subject_id));
-    const selectedGroupRows = await db.all(
-      'SELECT subject_id, group_number FROM student_groups WHERE student_id = ?',
-      [req.session.pendingUserId]
-    );
-    const selectedGroups = {};
-    (selectedGroupRows || []).forEach((row) => {
-      const subjectId = Number(row.subject_id);
-      const groupNumber = Number(row.group_number);
-      if (!Number.isInteger(subjectId) || subjectId < 1) return;
-      if (!Number.isInteger(groupNumber) || groupNumber < 1) return;
-      selectedGroups[subjectId] = groupNumber;
-    });
-    return res.render('register-subjects', {
-      subjects,
-      optouts,
-      selectedGroups,
+      registrationExperienceSummary,
       error: req.query.error || '',
     });
   } catch (err) {
@@ -27771,6 +27723,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
 
     let admissionHealthCards = [];
     let selectedCohortHealth = null;
+    let selectedRegistrationExperience = null;
     let cohortAlerts = [];
 
     try {
@@ -27853,6 +27806,24 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
 
       if (selectedAdmissionId && selectedProgram) {
         const selectedHealthCard = admissionHealthCards.find((item) => item.is_selected) || null;
+        const selectedRegistrationReadiness = pathwayHelpers.buildPathwayReadinessSummary({
+          mappedCourses: Number(mappingSummary.visible || 0),
+          visibleSubjects: Number(visibilitySummary.visible || 0),
+          totalSubjects: Number(visibilitySummary.total || 0),
+          campusBindings: Number(registrationCampusBindings.length || 0),
+          pendingUsers: Number(migrationSummary.pending_users || 0),
+        });
+        selectedRegistrationExperience = pathwayHelpers.buildRegistrationExperienceSummary({
+          summary: selectedRegistrationReadiness,
+          lang: pathwaysLang,
+          mappedCourses: Number(mappingSummary.visible || 0),
+          visibleSubjects: Number(visibilitySummary.visible || 0),
+          totalSubjects: Number(visibilitySummary.total || 0),
+          campusBindings: Number(registrationCampusBindings.length || 0),
+          ambiguousCampuses: Number(ambiguousCampusBindings.length || 0),
+          pendingUsers: Number(migrationSummary.pending_users || 0),
+          baseHiddenSubjects: Number(hiddenSubjectCount || 0),
+        });
         const campusSignalValue = ambiguousCampusBindings.length
           ? formatPathwaysBlockedMetric(ambiguousCampusBindings.length)
           : formatPathwaysReadyMetric(registrationCampusBindings.length);
@@ -28006,6 +27977,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
         users_count: 0,
       }));
       selectedCohortHealth = null;
+      selectedRegistrationExperience = null;
       cohortAlerts = selectedAdmissionId ? [] : [{
         tone: 'info',
         title: pathwaysText.pickCohortTitle,
@@ -28079,6 +28051,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
             };
           })
           .filter(Boolean);
+        const ownerCourse = courseById.get(Number(row.owner_course_id || 0)) || null;
         entry.instances.push({
           id: Number(row.subject_id || 0),
           name: sanitizeCompactText(row.subject_name || row.catalog_name || '', 140),
@@ -28094,6 +28067,12 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
           course_count: Number(row.course_count || courseIds.length || 0),
           course_names: String(row.course_names || ''),
           course_labels: courseLabels,
+          binding_description: pathwayHelpers.describeCatalogBinding({
+            isShared: row.is_shared === true || Number(row.is_shared) === 1,
+            bindingCount: Number(row.course_count || courseIds.length || 0),
+            ownerCourseName: ownerCourse ? sanitizeCompactText(ownerCourse.name || '', 120) : '',
+            lang: pathwaysLang,
+          }),
         });
       });
       subjectCatalogEntries = Array.from(subjectCatalogMap.values())
@@ -28166,6 +28145,12 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
             location: normalizeCourseCampus(course.location),
             is_teacher_course: course.is_teacher_course === true || Number(course.is_teacher_course) === 1,
           }] : [],
+          binding_description: pathwayHelpers.describeCatalogBinding({
+            isShared: false,
+            bindingCount: Number(row.owner_course_id || 0) > 0 ? 1 : 0,
+            ownerCourseName: course ? sanitizeCompactText(course.name || '', 120) : '',
+            lang: pathwaysLang,
+          }),
         });
       });
       subjectCatalogEntries = Array.from(legacyMap.values()).map((entry) => ({
@@ -28174,6 +28159,10 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
         total_courses: Number((entry.instances || []).length || 0),
       }));
     }
+    const subjectCatalogSummary = pathwayHelpers.buildCatalogBindingSummary({
+      entries: subjectCatalogEntries,
+      lang: pathwaysLang,
+    });
 
     const pageRole = hasSessionRole(req, 'admin')
       ? 'admin'
@@ -28208,9 +28197,11 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       migrationSummary,
       selectedCourseLabel,
       selectedCohortHealth,
+      registrationExperienceSummary: selectedRegistrationExperience,
       cohortAlerts,
       subjectVisibilityItems: configurableSubjectVisibility,
       subjectCatalogEntries,
+      subjectCatalogSummary,
       migrationCourseOptions,
       hiddenSubjectCount,
       visibilitySummary,
