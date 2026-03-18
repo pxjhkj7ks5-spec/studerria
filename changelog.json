@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.48",
+      "date": "2026-03-18",
+      "items": [
+        "fix(pathways-summary-parse): remove the stray closing parenthesis in `lib/pathways.js` so Cloud Run can parse the pathways helper during app startup instead of crashing before binding `PORT`",
+        "fix(homework-due-date-sql-casts): cast homework due-date and created-at sort/filter expressions to `TEXT` in teacher workspace, My Day, journal sync, journal columns, and course pulse analytics so Postgres no longer fails on mixed `COALESCE` types when date columns drift between text and timestamp-like types"
+      ]
+    },
+    {
       "version": "1.2.47",
       "date": "2026-03-18",
       "items": [

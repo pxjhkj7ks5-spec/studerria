@@ -9812,7 +9812,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
           WHERE h.created_by_id = ?
             AND COALESCE(h.is_teacher_homework, 0) = 1
             ${selectedCourseId ? 'AND h.course_id = ?' : ''}
-          ORDER BY COALESCE(h.custom_due_date, h.class_date) DESC NULLS LAST, h.created_at DESC
+          ORDER BY COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) DESC NULLS LAST, CAST(h.created_at AS TEXT) DESC
           LIMIT 8
         `,
         selectedCourseId ? [userId, selectedCourseId] : [userId]
@@ -11547,8 +11547,8 @@ async function buildAdminDataQualityDiagnostics({
             COALESCE(s.name, 'Предмет') AS subject_name,
             COALESCE(h.group_number, 0)::int AS group_number,
             COALESCE(
-              NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
-              NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
+              NULLIF(TRIM(CAST(h.class_date AS TEXT)), ''),
+              NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''),
               '—'
             ) AS due_label,
             LEFT(TRIM(COALESCE(h.description, '')), 80) AS description_preview
@@ -11574,8 +11574,8 @@ async function buildAdminDataQualityDiagnostics({
               COALESCE(s.name, 'Предмет') AS subject_name,
               COALESCE(h.group_number, 0)::int AS group_number,
               COALESCE(
-                NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
-                NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
+                NULLIF(TRIM(CAST(h.class_date AS TEXT)), ''),
+                NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''),
                 '—'
               ) AS due_label,
               COALESCE(h.class_number, 0)::int AS class_number,
@@ -11592,8 +11592,8 @@ async function buildAdminDataQualityDiagnostics({
               s.name,
               COALESCE(h.group_number, 0),
               COALESCE(
-                NULLIF(TRIM(COALESCE(h.class_date, '')), ''),
-                NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''),
+                NULLIF(TRIM(CAST(h.class_date AS TEXT)), ''),
+                NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''),
                 '—'
               ),
               COALESCE(h.class_number, 0),
@@ -12052,7 +12052,7 @@ async function buildCoursePulseAnalytics({
             AND su.course_id = ?
             AND COALESCE(h.is_teacher_homework, 0) = 1
             AND COALESCE(h.status, 'published') = 'published'
-            AND COALESCE(NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''), NULLIF(TRIM(COALESCE(h.class_date, '')), '')) < ?
+            AND COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) < ?
             AND NOT EXISTS (
               SELECT 1
               FROM homework_submissions hs
@@ -12200,7 +12200,7 @@ async function buildCoursePulseAnalytics({
           AND su.course_id = ?
           AND COALESCE(h.is_teacher_homework, 0) = 1
           AND COALESCE(h.status, 'published') = 'published'
-          AND COALESCE(NULLIF(TRIM(COALESCE(h.custom_due_date, '')), ''), NULLIF(TRIM(COALESCE(h.class_date, '')), '')) < ?
+          AND COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) < ?
           AND NOT EXISTS (
             SELECT 1
             FROM homework_submissions hs
@@ -12735,7 +12735,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
           AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
           AND (h.custom_due_date IS NOT NULL OR h.class_date IS NOT NULL)
           AND (${scope.clause})
-        ORDER BY COALESCE(h.custom_due_date, h.class_date) ASC, h.created_at DESC
+        ORDER BY COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) ASC, CAST(h.created_at AS TEXT) DESC
       `,
       params
     );
@@ -17597,7 +17597,7 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
   } else {
     sql += ' AND h.semester_id IS NULL';
   }
-  sql += ' ORDER BY COALESCE(h.custom_due_date, h.class_date, h.created_at) ASC, h.id ASC';
+  sql += " ORDER BY COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.created_at AS TEXT)), '')) ASC, h.id ASC";
   const rawHomeworkRows = await db.all(sql, params);
   const homeworkRowsForColumns = (rawHomeworkRows || []).filter((row) => !isSessionConsultationHomeworkRow(row));
 
@@ -18061,7 +18061,12 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
       CASE WHEN COALESCE(h.description, '') ILIKE '[Сесія]%' THEN 1 ELSE 0 END ASC,
       CASE WHEN COALESCE(jc.is_credit, 0) = 1 THEN 1 ELSE 0 END ASC,
       COALESCE(jc.position, 0) ASC,
-      COALESCE(h.custom_due_date, h.class_date, h.created_at, jc.created_at::text) ASC,
+      COALESCE(
+        NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''),
+        NULLIF(TRIM(CAST(h.class_date AS TEXT)), ''),
+        NULLIF(TRIM(CAST(h.created_at AS TEXT)), ''),
+        TO_CHAR(jc.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+      ) ASC,
       jc.id ASC
   `;
   let rows = [];
