@@ -2607,14 +2607,14 @@
                 <label class="form-label"><%= lang === 'en' ? 'Type' : 'Тип' %></label>
                 <select class="form-select" id="messagesTypeFilter">
                   <option value=""><%= lang === 'en' ? 'All updates' : 'Усі оновлення' %></option>
-                  <option value="broadcast"><%= lang === 'en' ? 'Broadcast' : 'Broadcast' %></option>
-                  <option value="group"><%= lang === 'en' ? 'Group' : 'Group' %></option>
-                  <option value="subject"><%= lang === 'en' ? 'Subject' : 'Subject' %></option>
+                  <option value="broadcast"><%= lang === 'en' ? 'Broadcast' : 'Загальні' %></option>
+                  <option value="group"><%= lang === 'en' ? 'Group' : 'Групові' %></option>
+                  <option value="subject"><%= lang === 'en' ? 'Subject' : 'Предметні' %></option>
                   <option value="direct"><%= lang === 'en' ? 'Direct' : 'Адресні' %></option>
                 </select>
               </div>
             </div>
-            <p class="text-muted small mb-3"><%= lang === 'en' ? 'Support threads are not mixed here. Open Help for support replies and SLA.' : 'Support threads тут не змішуються. Для support replies і SLA відкривайте Help.' %></p>
+            <p class="text-muted small mb-3"><%= lang === 'en' ? 'Support threads are not mixed here. Open Help for support replies and SLA.' : 'Треди підтримки тут не змішуються. Для відповідей підтримки та SLA відкривайте Help.' %></p>
             <div id="messagesList" class="d-grid gap-3">
               <div class="list-group-item text-muted"><%= t('schedule.messages.loading') %></div>
             </div>

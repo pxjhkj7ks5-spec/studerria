@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.50",
+      "date": "2026-03-18",
+      "items": [
+        "refactor(inbox-surface-consistency): switch Help and My Day inbox digest wiring away from legacy announcement naming, keep narrow fallback compatibility, and align inbox-specific copy across touched surfaces",
+        "tune(message-type-clarity-uk): translate Ukrainian inbox type chips and filters in `/help`, `/home`, and `/schedule` so broadcast, group, subject, and direct updates read clearly instead of mixing English labels",
+        "chore(appjs-dead-code-cleanup): remove the orphaned commented attendance-save block left in `app.js` after the journal recovery refactor"
+      ]
+    },
+    {
       "version": "1.2.49",
       "date": "2026-03-18",
       "items": [

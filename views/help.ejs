@@ -33,7 +33,9 @@
         });
       };
       const historyList = Array.isArray(supportRequests) ? supportRequests : [];
-      const announcementList = Array.isArray(announcementFeed) ? announcementFeed : [];
+      const inboxList = Array.isArray(inboxFeed)
+        ? inboxFeed
+        : (Array.isArray(announcementFeed) ? announcementFeed : []);
       const requestChipClass = (status) => (
         status === 'resolved'
           ? 'status-chip status-chip--active'
@@ -42,7 +44,10 @@
             : 'status-chip status-chip--pending')
       );
       const supportSummary = supportStats || {};
-      const announcementDigest = announcementSummary || {};
+      const inboxDigest = inboxSummary || announcementSummary || {};
+      const inboxDigestVisible = typeof showInboxDigest === 'boolean'
+        ? showInboxDigest
+        : Boolean(showAnnouncementDigest);
       const threadRoleLabel = (roleName) => (
         roleName === 'admin'
           ? (lang === 'uk' ? 'Підтримка' : 'Support')
@@ -206,27 +211,27 @@
               <button class="btn btn-primary" type="submit"><%= t('help.formSubmit') %></button>
             </form>
           </article>
-          <% if (showAnnouncementDigest) { %>
-            <article class="glass-panel studerria-help-messages-card" id="announcement-digest">
+          <% if (inboxDigestVisible) { %>
+            <article class="glass-panel studerria-help-messages-card" id="inbox-digest">
               <div class="studerria-help-section-head">
                 <div>
                   <p class="studerria-help-section-kicker"><%= lang === 'en' ? 'Inbox' : 'Inbox' %></p>
                   <h2 class="studerria-help-section-title"><%= lang === 'en' ? 'Inbox updates' : 'Оновлення inbox' %></h2>
                 </div>
-                <p class="studerria-help-section-copy"><%= lang === 'en' ? 'Broadcast, group, subject, and direct updates stay in the schedule inbox. Support threads remain separate here in Help.' : 'Broadcast, group, subject і direct-оновлення живуть в inbox розкладу. Support threads лишаються окремо тут, у Help.' %></p>
+                <p class="studerria-help-section-copy"><%= lang === 'en' ? 'Broadcast, group, subject, and direct updates stay in the schedule inbox. Support threads remain separate here in Help.' : 'Загальні, групові, предметні й адресні оновлення живуть в inbox розкладу. Треди підтримки лишаються окремо тут, у Help.' %></p>
               </div>
 
               <div class="studerria-help-history-summary">
-                <span class="status-chip status-chip--info"><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= Number(announcementDigest.unread || 0) %></span>
-                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Broadcast' : 'Broadcast' %>: <%= Number(announcementDigest.broadcast || 0) %></span>
-                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Group' : 'Group' %>: <%= Number(announcementDigest.group || 0) %></span>
-                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Subject' : 'Subject' %>: <%= Number(announcementDigest.subject || 0) %></span>
-                <span class="status-chip status-chip--muted"><%= lang === 'en' ? 'Direct' : 'Адресні' %>: <%= Number(announcementDigest.direct || 0) %></span>
+                <span class="status-chip status-chip--info"><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= Number(inboxDigest.unread || 0) %></span>
+                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Broadcast' : 'Загальні' %>: <%= Number(inboxDigest.broadcast || 0) %></span>
+                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Group' : 'Групові' %>: <%= Number(inboxDigest.group || 0) %></span>
+                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Subject' : 'Предметні' %>: <%= Number(inboxDigest.subject || 0) %></span>
+                <span class="status-chip status-chip--muted"><%= lang === 'en' ? 'Direct' : 'Адресні' %>: <%= Number(inboxDigest.direct || 0) %></span>
               </div>
 
-              <% if (announcementList.length) { %>
+              <% if (inboxList.length) { %>
                 <div class="studerria-help-announcement-list">
-                  <% announcementList.forEach(function(item) { %>
+                  <% inboxList.forEach(function(item) { %>
                     <article class="studerria-help-announcement-item <%= !item.read_id ? 'is-unread' : '' %>">
                       <div class="studerria-help-announcement-head">
                         <div class="studerria-help-history-meta">

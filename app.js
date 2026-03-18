@@ -8354,8 +8354,8 @@ app.get('/help', requireLogin, async (req, res) => {
     const supportStats = supportHelpers.summarizeSupportRequests(supportRequests, {
       responseLabel: lang === 'uk' ? 'до 1 робочого дня' : 'within 1 business day',
     });
-    let announcementFeed = [];
-    let announcementSummary = null;
+    let inboxFeed = [];
+    let inboxSummary = null;
     if (settingsCache.allow_messages) {
       try {
         const visibleMessages = await listVisibleMessagesForUser({
@@ -8366,10 +8366,10 @@ app.get('/help', requireLogin, async (req, res) => {
           staleDays: 45,
           lang,
         });
-        announcementFeed = (visibleMessages.messages || [])
+        inboxFeed = (visibleMessages.messages || [])
           .filter((item) => !item.is_stale || !item.read_id)
           .slice(0, 6);
-        announcementSummary = messageHelpers.summarizeVisibleMessages(visibleMessages.messages, {
+        inboxSummary = messageHelpers.summarizeVisibleMessages(visibleMessages.messages, {
           staleDays: 45,
           lang,
         });
@@ -8393,9 +8393,9 @@ app.get('/help', requireLogin, async (req, res) => {
       helpPage,
       supportRequests,
       supportStats,
-      announcementFeed,
-      announcementSummary,
-      showAnnouncementDigest: Boolean(settingsCache.allow_messages),
+      inboxFeed,
+      inboxSummary,
+      showInboxDigest: Boolean(settingsCache.allow_messages),
       supportCategoryOptions: SUPPORT_REQUEST_CATEGORIES,
       messages: {
         error: decodeMessage(req.query.err),
@@ -13102,8 +13102,8 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     }
   }
 
-  let announcementItems = [];
-  let announcementSummary = null;
+  let inboxMessageItems = [];
+  let inboxMessageSummary = null;
   if (settingsCache.allow_messages) {
     try {
       const visibleMessages = await listVisibleMessagesForUser({
@@ -13114,10 +13114,10 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
         staleDays: 45,
         lang: preferredMyDayLang,
       });
-      announcementItems = (visibleMessages.messages || [])
+      inboxMessageItems = (visibleMessages.messages || [])
         .filter((item) => !item.is_stale || !item.read_id)
         .slice(0, 3);
-      announcementSummary = messageHelpers.summarizeVisibleMessages(visibleMessages.messages, {
+      inboxMessageSummary = messageHelpers.summarizeVisibleMessages(visibleMessages.messages, {
         staleDays: 45,
         lang: preferredMyDayLang,
       });
@@ -13217,27 +13217,27 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       action_label: preferredMyDayLang === 'en' ? 'Open insights' : 'До insights',
     });
   }
-  if (announcementSummary && Number(announcementSummary.fresh_unread || 0) > 0) {
+  if (inboxMessageSummary && Number(inboxMessageSummary.fresh_unread || 0) > 0) {
     inboxItems.push({
       kind: 'focus',
       title: preferredMyDayLang === 'en'
-        ? `Unread updates: ${announcementSummary.fresh_unread}`
-        : `Непрочитані оновлення: ${announcementSummary.fresh_unread}`,
+        ? `Unread updates: ${inboxMessageSummary.fresh_unread}`
+        : `Непрочитані оновлення: ${inboxMessageSummary.fresh_unread}`,
       meta: preferredMyDayLang === 'en'
         ? 'Broadcast, group, subject, and direct updates stay in the schedule inbox. Support stays in Help.'
-        : 'Оголошення живуть в inbox розкладу, підтримка окремо в Help.',
+        : 'Загальні, групові, предметні й адресні оновлення живуть в inbox розкладу, а підтримка лишається окремо в Help.',
       action_href: '/schedule?panel=messages',
       action_label: preferredMyDayLang === 'en' ? 'Open inbox' : 'Відкрити inbox',
     });
-  } else if (announcementSummary && Number(announcementSummary.fresh || 0) > 0) {
+  } else if (inboxMessageSummary && Number(inboxMessageSummary.fresh || 0) > 0) {
     inboxItems.push({
       kind: 'update',
       title: preferredMyDayLang === 'en'
-        ? `Recent inbox updates: ${announcementSummary.fresh}`
-        : `Свіжі оголошення: ${announcementSummary.fresh}`,
+        ? `Recent inbox updates: ${inboxMessageSummary.fresh}`
+        : `Свіжі inbox-оновлення: ${inboxMessageSummary.fresh}`,
       meta: preferredMyDayLang === 'en'
         ? 'Check the latest broadcast, group, subject, and direct updates.'
-        : 'Перевір свіжі оголошення та адресні повідомлення.',
+        : 'Перевір останні загальні, групові, предметні й адресні оновлення.',
       action_href: '/schedule?panel=messages',
       action_label: preferredMyDayLang === 'en' ? 'Open inbox' : 'Відкрити inbox',
     });
@@ -13382,8 +13382,8 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     review_queue: reviewQueue,
     attendance_health: attendanceHealth,
     latest_rating_snapshot: latestRatingSnapshot,
-    announcement_summary: announcementSummary,
-    announcement_items: announcementItems,
+    inbox_message_summary: inboxMessageSummary,
+    inbox_message_items: inboxMessageItems,
     support_summary: supportSummary,
     support_threads: supportPreviewItems,
     teacher_quick_actions: teacherQuickActions,
@@ -19919,97 +19919,6 @@ app.get('/journal', requireLogin, async (req, res) => {
     return handleDbError(res, err, 'journal.page');
   }
 });
-
-/*
-          res.locals.messages.error = 'Журнал тимчасово працює в режимі сумісності (оновіть структуру БД).';
-          `
-            SELECT ar.id
-            FROM attendance_records ar
-            WHERE ar.subject_id = ?
-              AND ar.course_id = ?
-              ${semesterMatchClause}
-              AND ar.class_date = ?
-              AND ar.class_number = ?
-              AND ar.student_id = ?
-            ORDER BY ar.id ASC
-            LIMIT 1
-          `,
-          [subjectId, selectedCourseId, ...semesterMatchParams, attendanceDate, attendanceClassNumber, studentId]
-        );
-        const existingId = existing.rows && existing.rows[0] ? Number(existing.rows[0].id) : null;
-        if (Number.isFinite(existingId) && existingId > 0) {
-          await query(
-            `
-              UPDATE attendance_records
-              SET status = ?,
-                  reason = ?,
-                  group_number = ?,
-                  marked_by = ?,
-                  marked_at = NOW(),
-                  updated_at = NOW()
-              WHERE id = ?
-            `,
-            [
-              entry.status,
-              entry.reason || null,
-              Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
-              Number(req.session.user.id),
-              existingId,
-            ]
-          );
-        } else {
-          await query(
-            `
-              INSERT INTO attendance_records
-              (
-                subject_id, course_id, semester_id, student_id, group_number,
-                class_date, class_number, status, reason, marked_by, marked_at, updated_at
-              )
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-            `,
-            [
-              subjectId,
-              selectedCourseId,
-              semesterId,
-              studentId,
-              Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
-              attendanceDate,
-              attendanceClassNumber,
-              entry.status,
-              entry.reason || null,
-              Number(req.session.user.id),
-            ]
-          );
-        }
-        updatedCount += 1;
-      }
-    });
-
-    logActivity(
-      db,
-      req,
-      'journal_attendance_save',
-      'attendance_record',
-      null,
-      {
-        subject_id: subjectId,
-        class_date: attendanceDate,
-        class_number: attendanceClassNumber,
-        updated_count: updatedCount,
-        deleted_count: deletedCount,
-      },
-      selectedCourseId,
-      semesterId
-    );
-    return res.redirect(
-      `/journal?subject_id=${subjectId}&attendance_date=${encodeURIComponent(attendanceDate)}&attendance_class_number=${attendanceClassNumber}&ok=Відвідуваність%20збережено`
-    );
-  } catch (err) {
-    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
-  }
-});
-
-*/
 
 app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res) => {
   const subjectId = Number(req.body.subject_id);
