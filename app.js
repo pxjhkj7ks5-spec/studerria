@@ -42743,12 +42743,17 @@ const startServer = () => {
     node: process.version,
     env: process.env.NODE_ENV || 'unknown',
   });
-  server.listen(PORT, '0.0.0.0', () => console.log(`Listening on ${PORT}`));
-  ensureDbReady().catch((err) => {
-    console.error('Failed to initialize database', err);
+  server.once('error', (err) => {
+    console.error('Server failed to bind', err);
   });
-  startSessionHealthProbes();
-  startScheduler();
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Listening on ${PORT}`);
+    ensureDbReady().catch((err) => {
+      console.error('Failed to initialize database', err);
+    });
+    startSessionHealthProbes();
+    startScheduler();
+  });
 };
 
 app.use((err, req, res, next) => {

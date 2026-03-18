@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.47",
+      "date": "2026-03-18",
+      "items": [
+        "fix(cloud-run-startup-sequencing): wait for the HTTP server to bind `PORT` before kicking off database initialization, session health probes, and the scheduler so startup side effects cannot race the Cloud Run readiness window",
+        "chore(node-runtime-pin): pin the app runtime to Node 20.x in `package.json` so Google buildpacks stop auto-selecting the latest available Node release during deploys"
+      ]
+    },
+    {
       "version": "1.2.46",
       "date": "2026-03-17",
       "items": [
