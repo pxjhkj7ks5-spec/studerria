@@ -2241,34 +2241,19 @@ async function isTeacherCourse(courseId) {
 }
 
 function normalizeRegistrationTrack(rawTrack, fallback = 'bachelor') {
-  const normalized = String(rawTrack || '').trim().toLowerCase();
-  if (REGISTRATION_TRACK_KEYS.has(normalized)) {
-    return normalized;
-  }
-  if (REGISTRATION_TRACK_KEYS.has(fallback)) {
-    return fallback;
-  }
-  return 'bachelor';
+  return pathwayHelpers.normalizeRegistrationTrack(rawTrack, fallback);
 }
 
 function inferRegistrationTrackFromCourse(course) {
-  if (!course) {
-    return 'bachelor';
-  }
-  const isTeacher = course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
-  return isTeacher ? 'teacher' : 'bachelor';
+  return pathwayHelpers.inferRegistrationTrackFromCourse(course);
 }
 
 function isTeacherCourseRecord(course) {
-  return Boolean(course) && (
-    course.is_teacher_course === true
-    || Number(course.is_teacher_course) === 1
-  );
+  return pathwayHelpers.inferRegistrationTrackFromCourse(course) === 'teacher';
 }
 
 function courseMatchesRegistrationTrack(course, trackKey) {
-  const normalizedTrack = normalizeRegistrationTrack(trackKey, 'bachelor');
-  return normalizedTrack === 'teacher' ? isTeacherCourseRecord(course) : !isTeacherCourseRecord(course);
+  return pathwayHelpers.courseMatchesRegistrationTrack(course, trackKey);
 }
 
 function inferLegacyCourseOrdinal(rawCourseName) {
@@ -2285,48 +2270,8 @@ function inferLegacyCourseOrdinal(rawCourseName) {
   return Number.isInteger(rawOrdinal) && rawOrdinal > 0 ? rawOrdinal : null;
 }
 
-function formatCampusLabelServer(location) {
-  return normalizeCourseCampus(location) === 'munich' ? 'Munich' : 'Kyiv';
-}
-
 function buildAdmissionCampusChoicesFromCourses(courseRows, trackKey = '') {
-  const campusMap = new Map();
-  (Array.isArray(courseRows) ? courseRows : []).forEach((course) => {
-    if (!course) return;
-    if (trackKey && !courseMatchesRegistrationTrack(course, trackKey)) return;
-    const courseId = Number(course.course_id || course.id || 0);
-    if (!Number.isInteger(courseId) || courseId < 1) return;
-    const campusKey = normalizeCourseCampus(course.course_location || course.location);
-    if (!campusMap.has(campusKey)) {
-      campusMap.set(campusKey, {
-        campus_key: campusKey,
-        campus_label: formatCampusLabelServer(campusKey),
-        course_ids: [],
-        course_labels: [],
-      });
-    }
-    const entry = campusMap.get(campusKey);
-    entry.course_ids.push(courseId);
-    entry.course_labels.push(
-      sanitizeCompactText(course.course_name || course.name || `Course ${courseId}`, 140)
-    );
-  });
-
-  return ['kyiv', 'munich']
-    .map((campusKey) => campusMap.get(campusKey))
-    .filter(Boolean)
-    .map((entry) => {
-      const courseIds = Array.from(new Set(entry.course_ids));
-      const courseLabels = Array.from(new Set(entry.course_labels));
-      return {
-        campus_key: entry.campus_key,
-        campus_label: entry.campus_label,
-        course_count: courseIds.length,
-        course_id: courseIds.length === 1 ? courseIds[0] : null,
-        is_ambiguous: courseIds.length !== 1,
-        course_labels: courseLabels,
-      };
-    });
+  return pathwayHelpers.buildAdmissionCampusChoicesFromCourses(courseRows, trackKey);
 }
 
 async function getRegistrationPathways() {
@@ -8202,6 +8147,7 @@ async function listVisibleMessagesForUser({
   limit = 50,
   includeReactions = false,
   staleDays = 30,
+  lang = 'uk',
 } = {}) {
   const normalizedUserId = Number(userId || 0);
   const normalizedCourseId = Number(courseId || 0) || 1;
@@ -8277,7 +8223,48 @@ async function listVisibleMessagesForUser({
     ]
   );
 
-  rows = (rows || []).map((row) => messageHelpers.buildVisibleMessagePreview(row, { staleDays }));
+  if ((rows || []).length) {
+    try {
+      const messageIds = Array.from(new Set(
+        rows
+          .map((row) => Number(row.id || 0))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      ));
+      if (messageIds.length) {
+        const snapshotRows = await db.all(
+          `
+            SELECT
+              rps.*,
+              u.full_name AS published_by_name
+            FROM rating_publication_snapshots rps
+            LEFT JOIN users u ON u.id = rps.published_by
+            WHERE rps.message_id = ANY(?::int[])
+            ORDER BY rps.published_at DESC, rps.id DESC
+          `,
+          [messageIds]
+        );
+        const snapshotMap = new Map();
+        (snapshotRows || []).forEach((row) => {
+          const messageId = Number(row.message_id || 0);
+          if (!messageId || snapshotMap.has(messageId)) return;
+          snapshotMap.set(messageId, row);
+        });
+        rows = rows.map((row) => ({
+          ...row,
+          rating_snapshot: snapshotMap.get(Number(row.id || 0)) || null,
+        }));
+      }
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+    }
+  }
+
+  rows = (rows || []).map((row) => messageHelpers.buildVisibleMessagePreview(row, {
+    staleDays,
+    lang,
+  }));
   if (includeReactions && rows.length) {
     rows = await attachVisibleMessageReactions(rows, normalizedUserId);
   }
@@ -8285,107 +8272,6 @@ async function listVisibleMessagesForUser({
   return {
     messages: rows,
     unread_count: rows.filter((row) => !row.read_id).length,
-  };
-}
-
-function buildHelpPageContent(lang) {
-  const isUk = lang === 'uk';
-  return {
-    hero: {
-      kicker: isUk ? 'Особисте / Підтримка' : 'Personal / Support',
-      title: 'FAQ & Help',
-      subtitle: isUk
-        ? 'Часті питання, короткі відповіді й пряме звернення до техпідтримки.'
-        : 'Frequent questions, quick answers, and a direct line to technical support.',
-      lead: isUk
-        ? 'У цьому просторі можна швидко знайти відповідь по доступу, розкладу, журналу, предметах і teamwork або одразу створити звернення для адміністратора.'
-        : 'Use this space to quickly resolve account, schedule, journal, subject, or teamwork questions, or create a ticket for the administrator right away.',
-      note: isUk
-        ? 'Нові заявки зберігаються в персональній історії та потрапляють в inbox адміністратора.'
-        : 'New requests are saved in your personal history and delivered to the administrator inbox.',
-    },
-    actions: {
-      faq: isUk ? 'Перейти до FAQ' : 'Browse FAQ',
-      support: isUk ? 'Створити звернення' : 'Create request',
-    },
-    faqTitle: isUk ? 'Часті питання' : 'Frequently asked questions',
-    faqSubtitle: isUk
-      ? 'Найтиповіші сценарії, які найчастіше виникають у персональному просторі.'
-      : 'The most common scenarios that appear in the personal workspace.',
-    faqGroups: [
-      {
-        kicker: isUk ? 'Доступ' : 'Access',
-        title: isUk ? 'Акаунт і профіль' : 'Account and profile',
-        items: [
-          {
-            question: isUk ? 'Не вдається увійти в акаунт. Що робити?' : 'I cannot sign in. What should I do?',
-            answer: isUk
-              ? 'Спочатку перевірте правильність ПІБ і пароля. Якщо доступ усе одно не працює, створіть звернення з темою "Акаунт", і адміністратор перевірить ваш профіль та активність сесії.'
-              : 'First check that your full name and password are correct. If access still fails, create an "Account" request and the administrator will review your profile and session state.',
-          },
-          {
-            question: isUk ? 'Де змінити ПІБ, пароль або мову?' : 'Where can I update my name, password, or language?',
-            answer: isUk
-              ? 'Відкрийте "Особисте → Профіль". Там можна змінити ПІБ, пароль і мову інтерфейсу без переходу в інші розділи.'
-              : 'Open "Personal → Profile". That page lets you change your full name, password, and interface language without leaving the personal section.',
-          },
-          {
-            question: isUk ? 'Як обрати предметні групи заново?' : 'How do I choose subject groups again?',
-            answer: isUk
-              ? 'У профілі є окрема дія для повторного вибору груп. Вона поверне вас у крок налаштування предметів і дозволить оновити вибір без створення нового акаунта.'
-              : 'Your profile includes a dedicated action to reselect subject groups. It returns you to the subject setup step so you can update choices without creating a new account.',
-          },
-        ],
-      },
-      {
-        kicker: isUk ? 'Навчання' : 'Study flow',
-        title: isUk ? 'Розклад і журнал' : 'Schedule and journal',
-        items: [
-          {
-            question: isUk ? 'У розкладі немає пари або дедлайну.' : 'A class or deadline is missing from the schedule.',
-            answer: isUk
-              ? 'Спочатку перевірте правильний тиждень і курс. Якщо елемент все одно відсутній, надішліть звернення з темою "Розклад" і вкажіть день, пару, предмет та курс.'
-              : 'First confirm you are on the correct week and course. If the item is still missing, submit a "Schedule" request and include the day, class slot, subject, and course.',
-          },
-          {
-            question: isUk ? 'Чому журнал порожній або не відкривається?' : 'Why is the journal empty or unavailable?',
-            answer: isUk
-              ? 'Причиною може бути роль, ще не налаштований предмет або тимчасова помилка даних. У заявці з темою "Журнал" коротко опишіть, який предмет і яка дія не спрацювала.'
-              : 'This can happen because of role access, an unconfigured subject, or a temporary data issue. In a "Journal" request, briefly note which subject and which action failed.',
-          },
-          {
-            question: isUk ? 'Куди повідомити про неправильний предмет або групу?' : 'Where do I report the wrong subject or group?',
-            answer: isUk
-              ? 'Найкраще створити звернення з темою "Предмети" і додати, який саме курс, предмет або група відображаються неправильно.'
-              : 'The best option is to create a "Subjects" request and mention which course, subject, or group is displayed incorrectly.',
-          },
-        ],
-      },
-      {
-        kicker: isUk ? 'Колаборація' : 'Collaboration',
-        title: isUk ? 'Матеріали й teamwork' : 'Materials and teamwork',
-        items: [
-          {
-            question: isUk ? 'Не відкривається файл або посилання на матеріал.' : 'A material file or link does not open.',
-            answer: isUk
-              ? 'Перевірте, чи проблема повторюється на іншому предметі або сторінці. Якщо ні, вкажіть предмет і назву матеріалу в зверненні, щоб адміністратор перевірив саме це вкладення.'
-              : 'Check whether the problem repeats on a different subject or page. If not, include the subject and the material name in your request so the administrator can verify that exact attachment.',
-          },
-          {
-            question: isUk ? 'Не вдається створити або приєднатись до команди.' : 'I cannot create or join a team.',
-            answer: isUk
-              ? 'Таке трапляється, коли є обмеження по ролі, групі або поточному складу команди. Виберіть тему "Teamwork" і опишіть завдання та крок, на якому з’явилась проблема.'
-              : 'This usually happens because of role, group, or membership limits. Choose the "Teamwork" topic and describe the task plus the step where the issue appeared.',
-          },
-          {
-            question: isUk ? 'Хочу повідомити про загальний баг або UX-проблему.' : 'I want to report a general bug or UX issue.',
-            answer: isUk
-              ? 'Створіть звернення з темою "Інше" і дайте короткий сценарій: де ви були, що натиснули, що очікували й що отримали фактично.'
-              : 'Create an "Other" request and share a short scenario: where you were, what you clicked, what you expected, and what actually happened.',
-          },
-        ],
-      },
-    ],
   };
 }
 
@@ -8446,139 +8332,6 @@ app.get('/about', requireLogin, (req, res) => {
   });
 });
 
-function buildHelpPageExperienceContent(lang) {
-  const isUk = lang === 'uk';
-  return {
-    hero: {
-      kicker: isUk ? 'FAQ / Підтримка' : 'FAQ / Support',
-      title: 'FAQ & Help',
-      subtitle: isUk
-        ? 'Пояснення по щоденних сценаріях Studerria та жива історія ваших звернень.'
-        : 'Support around real Studerria journeys plus a live history of your requests.',
-      lead: isUk
-        ? 'Сторінка зібрана навколо того, що користувач робить щодня: входить в акаунт, проходить реєстрацію, перевіряє розклад, журнал, матеріали, teacher workspace та support threads.'
-        : 'This page is organized around what people actually do every day: sign in, finish registration, check schedule, journal, materials, teacher workspace, and support threads.',
-      note: isUk
-        ? 'Кожне звернення нижче зберігає повну нитку повідомлень. Якщо контекст змінився, відповідайте прямо в треді.'
-        : 'Every request keeps the full conversation thread. If the context changed, reply directly in the thread.',
-    },
-    faqTitle: isUk ? 'Питання по реальних сценаріях' : 'Answers by real workflow',
-    faqSubtitle: isUk
-      ? 'Менше довідки про модулі, більше конкретних дій для студентів, викладачів і адміністрації.'
-      : 'Less module theory, more concrete answers for students, teachers, and operations.',
-    faqGroups: [
-      {
-        kicker: isUk ? 'Доступ' : 'Access',
-        title: isUk ? 'Вхід, профіль, базовий доступ' : 'Sign-in, profile, core access',
-        items: [
-          {
-            question: isUk ? 'Не вдається увійти або профіль виглядає порожнім.' : 'I cannot sign in or the profile looks empty.',
-            answer: isUk
-              ? 'Спершу перевірте ПІБ і пароль. Якщо увійти вдалося, але курс, роль або модулі відсутні, створіть звернення з темою "Акаунт" і вкажіть, що саме зникло: курс, роль, групи або доступ до журналу.'
-              : 'First verify your name and password. If sign-in works but the course, role, or modules are missing, create an "Account" request and list what is absent: course, role, groups, or journal access.',
-          },
-          {
-            question: isUk ? 'Де змінити ПІБ, пароль або мову інтерфейсу?' : 'Where do I change my name, password, or language?',
-            answer: isUk
-              ? 'У "Профілі". Це єдина точка, де варто оновлювати персональні дані, щоб вони однаково відображались у щоденнику, повідомленнях і support історії.'
-              : 'Use "Profile". It is the single place to update personal data so it stays consistent across My Day, messages, and support history.',
-          },
-        ],
-      },
-      {
-        kicker: isUk ? 'Pathways' : 'Pathways',
-        title: isUk ? 'Реєстрація, pathways і база предметів' : 'Registration, pathways, and subject base',
-        items: [
-          {
-            question: isUk ? 'На кроці вибору предметів список порожній або неповний.' : 'The subject selection step is empty or incomplete.',
-            answer: isUk
-              ? 'Це зазвичай означає, що для вашого курсу або року вступу ще не завершені visibility-налаштування. Якщо бачите лише частину предметів, завершіть доступні вибори та створіть звернення з темою "Предмети" з назвою курсу й року вступу.'
-              : 'This usually means visibility rules for your course or admission year are not finished yet. If only part of the catalog is visible, complete the available choices and open a "Subjects" request with your course and admission year.',
-          },
-          {
-            question: isUk ? 'Можна змінити групи або пройти реєстрацію заново без нового акаунта?' : 'Can I reselect groups or restart registration without a new account?',
-            answer: isUk
-              ? 'Так. У профілі є повторний вхід у сценарій вибору предметів. Це безпечніше, ніж створювати дубль акаунта, бо Studerria збереже одну історію журналу, повідомлень і support.'
-              : 'Yes. Use the profile action that reopens the subject selection flow. It is safer than creating a duplicate account because Studerria keeps one journal, message, and support history.',
-          },
-        ],
-      },
-      {
-        kicker: isUk ? 'Розклад' : 'Schedule',
-        title: isUk ? 'Розклад, сесії та кабінети' : 'Schedule, sessions, and rooms',
-        items: [
-          {
-            question: isUk ? 'У розкладі немає пари, дедлайну або кабінету.' : 'A class, deadline, or room is missing in the schedule.',
-            answer: isUk
-              ? 'Перевірте правильний тиждень і курс. Якщо пара або room label все одно не показується, напишіть у зверненні день, пару, предмет, групу та який саме кабінет очікувався. Це найшвидший шлях до виправлення конфлікту або room mapping.'
-              : 'Check the correct week and course first. If the class or room label is still missing, include the day, slot, subject, group, and expected room in your request. That is the fastest way to resolve a conflict or missing room mapping.',
-          },
-          {
-            question: isUk ? 'Сесія опублікована, але виглядає конфліктною.' : 'The session plan is published but still looks conflicted.',
-            answer: isUk
-              ? 'Укажіть дату, пару, предмет і кабінет. Для сесій важливі два типи конфліктів: викладач і room occupancy. У підтримці це потрібно описувати окремо, щоб команда одразу перевірила правильний шар даних.'
-              : 'Include the date, slot, subject, and room. Session issues usually come from two layers: teacher clashes and room occupancy. Describe both so the team can check the correct data layer immediately.',
-          },
-        ],
-      },
-      {
-        kicker: isUk ? 'Журнал' : 'Journal',
-        title: isUk ? 'Журнал, відвідуваність і рейтинги' : 'Journal, attendance, and ratings',
-        items: [
-          {
-            question: isUk ? 'Журнал порожній або не відкривається по предмету.' : 'The journal is empty or does not open for a subject.',
-            answer: isUk
-              ? 'Найчастіше бракує звʼязки між викладачем, предметом або курсом. У зверненні вкажіть предмет, курс і що саме не працює: оцінки, attendance чи insights.'
-              : 'Most often the teacher-subject-course mapping is incomplete. In your request, include the subject, course, and the broken area: grades, attendance, or insights.',
-          },
-          {
-            question: isUk ? 'Де шукати published rating або attendance signal?' : 'Where do I find the published rating or attendance signal?',
-            answer: isUk
-              ? 'Рейтинги залишаються в Journal Insights, але їхній останній snapshot дублюється на My Day та в повідомленнях. Attendance лишається джерелом істини в журналі, а на головній показується стислий health summary.'
-              : 'Ratings stay in Journal Insights, but the latest snapshot is echoed in My Day and messages. Attendance remains editable in the journal, while the homepage shows a compact health summary.',
-          },
-        ],
-      },
-      {
-        kicker: isUk ? 'Матеріали' : 'Materials',
-        title: isUk ? 'Матеріали, teamwork і Teacher Hub' : 'Materials, teamwork, and Teacher Hub',
-        items: [
-          {
-            question: isUk ? 'Не відкривається вкладення або шаблон викладача без файлів.' : 'An attachment does not open or a teacher template lost its files.',
-            answer: isUk
-              ? 'У Teacher Workspace шаблони та домашні завдання можуть використовувати reusable assets. Якщо asset відсутній, повідомте назву шаблону або дедлайну, курс і предмет. Не треба перевантажувати весь пакет заново, якщо проблема лише в одному asset.'
-              : 'Teacher Workspace templates and homework can use reusable assets. If one asset is missing, report the template or deadline title, course, and subject. You do not need to reupload the whole package if only one asset failed.',
-          },
-          {
-            question: isUk ? 'Не вдається створити або приєднатися до teamwork-команди.' : 'I cannot create or join a teamwork team.',
-            answer: isUk
-              ? 'Опишіть крок, на якому процес зупинився, і до якого предмета або завдання це привʼязано. Це дозволяє швидко відрізнити проблему з ролями від проблеми з дедлайном або subject scope.'
-              : 'Describe the exact step where the flow stopped and which subject or task it belongs to. That helps separate a role issue from a deadline or subject-scope issue.',
-          },
-        ],
-      },
-      {
-        kicker: isUk ? 'Support' : 'Support',
-        title: isUk ? 'Як працює підтримка' : 'How support works',
-        items: [
-          {
-            question: isUk ? 'Коли відповідати в існуючий тред, а коли створювати новий?' : 'When should I reply in a thread instead of opening a new request?',
-            answer: isUk
-              ? 'Якщо це та сама проблема, відповідайте в наявний тред. Нове звернення варто створювати лише тоді, коли змінюється тема: наприклад, окремо login issue і окремо room conflict у сесії.'
-              : 'Reply in the existing thread if it is the same issue. Open a new request only when the topic changes, for example a login issue versus a session room conflict.',
-          },
-          {
-            question: isUk ? 'Який SLA у support?' : 'What is the support SLA?',
-            answer: isUk
-              ? 'Базовий орієнтир: до одного робочого дня на першу відповідь. Якщо ситуація блокує розклад, журнал або реєстрацію, вкажіть це в темі листа прямо в першому повідомленні.'
-              : 'The default target is within one business day for the first reply. If the issue blocks schedule, journal, or registration, say that in the subject of the first message.',
-          },
-        ],
-      },
-    ],
-  };
-}
-
 app.get('/help', requireLogin, async (req, res) => {
   try {
     await ensureDbReady();
@@ -8588,7 +8341,7 @@ app.get('/help', requireLogin, async (req, res) => {
 
   try {
     const lang = getPreferredLang(req);
-    const helpPage = buildHelpPageExperienceContent(lang);
+    const helpPage = supportHelpers.buildHelpPageExperienceContent(lang);
     const courseId = hasSessionRole(req, 'admin')
       ? getAdminCourse(req)
       : Number(req.session.user.course_id || 1);
@@ -8611,11 +8364,15 @@ app.get('/help', requireLogin, async (req, res) => {
           activeSemester,
           limit: 8,
           staleDays: 45,
+          lang,
         });
         announcementFeed = (visibleMessages.messages || [])
           .filter((item) => !item.is_stale || !item.read_id)
           .slice(0, 6);
-        announcementSummary = messageHelpers.summarizeVisibleMessages(visibleMessages.messages, { staleDays: 45 });
+        announcementSummary = messageHelpers.summarizeVisibleMessages(visibleMessages.messages, {
+          staleDays: 45,
+          lang,
+        });
       } catch (err) {
         if (!isDbSchemaCompatibilityError(err)) {
           throw err;
@@ -8746,41 +8503,6 @@ app.post('/help/support/:id/close', requireLogin, writeLimiter, async (req, res)
     return res.redirect(`/help?ok=${encodeURIComponent(translate(lang, 'help.flash.requestClosed'))}`);
   } catch (err) {
     return handleDbError(res, err, 'help.support.close');
-  }
-});
-
-app.get('/help', requireLogin, async (req, res) => {
-  try {
-    await ensureDbReady();
-  } catch (err) {
-    return handleDbError(res, err, 'help.init');
-  }
-
-  try {
-    const lang = getPreferredLang(req);
-    const helpPage = buildHelpPageContent(lang);
-    const supportRequests = await listSupportRequestsForUser(req.session.user.id, 12);
-    const supportStats = {
-      open: (supportRequests || []).filter((request) => request.status !== 'resolved').length,
-      resolved: (supportRequests || []).filter((request) => request.status === 'resolved').length,
-      response: lang === 'uk' ? 'до 1 робочого дня' : 'within 1 business day',
-    };
-
-    return res.render('help', {
-      helpPage,
-      supportRequests,
-      supportStats,
-      announcementFeed: [],
-      announcementSummary: null,
-      showAnnouncementDigest: Boolean(settingsCache.allow_messages),
-      supportCategoryOptions: SUPPORT_REQUEST_CATEGORIES,
-      messages: {
-        error: '',
-        success: '',
-      },
-    });
-  } catch (err) {
-    return handleDbError(res, err, 'help');
   }
 });
 
@@ -8983,41 +8705,28 @@ app.get('/register', async (req, res) => {
 });
 
 app.post('/register', registerLimiter, async (req, res) => {
-  const { full_name, password, confirm_password, agree, remember_me } = req.body;
-  if (!full_name || !password || !confirm_password || !agree) {
-    return res.redirect('/register?error=Missing%20fields');
-  }
-  if (password !== confirm_password) {
-    return res.redirect('/register?error=Passwords%20do%20not%20match');
+  const full_name = String(req.body.full_name || '').trim();
+  const password = String(req.body.password || '');
+  const remember_me = req.body.remember_me;
+
+  if (!full_name || password.length < 4) {
+    return res.redirect('/register?error=Check%20your%20details');
   }
 
+  const normalizedName = full_name.replace(/\s+/g, ' ');
   const pendingUserId = Number(req.session.pendingUserId || 0);
   if (Number.isInteger(pendingUserId) && pendingUserId > 0) {
     try {
       await ensureDbReady();
-      const pendingUser = await db.get('SELECT id FROM users WHERE id = ?', [pendingUserId]);
-      if (!pendingUser) {
-        req.session.pendingUserId = null;
-        req.session.rememberMe = null;
-        return res.redirect('/register?error=Session%20expired');
-      }
-      const normalizedName = full_name.trim().replace(/\s+/g, ' ');
-      const existing = await db.get(
-        'SELECT id FROM users WHERE LOWER(full_name) = LOWER(?) AND id <> ?',
-        [normalizedName, pendingUserId]
-      );
-      if (existing) {
-        return res.redirect('/register?error=User%20already%20exists');
-      }
       const hash = await bcrypt.hash(password, 10);
       const preferredLang = getPreferredLang(req);
       await db.run(
-        'UPDATE users SET full_name = ?, password_hash = ?, language = ? WHERE id = ?',
+        `
+          UPDATE users
+          SET full_name = ?, password_hash = ?, language = COALESCE(language, ?)
+          WHERE id = ?
+        `,
         [normalizedName, hash, preferredLang, pendingUserId]
-      );
-      await db.run(
-        'UPDATE user_registration_events SET full_name = ? WHERE user_id = ?',
-        [normalizedName, pendingUserId]
       );
       req.session.rememberMe = isRememberRequested(remember_me);
       return res.redirect('/register/course');
@@ -9029,7 +8738,6 @@ app.post('/register', registerLimiter, async (req, res) => {
 
   try {
     await ensureDbReady();
-    const normalizedName = full_name.trim().replace(/\s+/g, ' ');
     const existing = await db.get('SELECT id FROM users WHERE LOWER(full_name) = LOWER(?)', [normalizedName]);
     if (existing) {
       return res.redirect('/register?error=User%20already%20exists');
@@ -9145,8 +8853,12 @@ app.post('/register/course', registerLimiter, async (req, res) => {
   if (!Number.isInteger(userId) || userId < 1) {
     return res.redirect('/register');
   }
+  const lang = getPreferredLang(req);
   const redirectRegisterCourseError = (message) =>
     res.redirect(`/register/course?error=${encodeURIComponent(message)}`);
+  const redirectRegistrationFlowIssue = (issue) => redirectRegisterCourseError(
+    pathwayHelpers.buildRegistrationFlowError({ issue, lang })
+  );
 
   const rawTrack = String(req.body.study_track || req.body.track || '').trim().toLowerCase();
   const trackFromBody = REGISTRATION_TRACK_KEYS.has(rawTrack) ? rawTrack : '';
@@ -9175,15 +8887,15 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       });
       if (!resolvedCourse.courseId) {
         if (resolvedCourse.reason === 'ambiguous_campus') {
-          return redirectRegisterCourseError('Прив’язка кампусу неоднозначна');
+          return redirectRegistrationFlowIssue('ambiguous_campus');
         }
-        return redirectRegisterCourseError('Обраний кампус недоступний');
+        return redirectRegistrationFlowIssue(resolvedCourse.reason || 'campus_not_available');
       }
       courseId = resolvedCourse.courseId;
     }
 
     if (!courseId) {
-      return redirectRegisterCourseError('Оберіть кампус');
+      return redirectRegistrationFlowIssue('missing_campus');
     }
 
     const [pendingUser, course] = await Promise.all([
@@ -9196,7 +8908,7 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       return res.redirect('/register?error=Session%20expired');
     }
     if (!course) {
-      return redirectRegisterCourseError('Некоректний курс');
+      return redirectRegistrationFlowIssue('invalid_course');
     }
 
     const teacherCourse = course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
@@ -9231,7 +8943,7 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       if (explicitPath) {
         const explicitTrack = normalizeRegistrationTrack(explicitPath.track_key, selectedTrack);
         if (trackFromBody && explicitTrack !== selectedTrack) {
-          return redirectRegisterCourseError('Некоректний шлях реєстрації');
+          return redirectRegistrationFlowIssue('invalid_pathway');
         }
         selectedTrack = explicitTrack;
       } else if (selectedTrack === 'teacher') {
@@ -9243,13 +8955,13 @@ app.post('/register/course', registerLimiter, async (req, res) => {
           selectedAdmissionId = teacherAdmissionId;
           selectedTrack = 'teacher';
         } else if (requestedProgramId || requestedAdmissionId || requestedCampus) {
-          return redirectRegisterCourseError('Некоректна прив’язка кампусу');
+          return redirectRegistrationFlowIssue('invalid_campus_binding');
         } else {
           selectedProgramId = null;
           selectedAdmissionId = null;
         }
       } else if (requestedProgramId || requestedAdmissionId || requestedCampus) {
-        return redirectRegisterCourseError('Некоректна прив’язка кампусу');
+        return redirectRegistrationFlowIssue('invalid_campus_binding');
       } else {
         selectedProgramId = null;
         selectedAdmissionId = null;
@@ -9293,6 +9005,18 @@ app.post('/register/course', registerLimiter, async (req, res) => {
     }
 
     selectedTrack = normalizeRegistrationTrack(selectedTrack, teacherCourse ? 'teacher' : 'bachelor');
+    if (!courseMatchesRegistrationTrack(course, selectedTrack)) {
+      return redirectRegistrationFlowIssue('invalid_pathway');
+    }
+    if (selectedProgramId && !selectedAdmissionId) {
+      return redirectRegistrationFlowIssue('missing_admission');
+    }
+    if (!teacherCourse && selectedAdmissionId) {
+      const scopedSubjects = await getRegistrationSubjects(courseId, selectedAdmissionId);
+      if (!(scopedSubjects || []).length) {
+        return redirectRegistrationFlowIssue('empty_subject_scope');
+      }
+    }
 
     await db.run(
       'UPDATE users SET course_id = ?, study_track = ?, study_program_id = ?, admission_id = ? WHERE id = ?',
@@ -13344,20 +13068,12 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       `,
       [ratingCourseIds]
     );
-    const workloadKeys = new Set(
-      workloadTargets.map((target) => `${Number(target.subject_id || 0)}|${target.group_number === null ? 'all' : Number(target.group_number || 0)}`)
-    );
-    const matchedSnapshot = (ratingRows || []).find((row) => {
-      const scopeType = String(row.scope_type || '').trim().toLowerCase();
-      if (scopeType === 'course' || String(row.target_kind || '').trim().toLowerCase() === 'course') {
-        return true;
-      }
-      const subjectId = Number(row.subject_id || 0);
-      if (!Number.isInteger(subjectId) || subjectId < 1) return false;
-      const groupNumber = Number(row.group_number || 0);
-      if (workloadKeys.has(`${subjectId}|${groupNumber > 0 ? groupNumber : 'all'}`)) return true;
-      if (groupNumber > 0 && workloadKeys.has(`${subjectId}|all`)) return true;
-      return false;
+    const workloadKeys = workloadTargets.map((target) => (
+      `${Number(target.subject_id || 0)}|${target.group_number === null ? 'all' : Number(target.group_number || 0)}`
+    ));
+    const matchedSnapshot = journalInsightHelpers.findRelevantRatingSnapshot(ratingRows, {
+      courseIds: ratingCourseIds,
+      workloadKeys,
     });
     if (matchedSnapshot) {
       latestRatingSnapshot = journalInsightHelpers.formatRatingSnapshotCard(matchedSnapshot, preferredMyDayLang);
@@ -13396,11 +13112,15 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
         activeSemester,
         limit: 8,
         staleDays: 45,
+        lang: preferredMyDayLang,
       });
       announcementItems = (visibleMessages.messages || [])
         .filter((item) => !item.is_stale || !item.read_id)
         .slice(0, 3);
-      announcementSummary = messageHelpers.summarizeVisibleMessages(visibleMessages.messages, { staleDays: 45 });
+      announcementSummary = messageHelpers.summarizeVisibleMessages(visibleMessages.messages, {
+        staleDays: 45,
+        lang: preferredMyDayLang,
+      });
     } catch (err) {
       if (!isDbSchemaCompatibilityError(err)) {
         throw err;
@@ -13481,13 +13201,18 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       title: preferredMyDayLang === 'en'
         ? `Latest rating: ${latestRatingSnapshot.scope_label}`
         : `Останній рейтинг: ${latestRatingSnapshot.scope_label}`,
-      meta: latestRatingSnapshot.top_entry
-        ? (
-          preferredMyDayLang === 'en'
-            ? `Leader: ${latestRatingSnapshot.top_entry.full_name}`
-            : `Лідер: ${latestRatingSnapshot.top_entry.full_name}`
-        )
-        : '',
+      meta: [
+        latestRatingSnapshot.target_label || '',
+        latestRatingSnapshot.period_label || '',
+        latestRatingSnapshot.updated_label || '',
+        latestRatingSnapshot.top_entry
+          ? (
+            preferredMyDayLang === 'en'
+              ? `Leader: ${latestRatingSnapshot.top_entry.full_name}`
+              : `Лідер: ${latestRatingSnapshot.top_entry.full_name}`
+          )
+          : '',
+      ].filter(Boolean).join(' · '),
       action_href: '/journal/insights',
       action_label: preferredMyDayLang === 'en' ? 'Open insights' : 'До insights',
     });
@@ -13499,7 +13224,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
         ? `Unread updates: ${announcementSummary.fresh_unread}`
         : `Непрочитані оновлення: ${announcementSummary.fresh_unread}`,
       meta: preferredMyDayLang === 'en'
-        ? 'Announcements stay in the schedule inbox. Support stays in Help.'
+        ? 'Broadcast, group, subject, and direct updates stay in the schedule inbox. Support stays in Help.'
         : 'Оголошення живуть в inbox розкладу, підтримка окремо в Help.',
       action_href: '/schedule?panel=messages',
       action_label: preferredMyDayLang === 'en' ? 'Open inbox' : 'Відкрити inbox',
@@ -13508,10 +13233,10 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     inboxItems.push({
       kind: 'update',
       title: preferredMyDayLang === 'en'
-        ? `Recent announcements: ${announcementSummary.fresh}`
+        ? `Recent inbox updates: ${announcementSummary.fresh}`
         : `Свіжі оголошення: ${announcementSummary.fresh}`,
       meta: preferredMyDayLang === 'en'
-        ? 'Check the latest broadcasts and direct updates.'
+        ? 'Check the latest broadcast, group, subject, and direct updates.'
         : 'Перевір свіжі оголошення та адресні повідомлення.',
       action_href: '/schedule?panel=messages',
       action_label: preferredMyDayLang === 'en' ? 'Open inbox' : 'Відкрити inbox',
@@ -18906,6 +18631,7 @@ async function buildJournalInsightsContext({
   payloadSource = {},
 }) {
   const payload = payloadSource && typeof payloadSource === 'object' ? payloadSource : {};
+  const lang = getPreferredLang(req);
   const subjectOptions = await getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode);
   const courseMap = new Map();
   (subjectOptions || []).forEach((item) => {
@@ -19655,6 +19381,48 @@ async function buildJournalInsightsContext({
     publishDisabledReason = 'Select group scope to publish a ranking for a specific audience.';
   }
 
+  const publishTargetSummary = journalInsightHelpers.describeRatingPublishTarget({
+    publishTarget,
+    scopeLabel,
+    periodLabel,
+    participantsCount,
+    lang,
+  });
+  const snapshotWorkloadKeys = selectedSubject
+    ? [`${Number(selectedSubject.subject_id || 0)}|${Number((publishTarget && publishTarget.group_number) || selectedGroupNumber || 0) || 'all'}`]
+    : [];
+  let latestPublishedRating = null;
+  try {
+    if (selectedCourseId) {
+      const snapshotRows = await db.all(
+        `
+          SELECT *
+          FROM rating_publication_snapshots
+          WHERE course_id = ?
+          ORDER BY published_at DESC, id DESC
+          LIMIT 24
+        `,
+        [selectedCourseId]
+      );
+      const matchedSnapshot = journalInsightHelpers.findRelevantRatingSnapshot(snapshotRows, {
+        courseId: selectedCourseId,
+        semesterId: selectedSemesterId,
+        subjectId: selectedSubject ? Number(selectedSubject.subject_id || 0) : null,
+        groupNumber: (publishTarget && publishTarget.group_number) || selectedGroupNumber || null,
+        scopeType,
+        targetKind: publishTarget ? publishTarget.kind : '',
+        workloadKeys: snapshotWorkloadKeys,
+      });
+      if (matchedSnapshot) {
+        latestPublishedRating = journalInsightHelpers.formatRatingSnapshotCard(matchedSnapshot, lang);
+      }
+    }
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+
   return {
     subjectOptions,
     courseOptions,
@@ -19709,6 +19477,8 @@ async function buildJournalInsightsContext({
     canPublishRating,
     publishDisabledReason,
     publishTarget,
+    publishTargetSummary,
+    latestPublishedRating,
     canManageAllSubjects: Boolean(journalScope.fullAccess),
   };
 }
@@ -19995,142 +19765,6 @@ app.post('/journal/insights/publish-rating', requireLogin, writeLimiter, async (
   }
 });
 
-app.post('/journal/insights/publish-rating', requireLogin, writeLimiter, async (req, res) => {
-  try {
-    await ensureDbReady();
-  } catch (err) {
-    return res.redirect(buildJournalInsightsUrl({
-      courseId: parsePositiveIntStrict(req.body.course_id, req.session?.user?.course_id),
-      subjectId: parsePositiveIntStrict(req.body.subject_id),
-      scopeType: req.body.scope_type || 'subject',
-      groupNumber: parsePositiveIntStrict(req.body.group_number),
-      studentId: parsePositiveIntStrict(req.body.student_id),
-      period: req.body.period || 'semester',
-      compareMode: req.body.compare_mode || 'none',
-      error: 'Database error',
-    }));
-  }
-
-  try {
-    const journalScope = await getJournalAccessScope(req);
-    const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
-    if (!journalScope.canUseJournal || !teacherJournalMode) {
-      return res.status(403).send('Forbidden (journal)');
-    }
-
-    const context = await buildJournalInsightsContext({
-      req,
-      journalScope,
-      teacherJournalMode,
-      payloadSource: req.body || {},
-    });
-
-    const baseRedirect = {
-      courseId: Number(context.selectedCourseId || 0),
-      subjectId: Number(context.selectedSubject?.subject_id || 0),
-      scopeType: context.scopeType,
-      groupNumber: Number(context.selectedGroupNumber || 0),
-      studentId: Number(context.selectedStudentId || 0),
-      period: context.period,
-      compareMode: context.compareMode || 'none',
-    };
-
-    if (!context.canPublishRating || !context.publishTarget) {
-      return res.redirect(buildJournalInsightsUrl({
-        ...baseRedirect,
-        error: context.publishDisabledReason || 'Rating cannot be published for current scope',
-      }));
-    }
-
-    const topNRaw = Number(req.body.top_n);
-    const topN = Number.isFinite(topNRaw)
-      ? Math.max(3, Math.min(30, Math.round(topNRaw)))
-      : 10;
-    const ratingRows = (context.ranking || []).slice(0, topN);
-    if (!ratingRows.length) {
-      return res.redirect(buildJournalInsightsUrl({
-        ...baseRedirect,
-        error: 'No ranking data to publish',
-      }));
-    }
-
-    const createdAtIso = new Date().toISOString();
-    const createdAtLabel = new Date().toLocaleString('uk-UA');
-    const leaderboardLines = ratingRows.map((row, index) => {
-      const scoreLabel = roundToPrecision(row.final_score, 2).toFixed(2).replace(/\.00$/, '');
-      const subjectsSuffix = Number(row.subjects_count || 0) > 1
-        ? ` (${Number(row.subjects_count)} предмети)`
-        : '';
-      return `${index + 1}. ${row.full_name} — ${scoreLabel}${subjectsSuffix}`;
-    });
-    const messageBody = [
-      `Рейтинг студентів: ${context.scopeLabel}`,
-      `Період: ${context.periodLabel}`,
-      '',
-      ...leaderboardLines,
-      '',
-      `Оновлено: ${createdAtLabel}`,
-    ].join('\n').slice(0, 8000);
-
-    if (context.publishTarget.kind === 'course') {
-      await db.run(
-        `
-          INSERT INTO messages
-            (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
-          VALUES
-            (NULL, NULL, 1, ?, ?, ?, ?, ?, 'published', NULL, ?)
-        `,
-        [
-          messageBody,
-          Number(req.session.user.id),
-          createdAtIso,
-          Number(context.publishTarget.course_id || context.selectedCourseId || req.session.user.course_id || 1),
-          context.publishTarget.semester_id ? Number(context.publishTarget.semester_id) : null,
-          createdAtIso,
-        ]
-      );
-    } else {
-      await db.run(
-        `
-          INSERT INTO messages
-            (subject_id, group_number, target_all, body, created_by_id, created_at, course_id, semester_id, status, scheduled_at, published_at)
-          VALUES
-            (?, ?, 0, ?, ?, ?, ?, ?, 'published', NULL, ?)
-        `,
-        [
-          Number(context.publishTarget.subject_id || context.selectedSubject?.subject_id || 0),
-          Number(context.publishTarget.group_number || context.selectedGroupNumber || 0),
-          messageBody,
-          Number(req.session.user.id),
-          createdAtIso,
-          Number(context.publishTarget.course_id || context.selectedCourseId || req.session.user.course_id || 1),
-          context.publishTarget.semester_id ? Number(context.publishTarget.semester_id) : null,
-          createdAtIso,
-        ]
-      );
-    }
-
-    logAction(db, req, 'journal_insights_publish_rating', {
-      scope_type: context.scopeType,
-      scope_label: context.scopeLabel,
-      period: context.period,
-      compare_mode: context.compareMode || 'none',
-      rating_size: ratingRows.length,
-      target_kind: context.publishTarget.kind,
-      target_subject_id: context.publishTarget.subject_id || null,
-      target_group_number: context.publishTarget.group_number || null,
-      target_course_id: context.publishTarget.course_id || context.selectedCourseId || null,
-    });
-
-    return res.redirect(buildJournalInsightsUrl({
-      ...baseRedirect,
-      ok: 'Rating published',
-    }));
-  } catch (err) {
-    return handleDbError(res, err, 'journal.insights.publish');
-  }
-});
-
 app.get('/journal', requireLogin, async (req, res) => {
   try {
     await ensureDbReady();
@@ -20285,6 +19919,97 @@ app.get('/journal', requireLogin, async (req, res) => {
     return handleDbError(res, err, 'journal.page');
   }
 });
+
+/*
+          res.locals.messages.error = 'Журнал тимчасово працює в режимі сумісності (оновіть структуру БД).';
+          `
+            SELECT ar.id
+            FROM attendance_records ar
+            WHERE ar.subject_id = ?
+              AND ar.course_id = ?
+              ${semesterMatchClause}
+              AND ar.class_date = ?
+              AND ar.class_number = ?
+              AND ar.student_id = ?
+            ORDER BY ar.id ASC
+            LIMIT 1
+          `,
+          [subjectId, selectedCourseId, ...semesterMatchParams, attendanceDate, attendanceClassNumber, studentId]
+        );
+        const existingId = existing.rows && existing.rows[0] ? Number(existing.rows[0].id) : null;
+        if (Number.isFinite(existingId) && existingId > 0) {
+          await query(
+            `
+              UPDATE attendance_records
+              SET status = ?,
+                  reason = ?,
+                  group_number = ?,
+                  marked_by = ?,
+                  marked_at = NOW(),
+                  updated_at = NOW()
+              WHERE id = ?
+            `,
+            [
+              entry.status,
+              entry.reason || null,
+              Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
+              Number(req.session.user.id),
+              existingId,
+            ]
+          );
+        } else {
+          await query(
+            `
+              INSERT INTO attendance_records
+              (
+                subject_id, course_id, semester_id, student_id, group_number,
+                class_date, class_number, status, reason, marked_by, marked_at, updated_at
+              )
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            `,
+            [
+              subjectId,
+              selectedCourseId,
+              semesterId,
+              studentId,
+              Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
+              attendanceDate,
+              attendanceClassNumber,
+              entry.status,
+              entry.reason || null,
+              Number(req.session.user.id),
+            ]
+          );
+        }
+        updatedCount += 1;
+      }
+    });
+
+    logActivity(
+      db,
+      req,
+      'journal_attendance_save',
+      'attendance_record',
+      null,
+      {
+        subject_id: subjectId,
+        class_date: attendanceDate,
+        class_number: attendanceClassNumber,
+        updated_count: updatedCount,
+        deleted_count: deletedCount,
+      },
+      selectedCourseId,
+      semesterId
+    );
+    return res.redirect(
+      `/journal?subject_id=${subjectId}&attendance_date=${encodeURIComponent(attendanceDate)}&attendance_class_number=${attendanceClassNumber}&ok=Відвідуваність%20збережено`
+    );
+  } catch (err) {
+    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
+  }
+});
+
+*/
 
 app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res) => {
   const subjectId = Number(req.body.subject_id);
@@ -25891,6 +25616,7 @@ app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
       limit: 50,
       includeReactions: true,
       staleDays: 45,
+      lang: getPreferredLang(req),
     });
     return res.json(payload);
   } catch (err) {
@@ -28321,6 +28047,57 @@ function getPathwaysRouteMessages(req) {
   };
 }
 
+async function getAdmissionPathwayContext(admissionId) {
+  return db.get(
+    `
+      SELECT
+        a.id,
+        a.program_id,
+        a.admission_year,
+        p.track_key
+      FROM program_admissions a
+      JOIN study_programs p ON p.id = a.program_id
+      WHERE a.id = ?
+    `,
+    [admissionId]
+  );
+}
+
+async function getAdmissionCourseScope(admissionId, trackKey) {
+  const [courses, mappingRows] = await Promise.all([
+    getCoursesCached(),
+    db.all(
+      `
+        SELECT course_id, is_visible
+        FROM program_admission_courses
+        WHERE admission_id = ?
+      `,
+      [admissionId]
+    ),
+  ]);
+  const compatibleCourses = pathwayHelpers.filterCourseRowsForTrack(courses || [], trackKey);
+  const compatibleCourseIds = compatibleCourses
+    .map((course) => Number(course.id || 0))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  const mappedCourseIdSet = new Set(
+    (mappingRows || [])
+      .map((row) => Number(row.course_id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  );
+  const visibleCourseIdSet = new Set(
+    (mappingRows || [])
+      .filter((row) => row.is_visible === true || Number(row.is_visible) === 1)
+      .map((row) => Number(row.course_id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  );
+  return {
+    compatibleCourses,
+    compatibleCourseIds,
+    mappedCourseIdSet,
+    visibleCourseIdSet,
+  };
+}
+
 app.post('/admin/pathways/catalog/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);
   const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
@@ -28419,7 +28196,53 @@ app.post('/admin/pathways/catalog/assign', requirePathwaysSectionAccess, writeLi
     }));
   }
 
+  let admissionRow = null;
   try {
+    let admissionCourseScope = null;
+    if (admissionId) {
+      admissionRow = await getAdmissionPathwayContext(admissionId);
+      if (!admissionRow) {
+        return res.redirect(buildAdminPathwaysUrl({
+          courseId,
+          track: trackFilter,
+          programId,
+          admissionId,
+          error: msg.admissionNotFound,
+        }));
+      }
+      if (programId && Number(programId) !== Number(admissionRow.program_id || 0)) {
+        return res.redirect(buildAdminPathwaysUrl({
+          courseId,
+          track: trackFilter,
+          programId: Number(admissionRow.program_id || 0),
+          admissionId,
+          error: msg.admissionNotInSelectedProgram,
+        }));
+      }
+      admissionCourseScope = await getAdmissionCourseScope(admissionId, admissionRow.track_key);
+      const invalidContextTarget = targetCourseIds.some((targetId) => !admissionCourseScope.compatibleCourseIds.includes(Number(targetId)));
+      if (invalidContextTarget) {
+        return res.redirect(buildAdminPathwaysUrl({
+          courseId,
+          track: trackFilter,
+          programId: Number(admissionRow.program_id || 0),
+          admissionId,
+          error: msg.selectedCoursesDoNotMatchTrack,
+        }));
+      }
+      const unmappedTarget = targetCourseIds.some((targetId) => !admissionCourseScope.mappedCourseIdSet.has(Number(targetId)));
+      if (unmappedTarget) {
+        return res.redirect(buildAdminPathwaysUrl({
+          courseId,
+          track: trackFilter,
+          programId: Number(admissionRow.program_id || 0),
+          admissionId,
+          error: getPreferredLang(req) === 'uk'
+            ? 'Деякі цільові курси не належать вибраному admission-контексту'
+            : 'Some target courses do not belong to the selected admission context',
+        }));
+      }
+    }
     const summary = await withTransaction(async (client) => {
       const validCatalogRows = await txAll(
         client,
@@ -28434,14 +28257,23 @@ app.post('/admin/pathways/catalog/assign', requirePathwaysSectionAccess, writeLi
       const validTargetRows = await txAll(
         client,
         `
-          SELECT id
+          SELECT id, is_teacher_course
           FROM courses
           WHERE id = ANY(?::int[])
         `,
         [targetCourseIds]
       );
-      const validTargetSet = new Set((validTargetRows || []).map((row) => Number(row.id || 0)).filter((value) => value > 0));
-      const validTargetCourseIds = targetCourseIds.filter((value) => validTargetSet.has(Number(value)));
+      const validTargetCourseIds = (validTargetRows || [])
+        .filter((row) => (
+          !admissionRow
+          || courseMatchesRegistrationTrack(row, admissionRow.track_key)
+        ))
+        .map((row) => Number(row.id || 0))
+        .filter((value) => Number.isInteger(value) && value > 0);
+      const validTargetSet = new Set(validTargetCourseIds);
+      if (validTargetCourseIds.length !== targetCourseIds.length) {
+        throw new Error('PATHWAYS_TARGET_COURSE_TRACK_MISMATCH');
+      }
       const touchedSubjectIds = new Set();
       const touchedCourseIds = new Set(validTargetCourseIds);
       let createdBindings = 0;
@@ -28605,7 +28437,7 @@ app.post('/admin/pathways/catalog/assign', requirePathwaysSectionAccess, writeLi
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId,
+      programId: admissionRow ? Number(admissionRow.program_id || 0) : programId,
       admissionId,
       ok: msg.subjectCatalogAssignmentsSaved(
         summary.createdBindings,
@@ -28615,6 +28447,15 @@ app.post('/admin/pathways/catalog/assign', requirePathwaysSectionAccess, writeLi
       ),
     }));
   } catch (err) {
+    if (err && err.message === 'PATHWAYS_TARGET_COURSE_TRACK_MISMATCH') {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId: admissionRow ? Number(admissionRow.program_id || 0) : programId,
+        admissionId,
+        error: msg.selectedCoursesDoNotMatchTrack,
+      }));
+    }
     return handleDbError(res, err, 'admin.pathways.catalog.assign');
   }
 });
@@ -28946,8 +28787,28 @@ app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAc
   }
 
   try {
-    const courses = await getCoursesCached();
-    for (const course of courses || []) {
+    const admissionRow = await getAdmissionPathwayContext(admissionId);
+    if (!admissionRow) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        error: msg.admissionNotFound,
+      }));
+    }
+    const resolvedProgramId = Number(admissionRow.program_id || 0);
+    if (programId && Number(programId) !== resolvedProgramId) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId: resolvedProgramId,
+        admissionId,
+        error: msg.admissionNotInSelectedProgram,
+      }));
+    }
+    const { compatibleCourses } = await getAdmissionCourseScope(admissionId, admissionRow.track_key);
+    for (const course of compatibleCourses || []) {
       const mappedFlag = parseBooleanFlag(req.body[`course_${course.id}`], false);
       await db.run(
         `
@@ -28966,7 +28827,7 @@ app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAc
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId,
+      programId: resolvedProgramId,
       admissionId,
       ok: msg.courseMappingSaved,
     }));
@@ -29005,9 +28866,13 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
   try {
     const pair = await db.all(
       `
-        SELECT id, program_id
-        FROM program_admissions
-        WHERE id = ANY(?::int[])
+        SELECT
+          a.id,
+          a.program_id,
+          p.track_key
+        FROM program_admissions a
+        JOIN study_programs p ON p.id = a.program_id
+        WHERE a.id = ANY(?::int[])
       `,
       [[admissionId, sourceAdmissionId]]
     );
@@ -29031,6 +28896,26 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
         error: msg.sourceAdmissionSameProgram,
       }));
     }
+    if (programId && Number(programId) !== Number(targetRow.program_id || 0)) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId: Number(targetRow.program_id || 0),
+        admissionId,
+        error: msg.admissionNotInSelectedProgram,
+      }));
+    }
+
+    const { compatibleCourseIds } = await getAdmissionCourseScope(admissionId, targetRow.track_key);
+    if (!compatibleCourseIds.length) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId: Number(targetRow.program_id || 0),
+        admissionId,
+        error: msg.selectedCoursesDoNotMatchTrack,
+      }));
+    }
 
     await db.run(
       `
@@ -29046,19 +28931,20 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
         LEFT JOIN program_admission_courses src
           ON src.course_id = c.id
          AND src.admission_id = ?
+        WHERE c.id = ANY(?::int[])
         ON CONFLICT (admission_id, course_id)
         DO UPDATE SET
           is_visible = EXCLUDED.is_visible,
           updated_at = NOW()
       `,
-      [admissionId, sourceAdmissionId]
+      [admissionId, sourceAdmissionId, compatibleCourseIds]
     );
 
     invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId,
+      programId: Number(targetRow.program_id || 0),
       admissionId,
       ok: msg.courseMappingCopied,
     }));
@@ -29339,6 +29225,47 @@ app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionA
   }
 
   try {
+    const admissionRow = await getAdmissionPathwayContext(admissionId);
+    if (!admissionRow) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId: selectedCourseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        error: msg.admissionNotFound,
+      }));
+    }
+    const resolvedProgramId = Number(admissionRow.program_id || 0);
+    if (programId && Number(programId) !== resolvedProgramId) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId: selectedCourseId,
+        track: trackFilter,
+        programId: resolvedProgramId,
+        admissionId,
+        error: msg.admissionNotInSelectedProgram,
+      }));
+    }
+    const { compatibleCourseIds, mappedCourseIdSet } = await getAdmissionCourseScope(admissionId, admissionRow.track_key);
+    if (!compatibleCourseIds.includes(Number(selectedCourseId))) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId: selectedCourseId,
+        track: trackFilter,
+        programId: resolvedProgramId,
+        admissionId,
+        error: msg.selectedCoursesDoNotMatchTrack,
+      }));
+    }
+    if (!mappedCourseIdSet.has(Number(selectedCourseId))) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId: selectedCourseId,
+        track: trackFilter,
+        programId: resolvedProgramId,
+        admissionId,
+        error: getPreferredLang(req) === 'uk'
+          ? 'Обраний курс не належить цьому admission-контексту'
+          : 'Selected course does not belong to this admission context',
+      }));
+    }
     const subjects = await getSubjectsCached(selectedCourseId, { visibleOnly: false });
     for (const subject of subjects || []) {
       const subjectId = parsePositiveIntStrict(subject.id);
@@ -29370,7 +29297,7 @@ app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionA
     return res.redirect(buildAdminPathwaysUrl({
       courseId: selectedCourseId,
       track: trackFilter,
-      programId,
+      programId: resolvedProgramId,
       admissionId,
       ok: msg.subjectVisibilitySaved,
     }));
@@ -29417,9 +29344,13 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
   try {
     const pair = await db.all(
       `
-        SELECT id, program_id
-        FROM program_admissions
-        WHERE id = ANY(?::int[])
+        SELECT
+          a.id,
+          a.program_id,
+          p.track_key
+        FROM program_admissions a
+        JOIN study_programs p ON p.id = a.program_id
+        WHERE a.id = ANY(?::int[])
       `,
       [[admissionId, sourceAdmissionId]]
     );
@@ -29441,6 +29372,39 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
         programId,
         admissionId,
         error: msg.sourceAdmissionSameProgram,
+      }));
+    }
+    if (programId && Number(programId) !== Number(targetRow.program_id || 0)) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId: selectedCourseId,
+        track: trackFilter,
+        programId: Number(targetRow.program_id || 0),
+        admissionId,
+        error: msg.admissionNotInSelectedProgram,
+      }));
+    }
+    const [targetScope, sourceScope] = await Promise.all([
+      getAdmissionCourseScope(admissionId, targetRow.track_key),
+      getAdmissionCourseScope(sourceAdmissionId, sourceRow.track_key),
+    ]);
+    if (!targetScope.compatibleCourseIds.includes(Number(selectedCourseId))) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId: selectedCourseId,
+        track: trackFilter,
+        programId: Number(targetRow.program_id || 0),
+        admissionId,
+        error: msg.selectedCoursesDoNotMatchTrack,
+      }));
+    }
+    if (!targetScope.mappedCourseIdSet.has(Number(selectedCourseId)) || !sourceScope.mappedCourseIdSet.has(Number(selectedCourseId))) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId: selectedCourseId,
+        track: trackFilter,
+        programId: Number(targetRow.program_id || 0),
+        admissionId,
+        error: getPreferredLang(req) === 'uk'
+          ? 'Обраний курс має бути замаплений і в source, і в target admission'
+          : 'Selected course must be mapped in both source and target admissions',
       }));
     }
 
@@ -29486,7 +29450,7 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
     return res.redirect(buildAdminPathwaysUrl({
       courseId: selectedCourseId,
       track: trackFilter,
-      programId,
+      programId: Number(targetRow.program_id || 0),
       admissionId,
       ok: msg.subjectVisibilityCopied,
     }));

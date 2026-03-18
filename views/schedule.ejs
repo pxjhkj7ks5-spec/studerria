@@ -2593,18 +2593,31 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= t('changelog.close') %>"></button>
           </div>
           <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label"><%= t('schedule.messages.subjectFilter') %></label>
-              <select class="form-select" id="messagesSubjectFilter">
-                <option value=""><%= t('schedule.messages.allSubjects') %></option>
-                <% (messageSubjects || []).forEach(function(s) { %>
-                  <option value="<%= s.subject_id %>"><%= s.subject_name %></option>
-                <% }); %>
-              </select>
+            <div class="row g-2 mb-3">
+              <div class="col-12 col-md-7">
+                <label class="form-label"><%= t('schedule.messages.subjectFilter') %></label>
+                <select class="form-select" id="messagesSubjectFilter">
+                  <option value=""><%= t('schedule.messages.allSubjects') %></option>
+                  <% (messageSubjects || []).forEach(function(s) { %>
+                    <option value="<%= s.subject_id %>"><%= s.subject_name %></option>
+                  <% }); %>
+                </select>
+              </div>
+              <div class="col-12 col-md-5">
+                <label class="form-label"><%= lang === 'en' ? 'Type' : 'Тип' %></label>
+                <select class="form-select" id="messagesTypeFilter">
+                  <option value=""><%= lang === 'en' ? 'All updates' : 'Усі оновлення' %></option>
+                  <option value="broadcast"><%= lang === 'en' ? 'Broadcast' : 'Broadcast' %></option>
+                  <option value="group"><%= lang === 'en' ? 'Group' : 'Group' %></option>
+                  <option value="subject"><%= lang === 'en' ? 'Subject' : 'Subject' %></option>
+                  <option value="direct"><%= lang === 'en' ? 'Direct' : 'Адресні' %></option>
+                </select>
+              </div>
             </div>
-            <ul id="messagesList" class="list-group">
-              <li class="list-group-item text-muted"><%= t('schedule.messages.loading') %></li>
-            </ul>
+            <p class="text-muted small mb-3"><%= lang === 'en' ? 'Support threads are not mixed here. Open Help for support replies and SLA.' : 'Support threads тут не змішуються. Для support replies і SLA відкривайте Help.' %></p>
+            <div id="messagesList" class="d-grid gap-3">
+              <div class="list-group-item text-muted"><%= t('schedule.messages.loading') %></div>
+            </div>
           </div>
         </div>
       </div>
@@ -2685,12 +2698,16 @@
         messagesAllStudents: t('schedule.messages.allStudents'),
         messagesSubjectFallback: t('schedule.messages.subjectFallback'),
         messagesAdminFallback: t('schedule.messages.adminFallback'),
-        messagesKindAnnouncement: lang === 'en' ? 'Announcement' : 'Оголошення',
+        messagesKindAnnouncement: lang === 'en' ? 'Inbox update' : 'Оновлення inbox',
         messagesKindBroadcast: lang === 'en' ? 'All-course broadcast' : 'Загальне оголошення',
         messagesKindGroup: lang === 'en' ? 'Group update' : 'Оновлення групи',
         messagesKindSubject: lang === 'en' ? 'Subject update' : 'Оновлення предмета',
         messagesKindDirect: lang === 'en' ? 'Direct update' : 'Адресне повідомлення',
         messagesUnreadBadge: lang === 'en' ? 'Unread' : 'Нове',
+        messagesTypeFilter: lang === 'en' ? 'Type' : 'Тип',
+        messagesNoFiltered: lang === 'en' ? 'No updates match the current filters.' : 'Під поточні фільтри оновлень немає.',
+        messagesPublishedRating: lang === 'en' ? 'Published rating' : 'Опублікований рейтинг',
+        messagesTopPrefix: lang === 'en' ? 'Top' : 'Топ',
       }) %>;
       const scheduleUiText = <%- JSON.stringify({
         roomLabel: lang === 'en' ? 'Room' : 'Кабінет',
@@ -3550,6 +3567,7 @@
       const messagesBadge = document.getElementById('messagesBadge');
       const mobileMenuBadge = document.getElementById('mobileMenuBadge');
       const messagesSubjectFilter = document.getElementById('messagesSubjectFilter');
+      const messagesTypeFilter = document.getElementById('messagesTypeFilter');
       const messagesModalEl = document.getElementById('messagesModal');
       const weekPrev = document.getElementById('weekPrev');
       const weekNext = document.getElementById('weekNext');
@@ -4355,13 +4373,16 @@
         const { markAsRead = false, showLoading = true } = options;
         if (!messagesList) return;
         if (showLoading) {
-          messagesList.innerHTML = `<li class="list-group-item text-muted">${scheduleText.messagesLoading}</li>`;
+          messagesList.innerHTML = `<div class="list-group-item text-muted">${scheduleText.messagesLoading}</div>`;
         }
         try {
           const subjectId = messagesSubjectFilter && messagesSubjectFilter.value
             ? `?subject_id=${encodeURIComponent(messagesSubjectFilter.value)}`
             : '';
-          const shouldSyncBadgeFromResponse = !subjectId;
+          const selectedKind = messagesTypeFilter && messagesTypeFilter.value
+            ? String(messagesTypeFilter.value)
+            : '';
+          const shouldSyncBadgeFromResponse = !subjectId && !selectedKind;
           const requestToken = ++messageListRequestToken;
           const res = await fetch(`/messages.json${subjectId}`, {
             cache: 'no-store',
@@ -4373,8 +4394,11 @@
           const data = await res.json();
           if (requestToken !== messageListRequestToken) return;
           const messages = Array.isArray(data.messages) ? data.messages : [];
-          if (!messages.length) {
-            messagesList.innerHTML = `<li class="list-group-item text-muted">${scheduleText.messagesEmpty}</li>`;
+          const filteredMessages = selectedKind
+            ? messages.filter((message) => String(message.message_kind || '') === selectedKind)
+            : messages;
+          if (!filteredMessages.length) {
+            messagesList.innerHTML = `<div class="list-group-item text-muted">${selectedKind ? scheduleText.messagesNoFiltered : scheduleText.messagesEmpty}</div>`;
             if (shouldSyncBadgeFromResponse) {
               updateUnreadBadges(Number(data.unread_count) || 0);
             } else {
@@ -4382,63 +4406,99 @@
             }
             return;
           }
-          messagesList.innerHTML = messages
-            .map((m) => {
-              let meta = m.target_all
-                ? scheduleText.messagesAllStudents
-                : `${m.subject_name || scheduleText.messagesSubjectFallback} · ${scheduleText.groupSingle} ${m.group_number}`;
-              const kindLabel = m.message_kind === 'broadcast'
-                ? scheduleText.messagesKindBroadcast
-                : (m.message_kind === 'group'
-                  ? scheduleText.messagesKindGroup
-                  : (m.message_kind === 'subject'
-                    ? scheduleText.messagesKindSubject
-                    : (m.message_kind === 'direct'
-                      ? scheduleText.messagesKindDirect
-                      : scheduleText.messagesKindAnnouncement)));
-              const metaParts = [];
-              if (m.subject_name) {
-                metaParts.push(m.subject_name);
-              } else if (m.target_all) {
-                metaParts.push(scheduleText.messagesAllStudents);
-              } else {
-                metaParts.push(scheduleText.messagesSubjectFallback);
-              }
-              if (Number(m.group_number || 0) > 0) {
-                metaParts.push(`${scheduleText.groupSingle} ${m.group_number}`);
-              }
-              meta = metaParts.join(' · ');
-              const unreadClass = m.read_id ? '' : 'fw-semibold';
-              const reactions = m.reactions || {};
-              const reacted = m.reacted || {};
-              const makeBtn = (emoji) => {
-                const count = reactions[emoji] || 0;
-                const active = reacted[emoji] ? 'active' : '';
-                return `<button class="btn btn-sm btn-outline-secondary react-btn ${active}" data-message-id="${m.id}" data-emoji="${emoji}">
-                  <span>${emoji}</span><span class="react-count">${count}</span>
-                </button>`;
-              };
-              return `
-                <li class="list-group-item">
-                  <div class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">${kindLabel}</span>
-                    ${m.read_id ? '' : `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">${scheduleText.messagesUnreadBadge}</span>`}
-                  </div>
-                  <div class="${unreadClass} mb-1">${m.body}</div>
-                  <div class="text-muted small">${meta} · ${m.created_by || scheduleText.messagesAdminFallback} · ${new Date(m.created_at).toLocaleString(scheduleLocale)}</div>
-                  <div class="d-flex gap-2 mt-2 msg-reactions">
-                    ${makeBtn('🔥')}
-                    ${makeBtn('👍')}
-                  </div>
-                </li>
-              `;
-            })
+          const escapeHtml = (value) => String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+          const messageKinds = ['broadcast', 'group', 'subject', 'direct'];
+          const kindLabelMap = {
+            broadcast: scheduleText.messagesKindBroadcast,
+            group: scheduleText.messagesKindGroup,
+            subject: scheduleText.messagesKindSubject,
+            direct: scheduleText.messagesKindDirect,
+          };
+          const renderMessageCard = (m) => {
+            const kindLabel = kindLabelMap[m.message_kind] || scheduleText.messagesKindAnnouncement;
+            const meta = m.message_scope_line
+              ? m.message_scope_line
+              : [
+                m.target_all ? scheduleText.messagesAllStudents : (m.subject_name || scheduleText.messagesSubjectFallback),
+                Number(m.group_number || 0) > 0 ? `${scheduleText.groupSingle} ${m.group_number}` : '',
+              ].filter(Boolean).join(' · ');
+            const createdLabel = new Date(m.published_at || m.created_at).toLocaleString(scheduleLocale);
+            const footerMeta = [
+              meta,
+              m.message_scope_line ? '' : (m.created_by || scheduleText.messagesAdminFallback),
+              createdLabel,
+            ].filter(Boolean).join(' · ');
+            const unreadClass = m.read_id ? '' : 'fw-semibold';
+            const reactions = m.reactions || {};
+            const reacted = m.reacted || {};
+            const makeBtn = (emoji) => {
+              const count = reactions[emoji] || 0;
+              const active = reacted[emoji] ? 'active' : '';
+              return `<button class="btn btn-sm btn-outline-secondary react-btn ${active}" data-message-id="${m.id}" data-emoji="${emoji}">
+                <span>${emoji}</span><span class="react-count">${count}</span>
+              </button>`;
+            };
+            const ratingCard = m.rating_snapshot_card || null;
+            const ratingPreview = ratingCard && Array.isArray(ratingCard.ranking_preview) && ratingCard.ranking_preview.length
+              ? `
+                <div class="small text-muted mt-2">
+                  ${ratingCard.ranking_preview.map((row) => `${scheduleText.messagesTopPrefix} ${Number(row.rank || 0)}: ${escapeHtml(row.full_name || '')} (${escapeHtml(row.score_label || row.final_score || '')})`).join('<br />')}
+                </div>
+              `
+              : '';
+            const titleHtml = m.message_title
+              ? `<div class="${unreadClass} mb-1">${escapeHtml(m.message_title)}</div>`
+              : `<div class="${unreadClass} mb-1">${escapeHtml(m.body || '')}</div>`;
+            const bodyHtml = m.message_title && (m.body_preview || m.body)
+              ? `<div class="small mb-1">${escapeHtml(m.body_preview || m.body || '')}</div>`
+              : '';
+            return `
+              <li class="list-group-item">
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                  <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">${escapeHtml(kindLabel)}</span>
+                  ${m.read_id ? '' : `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">${scheduleText.messagesUnreadBadge}</span>`}
+                  ${m.is_rating_publication ? `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">${scheduleText.messagesPublishedRating}</span>` : ''}
+                </div>
+                ${titleHtml}
+                ${bodyHtml}
+                ${ratingPreview}
+                <div class="text-muted small">${escapeHtml(footerMeta)}</div>
+                <div class="d-flex gap-2 mt-2 msg-reactions">
+                  ${makeBtn('🔥')}
+                  ${makeBtn('👍')}
+                </div>
+              </li>
+            `;
+          };
+          const groupedHtml = messageKinds
+            .map((kind) => ({
+              kind,
+              items: filteredMessages.filter((message) => String(message.message_kind || '') === kind),
+            }))
+            .filter((group) => group.items.length)
+            .map((group) => `
+              <section class="d-grid gap-2">
+                <div class="d-flex align-items-center justify-content-between">
+                  <strong>${escapeHtml(kindLabelMap[group.kind] || scheduleText.messagesKindAnnouncement)}</strong>
+                  <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">${group.items.length}</span>
+                </div>
+                <ul class="list-group">
+                  ${group.items.map((message) => renderMessageCard(message)).join('')}
+                </ul>
+              </section>
+            `)
             .join('');
+          messagesList.innerHTML = groupedHtml || `<div class="list-group-item text-muted">${selectedKind ? scheduleText.messagesNoFiltered : scheduleText.messagesEmpty}</div>`;
           if (shouldSyncBadgeFromResponse) {
             updateUnreadBadges(Number(data.unread_count) || 0);
           }
           if (markAsRead) {
-            const unreadIds = messages
+            const unreadIds = filteredMessages
               .filter((m) => !m.read_id)
               .map((m) => Number(m.id))
               .filter((id) => Number.isFinite(id));
@@ -4482,7 +4542,7 @@
             });
           });
         } catch (err) {
-          messagesList.innerHTML = `<li class="list-group-item text-muted">${scheduleText.messagesLoadError}</li>`;
+          messagesList.innerHTML = `<div class="list-group-item text-muted">${scheduleText.messagesLoadError}</div>`;
         }
       }
 
@@ -4502,6 +4562,11 @@
       }
       if (messagesSubjectFilter) {
         messagesSubjectFilter.addEventListener('change', () => {
+          loadMessages({ markAsRead: true, showLoading: true });
+        });
+      }
+      if (messagesTypeFilter) {
+        messagesTypeFilter.addEventListener('change', () => {
           loadMessages({ markAsRead: true, showLoading: true });
         });
       }
@@ -4525,6 +4590,13 @@
 
       refreshUnreadBadges();
       setInterval(refreshUnreadBadges, 60000);
+      if (messagesModalEl) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('panel') === 'messages') {
+          const modal = bootstrap.Modal.getOrCreateInstance(messagesModalEl);
+          modal.show();
+        }
+      }
 
       const phrases = Array.isArray(scheduleViewText.dailyPhrases) && scheduleViewText.dailyPhrases.length
         ? scheduleViewText.dailyPhrases

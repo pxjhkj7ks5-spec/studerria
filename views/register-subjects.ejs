@@ -637,6 +637,28 @@
                   </div>
                 <% } %>
 
+                <% if (showNoSubjectsNotice || showAutoAssignedNotice) { %>
+                  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <% if (showAutoAssignedNotice) { %>
+                      <button type="submit" class="btn btn-primary"><%= t('registerSubjects.finish') %></button>
+                      <span class="text-muted small">
+                        <%= lang === 'en'
+                          ? 'Required subjects are already assigned. Finish registration to open Home and Schedule.'
+                          : 'Обов’язкові предмети вже призначені. Завершіть реєстрацію, щоб відкрити Home і розклад.' %>
+                      </span>
+                    <% } else { %>
+                      <a class="btn btn-outline-secondary" href="/register/course">
+                        <%= lang === 'en' ? 'Back to course step' : 'Назад до вибору курсу' %>
+                      </a>
+                      <span class="text-muted small">
+                        <%= lang === 'en'
+                          ? 'This pathway currently exposes no subjects, so the student would enter Home with an empty study route until an administrator fixes the cohort mapping.'
+                          : 'Цей pathway зараз не відкриває жодного предмета, тому студент потрапить на Home з порожнім навчальним маршрутом, доки адміністратор не виправить мапінг когорти.' %>
+                      </span>
+                    <% } %>
+                  </div>
+                <% } %>
+
                 <% if (selectableSubjects.length) { %>
                   <section class="reg-groups-surface reg-groups-quick-panel" aria-labelledby="quickSelectHeading">
                     <div class="reg-groups-quick-panel__copy">

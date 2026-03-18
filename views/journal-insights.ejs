@@ -34,6 +34,9 @@
   const gradeTrend = (trends && Array.isArray(trends.grade)) ? trends.grade : [];
   const attendanceTrend = (trends && Array.isArray(trends.attendance)) ? trends.attendance : [];
   const gradeMax = Math.max(100, ...gradeTrend.map((item) => Number(item.avg_score_percent || 0)));
+  const publishScopeSummary = publishTargetSummary || null;
+  const latestPublishedCard = latestPublishedRating || null;
+  const rankingRows = Array.isArray(rankingTop) ? rankingTop : [];
 %>
 <!doctype html>
 <html lang="<%= lang %>">
@@ -376,6 +379,92 @@
         gap: 10px;
         margin-top: 4px;
       }
+      .publish-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        margin-bottom: 12px;
+      }
+      .publish-card {
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        background: rgba(15, 23, 42, 0.22);
+        padding: 14px;
+      }
+      body.theme-light .publish-card {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.9);
+      }
+      .publish-card__eyebrow {
+        font-size: 0.76rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(226, 232, 240, 0.56);
+      }
+      body.theme-light .publish-card__eyebrow {
+        color: rgba(15, 23, 42, 0.48);
+      }
+      .publish-card__title {
+        margin-top: 8px;
+        font-size: 1.02rem;
+        font-weight: 680;
+      }
+      .publish-card__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .publish-card__note {
+        margin: 10px 0 0;
+        font-size: 0.88rem;
+        line-height: 1.55;
+        color: rgba(226, 232, 240, 0.72);
+      }
+      body.theme-light .publish-card__note {
+        color: rgba(15, 23, 42, 0.58);
+      }
+      .publish-card__ranking {
+        margin: 12px 0 0;
+        padding-left: 1.05rem;
+      }
+      .publish-card__ranking li {
+        margin-bottom: 0.28rem;
+        font-size: 0.88rem;
+      }
+      .ranking-position {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        font-weight: 700;
+        background: rgba(59, 130, 246, 0.16);
+        color: #bfdbfe;
+      }
+      body.theme-light .ranking-position {
+        color: #1d4ed8;
+        background: rgba(59, 130, 246, 0.12);
+      }
+      .ranking-name {
+        font-weight: 650;
+      }
+      .ranking-subtext {
+        display: block;
+        margin-top: 2px;
+        font-size: 0.78rem;
+        color: rgba(226, 232, 240, 0.6);
+      }
+      body.theme-light .ranking-subtext {
+        color: rgba(15, 23, 42, 0.54);
+      }
+      .insights-table tbody tr.ranking-row-top td {
+        background: rgba(56, 189, 248, 0.12);
+      }
+      body.theme-light .insights-table tbody tr.ranking-row-top td {
+        background: rgba(56, 189, 248, 0.08);
+      }
       @media (max-width: 991px) {
         .hero-grid {
           grid-template-columns: 1fr;
@@ -574,6 +663,63 @@
               <p class="section-subtitle"><%= t('journalInsights.publishSubtitle') %></p>
             </div>
           </div>
+          <div class="publish-grid">
+            <article class="publish-card">
+              <div class="publish-card__eyebrow"><%= lang === 'en' ? 'Publish scope' : 'Контур публікації' %></div>
+              <div class="publish-card__title">
+                <%= publishScopeSummary && publishScopeSummary.title
+                  ? publishScopeSummary.title
+                  : (scopeLabelValue || t('journalInsights.scope')) %>
+              </div>
+              <div class="publish-card__meta">
+                <span class="chip"><%= t('journalInsights.period') %>: <%= periodLabel %></span>
+                <span class="chip"><%= t('journalInsights.participants') %>: <%= Number(summary && summary.participants_count ? summary.participants_count : 0) %></span>
+                <% if (publishScopeSummary && publishScopeSummary.subtitle) { %>
+                  <span class="chip"><%= publishScopeSummary.subtitle %></span>
+                <% } %>
+              </div>
+              <p class="publish-card__note">
+                <%= publishScopeSummary && publishScopeSummary.note
+                  ? publishScopeSummary.note
+                  : (lang === 'en'
+                    ? 'Publishing from this scope will reuse the same snapshot in Journal Insights, My Day, and the schedule inbox.'
+                    : 'Публікація з цього контуру перевикористає той самий snapshot у Journal Insights, My Day та inbox розкладу.') %>
+              </p>
+            </article>
+
+            <article class="publish-card">
+              <div class="publish-card__eyebrow"><%= lang === 'en' ? 'Latest published' : 'Остання публікація' %></div>
+              <% if (latestPublishedCard) { %>
+                <div class="publish-card__title"><%= latestPublishedCard.scope_label %></div>
+                <div class="publish-card__meta">
+                  <span class="chip"><%= latestPublishedCard.target_label || (lang === 'en' ? 'Selected audience' : 'Обрана аудиторія') %></span>
+                  <span class="chip"><%= latestPublishedCard.period_label || periodLabel %></span>
+                  <% if (latestPublishedCard.updated_label) { %>
+                    <span class="chip"><%= latestPublishedCard.updated_label %></span>
+                  <% } %>
+                </div>
+                <% if (latestPublishedCard.top_entry) { %>
+                  <p class="publish-card__note">
+                    <strong><%= lang === 'en' ? 'Leader' : 'Лідер' %>:</strong>
+                    <%= latestPublishedCard.top_entry.full_name %>
+                    <% if (latestPublishedCard.top_entry.score_label) { %>
+                      · <%= latestPublishedCard.top_entry.score_label %>
+                    <% } %>
+                  </p>
+                <% } %>
+                <% if (latestPublishedCard.ranking_preview && latestPublishedCard.ranking_preview.length) { %>
+                  <ol class="publish-card__ranking">
+                    <% latestPublishedCard.ranking_preview.forEach((row) => { %>
+                      <li><%= row.full_name %> · <%= row.score_label || row.final_score || '' %></li>
+                    <% }) %>
+                  </ol>
+                <% } %>
+              <% } else { %>
+                <div class="publish-card__title"><%= lang === 'en' ? 'No published rating yet' : 'Ще немає опублікованого рейтингу' %></div>
+                <p class="publish-card__note"><%= lang === 'en' ? 'Once published, the latest snapshot will appear here and stay aligned with My Day and the schedule inbox.' : 'Після публікації останній snapshot з’явиться тут і лишиться узгодженим з My Day та inbox розкладу.' %></p>
+              <% } %>
+            </article>
+          </div>
           <% if (canPublishRating) { %>
             <form method="POST" action="/journal/insights/publish-rating" class="soft-panel row g-2 align-items-end">
               <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
@@ -587,7 +733,14 @@
                 <label class="form-label small" for="publishTopN"><%= t('journalInsights.topN') %></label>
                 <input id="publishTopN" class="form-control compact-input" type="number" min="3" max="30" name="top_n" value="10" />
               </div>
-              <div class="col-12 col-md-9 d-grid">
+              <div class="col-12 col-md-5">
+                <div class="soft-panel h-100">
+                  <div class="summary-label"><%= lang === 'en' ? 'Will publish to' : 'Буде опубліковано для' %></div>
+                  <div class="summary-value fs-5"><%= publishScopeSummary && publishScopeSummary.title ? publishScopeSummary.title : scopeLabelValue %></div>
+                  <div class="hero-stat-meta mt-1"><%= publishScopeSummary && publishScopeSummary.subtitle ? publishScopeSummary.subtitle : periodLabel %></div>
+                </div>
+              </div>
+              <div class="col-12 col-md-4 d-grid">
                 <button class="btn btn-primary" type="submit"><%= t('journalInsights.publishAction') %></button>
               </div>
             </form>
@@ -710,6 +863,9 @@
                 <h2 class="section-title"><%= t('journalInsights.rankingTitle') %></h2>
                 <p class="section-subtitle"><%= t('journalInsights.rankingSubtitle') %></p>
               </div>
+              <% if (latestPublishedCard && latestPublishedCard.updated_label) { %>
+                <span class="chip"><%= latestPublishedCard.updated_label %></span>
+              <% } %>
             </div>
             <div class="table-shell mt-2">
               <div class="table-responsive">
@@ -724,15 +880,21 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <% if (!(rankingTop || []).length) { %>
+                    <% if (!rankingRows.length) { %>
                       <tr>
                         <td colspan="5" class="empty-state"><%= t('journalInsights.empty.ranking') %></td>
                       </tr>
                     <% } %>
-                    <% (rankingTop || []).forEach((row) => { %>
-                      <tr>
-                        <td><%= row.rank %></td>
-                        <td><%= row.full_name %></td>
+                    <% rankingRows.forEach((row) => { %>
+                      <tr class="<%= Number(row.rank || 0) <= 3 ? 'ranking-row-top' : '' %>">
+                        <td><span class="ranking-position"><%= row.rank %></span></td>
+                        <td>
+                          <span class="ranking-name"><%= row.full_name %></span>
+                          <span class="ranking-subtext">
+                            <%= lang === 'en' ? 'Group' : 'Група' %> <%= Number(row.group_number || 0) || '-' %>
+                            · <%= Number(row.subjects_count || 1) %> <%= t('journalInsights.table.subjects').toLowerCase() %>
+                          </span>
+                        </td>
                         <td><%= Number(row.group_number || 0) || '-' %></td>
                         <td><strong><%= Number(row.final_score || 0).toFixed(2).replace(/\.00$/, '') %></strong></td>
                         <td><%= Number(row.subjects_count || 1) %></td>

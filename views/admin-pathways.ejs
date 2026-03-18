@@ -52,6 +52,21 @@
     already_assigned: 0,
     pending_users: 0,
   };
+  const buildCatalogModeSummary = (sharedSubject, selectedCount) => {
+    const countToken = typeof selectedCount === 'string' && selectedCount.includes('__COUNT__')
+      ? '__COUNT__'
+      : null;
+    const numericCount = Number(selectedCount);
+    const count = countToken || (Number.isFinite(numericCount) && numericCount > 0 ? numericCount : 1);
+    if (isUk) {
+      return sharedSubject
+        ? `Один shared subject instance покриє ${count} вибраних курсів. Розклад, ДЗ, журнал, матеріали та publish surface змінюватимуться разом для всіх них.`
+        : `Для ${count} вибраних курсів буде створено окремі subject instances. Кожен курс збереже власні розклад, ДЗ, журнал, attendance і publish flow.`;
+    }
+    return sharedSubject
+      ? `One shared subject instance will cover ${count} selected courses. Schedule, homework, journal, materials, and publish surface will change together for all of them.`
+      : `Separate subject instances will be created for ${count} selected courses. Each course keeps its own schedule, homework, journal, attendance, and publish flow.`;
+  };
   const legacyAdmissionOrdinal = Number(selectedAdmissionLegacyOrdinal || 0);
   const legacySuggestedCount = Number(legacySuggestedCourseCount || 0);
   const ui = isUk ? {
@@ -123,9 +138,9 @@
     mappingSubtitle: 'Курси, для яких рік вступу доступний на етапі реєстрації. Це перша критична умова для працездатного сценарію онбордингу.',
     mappingEmptyTitle: 'Мапінг ще не налаштовано',
     mappingCoverageTitle: 'Покриття мапінгу',
-    mappingEmptyHelp: 'Реєстрація не зможе визначити курс для цієї когорти, доки не з\'явиться хоча б один видимий зв\'язок.',
-    mappingPartialHelp: 'Когорта замаплена частково. Залишайте видимими лише ті курси, які справді мають бути доступні під час реєстрації.',
-    mappingReadyHelp: 'Мапінг заповнено. Тепер перевірте кампуси та предмети.',
+    mappingEmptyHelp: 'Студент не зможе визначити курс для цієї когорти, доки не з\'явиться хоча б один видимий зв\'язок.',
+    mappingPartialHelp: 'Залишайте видимими тільки реальні маршрути реєстрації. Зайві курси тут відправляють студента в неправильний subject flow.',
+    mappingReadyHelp: 'Курс для реєстрації вже визначається. Тепер перевірте кампуси й предмети, щоб студент дійшов до subjects без блокувань.',
     legacyTitle: 'Швидкий legacy-мапінг',
     legacyTeacherHelp: 'Викладацький трек може замапити всі викладацькі курси одразу.',
     legacyYearPrefix: 'Рік вступу',
@@ -142,9 +157,9 @@
     subjectsSubtitle: 'Предмети, які бачать студенти під час реєстрації для обраної когорти. Тут одразу видно, коли когорта формально існує, але список предметів фактично порожній.',
     noVisibleSubjectsTitle: 'Немає видимих предметів',
     visibilityCoverageTitle: 'Покриття видимості',
-    emptySubjectPickerHelp: 'Студенти побачать порожній вибір предметів у цьому контексті курсу.',
+    emptySubjectPickerHelp: 'Студент дійде до вибору предметів і побачить порожній список, доки ця когорта не отримає видимі предмети.',
     hiddenBaseHelpSuffix: 'предметів приховано глобально в базовому курсі, тому тут їх не можна знову відкрити.',
-    visibilityReadyHelp: 'Видимість предметів вирівняна для вибраного контексту курсу.',
+    visibilityReadyHelp: 'Видимість предметів вирівняна: студент побачить лише цей підготовлений набір під час реєстрації.',
     groups: 'Групи',
     noVisibleSubjectsInCourse: 'У вибраному курсі немає видимих предметів.',
     saveVisibility: 'Зберегти видимість',
@@ -160,7 +175,7 @@
     noCampusRoutingTitle: 'Маршрутизація кампусів ще відсутня',
     campusConflictHelp: 'Реєстрація залишається заблокованою, доки для кожного кампусу не залишиться рівно один видимий зв\'язаний курс.',
     campusReadyHelp: 'Для кожного доступного кампусу є один маршрут реєстрації.',
-    campusEmptyHelp: 'Замапте хоча б один видимий курс, щоб з\'явився маршрут кампусу.',
+    campusEmptyHelp: 'Без мапінгу курсів маршрут кампусу не з\'явиться, тому реєстрація зупиниться ще до предметів.',
     linkedCourseSingle: '1 прив\'язаний курс',
     linkedCoursePlural: 'прив\'язаних курсів',
     fixMapping: 'Виправити мапінг',
@@ -176,7 +191,7 @@
     migrationAlignedTitle: 'Міграція вирівняна',
     noSourceCoursesTitle: 'Джерельних курсів ще немає',
     migrationSafeModeHelp: 'Безпечний режим оновлює лише трек, програму та рік вступу. Наявні прив\'язки до курсу зберігаються.',
-    migrationEmptyHelp: 'Оберіть сумісні джерельні курси, щоб розпочати простановку когорти для наявних користувачів.',
+    migrationEmptyHelp: 'Поки наявних користувачів не проставлено, вони залишаться поза program/admission-контекстом і бачитимуть старий або порожній маршрут.',
     usersPrefix: 'Користувачі',
     alreadyAssignedPrefix: 'Вже призначено',
     mappedToAdmissionSuffix: 'замаплено до цього року вступу',
@@ -197,12 +212,12 @@
     coursesCount: 'Курсів',
     assignToCourses: 'Додати на вибрані курси',
     sharedSubject: 'Спільний предмет',
-    sharedSubjectHint: 'Один subject instance для всіх вибраних курсів: спільні розклад, ДЗ, матеріали, викладачі й налаштування.',
-    separateSubjectHint: 'Окремі subject instance по кожному курсу: база спільна лише як каталог назви.',
+    sharedSubjectHint: 'Один subject instance для всіх вибраних курсів: спільні розклад, ДЗ, журнал, матеріали, викладачі й publish surface. Зміни торкнуться всіх вибраних курсів.',
+    separateSubjectHint: 'Окремий subject instance на кожен курс: розклад, ДЗ, журнал, attendance і publish flow живуть окремо. Спільною лишається тільки база назви.',
     targetCourses: 'Цільові курси',
     sourceCourse: 'Базовий курс для копіювання налаштувань',
-    catalogEmptyState: 'У глобальній базі ще немає предметів.',
-    catalogNoInstances: 'Цей базовий предмет ще не призначено на жоден курс.',
+    catalogEmptyState: 'У глобальній базі ще немає предметів, тож pathways нічого призначати, а студенти не отримають предмети з цього каталогу.',
+    catalogNoInstances: 'Цей базовий предмет ще ніде не призначено, тож жоден курс не покаже його студентам або викладачам.',
     catalogInstanceShared: 'Спільний',
     catalogInstanceSeparate: 'Окремий',
     catalogCourseRemove: 'Прибрати з курсу',
@@ -304,8 +319,8 @@
     mappingEmptyTitle: 'No course mapping yet',
     mappingCoverageTitle: 'Mapping coverage',
     mappingEmptyHelp: 'Registration cannot resolve a course for this cohort until at least one linked course is visible.',
-    mappingPartialHelp: 'The cohort is only partially mapped. Keep only the intended courses visible for registration.',
-    mappingReadyHelp: 'Mapping is filled. Now verify campus routing and subjects.',
+    mappingPartialHelp: 'Keep only the intended registration routes visible here. Extra courses send students into the wrong subject flow.',
+    mappingReadyHelp: 'The registration course now resolves correctly. Verify campus routing and subjects so students can reach subject selection without blockers.',
     legacyTitle: 'Legacy quick map',
     legacyTeacherHelp: 'Teacher track can map every teacher course at once.',
     legacyYearPrefix: 'Admission year',
@@ -322,9 +337,9 @@
     subjectsSubtitle: 'Subjects students see during registration for the selected cohort. This makes it obvious when a cohort exists technically but the subject list is effectively empty.',
     noVisibleSubjectsTitle: 'No visible subjects',
     visibilityCoverageTitle: 'Visibility coverage',
-    emptySubjectPickerHelp: 'Students would land on an empty subject picker in this course scope.',
+    emptySubjectPickerHelp: 'Students would reach subject selection and see an empty list until this cohort gets visible subjects.',
     hiddenBaseHelpSuffix: 'subjects are hidden globally in the base course and cannot be re-exposed here.',
-    visibilityReadyHelp: 'Subject visibility is aligned for the selected course scope.',
+    visibilityReadyHelp: 'Subject visibility is aligned, so students will only see this prepared set during registration.',
     groups: 'Groups',
     noVisibleSubjectsInCourse: 'No visible subjects in selected course.',
     saveVisibility: 'Save visibility',
@@ -340,7 +355,7 @@
     noCampusRoutingTitle: 'No campus routing yet',
     campusConflictHelp: 'Registration stays blocked until each campus resolves to exactly one visible linked course.',
     campusReadyHelp: 'Every available campus has a single registration route.',
-    campusEmptyHelp: 'Map at least one visible course before campus routing can be derived.',
+    campusEmptyHelp: 'Without course mapping, campus routing cannot be derived and registration stops before subjects.',
     linkedCourseSingle: '1 linked course',
     linkedCoursePlural: 'linked courses',
     fixMapping: 'Fix mapping',
@@ -356,7 +371,7 @@
     migrationAlignedTitle: 'Migration is aligned',
     noSourceCoursesTitle: 'No source courses yet',
     migrationSafeModeHelp: 'Safe mode only updates track, program, and admission. Existing course bindings are preserved.',
-    migrationEmptyHelp: 'Pick compatible source courses to start cohort stamping for existing users.',
+    migrationEmptyHelp: 'Until existing users are stamped into the program/admission context, they keep an old or empty route.',
     usersPrefix: 'Users',
     alreadyAssignedPrefix: 'Already assigned',
     mappedToAdmissionSuffix: 'mapped to this admission',
@@ -377,12 +392,12 @@
     coursesCount: 'Courses',
     assignToCourses: 'Assign to selected courses',
     sharedSubject: 'Shared subject',
-    sharedSubjectHint: 'One subject instance for all selected courses: shared schedule, homework, materials, teachers, and settings.',
-    separateSubjectHint: 'Separate subject instances per course: only the catalog name stays shared.',
+    sharedSubjectHint: 'One subject instance for all selected courses: shared schedule, homework, journal, materials, teachers, and publish surface. Changes affect every selected course.',
+    separateSubjectHint: 'Separate subject instances per course: schedule, homework, journal, attendance, and publish flow stay independent. Only the catalog name remains shared.',
     targetCourses: 'Target courses',
     sourceCourse: 'Base course for settings copy',
-    catalogEmptyState: 'No subjects in the global base yet.',
-    catalogNoInstances: 'This base subject is not assigned to any course yet.',
+    catalogEmptyState: 'No subjects exist in the global base yet, so pathways have nothing to assign and students cannot receive subjects from this catalog.',
+    catalogNoInstances: 'This base subject is not assigned anywhere yet, so no course can expose it to students or teachers.',
     catalogInstanceShared: 'Shared',
     catalogInstanceSeparate: 'Separate',
     catalogCourseRemove: 'Remove from course',
@@ -873,6 +888,19 @@
       .catalog-shared-note {
         font-size: 0.79rem;
         line-height: 1.45;
+      }
+      .catalog-mode-summary {
+        margin-top: 10px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.18);
+        font-size: 0.84rem;
+        line-height: 1.55;
+      }
+      body.theme-light .catalog-mode-summary {
+        border-color: rgba(15, 23, 42, 0.1);
+        background: rgba(248, 250, 252, 0.9);
       }
       @media (max-width: 991px) {
         .catalog-forms {
@@ -1755,6 +1783,12 @@
               </div>
               <div class="catalog-shared-note muted"><%= ui.sharedSubjectHint %></div>
               <div class="catalog-shared-note muted mt-1"><%= ui.separateSubjectHint %></div>
+              <div
+                class="catalog-mode-summary"
+                id="catalogModeSummary"
+                data-summary-shared="<%= buildCatalogModeSummary(true, 1) %>"
+                data-summary-separate="<%= buildCatalogModeSummary(false, 1) %>"
+              ><%= buildCatalogModeSummary(false, 1) %></div>
             </div>
 
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
@@ -1902,6 +1936,32 @@
             });
           });
         });
+      })();
+
+      (function initCatalogModeSummary() {
+        const form = document.getElementById('pathwayCatalogAssignForm');
+        const summary = document.getElementById('catalogModeSummary');
+        const sharedToggle = document.getElementById('pathwaysSharedSubject');
+        if (!form || !summary || !sharedToggle) return;
+
+        function buildSummaryText(sharedSubject, selectedCount) {
+          const count = Math.max(1, Number(selectedCount || 0));
+          if (sharedSubject) {
+            return <%- JSON.stringify(buildCatalogModeSummary(true, '__COUNT__')) %>.replace('__COUNT__', String(count));
+          }
+          return <%- JSON.stringify(buildCatalogModeSummary(false, '__COUNT__')) %>.replace('__COUNT__', String(count));
+        }
+
+        function refreshSummary() {
+          const selectedCount = form.querySelectorAll('input[name="target_course_ids"]:checked').length;
+          summary.textContent = buildSummaryText(sharedToggle.checked, selectedCount);
+        }
+
+        sharedToggle.addEventListener('change', refreshSummary);
+        form.querySelectorAll('input[name="target_course_ids"]').forEach((input) => {
+          input.addEventListener('change', refreshSummary);
+        });
+        refreshSummary();
       })();
     </script>
       <script src="/js/dynamic-bg.js" defer></script>

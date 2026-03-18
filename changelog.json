@@ -1,6 +1,17 @@
 {
   "items": [
     {
+      "version": "1.2.49",
+      "date": "2026-03-18",
+      "items": [
+        "feat(core-ux-wave-pathways-correctness): harden admin pathway validation for program/admission/course/campus mapping, remove remaining registration dead ends, and explain exactly how broken cohort setup blocks student subject registration",
+        "tune(journal-insights-publish-surface): add publish-scope and latest-published snapshot cards in `/journal/insights`, improve ranking readability, and keep the latest published rating aligned with My Day and message surfaces without adding a separate portal",
+        "tune(messages-inbox-separation): upgrade the schedule inbox with broadcast/group/subject/direct filtering and grouping, keep support threads in Help, and render published rating updates as reusable inbox cards instead of generic announcements",
+        "refresh(help-and-my-day-journeys): update FAQ/help inbox digest and My Day mission cards to reflect the current login, registration, schedule, journal, ratings, materials, teamwork, teacher assets, and support SLA journeys",
+        "refactor(surgical-appjs-recovery): continue moving touched pathway/message/journal/support shaping into focused helpers, remove duplicate route leftovers, and repair broken register/journal blocks in `app.js` caused by prior partial cuts"
+      ]
+    },
+    {
       "version": "1.2.48",
       "date": "2026-03-18",
       "items": [

@@ -182,27 +182,45 @@
         return 'Спокійно';
       };
       const getAnnouncementKindLabel = (item) => {
-        const kind = String(item && item.message_kind ? item.message_kind : 'announcement');
+        const kind = String(item && item.message_kind ? item.message_kind : 'broadcast');
         if (lang === 'en') {
           if (kind === 'broadcast') return 'All-course broadcast';
           if (kind === 'group') return 'Group update';
           if (kind === 'subject') return 'Subject update';
           if (kind === 'direct') return 'Direct update';
-          return 'Announcement';
+          return 'Inbox update';
         }
         if (kind === 'broadcast') return 'Загальне оголошення';
         if (kind === 'group') return 'Оновлення групи';
         if (kind === 'subject') return 'Оновлення предмета';
         if (kind === 'direct') return 'Адресне повідомлення';
-        return 'Оголошення';
+        return 'Оновлення inbox';
+      };
+      const getAnnouncementCardTitle = (item) => {
+        if (item && item.message_title) return item.message_title;
+        if (item && item.body_preview) return item.body_preview;
+        if (item && item.body) return item.body;
+        return lang === 'en' ? 'Inbox update' : 'Оновлення inbox';
+      };
+      const getAnnouncementCardBody = (item) => {
+        if (item && item.message_title) {
+          return item.body_preview || item.body || '';
+        }
+        return '';
       };
       const getAnnouncementMeta = (item) => {
         const parts = [];
-        if (item && item.subject_name) parts.push(item.subject_name);
-        if (item && Number(item.group_number || 0) > 0) {
-          parts.push(`${lang === 'en' ? 'Group' : 'Група'} ${Number(item.group_number)}`);
+        if (item && item.message_scope_line) {
+          parts.push(item.message_scope_line);
+        } else {
+          if (item && item.subject_name) parts.push(item.subject_name);
+          if (item && Number(item.group_number || 0) > 0) {
+            parts.push(`${lang === 'en' ? 'Group' : 'Група'} ${Number(item.group_number)}`);
+          }
         }
-        if (item && (item.published_at || item.created_at)) {
+        if (item && item.rating_snapshot_card && item.rating_snapshot_card.updated_label) {
+          parts.push(item.rating_snapshot_card.updated_label);
+        } else if (item && (item.published_at || item.created_at)) {
           parts.push(formatDateTime(item.published_at || item.created_at));
         }
         return parts.join(' · ');
@@ -328,11 +346,23 @@
           <% if (latestRatingSnapshot) { %>
             <div class="mission-card-value"><%= latestRatingSnapshot.scope_label || '-' %></div>
             <div class="mission-card-meta">
+              <% if (latestRatingSnapshot.target_label) { %>
+                <span><%= latestRatingSnapshot.target_label %></span>
+              <% } %>
               <span><%= latestRatingSnapshot.period_label || '' %></span>
+              <% if (latestRatingSnapshot.updated_label) { %>
+                <span><%= latestRatingSnapshot.updated_label %></span>
+              <% } %>
               <% if (latestRatingSnapshot.top_entry) { %>
                 <span><%= lang === 'en' ? 'Leader' : 'Лідер' %>: <%= latestRatingSnapshot.top_entry.full_name %></span>
               <% } %>
             </div>
+            <% if (latestRatingSnapshot.top_entry) { %>
+              <p class="mission-card-note">
+                <strong><%= lang === 'en' ? 'Top score' : 'Топ-оцінка' %></strong>:
+                <%= latestRatingSnapshot.top_entry.score_label || latestRatingSnapshot.top_entry.final_score || '' %>
+              </p>
+            <% } %>
             <a class="btn btn-inline-link mt-2" href="<%= latestRatingSnapshot.action_href || '/journal/insights' %>"><%= lang === 'en' ? 'Open insights' : 'Відкрити insights' %></a>
           <% } else { %>
             <div class="mission-card-empty"><%= lang === 'en' ? 'No published rating yet.' : 'Опублікованого рейтингу ще немає.' %></div>
@@ -355,28 +385,32 @@
         </article>
         <% if (settings && settings.allow_messages) { %>
           <article class="cockpit-card mission-card mission-card-announcements<%= announcementSummary ? ` is-${getAnnouncementTone(announcementSummary)}` : '' %>">
-            <div class="mission-card-kicker"><%= lang === 'en' ? 'Announcements' : 'Оголошення' %></div>
+            <div class="mission-card-kicker"><%= lang === 'en' ? 'Inbox updates' : 'Оновлення inbox' %></div>
             <% if (announcementSummary) { %>
               <div class="mission-card-topline">
                 <div class="mission-card-value"><%= Number(announcementSummary.fresh_unread || 0) || Number(announcementSummary.fresh || 0) || 0 %></div>
                 <span class="mission-card-badge mission-card-badge-<%= getAnnouncementTone(announcementSummary) %>"><%= getAnnouncementStatusLabel(announcementSummary) %></span>
               </div>
               <div class="mission-card-meta">
-                <span><%= lang === 'en' ? 'Fresh' : 'Свіжі' %>: <%= Number(announcementSummary.fresh || 0) %></span>
                 <span><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= Number(announcementSummary.unread || 0) %></span>
+                <span><%= lang === 'en' ? 'Broadcast' : 'Broadcast' %>: <%= Number(announcementSummary.broadcast || 0) %></span>
+                <span><%= lang === 'en' ? 'Subject' : 'Subject' %>: <%= Number(announcementSummary.subject || 0) %></span>
                 <span><%= lang === 'en' ? 'Direct' : 'Адресні' %>: <%= Number(announcementSummary.direct || 0) %></span>
               </div>
               <% if (announcementItems[0]) { %>
-                <p class="mission-card-note"><strong><%= getAnnouncementKindLabel(announcementItems[0]) %></strong>: <%= announcementItems[0].body_preview || announcementItems[0].body %></p>
+                <p class="mission-card-note"><strong><%= getAnnouncementKindLabel(announcementItems[0]) %></strong>: <%= getAnnouncementCardTitle(announcementItems[0]) %></p>
+                <% if (getAnnouncementCardBody(announcementItems[0])) { %>
+                  <p class="mission-card-note"><%= getAnnouncementCardBody(announcementItems[0]) %></p>
+                <% } %>
                 <div class="mission-card-foot">
                   <span><%= getAnnouncementMeta(announcementItems[0]) %></span>
                 </div>
               <% } else { %>
-                <p class="mission-card-note"><%= lang === 'en' ? 'Fresh broadcasts and direct updates appear here. Older items stay in the schedule inbox.' : 'Тут з’являються свіжі оголошення та адресні оновлення. Старіші елементи залишаються в inbox розкладу.' %></p>
+                <p class="mission-card-note"><%= lang === 'en' ? 'Broadcast, group, subject, and direct updates appear here. Support stays separate in Help.' : 'Тут з’являються broadcast, group, subject і direct-оновлення. Support лишається окремо в Help.' %></p>
               <% } %>
               <a class="btn btn-inline-link mt-1" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open inbox' : 'Відкрити inbox' %></a>
             <% } else { %>
-              <div class="mission-card-empty"><%= lang === 'en' ? 'No recent announcements right now.' : 'Наразі немає свіжих оголошень.' %></div>
+              <div class="mission-card-empty"><%= lang === 'en' ? 'No recent inbox updates right now.' : 'Наразі немає свіжих оновлень inbox.' %></div>
             <% } %>
           </article>
         <% } %>

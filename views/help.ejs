@@ -49,27 +49,46 @@
           : (lang === 'uk' ? 'Ви' : 'You')
       );
       const messageKindLabel = (item) => {
-        const kind = String(item && item.message_kind ? item.message_kind : 'announcement');
+        const kind = String(item && item.message_kind ? item.message_kind : 'broadcast');
         if (lang === 'en') {
           if (kind === 'broadcast') return 'All-course broadcast';
           if (kind === 'group') return 'Group update';
           if (kind === 'subject') return 'Subject update';
           if (kind === 'direct') return 'Direct update';
-          return 'Announcement';
+          return 'Inbox update';
         }
         if (kind === 'broadcast') return 'Загальне оголошення';
         if (kind === 'group') return 'Оновлення групи';
         if (kind === 'subject') return 'Оновлення предмета';
         if (kind === 'direct') return 'Адресне повідомлення';
-        return 'Оголошення';
+        return 'Оновлення inbox';
+      };
+      const messageCardTitle = (item) => {
+        if (item && item.message_title) return item.message_title;
+        if (item && item.body_preview) return item.body_preview;
+        if (item && item.body) return item.body;
+        return lang === 'en' ? 'Inbox update' : 'Оновлення inbox';
+      };
+      const messageCardBody = (item) => {
+        if (item && item.message_title) {
+          return item.body_preview || item.body || '';
+        }
+        return '';
       };
       const messageMetaLine = (item) => {
         const parts = [];
-        if (item && item.subject_name) parts.push(item.subject_name);
-        if (item && Number(item.group_number || 0) > 0) {
-          parts.push(`${lang === 'en' ? 'Group' : 'Група'} ${Number(item.group_number)}`);
+        if (item && item.message_scope_line) {
+          parts.push(item.message_scope_line);
+        } else {
+          if (item && item.subject_name) parts.push(item.subject_name);
+          if (item && Number(item.group_number || 0) > 0) {
+            parts.push(`${lang === 'en' ? 'Group' : 'Група'} ${Number(item.group_number)}`);
+          }
+          if (item && item.created_by) parts.push(item.created_by);
         }
-        if (item && item.created_by) parts.push(item.created_by);
+        if (item && item.rating_snapshot_card && item.rating_snapshot_card.updated_label) {
+          parts.push(item.rating_snapshot_card.updated_label);
+        }
         return parts.join(' · ');
       };
     %>
@@ -192,14 +211,16 @@
               <div class="studerria-help-section-head">
                 <div>
                   <p class="studerria-help-section-kicker"><%= lang === 'en' ? 'Inbox' : 'Inbox' %></p>
-                  <h2 class="studerria-help-section-title"><%= lang === 'en' ? 'Announcements' : 'Оголошення' %></h2>
+                  <h2 class="studerria-help-section-title"><%= lang === 'en' ? 'Inbox updates' : 'Оновлення inbox' %></h2>
                 </div>
-                <p class="studerria-help-section-copy"><%= lang === 'en' ? 'Broadcasts and direct updates stay separate from support threads. The full archive still opens from the schedule inbox.' : 'Broadcast-оголошення та адресні оновлення тепер окремо від support threads. Повний архів і далі відкривається з inbox у розкладі.' %></p>
+                <p class="studerria-help-section-copy"><%= lang === 'en' ? 'Broadcast, group, subject, and direct updates stay in the schedule inbox. Support threads remain separate here in Help.' : 'Broadcast, group, subject і direct-оновлення живуть в inbox розкладу. Support threads лишаються окремо тут, у Help.' %></p>
               </div>
 
               <div class="studerria-help-history-summary">
                 <span class="status-chip status-chip--info"><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= Number(announcementDigest.unread || 0) %></span>
-                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Fresh' : 'Свіжі' %>: <%= Number(announcementDigest.fresh || 0) %></span>
+                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Broadcast' : 'Broadcast' %>: <%= Number(announcementDigest.broadcast || 0) %></span>
+                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Group' : 'Group' %>: <%= Number(announcementDigest.group || 0) %></span>
+                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Subject' : 'Subject' %>: <%= Number(announcementDigest.subject || 0) %></span>
                 <span class="status-chip status-chip--muted"><%= lang === 'en' ? 'Direct' : 'Адресні' %>: <%= Number(announcementDigest.direct || 0) %></span>
               </div>
 
@@ -216,7 +237,10 @@
                         </div>
                         <span class="studerria-help-announcement-date"><%= formatStamp(item.published_at || item.created_at) %></span>
                       </div>
-                      <p class="studerria-help-announcement-body"><%= item.body_preview || item.body %></p>
+                      <p class="studerria-help-announcement-body"><strong><%= messageCardTitle(item) %></strong></p>
+                      <% if (messageCardBody(item)) { %>
+                        <p class="studerria-help-announcement-body"><%= messageCardBody(item) %></p>
+                      <% } %>
                       <% if (messageMetaLine(item)) { %>
                         <p class="studerria-help-announcement-meta"><%= messageMetaLine(item) %></p>
                       <% } %>
@@ -224,7 +248,7 @@
                   <% }); %>
                 </div>
               <% } else { %>
-                <p class="studerria-help-empty"><%= lang === 'en' ? 'No fresh announcements right now. Older items remain available from the schedule inbox.' : 'Зараз немає свіжих оголошень. Старіші елементи залишаються доступними в inbox розкладу.' %></p>
+                <p class="studerria-help-empty"><%= lang === 'en' ? 'No fresh inbox updates right now. Older items remain available from the schedule inbox.' : 'Зараз немає свіжих оновлень inbox. Старіші елементи залишаються доступними в inbox розкладу.' %></p>
               <% } %>
 
               <a class="btn btn-outline-secondary glass" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open schedule inbox' : 'Відкрити inbox розкладу' %></a>
