@@ -11152,6 +11152,23 @@ const normalizeDataQualitySeverity = (value) => {
   return 'info';
 };
 
+const buildEmptyDataQualitySummary = () => ({
+  checks_total: 0,
+  checks_with_issues: 0,
+  total_issues: 0,
+  affected_subjects: 0,
+  severity_rows: {
+    critical: 0,
+    warning: 0,
+    info: 0,
+  },
+  severity_checks: {
+    critical: 0,
+    warning: 0,
+    info: 0,
+  },
+});
+
 const parseDbIntegerArray = (value) => {
   if (Array.isArray(value)) {
     return value
@@ -11343,6 +11360,50 @@ const buildDataQualityCheck = ({
   };
 };
 
+const buildDataQualityCompatibilityCheck = ({
+  key = 'partial_schema_compatibility',
+  title = 'Частина перевірок недоступна',
+  description = 'Деякі діагностичні запити пропущено, показано частковий результат.',
+  examples = [],
+} = {}) => buildDataQualityCheck({
+  key,
+  title,
+  severity: 'info',
+  description,
+  count: 0,
+  examples,
+});
+
+const finalizeDataQualityDiagnosticsResult = (result, items = []) => {
+  const severityRows = { critical: 0, warning: 0, info: 0 };
+  const severityChecks = { critical: 0, warning: 0, info: 0 };
+  const affectedSubjectSet = new Set();
+  let checksWithIssues = 0;
+  let totalIssues = 0;
+
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    if (Number(item && item.count ? item.count : 0) <= 0) return;
+    checksWithIssues += 1;
+    totalIssues += Number(item.count || 0);
+    severityRows[item.severity] += Number(item.count || 0);
+    severityChecks[item.severity] += 1;
+    (item.subject_ids || []).forEach((subjectId) => {
+      affectedSubjectSet.add(subjectId);
+    });
+  });
+
+  result.items = Array.isArray(items) ? items : [];
+  result.summary = {
+    checks_total: result.items.length,
+    checks_with_issues: checksWithIssues,
+    total_issues: totalIssues,
+    affected_subjects: affectedSubjectSet.size,
+    severity_rows: severityRows,
+    severity_checks: severityChecks,
+  };
+  return result;
+};
+
 async function buildAdminDataQualityDiagnostics({
   courseId,
   semesterId = null,
@@ -11355,73 +11416,60 @@ async function buildAdminDataQualityDiagnostics({
     course_id: Number.isInteger(normalizedCourseId) && normalizedCourseId > 0 ? normalizedCourseId : null,
     semester_id: hasSemester ? normalizedSemesterId : null,
     available: true,
-    summary: {
-      checks_total: 0,
-      checks_with_issues: 0,
-      total_issues: 0,
-      affected_subjects: 0,
-      severity_rows: {
-        critical: 0,
-        warning: 0,
-        info: 0,
-      },
-      severity_checks: {
-        critical: 0,
-        warning: 0,
-        info: 0,
-      },
-    },
+    partial: false,
+    summary: buildEmptyDataQualitySummary(),
     items: [],
   };
   if (!Number.isInteger(normalizedCourseId) || normalizedCourseId < 1) {
     return result;
   }
 
-  const subjectScope = await getCourseSubjectAccessScope(normalizedCourseId, { visibleOnly: false });
-  const scopeSubjectIds = Array.isArray(subjectScope.subject_ids) ? subjectScope.subject_ids : [];
-  if (!scopeSubjectIds.length) {
-    return result;
-  }
-  const scopeOwnerCourseIds = Array.isArray(subjectScope.owner_course_ids) && subjectScope.owner_course_ids.length
-    ? subjectScope.owner_course_ids
-    : [normalizedCourseId];
-  const scopeSemesterIds = resolveSubjectScopeSemesterIds(subjectScope, hasSemester ? normalizedSemesterId : null);
-
-  const homeworkSemesterClause = scopeSemesterIds.length
-    ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
-    : 'AND h.semester_id IS NULL';
-  const homeworkBaseParams = [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])];
-
-  const journalSemesterClause = scopeSemesterIds.length
-    ? 'AND (jc.semester_id = ANY(?::int[]) OR jc.semester_id IS NULL)'
-    : 'AND jc.semester_id IS NULL';
-  const journalBaseParams = [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])];
-
-  const gradingSemesterClause = scopeSemesterIds.length
-    ? 'AND (sgs.semester_id = ANY(?::int[]) OR sgs.semester_id IS NULL)'
-    : 'AND sgs.semester_id IS NULL';
-  const gradingBaseParams = [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])];
-
-  let diagnosticsRows = null;
-  let compatibilityFallbacks = 0;
-  const fallbackMessages = [];
-  const withCompatibilityFallback = async (queryPromise, fallbackValue) => {
-    try {
-      return await queryPromise;
-    } catch (err) {
-      compatibilityFallbacks += 1;
-      const rawMessage = String(err && err.message ? err.message : err || '').trim();
-      if (rawMessage) {
-        fallbackMessages.push(rawMessage.slice(0, 180));
-      } else if (isDataQualityCompatibilityError(err)) {
-        fallbackMessages.push('schema compatibility');
-      } else {
-        fallbackMessages.push('query failed');
-      }
-      return fallbackValue;
+  try {
+    const subjectScope = await getCourseSubjectAccessScope(normalizedCourseId, { visibleOnly: false });
+    const scopeSubjectIds = Array.isArray(subjectScope.subject_ids) ? subjectScope.subject_ids : [];
+    if (!scopeSubjectIds.length) {
+      return result;
     }
-  };
-  diagnosticsRows = await Promise.all([
+    const scopeOwnerCourseIds = Array.isArray(subjectScope.owner_course_ids) && subjectScope.owner_course_ids.length
+      ? subjectScope.owner_course_ids
+      : [normalizedCourseId];
+    const scopeSemesterIds = resolveSubjectScopeSemesterIds(subjectScope, hasSemester ? normalizedSemesterId : null);
+
+    const homeworkSemesterClause = scopeSemesterIds.length
+      ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
+      : 'AND h.semester_id IS NULL';
+    const homeworkBaseParams = [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])];
+
+    const journalSemesterClause = scopeSemesterIds.length
+      ? 'AND (jc.semester_id = ANY(?::int[]) OR jc.semester_id IS NULL)'
+      : 'AND jc.semester_id IS NULL';
+    const journalBaseParams = [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])];
+
+    const gradingSemesterClause = scopeSemesterIds.length
+      ? 'AND (sgs.semester_id = ANY(?::int[]) OR sgs.semester_id IS NULL)'
+      : 'AND sgs.semester_id IS NULL';
+    const gradingBaseParams = [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])];
+
+    let diagnosticsRows = null;
+    let compatibilityFallbacks = 0;
+    const fallbackMessages = [];
+    const withCompatibilityFallback = async (queryPromise, fallbackValue) => {
+      try {
+        return await queryPromise;
+      } catch (err) {
+        compatibilityFallbacks += 1;
+        const rawMessage = String(err && err.message ? err.message : err || '').trim();
+        if (rawMessage) {
+          fallbackMessages.push(rawMessage.slice(0, 180));
+        } else if (isDataQualityCompatibilityError(err)) {
+          fallbackMessages.push('schema compatibility');
+        } else {
+          fallbackMessages.push('query failed');
+        }
+        return fallbackValue;
+      }
+    };
+    diagnosticsRows = await Promise.all([
       withCompatibilityFallback(db.get(
         `
           SELECT
@@ -11675,192 +11723,182 @@ async function buildAdminDataQualityDiagnostics({
       ), []),
     ]);
 
-  const [
-    missingJournalCountRow,
-    missingJournalRows,
-    duplicateTeacherHomeworkRows,
-    orphanHomeworkColumnCountRow,
-    orphanHomeworkColumnRows,
-    duplicateManualColumnsRows,
-    invalidStudentGroupRows,
-    invalidTeacherGroupRows,
-    gradingWeightMismatchRows,
-  ] = diagnosticsRows;
+    const [
+      missingJournalCountRow,
+      missingJournalRows,
+      duplicateTeacherHomeworkRows,
+      orphanHomeworkColumnCountRow,
+      orphanHomeworkColumnRows,
+      duplicateManualColumnsRows,
+      invalidStudentGroupRows,
+      invalidTeacherGroupRows,
+      gradingWeightMismatchRows,
+    ] = diagnosticsRows;
 
-  const items = [];
-  items.push(buildDataQualityCheck({
-    key: 'teacher_homework_without_journal_column',
-    title: 'Викладацьке ДЗ без колонки журналу',
-    severity: 'critical',
-    description: 'ДЗ створене, але автоматична колонка журналу відсутня.',
-    count: Number(missingJournalCountRow?.count || 0),
-    subjectIds: parseDbIntegerArray(missingJournalCountRow?.subject_ids),
-    examples: (missingJournalRows || []).map((row) => {
-      const groupLabel = Number(row.group_number || 0) > 0 ? `група ${row.group_number}` : 'всі групи';
-      const dueLabel = row.due_label ? String(row.due_label) : '—';
-      return `${row.subject_name || 'Предмет'} · ${groupLabel} · ${dueLabel} · #${Number(row.homework_id || 0)}`;
-    }),
-  }));
+    const items = [];
+    items.push(buildDataQualityCheck({
+      key: 'teacher_homework_without_journal_column',
+      title: 'Викладацьке ДЗ без колонки журналу',
+      severity: 'critical',
+      description: 'ДЗ створене, але автоматична колонка журналу відсутня.',
+      count: Number(missingJournalCountRow?.count || 0),
+      subjectIds: parseDbIntegerArray(missingJournalCountRow?.subject_ids),
+      examples: (missingJournalRows || []).map((row) => {
+        const groupLabel = Number(row.group_number || 0) > 0 ? `група ${row.group_number}` : 'всі групи';
+        const dueLabel = row.due_label ? String(row.due_label) : '—';
+        return `${row.subject_name || 'Предмет'} · ${groupLabel} · ${dueLabel} · #${Number(row.homework_id || 0)}`;
+      }),
+    }));
 
-  items.push(buildDataQualityCheck({
-    key: 'duplicate_teacher_homework',
-    title: 'Дублі викладацьких ДЗ',
-    severity: 'warning',
-    description: 'Підозра на подвійне створення однакових завдань.',
-    count: Number(duplicateTeacherHomeworkRows && duplicateTeacherHomeworkRows[0]
-      ? duplicateTeacherHomeworkRows[0].extra_total
-      : 0),
-    subjectIds: Array.from(
-      new Set(
-        (duplicateTeacherHomeworkRows || [])
-          .map((row) => Number(row.subject_id || 0))
-          .filter((id) => Number.isInteger(id) && id > 0)
-      )
-    ),
-    examples: (duplicateTeacherHomeworkRows || []).map((row) => {
-      const groupLabel = Number(row.group_number || 0) > 0 ? `група ${row.group_number}` : 'всі групи';
-      const classLabel = Number(row.class_number || 0) > 0 ? `пара ${row.class_number}` : 'без пари';
-      return `${row.subject_name || 'Предмет'} · ${groupLabel} · ${row.due_label || '—'} · ${classLabel} · x${Number(row.duplicates || 0)}`;
-    }),
-  }));
+    items.push(buildDataQualityCheck({
+      key: 'duplicate_teacher_homework',
+      title: 'Дублі викладацьких ДЗ',
+      severity: 'warning',
+      description: 'Підозра на подвійне створення однакових завдань.',
+      count: Number(duplicateTeacherHomeworkRows && duplicateTeacherHomeworkRows[0]
+        ? duplicateTeacherHomeworkRows[0].extra_total
+        : 0),
+      subjectIds: Array.from(
+        new Set(
+          (duplicateTeacherHomeworkRows || [])
+            .map((row) => Number(row.subject_id || 0))
+            .filter((id) => Number.isInteger(id) && id > 0)
+        )
+      ),
+      examples: (duplicateTeacherHomeworkRows || []).map((row) => {
+        const groupLabel = Number(row.group_number || 0) > 0 ? `група ${row.group_number}` : 'всі групи';
+        const classLabel = Number(row.class_number || 0) > 0 ? `пара ${row.class_number}` : 'без пари';
+        return `${row.subject_name || 'Предмет'} · ${groupLabel} · ${row.due_label || '—'} · ${classLabel} · x${Number(row.duplicates || 0)}`;
+      }),
+    }));
 
-  items.push(buildDataQualityCheck({
-    key: 'orphan_homework_journal_columns',
-    title: 'Колонки типу homework без source_homework_id',
-    severity: 'critical',
-    description: 'Колонка журналу не прив’язана до первинного ДЗ.',
-    count: Number(orphanHomeworkColumnCountRow?.count || 0),
-    subjectIds: parseDbIntegerArray(orphanHomeworkColumnCountRow?.subject_ids),
-    examples: (orphanHomeworkColumnRows || []).map((row) => (
-      `${row.subject_name || 'Предмет'} · ${row.title || 'Колонка'} · #${Number(row.id || 0)}`
-    )),
-  }));
+    items.push(buildDataQualityCheck({
+      key: 'orphan_homework_journal_columns',
+      title: 'Колонки типу homework без source_homework_id',
+      severity: 'critical',
+      description: 'Колонка журналу не прив’язана до первинного ДЗ.',
+      count: Number(orphanHomeworkColumnCountRow?.count || 0),
+      subjectIds: parseDbIntegerArray(orphanHomeworkColumnCountRow?.subject_ids),
+      examples: (orphanHomeworkColumnRows || []).map((row) => (
+        `${row.subject_name || 'Предмет'} · ${row.title || 'Колонка'} · #${Number(row.id || 0)}`
+      )),
+    }));
 
-  items.push(buildDataQualityCheck({
-    key: 'duplicate_manual_journal_columns',
-    title: 'Дублі ручних колонок журналу',
-    severity: 'warning',
-    description: 'У межах предмета знайдено однакові ручні колонки.',
-    count: Number(duplicateManualColumnsRows && duplicateManualColumnsRows[0]
-      ? duplicateManualColumnsRows[0].extra_total
-      : 0),
-    subjectIds: Array.from(
-      new Set(
-        (duplicateManualColumnsRows || [])
-          .map((row) => Number(row.subject_id || 0))
-          .filter((id) => Number.isInteger(id) && id > 0)
-      )
-    ),
-    examples: (duplicateManualColumnsRows || []).map((row) => {
-      const title = String(row.title_key || '').trim() || 'без назви';
-      return `${row.subject_name || 'Предмет'} · ${title} · ${row.column_type || 'custom'} · x${Number(row.duplicates || 0)}`;
-    }),
-  }));
+    items.push(buildDataQualityCheck({
+      key: 'duplicate_manual_journal_columns',
+      title: 'Дублі ручних колонок журналу',
+      severity: 'warning',
+      description: 'У межах предмета знайдено однакові ручні колонки.',
+      count: Number(duplicateManualColumnsRows && duplicateManualColumnsRows[0]
+        ? duplicateManualColumnsRows[0].extra_total
+        : 0),
+      subjectIds: Array.from(
+        new Set(
+          (duplicateManualColumnsRows || [])
+            .map((row) => Number(row.subject_id || 0))
+            .filter((id) => Number.isInteger(id) && id > 0)
+        )
+      ),
+      examples: (duplicateManualColumnsRows || []).map((row) => {
+        const title = String(row.title_key || '').trim() || 'без назви';
+        return `${row.subject_name || 'Предмет'} · ${title} · ${row.column_type || 'custom'} · x${Number(row.duplicates || 0)}`;
+      }),
+    }));
 
-  items.push(buildDataQualityCheck({
-    key: 'invalid_student_group_numbers',
-    title: 'Некоректні групи студентів',
-    severity: 'warning',
-    description: 'group_number виходить за діапазон предмета.',
-    count: Number(invalidStudentGroupRows && invalidStudentGroupRows[0]
-      ? invalidStudentGroupRows[0].affected_rows_total
-      : 0),
-    subjectIds: Array.from(
-      new Set(
-        (invalidStudentGroupRows || [])
-          .map((row) => Number(row.subject_id || 0))
-          .filter((id) => Number.isInteger(id) && id > 0)
-      )
-    ),
-    examples: (invalidStudentGroupRows || []).map((row) => (
-      `${row.subject_name || 'Предмет'} · group ${Number(row.group_number || 0)} / max ${Number(row.max_group || 1)} · студентів ${Number(row.rows_count || 0)}`
-    )),
-  }));
+    items.push(buildDataQualityCheck({
+      key: 'invalid_student_group_numbers',
+      title: 'Некоректні групи студентів',
+      severity: 'warning',
+      description: 'group_number виходить за діапазон предмета.',
+      count: Number(invalidStudentGroupRows && invalidStudentGroupRows[0]
+        ? invalidStudentGroupRows[0].affected_rows_total
+        : 0),
+      subjectIds: Array.from(
+        new Set(
+          (invalidStudentGroupRows || [])
+            .map((row) => Number(row.subject_id || 0))
+            .filter((id) => Number.isInteger(id) && id > 0)
+        )
+      ),
+      examples: (invalidStudentGroupRows || []).map((row) => (
+        `${row.subject_name || 'Предмет'} · group ${Number(row.group_number || 0)} / max ${Number(row.max_group || 1)} · студентів ${Number(row.rows_count || 0)}`
+      )),
+    }));
 
-  items.push(buildDataQualityCheck({
-    key: 'invalid_teacher_subject_groups',
-    title: 'Некоректні групи у зв’язках викладач-предмет',
-    severity: 'warning',
-    description: 'У teacher_subjects записано group_number поза межами предмета.',
-    count: Number(invalidTeacherGroupRows && invalidTeacherGroupRows[0]
-      ? invalidTeacherGroupRows[0].affected_rows_total
-      : 0),
-    subjectIds: Array.from(
-      new Set(
-        (invalidTeacherGroupRows || [])
-          .map((row) => Number(row.subject_id || 0))
-          .filter((id) => Number.isInteger(id) && id > 0)
-      )
-    ),
-    examples: (invalidTeacherGroupRows || []).map((row) => (
-      `${row.subject_name || 'Предмет'} · group ${Number(row.group_number || 0)} / max ${Number(row.max_group || 1)} · зв’язків ${Number(row.rows_count || 0)}`
-    )),
-  }));
+    items.push(buildDataQualityCheck({
+      key: 'invalid_teacher_subject_groups',
+      title: 'Некоректні групи у зв’язках викладач-предмет',
+      severity: 'warning',
+      description: 'У teacher_subjects записано group_number поза межами предмета.',
+      count: Number(invalidTeacherGroupRows && invalidTeacherGroupRows[0]
+        ? invalidTeacherGroupRows[0].affected_rows_total
+        : 0),
+      subjectIds: Array.from(
+        new Set(
+          (invalidTeacherGroupRows || [])
+            .map((row) => Number(row.subject_id || 0))
+            .filter((id) => Number.isInteger(id) && id > 0)
+        )
+      ),
+      examples: (invalidTeacherGroupRows || []).map((row) => (
+        `${row.subject_name || 'Предмет'} · group ${Number(row.group_number || 0)} / max ${Number(row.max_group || 1)} · зв’язків ${Number(row.rows_count || 0)}`
+      )),
+    }));
 
-  items.push(buildDataQualityCheck({
-    key: 'grading_weights_not_100',
-    title: 'Вага оцінювання не дорівнює 100',
-    severity: 'warning',
-    description: 'Сума активних внесків у фінал має бути рівно 100.',
-    count: Number(gradingWeightMismatchRows && gradingWeightMismatchRows[0]
-      ? gradingWeightMismatchRows[0].rows_total
-      : 0),
-    subjectIds: Array.from(
-      new Set(
-        (gradingWeightMismatchRows || [])
-          .map((row) => Number(row.subject_id || 0))
-          .filter((id) => Number.isInteger(id) && id > 0)
-      )
-    ),
-    examples: (gradingWeightMismatchRows || []).map((row) => (
-      `${row.subject_name || 'Предмет'} · активна сума ${Number(row.active_weight_sum || 0)} / 100`
-    )),
-  }));
+    items.push(buildDataQualityCheck({
+      key: 'grading_weights_not_100',
+      title: 'Вага оцінювання не дорівнює 100',
+      severity: 'warning',
+      description: 'Сума активних внесків у фінал має бути рівно 100.',
+      count: Number(gradingWeightMismatchRows && gradingWeightMismatchRows[0]
+        ? gradingWeightMismatchRows[0].rows_total
+        : 0),
+      subjectIds: Array.from(
+        new Set(
+          (gradingWeightMismatchRows || [])
+            .map((row) => Number(row.subject_id || 0))
+            .filter((id) => Number.isInteger(id) && id > 0)
+        )
+      ),
+      examples: (gradingWeightMismatchRows || []).map((row) => (
+        `${row.subject_name || 'Предмет'} · активна сума ${Number(row.active_weight_sum || 0)} / 100`
+      )),
+    }));
 
-  if (compatibilityFallbacks > 0) {
-    const fallbackExamples = Array.from(
+    if (compatibilityFallbacks > 0) {
+      result.partial = true;
+      const fallbackExamples = Array.from(
+        new Set([
+          `Пропущено перевірок: ${compatibilityFallbacks}`,
+          ...fallbackMessages.slice(0, 3),
+        ].filter(Boolean))
+      );
+      items.push(buildDataQualityCompatibilityCheck({
+        examples: fallbackExamples,
+      }));
+    }
+
+    return finalizeDataQualityDiagnosticsResult(result, items);
+  } catch (err) {
+    if (!isDataQualityCompatibilityError(err)) {
+      throw err;
+    }
+    result.partial = true;
+    const compatibilityExamples = Array.from(
       new Set([
-        `Пропущено перевірок: ${compatibilityFallbacks}`,
-        ...fallbackMessages.slice(0, 3),
+        'Поточна схема БД не підтримує повний набір data quality перевірок.',
+        String(err && err.message ? err.message : err || '').trim().slice(0, 180),
       ].filter(Boolean))
     );
-    items.push(buildDataQualityCheck({
-      key: 'partial_schema_compatibility',
-      title: 'Частина перевірок недоступна',
-      severity: 'info',
-      description: 'Деякі діагностичні запити пропущено, показано частковий результат.',
-      count: 0,
-      examples: fallbackExamples,
-    }));
+    return finalizeDataQualityDiagnosticsResult(result, [
+      buildDataQualityCompatibilityCheck({
+        key: 'schema_compatibility_mode',
+        title: 'Data quality у режимі сумісності',
+        description: 'Повний набір перевірок недоступний для поточної схеми БД.',
+        examples: compatibilityExamples,
+      }),
+    ]);
   }
-
-  const severityRows = { critical: 0, warning: 0, info: 0 };
-  const severityChecks = { critical: 0, warning: 0, info: 0 };
-  const affectedSubjectSet = new Set();
-  let checksWithIssues = 0;
-  let totalIssues = 0;
-
-  items.forEach((item) => {
-    if (Number(item.count || 0) <= 0) return;
-    checksWithIssues += 1;
-    totalIssues += Number(item.count || 0);
-    severityRows[item.severity] += Number(item.count || 0);
-    severityChecks[item.severity] += 1;
-    (item.subject_ids || []).forEach((subjectId) => {
-      affectedSubjectSet.add(subjectId);
-    });
-  });
-
-  result.items = items;
-  result.summary = {
-    checks_total: items.length,
-    checks_with_issues: checksWithIssues,
-    total_issues: totalIssues,
-    affected_subjects: affectedSubjectSet.size,
-    severity_rows: severityRows,
-    severity_checks: severityChecks,
-  };
-  return result;
 }
 
 async function buildCoursePulseAnalytics({
@@ -36073,22 +36111,8 @@ app.get('/admin/data-quality.json', requireVisitAnalyticsSectionAccess, async (r
     ok: true,
     generated_at: new Date().toISOString(),
     available: false,
-    summary: {
-      checks_total: 0,
-      checks_with_issues: 0,
-      total_issues: 0,
-      affected_subjects: 0,
-      severity_rows: {
-        critical: 0,
-        warning: 0,
-        info: 0,
-      },
-      severity_checks: {
-        critical: 0,
-        warning: 0,
-        info: 0,
-      },
-    },
+    partial: false,
+    summary: buildEmptyDataQualitySummary(),
     items: [],
   };
   try {
@@ -36116,6 +36140,9 @@ app.get('/admin/data-quality.json', requireVisitAnalyticsSectionAccess, async (r
       ...diagnostics,
     });
   } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      console.error('Database error (admin.dataQuality)', err);
+    }
     return res.json(unavailablePayload);
   }
 });

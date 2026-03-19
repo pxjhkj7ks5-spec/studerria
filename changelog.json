@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.53",
+      "date": "2026-03-19",
+      "items": [
+        "fix(admin-data-quality-compatibility): keep `/admin/data-quality.json` in a compatible partial-results mode when legacy subject-scope or diagnostic queries hit schema drift, instead of collapsing the whole widget into `Unavailable`",
+        "tune(admin-data-quality-status-ui): add a dedicated `Partial` state in the admin Data quality card and render schema-compatibility notes as neutral `INFO` rows rather than green `OK` rows"
+      ]
+    },
+    {
       "version": "1.2.52",
       "date": "2026-03-19",
       "items": [

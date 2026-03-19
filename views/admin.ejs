@@ -5660,6 +5660,7 @@
         const criticalRows = Number(summary && summary.severity_rows ? summary.severity_rows.critical : 0);
         const checksWithIssues = Number(summary.checks_with_issues || 0);
         const checksTotal = Number(summary.checks_total || 0);
+        const hasPartialData = data.partial === true;
 
         if (dataQualityMetricIssues) {
           dataQualityMetricIssues.textContent = formatVisitNumber(totalIssues);
@@ -5677,10 +5678,10 @@
         if (dataQualityStatusBadge) {
           const badgeClass = criticalRows > 0
             ? 'text-bg-danger'
-            : (totalIssues > 0 ? 'text-bg-warning' : 'text-bg-success');
+            : (totalIssues > 0 ? 'text-bg-warning' : (hasPartialData ? 'text-bg-secondary' : 'text-bg-success'));
           const badgeLabel = criticalRows > 0
             ? 'Critical issues'
-            : (totalIssues > 0 ? 'Warnings' : 'Clean');
+            : (totalIssues > 0 ? 'Warnings' : (hasPartialData ? 'Partial' : 'Clean'));
           dataQualityStatusBadge.className = `badge ${badgeClass}`;
           dataQualityStatusBadge.textContent = badgeLabel;
         }
@@ -5700,10 +5701,13 @@
         }
         dataQualityBody.innerHTML = rows.map((row) => {
           const count = Number(row && row.count ? row.count : 0);
-          const statusClass = count > 0 ? dataQualitySeverityBadgeClass(row.severity) : 'text-bg-success';
+          const isInfoNote = count <= 0 && String(row && row.severity ? row.severity : '').toLowerCase() === 'info';
+          const statusClass = count > 0
+            ? dataQualitySeverityBadgeClass(row.severity)
+            : (isInfoNote ? 'text-bg-secondary' : 'text-bg-success');
           const statusLabel = count > 0
             ? String(row.severity || 'warning').toUpperCase()
-            : 'OK';
+            : (isInfoNote ? 'INFO' : 'OK');
           const description = row && row.description ? String(row.description) : '';
           const examples = Array.isArray(row && row.examples ? row.examples : [])
             .slice(0, 2)
@@ -5727,6 +5731,7 @@
         ok: true,
         generated_at: new Date().toISOString(),
         available: false,
+        partial: false,
         summary: {
           checks_total: 0,
           checks_with_issues: 0,
