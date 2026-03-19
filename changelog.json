@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.55",
+      "date": "2026-03-19",
+      "items": [
+        "tune(my-day-mission-cards-normalization): rebuild the four My Day mission cards into a stable 4-column deck with equal-height glass cards, bottom-pinned CTA pills, cleaner empty states, and responsive 2/1-column fallbacks so attendance, rating, support, and inbox blocks stop looking collapsed or misaligned",
+        "fix(my-day-attendance-short-date): make the attendance last-mark label accept both date-only and datetime values so the homepage no longer leaks raw timestamp strings in the summary card"
+      ]
+    },
+    {
       "version": "1.2.54",
       "date": "2026-03-19",
       "items": [
