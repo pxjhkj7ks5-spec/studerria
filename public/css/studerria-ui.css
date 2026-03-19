@@ -534,12 +534,14 @@ body.theme-light.studerria-theme .app-footer .footer-sync-pill {
 
 .studerria-theme .app-footer .footer-version,
 .studerria-theme .app-footer .footer-build,
+.studerria-theme .app-footer .footer-signature,
 .studerria-theme .app-footer .footer-link {
   color: inherit !important;
   opacity: 0.88;
 }
 
 .studerria-theme .app-footer .footer-build,
+.studerria-theme .app-footer .footer-signature,
 .studerria-theme .app-footer .footer-link {
   border: 0;
   background: none;
@@ -555,6 +557,11 @@ body.theme-light.studerria-theme .app-footer .footer-sync-pill {
   opacity: 1;
   color: var(--studerria-text-primary) !important;
   text-decoration: none;
+}
+
+.studerria-theme .app-footer .footer-signature {
+  cursor: default;
+  white-space: nowrap;
 }
 
 .studerria-theme .section-title,

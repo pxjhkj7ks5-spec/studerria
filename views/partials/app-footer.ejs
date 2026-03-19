@@ -36,17 +36,9 @@
       data-island-props='<%- footerReleasePropsJson %>'
       aria-hidden="true"
     ></span>
-    <button
-      type="button"
-      class="footer-build"
-      data-bs-toggle="tooltip"
-      data-bs-placement="top"
-      data-bs-title="<%= buildStamp %>"
-      title="<%= buildStamp %>"
-      aria-label="<%= t('footer.buildTimestamp') %>"
-    >
-      <%= t('footer.build') %>
-    </button>
+    <span class="footer-signature" title="All rights reserved" aria-label="All rights reserved by A.M.">
+      &copy; A.M.
+    </span>
     <button
       type="button"
       class="footer-link"

@@ -902,6 +902,7 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
 .app-footer .footer-meta,
 .app-footer .footer-version,
 .app-footer .footer-build,
+.app-footer .footer-signature,
 .app-footer .footer-link {
   color: var(--ds-text2) !important;
   font-size: 11.5px;
@@ -1003,6 +1004,7 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
 .app-footer .btn-link,
 .app-footer a,
 .app-footer .footer-link,
+.app-footer .footer-signature,
 .app-footer .footer-build {
   color: var(--ds-text2);
   opacity: 0.78;
@@ -1019,6 +1021,12 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
   opacity: 1;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.app-footer .footer-signature {
+  cursor: default;
+  white-space: nowrap;
+  text-decoration: none;
 }
 
 .island-toolbar-shell {
@@ -1559,6 +1567,25 @@ body.theme-light .glass-float {
 
 .changelog-liquid-modal .modal-header {
   border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 78%, transparent);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.changelog-liquid-modal .modal-header .btn-close {
+  margin-left: auto;
+}
+
+.changelog-modal__header-copy {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.changelog-modal__header-copy .modal-title {
+  margin-bottom: 0;
 }
 
 .changelog-liquid-modal .modal-footer {

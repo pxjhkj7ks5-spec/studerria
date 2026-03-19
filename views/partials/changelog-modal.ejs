@@ -8,8 +8,10 @@
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content changelog-sheet">
       <div class="modal-header">
-        <h5 class="modal-title"><%= t('changelog.title') %></h5>
-        <span class="status-chip status-chip--info"><%= t('changelog.releaseNotes') %></span>
+        <div class="changelog-modal__header-copy">
+          <h5 class="modal-title"><%= t('changelog.title') %></h5>
+          <span class="status-chip status-chip--info"><%= t('changelog.releaseNotes') %></span>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= t('changelog.close') %>"></button>
       </div>
       <div class="modal-body">
