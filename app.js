@@ -278,7 +278,21 @@ const translate = (lang, key) => {
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ noServer: true });
+const SOCKET_CHANNEL_MESSAGES = 'messages';
+const SOCKET_CHANNEL_ADMIN = 'admin';
+const SOCKET_CHANNELS = new Set([SOCKET_CHANNEL_MESSAGES, SOCKET_CHANNEL_ADMIN]);
+const DANGEROUS_UPLOAD_EXTENSIONS = new Set([
+  '.html',
+  '.htm',
+  '.xhtml',
+  '.mhtml',
+  '.svg',
+  '.xml',
+  '.js',
+  '.mjs',
+  '.json',
+]);
 
 process.on('uncaughtException', (err) => {
   pushRuntimeErrorEvent('unhandled', 'uncaughtException', err && err.message ? err.message : err);
@@ -679,7 +693,6 @@ app.use((req, res, next) => {
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public'));
-app.use('/uploads', express.static('uploads'));
 
 const isProd = process.env.NODE_ENV === 'production';
 app.set('trust proxy', 1);
@@ -804,23 +817,23 @@ const sessionStore = new PgSession({
   },
 });
 
-app.use(
-  session({
-    name: process.env.SESSION_COOKIE_NAME || 'sid',
-    store: sessionStore,
-    secret: sessionSecret,
-    resave: false,
-    saveUninitialized: false,
-    rolling: true,
-    unset: 'destroy',
-    cookie: {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: isProd,
-      maxAge: resolveSessionTtlMs(DEFAULT_SETTINGS.session_duration_days),
-    },
-  })
-);
+const sessionMiddleware = session({
+  name: process.env.SESSION_COOKIE_NAME || 'sid',
+  store: sessionStore,
+  secret: sessionSecret,
+  resave: false,
+  saveUninitialized: false,
+  rolling: true,
+  unset: 'destroy',
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProd,
+    maxAge: resolveSessionTtlMs(DEFAULT_SETTINGS.session_duration_days),
+  },
+});
+
+app.use(sessionMiddleware);
 
 app.use((req, _res, next) => {
   if (req.session && req.session.cookie) {
@@ -844,6 +857,143 @@ app.use((req, res, next) => {
   res.locals.lang = lang;
   res.locals.t = (key) => translate(lang, key);
   next();
+});
+
+function normalizeSocketChannel(rawValue) {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  if (!SOCKET_CHANNELS.has(normalized)) return '';
+  return normalized;
+}
+
+function getRequestedSocketChannel(req) {
+  try {
+    const parsed = new URL(String(req && req.url ? req.url : '/'), 'http://localhost');
+    if (parsed.pathname !== '/ws') return '';
+    return normalizeSocketChannel(parsed.searchParams.get('channel'));
+  } catch (_err) {
+    return '';
+  }
+}
+
+function rejectWebSocketUpgrade(socket, statusCode = 403, statusText = 'Forbidden') {
+  if (!socket || socket.destroyed) return;
+  try {
+    socket.write(`HTTP/1.1 ${statusCode} ${statusText}\r\nConnection: close\r\n\r\n`);
+  } catch (_err) {
+    // ignore write failures and close below
+  }
+  socket.destroy();
+}
+
+function getExpectedRequestHost(req) {
+  const forwardedHost = String(req && req.headers && req.headers['x-forwarded-host'] ? req.headers['x-forwarded-host'] : '').split(',')[0].trim();
+  const hostHeader = String(req && req.headers && req.headers.host ? req.headers.host : '').split(',')[0].trim();
+  return (forwardedHost || hostHeader).toLowerCase();
+}
+
+function isAllowedWebSocketOrigin(req) {
+  const originHeader = String(req && req.headers && req.headers.origin ? req.headers.origin : '').trim();
+  const expectedHost = getExpectedRequestHost(req);
+  if (!originHeader || !expectedHost) {
+    return false;
+  }
+  try {
+    const parsedOrigin = new URL(originHeader);
+    return String(parsedOrigin.host || '').toLowerCase() === expectedHost;
+  } catch (_err) {
+    return false;
+  }
+}
+
+async function canUseSocketChannel(req, channel) {
+  if (!req || !req.session || !req.session.user) return false;
+  if (channel === SOCKET_CHANNEL_MESSAGES) {
+    return true;
+  }
+  if (channel !== SOCKET_CHANNEL_ADMIN) {
+    return false;
+  }
+  const roleKeys = getSessionRoleList(req);
+  if (roleKeys.includes('admin')) {
+    return true;
+  }
+  try {
+    await ensureDbReady();
+    const allowedSections = await getRoleAllowedSectionsForRoleKeys(
+      roleKeys,
+      req.session.role || roleKeys[0] || 'student'
+    );
+    return Array.isArray(allowedSections) && allowedSections.length > 0;
+  } catch (_err) {
+    const fallbackSections = getRoleAllowedSections(req.session.role || roleKeys[0] || 'student');
+    return Array.isArray(fallbackSections) && fallbackSections.length > 0;
+  }
+}
+
+function resolveBroadcastChannels(type, requestedChannels = null) {
+  const normalizedRequested = Array.isArray(requestedChannels)
+    ? requestedChannels.map((channel) => normalizeSocketChannel(channel)).filter(Boolean)
+    : [];
+  if (normalizedRequested.length) {
+    return normalizedRequested;
+  }
+  if (type === 'messages_updated') {
+    return [SOCKET_CHANNEL_MESSAGES];
+  }
+  return [SOCKET_CHANNEL_ADMIN];
+}
+
+const websocketSessionResponseShim = {
+  getHeader() {
+    return undefined;
+  },
+  setHeader() {},
+  removeHeader() {},
+  writeHead() {},
+  end() {},
+};
+
+server.on('upgrade', (req, socket, head) => {
+  const channel = getRequestedSocketChannel(req);
+  if (!channel) {
+    rejectWebSocketUpgrade(socket, 404, 'Not Found');
+    return;
+  }
+  if (!isAllowedWebSocketOrigin(req)) {
+    rejectWebSocketUpgrade(socket, 403, 'Forbidden');
+    return;
+  }
+  sessionMiddleware(req, websocketSessionResponseShim, (sessionErr) => {
+    if (sessionErr) {
+      console.error('WebSocket session error', sessionErr);
+      rejectWebSocketUpgrade(socket, 500, 'Internal Server Error');
+      return;
+    }
+    (async () => {
+      try {
+        const allowed = await canUseSocketChannel(req, channel);
+        if (!allowed) {
+          rejectWebSocketUpgrade(socket, 403, 'Forbidden');
+          return;
+        }
+        wss.handleUpgrade(req, socket, head, (client) => {
+          client.studerriaChannel = channel;
+          client.studerriaUserId = Number(req.session?.user?.id || 0);
+          client.studerriaRoles = getSessionRoleList(req);
+          wss.emit('connection', client, req);
+        });
+      } catch (err) {
+        console.error('WebSocket upgrade failed', err);
+        rejectWebSocketUpgrade(socket, 500, 'Internal Server Error');
+      }
+    })();
+  });
+});
+
+wss.on('connection', (client) => {
+  client.on('error', (err) => {
+    console.error('WebSocket client error', err);
+  });
 });
 
 const convertPlaceholders = (sql) => {
@@ -1961,6 +2111,33 @@ function normalizeUploadedOriginalName(rawName, fallbackName = null) {
   return normalized.replace(/[\u0000-\u001F\u007F]/g, '').trim() || fallbackName;
 }
 
+const uploadMimeExtensionMap = new Map([
+  ['image/png', '.png'],
+  ['image/jpeg', '.jpg'],
+  ['image/gif', '.gif'],
+  ['application/pdf', '.pdf'],
+  ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.docx'],
+  ['application/msword', '.doc'],
+  ['application/vnd.openxmlformats-officedocument.presentationml.presentation', '.pptx'],
+  ['application/vnd.ms-powerpoint', '.ppt'],
+  ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.xlsx'],
+  ['application/vnd.ms-excel', '.xls'],
+  ['text/plain', '.txt'],
+]);
+const uploadSafeExtensions = new Set(Array.from(uploadMimeExtensionMap.values()));
+
+function getSafeUploadExtension(mimeType, originalName = '') {
+  const normalizedMime = String(mimeType || '').trim().toLowerCase();
+  if (uploadMimeExtensionMap.has(normalizedMime)) {
+    return uploadMimeExtensionMap.get(normalizedMime);
+  }
+  const originalExt = path.extname(String(originalName || '')).trim().toLowerCase();
+  if (uploadSafeExtensions.has(originalExt)) {
+    return originalExt;
+  }
+  return '.bin';
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     try {
@@ -1973,9 +2150,9 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const originalName = normalizeUploadedOriginalName(file.originalname, 'file');
     file.originalname = originalName;
-    const ext = path.extname(originalName);
+    const ext = getSafeUploadExtension(file.mimetype, originalName);
     const base = path
-      .basename(originalName, ext)
+      .basename(originalName, path.extname(originalName))
       .replace(/\s+/g, '_')
       .replace(/[^a-zA-Z0-9-_]/g, '_')
       .replace(/_+/g, '_')
@@ -7869,10 +8046,11 @@ async function saveTeacherSubjects(userId, body, options = {}) {
   return { ok: true, status: nextStatus, selections };
 }
 
-function broadcast(type, payload) {
+function broadcast(type, payload, options = {}) {
   const message = JSON.stringify({ type, payload });
+  const targetChannels = new Set(resolveBroadcastChannels(type, options.channels));
   wss.clients.forEach((client) => {
-    if (client.readyState === 1) {
+    if (client.readyState === 1 && targetChannels.has(normalizeSocketChannel(client.studerriaChannel))) {
       client.send(message);
     }
   });
@@ -16093,9 +16271,201 @@ const resolveStoredUploadAbsolutePath = (storedPath) => {
   if (!relative) return '';
   const absolutePath = path.resolve(__dirname, relative);
   const allowedRoot = path.resolve(uploadsDir);
-  if (!absolutePath.startsWith(allowedRoot)) return '';
+  if (absolutePath !== allowedRoot && !absolutePath.startsWith(`${allowedRoot}${path.sep}`)) return '';
   return absolutePath;
 };
+
+const normalizeStoredUploadPath = (storedPath) => {
+  const rawValue = String(storedPath || '').trim().replace(/\\/g, '/');
+  if (!rawValue) return '';
+  const withLeadingSlash = rawValue.startsWith('/') ? rawValue : `/${rawValue}`;
+  if (!withLeadingSlash.startsWith('/uploads/')) return '';
+  return withLeadingSlash;
+};
+
+const isStaffUploadViewer = (req) => (
+  hasSessionRole(req, 'admin')
+  || hasSessionRole(req, 'teacher')
+  || hasSessionRole(req, 'deanery')
+);
+
+async function resolveStoredUploadAccess(req, storedPath) {
+  const normalizedPath = normalizeStoredUploadPath(storedPath);
+  if (!normalizedPath || !req || !req.session || !req.session.user) {
+    return { allowed: false, absolutePath: '' };
+  }
+
+  const absolutePath = resolveStoredUploadAbsolutePath(normalizedPath);
+  if (!absolutePath || !fs.existsSync(absolutePath)) {
+    return { allowed: false, absolutePath: '' };
+  }
+
+  if (hasSessionRole(req, 'admin')) {
+    return { allowed: true, absolutePath };
+  }
+
+  const viewerUserId = Number(req.session.user.id || 0);
+  const viewerCourseId = Number(
+    (isStaffUploadViewer(req) ? getStaffCourse(req) : req.session.user.course_id) || 0
+  );
+  const nowIso = new Date().toISOString();
+  const nowMs = Date.now();
+  const isVisibleHomeworkRow = (row) => {
+    const status = String(row && row.status ? row.status : 'published').trim().toLowerCase();
+    if (status !== 'published') return false;
+    const scheduledAt = String(row && row.scheduled_at ? row.scheduled_at : '').trim();
+    if (!scheduledAt) return true;
+    const scheduledAtMs = new Date(scheduledAt).getTime();
+    if (!Number.isFinite(scheduledAtMs)) return false;
+    return scheduledAtMs <= nowMs;
+  };
+
+  const [assetRow, homeworkRow, submissionRow, materialRow, journalExportRow] = await Promise.all([
+    db.get(
+      `
+        SELECT
+          a.id,
+          a.user_id,
+          a.course_id,
+          EXISTS (
+            SELECT 1
+            FROM homework_asset_map ham
+            JOIN homework h ON h.id = ham.homework_id
+            WHERE ham.asset_id = a.id
+              AND h.course_id = ?
+              AND COALESCE(h.status, 'published') = 'published'
+              AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
+          ) AS linked_visible_homework_in_course
+        FROM assets a
+        WHERE a.file_path = ?
+        LIMIT 1
+      `,
+      [viewerCourseId || 0, nowIso, normalizedPath]
+    ),
+    db.get(
+      `
+        SELECT id, course_id, status, scheduled_at
+        FROM homework
+        WHERE file_path = ?
+        LIMIT 1
+      `,
+      [normalizedPath]
+    ),
+    db.get(
+      `
+        SELECT hs.id, hs.student_id, h.course_id
+        FROM homework_submissions hs
+        JOIN homework h ON h.id = hs.homework_id
+        WHERE hs.file_path = ?
+        LIMIT 1
+      `,
+      [normalizedPath]
+    ),
+    db.get(
+      `
+        SELECT id, course_id
+        FROM subject_materials
+        WHERE file_path = ?
+        LIMIT 1
+      `,
+      [normalizedPath]
+    ),
+    db.get(
+      `
+        SELECT j.id, COALESCE(j.course_id, s.course_id) AS course_id
+        FROM journal_subject_close_events j
+        LEFT JOIN subjects s ON s.id = j.subject_id
+        WHERE j.export_file_path = ?
+        LIMIT 1
+      `,
+      [normalizedPath]
+    ),
+  ]);
+
+  if (assetRow) {
+    const assetOwnerId = Number(assetRow.user_id || 0);
+    const assetCourseId = Number(assetRow.course_id || 0);
+    const linkedHomeworkInCourse = Number(assetRow.linked_visible_homework_in_course || 0) === 1;
+    if (assetOwnerId > 0 && assetOwnerId === viewerUserId) {
+      return { allowed: true, absolutePath };
+    }
+    if (linkedHomeworkInCourse) {
+      return { allowed: true, absolutePath };
+    }
+    if (isStaffUploadViewer(req) && assetCourseId > 0 && assetCourseId === viewerCourseId) {
+      return { allowed: true, absolutePath };
+    }
+    return { allowed: false, absolutePath };
+  }
+
+  if (homeworkRow) {
+    const homeworkCourseId = Number(homeworkRow.course_id || 0);
+    if (
+      homeworkCourseId > 0
+      && homeworkCourseId === viewerCourseId
+      && (isStaffUploadViewer(req) || isVisibleHomeworkRow(homeworkRow))
+    ) {
+      return { allowed: true, absolutePath };
+    }
+    return { allowed: false, absolutePath };
+  }
+
+  if (submissionRow) {
+    const submissionStudentId = Number(submissionRow.student_id || 0);
+    const submissionCourseId = Number(submissionRow.course_id || 0);
+    if (submissionStudentId > 0 && submissionStudentId === viewerUserId) {
+      return { allowed: true, absolutePath };
+    }
+    if (isStaffUploadViewer(req) && submissionCourseId > 0 && submissionCourseId === viewerCourseId) {
+      return { allowed: true, absolutePath };
+    }
+    return { allowed: false, absolutePath };
+  }
+
+  if (materialRow) {
+    const materialCourseId = Number(materialRow.course_id || 0);
+    if (materialCourseId > 0 && materialCourseId === viewerCourseId) {
+      return { allowed: true, absolutePath };
+    }
+    return { allowed: false, absolutePath };
+  }
+
+  if (journalExportRow) {
+    const exportCourseId = Number(journalExportRow.course_id || 0);
+    if (isStaffUploadViewer(req) && exportCourseId > 0 && exportCourseId === viewerCourseId) {
+      return { allowed: true, absolutePath };
+    }
+    return { allowed: false, absolutePath };
+  }
+
+  return { allowed: false, absolutePath };
+}
+
+app.get(/^\/uploads\/(.+)$/, requireLogin, async (req, res) => {
+  const requestedPath = normalizeStoredUploadPath(`/uploads/${String(req.params[0] || '')}`);
+  if (!requestedPath) {
+    return res.status(400).send('Invalid upload path');
+  }
+  try {
+    await ensureDbReady();
+    const access = await resolveStoredUploadAccess(req, requestedPath);
+    if (!access.allowed || !access.absolutePath) {
+      return res.status(403).send('Forbidden (upload access)');
+    }
+    const absolutePath = access.absolutePath;
+    const extension = path.extname(absolutePath).toLowerCase();
+    res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (DANGEROUS_UPLOAD_EXTENSIONS.has(extension)) {
+      res.setHeader('Content-Disposition', `attachment; filename="${path.basename(absolutePath).replace(/"/g, '')}"`);
+      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    }
+    return res.sendFile(absolutePath);
+  } catch (err) {
+    return handleDbError(res, err, 'uploads.read');
+  }
+});
 
 const getAttendanceClassOptions = () => (
   Object.entries(bellSchedule)

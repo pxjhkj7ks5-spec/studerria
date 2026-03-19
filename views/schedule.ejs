@@ -3048,6 +3048,49 @@
         }
       }
 
+      function resolveSafeClientHref(rawValue, { uploadsOnly = false } = {}) {
+        const value = String(rawValue || '').trim();
+        if (!value) return '';
+        try {
+          const parsed = new URL(value, window.location.origin);
+          const isSameOrigin = parsed.origin === window.location.origin;
+          if (isSameOrigin) {
+            if (uploadsOnly && !parsed.pathname.startsWith('/uploads/')) {
+              return '';
+            }
+            return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+          }
+          if (uploadsOnly) {
+            return '';
+          }
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return '';
+          }
+          return parsed.toString();
+        } catch (_err) {
+          return '';
+        }
+      }
+
+      function buildSafeAnchor({ href = '', label = '', className = '', target = '' } = {}, { uploadsOnly = false } = {}) {
+        const safeHref = resolveSafeClientHref(href, { uploadsOnly });
+        const safeLabel = String(label || '').trim();
+        if (!safeHref || !safeLabel) {
+          return null;
+        }
+        const link = document.createElement('a');
+        link.href = safeHref;
+        link.textContent = safeLabel;
+        if (className) {
+          link.className = className;
+        }
+        if (target) {
+          link.target = target;
+          link.rel = 'noopener noreferrer';
+        }
+        return link;
+      }
+
       function renderHomework(items) {
         listEl.innerHTML = '';
         if (!items.length) {
@@ -3190,30 +3233,37 @@
           }
 
           if (item.link_url) {
-            const link = document.createElement('a');
-            link.href = item.link_url;
-            link.target = '_blank';
-            link.rel = 'noopener';
-            link.textContent = scheduleText.homeworkLinkLabel;
-            link.className = 'me-3';
-            li.appendChild(link);
+            const link = buildSafeAnchor({
+              href: item.link_url,
+              label: scheduleText.homeworkLinkLabel,
+              className: 'me-3',
+              target: '_blank',
+            });
+            if (link) {
+              li.appendChild(link);
+            }
           }
           if (item.meeting_url) {
-            const meet = document.createElement('a');
-            meet.href = item.meeting_url;
-            meet.target = '_blank';
-            meet.rel = 'noopener';
-            meet.textContent = scheduleText.homeworkMeetingLabel;
-            meet.className = 'me-3';
-            li.appendChild(meet);
+            const meet = buildSafeAnchor({
+              href: item.meeting_url,
+              label: scheduleText.homeworkMeetingLabel,
+              className: 'me-3',
+              target: '_blank',
+            });
+            if (meet) {
+              li.appendChild(meet);
+            }
           }
 
           if (item.file_path) {
-            const fileLink = document.createElement('a');
-            fileLink.href = item.file_path;
-            fileLink.textContent = item.file_name || scheduleText.customDeadlinesFileFallback;
-            fileLink.className = 'd-inline-block';
-            li.appendChild(fileLink);
+            const fileLink = buildSafeAnchor({
+              href: item.file_path,
+              label: item.file_name || scheduleText.customDeadlinesFileFallback,
+              className: 'd-inline-block',
+            }, { uploadsOnly: true });
+            if (fileLink) {
+              li.appendChild(fileLink);
+            }
           }
           if (item.assets && item.assets.length) {
             const assetWrap = document.createElement('div');
@@ -3223,11 +3273,14 @@
             assetLabel.textContent = `${scheduleUiText.assetsLabel}:`;
             assetWrap.appendChild(assetLabel);
             item.assets.forEach((asset) => {
-              const assetLink = document.createElement('a');
-              assetLink.href = asset.file_path;
-              assetLink.textContent = asset.name || asset.original_name || scheduleText.customDeadlinesFileFallback;
-              assetLink.className = 'small';
-              assetWrap.appendChild(assetLink);
+              const assetLink = buildSafeAnchor({
+                href: asset.file_path,
+                label: asset.name || asset.original_name || scheduleText.customDeadlinesFileFallback,
+                className: 'small',
+              }, { uploadsOnly: true });
+              if (assetLink) {
+                assetWrap.appendChild(assetLink);
+              }
             });
             li.appendChild(assetWrap);
           }
@@ -3755,20 +3808,37 @@
           customDeadlineDescription.textContent = item.description || '';
         }
         if (customDeadlineLinks) {
-          customDeadlineLinks.innerHTML = '';
+          customDeadlineLinks.replaceChildren();
           const links = [];
           if (item.link_url) {
-            links.push(`<a href="${item.link_url}" target="_blank" rel="noopener">${scheduleText.customDeadlinesViewLink}</a>`);
+            links.push(buildSafeAnchor({
+              href: item.link_url,
+              label: scheduleText.customDeadlinesViewLink,
+              target: '_blank',
+            }));
           }
           if (item.meeting_url) {
-            links.push(`<a href="${item.meeting_url}" target="_blank" rel="noopener">${scheduleText.customDeadlinesViewMeeting}</a>`);
+            links.push(buildSafeAnchor({
+              href: item.meeting_url,
+              label: scheduleText.customDeadlinesViewMeeting,
+              target: '_blank',
+            }));
           }
           if (item.file_path) {
-            links.push(`<a href="${item.file_path}" target="_blank" rel="noopener">${item.file_name || scheduleText.customDeadlinesFileFallback}</a>`);
+            links.push(buildSafeAnchor({
+              href: item.file_path,
+              label: item.file_name || scheduleText.customDeadlinesFileFallback,
+              target: '_blank',
+            }, { uploadsOnly: true }));
           }
-          if (links.length) {
-            customDeadlineLinks.innerHTML = links.join(' · ');
-          }
+          links
+            .filter((link) => link instanceof HTMLAnchorElement)
+            .forEach((link, index) => {
+              if (index > 0) {
+                customDeadlineLinks.appendChild(document.createTextNode(' · '));
+              }
+              customDeadlineLinks.appendChild(link);
+            });
         }
         if (customDeadlineReactions) {
           updateReactionButtons(customDeadlineReactions, item.reactions || {}, item.reacted || {});

@@ -1405,6 +1405,29 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+      const resolveSafeHref = (rawValue, { uploadsOnly = false } = {}) => {
+        const value = String(rawValue || '').trim();
+        if (!value) return '';
+        try {
+          const parsed = new URL(value, window.location.origin);
+          const isSameOrigin = parsed.origin === window.location.origin;
+          if (isSameOrigin) {
+            if (uploadsOnly && !parsed.pathname.startsWith('/uploads/')) {
+              return '';
+            }
+            return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+          }
+          if (uploadsOnly) {
+            return '';
+          }
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return '';
+          }
+          return parsed.toString();
+        } catch (_err) {
+          return '';
+        }
+      };
       const formatDateTime = (value) => {
         if (!value) return '';
         const parsed = new Date(value);
@@ -1616,31 +1639,86 @@
       }
 
       function renderSubmission(submission, column) {
-        const parts = [];
-        if (column && column.homework_description) {
-          parts.push(`<div class="mb-2"><strong>Завдання:</strong> ${column.homework_description}</div>`);
-        }
-        if (column && column.due_date) {
-          parts.push(`<div class="mb-2 text-muted small">Дедлайн: ${column.due_date}</div>`);
-        }
-        if (submission && submission.submitted_at) {
-          parts.push(`<div class="mb-2 text-muted small">Здано: ${new Date(submission.submitted_at).toLocaleString('uk-UA')}</div>`);
-        }
-        if (submission && submission.submission_text) {
-          parts.push(`<div class="mb-2"><strong>Текст:</strong><div class="journal-submission-text">${submission.submission_text}</div></div>`);
-        }
-        if (submission && submission.link_url) {
-          parts.push(`<div class="mb-2"><a href="${submission.link_url}" target="_blank" rel="noopener">Відкрити посилання</a></div>`);
-        }
-        if (submission && submission.file_path) {
-          const fileLabel = submission.file_name || 'Файл';
-          parts.push(`<div class="mb-2"><a href="${submission.file_path}" target="_blank" rel="noopener">${fileLabel}</a></div>`);
-        }
-        if (!parts.length) {
-          submissionBox.innerHTML = '<div class="text-muted">Здача відсутня.</div>';
+        if (!(submissionBox instanceof HTMLElement)) {
           return;
         }
-        submissionBox.innerHTML = parts.join('');
+        submissionBox.replaceChildren();
+        let hasContent = false;
+
+        const appendTextRow = ({ label = '', value = '', className = 'mb-2', valueClassName = '' } = {}) => {
+          const safeValue = String(value || '').trim();
+          if (!safeValue) return;
+          const row = document.createElement('div');
+          row.className = className;
+          if (label) {
+            const strong = document.createElement('strong');
+            strong.textContent = label;
+            row.appendChild(strong);
+            if (!valueClassName) {
+              row.appendChild(document.createTextNode(` ${safeValue}`));
+            }
+          }
+          if (valueClassName) {
+            const valueEl = document.createElement('div');
+            valueEl.className = valueClassName;
+            valueEl.textContent = safeValue;
+            row.appendChild(valueEl);
+          }
+          submissionBox.appendChild(row);
+          hasContent = true;
+        };
+
+        const appendLinkRow = ({ href = '', label = '', uploadsOnly = false } = {}) => {
+          const safeHref = resolveSafeHref(href, { uploadsOnly });
+          const safeLabel = String(label || '').trim();
+          if (!safeHref || !safeLabel) return;
+          const row = document.createElement('div');
+          row.className = 'mb-2';
+          const link = document.createElement('a');
+          link.href = safeHref;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = safeLabel;
+          row.appendChild(link);
+          submissionBox.appendChild(row);
+          hasContent = true;
+        };
+
+        appendTextRow({
+          label: 'Завдання:',
+          value: column && column.homework_description ? column.homework_description : '',
+        });
+        appendTextRow({
+          value: column && column.due_date ? `Дедлайн: ${column.due_date}` : '',
+          className: 'mb-2 text-muted small',
+        });
+        appendTextRow({
+          value: submission && submission.submitted_at
+            ? `Здано: ${new Date(submission.submitted_at).toLocaleString('uk-UA')}`
+            : '',
+          className: 'mb-2 text-muted small',
+        });
+        appendTextRow({
+          label: 'Текст:',
+          value: submission && submission.submission_text ? submission.submission_text : '',
+          valueClassName: 'journal-submission-text',
+        });
+        appendLinkRow({
+          href: submission && submission.link_url ? submission.link_url : '',
+          label: 'Відкрити посилання',
+        });
+        appendLinkRow({
+          href: submission && submission.file_path ? submission.file_path : '',
+          label: submission && submission.file_name ? submission.file_name : 'Файл',
+          uploadsOnly: true,
+        });
+
+        if (!hasContent) {
+          const empty = document.createElement('div');
+          empty.className = 'text-muted';
+          empty.textContent = 'Здача відсутня.';
+          submissionBox.appendChild(empty);
+        }
       }
 
       function renderRetakes(data) {

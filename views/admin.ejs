@@ -7334,7 +7334,7 @@
 
       function connectUserSocket() {
         const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-        const socket = new WebSocket(`${protocol}://${location.host}`);
+        const socket = new WebSocket(`${protocol}://${location.host}/ws?channel=admin`);
         socket.addEventListener('message', (event) => {
           try {
             const msg = JSON.parse(event.data);

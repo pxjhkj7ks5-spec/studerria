@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.2.52",
+      "date": "2026-03-19",
+      "items": [
+        "fix(security-upload-hardening): replace the public `/uploads` static surface with authenticated access checks, keep file reads scoped to the right user or course context, and force dangerous legacy extensions like `.html` or `.svg` to download instead of rendering inline",
+        "fix(security-safe-upload-storage): stop preserving attacker-controlled active file extensions during upload writes by normalizing saved filenames to safe extensions derived from the allowed MIME catalog",
+        "fix(security-realtime-channel-scoping): move WebSocket traffic onto explicit `/ws` channels, require same-origin authenticated upgrades, and keep admin-only events like `security_alert`, `users_updated`, and `history_updated` off the student-facing realtime channel",
+        "fix(security-xss-render-paths): replace unsafe HTML-string rendering for journal submissions and custom-deadline attachment links with safe DOM node creation and href validation so stored submission text or file labels can no longer execute in the UI"
+      ]
+    },
+    {
       "version": "1.2.51",
       "date": "2026-03-19",
       "items": [

@@ -444,7 +444,7 @@
 
     const connect = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const socket = new window.WebSocket(`${protocol}://${window.location.host}`);
+      const socket = new window.WebSocket(`${protocol}://${window.location.host}/ws?channel=messages`);
 
       socket.addEventListener('message', (event) => {
         try {
