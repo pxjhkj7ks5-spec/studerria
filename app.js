@@ -8573,7 +8573,10 @@ app.get('/help', requireLogin, async (req, res) => {
       supportStats,
       inboxFeed,
       inboxSummary,
+      announcementFeed: inboxFeed,
+      announcementSummary: inboxSummary,
       showInboxDigest: Boolean(settingsCache.allow_messages),
+      showAnnouncementDigest: Boolean(settingsCache.allow_messages),
       supportCategoryOptions: SUPPORT_REQUEST_CATEGORIES,
       messages: {
         error: decodeMessage(req.query.err),

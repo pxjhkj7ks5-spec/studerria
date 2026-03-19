@@ -23,6 +23,9 @@
 
     <%
       const localeCode = lang === 'uk' ? 'uk-UA' : 'en-US';
+      const legacyAnnouncementFeed = typeof announcementFeed !== 'undefined' ? announcementFeed : [];
+      const legacyAnnouncementSummary = typeof announcementSummary !== 'undefined' ? announcementSummary : null;
+      const legacyAnnouncementDigestFlag = typeof showAnnouncementDigest !== 'undefined' ? showAnnouncementDigest : undefined;
       const formatStamp = (value) => {
         if (!value) return '—';
         const date = new Date(value);
@@ -35,7 +38,7 @@
       const historyList = Array.isArray(supportRequests) ? supportRequests : [];
       const inboxList = Array.isArray(inboxFeed)
         ? inboxFeed
-        : (Array.isArray(announcementFeed) ? announcementFeed : []);
+        : (Array.isArray(legacyAnnouncementFeed) ? legacyAnnouncementFeed : []);
       const requestChipClass = (status) => (
         status === 'resolved'
           ? 'status-chip status-chip--active'
@@ -44,10 +47,10 @@
             : 'status-chip status-chip--pending')
       );
       const supportSummary = supportStats || {};
-      const inboxDigest = inboxSummary || announcementSummary || {};
+      const inboxDigest = inboxSummary || legacyAnnouncementSummary || {};
       const inboxDigestVisible = typeof showInboxDigest === 'boolean'
         ? showInboxDigest
-        : Boolean(showAnnouncementDigest);
+        : Boolean(legacyAnnouncementDigestFlag);
       const threadRoleLabel = (roleName) => (
         roleName === 'admin'
           ? (lang === 'uk' ? 'Підтримка' : 'Support')

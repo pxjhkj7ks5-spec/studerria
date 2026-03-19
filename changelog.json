@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.54",
+      "date": "2026-03-19",
+      "items": [
+        "fix(help-faq-render-locals): restore the FAQ page by making `views/help.ejs` tolerant to missing legacy announcement locals and by passing compatibility aliases from `/help` so the inbox digest no longer crashes with `announcementSummary is not defined`"
+      ]
+    },
+    {
       "version": "1.2.53",
       "date": "2026-03-19",
       "items": [
