@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.51",
+      "date": "2026-03-19",
+      "items": [
+        "fix(journal-insights-filters-localization): add the missing filters title and subtitle keys in `locales/en.json` and `locales/uk.json` so the journal insights filter card renders translated copy instead of raw i18n keys"
+      ]
+    },
+    {
       "version": "1.2.50",
       "date": "2026-03-18",
       "items": [

@@ -614,6 +614,8 @@
   "journalInsights.pageTitle": "Інсайти журналу",
   "journalInsights.title": "Інсайти журналу",
   "journalInsights.subtitle": "Інсайти про успішність і відвідуваність у різних зрізах: студент, група, предмет або весь курс. Екран для швидкого ранжування, порівняння, експорту й публікації.",
+  "journalInsights.filtersTitle": "Фільтри",
+  "journalInsights.filtersSubtitle": "Налаштуй курс, зріз, період і режим порівняння перед оновленням знімка.",
   "journalInsights.course": "Курс",
   "journalInsights.scope": "Зріз",
   "journalInsights.period": "Період",

@@ -614,6 +614,8 @@
   "journalInsights.pageTitle": "Journal insights",
   "journalInsights.title": "Journal insights",
   "journalInsights.subtitle": "Performance and attendance insights across flexible scopes: student, group, subject, or whole course. Built for quick ranking review, comparison, export, and publication workflows.",
+  "journalInsights.filtersTitle": "Filters",
+  "journalInsights.filtersSubtitle": "Adjust the course, scope, period, and compare mode before refreshing the snapshot.",
   "journalInsights.course": "Course",
   "journalInsights.scope": "Scope",
   "journalInsights.period": "Period",
