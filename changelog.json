@@ -1,14 +1,14 @@
 {
   "items": [
     {
-      "version": "1.2.57",
+      "version": "1.2.58",
       "date": "2026-03-23",
       "items": [
-        "tune(shared-footer-signature-order): move the compact `© A.M.` rights mark left of the release pill in the shared footer so the reserved-rights marker reads earlier in the dock"
+        "tune(shared-footer-signature-order): move the compact `© A.M.` rights mark even further left by placing it before the sync pill in the shared footer dock"
       ]
     },
     {
-      "version": "1.2.56",
+      "version": "1.2.57",
       "date": "2026-03-19",
       "items": [
         "tune(changelog-modal-header-spacing): add explicit spacing between the changelog title and the release-notes chip so the modal header no longer looks crowded",

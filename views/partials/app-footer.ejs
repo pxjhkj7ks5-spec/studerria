@@ -18,6 +18,9 @@
 %>
 <footer class="app-footer text-center py-4">
   <small class="<%= footerMetaClassList.join(' ') %>">
+    <span class="footer-signature" title="All rights reserved" aria-label="All rights reserved by A.M.">
+      &copy; A.M.
+    </span>
     <% if (showFooterSyncStatus) { %>
       <span
         class="footer-sync-pill"
@@ -30,9 +33,6 @@
         <span class="footer-sync-label" data-footer-sync-label><%= footerNetworkLabels.online %></span>
       </span>
     <% } %>
-    <span class="footer-signature" title="All rights reserved" aria-label="All rights reserved by A.M.">
-      &copy; A.M.
-    </span>
     <span
       class="footer-release-slot"
       data-react-island="footer-release-pill"
