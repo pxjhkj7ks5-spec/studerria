@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.57",
+      "date": "2026-03-23",
+      "items": [
+        "tune(shared-footer-signature-order): move the compact `© A.M.` rights mark left of the release pill in the shared footer so the reserved-rights marker reads earlier in the dock"
+      ]
+    },
+    {
       "version": "1.2.56",
       "date": "2026-03-19",
       "items": [
