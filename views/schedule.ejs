@@ -12,6 +12,10 @@
         previousWeekAria: 'Previous week',
         currentWeekAria: 'Current week',
         nextWeekAria: 'Next week',
+        weekCarouselKicker: 'Week navigator',
+        weekCarouselHint: 'Swipe, tap or use arrows',
+        weekCarouselAria: 'Week carousel',
+        weekRangeFallback: 'Semester flow',
         monthSummaryEmpty: 'No data yet for the month snapshot.',
         monthSummaryTitle: 'Month Snapshot',
         monthSummarySub: 'Prototype view based on current visible week data.',
@@ -81,6 +85,10 @@
         previousWeekAria: 'Попередній тиждень',
         currentWeekAria: 'Поточний тиждень',
         nextWeekAria: 'Наступний тиждень',
+        weekCarouselKicker: 'Навігація тижнями',
+        weekCarouselHint: 'Свайп, тап або стрілки',
+        weekCarouselAria: 'Карусель тижнів',
+        weekRangeFallback: 'Ритм семестру',
         monthSummaryEmpty: 'Для місячного огляду поки немає даних.',
         monthSummaryTitle: 'Знімок місяця',
         monthSummarySub: 'Прототипний огляд на основі поточних даних видимого тижня.',
@@ -2167,14 +2175,29 @@
       </main>
 
       <div class="week-rail week-pager" id="weekPager">
-        <button class="week-nav-btn week-nav-btn--prev" type="button" id="weekPrev" aria-label="<%= scheduleViewText.previousWeekAria %>">‹</button>
-        <div class="week-pill" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
-          <span class="week-pill-title"><%= t('schedule.week') %> <span id="weekPillCurrent"><%= currentWeek %></span></span>
-          <span class="week-pill-progress" aria-hidden="true">
-            <span class="week-pill-progress-fill" id="weekPillProgress"></span>
-          </span>
+        <button class="week-nav-btn week-nav-btn--prev" type="button" id="weekPrev" aria-label="<%= scheduleViewText.previousWeekAria %>">
+          <span class="week-nav-btn__icon" aria-hidden="true">‹</span>
+        </button>
+        <div class="week-pager-shell">
+          <div class="week-pill" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
+            <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
+            <div class="week-pill-head">
+              <span class="week-pill-title-wrap">
+                <span class="week-pill-title-label"><%= t('schedule.week') %></span>
+                <span class="week-pill-title-value" id="weekPillCurrent"><%= String(currentWeek).padStart(2, '0') %></span>
+              </span>
+              <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
+            </div>
+            <span class="week-pill-meta" id="weekPillMeta"><%= scheduleViewText.weekCarouselHint %></span>
+            <span class="week-pill-progress" aria-hidden="true">
+              <span class="week-pill-progress-fill" id="weekPillProgress"></span>
+            </span>
+            <div class="week-carousel" id="weekCarousel" aria-label="<%= scheduleViewText.weekCarouselAria %>"></div>
+          </div>
         </div>
-        <button class="week-nav-btn week-nav-btn--next" type="button" id="weekNext" aria-label="<%= scheduleViewText.nextWeekAria %>">›</button>
+        <button class="week-nav-btn week-nav-btn--next" type="button" id="weekNext" aria-label="<%= scheduleViewText.nextWeekAria %>">
+          <span class="week-nav-btn__icon" aria-hidden="true">›</span>
+        </button>
       </div>
 
       <%- include('partials/app-footer', { footerSyncStatus: true }) %>
@@ -3613,7 +3636,10 @@
       const weekPager = document.getElementById('weekPager');
       const weekPill = document.getElementById('weekPill');
       const weekPillCurrent = document.getElementById('weekPillCurrent');
+      const weekPillCount = document.getElementById('weekPillCount');
+      const weekPillMeta = document.getElementById('weekPillMeta');
       const weekPillProgress = document.getElementById('weekPillProgress');
+      const weekCarousel = document.getElementById('weekCarousel');
       const messagesBtn = document.getElementById('messagesBtn');
       const messagesBtnMobile = document.getElementById('messagesBtnMobile');
       const messagesList = document.getElementById('messagesList');
@@ -3632,6 +3658,14 @@
       const densityChipPeak = document.getElementById('densityChipPeak');
       const totalWeeks = <%= totalWeeks || 15 %>;
       const semesterStartDate = <%- JSON.stringify(semester && semester.start_date ? semester.start_date : null) %>;
+      const kyivWeekFormatter = new Intl.DateTimeFormat(scheduleLocale, {
+        day: 'numeric',
+        month: 'short',
+        timeZone: 'Europe/Kyiv',
+      });
+      const prefersReducedMotion = window.matchMedia
+        ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        : false;
       let currentWeek = <%= currentWeek %>;
       function setDrawerOpen(open) {
         if (!scheduleDrawer) return;
@@ -3679,6 +3713,70 @@
         return Date.UTC(y, m - 1, d);
       }
 
+      function getWeekRange(week) {
+        const startUtc = parseDateUtc(semesterStartDate);
+        if (startUtc === null) return null;
+        const safeWeek = clampWeek(week);
+        const start = new Date(startUtc + ((safeWeek - 1) * 7 * 86400000));
+        const end = new Date(startUtc + (((safeWeek - 1) * 7) + 6) * 86400000);
+        return { start, end };
+      }
+
+      function formatWeekRange(week) {
+        const range = getWeekRange(week);
+        if (!range) return scheduleViewText.weekRangeFallback;
+        try {
+          if (typeof kyivWeekFormatter.formatRange === 'function') {
+            return kyivWeekFormatter.formatRange(range.start, range.end);
+          }
+        } catch (error) {
+          // Fallback below handles browsers without formatRange.
+        }
+        return `${kyivWeekFormatter.format(range.start)} - ${kyivWeekFormatter.format(range.end)}`;
+      }
+
+      function centerWeekCarouselChip(activeWeek, animate = true) {
+        if (!weekCarousel) return;
+        const activeChip = weekCarousel.querySelector(`[data-week="${activeWeek}"]`);
+        if (!(activeChip instanceof HTMLElement)) return;
+        const targetLeft = Math.max(0, activeChip.offsetLeft - ((weekCarousel.clientWidth - activeChip.offsetWidth) / 2));
+        const behavior = animate && !prefersReducedMotion ? 'smooth' : 'auto';
+        if (typeof weekCarousel.scrollTo === 'function') {
+          weekCarousel.scrollTo({ left: targetLeft, behavior });
+          return;
+        }
+        weekCarousel.scrollLeft = targetLeft;
+      }
+
+      function renderWeekCarousel(activeWeek) {
+        if (!weekCarousel) return;
+        weekCarousel.textContent = '';
+        const fragment = document.createDocumentFragment();
+
+        for (let week = 1; week <= totalWeeks; week += 1) {
+          const distance = Math.abs(week - activeWeek);
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'week-carousel-chip';
+          chip.dataset.week = String(week);
+          chip.dataset.distance = String(Math.min(distance, 4));
+          chip.setAttribute('aria-label', `<%= t('schedule.week') %> ${week}`);
+          if (week === activeWeek) {
+            chip.classList.add('is-active');
+            chip.setAttribute('aria-current', 'page');
+          }
+          chip.innerHTML = `
+            <span class="week-carousel-chip__dot" aria-hidden="true"></span>
+            <span class="week-carousel-chip__number">${String(week).padStart(2, '0')}</span>
+          `;
+          chip.addEventListener('click', () => goToWeek(week));
+          fragment.appendChild(chip);
+        }
+
+        weekCarousel.appendChild(fragment);
+        requestAnimationFrame(() => centerWeekCarouselChip(activeWeek, false));
+      }
+
       function getKyivAcademicWeek() {
         if (!semesterStartDate) return clampWeek(currentWeek);
         const startUtc = parseDateUtc(semesterStartDate);
@@ -3707,8 +3805,15 @@
 
       function syncWeekPager(week) {
         const safe = clampWeek(week);
+        const displayWeek = String(safe).padStart(2, '0');
         currentWeek = safe;
-        if (weekPillCurrent) weekPillCurrent.textContent = String(safe);
+        if (weekPillCurrent) weekPillCurrent.textContent = displayWeek;
+        if (weekPillCount) {
+          weekPillCount.textContent = `${displayWeek} / ${String(totalWeeks).padStart(2, '0')}`;
+        }
+        if (weekPillMeta) {
+          weekPillMeta.textContent = `${formatWeekRange(safe)} · ${scheduleViewText.weekCarouselHint}`;
+        }
         if (weekPillProgress) {
           const ratio = totalWeeks > 0 ? safe / totalWeeks : 1;
           weekPillProgress.style.transform = `scaleX(${ratio})`;
@@ -3716,6 +3821,7 @@
         if (weekPrev) weekPrev.disabled = safe <= 1;
         if (weekNext) weekNext.disabled = safe >= totalWeeks;
         if (weekPill) weekPill.setAttribute('aria-label', `<%= t('schedule.week') %> ${safe}`);
+        renderWeekCarousel(safe);
       }
 
       function goToWeek(targetWeek) {
@@ -3726,10 +3832,16 @@
         if (now < weekDebounceUntil) return;
         weekDebounceUntil = now + weekDebounceMs;
         isWeekSwitching = true;
+        if (weekPager) {
+          weekPager.dataset.direction = safeWeek > currentWeek ? 'forward' : 'backward';
+        }
 
         syncWeekPager(safeWeek);
         setTimeout(() => {
           isWeekSwitching = false;
+          if (weekPager) {
+            delete weekPager.dataset.direction;
+          }
         }, 260);
         requestAnimationFrame(() => updateSchedule(safeWeek));
       }

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.59",
+      "date": "2026-03-23",
+      "items": [
+        "feat(schedule-week-carousel): redesign the floating week carousel into a liquid-glass navigator with centered week chips, date-range context, and richer swipe-friendly motion"
+      ]
+    },
+    {
       "version": "1.2.58",
       "date": "2026-03-23",
       "items": [
