@@ -67,7 +67,7 @@
   --week-glass-dark-border: rgba(148, 163, 184, 0.36);
   --week-glass-light-bg: linear-gradient(180deg, rgba(245, 248, 255, 0.78), rgba(231, 238, 250, 0.72));
   --week-glass-light-border: rgba(100, 116, 139, 0.3);
-  --studerria-mobile-week-dock-space: 154px;
+  --studerria-mobile-week-dock-space: 214px;
 }
 
 body {
@@ -1215,14 +1215,14 @@ body.page-schedule .week-rail {
   right: 0;
   bottom: calc(18px + env(safe-area-inset-bottom) + var(--studerria-vv-offset-bottom, 0px));
   margin-inline: auto;
-  width: min(660px, calc(100vw - 20px));
+  width: min(760px, calc(100vw - 24px));
   min-width: 0;
-  max-width: calc(100vw - 20px);
+  max-width: calc(100vw - 24px);
   padding: 14px;
   z-index: 1050;
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 52px;
-  gap: 14px;
+  grid-template-columns: 56px minmax(0, 1fr) 56px;
+  gap: 16px;
   align-items: center;
   justify-content: center;
 }
@@ -1287,7 +1287,7 @@ body.page-schedule .week-pager .week-pager-shell {
 body.page-schedule .week-pager .week-pill {
   position: relative;
   min-width: 0;
-  padding: 14px 16px 14px;
+  padding: 14px 16px 16px;
   border-radius: 26px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   background:
@@ -1295,7 +1295,7 @@ body.page-schedule .week-pager .week-pill {
     rgba(13, 20, 33, 0.46);
   display: grid;
   gap: 9px;
-  min-height: 118px;
+  min-height: 194px;
   transition: transform 220ms var(--week-apple-curve), border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
@@ -1453,114 +1453,203 @@ body.page-schedule .week-pager .week-pill-progress-fill {
 }
 
 body.page-schedule .week-pager .week-carousel {
+  --week-carousel-columns: 5;
   position: relative;
   z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 2px 4px 4px;
-  margin: 0 -4px -2px;
-  scrollbar-width: none;
-  scroll-snap-type: x proximity;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 1) 10%, rgba(0, 0, 0, 1) 90%, transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 1) 10%, rgba(0, 0, 0, 1) 90%, transparent 100%);
+  display: grid;
+  grid-template-columns: repeat(var(--week-carousel-columns), minmax(0, 1fr));
+  align-items: end;
+  gap: 10px;
+  min-height: 104px;
+  padding: 6px 2px 2px;
+  overflow: visible;
 }
 
-body.page-schedule .week-pager .week-carousel::-webkit-scrollbar {
-  display: none;
+body.page-schedule .week-pager .week-carousel::before {
+  content: "";
+  position: absolute;
+  inset: auto 14% 12px;
+  height: 44%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(125, 211, 252, 0.24), rgba(96, 165, 250, 0.04) 72%, transparent 100%);
+  filter: blur(24px);
+  opacity: 0.88;
+  pointer-events: none;
+  z-index: 0;
 }
 
-body.page-schedule .week-pager .week-carousel-chip {
+body.theme-light.page-schedule .week-pager .week-carousel::before {
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.2), rgba(191, 219, 254, 0.08) 72%, transparent 100%);
+  opacity: 0.72;
+}
+
+body.page-schedule .week-pager .week-carousel-card,
+body.page-schedule .week-pager .week-carousel-card--ghost {
+  --week-card-shift: 0px;
+  --week-card-scale: 1;
+  position: relative;
+  min-width: 0;
+  border-radius: 22px;
+  transform: translateY(var(--week-card-shift)) scale(var(--week-card-scale));
+  transform-origin: center bottom;
+}
+
+body.page-schedule .week-pager .week-carousel-card {
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(148, 163, 184, 0.1);
-  color: rgba(226, 232, 240, 0.78);
-  min-width: 48px;
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex: 0 0 auto;
-  scroll-snap-align: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+    rgba(12, 19, 33, 0.42);
+  color: rgba(226, 232, 240, 0.92);
+  min-height: 80px;
+  padding: 12px 12px 14px;
+  display: grid;
+  align-content: end;
+  gap: 5px;
+  text-align: left;
   transition:
     transform 220ms var(--week-apple-curve),
     opacity 180ms ease,
     background 180ms ease,
     border-color 180ms ease,
     box-shadow 220ms ease;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-body.page-schedule .week-pager .week-carousel-chip__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: 0.68;
-  transition: inherit;
-}
-
-body.page-schedule .week-pager .week-carousel-chip__number {
-  font-size: 12px;
-  line-height: 1;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-body.page-schedule .week-pager .week-carousel-chip[data-distance="1"] {
-  opacity: 0.92;
-}
-
-body.page-schedule .week-pager .week-carousel-chip[data-distance="2"] {
-  opacity: 0.74;
-}
-
-body.page-schedule .week-pager .week-carousel-chip[data-distance="3"] {
-  opacity: 0.56;
-}
-
-body.page-schedule .week-pager .week-carousel-chip[data-distance="4"] {
-  opacity: 0.38;
-}
-
-body.page-schedule .week-pager .week-carousel-chip.is-active {
-  min-width: 62px;
-  border-color: rgba(125, 211, 252, 0.34);
-  background: linear-gradient(135deg, rgba(125, 211, 252, 0.3), rgba(196, 181, 253, 0.28));
-  color: rgba(248, 250, 252, 0.98);
   box-shadow:
-    0 14px 24px rgba(56, 189, 248, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 24px rgba(2, 6, 23, 0.12);
+  backdrop-filter: blur(calc(var(--week-glass-blur) + 4px));
+  overflow: hidden;
+  z-index: 1;
+}
+
+body.page-schedule .week-pager .week-carousel-card__shine {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 58%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 78%);
+  opacity: 0.88;
+  pointer-events: none;
+}
+
+body.page-schedule .week-pager .week-carousel-card__label {
+  position: relative;
+  z-index: 1;
+  font-size: 9px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(226, 232, 240, 0.58);
+}
+
+body.page-schedule .week-pager .week-carousel-card__number {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(1.18rem, 0.95rem + 0.9vw, 1.72rem);
+  line-height: 0.9;
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  color: rgba(248, 250, 252, 0.98);
+}
+
+body.page-schedule .week-pager .week-carousel-card__range {
+  position: relative;
+  z-index: 1;
+  font-size: 10.5px;
+  line-height: 1.25;
+  color: rgba(203, 213, 225, 0.72);
+}
+
+body.page-schedule .week-pager .week-carousel-card[data-distance="1"] {
+  --week-card-shift: 12px;
+  --week-card-scale: 0.93;
+  opacity: 0.8;
+}
+
+body.page-schedule .week-pager .week-carousel-card[data-distance="2"] {
+  --week-card-shift: 18px;
+  --week-card-scale: 0.84;
+  opacity: 0.52;
+}
+
+body.page-schedule .week-pager .week-carousel-card.is-active {
+  min-height: 102px;
+  border-color: rgba(125, 211, 252, 0.34);
+  background:
+    linear-gradient(160deg, rgba(125, 211, 252, 0.3), rgba(196, 181, 253, 0.18) 56%, rgba(15, 23, 42, 0.2)),
+    rgba(9, 16, 29, 0.64);
+  box-shadow:
+    0 24px 36px rgba(14, 116, 144, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.28);
   opacity: 1;
-  transform: translateY(-1px) scale(1.02);
 }
 
-body.page-schedule .week-pager .week-carousel-chip.is-active .week-carousel-chip__dot {
-  width: 7px;
-  height: 7px;
-  opacity: 1;
+body.page-schedule .week-pager .week-carousel-card.is-active .week-carousel-card__label {
+  color: rgba(248, 250, 252, 0.72);
 }
 
-body.theme-light.page-schedule .week-pager .week-carousel-chip {
+body.page-schedule .week-pager .week-carousel-card.is-active .week-carousel-card__range {
+  color: rgba(226, 232, 240, 0.84);
+}
+
+body.page-schedule .week-pager .week-carousel-card--ghost {
+  border: 1px dashed rgba(148, 163, 184, 0.16);
+  min-height: 74px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  box-shadow: none;
+  opacity: 0.16;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body.page-schedule .week-pager .week-carousel-card--ghost[data-distance="1"] {
+  --week-card-shift: 12px;
+  --week-card-scale: 0.93;
+  opacity: 0.2;
+}
+
+body.page-schedule .week-pager .week-carousel-card--ghost[data-distance="2"] {
+  --week-card-shift: 18px;
+  --week-card-scale: 0.84;
+  opacity: 0.12;
+}
+
+body.theme-light.page-schedule .week-pager .week-carousel-card {
   border-color: rgba(123, 140, 166, 0.18);
-  background: rgba(255, 255, 255, 0.58);
-  color: rgba(51, 65, 85, 0.76);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 246, 255, 0.78)),
+    rgba(255, 255, 255, 0.66);
+  color: rgba(51, 65, 85, 0.88);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 18px 24px rgba(130, 146, 173, 0.14);
 }
 
-body.theme-light.page-schedule .week-pager .week-carousel-chip.is-active {
+body.theme-light.page-schedule .week-pager .week-carousel-card__label {
+  color: rgba(51, 65, 85, 0.52);
+}
+
+body.theme-light.page-schedule .week-pager .week-carousel-card__number {
+  color: rgba(15, 23, 42, 0.94);
+}
+
+body.theme-light.page-schedule .week-pager .week-carousel-card__range {
+  color: rgba(71, 85, 105, 0.72);
+}
+
+body.theme-light.page-schedule .week-pager .week-carousel-card.is-active {
   border-color: rgba(96, 165, 250, 0.34);
-  background: linear-gradient(135deg, rgba(219, 234, 254, 0.94), rgba(224, 231, 255, 0.92));
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.98), rgba(224, 231, 255, 0.92) 58%, rgba(191, 219, 254, 0.78)),
+    rgba(255, 255, 255, 0.84);
   color: rgba(15, 23, 42, 0.92);
   box-shadow:
-    0 14px 24px rgba(96, 165, 250, 0.16),
+    0 24px 34px rgba(96, 165, 250, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+body.theme-light.page-schedule .week-pager .week-carousel-card--ghost {
+  border-color: rgba(123, 140, 166, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.18));
 }
 
 .week-slider {
@@ -1788,7 +1877,7 @@ body.page-schedule .week-pager .week-nav-btn:hover {
 }
 
 body.page-schedule .week-pager .week-nav-btn:focus-visible,
-body.page-schedule .week-pager .week-carousel-chip:focus-visible {
+body.page-schedule .week-pager .week-carousel-card:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 2px rgba(125, 211, 252, 0.42),
@@ -1811,7 +1900,7 @@ body.theme-light.page-schedule .week-pager .week-nav-btn:hover {
 }
 
 body.theme-light.page-schedule .week-pager .week-nav-btn:focus-visible,
-body.theme-light.page-schedule .week-pager .week-carousel-chip:focus-visible {
+body.theme-light.page-schedule .week-pager .week-carousel-card:focus-visible {
   box-shadow:
     0 0 0 2px rgba(96, 165, 250, 0.34),
     0 16px 28px rgba(130, 146, 173, 0.2);
@@ -1940,12 +2029,17 @@ body.page-schedule .week-pager[data-direction="backward"] .week-pill {
   transform: translateX(-2px);
 }
 
-body.page-schedule .week-pager .week-carousel-chip:hover {
-  transform: translateY(-1px);
+body.page-schedule .week-pager .week-carousel-card:hover {
+  transform: translateY(calc(var(--week-card-shift) - 2px)) scale(calc(var(--week-card-scale) + 0.02));
+  border-color: rgba(125, 211, 252, 0.28);
+  box-shadow:
+    0 22px 28px rgba(2, 6, 23, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  opacity: 1;
 }
 
 body.page-schedule .app-footer {
-  padding-bottom: calc(146px + env(safe-area-inset-bottom));
+  padding-bottom: calc(220px + env(safe-area-inset-bottom));
 }
 
 @media (max-width: 991px) {
@@ -1998,7 +2092,7 @@ body.page-schedule .app-footer {
 
   body.page-schedule .week-pager .week-pill {
     padding: 13px 14px 12px;
-    min-height: 112px;
+    min-height: 182px;
     border-radius: 22px;
   }
 
@@ -2026,16 +2120,17 @@ body.page-schedule .app-footer {
 
   body.page-schedule .week-pager .week-carousel {
     gap: 8px;
+    min-height: 96px;
   }
 
-  body.page-schedule .week-pager .week-carousel-chip {
-    min-width: 44px;
-    height: 32px;
-    padding-inline: 11px;
+  body.page-schedule .week-pager .week-carousel-card {
+    min-height: 72px;
+    padding: 11px 10px 12px;
+    border-radius: 18px;
   }
 
-  body.page-schedule .week-pager .week-carousel-chip.is-active {
-    min-width: 56px;
+  body.page-schedule .week-pager .week-carousel-card.is-active {
+    min-height: 94px;
   }
 
   body.page-schedule .week-pager .week-nav-btn {
@@ -2062,7 +2157,7 @@ body.page-schedule .app-footer {
   }
 
   body.page-schedule .week-pager .week-pill {
-    min-height: 108px;
+    min-height: 168px;
     padding: 12px 12px 11px;
     gap: 8px;
   }
@@ -2091,9 +2186,27 @@ body.page-schedule .app-footer {
     font-size: 10.5px;
   }
 
-  body.page-schedule .week-pager .week-carousel-chip {
-    min-width: 42px;
-    padding-inline: 10px;
+  body.page-schedule .week-pager .week-carousel {
+    min-height: 82px;
+    gap: 6px;
+  }
+
+  body.page-schedule .week-pager .week-carousel-card {
+    min-height: 66px;
+    padding: 10px 9px 11px;
+    border-radius: 16px;
+  }
+
+  body.page-schedule .week-pager .week-carousel-card.is-active {
+    min-height: 86px;
+  }
+
+  body.page-schedule .week-pager .week-carousel-card__label {
+    font-size: 8px;
+  }
+
+  body.page-schedule .week-pager .week-carousel-card__range {
+    font-size: 9.5px;
   }
 
   body.page-schedule .week-pager .week-nav-btn {

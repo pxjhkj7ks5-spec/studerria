@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.60",
+      "date": "2026-03-24",
+      "items": [
+        "tune(schedule-week-carousel-spotlight): turn the floating week navigator into a true glass carousel with a centered active week card, adjacent week previews, wider dock spacing, and cleaner mobile sizing so week switching reads like a proper liquid-glass control"
+      ]
+    },
+    {
       "version": "1.2.59",
       "date": "2026-03-23",
       "items": [
