@@ -67,7 +67,7 @@
   --week-glass-dark-border: rgba(148, 163, 184, 0.36);
   --week-glass-light-bg: linear-gradient(180deg, rgba(245, 248, 255, 0.78), rgba(231, 238, 250, 0.72));
   --week-glass-light-border: rgba(100, 116, 139, 0.3);
-  --studerria-mobile-week-dock-space: 214px;
+  --studerria-mobile-week-dock-space: 160px;
 }
 
 body {
@@ -1215,22 +1215,22 @@ body.page-schedule .week-rail {
   right: 0;
   bottom: calc(18px + env(safe-area-inset-bottom) + var(--studerria-vv-offset-bottom, 0px));
   margin-inline: auto;
-  width: min(760px, calc(100vw - 24px));
+  width: min(680px, calc(100vw - 24px));
   min-width: 0;
   max-width: calc(100vw - 24px);
-  padding: 14px;
+  padding: 10px;
   z-index: 1050;
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 56px;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   align-items: center;
   justify-content: center;
 }
 
 body.page-schedule .week-pager {
   position: relative;
-  padding: 12px;
-  border-radius: 34px;
+  padding: 10px;
+  border-radius: 30px;
   backdrop-filter: blur(calc(var(--week-glass-blur) + 2px));
   border: 1px solid var(--week-glass-dark-border);
   background:
@@ -1287,15 +1287,15 @@ body.page-schedule .week-pager .week-pager-shell {
 body.page-schedule .week-pager .week-pill {
   position: relative;
   min-width: 0;
-  padding: 14px 16px 16px;
-  border-radius: 26px;
+  padding: 12px 14px;
+  border-radius: 24px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   background:
     linear-gradient(152deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04) 48%, rgba(59, 130, 246, 0.12)),
     rgba(13, 20, 33, 0.46);
   display: grid;
-  gap: 9px;
-  min-height: 194px;
+  gap: 7px;
+  min-height: 128px;
   transition: transform 220ms var(--week-apple-curve), border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
@@ -1328,17 +1328,17 @@ body.page-schedule .week-pager .week-pill-kicker {
   z-index: 1;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 10px;
+  gap: 7px;
+  font-size: 9px;
   line-height: 1;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(226, 232, 240, 0.72);
 }
 
 body.page-schedule .week-pager .week-pill-kicker::before {
   content: "";
-  width: 18px;
+  width: 14px;
   height: 1px;
   border-radius: 999px;
   background: rgba(125, 211, 252, 0.64);
@@ -1354,7 +1354,7 @@ body.page-schedule .week-pager .week-pill-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
 body.page-schedule .week-pager .week-pill-title-wrap {
@@ -1394,13 +1394,13 @@ body.page-schedule .week-pager .week-pill-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
-  padding: 0 12px;
+  min-height: 24px;
+  padding: 0 10px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.24);
   background: rgba(148, 163, 184, 0.12);
   color: rgba(226, 232, 240, 0.78);
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -1412,26 +1412,13 @@ body.theme-light.page-schedule .week-pager .week-pill-count {
   color: rgba(51, 65, 85, 0.7);
 }
 
-body.page-schedule .week-pager .week-pill-meta {
-  position: relative;
-  z-index: 1;
-  display: block;
-  font-size: 12px;
-  line-height: 1.25;
-  color: rgba(203, 213, 225, 0.72);
-}
-
-body.theme-light.page-schedule .week-pager .week-pill-meta {
-  color: rgba(71, 85, 105, 0.68);
-}
-
 body.page-schedule .week-pager .week-pill-progress {
   position: relative;
   z-index: 1;
   left: auto;
   right: auto;
   bottom: auto;
-  height: 4px;
+  height: 3px;
   border-radius: 999px;
   background: rgba(148, 163, 184, 0.16);
   overflow: hidden;
@@ -1459,21 +1446,21 @@ body.page-schedule .week-pager .week-carousel {
   display: grid;
   grid-template-columns: repeat(var(--week-carousel-columns), minmax(0, 1fr));
   align-items: end;
-  gap: 10px;
-  min-height: 104px;
-  padding: 6px 2px 2px;
+  gap: 8px;
+  min-height: 70px;
+  padding: 4px 1px 1px;
   overflow: visible;
 }
 
 body.page-schedule .week-pager .week-carousel::before {
   content: "";
   position: absolute;
-  inset: auto 14% 12px;
-  height: 44%;
+  inset: auto 18% 8px;
+  height: 34%;
   border-radius: 999px;
   background: radial-gradient(circle, rgba(125, 211, 252, 0.24), rgba(96, 165, 250, 0.04) 72%, transparent 100%);
-  filter: blur(24px);
-  opacity: 0.88;
+  filter: blur(18px);
+  opacity: 0.76;
   pointer-events: none;
   z-index: 0;
 }
@@ -1489,7 +1476,7 @@ body.page-schedule .week-pager .week-carousel-card--ghost {
   --week-card-scale: 1;
   position: relative;
   min-width: 0;
-  border-radius: 22px;
+  border-radius: 18px;
   transform: translateY(var(--week-card-shift)) scale(var(--week-card-scale));
   transform-origin: center bottom;
 }
@@ -1502,11 +1489,11 @@ body.page-schedule .week-pager .week-carousel-card {
     linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
     rgba(12, 19, 33, 0.42);
   color: rgba(226, 232, 240, 0.92);
-  min-height: 80px;
-  padding: 12px 12px 14px;
+  min-height: 56px;
+  padding: 9px 10px 10px;
   display: grid;
   align-content: end;
-  gap: 5px;
+  gap: 3px;
   text-align: left;
   transition:
     transform 220ms var(--week-apple-curve),
@@ -1516,7 +1503,7 @@ body.page-schedule .week-pager .week-carousel-card {
     box-shadow 220ms ease;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 18px 24px rgba(2, 6, 23, 0.12);
+    0 14px 20px rgba(2, 6, 23, 0.12);
   backdrop-filter: blur(calc(var(--week-glass-blur) + 4px));
   overflow: hidden;
   z-index: 1;
@@ -1525,26 +1512,26 @@ body.page-schedule .week-pager .week-carousel-card {
 body.page-schedule .week-pager .week-carousel-card__shine {
   position: absolute;
   inset: 0 0 auto;
-  height: 58%;
+  height: 52%;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 78%);
-  opacity: 0.88;
+  opacity: 0.76;
   pointer-events: none;
 }
 
 body.page-schedule .week-pager .week-carousel-card__label {
   position: relative;
   z-index: 1;
-  font-size: 9px;
+  font-size: 8px;
   line-height: 1;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   color: rgba(226, 232, 240, 0.58);
 }
 
 body.page-schedule .week-pager .week-carousel-card__number {
   position: relative;
   z-index: 1;
-  font-size: clamp(1.18rem, 0.95rem + 0.9vw, 1.72rem);
+  font-size: clamp(1.02rem, 0.88rem + 0.72vw, 1.42rem);
   line-height: 0.9;
   font-weight: 600;
   letter-spacing: -0.05em;
@@ -1554,31 +1541,31 @@ body.page-schedule .week-pager .week-carousel-card__number {
 body.page-schedule .week-pager .week-carousel-card__range {
   position: relative;
   z-index: 1;
-  font-size: 10.5px;
+  font-size: 9.5px;
   line-height: 1.25;
   color: rgba(203, 213, 225, 0.72);
 }
 
 body.page-schedule .week-pager .week-carousel-card[data-distance="1"] {
-  --week-card-shift: 12px;
-  --week-card-scale: 0.93;
-  opacity: 0.8;
+  --week-card-shift: 8px;
+  --week-card-scale: 0.94;
+  opacity: 0.78;
 }
 
 body.page-schedule .week-pager .week-carousel-card[data-distance="2"] {
-  --week-card-shift: 18px;
-  --week-card-scale: 0.84;
-  opacity: 0.52;
+  --week-card-shift: 12px;
+  --week-card-scale: 0.87;
+  opacity: 0.46;
 }
 
 body.page-schedule .week-pager .week-carousel-card.is-active {
-  min-height: 102px;
+  min-height: 72px;
   border-color: rgba(125, 211, 252, 0.34);
   background:
     linear-gradient(160deg, rgba(125, 211, 252, 0.3), rgba(196, 181, 253, 0.18) 56%, rgba(15, 23, 42, 0.2)),
     rgba(9, 16, 29, 0.64);
   box-shadow:
-    0 24px 36px rgba(14, 116, 144, 0.18),
+    0 18px 26px rgba(14, 116, 144, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.28);
   opacity: 1;
 }
@@ -1593,7 +1580,7 @@ body.page-schedule .week-pager .week-carousel-card.is-active .week-carousel-card
 
 body.page-schedule .week-pager .week-carousel-card--ghost {
   border: 1px dashed rgba(148, 163, 184, 0.16);
-  min-height: 74px;
+  min-height: 52px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
   box-shadow: none;
   opacity: 0.16;
@@ -1602,15 +1589,15 @@ body.page-schedule .week-pager .week-carousel-card--ghost {
 }
 
 body.page-schedule .week-pager .week-carousel-card--ghost[data-distance="1"] {
-  --week-card-shift: 12px;
-  --week-card-scale: 0.93;
-  opacity: 0.2;
+  --week-card-shift: 8px;
+  --week-card-scale: 0.94;
+  opacity: 0.18;
 }
 
 body.page-schedule .week-pager .week-carousel-card--ghost[data-distance="2"] {
-  --week-card-shift: 18px;
-  --week-card-scale: 0.84;
-  opacity: 0.12;
+  --week-card-shift: 12px;
+  --week-card-scale: 0.87;
+  opacity: 0.1;
 }
 
 body.theme-light.page-schedule .week-pager .week-carousel-card {
@@ -2033,13 +2020,13 @@ body.page-schedule .week-pager .week-carousel-card:hover {
   transform: translateY(calc(var(--week-card-shift) - 2px)) scale(calc(var(--week-card-scale) + 0.02));
   border-color: rgba(125, 211, 252, 0.28);
   box-shadow:
-    0 22px 28px rgba(2, 6, 23, 0.18),
+    0 18px 24px rgba(2, 6, 23, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
   opacity: 1;
 }
 
 body.page-schedule .app-footer {
-  padding-bottom: calc(220px + env(safe-area-inset-bottom));
+  padding-bottom: calc(168px + env(safe-area-inset-bottom));
 }
 
 @media (max-width: 991px) {
@@ -2079,21 +2066,21 @@ body.page-schedule .app-footer {
     width: min(100%, calc(100vw - 16px));
     min-width: 0;
     max-width: calc(100vw - 16px);
-    grid-template-columns: 48px minmax(0, 1fr) 48px;
-    gap: 10px;
-    padding: 10px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 8px;
     transform: none;
   }
 
   body.page-schedule .week-pager {
-    padding: 10px;
-    border-radius: 28px;
+    padding: 9px;
+    border-radius: 26px;
   }
 
   body.page-schedule .week-pager .week-pill {
-    padding: 13px 14px 12px;
-    min-height: 182px;
-    border-radius: 22px;
+    padding: 11px 12px;
+    min-height: 122px;
+    border-radius: 20px;
   }
 
   body.page-schedule .week-pager .week-pill-head {
@@ -2104,39 +2091,25 @@ body.page-schedule .app-footer {
     gap: 8px;
   }
 
-  body.page-schedule .week-pager .week-pill-title-value {
-    font-size: clamp(1.34rem, 1rem + 2vw, 1.72rem);
-  }
-
   body.page-schedule .week-pager .week-pill-count {
     padding-inline: 10px;
-    min-height: 26px;
+    min-height: 23px;
     font-size: 10px;
   }
 
-  body.page-schedule .week-pager .week-pill-meta {
-    font-size: 11px;
-  }
-
   body.page-schedule .week-pager .week-carousel {
-    gap: 8px;
-    min-height: 96px;
+    gap: 7px;
+    min-height: 64px;
   }
 
   body.page-schedule .week-pager .week-carousel-card {
-    min-height: 72px;
-    padding: 11px 10px 12px;
-    border-radius: 18px;
+    min-height: 52px;
+    padding: 8px 9px 9px;
+    border-radius: 16px;
   }
 
   body.page-schedule .week-pager .week-carousel-card.is-active {
-    min-height: 94px;
-  }
-
-  body.page-schedule .week-pager .week-nav-btn {
-    width: 48px;
-    height: 48px;
-    border-radius: 16px;
+    min-height: 64px;
   }
 
   body.page-schedule .app-footer {
@@ -2146,72 +2119,59 @@ body.page-schedule .app-footer {
 
 @media (max-width: 560px) {
   body.page-schedule .week-rail {
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
-    gap: 8px;
-    padding: 8px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 7px;
   }
 
   body.page-schedule .week-pager {
-    padding: 8px;
-    border-radius: 24px;
+    padding: 7px;
+    border-radius: 22px;
   }
 
   body.page-schedule .week-pager .week-pill {
-    min-height: 168px;
-    padding: 12px 12px 11px;
-    gap: 8px;
+    min-height: 114px;
+    padding: 10px 11px;
+    gap: 6px;
   }
 
   body.page-schedule .week-pager .week-pill-kicker {
-    font-size: 9px;
-    letter-spacing: 0.16em;
-  }
-
-  body.page-schedule .week-pager .week-pill-title-wrap {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+    font-size: 8px;
+    letter-spacing: 0.14em;
   }
 
   body.page-schedule .week-pager .week-pill-count {
-    align-self: flex-start;
+    align-self: auto;
   }
 
   body.page-schedule .week-pager .week-pill-head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  body.page-schedule .week-pager .week-pill-meta {
-    font-size: 10.5px;
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 8px;
   }
 
   body.page-schedule .week-pager .week-carousel {
-    min-height: 82px;
+    min-height: 56px;
     gap: 6px;
   }
 
   body.page-schedule .week-pager .week-carousel-card {
-    min-height: 66px;
-    padding: 10px 9px 11px;
-    border-radius: 16px;
+    min-height: 46px;
+    padding: 7px 8px 8px;
+    border-radius: 14px;
   }
 
   body.page-schedule .week-pager .week-carousel-card.is-active {
-    min-height: 86px;
+    min-height: 58px;
   }
 
   body.page-schedule .week-pager .week-carousel-card__label {
-    font-size: 8px;
+    font-size: 7px;
   }
 
   body.page-schedule .week-pager .week-carousel-card__range {
-    font-size: 9.5px;
-  }
-
-  body.page-schedule .week-pager .week-nav-btn {
-    width: 44px;
-    height: 44px;
+    font-size: 8.5px;
   }
 }
 

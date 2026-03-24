@@ -13,7 +13,7 @@
         currentWeekAria: 'Current week',
         nextWeekAria: 'Next week',
         weekCarouselKicker: 'Week navigator',
-        weekCarouselHint: 'Swipe, tap or use arrows',
+        weekCarouselHint: 'Swipe or tap',
         weekCarouselAria: 'Week carousel',
         weekRangeFallback: 'Semester flow',
         monthSummaryEmpty: 'No data yet for the month snapshot.',
@@ -86,7 +86,7 @@
         currentWeekAria: 'Поточний тиждень',
         nextWeekAria: 'Наступний тиждень',
         weekCarouselKicker: 'Навігація тижнями',
-        weekCarouselHint: 'Свайп, тап або стрілки',
+        weekCarouselHint: 'Свайп або тап',
         weekCarouselAria: 'Карусель тижнів',
         weekRangeFallback: 'Ритм семестру',
         monthSummaryEmpty: 'Для місячного огляду поки немає даних.',
@@ -2175,29 +2175,18 @@
       </main>
 
       <div class="week-rail week-pager" id="weekPager">
-        <button class="week-nav-btn week-nav-btn--prev" type="button" id="weekPrev" aria-label="<%= scheduleViewText.previousWeekAria %>">
-          <span class="week-nav-btn__icon" aria-hidden="true">&lsaquo;</span>
-        </button>
         <div class="week-pager-shell">
           <div class="week-pill" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
-            <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
-            <div class="week-pill-head">
-              <span class="week-pill-title-wrap">
-                <span class="week-pill-title-label"><%= t('schedule.week') %></span>
-                <span class="week-pill-title-value" id="weekPillCurrent"><%= String(currentWeek).padStart(2, '0') %></span>
-              </span>
+            <div class="week-pill-head week-pill-head--compact">
+              <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
               <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
             </div>
-            <span class="week-pill-meta" id="weekPillMeta"><%= scheduleViewText.weekCarouselHint %></span>
             <span class="week-pill-progress" aria-hidden="true">
               <span class="week-pill-progress-fill" id="weekPillProgress"></span>
             </span>
             <div class="week-carousel" id="weekCarousel" aria-label="<%= scheduleViewText.weekCarouselAria %>"></div>
           </div>
         </div>
-        <button class="week-nav-btn week-nav-btn--next" type="button" id="weekNext" aria-label="<%= scheduleViewText.nextWeekAria %>">
-          <span class="week-nav-btn__icon" aria-hidden="true">&rsaquo;</span>
-        </button>
       </div>
 
       <%- include('partials/app-footer', { footerSyncStatus: true }) %>
@@ -3635,9 +3624,7 @@
 
       const weekPager = document.getElementById('weekPager');
       const weekPill = document.getElementById('weekPill');
-      const weekPillCurrent = document.getElementById('weekPillCurrent');
       const weekPillCount = document.getElementById('weekPillCount');
-      const weekPillMeta = document.getElementById('weekPillMeta');
       const weekPillProgress = document.getElementById('weekPillProgress');
       const weekCarousel = document.getElementById('weekCarousel');
       const messagesBtn = document.getElementById('messagesBtn');
@@ -3812,12 +3799,8 @@
         const safe = clampWeek(week);
         const displayWeek = String(safe).padStart(2, '0');
         currentWeek = safe;
-        if (weekPillCurrent) weekPillCurrent.textContent = displayWeek;
         if (weekPillCount) {
           weekPillCount.textContent = `${displayWeek} / ${String(totalWeeks).padStart(2, '0')}`;
-        }
-        if (weekPillMeta) {
-          weekPillMeta.textContent = `${formatWeekRange(safe)} / ${scheduleViewText.weekCarouselHint}`;
         }
         if (weekPillProgress) {
           const ratio = totalWeeks > 0 ? safe / totalWeeks : 1;

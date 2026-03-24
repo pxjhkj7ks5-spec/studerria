@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.2.61",
+      "date": "2026-03-24",
+      "items": [
+        "tune(schedule-week-carousel-compact): remove the side arrows and header copy from the floating week carousel, compress the glass dock into a lower profile, and clean Role Studio simulator blocks by dropping the extra English section labels"
+      ]
+    },
+    {
       "version": "1.2.60",
       "date": "2026-03-24",
       "items": [
