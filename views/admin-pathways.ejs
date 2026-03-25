@@ -52,6 +52,25 @@
     already_assigned: 0,
     pending_users: 0,
   };
+  const catalogTargetReadyLabel = isUk ? 'Готово до призначення' : 'Ready for assignment';
+  const catalogTargetBlockedLabel = isUk ? 'Спершу додайте в mapping' : 'Map into the cohort first';
+  const catalogTargetList = selectedAdmissionValue > 0
+    ? migrationCourseList.map((course) => ({
+        course_id: Number(course.course_id || 0),
+        name: String(course.course_name || ''),
+        location: course.course_location || 'kyiv',
+        is_teacher_course: course.is_teacher_course === true || Number(course.is_teacher_course) === 1,
+        is_available: course.is_mapped === true || Number(course.is_mapped) === 1,
+      }))
+    : (Array.isArray(courses) ? courses : []).map((course) => ({
+        course_id: Number(course.id || 0),
+        name: String(course.name || ''),
+        location: course.location || 'kyiv',
+        is_teacher_course: course.is_teacher_course === true || Number(course.is_teacher_course) === 1,
+        is_available: true,
+      }));
+  const catalogReadyTargetCount = catalogTargetList.filter((course) => course.is_available).length;
+  const catalogBlockedTargetCount = Math.max(0, catalogTargetList.length - catalogReadyTargetCount);
   const buildCatalogModeSummary = (sharedSubject, selectedCount) => {
     const countToken = typeof selectedCount === 'string' && selectedCount.includes('__COUNT__')
       ? '__COUNT__'
@@ -813,6 +832,10 @@
         justify-content: space-between;
         gap: 10px;
         align-items: center;
+      }
+      .catalog-target-row.is-disabled {
+        opacity: 0.62;
+        border-style: dashed;
       }
       .catalog-instance-row.is-hidden {
         opacity: 0.64;
@@ -1811,14 +1834,34 @@
                 data-island-props='<%- catalogCourseChecklistPropsJson %>'
               ></span>
             </div>
+            <% if (selectedAdmissionValue > 0) { %>
+              <div class="pathways-banner pathways-banner--<%= catalogReadyTargetCount > 0 ? (catalogBlockedTargetCount > 0 ? 'warning' : 'success') : 'danger' %> mb-3">
+                <strong>
+                  <% if (catalogReadyTargetCount > 0) { %>
+                    <%= isUk ? `Готові курси: ${catalogReadyTargetCount}` : `Ready courses: ${catalogReadyTargetCount}` %>
+                  <% } else { %>
+                    <%= isUk ? 'Ще немає жодного готового курсу для призначення' : 'No target courses are ready for assignment yet' %>
+                  <% } %>
+                </strong>
+                <span>
+                  <% if (catalogReadyTargetCount > 0 && catalogBlockedTargetCount > 0) { %>
+                    <%= isUk ? `${catalogBlockedTargetCount} курс(ів) залишаються заблокованими, доки не стануть visible в mapping цієї когорти.` : `${catalogBlockedTargetCount} course(s) are still blocked until they become visible in this cohort mapping.` %>
+                  <% } else if (catalogReadyTargetCount > 0) { %>
+                    <%= isUk ? 'У focused cohort mode призначення піде тільки по замаплених курсах нижче.' : 'In focused cohort mode, assignment stays scoped to the mapped courses below.' %>
+                  <% } else { %>
+                    <%= isUk ? 'Спершу завершіть course mapping для цієї когорти, і тоді призначення з каталогу розблокується.' : 'Finish course mapping for this cohort first, then catalog assignment will unlock.' %>
+                  <% } %>
+                </span>
+              </div>
+            <% } %>
             <div class="catalog-target-list mb-3">
-              <% (courses || []).forEach((course) => { %>
-                <label class="catalog-target-row" data-catalog-course-row data-catalog-course-text="<%= `${course.name || ''} ${course.id || ''}` %>">
+              <% (catalogTargetList || []).forEach((course) => { %>
+                <label class="catalog-target-row <%= course.is_available ? '' : 'is-disabled' %>" data-catalog-course-row data-catalog-course-text="<%= `${course.name || ''} ${course.course_id || ''} ${course.is_available ? catalogTargetReadyLabel : catalogTargetBlockedLabel}` %>">
                   <span data-catalog-course-text>
-                    <span class="row-label"><%= course.name %></span>
-                    <span class="catalog-subject-meta d-block">#<%= course.id %><%= course.location ? ` · ${formatCampusLabel(course.location)}` : '' %></span>
+                    <span class="row-label"><%= buildCourseLabel(course) %></span>
+                    <span class="catalog-subject-meta d-block">#<%= course.course_id %><%= course.location ? ` · ${formatCampusLabel(course.location)}` : '' %><%= selectedAdmissionValue > 0 ? ` · ${course.is_available ? catalogTargetReadyLabel : catalogTargetBlockedLabel}` : '' %></span>
                   </span>
-                  <input class="form-check-input" type="checkbox" name="target_course_ids" value="<%= course.id %>" />
+                  <input class="form-check-input" type="checkbox" name="target_course_ids" value="<%= course.course_id %>" <%= course.is_available ? '' : 'disabled' %> />
                 </label>
               <% }) %>
             </div>

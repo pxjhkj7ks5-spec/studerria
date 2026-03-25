@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.74",
+      "date": "2026-03-25",
+      "items": [
+        "fix(pathways-catalog-target-scope): drive catalog assignment targets from the active cohort context so `/admin/pathways` now surfaces mapped cohort courses first instead of inviting picks that the server would immediately reject",
+        "tune(pathways-catalog-readiness-copy): add a readiness banner and disabled target rows in focused cohort mode, making it explicit which courses are ready for catalog assignment and which still need mapping before they can receive subjects"
+      ]
+    },
+    {
       "version": "1.2.73",
       "date": "2026-03-25",
       "items": [
