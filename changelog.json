@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.67",
+      "date": "2026-03-25",
+      "items": [
+        "fix(journal-modal-safe-dom-render): replace the remaining string-based rendering in journal retakes, appeals, moderation, and competency modal sections with DOM node construction so dynamic teacher/student state no longer flows through `innerHTML` sinks",
+        "fix(journal-competency-checklist-safe-updates): rebuild the competency signal list and checklist rows through DOM APIs while keeping the existing score-chip toggle behavior and submission wiring intact",
+        "tune(journal-review-surfaces): keep the same journal modal actions and status chips, but make empty states, readonly blocks, and moderation summaries use one consistent safe-render pattern"
+      ]
+    },
+    {
       "version": "1.2.66",
       "date": "2026-03-25",
       "items": [
