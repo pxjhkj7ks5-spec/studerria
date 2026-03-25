@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.71",
+      "date": "2026-03-25",
+      "items": [
+        "fix(session-generator-cleanup-current-planner-payload): `delete` and `delete-all-active` now submit the current in-memory manual assignment payload too, so cleanup-driven draft pruning uses the actual planner state even if autosave has not finished yet",
+        "fix(session-generator-cleanup-helper-current-state): session cleanup draft sync can now prune against posted planner assignments instead of only the last persisted draft snapshot, which closes the remaining race between client-side edits and cleanup actions"
+      ]
+    },
+    {
       "version": "1.2.70",
       "date": "2026-03-25",
       "items": [

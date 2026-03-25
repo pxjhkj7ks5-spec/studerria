@@ -1963,6 +1963,7 @@
               <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
               <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
               <input type="hidden" name="explicit_dates_json" value='<%- JSON.stringify(explicitSessionDates || []) %>' />
+              <input type="hidden" name="manual_assignments_json" data-manual-assignments-payload value="" />
               <button class="btn btn-outline-danger" type="submit"><%= sessionGeneratorText.deleteButton %></button>
             </div>
           </form>
@@ -1993,6 +1994,7 @@
               <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
               <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
               <input type="hidden" name="explicit_dates_json" value='<%- JSON.stringify(explicitSessionDates || []) %>' />
+              <input type="hidden" name="manual_assignments_json" data-manual-assignments-payload value="" />
               <button class="btn btn-danger" type="submit"><%= sessionGeneratorText.deleteAllButton %></button>
             </div>
           </form>
@@ -2028,6 +2030,9 @@
         const form = document.getElementById('sessionGeneratorForm');
         const publishForm = document.querySelector('form[action="/admin/session-generator/publish"]');
         const sessionActionForms = Array.from(document.querySelectorAll('[data-session-action-form]'));
+        const sessionActionManualInputs = sessionActionForms
+          .map((actionForm) => actionForm.querySelector('[data-manual-assignments-payload]'))
+          .filter(Boolean);
         const publishDraftInput = publishForm ? publishForm.querySelector('input[name="draft_id"]') : null;
         const draftIdInput = document.getElementById('sessionDraftIdInput');
         const liveConflictStatus = document.getElementById('manualLiveConflictStatus');
@@ -2919,22 +2924,28 @@
           if (publishImpactHint) publishImpactHint.textContent = hintText;
         };
 
+        const serializeManualAssignments = (rows) => rows.map((row) => ({
+          subject_id: Number(row.subject_id || 0),
+          type: row.type === 'credit' ? 'credit' : (row.type === 'consultation' ? 'consultation' : 'exam'),
+          date: row.date || '',
+          class_number: Number(row.class_number || 0),
+          group_number: row.group_number ? Number(row.group_number) : null,
+          room_id: row.room_id ? Number(row.room_id) : null,
+          note: row.note || '',
+        }));
+
         const syncPublishState = () => {
           if (!publishBtn || !manualAssignmentsInput) return;
           const rows = sortAssignments(manualAssignments);
+          const serializedRows = rows.length ? JSON.stringify(serializeManualAssignments(rows)) : '';
           publishBtn.disabled = rows.length === 0;
           if (checkConflictsBtn) {
             checkConflictsBtn.disabled = rows.length === 0;
           }
-          manualAssignmentsInput.value = rows.length ? JSON.stringify(rows.map((row) => ({
-            subject_id: Number(row.subject_id || 0),
-            type: row.type === 'credit' ? 'credit' : (row.type === 'consultation' ? 'consultation' : 'exam'),
-            date: row.date || '',
-            class_number: Number(row.class_number || 0),
-            group_number: row.group_number ? Number(row.group_number) : null,
-            room_id: row.room_id ? Number(row.room_id) : null,
-            note: row.note || '',
-          }))) : '';
+          manualAssignmentsInput.value = serializedRows;
+          sessionActionManualInputs.forEach((input) => {
+            input.value = serializedRows;
+          });
           if (publishSourceHint) {
             publishSourceHint.textContent = rows.length
               ? sessionGeneratorText.publishSourceManual

@@ -30827,6 +30827,7 @@ const syncSessionGeneratorDraftAfterCleanup = async ({
   draftId,
   form = {},
   targetDates = [],
+  currentAssignments = null,
   clearAll = false,
 } = {}) => {
   const safeUserId = Number(userId);
@@ -30839,26 +30840,28 @@ const syncSessionGeneratorDraftAfterCleanup = async ({
     };
   }
   const currentDraft = await getSessionGeneratorDraftRecordById(safeUserId, safeDraftId);
-  if (!currentDraft) {
+  if (!currentDraft && !Array.isArray(currentAssignments)) {
     return {
       removedAssignmentsCount: 0,
       remainingAssignmentsCount: 0,
       updated: false,
     };
   }
-  const currentAssignments = normalizeSessionGeneratorDraftAssignments(currentDraft.assignments);
+  const normalizedCurrentAssignments = Array.isArray(currentAssignments)
+    ? normalizeSessionGeneratorDraftAssignments(currentAssignments)
+    : normalizeSessionGeneratorDraftAssignments(currentDraft ? currentDraft.assignments : []);
   const normalizedTargetDateSet = new Set((Array.isArray(targetDates) ? targetDates : [])
     .map((value) => toDateOnly(value))
     .filter((value) => isValidDateString(value)));
   const nextAssignments = clearAll
     ? []
-    : currentAssignments.filter((item) => {
+    : normalizedCurrentAssignments.filter((item) => {
         const itemDate = toDateOnly(item && item.date);
         if (!itemDate || !normalizedTargetDateSet.size) return true;
         return !normalizedTargetDateSet.has(itemDate);
       });
-  const removedAssignmentsCount = Math.max(0, currentAssignments.length - nextAssignments.length);
-  if (removedAssignmentsCount === 0 && nextAssignments.length === currentAssignments.length) {
+  const removedAssignmentsCount = Math.max(0, normalizedCurrentAssignments.length - nextAssignments.length);
+  if (removedAssignmentsCount === 0 && nextAssignments.length === normalizedCurrentAssignments.length) {
     return {
       removedAssignmentsCount,
       remainingAssignmentsCount: nextAssignments.length,
@@ -33828,12 +33831,14 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
       updated: false,
     };
     if (actorUserId && draftId) {
+      const currentDraftAssignments = parseSessionManualAssignments(body.manual_assignments_json);
       try {
         draftCleanup = await syncSessionGeneratorDraftAfterCleanup({
           userId: actorUserId,
           draftId,
           form,
           targetDates,
+          currentAssignments: currentDraftAssignments,
         });
       } catch (_err) {
         draftCleanup = {
@@ -33958,11 +33963,13 @@ app.post('/admin/session-generator/delete-all-active', requireScheduleGeneratorS
       updated: false,
     };
     if (actorUserId && draftId) {
+      const currentDraftAssignments = parseSessionManualAssignments(body.manual_assignments_json);
       try {
         draftCleanup = await syncSessionGeneratorDraftAfterCleanup({
           userId: actorUserId,
           draftId,
           form,
+          currentAssignments: currentDraftAssignments,
           clearAll: true,
         });
       } catch (_err) {
