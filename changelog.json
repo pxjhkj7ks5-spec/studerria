@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.78",
+      "date": "2026-03-25",
+      "items": [
+        "fix(pathways-mapping-track-scope): make the admin mapping board render only track-compatible courses for the selected cohort, instead of showing cross-track rows that the save route would silently ignore",
+        "fix(pathways-mapping-summary-parity): align mapping totals and visible counts with the same compatible-course scope that `/admin/pathways/admissions/:id/courses/save` already enforces, removing another false-affordance gap between UI and server behavior"
+      ]
+    },
+    {
       "version": "1.2.77",
       "date": "2026-03-25",
       "items": [

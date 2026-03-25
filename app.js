@@ -27623,38 +27623,33 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     let selectedAdmissionId = selectedProgramAdmissions.some((item) => Number(item.id) === Number(requestedAdmissionId))
       ? requestedAdmissionId
       : 0;
+    const selectedProgram = programs.find((item) => Number(item.id) === Number(selectedProgramId)) || null;
+    const selectedTrackKey = selectedProgram
+      ? normalizeRegistrationTrack(selectedProgram.track_key, 'bachelor')
+      : '';
 
-    let courseMappings = (courses || []).map((course) => ({
+    const baseCourseMappingRows = selectedTrackKey
+      ? pathwayHelpers.filterCourseRowsForTrack(courses || [], selectedTrackKey)
+      : (courses || []);
+    let courseMappings = baseCourseMappingRows.map((course) => ({
       course_id: Number(course.id || 0),
       course_name: sanitizeCompactText(course.name || '', 120),
       course_location: normalizeCourseCampus(course.location),
       is_teacher_course: course.is_teacher_course === true || Number(course.is_teacher_course) === 1,
       is_visible: false,
     }));
-    if (selectedAdmissionId) {
-      const mappingRows = await db.all(
-        `
-          SELECT
-            c.id AS course_id,
-            c.name AS course_name,
-            COALESCE(c.location, 'kyiv') AS course_location,
-            c.is_teacher_course,
-            COALESCE(pac.is_visible, false) AS is_visible
-          FROM courses c
-          LEFT JOIN program_admission_courses pac
-            ON pac.course_id = c.id
-           AND pac.admission_id = ?
-          ORDER BY c.id
-        `,
-        [selectedAdmissionId]
-      );
-      courseMappings = (mappingRows || []).map((row) => ({
-        course_id: Number(row.course_id || 0),
-        course_name: sanitizeCompactText(row.course_name || '', 120),
-        course_location: normalizeCourseCampus(row.course_location),
-        is_teacher_course: row.is_teacher_course === true || Number(row.is_teacher_course) === 1,
-        is_visible: row.is_visible === true || Number(row.is_visible) === 1,
-      }));
+    if (selectedAdmissionId && selectedTrackKey) {
+      const admissionCourseScope = await getAdmissionCourseScope(selectedAdmissionId, selectedTrackKey);
+      courseMappings = (admissionCourseScope.compatibleCourses || []).map((course) => {
+        const courseId = Number(course.id || 0);
+        return {
+          course_id: courseId,
+          course_name: sanitizeCompactText(course.name || '', 120),
+          course_location: normalizeCourseCampus(course.location),
+          is_teacher_course: course.is_teacher_course === true || Number(course.is_teacher_course) === 1,
+          is_visible: admissionCourseScope.visibleCourseIdSet.has(courseId),
+        };
+      });
     }
 
     const allCourseSubjects = await getSubjectsCached(selectedCourseId, { visibleOnly: false });
@@ -27796,10 +27791,6 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     };
     visibilitySummary.hidden = Math.max(0, visibilitySummary.total - visibilitySummary.visible);
 
-    const selectedProgram = programs.find((item) => Number(item.id) === Number(selectedProgramId)) || null;
-    const selectedTrackKey = selectedProgram
-      ? normalizeRegistrationTrack(selectedProgram.track_key, 'bachelor')
-      : '';
     const selectedProgramAdmissionsSorted = [...selectedProgramAdmissions].sort((a, b) => {
       const yearDiff = Number(b.admission_year || 0) - Number(a.admission_year || 0);
       if (yearDiff !== 0) return yearDiff;
