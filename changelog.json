@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.75",
+      "date": "2026-03-25",
+      "items": [
+        "fix(pathways-explicit-focus-mode): stop auto-selecting the first program and first admission on `/admin/pathways`, so cohort focus now stays explicit and the page can honestly render its no-focus state until the admin chooses a program or cohort",
+        "tune(pathways-clear-focus-control): add a direct clear-focus action in the scope header, making it possible to leave cohort mode without hacking query params or getting bounced into another admission automatically"
+      ]
+    },
+    {
       "version": "1.2.74",
       "date": "2026-03-25",
       "items": [

@@ -122,6 +122,7 @@
     scopeTitle: 'Контекст',
     scopeSubtitle: 'Оберіть курс і трек для фокусного редагування. Поточний фокус збереже програму й рік вступу, якщо вони залишаються валідними в новому контексті.',
     applyScope: 'Застосувати контекст',
+    clearFocus: 'Скинути фокус',
     programFocus: 'Фокус програми',
     admissionFocus: 'Фокус року вступу',
     programsTitle: 'Програми',
@@ -302,6 +303,7 @@
     scopeTitle: 'Scope',
     scopeSubtitle: 'Pick a course and track for focused editing. The current focus keeps the program and admission if they stay valid inside the new scope.',
     applyScope: 'Apply scope',
+    clearFocus: 'Clear focus',
     programFocus: 'Program focus',
     admissionFocus: 'Admission focus',
     programsTitle: 'Programs',
@@ -1096,7 +1098,12 @@
             <h2 class="section-title"><%= ui.scopeTitle %></h2>
             <p class="section-subtitle"><%= ui.scopeSubtitle %></p>
           </div>
-          <span class="chip"><%= activeTrackLabel %></span>
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="chip"><%= activeTrackLabel %></span>
+            <% if (selectedProgramValue > 0 || selectedAdmissionValue > 0) { %>
+              <a class="btn btn-soft btn-sm btn-pill" href="<%= buildPathwaysUrl({ program_id: null, admission_id: null }) %>"><%= ui.clearFocus %></a>
+            <% } %>
+          </div>
         </div>
         <form method="GET" action="/admin/pathways" class="row g-2 mt-1">
           <div class="col-12 col-md-6 col-xl-4">

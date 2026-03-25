@@ -27563,12 +27563,11 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       trackFilter === 'all' ? true : program.track_key === trackFilter
     );
 
-    let selectedProgramId = parsePositiveIntStrict(req.query.program_id);
-    if (!filteredPrograms.some((item) => Number(item.id) === Number(selectedProgramId))) {
-      selectedProgramId = parsePositiveIntStrict(
-        (filteredPrograms[0] && filteredPrograms[0].id) || (programs[0] && programs[0].id)
-      );
-    }
+    const requestedProgramId = parsePositiveIntStrict(req.query.program_id);
+    const requestedAdmissionId = parsePositiveIntStrict(req.query.admission_id);
+    let selectedProgramId = filteredPrograms.some((item) => Number(item.id) === Number(requestedProgramId))
+      ? requestedProgramId
+      : 0;
 
     const admissionRows = await db.all(
       `
@@ -27606,6 +27605,14 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       program_code: sanitizeCompactText(row.program_code || '', 40),
       program_name: sanitizeCompactText(row.program_name || '', 140),
     }));
+    if (!selectedProgramId && requestedAdmissionId) {
+      const requestedAdmissionProgramId = Number(
+        (admissions.find((item) => Number(item.id) === Number(requestedAdmissionId)) || {}).program_id || 0
+      );
+      if (filteredPrograms.some((item) => Number(item.id) === requestedAdmissionProgramId)) {
+        selectedProgramId = requestedAdmissionProgramId;
+      }
+    }
     const selectedProgramAdmissions = admissions.filter(
       (admission) => Number(admission.program_id) === Number(selectedProgramId)
     );
@@ -27613,10 +27620,9 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       .map((item) => Number(item.id || 0))
       .filter((value) => Number.isInteger(value) && value > 0);
 
-    let selectedAdmissionId = parsePositiveIntStrict(req.query.admission_id);
-    if (!selectedProgramAdmissions.some((item) => Number(item.id) === Number(selectedAdmissionId))) {
-      selectedAdmissionId = parsePositiveIntStrict(selectedProgramAdmissions[0] && selectedProgramAdmissions[0].id);
-    }
+    let selectedAdmissionId = selectedProgramAdmissions.some((item) => Number(item.id) === Number(requestedAdmissionId))
+      ? requestedAdmissionId
+      : 0;
 
     let courseMappings = (courses || []).map((course) => ({
       course_id: Number(course.id || 0),
