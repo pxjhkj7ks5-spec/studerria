@@ -5,6 +5,8 @@ const {
   buildRatingSnapshotPayload,
   formatRatingSnapshotCard,
   buildAttendanceHealthSummary,
+  describeRatingPublishTarget,
+  findRelevantRatingSnapshot,
 } = require('../lib/journalInsights');
 
 test('rating snapshot payload formats leaderboard and message body', () => {
@@ -52,4 +54,54 @@ test('attendance summary marks risky absence share', () => {
   assert.equal(summary.status_key, 'attention');
   assert.equal(summary.recent.flagged_total, 3);
   assert.equal(summary.last_marked_at, '2026-03-15');
+});
+
+test('publish target description explains course-wide reuse', () => {
+  const target = describeRatingPublishTarget({
+    publishTarget: { kind: 'course' },
+    scopeLabel: 'Course 2',
+    periodLabel: 'Semester',
+    participantsCount: 24,
+    lang: 'en',
+  });
+  assert.equal(target.kind, 'course');
+  assert.match(target.title, /full course audience/i);
+  assert.match(target.note, /My Day/i);
+  assert.equal(target.participants_count, 24);
+});
+
+test('relevant snapshot finder prefers exact group match before course fallback', () => {
+  const exactGroup = {
+    id: 11,
+    course_id: 1,
+    semester_id: 2,
+    subject_id: 7,
+    group_number: 3,
+    target_kind: 'group',
+    scope_type: 'group',
+  };
+  const courseWide = {
+    id: 12,
+    course_id: 1,
+    semester_id: 2,
+    target_kind: 'course',
+    scope_type: 'course',
+  };
+  const result = findRelevantRatingSnapshot([courseWide, exactGroup], {
+    courseId: 1,
+    semesterId: 2,
+    subjectId: 7,
+    groupNumber: 3,
+    targetKind: 'group',
+  });
+  assert.equal(result.id, 11);
+
+  const fallback = findRelevantRatingSnapshot([courseWide], {
+    courseId: 1,
+    semesterId: 2,
+    subjectId: 7,
+    groupNumber: 5,
+    workloadKeys: ['7|all'],
+  });
+  assert.equal(fallback.id, 12);
 });

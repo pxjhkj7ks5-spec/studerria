@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.63",
+      "date": "2026-03-25",
+      "items": [
+        "test(core-security-helpers): add focused `node:test` coverage for trust-proxy resolution, session secret policy, operational access gating, rate limiting, pathways readiness, and journal insights snapshot helpers",
+        "fix(journal-attendance-health-null-total): stop treating `null` totals as zero in attendance health summaries so risk/share calculations use the real marked counts when explicit totals are omitted",
+        "tune(second-security-sweep-ui): replace a few remaining string-based DOM updates in session generator group selection and journal moderation status controls with DOM-node rendering to keep the hardening pass moving toward one safe pattern"
+      ]
+    },
+    {
       "version": "1.2.62",
       "date": "2026-03-25",
       "items": [

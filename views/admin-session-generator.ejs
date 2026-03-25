@@ -2427,17 +2427,22 @@
           if (!manualGroupSelect || !manualSubjectSelect) return;
           const subjectId = Number(manualSubjectSelect.value || 0);
           const subject = manualSubjectMap.get(subjectId);
+          manualGroupSelect.replaceChildren();
+          const allGroupsOption = document.createElement('option');
+          allGroupsOption.value = '';
+          allGroupsOption.textContent = sessionGeneratorText.allSubjectGroups;
+          manualGroupSelect.appendChild(allGroupsOption);
           if (!subject) {
-            manualGroupSelect.innerHTML = `<option value="">${escapeHtml(sessionGeneratorText.allSubjectGroups)}</option>`;
             manualGroupSelect.disabled = true;
             return;
           }
           const groupCount = Math.max(1, Number(subject.group_count || 1));
-          const options = [`<option value="">${escapeHtml(sessionGeneratorText.allSubjectGroups)}</option>`];
           for (let index = 1; index <= groupCount; index += 1) {
-            options.push(`<option value="${index}">${escapeHtml(sessionGeneratorText.groupPrefix)} ${index}</option>`);
+            const option = document.createElement('option');
+            option.value = String(index);
+            option.textContent = `${sessionGeneratorText.groupPrefix} ${index}`;
+            manualGroupSelect.appendChild(option);
           }
-          manualGroupSelect.innerHTML = options.join('');
           manualGroupSelect.disabled = false;
         };
 

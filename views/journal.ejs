@@ -2094,9 +2094,13 @@
         if (moderationColumnInput) moderationColumnInput.value = String(currentCellColumnId || 0);
         if (moderationStudentInput) moderationStudentInput.value = String(currentCellStudentId || 0);
         if (moderationStatusInput) {
-          moderationStatusInput.innerHTML = statuses.map((item) => (
-            `<option value="${escapeHtml(String(item && item.key ? item.key : ''))}">${escapeHtml(String(item && item.label ? item.label : item.key || ''))}</option>`
-          )).join('');
+          clearNodeChildren(moderationStatusInput);
+          statuses.forEach((item) => {
+            const option = document.createElement('option');
+            option.value = String(item && item.key ? item.key : '');
+            option.textContent = String(item && item.label ? item.label : item && item.key ? item.key : '');
+            moderationStatusInput.appendChild(option);
+          });
           moderationStatusInput.value = moderation && moderation.status ? String(moderation.status) : 'approved';
           moderationStatusInput.disabled = !canManage || !hasGrade;
         }

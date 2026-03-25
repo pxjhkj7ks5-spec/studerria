@@ -18,6 +18,7 @@ const teacherTemplateHelpers = require('./lib/teacherTemplates');
 const journalInsightHelpers = require('./lib/journalInsights');
 const roomHelpers = require('./lib/rooms');
 const pathwayHelpers = require('./lib/pathways');
+const securityHelpers = require('./lib/security');
 const versionFile = path.join(__dirname, 'version.json');
 const changelogFile = path.join(__dirname, 'changelog.json');
 let appVersion = pkg.version || '0.0.0';
@@ -695,18 +696,7 @@ const isProd = process.env.NODE_ENV === 'production';
 const bodyFormLimit = String(process.env.BODY_FORM_LIMIT || '512kb').trim() || '512kb';
 const bodyJsonLimit = String(process.env.BODY_JSON_LIMIT || '512kb').trim() || '512kb';
 const trustProxyRaw = String(process.env.TRUST_PROXY || '').trim();
-const resolveTrustProxySetting = (rawValue) => {
-  if (!rawValue) return isProd ? 1 : false;
-  const normalized = String(rawValue).trim().toLowerCase();
-  if (['false', '0', 'off', 'none'].includes(normalized)) return false;
-  if (['true', '1', 'on'].includes(normalized)) return 1;
-  const numeric = Number(rawValue);
-  if (Number.isFinite(numeric) && numeric >= 0) {
-    return Math.floor(numeric);
-  }
-  return rawValue;
-};
-const trustProxySetting = resolveTrustProxySetting(trustProxyRaw);
+const trustProxySetting = securityHelpers.resolveTrustProxySetting(trustProxyRaw, { isProd });
 const sessionCookieName = String(process.env.SESSION_COOKIE_NAME || 'sid').trim() || 'sid';
 const contentSecurityDirectives = {
   defaultSrc: ["'self'"],
@@ -762,7 +752,6 @@ app.use((err, req, res, next) => {
 app.use(express.static('public'));
 
 const dbSslEnabled = String(process.env.DB_SSL || '').trim().toLowerCase() === 'true';
-const dbSslCa = String(process.env.DB_SSL_CA || '').replace(/\\n/g, '\n');
 
 const pool = new Pool({
   host: process.env.DB_HOST || `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
@@ -770,25 +759,15 @@ const pool = new Pool({
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
-  ssl: dbSslEnabled
-    ? (() => {
-      if (!dbSslCa) {
-        throw new Error('DB_SSL=true requires DB_SSL_CA so the Postgres certificate can be verified.');
-      }
-      return {
-        ca: dbSslCa,
-        rejectUnauthorized: true,
-      };
-    })()
-    : false,
+  ssl: securityHelpers.resolveDbSslConfig({
+    enabled: dbSslEnabled,
+    ca: process.env.DB_SSL_CA || '',
+  }),
 });
 
-const sessionSecret = String(process.env.SESSION_SECRET || '').trim();
-if (isProd && !sessionSecret) {
-  throw new Error('SESSION_SECRET must be set in production.');
-}
-const resolvedSessionSecret = sessionSecret || 'dev-secret-change-me';
-if (!isProd && !sessionSecret) {
+const sessionSecretState = securityHelpers.resolveSessionSecret(process.env.SESSION_SECRET || '', { isProd });
+const resolvedSessionSecret = sessionSecretState.secret;
+if (!isProd && sessionSecretState.usedFallback) {
   console.warn('SESSION_SECRET is not set; using the local development fallback secret.');
 }
 const sessionTableNameRaw = String(process.env.SESSION_TABLE_NAME || 'user_sessions').trim();
@@ -8918,22 +8897,14 @@ app.get('/vision', (req, res) => {
 });
 
 const statusAccessToken = String(process.env.STATUS_ACCESS_TOKEN || process.env.BOOTSTRAP_TOKEN || '').trim();
-const isLoopbackIpAddress = (rawIp) => {
-  const normalized = String(rawIp || '')
-    .trim()
-    .toLowerCase()
-    .replace(/^::ffff:/, '');
-  return normalized === '127.0.0.1' || normalized === '::1' || normalized === 'localhost';
-};
 const canAccessOperationalDetails = (req) => {
-  const providedToken = String(req.get('x-status-token') || req.get('x-bootstrap-token') || '').trim();
-  if (statusAccessToken && providedToken && providedToken === statusAccessToken) {
-    return true;
-  }
-  if (req.session?.user && (hasSessionRole(req, 'admin') || hasSessionRole(req, 'deanery'))) {
-    return true;
-  }
-  return isLoopbackIpAddress(getClientIp(req));
+  return securityHelpers.canAccessOperationalDetails({
+    providedToken: String(req.get('x-status-token') || req.get('x-bootstrap-token') || '').trim(),
+    statusAccessToken,
+    isAdmin: Boolean(req.session?.user && hasSessionRole(req, 'admin')),
+    isDeanery: Boolean(req.session?.user && hasSessionRole(req, 'deanery')),
+    clientIp: getClientIp(req),
+  });
 };
 
 app.get('/_health', (req, res) => {

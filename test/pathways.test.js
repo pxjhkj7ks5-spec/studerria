@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  buildAdmissionCampusChoicesFromCourses,
+  buildCatalogAssignmentModeSummary,
   buildCatalogBindingSummary,
   buildRegistrationExperienceSummary,
   buildPathwayReadinessSummary,
@@ -91,4 +93,31 @@ test('registration readiness alert explains blocked mapping state', () => {
   });
   assert.equal(alert.status, 'blocked');
   assert.match(alert.title, /mapping|мап/i);
+});
+
+test('admission campus choices mark ambiguous campuses and filter teacher track', () => {
+  const choices = buildAdmissionCampusChoicesFromCourses([
+    { id: 1, name: 'Course A', location: 'kyiv', is_teacher_course: 0 },
+    { id: 2, name: 'Course B', location: 'kyiv', is_teacher_course: 0 },
+    { id: 3, name: 'Teacher Course', location: 'munich', is_teacher_course: 1 },
+  ], 'bachelor');
+  assert.equal(choices.length, 1);
+  assert.equal(choices[0].campus_key, 'kyiv');
+  assert.equal(choices[0].is_ambiguous, true);
+
+  const teacherChoices = buildAdmissionCampusChoicesFromCourses([
+    { id: 3, name: 'Teacher Course', location: 'munich', is_teacher_course: 1 },
+  ], 'teacher');
+  assert.equal(teacherChoices[0].campus_key, 'munich');
+  assert.equal(teacherChoices[0].is_ambiguous, false);
+});
+
+test('catalog assignment mode summary explains shared course propagation', () => {
+  const summary = buildCatalogAssignmentModeSummary({
+    sharedSubject: true,
+    targetCourseCount: 3,
+    lang: 'en',
+  });
+  assert.match(summary, /shared subject instance/i);
+  assert.match(summary, /3 selected courses/i);
 });
