@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.79",
+      "date": "2026-03-25",
+      "items": [
+        "fix(admin-pathways-sidebar-navigation): replace the admin sidebar `Pathways` control with a real `/admin/pathways` link instead of an inline `onclick` button, so the section opens reliably even when client-side navigation or browser security rules ignore inline handlers",
+        "tune(admin-sidebar-link-styling): make `.admin-nav-link` explicitly remove text decoration so anchor-based admin navigation keeps the same Tahoe/Liquid Glass sidebar look as the existing button-based items"
+      ]
+    },
+    {
       "version": "1.2.78",
       "date": "2026-03-25",
       "items": [

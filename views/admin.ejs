@@ -1026,7 +1026,7 @@
               <button class="admin-nav-link" type="button" data-admin-nav="admin-courses">Courses</button>
             <% } %>
             <% if (canManagePathways) { %>
-              <button class="admin-nav-link" type="button" onclick="window.location.href='/admin/pathways'">Pathways</button>
+              <a class="admin-nav-link" href="<%= pathwaysPanelHref || '/admin/pathways' %>">Pathways</a>
             <% } %>
             <% if (sectionAllowed('admin-homework')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-homework">Homework</button>
