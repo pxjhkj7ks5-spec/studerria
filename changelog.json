@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.68",
+      "date": "2026-03-25",
+      "items": [
+        "fix(session-generator-day-window-get-state): stop forcing `/admin/session-generator` back to `weeks` mode on each GET render and let explicit window dates round-trip through the shared helper so day-mode planning and stateful redirects no longer collapse to the default week flow",
+        "fix(session-generator-draft-navigation-context): preserve course, semester, window knobs, boolean planner flags, sequencing, strategy, and current explicit session dates when creating a new draft, clearing the current draft, or switching drafts inside the session generator",
+        "tune(session-generator-explicit-window-guard): keep explicit planner dates only while the current form still matches the rendered window state, so draft navigation stays stable without overriding freshly changed window controls with stale explicit-date payloads"
+      ]
+    },
+    {
       "version": "1.2.67",
       "date": "2026-03-25",
       "items": [

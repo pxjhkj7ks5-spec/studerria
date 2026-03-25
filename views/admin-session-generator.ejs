@@ -291,6 +291,44 @@
     `${semester.title || (sessionGeneratorText.semesterPrefix + semester.id)} · ${semester.weeks_count || '—'} ${sessionGeneratorText.weeksShort}`;
   const formatSessionFreeBusyLabel = (freeCount, busyCount) =>
     `${sessionGeneratorText.free} ${freeCount || 0} / ${sessionGeneratorText.busy} ${busyCount || 0}`;
+  const sessionGeneratorFormState = form && typeof form === 'object' ? form : {};
+  const sessionGeneratorDraftMeta = draftMeta && typeof draftMeta === 'object' ? draftMeta : null;
+  const sessionGeneratorSelectedSemesterId = typeof selectedSemesterId !== 'undefined'
+    ? selectedSemesterId
+    : (sessionGeneratorFormState.semester_id || '');
+  const sessionGeneratorExplicitDates = Array.isArray(explicitSessionDates) ? explicitSessionDates : [];
+  const sessionGeneratorNavBase = {
+    location: activeLocation,
+    course_id: sessionGeneratorFormState.course_id || '',
+    semester_id: sessionGeneratorSelectedSemesterId || '',
+    draft_id: sessionGeneratorDraftMeta && sessionGeneratorDraftMeta.id ? sessionGeneratorDraftMeta.id : '',
+    window_mode: sessionGeneratorFormState.window_mode || 'weeks',
+    start_date: sessionGeneratorFormState.start_date || '',
+    session_days: sessionGeneratorFormState.session_days || '',
+    session_weeks_count: sessionGeneratorFormState.session_weeks_count || '',
+    session_weeks_set: sessionGeneratorFormState.session_weeks_set || '',
+    max_events_per_day: sessionGeneratorFormState.max_events_per_day || '',
+    reserve_every: sessionGeneratorFormState.reserve_every || '',
+    exam_gap_days: sessionGeneratorFormState.exam_gap_days || '',
+    retake_gap_days: sessionGeneratorFormState.retake_gap_days || '',
+    retake_window_days: sessionGeneratorFormState.retake_window_days || '',
+    include_weekends: sessionGeneratorFormState.include_weekends ? '1' : '0',
+    include_consultations: sessionGeneratorFormState.include_consultations ? '1' : '0',
+    respect_study_days: sessionGeneratorFormState.respect_study_days ? '1' : '0',
+    day_grouping_mode: sessionGeneratorFormState.day_grouping_mode || 'none',
+    exam_sequence: sessionGeneratorFormState.exam_sequence || 'exam_only',
+    credit_sequence: sessionGeneratorFormState.credit_sequence || 'credit_only',
+    strategy: sessionGeneratorFormState.strategy || 'exams_first',
+    explicit_dates_json: sessionGeneratorExplicitDates.length ? JSON.stringify(sessionGeneratorExplicitDates) : '',
+  };
+  const buildSessionGeneratorHref = (overrides = {}) => {
+    const params = new URLSearchParams();
+    Object.entries({ ...sessionGeneratorNavBase, ...overrides }).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return;
+      params.set(key, String(value));
+    });
+    return `/admin/session-generator${params.toString() ? `?${params.toString()}` : ''}`;
+  };
 %>
 <!doctype html>
 <html lang="<%= lang %>">
@@ -1359,14 +1397,17 @@
               <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
                 <a
                   class="btn btn-outline-secondary btn-sm"
-                  href="/admin/session-generator?draft_action=new&location=<%= activeLocation %><%= form && form.course_id ? ('&course_id=' + form.course_id) : '' %><%= selectedSemesterId ? ('&semester_id=' + selectedSemesterId) : '' %>"
+                  href="<%= buildSessionGeneratorHref({ draft_id: '', draft_action: 'new' }) %>"
+                  data-draft-action="new"
                 >
                   <%= sessionGeneratorText.newPlan %>
                 </a>
                 <% if (draftMeta && draftMeta.id) { %>
                   <a
                     class="btn btn-outline-secondary btn-sm"
-                    href="/admin/session-generator?draft_id=<%= draftMeta.id %>&draft_action=clear&location=<%= activeLocation %><%= form && form.course_id ? ('&course_id=' + form.course_id) : '' %><%= selectedSemesterId ? ('&semester_id=' + selectedSemesterId) : '' %>"
+                    href="<%= buildSessionGeneratorHref({ draft_id: draftMeta.id, draft_action: 'clear' }) %>"
+                    data-draft-action="clear"
+                    data-draft-id="<%= draftMeta.id %>"
                   >
                     <%= sessionGeneratorText.clearPlan %>
                   </a>
@@ -1376,7 +1417,7 @@
                     <label class="small text-muted m-0" for="draftSwitcherSelect"><%= sessionGeneratorText.drafts %></label>
                     <select class="form-select form-select-sm" id="draftSwitcherSelect" style="width: auto;" data-draft-switch>
                       <% draftMeta.list.forEach(function(d) { %>
-                        <option value="/admin/session-generator?draft_id=<%= d.id %>" <%= Number(d.id) === Number(draftMeta.id) ? 'selected' : '' %>>
+                        <option value="<%= buildSessionGeneratorHref({ draft_id: d.id, draft_action: '' }) %>" data-draft-id="<%= d.id %>" <%= Number(d.id) === Number(draftMeta.id) ? 'selected' : '' %>>
                           #<%= d.id %>
                         </option>
                       <% }); %>
@@ -1982,6 +2023,7 @@
         }
 
         const locationInput = document.getElementById('sessionLocationInput');
+        const draftNavLinks = Array.from(document.querySelectorAll('[data-draft-action]'));
         const draftSwitcher = document.querySelector('[data-draft-switch]');
         const form = document.getElementById('sessionGeneratorForm');
         const publishForm = document.querySelector('form[action="/admin/session-generator/publish"]');
@@ -2002,6 +2044,43 @@
         const activeAssignmentSubtitle = document.getElementById('activeAssignmentSubtitle');
         const groupTimelineRoot = document.getElementById('groupTimelineRoot');
         const groupTimelineLabel = document.getElementById('groupTimelineLabel');
+        const sessionWindowExplicitDates = <%- JSON.stringify(explicitSessionDates || []) %>;
+        const sessionWindowStateBase = {
+          course_id: '<%= sessionGeneratorFormState.course_id || "" %>',
+          semester_id: '<%= sessionGeneratorSelectedSemesterId || "" %>',
+          window_mode: '<%= sessionGeneratorFormState.window_mode || "weeks" %>',
+          start_date: '<%= sessionGeneratorFormState.start_date || "" %>',
+          session_days: '<%= sessionGeneratorFormState.session_days || "" %>',
+          session_weeks_count: '<%= sessionGeneratorFormState.session_weeks_count || "" %>',
+          session_weeks_set: '<%= sessionGeneratorFormState.session_weeks_set || "" %>',
+          include_weekends: '<%= sessionGeneratorFormState.include_weekends ? "1" : "0" %>',
+          respect_study_days: '<%= sessionGeneratorFormState.respect_study_days ? "1" : "0" %>',
+        };
+        const draftNavigationStateKeys = [
+          'location',
+          'course_id',
+          'semester_id',
+          'draft_id',
+          'window_mode',
+          'start_date',
+          'session_days',
+          'session_weeks_count',
+          'session_weeks_set',
+          'max_events_per_day',
+          'reserve_every',
+          'exam_gap_days',
+          'retake_gap_days',
+          'retake_window_days',
+          'include_consultations',
+          'day_grouping_mode',
+          'exam_sequence',
+          'credit_sequence',
+          'strategy',
+        ];
+        const draftNavigationCheckboxKeys = [
+          'include_weekends',
+          'respect_study_days',
+        ];
         document.querySelectorAll('[data-location]').forEach((btn) => {
           btn.addEventListener('click', () => {
             if (!locationInput || !form) return;
@@ -2010,8 +2089,66 @@
           });
         });
 
+        const buildSessionGeneratorUrlFromForm = (overrides = {}) => {
+          const params = new URLSearchParams();
+          if (form) {
+            const formData = new FormData(form);
+            draftNavigationStateKeys.forEach((key) => {
+              const value = formData.get(key);
+              if (value === null || value === undefined) return;
+              const normalized = String(value).trim();
+              if (!normalized) return;
+              params.set(key, normalized);
+            });
+            draftNavigationCheckboxKeys.forEach((key) => {
+              const input = form.querySelector(`input[name="${key}"]`);
+              if (!input) return;
+              params.set(key, input.checked ? '1' : '0');
+            });
+          }
+          if (!params.get('location') && locationInput && locationInput.value) {
+            params.set('location', locationInput.value);
+          }
+          const shouldPreserveExplicitDates = Object.entries(sessionWindowStateBase).every(([key, value]) => {
+            return String(params.get(key) || '') === String(value || '');
+          });
+          if (shouldPreserveExplicitDates && Array.isArray(sessionWindowExplicitDates) && sessionWindowExplicitDates.length) {
+            params.set('explicit_dates_json', JSON.stringify(sessionWindowExplicitDates));
+          }
+          ['ok', 'err'].forEach((key) => params.delete(key));
+          Object.entries(overrides || {}).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') {
+              params.delete(key);
+              return;
+            }
+            params.set(key, String(value));
+          });
+          return `/admin/session-generator${params.toString() ? `?${params.toString()}` : ''}`;
+        };
+
+        draftNavLinks.forEach((link) => {
+          link.addEventListener('click', (event) => {
+            event.preventDefault();
+            const action = String(link.dataset.draftAction || '').trim();
+            const nextDraftId = String(link.dataset.draftId || '').trim();
+            window.location.href = buildSessionGeneratorUrlFromForm({
+              draft_action: action || null,
+              draft_id: action === 'new' ? null : (nextDraftId || null),
+            });
+          });
+        });
+
         if (draftSwitcher) {
           draftSwitcher.addEventListener('change', () => {
+            const selectedOption = draftSwitcher.options[draftSwitcher.selectedIndex];
+            const nextDraftId = selectedOption ? String(selectedOption.dataset.draftId || '').trim() : '';
+            if (nextDraftId) {
+              window.location.href = buildSessionGeneratorUrlFromForm({
+                draft_action: null,
+                draft_id: nextDraftId,
+              });
+              return;
+            }
             const url = String(draftSwitcher.value || '').trim();
             if (!url) return;
             window.location.href = url;

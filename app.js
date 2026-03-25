@@ -32847,7 +32847,7 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     form.location = activeLocation;
     form.course_id = selectedCourseId;
     form.semester_id = selectedSemesterId;
-    form.window_mode = 'weeks';
+    form.window_mode = normalizeSessionWindowMode(form.window_mode || SESSION_GENERATOR_DEFAULTS.window_mode);
     form.session_weeks_count = parseSessionGeneratorInt(
       form.session_weeks_count,
       SESSION_GENERATOR_DEFAULTS.session_weeks_count,
@@ -32927,6 +32927,7 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       form,
       semester: activeSemester,
       activeStudyDayNames,
+      explicitDates: query.explicit_dates_json,
     });
     const sessionWeekNumbers = windowDates.sessionWeekNumbers;
     form.window_mode = windowDates.window_mode;
