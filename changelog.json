@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.69",
+      "date": "2026-03-25",
+      "items": [
+        "fix(session-generator-room-publish-binding): keep `room_id` when manual session assignments expand into per-group publish rows so published session events finally retain the room chosen in the planner instead of silently dropping it on insert",
+        "fix(session-generator-room-conflict-expansion): run live room-conflict checks and publish-time room validation against expanded per-group assignments, which closes the blind spot where all-group session rows could miss room collisions that only appeared after group expansion"
+      ]
+    },
+    {
       "version": "1.2.68",
       "date": "2026-03-25",
       "items": [

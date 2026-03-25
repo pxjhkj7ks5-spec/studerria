@@ -31483,6 +31483,7 @@ const buildSessionExpandedAssignments = (assessments = [], subjectById = new Map
         date,
         day_name: dayName,
         class_number: classNumber,
+        room_id: Number(assessment.room_id || 0) || null,
         type: assessment.type === 'credit'
           ? 'credit'
           : (assessment.type === 'consultation' ? 'consultation' : 'exam'),
@@ -33255,11 +33256,11 @@ app.post('/admin/session-generator/conflicts/live', requireScheduleGeneratorSect
           selectedCourseId,
         })
       : { conflicts: [], unresolvedRows: [], checkedRows: 0 };
-    const roomConflictState = assessments.length
+    const roomConflictState = expandedAssignments.length
       ? await buildSessionRoomConflictState({
           selectedCourseId,
           selectedSemesterId,
-          assessments,
+          assessments: expandedAssignments,
         })
       : { conflicts: [], checkedRows: 0 };
     const combinedReport = {
@@ -33488,7 +33489,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
     const roomConflictState = await buildSessionRoomConflictState({
       selectedCourseId,
       selectedSemesterId,
-      assessments,
+      assessments: expandedAssignments,
     });
     const combinedReport = {
       conflicts: [
