@@ -1853,7 +1853,7 @@
             </div>
           </article>
 
-          <form method="POST" action="/admin/session-generator/publish" class="card liquid-panel mb-4">
+          <form method="POST" action="/admin/session-generator/publish" class="card liquid-panel mb-4" data-session-action-form>
             <div class="card-body d-grid gap-2">
               <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
@@ -1937,7 +1937,7 @@
             </div>
           </form>
 
-          <form method="POST" action="/admin/session-generator/delete" class="card liquid-panel mb-4" onsubmit='return window.confirm(<%- JSON.stringify(sessionGeneratorText.deleteConfirm) %>);'>
+          <form method="POST" action="/admin/session-generator/delete" class="card liquid-panel mb-4" data-session-action-form onsubmit='return window.confirm(<%- JSON.stringify(sessionGeneratorText.deleteConfirm) %>);'>
             <div class="card-body d-grid gap-2">
               <div class="fw-semibold"><%= sessionGeneratorText.deleteTitle %></div>
               <div class="session-subtle"><%= sessionGeneratorText.deleteHint %></div>
@@ -1967,7 +1967,7 @@
             </div>
           </form>
 
-          <form method="POST" action="/admin/session-generator/delete-all-active" class="card liquid-panel mb-4" onsubmit='return window.confirm(<%- JSON.stringify(sessionGeneratorText.deleteAllConfirm) %>);'>
+          <form method="POST" action="/admin/session-generator/delete-all-active" class="card liquid-panel mb-4" data-session-action-form onsubmit='return window.confirm(<%- JSON.stringify(sessionGeneratorText.deleteAllConfirm) %>);'>
             <div class="card-body d-grid gap-2">
               <div class="fw-semibold text-danger"><%= sessionGeneratorText.deleteAllTitle %></div>
               <div class="session-subtle"><%= sessionGeneratorText.deleteAllHint %></div>
@@ -2027,6 +2027,7 @@
         const draftSwitcher = document.querySelector('[data-draft-switch]');
         const form = document.getElementById('sessionGeneratorForm');
         const publishForm = document.querySelector('form[action="/admin/session-generator/publish"]');
+        const sessionActionForms = Array.from(document.querySelectorAll('[data-session-action-form]'));
         const publishDraftInput = publishForm ? publishForm.querySelector('input[name="draft_id"]') : null;
         const draftIdInput = document.getElementById('sessionDraftIdInput');
         const liveConflictStatus = document.getElementById('manualLiveConflictStatus');
@@ -3016,6 +3017,10 @@
                 const nextId = String(data.draft_id);
                 if (draftIdInput) draftIdInput.value = nextId;
                 if (publishDraftInput) publishDraftInput.value = nextId;
+                sessionActionForms.forEach((actionForm) => {
+                  const draftInput = actionForm.querySelector('input[name="draft_id"]');
+                  if (draftInput) draftInput.value = nextId;
+                });
               }
             } catch (_err) {
               // Silent autosave failure.

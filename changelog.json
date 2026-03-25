@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.70",
+      "date": "2026-03-25",
+      "items": [
+        "fix(session-generator-cleanup-draft-sync): when deleting session events in the selected window or fully clearing active sessions, the linked session-generator draft is now pruned too, so the planner no longer bounces back with stale assignments that were just cleaned from timetable/journal state",
+        "fix(session-generator-action-form-draft-id-sync): keep `publish`, `delete`, and `delete-all-active` forms aligned with the latest autosaved `draft_id`, which closes the gap where cleanup actions could post an outdated draft reference after autosave created a fresh planner draft",
+        "tune(session-generator-cleanup-feedback): cleanup redirects now explicitly say when only the draft changed, and when published session data plus draft assignments were both removed, so the post-action state reads more honestly"
+      ]
+    },
+    {
       "version": "1.2.69",
       "date": "2026-03-25",
       "items": [

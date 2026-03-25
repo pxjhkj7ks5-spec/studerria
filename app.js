@@ -30822,6 +30822,60 @@ const saveSessionGeneratorDraftRecord = async (userId, draftId, payload = {}) =>
   return mapSessionGeneratorDraftRow(row);
 };
 
+const syncSessionGeneratorDraftAfterCleanup = async ({
+  userId,
+  draftId,
+  form = {},
+  targetDates = [],
+  clearAll = false,
+} = {}) => {
+  const safeUserId = Number(userId);
+  const safeDraftId = Number(draftId);
+  if (!Number.isFinite(safeUserId) || safeUserId < 1 || !Number.isFinite(safeDraftId) || safeDraftId < 1) {
+    return {
+      removedAssignmentsCount: 0,
+      remainingAssignmentsCount: 0,
+      updated: false,
+    };
+  }
+  const currentDraft = await getSessionGeneratorDraftRecordById(safeUserId, safeDraftId);
+  if (!currentDraft) {
+    return {
+      removedAssignmentsCount: 0,
+      remainingAssignmentsCount: 0,
+      updated: false,
+    };
+  }
+  const currentAssignments = normalizeSessionGeneratorDraftAssignments(currentDraft.assignments);
+  const normalizedTargetDateSet = new Set((Array.isArray(targetDates) ? targetDates : [])
+    .map((value) => toDateOnly(value))
+    .filter((value) => isValidDateString(value)));
+  const nextAssignments = clearAll
+    ? []
+    : currentAssignments.filter((item) => {
+        const itemDate = toDateOnly(item && item.date);
+        if (!itemDate || !normalizedTargetDateSet.size) return true;
+        return !normalizedTargetDateSet.has(itemDate);
+      });
+  const removedAssignmentsCount = Math.max(0, currentAssignments.length - nextAssignments.length);
+  if (removedAssignmentsCount === 0 && nextAssignments.length === currentAssignments.length) {
+    return {
+      removedAssignmentsCount,
+      remainingAssignmentsCount: nextAssignments.length,
+      updated: false,
+    };
+  }
+  const savedDraft = await saveSessionGeneratorDraftRecord(safeUserId, safeDraftId, {
+    form,
+    assignments: nextAssignments,
+  });
+  return {
+    removedAssignmentsCount,
+    remainingAssignmentsCount: nextAssignments.length,
+    updated: !!savedDraft,
+  };
+};
+
 const buildSessionGeneratorFormDefaults = ({ activeLocation, selectedCourseId, selectedSemesterId, defaultStartDate }) => ({
   location: normalizeGeneratorLocation(activeLocation),
   course_id: Number.isFinite(Number(selectedCourseId)) && Number(selectedCourseId) > 0 ? Number(selectedCourseId) : null,
@@ -33760,19 +33814,47 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
       return redirectToGenerator('err', 'Немає дат сесії для видалення. Перевірте тижні сесії.');
     }
 
+    const actorUserId = Number(req.session.user?.id || 0) || null;
     const cleanupResult = await purgeSessionGeneratorHomework({
       courseId: selectedCourseId,
       semesterId: selectedSemesterId,
       targetDates,
-      actorUserId: Number(req.session.user?.id || 0) || null,
+      actorUserId,
       purgeResidualSessionColumns: false,
     });
-    if (!Number(cleanupResult.deletedHomeworkCount || 0)) {
-      return redirectToGenerator('ok', 'У вибраному вікні сесії немає подій для видалення.');
+    let draftCleanup = {
+      removedAssignmentsCount: 0,
+      remainingAssignmentsCount: 0,
+      updated: false,
+    };
+    if (actorUserId && draftId) {
+      try {
+        draftCleanup = await syncSessionGeneratorDraftAfterCleanup({
+          userId: actorUserId,
+          draftId,
+          form,
+          targetDates,
+        });
+      } catch (_err) {
+        draftCleanup = {
+          removedAssignmentsCount: 0,
+          remainingAssignmentsCount: 0,
+          updated: false,
+        };
+      }
     }
+    if (!Number(cleanupResult.deletedHomeworkCount || 0)) {
+      const draftSuffix = draftCleanup.removedAssignmentsCount
+        ? ` З чернетки прибрано призначень: ${draftCleanup.removedAssignmentsCount}.`
+        : '';
+      return redirectToGenerator('ok', `У вибраному вікні сесії немає подій для видалення.${draftSuffix}`.trim());
+    }
+    const draftSuffix = draftCleanup.removedAssignmentsCount
+      ? ` З чернетки прибрано призначень: ${draftCleanup.removedAssignmentsCount}.`
+      : '';
     return redirectToGenerator(
       'ok',
-      `Видалено ${cleanupResult.deletedHomeworkCount} подій сесії у вибраному вікні. Очищено колонок журналу: ${cleanupResult.deletedJournalColumnsCount}. Синхронізовано предметів у журналі: ${cleanupResult.syncedSubjects}.`
+      `Видалено ${cleanupResult.deletedHomeworkCount} подій сесії у вибраному вікні. Очищено колонок журналу: ${cleanupResult.deletedJournalColumnsCount}. Синхронізовано предметів у журналі: ${cleanupResult.syncedSubjects}.${draftSuffix}`.trim()
     );
   } catch (err) {
     return handleDbError(res, err, 'admin.sessionGenerator.delete');
@@ -33861,21 +33943,49 @@ app.post('/admin/session-generator/delete-all-active', requireScheduleGeneratorS
     const selectedSemesterId = Number(activeSemester.id);
     form.semester_id = selectedSemesterId;
 
+    const actorUserId = Number(req.session.user?.id || 0) || null;
     const cleanupResult = await purgeSessionGeneratorHomework({
       courseId: selectedCourseId,
       semesterId: selectedSemesterId,
-      actorUserId: Number(req.session.user?.id || 0) || null,
+      actorUserId,
       purgeResidualSessionColumns: true,
     });
     const deletedHomeworkCount = Number(cleanupResult.deletedHomeworkCount || 0);
     const deletedJournalColumnsCount = Number(cleanupResult.deletedJournalColumnsCount || 0);
-    if (!deletedHomeworkCount && !deletedJournalColumnsCount) {
-      return redirectToGenerator('ok', 'Активних сесій для очищення не знайдено.');
+    let draftCleanup = {
+      removedAssignmentsCount: 0,
+      remainingAssignmentsCount: 0,
+      updated: false,
+    };
+    if (actorUserId && draftId) {
+      try {
+        draftCleanup = await syncSessionGeneratorDraftAfterCleanup({
+          userId: actorUserId,
+          draftId,
+          form,
+          clearAll: true,
+        });
+      } catch (_err) {
+        draftCleanup = {
+          removedAssignmentsCount: 0,
+          remainingAssignmentsCount: 0,
+          updated: false,
+        };
+      }
     }
+    if (!deletedHomeworkCount && !deletedJournalColumnsCount) {
+      const draftSuffix = draftCleanup.removedAssignmentsCount
+        ? ` Чернетку очищено: ${draftCleanup.removedAssignmentsCount} призначень прибрано.`
+        : '';
+      return redirectToGenerator('ok', `Активних сесій для очищення не знайдено.${draftSuffix}`.trim());
+    }
+    const draftSuffix = draftCleanup.removedAssignmentsCount
+      ? ` Чернетку очищено: ${draftCleanup.removedAssignmentsCount} призначень прибрано.`
+      : '';
 
     return redirectToGenerator(
       'ok',
-      `Повністю очищено активну сесію: подій ${deletedHomeworkCount}, колонок журналу ${deletedJournalColumnsCount}. Синхронізовано предметів у журналі: ${cleanupResult.syncedSubjects}.`
+      `Повністю очищено активну сесію: подій ${deletedHomeworkCount}, колонок журналу ${deletedJournalColumnsCount}. Синхронізовано предметів у журналі: ${cleanupResult.syncedSubjects}.${draftSuffix}`.trim()
     );
   } catch (err) {
     return handleDbError(res, err, 'admin.sessionGenerator.deleteAll');
