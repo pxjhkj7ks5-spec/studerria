@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.72",
+      "date": "2026-03-25",
+      "items": [
+        "refactor(session-generator-action-parser): extract one shared parser for session-generator action payloads so `publish`, `delete`, and `delete-all-active` now normalize the same planner knobs, booleans, timing values, and scope ids through one code path",
+        "fix(session-generator-action-parity): remove another source of route drift in cleanup/publish flows, reducing the chance that future fixes land in one session-generator action while the other two keep stale parsing behavior"
+      ]
+    },
+    {
       "version": "1.2.71",
       "date": "2026-03-25",
       "items": [

@@ -31395,6 +31395,58 @@ const normalizeSessionPublishAction = (value) => {
   return 'publish';
 };
 
+const parseSessionGeneratorActionPayload = (body = {}) => {
+  const activeLocation = normalizeGeneratorLocation(body.location || 'kyiv');
+  const selectedCourseId = parseSessionGeneratorInt(body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
+  const selectedSemesterRaw = parseSessionGeneratorInt(body.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
+  const draftId = parseSessionGeneratorInt(body.draft_id, null, 1, Number.MAX_SAFE_INTEGER);
+  return {
+    activeLocation,
+    selectedCourseId,
+    selectedSemesterRaw,
+    draftId,
+    form: {
+      location: activeLocation,
+      course_id: selectedCourseId,
+      semester_id: selectedSemesterRaw,
+      window_mode: normalizeSessionWindowMode(body.window_mode || 'weeks'),
+      start_date: isValidDateString(body.start_date)
+        ? String(body.start_date)
+        : buildSessionGeneratorDefaultStartDate(null),
+      session_days: parseSessionGeneratorInt(body.session_days, SESSION_GENERATOR_DEFAULTS.session_days, 3, 60),
+      session_weeks_count: parseSessionGeneratorInt(
+        body.session_weeks_count,
+        SESSION_GENERATOR_DEFAULTS.session_weeks_count,
+        1,
+        12
+      ),
+      session_weeks_set: String(body.session_weeks_set || '').trim(),
+      max_events_per_day: parseSessionGeneratorInt(
+        body.max_events_per_day,
+        SESSION_GENERATOR_DEFAULTS.max_events_per_day,
+        1,
+        6
+      ),
+      reserve_every: parseSessionGeneratorInt(body.reserve_every, SESSION_GENERATOR_DEFAULTS.reserve_every, 0, 20),
+      exam_gap_days: parseSessionGeneratorInt(body.exam_gap_days, SESSION_GENERATOR_DEFAULTS.exam_gap_days, 0, 5),
+      retake_gap_days: parseSessionGeneratorInt(body.retake_gap_days, SESSION_GENERATOR_DEFAULTS.retake_gap_days, 1, 14),
+      retake_window_days: parseSessionGeneratorInt(
+        body.retake_window_days,
+        SESSION_GENERATOR_DEFAULTS.retake_window_days,
+        1,
+        14
+      ),
+      include_weekends: parseSessionGeneratorFlag(body.include_weekends, SESSION_GENERATOR_DEFAULTS.include_weekends),
+      include_consultations: parseSessionGeneratorFlag(body.include_consultations, SESSION_GENERATOR_DEFAULTS.include_consultations),
+      respect_study_days: parseSessionGeneratorFlag(body.respect_study_days, SESSION_GENERATOR_DEFAULTS.respect_study_days),
+      day_grouping_mode: normalizeSessionDayGroupingMode(body.day_grouping_mode || SESSION_GENERATOR_DEFAULTS.day_grouping_mode),
+      exam_sequence: normalizeSessionExamSequence(body.exam_sequence || SESSION_GENERATOR_DEFAULTS.exam_sequence),
+      credit_sequence: normalizeSessionCreditSequence(body.credit_sequence || SESSION_GENERATOR_DEFAULTS.credit_sequence),
+      strategy: normalizeSessionGeneratorStrategy(body.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
+    },
+  };
+};
+
 const getSessionSubjectTeacherMap = async (subjectIds = []) => {
   const safeIds = Array.from(new Set((subjectIds || [])
     .map((value) => Number(value))
@@ -33357,50 +33409,8 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
   try {
     const body = req.body || {};
     const publishAction = normalizeSessionPublishAction(body.publish_action);
-    const activeLocation = normalizeGeneratorLocation(body.location || 'kyiv');
-    const selectedCourseId = parseSessionGeneratorInt(body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
-    const selectedSemesterRaw = parseSessionGeneratorInt(body.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
-    const draftId = parseSessionGeneratorInt(body.draft_id, null, 1, Number.MAX_SAFE_INTEGER);
+    let { activeLocation, selectedCourseId, selectedSemesterRaw, draftId, form } = parseSessionGeneratorActionPayload(body);
     const userId = Number(req.session && req.session.user ? req.session.user.id : 0);
-    let form = {
-      location: activeLocation,
-      course_id: selectedCourseId,
-      semester_id: selectedSemesterRaw,
-      window_mode: normalizeSessionWindowMode(body.window_mode || 'weeks'),
-      start_date: isValidDateString(body.start_date)
-        ? String(body.start_date)
-        : buildSessionGeneratorDefaultStartDate(null),
-      session_days: parseSessionGeneratorInt(body.session_days, SESSION_GENERATOR_DEFAULTS.session_days, 3, 60),
-      session_weeks_count: parseSessionGeneratorInt(
-        body.session_weeks_count,
-        SESSION_GENERATOR_DEFAULTS.session_weeks_count,
-        1,
-        12
-      ),
-      session_weeks_set: String(body.session_weeks_set || '').trim(),
-      max_events_per_day: parseSessionGeneratorInt(
-        body.max_events_per_day,
-        SESSION_GENERATOR_DEFAULTS.max_events_per_day,
-        1,
-        6
-      ),
-      reserve_every: parseSessionGeneratorInt(body.reserve_every, SESSION_GENERATOR_DEFAULTS.reserve_every, 0, 20),
-      exam_gap_days: parseSessionGeneratorInt(body.exam_gap_days, SESSION_GENERATOR_DEFAULTS.exam_gap_days, 0, 5),
-      retake_gap_days: parseSessionGeneratorInt(body.retake_gap_days, SESSION_GENERATOR_DEFAULTS.retake_gap_days, 1, 14),
-      retake_window_days: parseSessionGeneratorInt(
-        body.retake_window_days,
-        SESSION_GENERATOR_DEFAULTS.retake_window_days,
-        1,
-        14
-      ),
-      include_weekends: parseSessionGeneratorFlag(body.include_weekends, SESSION_GENERATOR_DEFAULTS.include_weekends),
-      include_consultations: parseSessionGeneratorFlag(body.include_consultations, SESSION_GENERATOR_DEFAULTS.include_consultations),
-      respect_study_days: parseSessionGeneratorFlag(body.respect_study_days, SESSION_GENERATOR_DEFAULTS.respect_study_days),
-      day_grouping_mode: normalizeSessionDayGroupingMode(body.day_grouping_mode || SESSION_GENERATOR_DEFAULTS.day_grouping_mode),
-      exam_sequence: normalizeSessionExamSequence(body.exam_sequence || SESSION_GENERATOR_DEFAULTS.exam_sequence),
-      credit_sequence: normalizeSessionCreditSequence(body.credit_sequence || SESSION_GENERATOR_DEFAULTS.credit_sequence),
-      strategy: normalizeSessionGeneratorStrategy(body.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
-    };
     const redirectToGenerator = (messageKind, messageText) => {
       return res.redirect(buildSessionGeneratorReturnHref({
         ...form,
@@ -33718,49 +33728,7 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
   }
   try {
     const body = req.body || {};
-    const activeLocation = normalizeGeneratorLocation(body.location || 'kyiv');
-    const selectedCourseId = parseSessionGeneratorInt(body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
-    const selectedSemesterRaw = parseSessionGeneratorInt(body.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
-    const draftId = parseSessionGeneratorInt(body.draft_id, null, 1, Number.MAX_SAFE_INTEGER);
-    const form = {
-      location: activeLocation,
-      course_id: selectedCourseId,
-      semester_id: selectedSemesterRaw,
-      window_mode: normalizeSessionWindowMode(body.window_mode || 'weeks'),
-      start_date: isValidDateString(body.start_date)
-        ? String(body.start_date)
-        : buildSessionGeneratorDefaultStartDate(null),
-      session_days: parseSessionGeneratorInt(body.session_days, SESSION_GENERATOR_DEFAULTS.session_days, 3, 60),
-      session_weeks_count: parseSessionGeneratorInt(
-        body.session_weeks_count,
-        SESSION_GENERATOR_DEFAULTS.session_weeks_count,
-        1,
-        12
-      ),
-      session_weeks_set: String(body.session_weeks_set || '').trim(),
-      max_events_per_day: parseSessionGeneratorInt(
-        body.max_events_per_day,
-        SESSION_GENERATOR_DEFAULTS.max_events_per_day,
-        1,
-        6
-      ),
-      reserve_every: parseSessionGeneratorInt(body.reserve_every, SESSION_GENERATOR_DEFAULTS.reserve_every, 0, 20),
-      exam_gap_days: parseSessionGeneratorInt(body.exam_gap_days, SESSION_GENERATOR_DEFAULTS.exam_gap_days, 0, 5),
-      retake_gap_days: parseSessionGeneratorInt(body.retake_gap_days, SESSION_GENERATOR_DEFAULTS.retake_gap_days, 1, 14),
-      retake_window_days: parseSessionGeneratorInt(
-        body.retake_window_days,
-        SESSION_GENERATOR_DEFAULTS.retake_window_days,
-        1,
-        14
-      ),
-      include_weekends: parseSessionGeneratorFlag(body.include_weekends, SESSION_GENERATOR_DEFAULTS.include_weekends),
-      include_consultations: parseSessionGeneratorFlag(body.include_consultations, SESSION_GENERATOR_DEFAULTS.include_consultations),
-      respect_study_days: parseSessionGeneratorFlag(body.respect_study_days, SESSION_GENERATOR_DEFAULTS.respect_study_days),
-      day_grouping_mode: normalizeSessionDayGroupingMode(body.day_grouping_mode || SESSION_GENERATOR_DEFAULTS.day_grouping_mode),
-      exam_sequence: normalizeSessionExamSequence(body.exam_sequence || SESSION_GENERATOR_DEFAULTS.exam_sequence),
-      credit_sequence: normalizeSessionCreditSequence(body.credit_sequence || SESSION_GENERATOR_DEFAULTS.credit_sequence),
-      strategy: normalizeSessionGeneratorStrategy(body.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
-    };
+    let { activeLocation, selectedCourseId, selectedSemesterRaw, draftId, form } = parseSessionGeneratorActionPayload(body);
     const redirectToGenerator = (messageKind, messageText) => {
       return res.redirect(buildSessionGeneratorReturnHref({
         ...form,
@@ -33874,49 +33842,7 @@ app.post('/admin/session-generator/delete-all-active', requireScheduleGeneratorS
   }
   try {
     const body = req.body || {};
-    const activeLocation = normalizeGeneratorLocation(body.location || 'kyiv');
-    const selectedCourseId = parseSessionGeneratorInt(body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
-    const selectedSemesterRaw = parseSessionGeneratorInt(body.semester_id, null, 1, Number.MAX_SAFE_INTEGER);
-    const draftId = parseSessionGeneratorInt(body.draft_id, null, 1, Number.MAX_SAFE_INTEGER);
-    const form = {
-      location: activeLocation,
-      course_id: selectedCourseId,
-      semester_id: selectedSemesterRaw,
-      window_mode: normalizeSessionWindowMode(body.window_mode || 'weeks'),
-      start_date: isValidDateString(body.start_date)
-        ? String(body.start_date)
-        : buildSessionGeneratorDefaultStartDate(null),
-      session_days: parseSessionGeneratorInt(body.session_days, SESSION_GENERATOR_DEFAULTS.session_days, 3, 60),
-      session_weeks_count: parseSessionGeneratorInt(
-        body.session_weeks_count,
-        SESSION_GENERATOR_DEFAULTS.session_weeks_count,
-        1,
-        12
-      ),
-      session_weeks_set: String(body.session_weeks_set || '').trim(),
-      max_events_per_day: parseSessionGeneratorInt(
-        body.max_events_per_day,
-        SESSION_GENERATOR_DEFAULTS.max_events_per_day,
-        1,
-        6
-      ),
-      reserve_every: parseSessionGeneratorInt(body.reserve_every, SESSION_GENERATOR_DEFAULTS.reserve_every, 0, 20),
-      exam_gap_days: parseSessionGeneratorInt(body.exam_gap_days, SESSION_GENERATOR_DEFAULTS.exam_gap_days, 0, 5),
-      retake_gap_days: parseSessionGeneratorInt(body.retake_gap_days, SESSION_GENERATOR_DEFAULTS.retake_gap_days, 1, 14),
-      retake_window_days: parseSessionGeneratorInt(
-        body.retake_window_days,
-        SESSION_GENERATOR_DEFAULTS.retake_window_days,
-        1,
-        14
-      ),
-      include_weekends: parseSessionGeneratorFlag(body.include_weekends, SESSION_GENERATOR_DEFAULTS.include_weekends),
-      include_consultations: parseSessionGeneratorFlag(body.include_consultations, SESSION_GENERATOR_DEFAULTS.include_consultations),
-      respect_study_days: parseSessionGeneratorFlag(body.respect_study_days, SESSION_GENERATOR_DEFAULTS.respect_study_days),
-      day_grouping_mode: normalizeSessionDayGroupingMode(body.day_grouping_mode || SESSION_GENERATOR_DEFAULTS.day_grouping_mode),
-      exam_sequence: normalizeSessionExamSequence(body.exam_sequence || SESSION_GENERATOR_DEFAULTS.exam_sequence),
-      credit_sequence: normalizeSessionCreditSequence(body.credit_sequence || SESSION_GENERATOR_DEFAULTS.credit_sequence),
-      strategy: normalizeSessionGeneratorStrategy(body.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
-    };
+    let { activeLocation, selectedCourseId, selectedSemesterRaw, draftId, form } = parseSessionGeneratorActionPayload(body);
     const redirectToGenerator = (messageKind, messageText) => {
       return res.redirect(buildSessionGeneratorReturnHref({
         ...form,
