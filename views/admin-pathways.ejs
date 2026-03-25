@@ -156,7 +156,11 @@
     manageProgramAdmissions: 'Оберіть програму, щоб керувати її роками вступу.',
     noAdmissionsForProgram: 'У цієї програми ще немає жодного року вступу. Додайте першу когорту у форму вище.',
     openPrograms: 'До програм',
+    openAdmissions: 'До років вступу',
     addFirstAdmission: 'Додати першу когорту',
+    reviewScope: 'До контексту',
+    reviewMapping: 'До мапінгу',
+    reviewCatalog: 'До каталогу',
     mappingTitle: 'Мапінг курсів',
     mappingSubtitle: 'Курси, для яких рік вступу доступний на етапі реєстрації. Це перша критична умова для працездатного сценарію онбордингу.',
     mappingEmptyTitle: 'Мапінг ще не налаштовано',
@@ -340,7 +344,11 @@
     manageProgramAdmissions: 'Select a program to manage its admission years.',
     noAdmissionsForProgram: 'This program does not have any admission years yet. Add the first cohort in the form above.',
     openPrograms: 'Go to programs',
+    openAdmissions: 'Go to admissions',
     addFirstAdmission: 'Add first cohort',
+    reviewScope: 'Go to scope',
+    reviewMapping: 'Go to mapping',
+    reviewCatalog: 'Go to catalog',
     mappingTitle: 'Course mapping',
     mappingSubtitle: 'Courses for which the admission is available during registration. This is the first critical condition for a working onboarding flow.',
     mappingEmptyTitle: 'No course mapping yet',
@@ -1471,7 +1479,12 @@
                 </form>
               <% } %>
             <% } else { %>
-              <div class="soft-panel muted"><%= ui.selectAdmissionFirst %></div>
+              <div class="soft-panel muted">
+                <div><%= ui.selectAdmissionFirst %></div>
+                <div class="mt-2">
+                  <a class="btn btn-soft btn-pill" href="<%= selectedProgramValue > 0 ? '#pathways-admissions' : '#pathways-programs' %>"><%= selectedProgramValue > 0 ? ui.openAdmissions : ui.openPrograms %></a>
+                </div>
+              </div>
             <% } %>
           </article>
         </div>
@@ -1529,7 +1542,12 @@
                     </label>
                   <% }) %>
                   <% if (!(subjectVisibilityItems || []).length) { %>
-                    <div class="soft-panel muted"><%= ui.noVisibleSubjectsInCourse %></div>
+                    <div class="soft-panel muted">
+                      <div><%= ui.noVisibleSubjectsInCourse %></div>
+                      <div class="mt-2">
+                        <a class="btn btn-soft btn-pill" href="<%= subjectCatalogList.length ? '#pathwayCatalogAssignForm' : '#pathwaysCatalogCreateForm' %>"><%= ui.reviewCatalog %></a>
+                      </div>
+                    </div>
                   <% } %>
                 </div>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -1561,7 +1579,12 @@
                 </form>
               <% } %>
             <% } else { %>
-              <div class="soft-panel muted"><%= ui.selectAdmissionFirst %></div>
+              <div class="soft-panel muted">
+                <div><%= ui.selectAdmissionFirst %></div>
+                <div class="mt-2">
+                  <a class="btn btn-soft btn-pill" href="<%= selectedProgramValue > 0 ? '#pathways-admissions' : '#pathways-programs' %>"><%= selectedProgramValue > 0 ? ui.openAdmissions : ui.openPrograms %></a>
+                </div>
+              </div>
             <% } %>
           </article>
         </div>
@@ -1611,11 +1634,21 @@
                     </div>
                   <% }) %>
                   <% if (!(campusBindingList || []).length) { %>
-                    <div class="soft-panel muted"><%= ui.noCampusBindings %></div>
+                    <div class="soft-panel muted">
+                      <div><%= ui.noCampusBindings %></div>
+                      <div class="mt-2">
+                        <a class="btn btn-soft btn-pill" href="#pathways-mapping"><%= ui.reviewMapping %></a>
+                      </div>
+                    </div>
                   <% } %>
                 </div>
               <% } else { %>
-                <div class="soft-panel muted mt-3"><%= ui.selectAdmissionFirst %></div>
+                <div class="soft-panel muted mt-3">
+                  <div><%= ui.selectAdmissionFirst %></div>
+                  <div class="mt-2">
+                    <a class="btn btn-soft btn-pill" href="<%= selectedProgramValue > 0 ? '#pathways-admissions' : '#pathways-programs' %>"><%= selectedProgramValue > 0 ? ui.openAdmissions : ui.openPrograms %></a>
+                  </div>
+                </div>
               <% } %>
             </div>
           </div>
@@ -1686,7 +1719,12 @@
                       </label>
                     <% }) %>
                     <% if (!(migrationCourseList || []).length) { %>
-                      <div class="soft-panel muted"><%= ui.noCompatibleSourceCourses %></div>
+                      <div class="soft-panel muted">
+                        <div><%= ui.noCompatibleSourceCourses %></div>
+                        <div class="mt-2">
+                          <a class="btn btn-soft btn-pill" href="#pathways-scope"><%= ui.reviewScope %></a>
+                        </div>
+                      </div>
                     <% } %>
                   </div>
                   <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -1695,7 +1733,12 @@
                   </div>
                 </form>
               <% } else { %>
-                <div class="soft-panel muted mt-3"><%= ui.selectProgramAndAdmissionFirst %></div>
+                <div class="soft-panel muted mt-3">
+                  <div><%= ui.selectProgramAndAdmissionFirst %></div>
+                  <div class="mt-2">
+                    <a class="btn btn-soft btn-pill" href="<%= selectedProgramValue > 0 ? '#pathways-admissions' : '#pathways-programs' %>"><%= selectedProgramValue > 0 ? ui.openAdmissions : ui.openPrograms %></a>
+                  </div>
+                </div>
               <% } %>
             </div>
           </div>
@@ -1737,7 +1780,7 @@
         <% } %>
 
         <div class="catalog-forms mb-3">
-          <form class="soft-panel h-100" method="POST" action="/admin/pathways/catalog/add">
+          <form id="pathwaysCatalogCreateForm" class="soft-panel h-100" method="POST" action="/admin/pathways/catalog/add">
             <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
             <input type="hidden" name="track" value="<%= activeTrack %>" />
             <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
@@ -1958,7 +2001,12 @@
             </article>
           <% }) %>
           <% if (!subjectCatalogList.length) { %>
-            <div class="soft-panel muted catalog-empty"><%= ui.catalogEmptyState %></div>
+            <div class="soft-panel muted catalog-empty">
+              <div><%= ui.catalogEmptyState %></div>
+              <div class="mt-2">
+                <a class="btn btn-soft btn-pill" href="#pathwaysCatalogCreateForm"><%= ui.catalogCreateAction %></a>
+              </div>
+            </div>
           <% } %>
         </div>
       </section>
