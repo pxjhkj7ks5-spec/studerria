@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.2.76",
+      "date": "2026-03-25",
+      "items": [
+        "fix(pathways-admissions-empty-state): make the admissions section distinguish between “no program selected” and “selected program has no cohorts yet”, so the empty state now explains the real blocker instead of collapsing both cases into one vague message",
+        "tune(pathways-admissions-cta): add direct CTA routing from the admissions empty state either back to the programs section or straight to the first admission form, which removes another dead-end from the admin cohort flow"
+      ]
+    },
+    {
       "version": "1.2.75",
       "date": "2026-03-25",
       "items": [

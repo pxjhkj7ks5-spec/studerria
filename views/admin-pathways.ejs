@@ -154,6 +154,9 @@
     year: 'Рік',
     focusCohort: 'Обрати когорту',
     manageProgramAdmissions: 'Оберіть програму, щоб керувати її роками вступу.',
+    noAdmissionsForProgram: 'У цієї програми ще немає жодного року вступу. Додайте першу когорту у форму вище.',
+    openPrograms: 'До програм',
+    addFirstAdmission: 'Додати першу когорту',
     mappingTitle: 'Мапінг курсів',
     mappingSubtitle: 'Курси, для яких рік вступу доступний на етапі реєстрації. Це перша критична умова для працездатного сценарію онбордингу.',
     mappingEmptyTitle: 'Мапінг ще не налаштовано',
@@ -335,6 +338,9 @@
     year: 'Year',
     focusCohort: 'Focus cohort',
     manageProgramAdmissions: 'Select a program to manage its admission years.',
+    noAdmissionsForProgram: 'This program does not have any admission years yet. Add the first cohort in the form above.',
+    openPrograms: 'Go to programs',
+    addFirstAdmission: 'Add first cohort',
     mappingTitle: 'Course mapping',
     mappingSubtitle: 'Courses for which the admission is available during registration. This is the first critical condition for a working onboarding flow.',
     mappingEmptyTitle: 'No course mapping yet',
@@ -1262,7 +1268,7 @@
           <% } %>
         </div>
 
-        <form method="POST" action="/admin/pathways/admissions/add" class="soft-panel row g-2 mb-3">
+        <form id="pathwaysAdmissionCreateForm" method="POST" action="/admin/pathways/admissions/add" class="soft-panel row g-2 mb-3">
           <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
           <input type="hidden" name="track" value="<%= activeTrack %>" />
           <input type="hidden" name="focus_program_id" value="<%= selectedProgramValue %>" />
@@ -1360,7 +1366,10 @@
           <% }) %>
           <% if (!admissionCards.length) { %>
             <div class="soft-panel muted">
-              <%= ui.manageProgramAdmissions %>
+              <div><%= selectedProgramValue > 0 ? ui.noAdmissionsForProgram : ui.manageProgramAdmissions %></div>
+              <div class="mt-2">
+                <a class="btn btn-soft btn-pill" href="<%= selectedProgramValue > 0 ? '#pathwaysAdmissionCreateForm' : '#pathways-programs' %>"><%= selectedProgramValue > 0 ? ui.addFirstAdmission : ui.openPrograms %></a>
+              </div>
             </div>
           <% } %>
         </div>
