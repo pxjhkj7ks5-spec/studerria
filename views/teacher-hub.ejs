@@ -216,6 +216,113 @@
       body.theme-light .hub-panel-head p {
         color: rgba(15, 23, 42, 0.58);
       }
+      .hub-brief-card {
+        border-radius: 18px;
+        padding: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.28);
+      }
+      .hub-brief-card.is-risk {
+        border-color: rgba(248, 113, 113, 0.38);
+        background: linear-gradient(145deg, rgba(127, 29, 29, 0.4), rgba(15, 23, 42, 0.32));
+      }
+      .hub-brief-card.is-focus {
+        border-color: rgba(251, 191, 36, 0.34);
+        background: linear-gradient(145deg, rgba(120, 53, 15, 0.34), rgba(15, 23, 42, 0.3));
+      }
+      .hub-brief-card.is-growth {
+        border-color: rgba(74, 222, 128, 0.28);
+        background: linear-gradient(145deg, rgba(20, 83, 45, 0.34), rgba(15, 23, 42, 0.28));
+      }
+      .hub-brief-card.is-calm {
+        border-color: rgba(125, 211, 252, 0.28);
+        background: linear-gradient(145deg, rgba(8, 47, 73, 0.34), rgba(15, 23, 42, 0.28));
+      }
+      body.theme-light .hub-brief-card {
+        background: rgba(255, 255, 255, 0.88);
+        border-color: rgba(15, 23, 42, 0.1);
+      }
+      body.theme-light .hub-brief-card.is-risk {
+        background: linear-gradient(145deg, rgba(254, 242, 242, 0.98), rgba(255, 255, 255, 0.9));
+      }
+      body.theme-light .hub-brief-card.is-focus {
+        background: linear-gradient(145deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.9));
+      }
+      body.theme-light .hub-brief-card.is-growth {
+        background: linear-gradient(145deg, rgba(240, 253, 244, 0.98), rgba(255, 255, 255, 0.9));
+      }
+      body.theme-light .hub-brief-card.is-calm {
+        background: linear-gradient(145deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 0.9));
+      }
+      .hub-kicker {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(226, 232, 240, 0.58);
+      }
+      body.theme-light .hub-kicker {
+        color: rgba(15, 23, 42, 0.48);
+      }
+      .hub-brief-title {
+        margin-top: 8px;
+        font-size: 1.15rem;
+        font-weight: 720;
+        line-height: 1.2;
+      }
+      .hub-reason-list {
+        margin-top: 14px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .hub-reason-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 5px 10px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 0.8rem;
+      }
+      body.theme-light .hub-reason-chip {
+        border-color: rgba(15, 23, 42, 0.1);
+        background: rgba(255, 255, 255, 0.82);
+      }
+      .hub-priority-list {
+        display: grid;
+        gap: 10px;
+      }
+      .hub-priority-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        border-radius: 16px;
+        padding: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.22);
+      }
+      body.theme-light .hub-priority-item {
+        background: rgba(255, 255, 255, 0.84);
+        border-color: rgba(15, 23, 42, 0.1);
+      }
+      .hub-priority-main {
+        min-width: 0;
+      }
+      .hub-priority-title {
+        font-weight: 650;
+      }
+      .hub-priority-meta {
+        margin-top: 4px;
+        font-size: 0.84rem;
+        color: rgba(203, 213, 225, 0.74);
+      }
+      body.theme-light .hub-priority-meta {
+        color: rgba(15, 23, 42, 0.58);
+      }
+      .hub-priority-link {
+        white-space: nowrap;
+      }
     </style>
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/dynamic-bg.css" />
@@ -263,6 +370,118 @@
           <a class="btn btn-hub" href="/teacher/workspace"><%= t('teacherHub.action.workspace') %></a>
           <a class="btn btn-hub" href="/teacher/subjects"><%= t('teacherHub.action.subjects') %></a>
           <a class="btn btn-hub" href="/journal"><%= t('teacherHub.action.journal') %></a>
+        </div>
+      </section>
+
+      <%
+        const teacherBriefTone = teacherBrief && teacherBrief.tone ? String(teacherBrief.tone) : 'calm';
+        const teacherBriefReasons = teacherBrief && Array.isArray(teacherBrief.reasons) ? teacherBrief.reasons.filter(Boolean).slice(0, 3) : [];
+        const teacherPriorities = Array.isArray(teacherTopPriorities) ? teacherTopPriorities : [];
+        const activitySummary = teacherActivitySummary || {};
+        const ratingTopEntry = latestRatingSnapshot && latestRatingSnapshot.top_entry ? latestRatingSnapshot.top_entry : null;
+      %>
+
+      <section class="row g-3 mb-1">
+        <div class="col-12 col-xl-7">
+          <article class="glass hub-panel h-100">
+            <div class="hub-panel-head">
+              <div>
+                <h5 class="mb-1"><%= lang === 'en' ? 'What needs attention now' : 'Що потребує уваги зараз' %></h5>
+                <p><%= lang === 'en' ? 'Keep the next move obvious: one brief, a short reason stack, and direct links to action.' : 'Тут має бути очевидний наступний крок: один brief, короткі причини й прямі переходи до дії.' %></p>
+              </div>
+              <% if (teacherBrief && teacherBrief.action_href) { %>
+                <a class="btn btn-hub btn-sm" href="<%= teacherBrief.action_href %>"><%= teacherBrief.action_label || (lang === 'en' ? 'Open' : 'Відкрити') %></a>
+              <% } %>
+            </div>
+            <div class="hub-brief-card is-<%= teacherBriefTone %>">
+              <div class="hub-kicker"><%= lang === 'en' ? 'Operational digest' : 'Оперативний зріз' %></div>
+              <div class="hub-brief-title"><%= teacherBrief && teacherBrief.title ? teacherBrief.title : (lang === 'en' ? 'Stable working rhythm' : 'Стабільний робочий ритм') %></div>
+              <div class="hub-list-meta mt-2">
+                <%= teacherBrief && teacherBrief.message ? teacherBrief.message : (lang === 'en' ? 'No critical blockers surfaced right now. Use the dashboard cards below to move into schedule, journal, or workspace.' : 'Критичних блокерів зараз не видно. Нижче є прямі переходи в розклад, журнал і workspace.') %>
+              </div>
+              <% if (teacherBriefReasons.length) { %>
+                <div class="hub-reason-list">
+                  <% teacherBriefReasons.forEach(function(reason) { %>
+                    <span class="hub-reason-chip"><%= reason %></span>
+                  <% }) %>
+                </div>
+              <% } %>
+            </div>
+            <% if (teacherPriorities.length) { %>
+              <div class="hub-priority-list mt-3">
+                <% teacherPriorities.forEach(function(item) { %>
+                  <div class="hub-priority-item">
+                    <div class="hub-priority-main">
+                      <div class="hub-priority-title"><%= item.subject_name || item.description || (lang === 'en' ? 'Priority item' : 'Пріоритет') %></div>
+                      <div class="hub-priority-meta">
+                        <%= item.description || (lang === 'en' ? 'Needs attention in the current teaching window.' : 'Потребує уваги в поточному викладацькому вікні.') %>
+                        <% if (item.deadline_date) { %>
+                          · <%= formatHubDate(item.deadline_date) %>
+                        <% } %>
+                      </div>
+                    </div>
+                    <a class="btn btn-hub btn-sm hub-priority-link" href="<%= item.action_href || '/journal' %>"><%= item.action_label || (lang === 'en' ? 'Open' : 'Відкрити') %></a>
+                  </div>
+                <% }) %>
+              </div>
+            <% } %>
+          </article>
+        </div>
+        <div class="col-12 col-xl-5">
+          <article class="glass hub-panel h-100">
+            <div class="hub-panel-head">
+              <div>
+                <h5 class="mb-1"><%= lang === 'en' ? 'Operational pulse' : 'Операційний пульс' %></h5>
+                <p><%= lang === 'en' ? 'Small numbers that show whether review, deadlines, and follow-up stay under control.' : 'Короткий набір метрик, який показує, чи контрольовані перевірка, дедлайни та follow-up.' %></p>
+              </div>
+              <a class="btn btn-hub btn-sm" href="/home"><%= lang === 'en' ? 'Open home' : 'На головну' %></a>
+            </div>
+            <div class="stat-grid">
+              <div class="stat-card">
+                <div class="stat-label"><%= lang === 'en' ? 'Due soon' : 'Скоро дедлайни' %></div>
+                <div class="stat-value"><%= Number(activitySummary && activitySummary.due_soon ? activitySummary.due_soon : 0) %></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label"><%= lang === 'en' ? 'Overdue' : 'Прострочено' %></div>
+                <div class="stat-value"><%= Number(activitySummary && activitySummary.overdue ? activitySummary.overdue : 0) %></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label"><%= lang === 'en' ? 'Recent feedback' : 'Свіжий фідбек' %></div>
+                <div class="stat-value"><%= Number(activitySummary && activitySummary.recent_feedback ? activitySummary.recent_feedback : 0) %></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label"><%= lang === 'en' ? 'Open reminders' : 'Активні нагадування' %></div>
+                <div class="stat-value"><%= Number(activitySummary && activitySummary.open_reminders ? activitySummary.open_reminders : 0) %></div>
+              </div>
+            </div>
+            <div class="hub-list mt-3">
+              <div class="hub-list-item">
+                <div class="hub-list-title"><%= lang === 'en' ? 'Latest published rating' : 'Останній опублікований рейтинг' %></div>
+                <% if (latestRatingSnapshot) { %>
+                  <div class="hub-list-meta">
+                    <%= latestRatingSnapshot.scope_label || (lang === 'en' ? 'Selected scope' : 'Обраний контур') %>
+                    <% if (latestRatingSnapshot.target_label) { %> · <%= latestRatingSnapshot.target_label %><% } %>
+                    <% if (latestRatingSnapshot.period_label) { %> · <%= latestRatingSnapshot.period_label %><% } %>
+                    <% if (latestRatingSnapshot.updated_label) { %> · <%= latestRatingSnapshot.updated_label %><% } %>
+                  </div>
+                  <% if (ratingTopEntry) { %>
+                    <div class="hub-list-meta mt-2">
+                      <strong><%= lang === 'en' ? 'Leader' : 'Лідер' %>:</strong> <%= ratingTopEntry.full_name %>
+                      <% if (ratingTopEntry.score_label) { %> · <%= ratingTopEntry.score_label %><% } %>
+                    </div>
+                  <% } %>
+                  <div class="mt-3">
+                    <a class="btn btn-hub btn-sm" href="/journal/insights"><%= lang === 'en' ? 'Open insights' : 'Відкрити інсайти' %></a>
+                  </div>
+                <% } else { %>
+                  <div class="hub-list-meta"><%= lang === 'en' ? 'Publish a rating from Journal Insights to keep this dashboard aligned with the same snapshot used in My Day and the schedule inbox.' : 'Опублікуйте рейтинг із Journal Insights, щоб цей дашборд бачив той самий snapshot, що й My Day та inbox розкладу.' %></div>
+                  <div class="mt-3">
+                    <a class="btn btn-hub btn-sm" href="/journal/insights"><%= lang === 'en' ? 'Go to insights' : 'До інсайтів' %></a>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+          </article>
         </div>
       </section>
 

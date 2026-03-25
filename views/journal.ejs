@@ -28,7 +28,7 @@
         reopenSubjectConfirm: 'Reopen this subject and unlock the journal?',
         reopenSubject: 'Reopen subject',
         exportStatement: 'Export statement',
-        attendanceTitleTeacher: 'Attendance (MVP)',
+        attendanceTitleTeacher: 'Attendance',
         attendanceTitleStudent: 'My attendance',
         classLabel: 'Class',
         attendancePresent: 'Present',
@@ -156,7 +156,7 @@
         reopenSubjectConfirm: 'Відкрити предмет і розблокувати журнал?',
         reopenSubject: 'Відкрити предмет',
         exportStatement: 'Експорт відомості',
-        attendanceTitleTeacher: 'Відвідуваність (MVP)',
+        attendanceTitleTeacher: 'Відвідуваність',
         attendanceTitleStudent: 'Моя відвідуваність',
         classLabel: 'Пара',
         attendancePresent: 'Присутні',
@@ -392,6 +392,11 @@
             const weight = Number(gradingSettings && gradingSettings[`${cfg.key}_weight_points`]);
             if (enabled && Number.isFinite(weight)) enabledWeightTotal += weight;
           });
+          const activeColumnCount = Array.isArray(columns)
+            ? columns.filter((column) => Number(column && column.is_archived ? column.is_archived : 0) !== 1).length
+            : 0;
+          const closureStudentCount = Array.isArray(journalRows) ? journalRows.length : 0;
+          const latestClosureEvent = subjectClosure && subjectClosure.latest_event ? subjectClosure.latest_event : null;
         %>
         <section class="glass liquid-card p-3 mb-3">
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -404,10 +409,34 @@
               <% } else { %>
                 <div class="text-muted small"><%= journalCopy.closureOpenHint %></div>
               <% } %>
+              <div class="d-flex flex-wrap gap-2 mt-2">
+                <span class="status-chip status-chip--neutral">
+                  <%= lang === 'en' ? 'Columns' : 'Колонки' %>: <%= activeColumnCount %>
+                </span>
+                <span class="status-chip status-chip--neutral">
+                  <%= lang === 'en' ? 'Students' : 'Студенти' %>: <%= closureStudentCount %>
+                </span>
+                <% if (subjectClosure && subjectClosure.is_closed && latestClosureEvent && (Number(latestClosureEvent.export_rows_count || 0) > 0 || Number(latestClosureEvent.export_columns_count || 0) > 0)) { %>
+                  <span class="status-chip status-chip--info">
+                    <%= lang === 'en' ? 'Snapshot' : 'Знімок' %>: <%= Number(latestClosureEvent.export_rows_count || 0) %> × <%= Number(latestClosureEvent.export_columns_count || 0) %>
+                  </span>
+                <% } %>
+              </div>
+              <div class="text-muted small mt-2">
+                <% if (subjectClosure && subjectClosure.is_closed) { %>
+                  <%= lang === 'en'
+                    ? 'Reopen returns editing to the subject, while the exported snapshot stays available for audit and download.'
+                    : 'Повторне відкриття повертає редагування, а експортований snapshot лишається доступним для аудиту й завантаження.' %>
+                <% } else { %>
+                  <%= lang === 'en'
+                    ? `Closing will lock ${activeColumnCount} active columns for ${closureStudentCount} students and generate an export snapshot.`
+                    : `Закриття заблокує ${activeColumnCount} активних колонок для ${closureStudentCount} студентів і згенерує export snapshot.` %>
+                <% } %>
+              </div>
             </div>
             <div class="d-flex flex-wrap gap-2">
               <% if (canCloseSubject) { %>
-                <form method="POST" action="/journal/subject/close" target="_blank" onsubmit="return confirm(<%- JSON.stringify(journalCopy.closeSubjectConfirm) %>)">
+                <form method="POST" action="/journal/subject/close" onsubmit="return confirm(<%- JSON.stringify(journalCopy.closeSubjectConfirm) %>)">
                   <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
                   <button class="btn btn-outline-danger btn-sm" type="submit"><%= journalCopy.closeSubject %></button>
                 </form>
@@ -1405,6 +1434,25 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+      const clearNodeChildren = (node) => {
+        if (!node) return;
+        while (node.firstChild) {
+          node.removeChild(node.firstChild);
+        }
+      };
+      const renderBulkPreviewMessages = (lines, className) => {
+        if (!bulkPreviewEl) return;
+        clearNodeChildren(bulkPreviewEl);
+        (Array.isArray(lines) ? lines : []).forEach((line) => {
+          const row = document.createElement('div');
+          row.className = className;
+          row.textContent = String(line || '');
+          bulkPreviewEl.appendChild(row);
+        });
+      };
+      const renderBulkPreviewEmpty = (message) => {
+        renderBulkPreviewMessages([message], 'text-muted small');
+      };
       const resolveSafeHref = (rawValue, { uploadsOnly = false } = {}) => {
         const value = String(rawValue || '').trim();
         if (!value) return '';
@@ -2278,12 +2326,14 @@
           : '';
         if (errors.length) {
           bulkPreviewMetaEl.textContent = `Попередній перегляд: помилки (${errors.length})${linesExtra}`;
-          bulkPreviewEl.innerHTML = errors.map((line) => `<div class="text-danger small">${line}</div>`).join('');
+          renderBulkPreviewMessages(errors, 'text-danger small');
         } else {
           bulkPreviewMetaEl.textContent = `Попередній перегляд: ${entries.length} записів${linesExtra}`;
-          bulkPreviewEl.innerHTML = previewRows.length
-            ? previewRows.map((line) => `<div class="small">${line}</div>`).join('')
-            : '<div class="text-muted small">Немає даних для збереження.</div>';
+          if (previewRows.length) {
+            renderBulkPreviewMessages(previewRows, 'small');
+          } else {
+            renderBulkPreviewEmpty('Немає даних для збереження.');
+          }
         }
         const canSubmit = !bulkCurrentLocked && entries.length > 0 && errors.length === 0;
         if (bulkSubmitBtn) bulkSubmitBtn.disabled = !canSubmit;
@@ -2313,7 +2363,7 @@
         }
         if (bulkEntriesInput) bulkEntriesInput.value = '';
         if (bulkPreviewMetaEl) bulkPreviewMetaEl.textContent = 'Попередній перегляд: 0 записів';
-        if (bulkPreviewEl) bulkPreviewEl.innerHTML = '<div class="text-muted small">Вставте дані для попереднього перегляду.</div>';
+        renderBulkPreviewEmpty('Вставте дані для попереднього перегляду.');
         if (bulkSubmitBtn) bulkSubmitBtn.disabled = true;
         bulkModal.show();
       };

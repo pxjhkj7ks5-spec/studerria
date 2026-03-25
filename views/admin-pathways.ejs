@@ -996,6 +996,11 @@
                   </a>
                 <% }) %>
               </div>
+              <% if (cohortAlertsList.length && cohortAlertsList[0] && cohortAlertsList[0].target) { %>
+                <div class="mt-3 d-grid">
+                  <a class="btn btn-soft btn-pill" href="#<%= cohortAlertsList[0].target %>"><%= cohortAlertsList[0].action_label || ui.openSection %></a>
+                </div>
+              <% } %>
             <% } else { %>
               <div class="hero-health__empty"><%= ui.heroHealthEmpty %></div>
             <% } %>

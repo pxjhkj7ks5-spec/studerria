@@ -719,6 +719,25 @@
                 <p class="publish-card__note"><%= lang === 'en' ? 'Once published, the latest snapshot will appear here and stay aligned with My Day and the schedule inbox.' : 'Після публікації останній snapshot з’явиться тут і лишиться узгодженим з My Day та inbox розкладу.' %></p>
               <% } %>
             </article>
+
+            <article class="publish-card">
+              <div class="publish-card__eyebrow"><%= lang === 'en' ? 'Next action' : 'Наступна дія' %></div>
+              <div class="publish-card__title"><%= scopeLabelValue || t('journalInsights.scope') %></div>
+              <div class="publish-card__meta">
+                <span class="chip"><%= t('journalInsights.compare') %>: <%= compareLabel %></span>
+                <span class="chip"><%= t('journalInsights.participants') %>: <%= Number(summary && summary.participants_count ? summary.participants_count : 0) %></span>
+              </div>
+              <p class="publish-card__note">
+                <%= lang === 'en'
+                  ? 'Use the same scope immediately: reopen the journal, export CSV, or move back to the schedule without losing context.'
+                  : 'Використайте цей самий контур одразу: поверніться в журнал, експортуйте CSV або перейдіть у розклад без втрати контексту.' %>
+              </p>
+              <div class="d-flex flex-wrap gap-2 mt-3">
+                <a class="btn btn-outline-primary btn-sm" href="/journal<%= selectedSubjectValue ? `?subject_id=${selectedSubjectValue}` : '' %>"><%= t('journalInsights.backToJournal') %></a>
+                <a class="btn btn-outline-secondary btn-sm" href="<%= exportCsvHref %>"><%= t('journalInsights.exportCsv') %></a>
+                <a class="btn btn-outline-secondary btn-sm" href="/schedule"><%= lang === 'en' ? 'Open schedule' : 'До розкладу' %></a>
+              </div>
+            </article>
           </div>
           <% if (canPublishRating) { %>
             <form method="POST" action="/journal/insights/publish-rating" class="soft-panel row g-2 align-items-end">

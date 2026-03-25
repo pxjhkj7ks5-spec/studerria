@@ -502,8 +502,82 @@
       const windowsResult = document.getElementById('courseWindowsResult');
       const windowsCourseInputs = Array.from(document.querySelectorAll('.windows-course'));
 
+      function clearChildren(node) {
+        if (!node) return;
+        while (node.firstChild) {
+          node.removeChild(node.firstChild);
+        }
+      }
+
       function renderWindowsEmpty(message) {
-        windowsResult.innerHTML = `<div class="windows-empty">${message}</div>`;
+        clearChildren(windowsResult);
+        const empty = document.createElement('div');
+        empty.className = 'windows-empty';
+        empty.textContent = message;
+        windowsResult.appendChild(empty);
+      }
+
+      function renderWindowsWarnings(messages) {
+        clearChildren(windowsWarnings);
+        (Array.isArray(messages) ? messages : []).forEach((message) => {
+          const alert = document.createElement('div');
+          alert.className = 'alert alert-warning py-2 px-3 mb-0';
+          alert.textContent = String(message || '');
+          windowsWarnings.appendChild(alert);
+        });
+      }
+
+      function renderWindowsDays(days) {
+        clearChildren(windowsResult);
+        (Array.isArray(days) ? days : []).forEach((day) => {
+          const dayCard = document.createElement('div');
+          dayCard.className = 'windows-day';
+
+          const title = document.createElement('div');
+          title.className = 'windows-day-title';
+          title.textContent = String(day && day.day ? day.day : '');
+          dayCard.appendChild(title);
+
+          const chipsWrap = document.createElement('div');
+          chipsWrap.className = 'd-flex flex-wrap gap-2';
+          (Array.isArray(day && day.slots ? day.slots : []) ? day.slots : []).forEach((slot) => {
+            const chip = document.createElement('span');
+            chip.className = 'window-chip';
+            const time = slot && slot.time ? String(slot.time) : '--:--';
+            const classNumber = Number(slot && slot.class_number ? slot.class_number : 0) || '—';
+            chip.textContent = `${time} · ${classNumber} пара`;
+            chipsWrap.appendChild(chip);
+          });
+          dayCard.appendChild(chipsWrap);
+          windowsResult.appendChild(dayCard);
+        });
+      }
+
+      function renderWindowsDaysSafe(days) {
+        clearChildren(windowsResult);
+        (Array.isArray(days) ? days : []).forEach((day) => {
+          const dayCard = document.createElement('div');
+          dayCard.className = 'windows-day';
+
+          const title = document.createElement('div');
+          title.className = 'windows-day-title';
+          title.textContent = String(day && day.day ? day.day : '');
+          dayCard.appendChild(title);
+
+          const chipsWrap = document.createElement('div');
+          chipsWrap.className = 'd-flex flex-wrap gap-2';
+          const slots = Array.isArray(day && day.slots) ? day.slots : [];
+          slots.forEach((slot) => {
+            const chip = document.createElement('span');
+            chip.className = 'window-chip';
+            const time = slot && slot.time ? String(slot.time) : '--:--';
+            const classNumber = Number(slot && slot.class_number ? slot.class_number : 0);
+            chip.textContent = classNumber > 0 ? `${time} · ${classNumber}` : time;
+            chipsWrap.appendChild(chip);
+          });
+          dayCard.appendChild(chipsWrap);
+          windowsResult.appendChild(dayCard);
+        });
       }
 
       function collectSelectedCourses() {
@@ -526,8 +600,8 @@
           const courseIds = collectSelectedCourses();
           const weekNumber = Number(windowsWeek.value);
           windowsSummary.textContent = '';
-          windowsWarnings.innerHTML = '';
-          windowsResult.innerHTML = '';
+          clearChildren(windowsWarnings);
+          clearChildren(windowsResult);
           if (!courseIds.length) {
             renderWindowsEmpty('Оберіть хоча б один курс.');
             return;
@@ -549,34 +623,20 @@
             }
             if (!payload.ok) {
               if (payload.warnings && payload.warnings.length) {
-                windowsWarnings.innerHTML = payload.warnings.map((w) => (
-                  `<div class="alert alert-warning py-2 px-3 mb-0">${w}</div>`
-                )).join('');
+                renderWindowsWarnings(payload.warnings);
               }
               renderWindowsEmpty(payload.error || 'Немає даних для розрахунку.');
               return;
             }
             windowsSummary.textContent = payload.summary || '';
             if (payload.warnings && payload.warnings.length) {
-              windowsWarnings.innerHTML = payload.warnings.map((w) => (
-                `<div class="alert alert-warning py-2 px-3 mb-0">${w}</div>`
-              )).join('');
+              renderWindowsWarnings(payload.warnings);
             }
             if (!payload.windows || !payload.windows.length) {
               renderWindowsEmpty('Спільних вікон не знайдено.');
               return;
             }
-            windowsResult.innerHTML = payload.windows.map((day) => {
-              const chips = day.slots.map((slot) => (
-                `<span class="window-chip">${slot.time} · ${slot.class_number} пара</span>`
-              )).join(' ');
-              return `
-                <div class="windows-day">
-                  <div class="windows-day-title">${day.day}</div>
-                  <div class="d-flex flex-wrap gap-2">${chips}</div>
-                </div>
-              `;
-            }).join('');
+            renderWindowsDaysSafe(payload.windows);
           } catch (err) {
             renderWindowsEmpty('Не вдалося отримати вікна. Спробуйте ще раз.');
           } finally {

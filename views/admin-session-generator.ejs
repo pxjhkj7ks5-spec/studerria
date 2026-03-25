@@ -73,6 +73,20 @@
         publishSourceEmpty: 'Source: manual plan (empty)',
         events: 'Events',
         publishHint: '1. Check teacher conflicts. 2. If everything is clean, publish to the journal and timetable.',
+        publishImpactTitle: 'Підсумок впливу',
+        publishImpactHint: 'Review scope, pressure, and journal readiness before publishing.',
+        publishImpactSubjects: 'Subjects',
+        publishImpactGroups: 'Groups',
+        publishImpactExams: 'Exams',
+        publishImpactConsultations: 'Consultations',
+        publishImpactCredits: 'Credits',
+        publishImpactRooms: 'Rooms',
+        publishImpactConflicts: 'Conflicts',
+        publishImpactOutOfWindow: 'Out of window',
+        publishImpactJournal: 'Journal',
+        publishImpactJournalReady: 'Ready',
+        publishImpactJournalReview: 'Needs review',
+        publishImpactJournalIdle: 'Draft',
         checkConflicts: 'Check conflicts',
         publishButton: 'Publish to timetable and journal',
         deleteConfirm: 'Delete session events in the selected week window?',
@@ -197,6 +211,20 @@
         publishSourceEmpty: 'Джерело: ручний план (порожньо)',
         events: 'Подій',
         publishHint: '1. Перевірте конфлікти викладачів. 2. Якщо все чисто, публікуйте в журнал і розклад.',
+        publishImpactTitle: 'Impact summary',
+        publishImpactHint: 'Перед публікацією перегляньте обсяг, тиск конфліктів і готовність журналу.',
+        publishImpactSubjects: 'Предмети',
+        publishImpactGroups: 'Групи',
+        publishImpactExams: 'Екзамени',
+        publishImpactConsultations: 'Консультації',
+        publishImpactCredits: 'Заліки',
+        publishImpactRooms: 'Кабінети',
+        publishImpactConflicts: 'Конфлікти',
+        publishImpactOutOfWindow: 'Поза вікном',
+        publishImpactJournal: 'Журнал',
+        publishImpactJournalReady: 'Готово',
+        publishImpactJournalReview: 'Потрібна увага',
+        publishImpactJournalIdle: 'Чернетка',
         checkConflicts: 'Перевірити конфлікти',
         publishButton: 'Опублікувати в розклад і журнал',
         deleteConfirm: 'Видалити сесійні події у вибраному вікні тижнів?',
@@ -1794,6 +1822,46 @@
                 <span class="mark-pill info"><%= sessionGeneratorText.events %>: <span id="sessionPublishCount">0</span></span>
               </div>
               <div class="session-subtle"><%= sessionGeneratorText.publishHint %></div>
+              <div class="fw-semibold"><%= sessionGeneratorText.publishImpactTitle %></div>
+              <div class="session-stat-grid">
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.publishImpactSubjects %></div>
+                  <div class="session-stat-value" id="sessionPublishSubjectCount">0</div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.publishImpactGroups %></div>
+                  <div class="session-stat-value" id="sessionPublishGroupCount">0</div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.publishImpactExams %></div>
+                  <div class="session-stat-value" id="sessionPublishExamCount">0</div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.publishImpactConsultations %></div>
+                  <div class="session-stat-value" id="sessionPublishConsultationCount">0</div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.publishImpactCredits %></div>
+                  <div class="session-stat-value" id="sessionPublishCreditCount">0</div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.publishImpactRooms %></div>
+                  <div class="session-stat-value" id="sessionPublishRoomCount">0</div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.publishImpactConflicts %></div>
+                  <div class="session-stat-value" id="sessionPublishConflictCount">0</div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.publishImpactOutOfWindow %></div>
+                  <div class="session-stat-value" id="sessionPublishOutOfWindowCount">0</div>
+                </div>
+              </div>
+              <div class="session-stat">
+                <div class="session-stat-label"><%= sessionGeneratorText.publishImpactJournal %></div>
+                <div class="session-stat-value" id="sessionPublishJournalStatus"><%= sessionGeneratorText.publishImpactJournalIdle %></div>
+                <div class="session-subtle" id="sessionPublishImpactHint"><%= sessionGeneratorText.publishImpactHint %></div>
+              </div>
               <input type="hidden" name="location" value="<%= activeLocation %>" />
               <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
               <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
@@ -1937,6 +2005,16 @@
         const checkConflictsBtn = document.getElementById('sessionCheckConflictsBtn');
         const publishSourceHint = document.getElementById('sessionPublishSourceHint');
         const publishCount = document.getElementById('sessionPublishCount');
+        const publishSubjectCount = document.getElementById('sessionPublishSubjectCount');
+        const publishGroupCount = document.getElementById('sessionPublishGroupCount');
+        const publishExamCount = document.getElementById('sessionPublishExamCount');
+        const publishConsultationCount = document.getElementById('sessionPublishConsultationCount');
+        const publishCreditCount = document.getElementById('sessionPublishCreditCount');
+        const publishRoomCount = document.getElementById('sessionPublishRoomCount');
+        const publishConflictCount = document.getElementById('sessionPublishConflictCount');
+        const publishOutOfWindowCount = document.getElementById('sessionPublishOutOfWindowCount');
+        const publishJournalStatus = document.getElementById('sessionPublishJournalStatus');
+        const publishImpactHint = document.getElementById('sessionPublishImpactHint');
         const sessionRoomForm = document.getElementById('sessionRoomForm');
         const sessionRoomIdInput = document.getElementById('sessionRoomId');
         const sessionRoomBuildingInput = document.getElementById('sessionRoomBuilding');
@@ -2554,6 +2632,63 @@
           renderGroupTimeline();
         };
 
+        const updatePublishImpactSummary = (rows) => {
+          const normalizedRows = Array.isArray(rows) ? rows : [];
+          const subjectIds = new Set();
+          const groupKeys = new Set();
+          const roomIds = new Set();
+          let examCount = 0;
+          let consultationCount = 0;
+          let creditCount = 0;
+
+          normalizedRows.forEach((row) => {
+            const subjectId = Number(row && row.subject_id ? row.subject_id : 0);
+            if (subjectId > 0) {
+              subjectIds.add(subjectId);
+              groupKeys.add(`${subjectId}|${Number(row && row.group_number ? row.group_number : 0) || 'all'}`);
+            }
+            const roomId = Number(row && row.room_id ? row.room_id : 0);
+            if (roomId > 0) {
+              roomIds.add(roomId);
+            }
+            const type = String(row && row.type ? row.type : 'exam');
+            if (type === 'consultation') {
+              consultationCount += 1;
+            } else if (type === 'credit') {
+              creditCount += 1;
+            } else {
+              examCount += 1;
+            }
+          });
+
+          const conflictTotal = Number(liveConflictState && liveConflictState.conflicts_total ? liveConflictState.conflicts_total : 0);
+          const outOfWindowTotal = Number(liveConflictState && liveConflictState.out_of_window_total ? liveConflictState.out_of_window_total : 0);
+          const journalStatus = !normalizedRows.length
+            ? sessionGeneratorText.publishImpactJournalIdle
+            : (conflictTotal || outOfWindowTotal
+              ? sessionGeneratorText.publishImpactJournalReview
+              : sessionGeneratorText.publishImpactJournalReady);
+          let hintText = sessionGeneratorText.publishImpactHint;
+          if (normalizedRows.length && (conflictTotal || outOfWindowTotal)) {
+            hintText = liveConflictState && liveConflictState.summary
+              ? String(liveConflictState.summary)
+              : sessionGeneratorText.publishHint;
+          } else if (!normalizedRows.length) {
+            hintText = sessionGeneratorText.publishSourceEmpty;
+          }
+
+          if (publishSubjectCount) publishSubjectCount.textContent = String(subjectIds.size);
+          if (publishGroupCount) publishGroupCount.textContent = String(groupKeys.size);
+          if (publishExamCount) publishExamCount.textContent = String(examCount);
+          if (publishConsultationCount) publishConsultationCount.textContent = String(consultationCount);
+          if (publishCreditCount) publishCreditCount.textContent = String(creditCount);
+          if (publishRoomCount) publishRoomCount.textContent = String(roomIds.size);
+          if (publishConflictCount) publishConflictCount.textContent = String(conflictTotal);
+          if (publishOutOfWindowCount) publishOutOfWindowCount.textContent = String(outOfWindowTotal);
+          if (publishJournalStatus) publishJournalStatus.textContent = journalStatus;
+          if (publishImpactHint) publishImpactHint.textContent = hintText;
+        };
+
         const syncPublishState = () => {
           if (!publishBtn || !manualAssignmentsInput) return;
           const rows = sortAssignments(manualAssignments);
@@ -2578,6 +2713,7 @@
           if (publishCount) {
             publishCount.textContent = String(rows.length);
           }
+          updatePublishImpactSummary(rows);
         };
 
         const setLiveConflictStatusText = (text, mode) => {
@@ -2669,6 +2805,7 @@
               slot_conflicts: {},
             };
             setLiveConflictStatusText(sessionGeneratorText.liveConflictEmpty, 'ok');
+            updatePublishImpactSummary(rows);
             renderPlannerSurface();
             if (force) {
               updateBlockReasonMessage(lastHoveredSlotKey && slotMetaByKey.get(lastHoveredSlotKey)
@@ -2728,6 +2865,7 @@
             if (myToken !== liveConflictRequestToken) return;
             setLiveConflictStatusText(sessionGeneratorText.liveConflictUpdateFailed, 'err');
           }
+          updatePublishImpactSummary(rows);
           renderPlannerSurface();
           if (force) {
             updateBlockReasonMessage(lastHoveredSlotKey && slotMetaByKey.get(lastHoveredSlotKey)

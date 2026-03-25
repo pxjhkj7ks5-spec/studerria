@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.62",
+      "date": "2026-03-25",
+      "items": [
+        "fix(security-session-and-ops-hardening): enforce a real production session secret, rotate sessions on login/logout/role changes, trust proxy-aware IP handling, explicit body-size limits, verified Postgres TLS, and tighter `/_health`, `/__version`, `/_bootstrap` exposure with baseline helmet hardening",
+        "fix(journal-and-schedule-safe-previews): replace unsafe HTML-string rendering in journal bulk grading and admin schedule windows with DOM-safe previews, and make journal subject closure explain lock/export impact before destructive actions",
+        "feat(core-module-finish-pass): add publish impact summary to `/admin/session-generator`, operational digest plus latest rating context to `/teacher/hub`, an action-oriented scope card to `/journal/insights`, and a stronger focus CTA inside `/admin/pathways`"
+      ]
+    },
+    {
       "version": "1.2.61",
       "date": "2026-03-24",
       "items": [

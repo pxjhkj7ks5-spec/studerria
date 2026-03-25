@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const helmet = require('helmet');
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 const path = require('path');
@@ -690,12 +691,78 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+const isProd = process.env.NODE_ENV === 'production';
+const bodyFormLimit = String(process.env.BODY_FORM_LIMIT || '512kb').trim() || '512kb';
+const bodyJsonLimit = String(process.env.BODY_JSON_LIMIT || '512kb').trim() || '512kb';
+const trustProxyRaw = String(process.env.TRUST_PROXY || '').trim();
+const resolveTrustProxySetting = (rawValue) => {
+  if (!rawValue) return isProd ? 1 : false;
+  const normalized = String(rawValue).trim().toLowerCase();
+  if (['false', '0', 'off', 'none'].includes(normalized)) return false;
+  if (['true', '1', 'on'].includes(normalized)) return 1;
+  const numeric = Number(rawValue);
+  if (Number.isFinite(numeric) && numeric >= 0) {
+    return Math.floor(numeric);
+  }
+  return rawValue;
+};
+const trustProxySetting = resolveTrustProxySetting(trustProxyRaw);
+const sessionCookieName = String(process.env.SESSION_COOKIE_NAME || 'sid').trim() || 'sid';
+const contentSecurityDirectives = {
+  defaultSrc: ["'self'"],
+  baseUri: ["'self'"],
+  objectSrc: ["'none'"],
+  frameAncestors: ["'self'"],
+  formAction: ["'self'"],
+  imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+  mediaSrc: ["'self'", 'data:', 'blob:'],
+  fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+  styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
+  scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+  connectSrc: ["'self'", 'ws:', 'wss:'],
+};
+if (isProd) {
+  contentSecurityDirectives.upgradeInsecureRequests = [];
+}
+
+app.disable('x-powered-by');
+app.set('trust proxy', trustProxySetting);
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: contentSecurityDirectives,
+  },
+  crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  frameguard: { action: 'sameorigin' },
+  permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+}));
+app.use((_req, res, next) => {
+  res.setHeader(
+    'Permissions-Policy',
+    'accelerometer=(), ambient-light-sensor=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()'
+  );
+  return next();
+});
+app.use(express.urlencoded({
+  extended: true,
+  limit: bodyFormLimit,
+  parameterLimit: 1000,
+}));
+app.use(express.json({ limit: bodyJsonLimit }));
+app.use((err, req, res, next) => {
+  if (!(err && (err.type === 'entity.too.large' || Number(err.status) === 413))) {
+    return next(err);
+  }
+  if (req.accepts('json') || req.path.startsWith('/api') || req.path.endsWith('.json')) {
+    return res.status(413).json({ ok: false, error: 'payload_too_large' });
+  }
+  return res.status(413).send('Request body too large');
+});
 app.use(express.static('public'));
 
-const isProd = process.env.NODE_ENV === 'production';
-app.set('trust proxy', 1);
+const dbSslEnabled = String(process.env.DB_SSL || '').trim().toLowerCase() === 'true';
+const dbSslCa = String(process.env.DB_SSL_CA || '').replace(/\\n/g, '\n');
 
 const pool = new Pool({
   host: process.env.DB_HOST || `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
@@ -703,12 +770,26 @@ const pool = new Pool({
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  ssl: dbSslEnabled
+    ? (() => {
+      if (!dbSslCa) {
+        throw new Error('DB_SSL=true requires DB_SSL_CA so the Postgres certificate can be verified.');
+      }
+      return {
+        ca: dbSslCa,
+        rejectUnauthorized: true,
+      };
+    })()
+    : false,
 });
 
-const sessionSecret = process.env.SESSION_SECRET || 'dev-secret-change-me';
-if (isProd && !process.env.SESSION_SECRET) {
-  console.warn('SESSION_SECRET is not set in production; use a stable secret to avoid forced logouts.');
+const sessionSecret = String(process.env.SESSION_SECRET || '').trim();
+if (isProd && !sessionSecret) {
+  throw new Error('SESSION_SECRET must be set in production.');
+}
+const resolvedSessionSecret = sessionSecret || 'dev-secret-change-me';
+if (!isProd && !sessionSecret) {
+  console.warn('SESSION_SECRET is not set; using the local development fallback secret.');
 }
 const sessionTableNameRaw = String(process.env.SESSION_TABLE_NAME || 'user_sessions').trim();
 const sessionTableName = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(sessionTableNameRaw)
@@ -818,9 +899,9 @@ const sessionStore = new PgSession({
 });
 
 const sessionMiddleware = session({
-  name: process.env.SESSION_COOKIE_NAME || 'sid',
+  name: sessionCookieName,
   store: sessionStore,
-  secret: sessionSecret,
+  secret: resolvedSessionSecret,
   resave: false,
   saveUninitialized: false,
   rolling: true,
@@ -835,9 +916,98 @@ const sessionMiddleware = session({
 
 app.use(sessionMiddleware);
 
+const buildSessionRoleFingerprint = (roles = []) => {
+  const normalizedRoles = normalizeRoleList(roles);
+  return normalizedRoles.length ? normalizedRoles.join('|') : 'student';
+};
+
+const regenerateRequestSession = (req) => new Promise((resolve, reject) => {
+  if (!req.session) {
+    return reject(new Error('Session is not initialized.'));
+  }
+  return req.session.regenerate((err) => (err ? reject(err) : resolve()));
+});
+
+const saveRequestSession = (req) => new Promise((resolve, reject) => {
+  if (!req.session) return resolve();
+  return req.session.save((err) => (err ? reject(err) : resolve()));
+});
+
+const destroyRequestSession = (req) => new Promise((resolve, reject) => {
+  if (!req.session) return resolve();
+  return req.session.destroy((err) => (err ? reject(err) : resolve()));
+});
+
+const establishAuthenticatedSession = async (req, {
+  user,
+  role,
+  remember = false,
+  sessionData = {},
+} = {}) => {
+  const normalizedUser = user && typeof user === 'object' ? { ...user } : null;
+  const normalizedUserId = Number(normalizedUser && normalizedUser.id);
+  if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) {
+    throw new Error('Authenticated session requires a valid user id.');
+  }
+  const safeRole = normalizeRoleKey(role || 'student');
+  const existingLang = req.session && req.session.lang ? req.session.lang : null;
+  await regenerateRequestSession(req);
+  req.session.user = normalizedUser;
+  req.session.role = safeRole;
+  req.session.roles = normalizeRoleList([safeRole]);
+  req.session.role_fingerprint = buildSessionRoleFingerprint(req.session.roles);
+  req.session.lang = normalizedUser.language || existingLang || getPreferredLang(req);
+  req.session.rememberMe = remember;
+  Object.assign(req.session, sessionData);
+  applyRememberMe(req, remember);
+};
+
+const rotateSessionForRoleChange = async (req, nextRoleKeys = [], nextLegacyRole = 'student') => {
+  if (!req.session || !req.session.user) return false;
+  const nextRoles = normalizeRoleList(nextRoleKeys);
+  const nextFingerprint = buildSessionRoleFingerprint(nextRoles);
+  if (!req.session.role_fingerprint || req.session.role_fingerprint === nextFingerprint) {
+    req.session.role_fingerprint = nextFingerprint;
+    return false;
+  }
+  const remember = Boolean(req.session.rememberMe);
+  const sessionUser = { ...req.session.user };
+  const preservedState = {
+    adminCourse: Number.isFinite(Number(req.session.adminCourse)) ? Number(req.session.adminCourse) : null,
+    viewAs: req.session.viewAs || null,
+    viewAsMode: req.session.viewAsMode || null,
+    viewAsCourseId: Number.isFinite(Number(req.session.viewAsCourseId)) ? Number(req.session.viewAsCourseId) : null,
+    viewAsGroupNumber: Number.isFinite(Number(req.session.viewAsGroupNumber)) ? Number(req.session.viewAsGroupNumber) : null,
+    lang: req.session.lang || null,
+    last_seen_route: req.session.last_seen_route || null,
+    last_seen_at: req.session.last_seen_at || null,
+    last_seen_ip: req.session.last_seen_ip || null,
+    last_seen_user_agent: req.session.last_seen_user_agent || null,
+    session_created_at: req.session.session_created_at || null,
+  };
+  await regenerateRequestSession(req);
+  req.session.user = sessionUser;
+  req.session.role = normalizeRoleKey(nextLegacyRole || 'student');
+  req.session.roles = nextRoles;
+  req.session.role_fingerprint = nextFingerprint;
+  Object.entries(preservedState).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== '') {
+      req.session[key] = value;
+    }
+  });
+  req.session.rememberMe = remember;
+  applyRememberMe(req, remember);
+  return true;
+};
+
 app.use((req, _res, next) => {
   if (req.session && req.session.cookie) {
-    req.session.cookie.maxAge = resolveSessionTtlMs(settingsCache.session_duration_days);
+    if (req.session.rememberMe) {
+      req.session.cookie.maxAge = resolveSessionTtlMs(settingsCache.session_duration_days);
+    } else {
+      req.session.cookie.expires = false;
+      req.session.cookie.maxAge = null;
+    }
   }
   return next();
 });
@@ -1903,13 +2073,19 @@ app.use(async (req, res, next) => {
   try {
     await ensureDbReady();
     const roleKeys = await getUserRoleKeys(req.session.user.id, req.session.role || 'student');
-    req.session.roles = roleKeys;
     const legacyRole = resolveLegacySessionRole(roleKeys, req.session.role || 'student');
+    const rotated = await rotateSessionForRoleChange(req, roleKeys, legacyRole);
+    req.session.roles = roleKeys;
     req.session.role = legacyRole;
+    req.session.role_fingerprint = buildSessionRoleFingerprint(roleKeys);
     res.locals.userRoles = roleKeys;
+    if (rotated) {
+      req.session.last_seen_route = req.originalUrl || req.path || req.session.last_seen_route || null;
+    }
   } catch (err) {
     req.session.roles = getSessionRoleList(req);
     req.session.role = normalizeRoleKey(req.session.role || req.session.roles[0] || 'student');
+    req.session.role_fingerprint = buildSessionRoleFingerprint(req.session.roles);
     res.locals.userRoles = req.session.roles;
   }
   return next();
@@ -8741,6 +8917,25 @@ app.get('/vision', (req, res) => {
   res.render('vision');
 });
 
+const statusAccessToken = String(process.env.STATUS_ACCESS_TOKEN || process.env.BOOTSTRAP_TOKEN || '').trim();
+const isLoopbackIpAddress = (rawIp) => {
+  const normalized = String(rawIp || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^::ffff:/, '');
+  return normalized === '127.0.0.1' || normalized === '::1' || normalized === 'localhost';
+};
+const canAccessOperationalDetails = (req) => {
+  const providedToken = String(req.get('x-status-token') || req.get('x-bootstrap-token') || '').trim();
+  if (statusAccessToken && providedToken && providedToken === statusAccessToken) {
+    return true;
+  }
+  if (req.session?.user && (hasSessionRole(req, 'admin') || hasSessionRole(req, 'deanery'))) {
+    return true;
+  }
+  return isLoopbackIpAddress(getClientIp(req));
+};
+
 app.get('/_health', (req, res) => {
   const dbStatus = initStatus === 'ok' ? 'ok' : (initStatus === 'error' ? 'fail' : 'starting');
   const sessionStatus = sessionHealthState.ok ? 'ok' : 'fail';
@@ -8748,16 +8943,20 @@ app.get('/_health', (req, res) => {
     ? 'degraded'
     : (dbStatus === 'starting' ? 'starting' : 'ok');
   const strictMode = String(req.query.strict || '') === '1';
+  const detailedMode = canAccessOperationalDetails(req);
   const httpStatus = strictMode && status !== 'ok' ? 503 : 200;
-  res.status(httpStatus).json({
+  res.setHeader('Cache-Control', 'no-store');
+  const payload = {
     status,
     healthy: status === 'ok',
-    db: {
+  };
+  if (detailedMode) {
+    payload.db = {
       initStatus,
       status: dbStatus,
       error: initError ? String(initError.message || initError) : null,
-    },
-    session: {
+    };
+    payload.session = {
       ok: sessionHealthState.ok,
       status: sessionStatus,
       table: sessionHealthState.table,
@@ -8769,11 +8968,16 @@ app.get('/_health', (req, res) => {
       last_error_at: sessionHealthState.lastErrorAt,
       last_error: sessionHealthState.lastError,
       last_duration_ms: sessionHealthState.lastDurationMs,
-    },
-  });
+    };
+  }
+  res.status(httpStatus).json(payload);
 });
 
 app.get('/__version', (req, res) => {
+  if (!canAccessOperationalDetails(req)) {
+    return res.status(404).send('Not found');
+  }
+  res.setHeader('Cache-Control', 'no-store');
   res.json({
     version: appVersion,
     buildStamp,
@@ -8782,8 +8986,8 @@ app.get('/__version', (req, res) => {
 });
 
 app.post('/_bootstrap', async (req, res) => {
-  const token = process.env.BOOTSTRAP_TOKEN;
-  const provided = req.get('x-bootstrap-token') || req.query.token || '';
+  const token = String(process.env.BOOTSTRAP_TOKEN || '').trim();
+  const provided = String(req.get('x-bootstrap-token') || '').trim();
   if (!token || provided !== token) {
     return res.status(403).json({ ok: false, error: 'Forbidden' });
   }
@@ -8806,62 +9010,73 @@ app.post('/login', authLimiter, async (req, res) => {
     console.error('DB init failed', err);
     return res.redirect('/login?error=1');
   }
-  ensureUsersSchema(() => {
+  return ensureUsersSchema(async () => {
     const normalizedName = full_name.trim().replace(/\s+/g, ' ');
     const activeClause = usersHasIsActive ? ' AND is_active = 1' : '';
-    db.get(
-      `SELECT id, full_name, role, password_hash, schedule_group, course_id, language FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
-      [normalizedName],
-      (err, user) => {
-        const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
-        if (err || !user || !validHash) {
-          recordAuthFailureEvent({
+    try {
+      const user = await db.get(
+        `SELECT id, full_name, role, password_hash, schedule_group, course_id, language FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
+        [normalizedName]
+      );
+      const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
+      if (!user || !validHash) {
+        try {
+          await recordAuthFailureEvent({
             attemptedName: normalizedName,
             userId: user && user.id ? Number(user.id) : null,
             ip: getClientIp(req),
             userAgent: req.headers['user-agent'] || null,
             sessionId: req.sessionID || null,
             courseId: user && Number.isFinite(Number(user.course_id)) ? Number(user.course_id) : null,
-          }).catch((failureErr) => {
-            console.error('Database error (login.auth_failure)', failureErr);
           });
-          return res.redirect('/login?error=1');
+        } catch (failureErr) {
+          console.error('Database error (login.auth_failure)', failureErr);
         }
-        const role = normalizeRoleKey(user.role);
-        if (role !== user.role) {
-          db.run('UPDATE users SET role = ? WHERE id = ?', [role, user.id]);
-        }
-        const loginAt = new Date().toISOString();
-        const loginIp = normalizeForensicsIp(getClientIp(req));
-        const loginUserAgent = normalizeForensicsAgent(req.headers['user-agent'] || null);
-        db.run(
-          'UPDATE users SET last_login_ip = ?, last_user_agent = ?, last_login_at = ? WHERE id = ?',
-          [loginIp, loginUserAgent, loginAt, user.id]
-        );
-        db.run(
-          'INSERT INTO login_history (user_id, full_name, ip, user_agent, created_at, course_id) VALUES (?, ?, ?, ?, ?, ?)',
-          [user.id, user.full_name, loginIp, loginUserAgent, loginAt, user.course_id || 1]
-        );
-        req.session.user = {
+        return res.redirect('/login?error=1');
+      }
+
+      const role = normalizeRoleKey(user.role);
+      if (role !== user.role) {
+        await db.run('UPDATE users SET role = ? WHERE id = ?', [role, user.id]);
+      }
+
+      const loginAt = new Date().toISOString();
+      const loginIp = normalizeForensicsIp(getClientIp(req));
+      const loginUserAgent = normalizeForensicsAgent(req.headers['user-agent'] || null);
+      await db.run(
+        'UPDATE users SET last_login_ip = ?, last_user_agent = ?, last_login_at = ? WHERE id = ?',
+        [loginIp, loginUserAgent, loginAt, user.id]
+      );
+      await db.run(
+        'INSERT INTO login_history (user_id, full_name, ip, user_agent, created_at, course_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [user.id, user.full_name, loginIp, loginUserAgent, loginAt, user.course_id || 1]
+      );
+
+      const remember = isRememberRequested(remember_me);
+      await establishAuthenticatedSession(req, {
+        user: {
           id: user.id,
           username: user.full_name,
           schedule_group: user.schedule_group,
           course_id: user.course_id || 1,
           language: user.language || getPreferredLang(req),
-        };
-        req.session.role = role;
-        const remember = isRememberRequested(remember_me);
-        req.session.rememberMe = remember;
-        applyRememberMe(req, remember);
-        req.session.session_created_at = req.session.session_created_at || loginAt;
-        req.session.last_seen_at = loginAt;
-        req.session.last_seen_route = '/login';
-        req.session.last_seen_ip = loginIp;
-        req.session.last_seen_user_agent = loginUserAgent;
-
-        req.session.save(() => res.redirect('/home'));
-      }
-    );
+        },
+        role,
+        remember,
+        sessionData: {
+          session_created_at: loginAt,
+          last_seen_at: loginAt,
+          last_seen_route: '/login',
+          last_seen_ip: loginIp,
+          last_seen_user_agent: loginUserAgent,
+        },
+      });
+      await saveRequestSession(req);
+      return res.redirect('/home');
+    } catch (err) {
+      console.error('Login failed', err);
+      return res.redirect('/login?error=1');
+    }
   });
 });
 
@@ -9434,20 +9649,28 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
       return res.redirect('/login');
     }
 
-    req.session.user = {
-      id: user.id,
-      username: user.full_name,
-      schedule_group: user.schedule_group,
-      course_id: user.course_id || 1,
-      language: user.language || getPreferredLang(req),
-    };
-    req.session.role = user.role;
-    applyRememberMe(req, Boolean(req.session.rememberMe));
+    const remember = Boolean(req.session.rememberMe);
+    await establishAuthenticatedSession(req, {
+      user: {
+        id: user.id,
+        username: user.full_name,
+        schedule_group: user.schedule_group,
+        course_id: user.course_id || 1,
+        language: user.language || getPreferredLang(req),
+      },
+      role: user.role,
+      remember,
+      sessionData: {
+        last_seen_route: '/register/subjects',
+        last_seen_at: new Date().toISOString(),
+      },
+    });
     req.session.pendingUserId = null;
     req.session.rememberMe = null;
     logAction(db, req, 'register_subjects', { user_id: user.id });
     broadcast('users_updated');
-    return req.session.save(() => res.redirect('/home?welcome=1'));
+    await saveRequestSession(req);
+    return res.redirect('/home?welcome=1');
   } catch (err) {
     console.error('Register subjects save failed', err);
     return res.redirect('/register/subjects?error=db-error');
@@ -9506,20 +9729,28 @@ app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
     if (!result.ok) {
       return res.redirect(`/register/teacher-subjects?error=${result.error || 'Select%20subject'}`);
     }
-    req.session.user = {
-      id: userRow.id,
-      username: userRow.full_name,
-      schedule_group: userRow.schedule_group,
-      course_id: userRow.course_id || 1,
-      language: userRow.language || getPreferredLang(req),
-    };
-    req.session.role = userRow.role || 'student';
-    applyRememberMe(req, Boolean(req.session.rememberMe));
+    const remember = Boolean(req.session.rememberMe);
+    await establishAuthenticatedSession(req, {
+      user: {
+        id: userRow.id,
+        username: userRow.full_name,
+        schedule_group: userRow.schedule_group,
+        course_id: userRow.course_id || 1,
+        language: userRow.language || getPreferredLang(req),
+      },
+      role: userRow.role || 'student',
+      remember,
+      sessionData: {
+        last_seen_route: '/register/teacher-subjects',
+        last_seen_at: new Date().toISOString(),
+      },
+    });
     req.session.pendingUserId = null;
     req.session.rememberMe = null;
     logAction(db, req, 'register_teacher_subjects', { user_id: userRow.id });
     broadcast('users_updated');
-    return req.session.save(() => res.redirect('/teacher/pending'));
+    await saveRequestSession(req);
+    return res.redirect('/teacher/pending');
   } catch (err) {
     console.error('Register teacher subjects failed', err);
     return res.redirect('/register/teacher-subjects?error=Database%20error');
@@ -9594,6 +9825,10 @@ app.get('/teacher', requireLogin, async (req, res) => {
       teacherAssets: (assetRows || []).slice(0, 6),
       upcomingClasses: (teacherCockpit && Array.isArray(teacherCockpit.next_classes)) ? teacherCockpit.next_classes.slice(0, 5) : [],
       reviewQueue: teacherCockpit && teacherCockpit.review_queue ? teacherCockpit.review_queue : null,
+      teacherBrief: teacherCockpit && teacherCockpit.brief ? teacherCockpit.brief : null,
+      teacherTopPriorities: (teacherCockpit && Array.isArray(teacherCockpit.top_priorities)) ? teacherCockpit.top_priorities.slice(0, 2) : [],
+      teacherActivitySummary: teacherCockpit && teacherCockpit.activity_summary ? teacherCockpit.activity_summary : null,
+      latestRatingSnapshot: teacherCockpit && teacherCockpit.latest_rating_snapshot ? teacherCockpit.latest_rating_snapshot : null,
       error: decodeMessage(req.query.error),
       success: decodeMessage(req.query.ok),
     });
@@ -10649,7 +10884,20 @@ app.get('/teacher/pending', requireLogin, async (req, res) => {
     }
     const request = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [userId]);
     if (request && request.status === 'approved') {
-      req.session.role = 'teacher';
+      await establishAuthenticatedSession(req, {
+        user: {
+          ...req.session.user,
+          course_id: courseId || req.session.user.course_id || 1,
+          language: req.session.user.language || getPreferredLang(req),
+        },
+        role: 'teacher',
+        remember: Boolean(req.session.rememberMe),
+        sessionData: {
+          last_seen_route: '/teacher/pending',
+          last_seen_at: new Date().toISOString(),
+        },
+      });
+      await saveRequestSession(req);
       return res.redirect('/schedule');
     }
     return res.render('teacher-pending', {
@@ -42963,10 +43211,19 @@ app.post('/admin/switch-to-admin', requireAdmin, (req, res) => {
   return res.redirect('/admin');
 });
 
-app.post('/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.redirect('/login');
+app.post('/logout', async (req, res) => {
+  try {
+    await destroyRequestSession(req);
+  } catch (err) {
+    console.error('Logout session destroy failed', err);
+  }
+  res.clearCookie(sessionCookieName, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProd,
+    path: '/',
   });
+  return res.redirect('/login');
 });
 
 const startScheduler = () => {
