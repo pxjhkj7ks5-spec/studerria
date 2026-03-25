@@ -29066,6 +29066,8 @@ app.post('/admin/pathways/subjects/:subjectId/course/:courseId/remove', requireP
 
 app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);
+  const focusProgramId = parsePositiveIntStrict(req.body.focus_program_id);
+  const focusAdmissionId = parsePositiveIntStrict(req.body.focus_admission_id);
   try {
     await ensureDbReady();
   } catch (err) {
@@ -29073,6 +29075,8 @@ app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimi
       buildAdminPathwaysUrl({
         courseId: parsePositiveIntStrict(req.body.course_id, getAdminCourse(req)),
         track: normalizePathwayTrackFilter(req.body.track, 'all'),
+        programId: focusProgramId,
+        admissionId: focusAdmissionId,
         error: msg.databaseError,
       })
     );
@@ -29090,6 +29094,8 @@ app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimi
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
+      programId: focusProgramId,
+      admissionId: focusAdmissionId,
       error: msg.programNameRequired,
     }));
   }
@@ -29116,6 +29122,8 @@ app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimi
       return res.redirect(buildAdminPathwaysUrl({
         courseId,
         track: trackFilter,
+        programId: focusProgramId,
+        admissionId: focusAdmissionId,
         error: msg.programExistsForTrack,
       }));
     }
@@ -29128,10 +29136,16 @@ app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, wr
   const programId = parsePositiveIntStrict(req.params.id);
   const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
   const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const focusProgramId = parsePositiveIntStrict(req.body.focus_program_id);
+  const focusAdmissionId = parsePositiveIntStrict(req.body.focus_admission_id);
+  const redirectProgramId = focusProgramId || programId;
+  const redirectAdmissionId = focusProgramId ? focusAdmissionId : null;
   if (!programId) {
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
+      programId: focusProgramId,
+      admissionId: focusAdmissionId,
       error: msg.invalidProgram,
     }));
   }
@@ -29147,7 +29161,8 @@ app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, wr
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId,
+      programId: redirectProgramId,
+      admissionId: redirectAdmissionId,
       error: msg.programNameRequired,
     }));
   }
@@ -29165,7 +29180,8 @@ app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, wr
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId,
+      programId: redirectProgramId,
+      admissionId: redirectAdmissionId,
       ok: msg.programUpdated,
     }));
   } catch (err) {
@@ -29173,7 +29189,8 @@ app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, wr
       return res.redirect(buildAdminPathwaysUrl({
         courseId,
         track: trackFilter,
-        programId,
+        programId: redirectProgramId,
+        admissionId: redirectAdmissionId,
         error: msg.programExistsForTrack,
       }));
     }
@@ -29186,6 +29203,8 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
   const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
   const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
   const programId = parsePositiveIntStrict(req.body.program_id);
+  const focusProgramId = parsePositiveIntStrict(req.body.focus_program_id);
+  const focusAdmissionId = parsePositiveIntStrict(req.body.focus_admission_id);
   const yearRaw = Number(req.body.admission_year);
   const admissionYear = Number.isFinite(yearRaw) ? Math.max(2000, Math.min(2100, Math.round(yearRaw))) : null;
   const label = sanitizeCompactText(req.body.label, 120);
@@ -29194,6 +29213,8 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
+      programId: focusProgramId,
+      admissionId: focusAdmissionId,
       error: msg.selectProgram,
     }));
   }
@@ -29202,6 +29223,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
       courseId,
       track: trackFilter,
       programId,
+      admissionId: focusProgramId ? focusAdmissionId : null,
       error: msg.admissionYearRequired,
     }));
   }
@@ -29234,6 +29256,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
         courseId,
         track: trackFilter,
         programId,
+        admissionId: focusProgramId === programId ? focusAdmissionId : null,
         error: msg.admissionExistsForProgram,
       }));
     }
@@ -29247,6 +29270,10 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
   const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
   const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
   const programId = parsePositiveIntStrict(req.body.program_id);
+  const focusProgramId = parsePositiveIntStrict(req.body.focus_program_id);
+  const focusAdmissionId = parsePositiveIntStrict(req.body.focus_admission_id);
+  const redirectProgramId = focusProgramId || programId;
+  const redirectAdmissionId = focusProgramId ? focusAdmissionId : admissionId;
   const yearRaw = Number(req.body.admission_year);
   const admissionYear = Number.isFinite(yearRaw) ? Math.max(2000, Math.min(2100, Math.round(yearRaw))) : null;
   const label = sanitizeCompactText(req.body.label, 120);
@@ -29256,7 +29283,8 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId,
+      programId: focusProgramId,
+      admissionId: focusAdmissionId,
       error: msg.invalidAdmissionYear,
     }));
   }
@@ -29264,8 +29292,8 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId,
-      admissionId,
+      programId: redirectProgramId,
+      admissionId: redirectAdmissionId,
       error: msg.programRequired,
     }));
   }
@@ -29273,8 +29301,8 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId,
-      admissionId,
+      programId: redirectProgramId,
+      admissionId: redirectAdmissionId,
       error: msg.admissionYearRequired,
     }));
   }
@@ -29292,8 +29320,8 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId,
-      admissionId,
+      programId: redirectProgramId,
+      admissionId: redirectAdmissionId,
       ok: msg.admissionUpdated,
     }));
   } catch (err) {
@@ -29301,8 +29329,8 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
       return res.redirect(buildAdminPathwaysUrl({
         courseId,
         track: trackFilter,
-        programId,
-        admissionId,
+        programId: redirectProgramId,
+        admissionId: redirectAdmissionId,
         error: msg.admissionExistsForProgram,
       }));
     }

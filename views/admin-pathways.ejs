@@ -1133,6 +1133,8 @@
         <form method="POST" action="/admin/pathways/programs/add" class="soft-panel row g-2 mb-3">
           <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
           <input type="hidden" name="track" value="<%= activeTrack %>" />
+          <input type="hidden" name="focus_program_id" value="<%= selectedProgramValue %>" />
+          <input type="hidden" name="focus_admission_id" value="<%= selectedAdmissionValue %>" />
           <div class="col-12 col-md-3">
             <label class="form-label small"><%= ui.track %></label>
             <select name="track_key" class="form-select compact-select" required>
@@ -1163,6 +1165,8 @@
             <form method="POST" action="/admin/pathways/programs/<%= program.id %>/update" class="soft-panel program-card <%= Number(program.id) === Number(selectedProgramValue) ? 'is-selected' : '' %>">
               <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
               <input type="hidden" name="track" value="<%= activeTrack %>" />
+              <input type="hidden" name="focus_program_id" value="<%= selectedProgramValue %>" />
+              <input type="hidden" name="focus_admission_id" value="<%= selectedAdmissionValue %>" />
               <div class="program-card__header">
                 <div>
                   <div class="program-card__eyebrow"><%= ui.programEyebrow %> #<%= program.id %></div>
@@ -1231,6 +1235,8 @@
         <form method="POST" action="/admin/pathways/admissions/add" class="soft-panel row g-2 mb-3">
           <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
           <input type="hidden" name="track" value="<%= activeTrack %>" />
+          <input type="hidden" name="focus_program_id" value="<%= selectedProgramValue %>" />
+          <input type="hidden" name="focus_admission_id" value="<%= selectedAdmissionValue %>" />
           <div class="col-12 col-md-4">
             <label class="form-label small"><%= ui.programLabel %></label>
             <select class="form-select compact-select" name="program_id" required>
@@ -1261,6 +1267,8 @@
               <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
               <input type="hidden" name="track" value="<%= activeTrack %>" />
               <input type="hidden" name="program_id" value="<%= admission.program_id %>" />
+              <input type="hidden" name="focus_program_id" value="<%= selectedProgramValue %>" />
+              <input type="hidden" name="focus_admission_id" value="<%= selectedAdmissionValue %>" />
               <div class="admission-card__head">
                 <div>
                   <div class="admission-card__eyebrow"><%= ui.admissionEyebrow %></div>
