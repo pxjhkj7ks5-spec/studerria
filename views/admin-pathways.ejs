@@ -10,6 +10,19 @@
   const campusBindingList = Array.isArray(registrationCampusBindings) ? registrationCampusBindings : [];
   const ambiguousCampusList = Array.isArray(ambiguousCampusBindings) ? ambiguousCampusBindings : [];
   const migrationCourseList = Array.isArray(migrationCourseOptions) ? migrationCourseOptions : [];
+  const migrationCourseRows = migrationCourseList.map((course) => {
+    const usersCount = Number(course && course.users_count ? course.users_count : 0);
+    const assignedCount = Number(course && course.assigned_count ? course.assigned_count : 0);
+    const pendingUsers = Math.max(0, usersCount - assignedCount);
+    return {
+      ...course,
+      users_count: usersCount,
+      assigned_count: assignedCount,
+      pending_users: pendingUsers,
+      is_actionable: pendingUsers > 0,
+    };
+  });
+  const actionableMigrationCourseCount = migrationCourseRows.filter((course) => course.is_actionable).length;
   const admissionCards = Array.isArray(admissionHealthCards) ? admissionHealthCards : [];
   const registrationExperience = registrationExperienceSummary || null;
   const catalogSummary = subjectCatalogSummary || null;
@@ -225,6 +238,8 @@
     noCompatibleSourceCourses: 'Для цього треку ще немає сумісних джерельних курсів.',
     assignUsersToAdmission: 'Призначити користувачів до цього року вступу',
     migrationSafeModeCaption: 'Безпечний режим: оновлюються лише трек, програма та рік вступу. Наявна прив\'язка до курсу зберігається.',
+    noMigrationCandidates: 'Немає кандидатів',
+    allMigrationCoursesAligned: 'Усі сумісні курси вже вирівняні або не мають користувачів для міграції.',
     selectProgramAndAdmissionFirst: 'Спершу оберіть програму та рік вступу.',
     catalogTitle: 'Глобальна база предметів',
     catalogSubtitle: 'Створюйте базові предмети один раз, а потім додавайте їх на один або кілька курсів. Якщо ввімкнути спільний предмет, один instance ділитиме розклад, ДЗ, матеріали, викладачів і налаштування між усіма вибраними курсами.',
@@ -413,6 +428,8 @@
     noCompatibleSourceCourses: 'No compatible source courses found for this track yet.',
     assignUsersToAdmission: 'Assign users to this admission',
     migrationSafeModeCaption: 'Safe mode: only track, program, and admission are updated. The existing course binding is preserved.',
+    noMigrationCandidates: 'No candidates',
+    allMigrationCoursesAligned: 'All compatible courses are already aligned or do not have users to migrate.',
     selectProgramAndAdmissionFirst: 'Select program and admission year first.',
     catalogTitle: 'Global subject base',
     catalogSubtitle: 'Create base subjects once and then assign them to one or many courses. When shared subject is enabled, one instance shares schedule, homework, materials, teachers, and settings across all selected courses.',
@@ -754,6 +771,10 @@
         border-radius: 12px;
         border: 1px solid rgba(148, 163, 184, 0.24);
         background: rgba(15, 23, 42, 0.28);
+      }
+      .subject-row.is-disabled {
+        opacity: 0.62;
+        border-style: dashed;
       }
       body.theme-light .subject-row {
         background: rgba(255, 255, 255, 0.92);
@@ -1703,19 +1724,19 @@
                     ></span>
                   </div>
                   <div class="d-grid gap-2 mb-3">
-                    <% (migrationCourseList || []).forEach((course) => { %>
+                    <% (migrationCourseRows || []).forEach((course) => { %>
                       <label
-                        class="subject-row"
+                        class="subject-row <%= course.is_actionable ? '' : 'is-disabled' %>"
                         data-checklist-row
-                        data-checklist-text="<%= `${course.course_name} ${formatCampusLabel(course.course_location || 'kyiv')} ${ui.usersPrefix.toLowerCase()} ${Number(course.users_count || 0)}` %>"
+                        data-checklist-text="<%= `${course.course_name} ${formatCampusLabel(course.course_location || 'kyiv')} ${ui.usersPrefix.toLowerCase()} ${Number(course.users_count || 0)} ${course.is_actionable ? `${course.pending_users} ${ui.pendingShort}` : (Number(course.users_count || 0) > 0 ? ui.alreadyAligned : ui.noMigrationCandidates)}` %>"
                       >
                         <span>
                           <span class="row-label"><%= buildCourseLabel(course) %></span>
                           <span class="muted d-block">
-                            <%= ui.usersPrefix %>: <%= Number(course.users_count || 0) %> / <%= ui.alreadyAssignedPrefix %>: <%= Number(course.assigned_count || 0) %><%= course.is_mapped ? ` / ${ui.mappedToAdmissionSuffix}` : '' %>
+                            <%= ui.usersPrefix %>: <%= Number(course.users_count || 0) %> / <%= ui.alreadyAssignedPrefix %>: <%= Number(course.assigned_count || 0) %> / <%= course.is_actionable ? `${course.pending_users} ${ui.pendingShort}` : (Number(course.users_count || 0) > 0 ? ui.alreadyAligned : ui.noMigrationCandidates) %><%= course.is_mapped ? ` / ${ui.mappedToAdmissionSuffix}` : '' %>
                           </span>
                         </span>
-                        <input class="form-check-input" type="checkbox" name="source_course_ids[]" value="<%= course.course_id %>" />
+                        <input class="form-check-input" type="checkbox" name="source_course_ids[]" value="<%= course.course_id %>" <%= course.is_actionable ? '' : 'disabled' %> />
                       </label>
                     <% }) %>
                     <% if (!(migrationCourseList || []).length) { %>
@@ -1728,9 +1749,12 @@
                     <% } %>
                   </div>
                   <div class="d-flex flex-wrap gap-2 align-items-center">
-                    <button class="btn btn-primary btn-pill" type="submit"><%= ui.assignUsersToAdmission %></button>
+                    <button class="btn btn-primary btn-pill" type="submit" <%= actionableMigrationCourseCount > 0 ? '' : 'disabled' %>><%= ui.assignUsersToAdmission %></button>
                     <span class="muted"><%= ui.migrationSafeModeCaption %></span>
                   </div>
+                  <% if ((migrationCourseRows || []).length && actionableMigrationCourseCount < 1) { %>
+                    <div class="soft-panel muted mt-3"><%= ui.allMigrationCoursesAligned %></div>
+                  <% } %>
                 </form>
               <% } else { %>
                 <div class="soft-panel muted mt-3">

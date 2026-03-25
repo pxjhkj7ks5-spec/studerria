@@ -5,7 +5,8 @@
       "date": "2026-03-25",
       "items": [
         "tune(pathways-actionable-empty-states): replace several passive empty-state blocks in mapping, subject visibility, campuses, migration, and catalog with direct CTA actions so the admin can jump straight to admissions, mapping, scope, or catalog repair instead of hitting dead ends",
-        "fix(pathways-catalog-create-entry-point): expose the global catalog create form as a real anchor target and wire the empty catalog state to it, so an empty subject base now leads directly into the first corrective action"
+        "fix(pathways-catalog-create-entry-point): expose the global catalog create form as a real anchor target and wire the empty catalog state to it, so an empty subject base now leads directly into the first corrective action",
+        "tune(pathways-migration-actionable-rows): make migration rows reflect real pending users, disable no-op source courses with zero candidates or fully aligned assignments, and disable the migration submit action when nothing actually needs stamping"
       ]
     },
     {
