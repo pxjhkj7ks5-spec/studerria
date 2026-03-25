@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.80",
+      "date": "2026-03-26",
+      "items": [
+        "fix(journal-workflow-context-redirects): stabilize the journal workflow refactor by routing attendance save, subject close/reopen, and the core grade action flows back through shared journal redirect helpers, preserving subject and attendance context instead of dropping users into generic fallback states",
+        "fix(journal-insights-return-context): carry the return-to-journal subject and attendance context through Journal Insights filters and publish-rating submits, and reuse that same workflow state when building publish redirects and back-to-journal actions",
+        "fix(teacher-hub-linked-actions): move shared journal/schedule/insights href locals to the top of Teacher Hub, remove the duplicated insights CTA in the latest rating card, and point the hub quick actions and latest-rating links at the same stabilized workflow surfaces"
+      ]
+    },
+    {
       "version": "1.2.79",
       "date": "2026-03-25",
       "items": [

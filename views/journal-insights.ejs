@@ -31,6 +31,15 @@
     submitOnPick: true,
   }).replace(/'/g, '&#39;');
   const scopeLabelValue = scopeLabel || t('journalInsights.scope');
+  const workflow = (workflowLinks && typeof workflowLinks === 'object') ? workflowLinks : {};
+  const journalReturnContext = (typeof returnJournalContext === 'object' && returnJournalContext) ? returnJournalContext : {};
+  const backToJournalHref = workflow.journalHref || `/journal${selectedSubjectValue ? `?subject_id=${selectedSubjectValue}` : ''}`;
+  const scheduleHref = workflow.scheduleHref || '/schedule';
+  const teacherHubHref = workflow.teacherHubHref || '/teacher/hub';
+  const returnSubjectValue = Number(journalReturnContext.subjectId || 0);
+  const returnAttendanceDateValue = String(journalReturnContext.attendanceDate || '').trim();
+  const returnAttendanceClassValue = Number(journalReturnContext.attendanceClassNumber || 0);
+  const returnAttendanceQuickValue = Number(journalReturnContext.attendanceQuick || 0) === 1 ? 1 : 0;
   const gradeTrend = (trends && Array.isArray(trends.grade)) ? trends.grade : [];
   const attendanceTrend = (trends && Array.isArray(trends.attendance)) ? trends.attendance : [];
   const gradeMax = Math.max(100, ...gradeTrend.map((item) => Number(item.avg_score_percent || 0)));
@@ -553,6 +562,10 @@
           </div>
         </div>
         <form id="journalInsightsFiltersForm" method="GET" action="/journal/insights" class="row g-2 mt-1">
+          <input type="hidden" name="return_subject_id" value="<%= returnSubjectValue || '' %>" />
+          <input type="hidden" name="return_attendance_date" value="<%= returnAttendanceDateValue %>" />
+          <input type="hidden" name="return_attendance_class_number" value="<%= returnAttendanceClassValue || '' %>" />
+          <input type="hidden" name="return_attendance_quick" value="<%= returnAttendanceQuickValue %>" />
           <div class="col-12 col-md-3">
             <label class="form-label small" for="insightsCourse"><%= t('journalInsights.course') %></label>
             <select id="insightsCourse" class="form-select compact-select" name="course_id" <%= isAllCoursesScope ? 'disabled' : '' %>>
@@ -650,7 +663,7 @@
 
           <div class="col-12 filters-actions">
             <a class="btn btn-outline-primary" href="<%= exportCsvHref %>"><%= t('journalInsights.exportCsv') %></a>
-            <a class="btn btn-outline-secondary" href="/journal<%= selectedSubjectValue ? `?subject_id=${selectedSubjectValue}` : '' %>"><%= t('journalInsights.backToJournal') %></a>
+            <a class="btn btn-outline-secondary" href="<%= backToJournalHref %>"><%= t('journalInsights.backToJournal') %></a>
           </div>
         </form>
       </section>
@@ -733,9 +746,12 @@
                   : 'Використайте цей самий контур одразу: поверніться в журнал, експортуйте CSV або перейдіть у розклад без втрати контексту.' %>
               </p>
               <div class="d-flex flex-wrap gap-2 mt-3">
-                <a class="btn btn-outline-primary btn-sm" href="/journal<%= selectedSubjectValue ? `?subject_id=${selectedSubjectValue}` : '' %>"><%= t('journalInsights.backToJournal') %></a>
+                <a class="btn btn-outline-primary btn-sm" href="<%= backToJournalHref %>"><%= t('journalInsights.backToJournal') %></a>
                 <a class="btn btn-outline-secondary btn-sm" href="<%= exportCsvHref %>"><%= t('journalInsights.exportCsv') %></a>
-                <a class="btn btn-outline-secondary btn-sm" href="/schedule"><%= lang === 'en' ? 'Open schedule' : 'До розкладу' %></a>
+                <% if (teacherJournalMode) { %>
+                  <a class="btn btn-outline-secondary btn-sm" href="<%= teacherHubHref %>"><%= lang === 'en' ? 'Teacher hub' : 'Teacher Hub' %></a>
+                <% } %>
+                <a class="btn btn-outline-secondary btn-sm" href="<%= scheduleHref %>"><%= lang === 'en' ? 'Open schedule' : 'До розкладу' %></a>
               </div>
             </article>
           </div>
@@ -748,6 +764,10 @@
               <input type="hidden" name="student_id" value="<%= selectedStudentValue || '' %>" />
               <input type="hidden" name="period" value="<%= periodValue %>" />
               <input type="hidden" name="compare_mode" value="<%= compareValue %>" />
+              <input type="hidden" name="return_subject_id" value="<%= returnSubjectValue || '' %>" />
+              <input type="hidden" name="return_attendance_date" value="<%= returnAttendanceDateValue %>" />
+              <input type="hidden" name="return_attendance_class_number" value="<%= returnAttendanceClassValue || '' %>" />
+              <input type="hidden" name="return_attendance_quick" value="<%= returnAttendanceQuickValue %>" />
               <div class="col-12 col-md-3">
                 <label class="form-label small" for="publishTopN"><%= t('journalInsights.topN') %></label>
                 <input id="publishTopN" class="form-control compact-input" type="number" min="3" max="30" name="top_n" value="10" />

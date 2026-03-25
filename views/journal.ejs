@@ -286,6 +286,15 @@
     <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'journal' }) %>
 
     <main class="container py-4">
+      <%
+        const journalLinks = (journalWorkflowLinks && typeof journalWorkflowLinks === 'object') ? journalWorkflowLinks : {};
+        const selectedJournalSubjectId = selectedSubject ? Number(selectedSubject.subject_id || 0) : 0;
+        const selectedJournalCourseId = selectedSubject ? Number(selectedSubject.course_id || 0) : 0;
+        const journalInsightsHref = journalLinks.insightsHref
+          || `/journal/insights?course_id=${selectedJournalCourseId}&subject_id=${selectedJournalSubjectId}&scope_type=subject&period=semester`;
+        const journalCloseExportHref = journalLinks.closeExportHref
+          || `/journal/subject/close-export?subject_id=${selectedJournalSubjectId}`;
+      %>
       <% if (messages && messages.error) { %>
         <div class="alert alert-danger"><%= messages.error %></div>
       <% } %>
@@ -345,7 +354,7 @@
               <div class="d-flex justify-content-lg-end mt-2">
                 <a
                   class="btn btn-sm btn-outline-secondary"
-                  href="/journal/insights?course_id=<%= Number(selectedSubject.course_id || 0) %>&subject_id=<%= Number(selectedSubject.subject_id || 0) %>&scope_type=subject&period=semester"
+                  href="<%= journalInsightsHref %>"
                 >
                   📊 <%= journalCopy.journalInsights %>
                 </a>
@@ -438,17 +447,35 @@
               <% if (canCloseSubject) { %>
                 <form method="POST" action="/journal/subject/close" onsubmit="return confirm(<%- JSON.stringify(journalCopy.closeSubjectConfirm) %>)">
                   <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                  <% if (attendance && attendance.date) { %>
+                    <input type="hidden" name="attendance_date" value="<%= attendance.date %>" />
+                  <% } %>
+                  <% if (attendance && attendance.class_number) { %>
+                    <input type="hidden" name="attendance_class_number" value="<%= attendance.class_number %>" />
+                  <% } %>
+                  <% if (attendanceQuickAutoOpen) { %>
+                    <input type="hidden" name="attendance_quick" value="1" />
+                  <% } %>
                   <button class="btn btn-outline-danger btn-sm" type="submit"><%= journalCopy.closeSubject %></button>
                 </form>
               <% } %>
               <% if (canReopenSubject) { %>
                 <form method="POST" action="/journal/subject/reopen" onsubmit="return confirm(<%- JSON.stringify(journalCopy.reopenSubjectConfirm) %>)">
                   <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                  <% if (attendance && attendance.date) { %>
+                    <input type="hidden" name="attendance_date" value="<%= attendance.date %>" />
+                  <% } %>
+                  <% if (attendance && attendance.class_number) { %>
+                    <input type="hidden" name="attendance_class_number" value="<%= attendance.class_number %>" />
+                  <% } %>
+                  <% if (attendanceQuickAutoOpen) { %>
+                    <input type="hidden" name="attendance_quick" value="1" />
+                  <% } %>
                   <button class="btn btn-outline-success btn-sm" type="submit"><%= journalCopy.reopenSubject %></button>
                 </form>
               <% } %>
               <% if (teacherJournalMode && subjectClosure && subjectClosure.is_closed && (canManageAllSubjects || selectedSubject.has_all_groups)) { %>
-                <a class="btn btn-outline-secondary btn-sm" href="/journal/subject/close-export?subject_id=<%= selectedSubject.subject_id %>"><%= journalCopy.exportStatement %></a>
+                <a class="btn btn-outline-secondary btn-sm" href="<%= journalCloseExportHref %>"><%= journalCopy.exportStatement %></a>
               <% } %>
             </div>
           </div>

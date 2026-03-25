@@ -6738,6 +6738,15 @@ function buildJournalInsightsUrl(params = {}) {
   if (period) query.set('period', period);
   const compareMode = String(params.compareMode || '').trim().toLowerCase();
   if (compareMode) query.set('compare_mode', compareMode);
+  const returnSubjectId = parsePositiveIntStrict(params.returnSubjectId);
+  if (returnSubjectId) query.set('return_subject_id', String(returnSubjectId));
+  const returnAttendanceDate = String(params.returnAttendanceDate || '').trim();
+  if (isValidDateString(returnAttendanceDate)) query.set('return_attendance_date', returnAttendanceDate);
+  const returnAttendanceClassNumber = parsePositiveIntStrict(params.returnAttendanceClassNumber);
+  if (returnAttendanceClassNumber && bellSchedule[returnAttendanceClassNumber]) {
+    query.set('return_attendance_class_number', String(returnAttendanceClassNumber));
+  }
+  if (parseBinaryFlag(params.returnAttendanceQuick, 0) === 1) query.set('return_attendance_quick', '1');
   if (params.error) query.set('error', String(params.error));
   if (params.ok) query.set('ok', String(params.ok));
   const queryString = query.toString();
@@ -9771,6 +9780,7 @@ app.get('/teacher', requireLogin, async (req, res) => {
       ),
     ]);
     const teacherCourses = buildTeacherCourseList(teacherSubjects);
+    const primaryTeacherSubject = Array.isArray(teacherSubjects) && teacherSubjects.length ? teacherSubjects[0] : null;
     const uniqueSubjectIds = new Set(
       (teacherSubjects || [])
         .map((row) => Number(row.subject_id))
@@ -9801,6 +9811,21 @@ app.get('/teacher', requireLogin, async (req, res) => {
       teacherTopPriorities: (teacherCockpit && Array.isArray(teacherCockpit.top_priorities)) ? teacherCockpit.top_priorities.slice(0, 2) : [],
       teacherActivitySummary: teacherCockpit && teacherCockpit.activity_summary ? teacherCockpit.activity_summary : null,
       latestRatingSnapshot: teacherCockpit && teacherCockpit.latest_rating_snapshot ? teacherCockpit.latest_rating_snapshot : null,
+      journalHubLinks: {
+        journalHref: primaryTeacherSubject
+          ? buildJournalRedirectPath({ subjectId: Number(primaryTeacherSubject.subject_id || 0) })
+          : '/journal',
+        insightsHref: primaryTeacherSubject
+          ? buildJournalInsightsUrl({
+              courseId: Number(primaryTeacherSubject.course_id || 0),
+              subjectId: Number(primaryTeacherSubject.subject_id || 0),
+              scopeType: 'subject',
+              period: 'semester',
+              returnSubjectId: Number(primaryTeacherSubject.subject_id || 0),
+            })
+          : '/journal/insights',
+        scheduleHref: '/schedule',
+      },
       error: decodeMessage(req.query.error),
       success: decodeMessage(req.query.ok),
     });
@@ -16517,12 +16542,119 @@ const buildScheduledAtReachedCondition = (columnExpr = 'scheduled_at') => {
 };
 
 const buildJournalClosedRedirectPath = (subjectId, message = JOURNAL_SUBJECT_CLOSED_ERROR) => {
-  const safeSubjectId = Number(subjectId);
-  const base = Number.isFinite(safeSubjectId) && safeSubjectId > 0
-    ? `/journal?subject_id=${safeSubjectId}`
-    : '/journal';
-  const separator = base.includes('?') ? '&' : '?';
-  return `${base}${separator}err=${encodeURIComponent(message)}`;
+  return buildJournalRedirectPath({
+    subjectId,
+    err: message || JOURNAL_SUBJECT_CLOSED_ERROR,
+  });
+};
+
+const pickJournalRequestValue = (...values) => {
+  for (const value of values) {
+    if (Array.isArray(value)) {
+      const nestedValue = pickJournalRequestValue(...value);
+      if (typeof nestedValue !== 'undefined') return nestedValue;
+      continue;
+    }
+    if (typeof value === 'string') {
+      if (value.trim()) return value;
+      continue;
+    }
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
+};
+
+const getJournalRefererSearchParams = (req) => {
+  const rawReferer = String(req?.get?.('referer') || req?.headers?.referer || '').trim();
+  if (!rawReferer) return new URLSearchParams();
+  try {
+    const refererUrl = new URL(rawReferer, 'http://localhost');
+    if (String(refererUrl.pathname || '').trim() !== '/journal') {
+      return new URLSearchParams();
+    }
+    return refererUrl.searchParams;
+  } catch (err) {
+    return new URLSearchParams();
+  }
+};
+
+const buildJournalRedirectPath = (params = {}) => {
+  const query = new URLSearchParams();
+  const subjectId = parsePositiveIntStrict(params.subjectId);
+  if (subjectId) query.set('subject_id', String(subjectId));
+  const attendanceDate = String(params.attendanceDate || '').trim();
+  if (isValidDateString(attendanceDate)) query.set('attendance_date', attendanceDate);
+  const attendanceClassNumber = parsePositiveIntStrict(params.attendanceClassNumber);
+  if (attendanceClassNumber && bellSchedule[attendanceClassNumber]) {
+    query.set('attendance_class_number', String(attendanceClassNumber));
+  }
+  if (parseBinaryFlag(params.attendanceQuick, 0) === 1) query.set('attendance_quick', '1');
+  const openColumnId = parsePositiveIntStrict(params.openColumnId);
+  if (openColumnId) query.set('open_column_id', String(openColumnId));
+  const openStudentId = parsePositiveIntStrict(params.openStudentId);
+  if (openStudentId) query.set('open_student_id', String(openStudentId));
+  const undoColumnId = parsePositiveIntStrict(params.undoColumnId);
+  if (undoColumnId) query.set('undo_column_id', String(undoColumnId));
+  const undoStudentId = parsePositiveIntStrict(params.undoStudentId);
+  if (undoStudentId) query.set('undo_student_id', String(undoStudentId));
+  const undoUntil = Number(params.undoUntil);
+  if (Number.isFinite(undoUntil) && undoUntil > 0) query.set('undo_until', String(Math.round(undoUntil)));
+  const prefillComment = String(params.prefillComment || '').trim();
+  if (prefillComment) query.set('prefill_comment', prefillComment.slice(0, 2000));
+  if (params.ok) query.set('ok', String(params.ok));
+  if (params.err) query.set('err', String(params.err));
+  const queryString = query.toString();
+  return `/journal${queryString ? `?${queryString}` : ''}`;
+};
+
+const buildJournalRedirectPathFromRequest = (req, overrides = {}) => {
+  const body = req?.body && typeof req.body === 'object' ? req.body : {};
+  const query = req?.query && typeof req.query === 'object' ? req.query : {};
+  const refererQuery = getJournalRefererSearchParams(req);
+  return buildJournalRedirectPath({
+    subjectId: pickJournalRequestValue(
+      overrides.subjectId,
+      body.subject_id,
+      query.subject_id,
+      refererQuery.get('subject_id')
+    ),
+    attendanceDate: pickJournalRequestValue(
+      overrides.attendanceDate,
+      body.attendance_date,
+      query.attendance_date,
+      refererQuery.get('attendance_date')
+    ),
+    attendanceClassNumber: pickJournalRequestValue(
+      overrides.attendanceClassNumber,
+      body.attendance_class_number,
+      query.attendance_class_number,
+      refererQuery.get('attendance_class_number')
+    ),
+    attendanceQuick: pickJournalRequestValue(
+      overrides.attendanceQuick,
+      body.attendance_quick,
+      query.attendance_quick,
+      refererQuery.get('attendance_quick')
+    ),
+    openColumnId: pickJournalRequestValue(
+      overrides.openColumnId,
+      body.open_column_id,
+      query.open_column_id,
+      refererQuery.get('open_column_id')
+    ),
+    openStudentId: pickJournalRequestValue(
+      overrides.openStudentId,
+      body.open_student_id,
+      query.open_student_id,
+      refererQuery.get('open_student_id')
+    ),
+    undoColumnId: overrides.undoColumnId,
+    undoStudentId: overrides.undoStudentId,
+    undoUntil: overrides.undoUntil,
+    prefillComment: overrides.prefillComment,
+    ok: overrides.ok,
+    err: overrides.err,
+  });
 };
 
 const resolveStoredUploadAbsolutePath = (storedPath) => {
@@ -19367,6 +19499,11 @@ async function buildJournalInsightsContext({
 
   let selectedGroupNumber = parsePositiveIntStrict(payload.group_number);
   let selectedStudentId = parsePositiveIntStrict(payload.student_id);
+  const returnSubjectId = parsePositiveIntStrict(payload.return_subject_id);
+  const returnAttendanceDateRaw = String(payload.return_attendance_date || '').trim();
+  const returnAttendanceDate = isValidDateString(returnAttendanceDateRaw) ? returnAttendanceDateRaw : '';
+  const returnAttendanceClassNumber = parsePositiveIntStrict(payload.return_attendance_class_number);
+  const returnAttendanceQuick = parseBinaryFlag(payload.return_attendance_quick, 0);
 
   const groupOptionSet = new Set();
   let studentOptions = [];
@@ -20053,6 +20190,16 @@ async function buildJournalInsightsContext({
       throw err;
     }
   }
+  const workflowLinks = {
+    journalHref: buildJournalRedirectPath({
+      subjectId: returnSubjectId || Number(selectedSubject?.subject_id || 0),
+      attendanceDate: returnAttendanceDate,
+      attendanceClassNumber: returnAttendanceClassNumber,
+      attendanceQuick: returnAttendanceQuick,
+    }),
+    scheduleHref: '/schedule',
+    teacherHubHref: teacherJournalMode ? '/teacher/hub' : '',
+  };
 
   return {
     subjectOptions,
@@ -20109,8 +20256,15 @@ async function buildJournalInsightsContext({
     publishDisabledReason,
     publishTarget,
     publishTargetSummary,
-    latestPublishedRating,
-    canManageAllSubjects: Boolean(journalScope.fullAccess),
+      latestPublishedRating,
+      workflowLinks,
+      returnJournalContext: {
+        subjectId: returnSubjectId || Number(selectedSubject?.subject_id || 0) || null,
+        attendanceDate: returnAttendanceDate,
+        attendanceClassNumber: returnAttendanceClassNumber || null,
+        attendanceQuick: returnAttendanceQuick ? 1 : 0,
+      },
+      canManageAllSubjects: Boolean(journalScope.fullAccess),
   };
 }
 
@@ -20214,6 +20368,10 @@ app.post('/journal/insights/publish-rating', requireLogin, writeLimiter, async (
       studentId: parsePositiveIntStrict(req.body.student_id),
       period: req.body.period || 'semester',
       compareMode: req.body.compare_mode || 'none',
+      returnSubjectId: parsePositiveIntStrict(req.body.return_subject_id),
+      returnAttendanceDate: String(req.body.return_attendance_date || '').trim(),
+      returnAttendanceClassNumber: parsePositiveIntStrict(req.body.return_attendance_class_number),
+      returnAttendanceQuick: parseBinaryFlag(req.body.return_attendance_quick, 0),
       error: 'Database error',
     }));
   }
@@ -20240,6 +20398,10 @@ app.post('/journal/insights/publish-rating', requireLogin, writeLimiter, async (
       studentId: Number(context.selectedStudentId || 0),
       period: context.period,
       compareMode: context.compareMode || 'none',
+      returnSubjectId: Number(context.returnJournalContext?.subjectId || 0),
+      returnAttendanceDate: context.returnJournalContext?.attendanceDate || '',
+      returnAttendanceClassNumber: Number(context.returnJournalContext?.attendanceClassNumber || 0),
+      returnAttendanceQuick: Number(context.returnJournalContext?.attendanceQuick || 0),
     };
 
     if (!context.canPublishRating || !context.publishTarget) {
@@ -20490,6 +20652,20 @@ app.get('/journal', requireLogin, async (req, res) => {
       allowedGroupNumbers: Array.isArray(selectedSubject.group_numbers) ? selectedSubject.group_numbers : [],
       hasAllGroups: Boolean(selectedSubject.has_all_groups),
     });
+    const attendanceQuickEnabled = teacherJournalMode && String(req.query.attendance_quick || '') === '1';
+    const journalWorkflowLinks = {
+      insightsHref: buildJournalInsightsUrl({
+        courseId: Number(selectedSubject.course_id || 0),
+        subjectId: Number(selectedSubject.subject_id || 0),
+        scopeType: 'subject',
+        period: 'semester',
+        returnSubjectId: Number(selectedSubject.subject_id || 0),
+        returnAttendanceDate: attendanceContext?.date || '',
+        returnAttendanceClassNumber: attendanceContext?.class_number || '',
+        returnAttendanceQuick: attendanceQuickEnabled ? 1 : 0,
+      }),
+      closeExportHref: `/journal/subject/close-export?subject_id=${Number(selectedSubject.subject_id || 0)}`,
+    };
 
     await renderViewToResponse(res, 'journal', {
       username: req.session.user.username,
@@ -20503,7 +20679,7 @@ app.get('/journal', requireLogin, async (req, res) => {
       canEditJournal,
       canEditAttendance: teacherJournalMode,
       teacherJournalMode,
-      attendanceQuickAutoOpen: teacherJournalMode && String(req.query.attendance_quick || '') === '1',
+      attendanceQuickAutoOpen: attendanceQuickEnabled,
       canManageAllSubjects: Boolean(journalScope.fullAccess),
       subjectClosure,
       canCloseSubject,
@@ -20511,6 +20687,7 @@ app.get('/journal', requireLogin, async (req, res) => {
       selectedSemester,
       undoGrade: canEditJournal ? undoGrade : null,
       gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
+      journalWorkflowLinks,
     });
     return;
   } catch (err) {
@@ -20556,15 +20733,21 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
   const attendanceDate = String(req.body.attendance_date || '').trim();
   const attendanceClassNumber = Number(req.body.attendance_class_number);
   const rowsRaw = String(req.body.rows_json || '[]').trim() || '[]';
+  const baseAttendanceRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
+    subjectId,
+    attendanceDate,
+    attendanceClassNumber,
+    ...overrides,
+  });
 
   if (!Number.isFinite(subjectId) || subjectId < 1) {
-    return res.redirect('/journal?err=Invalid%20subject');
+    return res.redirect(baseAttendanceRedirect({ err: 'Invalid subject' }));
   }
   if (!isValidDateString(attendanceDate)) {
-    return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20attendance%20date`);
+    return res.redirect(baseAttendanceRedirect({ err: 'Invalid attendance date' }));
   }
   if (!Number.isInteger(attendanceClassNumber) || !bellSchedule[attendanceClassNumber]) {
-    return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20class%20number`);
+    return res.redirect(baseAttendanceRedirect({ err: 'Invalid class number' }));
   }
 
   let parsedRows = [];
@@ -20572,13 +20755,13 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
     const parsed = JSON.parse(rowsRaw);
     parsedRows = Array.isArray(parsed) ? parsed : [];
   } catch (err) {
-    return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20attendance%20payload`);
+    return res.redirect(baseAttendanceRedirect({ err: 'Invalid attendance payload' }));
   }
   if (!parsedRows.length) {
-    return res.redirect(`/journal?subject_id=${subjectId}&err=No%20attendance%20rows`);
+    return res.redirect(baseAttendanceRedirect({ err: 'No attendance rows' }));
   }
   if (parsedRows.length > 500) {
-    return res.redirect(`/journal?subject_id=${subjectId}&err=Attendance%20payload%20is%20too%20large`);
+    return res.redirect(baseAttendanceRedirect({ err: 'Attendance payload is too large' }));
   }
 
   try {
@@ -20626,9 +20809,7 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
     });
     const normalizedEntries = Array.from(normalizedMap.values());
     if (!normalizedEntries.length) {
-      return res.redirect(
-        `/journal?subject_id=${subjectId}&attendance_date=${encodeURIComponent(attendanceDate)}&attendance_class_number=${attendanceClassNumber}&err=No%20attendance%20rows`
-      );
+      return res.redirect(baseAttendanceRedirect({ err: 'No attendance rows' }));
     }
 
     for (const entry of normalizedEntries) {
@@ -20744,18 +20925,23 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
       selectedCourseId,
       semesterId
     );
+    return res.redirect(baseAttendanceRedirect({ ok: 'Відвідуваність збережено' }));
     return res.redirect(
       `/journal?subject_id=${subjectId}&attendance_date=${encodeURIComponent(attendanceDate)}&attendance_class_number=${attendanceClassNumber}&ok=Відвідуваність%20збережено`
     );
   } catch (err) {
-    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
+    return res.redirect(baseAttendanceRedirect({ err: 'Database error' }));
   }
 });
 
 app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) => {
   const subjectId = Number(req.body.subject_id);
+  const subjectCloseRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
+    subjectId,
+    ...overrides,
+  });
   if (!Number.isFinite(subjectId) || subjectId < 1) {
-    return res.redirect('/journal?err=Invalid%20subject');
+    return res.redirect(subjectCloseRedirect({ err: 'Invalid subject' }));
   }
 
   try {
@@ -20772,6 +20958,11 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
       return res.status(403).send('Forbidden (journal)');
     }
     if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
+      return res.redirect(subjectCloseRedirect({
+        err: 'Для закриття предмета потрібен доступ до всіх груп',
+      }));
+    }
+    if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
       return res.redirect(
         `/journal?subject_id=${subjectId}&err=${encodeURIComponent('Для закриття предмета потрібен доступ до всіх груп')}`
       );
@@ -20782,6 +20973,9 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
     const semesterId = selectedSemester ? Number(selectedSemester.id) : null;
     await ensureSubjectGradingSettings(subjectId, selectedCourseId, semesterId, Number(req.session.user.id));
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
+    if (subjectClosure.is_closed) {
+      return res.redirect(subjectCloseRedirect({ ok: 'Предмет уже закрито' }));
+    }
     if (subjectClosure.is_closed) {
       return res.redirect(`/journal?subject_id=${subjectId}&ok=${encodeURIComponent('Предмет уже закрито')}`);
     }
@@ -21050,14 +21244,18 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
     res.setHeader('Content-Disposition', `attachment; filename="${exportFile.fileName}"`);
     return res.send(exportPayload.csv);
   } catch (err) {
-    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
+    return res.redirect(subjectCloseRedirect({ err: 'Database error' }));
   }
 });
 
 app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res) => {
   const subjectId = Number(req.body.subject_id);
+  const subjectReopenRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
+    subjectId,
+    ...overrides,
+  });
   if (!Number.isFinite(subjectId) || subjectId < 1) {
-    return res.redirect('/journal?err=Invalid%20subject');
+    return res.redirect(subjectReopenRedirect({ err: 'Invalid subject' }));
   }
 
   try {
@@ -21074,6 +21272,11 @@ app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res)
       return res.status(403).send('Forbidden (journal)');
     }
     if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
+      return res.redirect(subjectReopenRedirect({
+        err: 'Для повторного відкриття предмета потрібен доступ до всіх груп',
+      }));
+    }
+    if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
       return res.redirect(
         `/journal?subject_id=${subjectId}&err=${encodeURIComponent('Для повторного відкриття предмета потрібен доступ до всіх груп')}`
       );
@@ -21084,6 +21287,9 @@ app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res)
     const semesterId = selectedSemester ? Number(selectedSemester.id) : null;
     await ensureSubjectGradingSettings(subjectId, selectedCourseId, semesterId, Number(req.session.user.id));
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
+    if (!subjectClosure.is_closed) {
+      return res.redirect(subjectReopenRedirect({ ok: 'Предмет уже відкрито' }));
+    }
     if (!subjectClosure.is_closed) {
       return res.redirect(`/journal?subject_id=${subjectId}&ok=${encodeURIComponent('Предмет уже відкрито')}`);
     }
@@ -21258,7 +21464,7 @@ app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res)
       `/journal?subject_id=${subjectId}&ok=${encodeURIComponent('Предмет повторно відкрито. Журнал розблоковано')}`
     );
   } catch (err) {
-    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
+    return res.redirect(subjectReopenRedirect({ err: 'Database error' }));
   }
 });
 
@@ -21724,9 +21930,15 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
   const studentId = Number(req.body.student_id);
   const scoreRaw = req.body.score;
   const teacherComment = String(req.body.teacher_comment || '').trim();
+  const gradeRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
+    openColumnId: columnId,
+    openStudentId: studentId,
+    prefillComment: teacherComment,
+    ...overrides,
+  });
 
   if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
-    return res.redirect('/journal?err=Invalid%20grade%20target');
+    return res.redirect(gradeRedirect({ err: 'Invalid grade target' }));
   }
 
   try {
@@ -21765,25 +21977,34 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
       [columnId]
     );
     if (!column) {
-      return res.redirect('/journal?err=Column%20not%20found');
+      return res.redirect(gradeRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(gradeRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_SUBJECT_CLOSED_ERROR,
+      }));
     }
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     const parsedScore = Number(String(scoreRaw || '').replace(',', '.'));
     const score = Number.isFinite(parsedScore) ? Math.round(parsedScore * 100) / 100 : NaN;
     if (!Number.isFinite(score) || score < 0 || score > maxPoints) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
+      return res.redirect(gradeRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: `Score must be between 0 and ${String(maxPoints)}`,
+      }));
     }
 
     const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+      return res.redirect(gradeRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Student is not assigned to subject',
+      }));
     }
 
     if (!journalScope.fullAccess) {
@@ -21896,9 +22117,12 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(`/journal?subject_id=${column.subject_id}&ok=Оцінку%20збережено`);
+    return res.redirect(gradeRedirect({
+      subjectId: Number(column.subject_id || 0),
+      ok: 'Оцінку збережено',
+    }));
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(gradeRedirect({ err: 'Database error' }));
   }
 });
 
@@ -22156,15 +22380,20 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
     const subjectId = Number(column.subject_id || subjectIdFromBody || 0);
     return res.redirect(`/journal?subject_id=${subjectId}&ok=Масове%20оцінювання%20збережено%20(${updatedCount})`);
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(gradeDeleteRedirect({ err: 'Database error' }));
   }
 });
 
 app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) => {
   const columnId = Number(req.body.column_id);
   const studentId = Number(req.body.student_id);
+  const gradeDeleteRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
+    openColumnId: columnId,
+    openStudentId: studentId,
+    ...overrides,
+  });
   if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
-    return res.redirect('/journal?err=Invalid%20grade%20target');
+    return res.redirect(gradeDeleteRedirect({ err: 'Invalid grade target' }));
   }
 
   try {
@@ -22188,19 +22417,25 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
       [columnId]
     );
     if (!column) {
-      return res.redirect('/journal?err=Column%20not%20found');
+      return res.redirect(gradeDeleteRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(gradeDeleteRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_SUBJECT_CLOSED_ERROR,
+      }));
     }
 
     const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+      return res.redirect(gradeDeleteRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Student is not assigned to subject',
+      }));
     }
 
     if (!journalScope.fullAccess) {
@@ -22287,19 +22522,31 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
       column.semester_id ? Number(column.semester_id) : null
     );
     const undoUntil = Date.now() + (JOURNAL_GRADE_UNDO_SECONDS * 1000);
+    return res.redirect(gradeDeleteRedirect({
+      subjectId: Number(column.subject_id || 0),
+      undoColumnId: columnId,
+      undoStudentId: studentId,
+      undoUntil,
+      ok: 'Оцінку видалено',
+    }));
     return res.redirect(
       `/journal?subject_id=${column.subject_id}&ok=Оцінку%20видалено&undo_column_id=${columnId}&undo_student_id=${studentId}&undo_until=${undoUntil}`
     );
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(gradeDeleteRedirect({ err: 'Database error' }));
   }
 });
 
 app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res) => {
   const columnId = Number(req.body.column_id);
   const studentId = Number(req.body.student_id);
+  const gradeRestoreRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
+    openColumnId: columnId,
+    openStudentId: studentId,
+    ...overrides,
+  });
   if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
-    return res.redirect('/journal?err=Invalid%20grade%20target');
+    return res.redirect(gradeRestoreRedirect({ err: 'Invalid grade target' }));
   }
 
   try {
@@ -22323,19 +22570,25 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
       [columnId]
     );
     if (!column) {
-      return res.redirect('/journal?err=Column%20not%20found');
+      return res.redirect(gradeRestoreRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(gradeRestoreRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_SUBJECT_CLOSED_ERROR,
+      }));
     }
 
     const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+      return res.redirect(gradeRestoreRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Student is not assigned to subject',
+      }));
     }
 
     if (!journalScope.fullAccess) {
@@ -22365,6 +22618,10 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
       [columnId, studentId, JOURNAL_GRADE_UNDO_SECONDS]
     );
     if (!restorable) {
+      return res.redirect(gradeRestoreRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Час на відновлення оцінки минув',
+      }));
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Час%20на%20відновлення%20оцінки%20минув`);
     }
     const beforeGradeState = buildGradeAuditState(restorable);
@@ -22415,7 +22672,7 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
     );
     return res.redirect(`/journal?subject_id=${column.subject_id}&ok=Оцінку%20відновлено`);
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(gradeRestoreRedirect({ err: 'Database error' }));
   }
 });
 
@@ -22425,12 +22682,17 @@ app.post('/journal/retakes/create', requireLogin, writeLimiter, async (req, res)
   const kind = normalizeJournalRetakeKind(req.body.kind);
   const dueDateRaw = String(req.body.due_date || '').trim();
   const note = normalizeJournalRetakeNote(req.body.note);
+  const retakeCreateRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
+    openColumnId: columnId,
+    openStudentId: studentId,
+    ...overrides,
+  });
 
   if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
-    return res.redirect('/journal?err=Invalid%20retake%20target');
+    return res.redirect(retakeCreateRedirect({ err: 'Invalid retake target' }));
   }
   if (dueDateRaw && !isValidDateString(dueDateRaw)) {
-    return res.redirect('/journal?err=Invalid%20retake%20due%20date');
+    return res.redirect(retakeCreateRedirect({ err: 'Invalid retake due date' }));
   }
   const dueDate = dueDateRaw && isValidDateString(dueDateRaw) ? dueDateRaw : null;
 
@@ -22455,19 +22717,25 @@ app.post('/journal/retakes/create', requireLogin, writeLimiter, async (req, res)
       [columnId]
     );
     if (!column) {
-      return res.redirect('/journal?err=Column%20not%20found');
+      return res.redirect(retakeCreateRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(retakeCreateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_SUBJECT_CLOSED_ERROR,
+      }));
     }
 
     const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+      return res.redirect(retakeCreateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Student is not assigned to subject',
+      }));
     }
 
     if (!journalScope.fullAccess) {
@@ -22536,7 +22804,7 @@ app.post('/journal/retakes/create', requireLogin, writeLimiter, async (req, res)
       `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Спробу додано')}`
     );
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(retakeCreateRedirect({ err: 'Database error' }));
   }
 });
 
@@ -22552,15 +22820,20 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
   const scoreText = String(req.body.score || '').trim();
   const parsedScore = scoreText ? Number(scoreText.replace(',', '.')) : NaN;
   const score = scoreText ? (Number.isFinite(parsedScore) ? Math.round(parsedScore * 100) / 100 : NaN) : null;
+  const retakeUpdateRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
+    openColumnId: columnId,
+    openStudentId: studentId,
+    ...overrides,
+  });
 
   if (!Number.isFinite(attemptId) || attemptId < 1 || !Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
-    return res.redirect('/journal?err=Invalid%20retake%20target');
+    return res.redirect(retakeUpdateRedirect({ err: 'Invalid retake target' }));
   }
   if (dueDateRaw && !isValidDateString(dueDateRaw)) {
-    return res.redirect('/journal?err=Invalid%20retake%20due%20date');
+    return res.redirect(retakeUpdateRedirect({ err: 'Invalid retake due date' }));
   }
   if (scoreText && !Number.isFinite(score)) {
-    return res.redirect('/journal?err=Invalid%20retake%20score');
+    return res.redirect(retakeUpdateRedirect({ err: 'Invalid retake score' }));
   }
   if (status === 'graded' && !Number.isFinite(score)) {
     return res.redirect('/journal?err=Для%20статусу%20Оцінено%20потрібно%20вказати%20бал');
@@ -22591,23 +22864,32 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
       [columnId]
     );
     if (!column) {
-      return res.redirect('/journal?err=Column%20not%20found');
+      return res.redirect(retakeUpdateRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(retakeUpdateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_SUBJECT_CLOSED_ERROR,
+      }));
     }
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     if (Number.isFinite(score) && (score < 0 || score > maxPoints)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Retake%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
+      return res.redirect(retakeUpdateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: `Retake score must be between 0 and ${String(maxPoints)}`,
+      }));
     }
 
     const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+      return res.redirect(retakeUpdateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Student is not assigned to subject',
+      }));
     }
 
     if (!journalScope.fullAccess) {
@@ -22637,6 +22919,10 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
       [attemptId, columnId, studentId]
     );
     if (!existingAttempt) {
+      return res.redirect(retakeUpdateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Спробу не знайдено',
+      }));
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Спроба%20не%20знайдена`);
     }
 
@@ -22801,7 +23087,7 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
       `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Спробу оновлено')}`
     );
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(retakeUpdateRedirect({ err: 'Database error' }));
   }
 });
 
@@ -22814,15 +23100,21 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
   const requestedScore = requestedScoreRaw
     ? (Number.isFinite(parsedRequestedScore) ? Math.round(parsedRequestedScore * 100) / 100 : NaN)
     : null;
+  const appealCreateRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
+    openColumnId: columnId,
+    openStudentId: studentId,
+    ...overrides,
+  });
 
   if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
-    return res.redirect('/journal?err=Invalid%20appeal%20target');
+    return res.redirect(appealCreateRedirect({ err: 'Invalid appeal target' }));
   }
   if (!reason) {
+    return res.redirect(appealCreateRedirect({ err: 'Вкажіть причину апеляції' }));
     return res.redirect('/journal?err=Вкажіть%20причину%20апеляції');
   }
   if (requestedScoreRaw && !Number.isFinite(requestedScore)) {
-    return res.redirect('/journal?err=Invalid%20requested%20score');
+    return res.redirect(appealCreateRedirect({ err: 'Invalid requested score' }));
   }
 
   try {
@@ -22846,11 +23138,14 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
       [columnId]
     );
     if (!column) {
-      return res.redirect('/journal?err=Column%20not%20found');
+      return res.redirect(appealCreateRedirect({ err: 'Column not found' }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(appealCreateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_SUBJECT_CLOSED_ERROR,
+      }));
     }
 
     const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
@@ -22860,7 +23155,10 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
 
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     if (Number.isFinite(requestedScore) && (requestedScore < 0 || requestedScore > maxPoints)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Requested%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
+      return res.redirect(appealCreateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: `Requested score must be between 0 and ${String(maxPoints)}`,
+      }));
     }
 
     const existingGrade = await db.get(
@@ -22874,6 +23172,10 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
       [columnId, studentId]
     );
     if (!existingGrade || !Number.isFinite(Number(existingGrade.score))) {
+      return res.redirect(appealCreateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Немає оцінки для апеляції',
+      }));
       return res.redirect(`/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&err=${encodeURIComponent('Немає оцінки для апеляції')}`);
     }
 
@@ -22889,6 +23191,10 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
       [columnId, studentId]
     );
     if (activeAppeal) {
+      return res.redirect(appealCreateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Вже є активна апеляція для цієї клітинки',
+      }));
       return res.redirect(`/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&err=${encodeURIComponent('Вже є активна апеляція для цієї клітинки')}`);
     }
 
@@ -22933,7 +23239,7 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
       `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Апеляцію подано')}`
     );
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(appealCreateRedirect({ err: 'Database error' }));
   }
 });
 
@@ -22949,16 +23255,21 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
     ? (Number.isFinite(parsedResolvedScore) ? Math.round(parsedResolvedScore * 100) / 100 : NaN)
     : null;
   const applyResolvedScore = parseBinaryFlag(req.body.apply_resolved_score, 0) === 1;
+  const appealUpdateRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
+    openColumnId: columnId,
+    openStudentId: studentId,
+    ...overrides,
+  });
 
   if (
     !Number.isFinite(appealId) || appealId < 1
     || !Number.isFinite(columnId) || columnId < 1
     || !Number.isFinite(studentId) || studentId < 1
   ) {
-    return res.redirect('/journal?err=Invalid%20appeal%20target');
+    return res.redirect(appealUpdateRedirect({ err: 'Invalid appeal target' }));
   }
   if (resolvedScoreRaw && !Number.isFinite(resolvedScore)) {
-    return res.redirect('/journal?err=Invalid%20resolved%20score');
+    return res.redirect(appealUpdateRedirect({ err: 'Invalid resolved score' }));
   }
   if (applyResolvedScore && !Number.isFinite(resolvedScore)) {
     return res.redirect('/journal?err=Щоб%20застосувати%20новий%20бал,%20вкажіть%20коректне%20значення');
@@ -22985,19 +23296,25 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
       [columnId]
     );
     if (!column) {
-      return res.redirect('/journal?err=Column%20not%20found');
+      return res.redirect(appealUpdateRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(appealUpdateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_SUBJECT_CLOSED_ERROR,
+      }));
     }
 
     const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+      return res.redirect(appealUpdateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Student is not assigned to subject',
+      }));
     }
 
     if (!journalScope.fullAccess) {
@@ -23027,12 +23344,19 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
       [appealId, columnId, studentId]
     );
     if (!appeal) {
+      return res.redirect(appealUpdateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Апеляцію не знайдено',
+      }));
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Апеляцію%20не%20знайдено`);
     }
 
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     if (Number.isFinite(resolvedScore) && (resolvedScore < 0 || resolvedScore > maxPoints)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Resolved%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
+      return res.redirect(appealUpdateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: `Resolved score must be between 0 and ${String(maxPoints)}`,
+      }));
     }
 
     const isFinalStatus = ['approved', 'rejected'].includes(status);
@@ -23144,7 +23468,7 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
       `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Апеляцію оновлено')}`
     );
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(appealUpdateRedirect({ err: 'Database error' }));
   }
 });
 
@@ -23158,15 +23482,20 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
   const moderatedScore = moderatedScoreRaw
     ? (Number.isFinite(parsedModeratedScore) ? Math.round(parsedModeratedScore * 100) / 100 : NaN)
     : null;
+  const moderationRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
+    openColumnId: columnId,
+    openStudentId: studentId,
+    ...overrides,
+  });
 
   if (
     !Number.isFinite(columnId) || columnId < 1
     || !Number.isFinite(studentId) || studentId < 1
   ) {
-    return res.redirect('/journal?err=Invalid%20moderation%20target');
+    return res.redirect(moderationRedirect({ err: 'Invalid moderation target' }));
   }
   if (moderatedScoreRaw && !Number.isFinite(moderatedScore)) {
-    return res.redirect('/journal?err=Invalid%20moderation%20score');
+    return res.redirect(moderationRedirect({ err: 'Invalid moderation score' }));
   }
   if (status === 'adjusted' && !Number.isFinite(moderatedScore)) {
     return res.redirect('/journal?err=Для%20статусу%20Скориговано%20потрібно%20вказати%20новий%20бал');
@@ -23193,26 +23522,35 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
       [columnId]
     );
     if (!column) {
-      return res.redirect('/journal?err=Column%20not%20found');
+      return res.redirect(moderationRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(moderationRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_SUBJECT_CLOSED_ERROR,
+      }));
     }
     if (!isJournalModerationRequiredColumn(column)) {
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Модерація%20доступна%20лише%20для%20екзаменів%20та%20заліків`);
     }
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     if (Number.isFinite(moderatedScore) && (moderatedScore < 0 || moderatedScore > maxPoints)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Moderation%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`);
+      return res.redirect(moderationRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: `Moderation score must be between 0 and ${String(maxPoints)}`,
+      }));
     }
 
     const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+      return res.redirect(moderationRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Student is not assigned to subject',
+      }));
     }
 
     if (!journalScope.fullAccess) {
@@ -23242,9 +23580,17 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
       [columnId, studentId]
     );
     if (!grade || !Number.isFinite(Number(grade.score))) {
+      return res.redirect(moderationRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Немає оцінки для модерації',
+      }));
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Немає%20оцінки%20для%20модерації`);
     }
     if (Number(req.session.user.id) === Number(grade.graded_by || 0)) {
+      return res.redirect(moderationRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Той самий викладач не може погодити власну оцінку',
+      }));
       return res.redirect(`/journal?subject_id=${column.subject_id}&err=Той%20самий%20викладач%20не%20може%20погодити%20власну%20оцінку`);
     }
 

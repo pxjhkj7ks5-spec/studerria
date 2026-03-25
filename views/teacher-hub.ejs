@@ -1,3 +1,9 @@
+<%
+  const hubLinks = (journalHubLinks && typeof journalHubLinks === 'object') ? journalHubLinks : {};
+  const teacherJournalHref = hubLinks.journalHref || '/journal';
+  const teacherInsightsHref = hubLinks.insightsHref || '/journal/insights';
+  const teacherScheduleHref = hubLinks.scheduleHref || '/schedule';
+%>
 <!doctype html>
 <html lang="<%= lang %>">
   <head>
@@ -366,10 +372,10 @@
           <%= t('teacherHub.subtitle') %>
         </p>
         <div class="hub-actions">
-          <a class="btn btn-hub" href="/schedule"><%= t('teacherHub.action.schedule') %></a>
+          <a class="btn btn-hub" href="<%= teacherScheduleHref %>"><%= t('teacherHub.action.schedule') %></a>
           <a class="btn btn-hub" href="/teacher/workspace"><%= t('teacherHub.action.workspace') %></a>
           <a class="btn btn-hub" href="/teacher/subjects"><%= t('teacherHub.action.subjects') %></a>
-          <a class="btn btn-hub" href="/journal"><%= t('teacherHub.action.journal') %></a>
+          <a class="btn btn-hub" href="<%= teacherJournalHref %>"><%= t('teacherHub.action.journal') %></a>
         </div>
       </section>
 
@@ -420,7 +426,7 @@
                         <% } %>
                       </div>
                     </div>
-                    <a class="btn btn-hub btn-sm hub-priority-link" href="<%= item.action_href || '/journal' %>"><%= item.action_label || (lang === 'en' ? 'Open' : 'Відкрити') %></a>
+                    <a class="btn btn-hub btn-sm hub-priority-link" href="<%= item.action_href || teacherJournalHref %>"><%= item.action_label || (lang === 'en' ? 'Open' : 'Відкрити') %></a>
                   </div>
                 <% }) %>
               </div>
@@ -471,12 +477,12 @@
                     </div>
                   <% } %>
                   <div class="mt-3">
-                    <a class="btn btn-hub btn-sm" href="/journal/insights"><%= lang === 'en' ? 'Open insights' : 'Відкрити інсайти' %></a>
+                    <a class="btn btn-hub btn-sm" href="<%= teacherInsightsHref %>"><%= lang === 'en' ? 'Open insights' : 'Відкрити інсайти' %></a>
                   </div>
                 <% } else { %>
                   <div class="hub-list-meta"><%= lang === 'en' ? 'Publish a rating from Journal Insights to keep this dashboard aligned with the same snapshot used in My Day and the schedule inbox.' : 'Опублікуйте рейтинг із Journal Insights, щоб цей дашборд бачив той самий snapshot, що й My Day та inbox розкладу.' %></div>
                   <div class="mt-3">
-                    <a class="btn btn-hub btn-sm" href="/journal/insights"><%= lang === 'en' ? 'Go to insights' : 'До інсайтів' %></a>
+                    <a class="btn btn-hub btn-sm" href="<%= teacherInsightsHref %>"><%= lang === 'en' ? 'Go to insights' : 'До інсайтів' %></a>
                   </div>
                 <% } %>
               </div>
@@ -529,11 +535,11 @@
                 <span class="quick-title"><%= t('teacherHub.quick.updateScope.title') %></span>
                 <span class="quick-desc"><%= t('teacherHub.quick.updateScope.desc') %></span>
               </a>
-              <a class="quick-card" href="/schedule">
+              <a class="quick-card" href="<%= teacherScheduleHref %>">
                 <span class="quick-title"><%= t('teacherHub.quick.openSchedule.title') %></span>
                 <span class="quick-desc"><%= t('teacherHub.quick.openSchedule.desc') %></span>
               </a>
-              <a class="quick-card" href="/journal">
+              <a class="quick-card" href="<%= teacherJournalHref %>">
                 <span class="quick-title"><%= t('teacherHub.quick.goJournal.title') %></span>
                 <span class="quick-desc"><%= t('teacherHub.quick.goJournal.desc') %></span>
               </a>
@@ -557,7 +563,7 @@
                 <h5 class="mb-1"><%= lang === 'en' ? 'Upcoming sessions' : 'Найближчі сесії' %></h5>
                 <p><%= lang === 'en' ? 'What requires action from the next timetable window.' : 'Що варто закрити до найближчих пар.' %></p>
               </div>
-              <a class="btn btn-hub btn-sm" href="/schedule"><%= lang === 'en' ? 'Open schedule' : 'До розкладу' %></a>
+              <a class="btn btn-hub btn-sm" href="<%= teacherScheduleHref %>"><%= lang === 'en' ? 'Open schedule' : 'До розкладу' %></a>
             </div>
             <% if ((upcomingClasses || []).length) { %>
               <div class="hub-list">
