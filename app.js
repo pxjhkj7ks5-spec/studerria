@@ -30911,6 +30911,14 @@ const buildSessionGeneratorReturnHref = (payload = {}, messageKind = '', message
     normalizeGeneratorLocation
   );
 
+const resolveSessionGeneratorWindowDates = (options = {}) =>
+  sessionGeneratorHelpers.resolveSessionGeneratorWindowDates({
+    ...options,
+    parseWeekSet,
+    buildDatesFromWeekNumbers,
+    buildDayBuckets: buildSessionDayBuckets,
+  });
+
 const parseSessionManualAssignments = (rawValue) => {
   if (rawValue === undefined || rawValue === null || rawValue === '') return [];
   let payload = rawValue;
@@ -32915,28 +32923,15 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       };
     });
 
-    let sessionWeekNumbers = [];
-    if (form.window_mode === 'weeks' && activeSemester && Number(activeSemester.weeks_count || 0) > 0) {
-      const semesterWeeksCount = Number(activeSemester.weeks_count || 0);
-      const parsedWeeks = parseWeekSet(form.session_weeks_set, semesterWeeksCount);
-      if (parsedWeeks.length) {
-        sessionWeekNumbers = parsedWeeks;
-      } else {
-        const count = Math.min(Math.max(Number(form.session_weeks_count || 1), 1), semesterWeeksCount);
-        const startWeek = Math.max(1, semesterWeeksCount - count + 1);
-        sessionWeekNumbers = Array.from({ length: count }, (_, idx) => startWeek + idx);
-      }
-      form.session_weeks_set = sessionWeekNumbers.join(',');
-    }
-    const explicitSessionDates = form.window_mode === 'weeks'
-      ? buildSessionDatesFromWeekNumbers({
-          semester: activeSemester,
-          weekNumbers: sessionWeekNumbers,
-          includeWeekends: form.include_weekends,
-          respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
-          activeStudyDayNames,
-        })
-      : [];
+    const windowDates = resolveSessionGeneratorWindowDates({
+      form,
+      semester: activeSemester,
+      activeStudyDayNames,
+    });
+    const sessionWeekNumbers = windowDates.sessionWeekNumbers;
+    form.window_mode = windowDates.window_mode;
+    form.session_weeks_set = windowDates.sessionWeeksSet;
+    const explicitSessionDates = windowDates.explicitSessionDates;
 
     const previewCleared = draftAction === 'clear';
     const preview = null;
@@ -33312,7 +33307,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       location: activeLocation,
       course_id: selectedCourseId,
       semester_id: selectedSemesterRaw,
-      window_mode: 'weeks',
+      window_mode: normalizeSessionWindowMode(body.window_mode || 'weeks'),
       start_date: isValidDateString(body.start_date)
         ? String(body.start_date)
         : buildSessionGeneratorDefaultStartDate(null),
@@ -33348,36 +33343,13 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       strategy: normalizeSessionGeneratorStrategy(body.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
     };
     const redirectToGenerator = (messageKind, messageText) => {
-      const params = new URLSearchParams();
-      const safeSet = (key, value) => {
-        if (value === undefined || value === null || value === '') return;
-        params.set(key, String(value));
-      };
-      safeSet('location', activeLocation);
-      safeSet('course_id', selectedCourseId);
-      safeSet('semester_id', form.semester_id || selectedSemesterRaw);
-      safeSet('draft_id', draftId);
-      safeSet('window_mode', form.window_mode);
-      safeSet('start_date', form.start_date);
-      safeSet('session_days', form.session_days);
-      safeSet('session_weeks_count', form.session_weeks_count);
-      safeSet('session_weeks_set', form.session_weeks_set);
-      safeSet('max_events_per_day', form.max_events_per_day);
-      safeSet('reserve_every', form.reserve_every);
-      safeSet('exam_gap_days', form.exam_gap_days);
-      safeSet('retake_gap_days', form.retake_gap_days);
-      safeSet('retake_window_days', form.retake_window_days);
-      safeSet('day_grouping_mode', form.day_grouping_mode);
-      safeSet('exam_sequence', form.exam_sequence);
-      safeSet('credit_sequence', form.credit_sequence);
-      safeSet('strategy', form.strategy);
-      params.set('include_weekends', form.include_weekends ? '1' : '0');
-      params.set('include_consultations', form.include_consultations ? '1' : '0');
-      params.set('respect_study_days', form.respect_study_days ? '1' : '0');
-      if (messageText) {
-        params.set(messageKind, String(messageText));
-      }
-      return res.redirect(`/admin/session-generator?${params.toString()}`);
+      return res.redirect(buildSessionGeneratorReturnHref({
+        ...form,
+        location: activeLocation,
+        course_id: selectedCourseId,
+        semester_id: form.semester_id || selectedSemesterRaw,
+        draft_id: draftId,
+      }, messageKind, messageText));
     };
 
     if (!selectedCourseId) {
@@ -33419,28 +33391,15 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       .filter((row) => row.is_active)
       .map((row) => row.day_name)
       .filter(Boolean);
-    let sessionWeekNumbers = [];
-    if (form.window_mode === 'weeks' && Number(activeSemester.weeks_count || 0) > 0) {
-      const semesterWeeksCount = Number(activeSemester.weeks_count || 0);
-      const parsedWeeks = parseWeekSet(form.session_weeks_set, semesterWeeksCount);
-      if (parsedWeeks.length) {
-        sessionWeekNumbers = parsedWeeks;
-      } else {
-        const count = Math.min(Math.max(Number(form.session_weeks_count || 1), 1), semesterWeeksCount);
-        const startWeek = Math.max(1, semesterWeeksCount - count + 1);
-        sessionWeekNumbers = Array.from({ length: count }, (_value, index) => startWeek + index);
-      }
-      form.session_weeks_set = sessionWeekNumbers.join(',');
-    }
-    const explicitSessionDates = form.window_mode === 'weeks'
-      ? buildSessionDatesFromWeekNumbers({
-          semester: activeSemester,
-          weekNumbers: sessionWeekNumbers,
-          includeWeekends: form.include_weekends,
-          respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
-          activeStudyDayNames,
-        })
-      : [];
+    const windowDates = resolveSessionGeneratorWindowDates({
+      form,
+      semester: activeSemester,
+      activeStudyDayNames,
+      explicitDates: body.explicit_dates_json,
+    });
+    const explicitSessionDates = windowDates.explicitSessionDates;
+    form.window_mode = windowDates.window_mode;
+    form.session_weeks_set = windowDates.sessionWeeksSet;
 
     const subjectById = new Map((subjects || []).map((subject) => [Number(subject.id), subject]));
     const rawManualAssignments = parseSessionManualAssignments(body.manual_assignments_json);
@@ -33708,7 +33667,7 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
       location: activeLocation,
       course_id: selectedCourseId,
       semester_id: selectedSemesterRaw,
-      window_mode: 'weeks',
+      window_mode: normalizeSessionWindowMode(body.window_mode || 'weeks'),
       start_date: isValidDateString(body.start_date)
         ? String(body.start_date)
         : buildSessionGeneratorDefaultStartDate(null),
@@ -33720,30 +33679,37 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
         12
       ),
       session_weeks_set: String(body.session_weeks_set || '').trim(),
+      max_events_per_day: parseSessionGeneratorInt(
+        body.max_events_per_day,
+        SESSION_GENERATOR_DEFAULTS.max_events_per_day,
+        1,
+        6
+      ),
+      reserve_every: parseSessionGeneratorInt(body.reserve_every, SESSION_GENERATOR_DEFAULTS.reserve_every, 0, 20),
+      exam_gap_days: parseSessionGeneratorInt(body.exam_gap_days, SESSION_GENERATOR_DEFAULTS.exam_gap_days, 0, 5),
+      retake_gap_days: parseSessionGeneratorInt(body.retake_gap_days, SESSION_GENERATOR_DEFAULTS.retake_gap_days, 1, 14),
+      retake_window_days: parseSessionGeneratorInt(
+        body.retake_window_days,
+        SESSION_GENERATOR_DEFAULTS.retake_window_days,
+        1,
+        14
+      ),
       include_weekends: parseSessionGeneratorFlag(body.include_weekends, SESSION_GENERATOR_DEFAULTS.include_weekends),
+      include_consultations: parseSessionGeneratorFlag(body.include_consultations, SESSION_GENERATOR_DEFAULTS.include_consultations),
       respect_study_days: parseSessionGeneratorFlag(body.respect_study_days, SESSION_GENERATOR_DEFAULTS.respect_study_days),
+      day_grouping_mode: normalizeSessionDayGroupingMode(body.day_grouping_mode || SESSION_GENERATOR_DEFAULTS.day_grouping_mode),
+      exam_sequence: normalizeSessionExamSequence(body.exam_sequence || SESSION_GENERATOR_DEFAULTS.exam_sequence),
+      credit_sequence: normalizeSessionCreditSequence(body.credit_sequence || SESSION_GENERATOR_DEFAULTS.credit_sequence),
+      strategy: normalizeSessionGeneratorStrategy(body.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
     };
     const redirectToGenerator = (messageKind, messageText) => {
-      const params = new URLSearchParams();
-      const safeSet = (key, value) => {
-        if (value === undefined || value === null || value === '') return;
-        params.set(key, String(value));
-      };
-      safeSet('location', activeLocation);
-      safeSet('course_id', selectedCourseId);
-      safeSet('semester_id', form.semester_id || selectedSemesterRaw);
-      safeSet('draft_id', draftId);
-      safeSet('window_mode', form.window_mode);
-      safeSet('start_date', form.start_date);
-      safeSet('session_days', form.session_days);
-      safeSet('session_weeks_count', form.session_weeks_count);
-      safeSet('session_weeks_set', form.session_weeks_set);
-      params.set('include_weekends', form.include_weekends ? '1' : '0');
-      params.set('respect_study_days', form.respect_study_days ? '1' : '0');
-      if (messageText) {
-        params.set(messageKind, String(messageText));
-      }
-      return res.redirect(`/admin/session-generator?${params.toString()}`);
+      return res.redirect(buildSessionGeneratorReturnHref({
+        ...form,
+        location: activeLocation,
+        course_id: selectedCourseId,
+        semester_id: form.semester_id || selectedSemesterRaw,
+        draft_id: draftId,
+      }, messageKind, messageText));
     };
 
     if (!selectedCourseId) {
@@ -33778,26 +33744,15 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
       .map((row) => row.day_name)
       .filter(Boolean);
 
-    let sessionWeekNumbers = [];
-    if (Number(activeSemester.weeks_count || 0) > 0) {
-      const semesterWeeksCount = Number(activeSemester.weeks_count || 0);
-      const parsedWeeks = parseWeekSet(form.session_weeks_set, semesterWeeksCount);
-      if (parsedWeeks.length) {
-        sessionWeekNumbers = parsedWeeks;
-      } else {
-        const count = Math.min(Math.max(Number(form.session_weeks_count || 1), 1), semesterWeeksCount);
-        const startWeek = Math.max(1, semesterWeeksCount - count + 1);
-        sessionWeekNumbers = Array.from({ length: count }, (_value, index) => startWeek + index);
-      }
-      form.session_weeks_set = sessionWeekNumbers.join(',');
-    }
-    const explicitSessionDates = buildSessionDatesFromWeekNumbers({
+    const windowDates = resolveSessionGeneratorWindowDates({
+      form,
       semester: activeSemester,
-      weekNumbers: sessionWeekNumbers,
-      includeWeekends: form.include_weekends,
-      respectStudyDays: form.respect_study_days && activeStudyDayNames.length > 0,
       activeStudyDayNames,
+      explicitDates: body.explicit_dates_json,
     });
+    form.window_mode = windowDates.window_mode;
+    form.session_weeks_set = windowDates.sessionWeeksSet;
+    const explicitSessionDates = windowDates.explicitSessionDates;
     const targetDates = Array.from(new Set((explicitSessionDates || []).filter((date) => isValidDateString(date)))).sort();
     if (!targetDates.length) {
       return redirectToGenerator('err', 'Немає дат сесії для видалення. Перевірте тижні сесії.');
@@ -33838,7 +33793,7 @@ app.post('/admin/session-generator/delete-all-active', requireScheduleGeneratorS
       location: activeLocation,
       course_id: selectedCourseId,
       semester_id: selectedSemesterRaw,
-      window_mode: 'weeks',
+      window_mode: normalizeSessionWindowMode(body.window_mode || 'weeks'),
       start_date: isValidDateString(body.start_date)
         ? String(body.start_date)
         : buildSessionGeneratorDefaultStartDate(null),
@@ -33850,30 +33805,37 @@ app.post('/admin/session-generator/delete-all-active', requireScheduleGeneratorS
         12
       ),
       session_weeks_set: String(body.session_weeks_set || '').trim(),
+      max_events_per_day: parseSessionGeneratorInt(
+        body.max_events_per_day,
+        SESSION_GENERATOR_DEFAULTS.max_events_per_day,
+        1,
+        6
+      ),
+      reserve_every: parseSessionGeneratorInt(body.reserve_every, SESSION_GENERATOR_DEFAULTS.reserve_every, 0, 20),
+      exam_gap_days: parseSessionGeneratorInt(body.exam_gap_days, SESSION_GENERATOR_DEFAULTS.exam_gap_days, 0, 5),
+      retake_gap_days: parseSessionGeneratorInt(body.retake_gap_days, SESSION_GENERATOR_DEFAULTS.retake_gap_days, 1, 14),
+      retake_window_days: parseSessionGeneratorInt(
+        body.retake_window_days,
+        SESSION_GENERATOR_DEFAULTS.retake_window_days,
+        1,
+        14
+      ),
       include_weekends: parseSessionGeneratorFlag(body.include_weekends, SESSION_GENERATOR_DEFAULTS.include_weekends),
+      include_consultations: parseSessionGeneratorFlag(body.include_consultations, SESSION_GENERATOR_DEFAULTS.include_consultations),
       respect_study_days: parseSessionGeneratorFlag(body.respect_study_days, SESSION_GENERATOR_DEFAULTS.respect_study_days),
+      day_grouping_mode: normalizeSessionDayGroupingMode(body.day_grouping_mode || SESSION_GENERATOR_DEFAULTS.day_grouping_mode),
+      exam_sequence: normalizeSessionExamSequence(body.exam_sequence || SESSION_GENERATOR_DEFAULTS.exam_sequence),
+      credit_sequence: normalizeSessionCreditSequence(body.credit_sequence || SESSION_GENERATOR_DEFAULTS.credit_sequence),
+      strategy: normalizeSessionGeneratorStrategy(body.strategy || SESSION_GENERATOR_DEFAULTS.strategy),
     };
     const redirectToGenerator = (messageKind, messageText) => {
-      const params = new URLSearchParams();
-      const safeSet = (key, value) => {
-        if (value === undefined || value === null || value === '') return;
-        params.set(key, String(value));
-      };
-      safeSet('location', activeLocation);
-      safeSet('course_id', selectedCourseId);
-      safeSet('semester_id', form.semester_id || selectedSemesterRaw);
-      safeSet('draft_id', draftId);
-      safeSet('window_mode', form.window_mode);
-      safeSet('start_date', form.start_date);
-      safeSet('session_days', form.session_days);
-      safeSet('session_weeks_count', form.session_weeks_count);
-      safeSet('session_weeks_set', form.session_weeks_set);
-      params.set('include_weekends', form.include_weekends ? '1' : '0');
-      params.set('respect_study_days', form.respect_study_days ? '1' : '0');
-      if (messageText) {
-        params.set(messageKind, String(messageText));
-      }
-      return res.redirect(`/admin/session-generator?${params.toString()}`);
+      return res.redirect(buildSessionGeneratorReturnHref({
+        ...form,
+        location: activeLocation,
+        course_id: selectedCourseId,
+        semester_id: form.semester_id || selectedSemesterRaw,
+        draft_id: draftId,
+      }, messageKind, messageText));
     };
 
     if (!selectedCourseId) {

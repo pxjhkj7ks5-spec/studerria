@@ -6,6 +6,7 @@ const {
   parseSessionGeneratorFlag,
   parseSessionGeneratorInt,
   buildSessionGeneratorReturnHref,
+  resolveSessionGeneratorWindowDates,
   formatSessionConflictSummary,
   buildSessionConflictSlotMapV2,
 } = require('../lib/sessionGenerator');
@@ -43,6 +44,98 @@ test('session generator return href preserves normalized scope and flash payload
     href,
     '/admin/session-generator?location=munich&course_id=12&semester_id=9&draft_id=44&success=published+ok'
   );
+});
+
+test('session generator return href preserves planner state fields for redirects', () => {
+  const href = buildSessionGeneratorReturnHref(
+    {
+      location: 'kyiv',
+      course_id: 7,
+      semester_id: 3,
+      draft_id: 10,
+      window_mode: 'days',
+      start_date: '2026-03-30',
+      session_days: 12,
+      max_events_per_day: 3,
+      include_weekends: true,
+      include_consultations: false,
+      respect_study_days: true,
+      strategy: 'balanced',
+    },
+    'ok',
+    'done'
+  );
+
+  assert.equal(
+    href,
+    '/admin/session-generator?location=kyiv&course_id=7&semester_id=3&draft_id=10&window_mode=days&start_date=2026-03-30&session_days=12&max_events_per_day=3&strategy=balanced&include_weekends=1&include_consultations=0&respect_study_days=1&ok=done'
+  );
+});
+
+test('window date resolver derives fallback week ranges and normalizes week set', () => {
+  const resolved = resolveSessionGeneratorWindowDates({
+    form: {
+      window_mode: 'weeks',
+      session_weeks_count: 2,
+      session_weeks_set: '',
+      include_weekends: false,
+      respect_study_days: true,
+    },
+    semester: {
+      weeks_count: 6,
+      start_date: '2026-02-01',
+    },
+    activeStudyDayNames: ['Monday', 'Wednesday'],
+    parseWeekSet: () => [],
+    buildDatesFromWeekNumbers: ({ weekNumbers }) => weekNumbers.map((week) => `2026-02-0${week}`),
+    buildDayBuckets: () => [],
+  });
+
+  assert.equal(resolved.window_mode, 'weeks');
+  assert.deepEqual(resolved.sessionWeekNumbers, [5, 6]);
+  assert.equal(resolved.sessionWeeksSet, '5,6');
+  assert.deepEqual(resolved.explicitSessionDates, ['2026-02-05', '2026-02-06']);
+});
+
+test('window date resolver prefers explicit dates and supports day mode buckets', () => {
+  const explicitResolved = resolveSessionGeneratorWindowDates({
+    form: {
+      window_mode: 'weeks',
+      session_weeks_count: 3,
+      include_weekends: true,
+    },
+    semester: {
+      weeks_count: 8,
+    },
+    explicitDates: ['2026-04-02', '2026-04-01', '2026-04-01'],
+    parseWeekSet: () => [6, 7, 8],
+    buildDatesFromWeekNumbers: () => ['2026-05-01'],
+    buildDayBuckets: () => [],
+  });
+
+  assert.deepEqual(explicitResolved.explicitSessionDates, ['2026-04-01', '2026-04-02']);
+
+  const dayResolved = resolveSessionGeneratorWindowDates({
+    form: {
+      window_mode: 'days',
+      start_date: '2026-04-10',
+      session_days: 3,
+      max_events_per_day: 2,
+      include_weekends: false,
+      respect_study_days: false,
+    },
+    activeStudyDayNames: ['Monday'],
+    parseWeekSet: () => [],
+    buildDatesFromWeekNumbers: () => [],
+    buildDayBuckets: () => [
+      { date: '2026-04-10' },
+      { date: '2026-04-11' },
+      { date: '2026-04-10' },
+    ],
+  });
+
+  assert.equal(dayResolved.window_mode, 'days');
+  assert.deepEqual(dayResolved.explicitSessionDates, ['2026-04-10', '2026-04-11']);
 });
 
 test('session conflict slot map aggregates draft and occupied conflicts by slot', () => {

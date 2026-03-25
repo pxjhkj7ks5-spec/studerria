@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.65",
+      "date": "2026-03-25",
+      "items": [
+        "fix(session-generator-delete-flow-context): make `/admin/session-generator/delete` and `delete-all-active` keep the same planner scope on redirect, including window mode, timing knobs, sequencing, and boolean filters instead of collapsing back to a reduced weeks-only state",
+        "fix(session-generator-window-resolution): unify GET, publish, and delete window-date resolution through shared helpers so explicit planner dates and future day-mode windows resolve consistently instead of diverging between preview and cleanup flows",
+        "test(session-generator-window-state): extend focused helper coverage for stateful return URLs and explicit-date window resolution so the session-generator flow regressions are caught before they hit publish/delete UX"
+      ]
+    },
+    {
       "version": "1.2.64",
       "date": "2026-03-25",
       "items": [

@@ -1412,7 +1412,7 @@
                     <% }); %>
                   </select>
                 </div>
-                <input type="hidden" name="window_mode" value="weeks" />
+                <input type="hidden" name="window_mode" value="<%= form && form.window_mode ? form.window_mode : 'weeks' %>" />
                 <div class="col-4">
                   <label class="form-label"><%= sessionGeneratorText.sessionWeeksCount %></label>
                   <input class="form-control" type="number" min="1" max="12" name="session_weeks_count" value="<%= form && form.session_weeks_count %>" />
@@ -1866,7 +1866,7 @@
               <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
               <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
               <input type="hidden" name="draft_id" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
-              <input type="hidden" name="window_mode" value="weeks" />
+              <input type="hidden" name="window_mode" value="<%= form && form.window_mode ? form.window_mode : 'weeks' %>" />
               <input type="hidden" name="start_date" value="<%= form && form.start_date ? form.start_date : '' %>" />
               <input type="hidden" name="session_days" value="<%= form && form.session_days ? form.session_days : '' %>" />
               <input type="hidden" name="session_weeks_count" value="<%= form && form.session_weeks_count ? form.session_weeks_count : '' %>" />
@@ -1883,6 +1883,7 @@
               <input type="hidden" name="exam_sequence" value="<%= form && form.exam_sequence ? form.exam_sequence : 'exam_only' %>" />
               <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
               <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
+              <input type="hidden" name="explicit_dates_json" value='<%- JSON.stringify(explicitSessionDates || []) %>' />
               <input type="hidden" name="manual_assignments_json" id="manualAssignmentsInput" value="" />
               <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-outline-secondary" id="sessionCheckConflictsBtn" type="submit" name="publish_action" value="check_conflicts" disabled>
@@ -1903,13 +1904,24 @@
               <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
               <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
               <input type="hidden" name="draft_id" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
-              <input type="hidden" name="window_mode" value="weeks" />
+              <input type="hidden" name="window_mode" value="<%= form && form.window_mode ? form.window_mode : 'weeks' %>" />
               <input type="hidden" name="start_date" value="<%= form && form.start_date ? form.start_date : '' %>" />
               <input type="hidden" name="session_days" value="<%= form && form.session_days ? form.session_days : '' %>" />
               <input type="hidden" name="session_weeks_count" value="<%= form && form.session_weeks_count ? form.session_weeks_count : '' %>" />
               <input type="hidden" name="session_weeks_set" value="<%= form && form.session_weeks_set ? form.session_weeks_set : '' %>" />
+              <input type="hidden" name="max_events_per_day" value="<%= form && form.max_events_per_day ? form.max_events_per_day : '' %>" />
+              <input type="hidden" name="reserve_every" value="<%= form && form.reserve_every ? form.reserve_every : '' %>" />
+              <input type="hidden" name="exam_gap_days" value="<%= form && form.exam_gap_days ? form.exam_gap_days : '' %>" />
+              <input type="hidden" name="retake_gap_days" value="<%= form && form.retake_gap_days ? form.retake_gap_days : '' %>" />
+              <input type="hidden" name="retake_window_days" value="<%= form && form.retake_window_days ? form.retake_window_days : '' %>" />
               <input type="hidden" name="include_weekends" value="<%= form && form.include_weekends ? 1 : 0 %>" />
+              <input type="hidden" name="include_consultations" value="<%= form && form.include_consultations ? 1 : 0 %>" />
               <input type="hidden" name="respect_study_days" value="<%= form && form.respect_study_days ? 1 : 0 %>" />
+              <input type="hidden" name="day_grouping_mode" value="<%= form && form.day_grouping_mode ? form.day_grouping_mode : 'none' %>" />
+              <input type="hidden" name="exam_sequence" value="<%= form && form.exam_sequence ? form.exam_sequence : 'exam_only' %>" />
+              <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
+              <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
+              <input type="hidden" name="explicit_dates_json" value='<%- JSON.stringify(explicitSessionDates || []) %>' />
               <button class="btn btn-outline-danger" type="submit"><%= sessionGeneratorText.deleteButton %></button>
             </div>
           </form>
@@ -1922,13 +1934,24 @@
               <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
               <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
               <input type="hidden" name="draft_id" value="<%= draftMeta && draftMeta.id ? draftMeta.id : '' %>" />
-              <input type="hidden" name="window_mode" value="weeks" />
+              <input type="hidden" name="window_mode" value="<%= form && form.window_mode ? form.window_mode : 'weeks' %>" />
               <input type="hidden" name="start_date" value="<%= form && form.start_date ? form.start_date : '' %>" />
               <input type="hidden" name="session_days" value="<%= form && form.session_days ? form.session_days : '' %>" />
               <input type="hidden" name="session_weeks_count" value="<%= form && form.session_weeks_count ? form.session_weeks_count : '' %>" />
               <input type="hidden" name="session_weeks_set" value="<%= form && form.session_weeks_set ? form.session_weeks_set : '' %>" />
+              <input type="hidden" name="max_events_per_day" value="<%= form && form.max_events_per_day ? form.max_events_per_day : '' %>" />
+              <input type="hidden" name="reserve_every" value="<%= form && form.reserve_every ? form.reserve_every : '' %>" />
+              <input type="hidden" name="exam_gap_days" value="<%= form && form.exam_gap_days ? form.exam_gap_days : '' %>" />
+              <input type="hidden" name="retake_gap_days" value="<%= form && form.retake_gap_days ? form.retake_gap_days : '' %>" />
+              <input type="hidden" name="retake_window_days" value="<%= form && form.retake_window_days ? form.retake_window_days : '' %>" />
               <input type="hidden" name="include_weekends" value="<%= form && form.include_weekends ? 1 : 0 %>" />
+              <input type="hidden" name="include_consultations" value="<%= form && form.include_consultations ? 1 : 0 %>" />
               <input type="hidden" name="respect_study_days" value="<%= form && form.respect_study_days ? 1 : 0 %>" />
+              <input type="hidden" name="day_grouping_mode" value="<%= form && form.day_grouping_mode ? form.day_grouping_mode : 'none' %>" />
+              <input type="hidden" name="exam_sequence" value="<%= form && form.exam_sequence ? form.exam_sequence : 'exam_only' %>" />
+              <input type="hidden" name="credit_sequence" value="<%= form && form.credit_sequence ? form.credit_sequence : 'credit_only' %>" />
+              <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
+              <input type="hidden" name="explicit_dates_json" value='<%- JSON.stringify(explicitSessionDates || []) %>' />
               <button class="btn btn-danger" type="submit"><%= sessionGeneratorText.deleteAllButton %></button>
             </div>
           </form>
