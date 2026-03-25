@@ -1,11 +1,11 @@
 <%- include('navbar', {
   showGlobalNavbar: true,
   forceAppNavbar: true,
-  role,
-  username,
-  t,
-  navItems,
-  navMeta,
-  userNav,
-  currentPath,
+  role: (typeof role !== 'undefined') ? role : '',
+  username: (typeof username !== 'undefined') ? username : '',
+  t: (typeof t !== 'undefined') ? t : null,
+  navItems: (typeof navItems !== 'undefined') ? navItems : undefined,
+  navMeta: (typeof navMeta !== 'undefined') ? navMeta : undefined,
+  userNav: (typeof userNav !== 'undefined') ? userNav : undefined,
+  currentPath: (typeof currentPath !== 'undefined') ? currentPath : '',
 }) %>

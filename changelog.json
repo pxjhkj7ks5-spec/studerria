@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.66",
+      "date": "2026-03-25",
+      "items": [
+        "fix(shared-topbar-optional-nav-locals): make `views/partials/topbar.ejs` tolerate missing `navItems`, `navMeta`, `userNav`, and `currentPath` so pages that include the shared navbar no longer crash with `ReferenceError` when those optional locals are absent",
+        "fix(admin-pathways-render-regression): restore `/admin/pathways` page rendering by removing the shared-topbar crash path that blocked the admin pathways surface before any cohort data could load",
+        "test(shared-partials-render-smoke): add focused EJS render coverage for the shared topbar partial and the admin pathways page so future partial-local regressions are caught before they break SSR pages"
+      ]
+    },
+    {
       "version": "1.2.65",
       "date": "2026-03-25",
       "items": [
