@@ -2326,8 +2326,8 @@
           }
           return warnings;
         };
-        const renderWarningHtml = (warnings) => {
-          if (!warnings.length) return '';
+        const createWarningStack = (warnings) => {
+          if (!warnings.length) return null;
           const uniqueWarnings = [];
           const seen = new Set();
           warnings.forEach((warning) => {
@@ -2336,23 +2336,99 @@
             seen.add(key);
             uniqueWarnings.push(warning);
           });
-          const chips = uniqueWarnings
-            .map((warning) => `<span class="slot-warning-chip ${warning.tone === 'warn' ? 'warn' : ''}">⚠ ${escapeHtml(warning.label || '')}</span>`)
-            .join('');
+          const stack = document.createElement('div');
+          stack.className = 'slot-warning-stack';
+          uniqueWarnings.forEach((warning) => {
+            const chip = document.createElement('span');
+            chip.className = `slot-warning-chip ${warning.tone === 'warn' ? 'warn' : ''}`.trim();
+            chip.textContent = `\u26A0 ${warning.label || ''}`;
+            stack.appendChild(chip);
+          });
           const detail = uniqueWarnings.find((warning) => warning && warning.detail);
-          const detailHtml = detail ? `<div class="slot-warning-detail">${escapeHtml(detail.detail)}</div>` : '';
-          return `<div class="slot-warning-stack">${chips}${detailHtml}</div>`;
+          if (detail) {
+            const detailNode = document.createElement('div');
+            detailNode.className = 'slot-warning-detail';
+            detailNode.textContent = detail.detail;
+            stack.appendChild(detailNode);
+          }
+          return stack;
         };
-        const renderAssignmentCardHtml = (item) => `
-          <div class="slot-assignment-item">
-            <div class="slot-assignment-subject">${escapeHtml(item.subject_name || '')}</div>
-            <div class="slot-assignment-meta">
-              <span class="mark-pill ${resolveAssignmentTone(item.type)}">${escapeHtml(formatAssignmentTypeChipLabel(item.type))}</span>
-              <span class="group-badge">${escapeHtml(item.group_label || sessionGeneratorText.allGroups)}</span>
-              ${item.room_label ? `<span class="group-badge">${escapeHtml(item.room_label)}</span>` : ''}
-            </div>
-          </div>
-        `;
+        const createAssignmentCard = (item) => {
+          const card = document.createElement('div');
+          card.className = 'slot-assignment-item';
+          const subject = document.createElement('div');
+          subject.className = 'slot-assignment-subject';
+          subject.textContent = item.subject_name || '';
+          card.appendChild(subject);
+          const meta = document.createElement('div');
+          meta.className = 'slot-assignment-meta';
+          const typeChip = document.createElement('span');
+          typeChip.className = `mark-pill ${resolveAssignmentTone(item.type)}`;
+          typeChip.textContent = formatAssignmentTypeChipLabel(item.type);
+          meta.appendChild(typeChip);
+          const groupBadge = document.createElement('span');
+          groupBadge.className = 'group-badge';
+          groupBadge.textContent = item.group_label || sessionGeneratorText.allGroups;
+          meta.appendChild(groupBadge);
+          if (item.room_label) {
+            const roomBadge = document.createElement('span');
+            roomBadge.className = 'group-badge';
+            roomBadge.textContent = item.room_label;
+            meta.appendChild(roomBadge);
+          }
+          card.appendChild(meta);
+          return card;
+        };
+        const createTimelineEmptyState = (message) => {
+          const empty = document.createElement('div');
+          empty.className = 'timeline-empty';
+          empty.textContent = message || '';
+          return empty;
+        };
+        const createGroupTimelineItem = (row, hasShortGap) => {
+          const item = document.createElement('div');
+          item.className = 'group-timeline-item';
+          const date = document.createElement('div');
+          date.className = 'group-timeline-date';
+          date.textContent = formatIsoDateLabel(row.date || '');
+          item.appendChild(date);
+          const title = document.createElement('div');
+          title.className = 'group-timeline-title';
+          title.textContent = row.subject_name || '';
+          item.appendChild(title);
+          const meta = document.createElement('div');
+          meta.className = 'group-timeline-meta';
+          const typeChip = document.createElement('span');
+          typeChip.className = `mark-pill ${resolveAssignmentTone(row.type)}`;
+          typeChip.textContent = formatAssignmentTypeChipLabel(row.type);
+          meta.appendChild(typeChip);
+          const groupBadge = document.createElement('span');
+          groupBadge.className = 'group-badge';
+          groupBadge.textContent = row.group_label || sessionGeneratorText.allGroups;
+          meta.appendChild(groupBadge);
+          if (hasShortGap) {
+            const warningChip = document.createElement('span');
+            warningChip.className = 'slot-warning-chip warn';
+            warningChip.textContent = `\u26A0 ${sessionGeneratorText.warningShortGap}`;
+            meta.appendChild(warningChip);
+          }
+          item.appendChild(meta);
+          return item;
+        };
+        const createSlotAssignmentStack = (slotRows) => {
+          const stack = document.createElement('div');
+          stack.className = 'slot-assignment-stack';
+          slotRows.slice(0, 2).forEach((item) => {
+            stack.appendChild(createAssignmentCard(item));
+          });
+          if (slotRows.length > 2) {
+            const more = document.createElement('div');
+            more.className = 'small text-muted';
+            more.textContent = formatClientMoreLabel(slotRows.length - 2);
+            stack.appendChild(more);
+          }
+          return stack;
+        };
 
         const buildCandidateFromSlot = (button) => {
           if (!button || !manualSubjectSelect) return null;
@@ -2503,7 +2579,7 @@
           const groupNumber = getSelectedTimelineGroupNumber();
           if (!Number.isFinite(groupNumber) || groupNumber < 1) {
             groupTimelineLabel.textContent = sessionGeneratorText.groupTimelineHint;
-            groupTimelineRoot.innerHTML = `<div class="timeline-empty">${escapeHtml(sessionGeneratorText.groupTimelineHint)}</div>`;
+            groupTimelineRoot.replaceChildren(createTimelineEmptyState(sessionGeneratorText.groupTimelineHint));
             return;
           }
           groupTimelineLabel.textContent = `${sessionGeneratorText.groupPrefix} ${groupNumber}`;
@@ -2512,26 +2588,17 @@
             return rowGroup === 0 || rowGroup === groupNumber;
           }));
           if (!rows.length) {
-            groupTimelineRoot.innerHTML = `<div class="timeline-empty">${escapeHtml(sessionGeneratorText.groupTimelineEmpty)}</div>`;
+            groupTimelineRoot.replaceChildren(createTimelineEmptyState(sessionGeneratorText.groupTimelineEmpty));
             return;
           }
-          const itemsHtml = rows.map((row, index) => {
+          const fragment = document.createDocumentFragment();
+          rows.forEach((row, index) => {
             const previous = index > 0 ? rows[index - 1] : null;
             const gap = previous ? diffClientDays(String(row.date || ''), String(previous.date || '')) : null;
             const hasShortGap = gap !== null && gap < 2;
-            return `
-              <div class="group-timeline-item">
-                <div class="group-timeline-date">${escapeHtml(formatIsoDateLabel(row.date || ''))}</div>
-                <div class="group-timeline-title">${escapeHtml(row.subject_name || '')}</div>
-                <div class="group-timeline-meta">
-                  <span class="mark-pill ${resolveAssignmentTone(row.type)}">${escapeHtml(formatAssignmentTypeChipLabel(row.type))}</span>
-                  <span class="group-badge">${escapeHtml(row.group_label || sessionGeneratorText.allGroups)}</span>
-                  ${hasShortGap ? `<span class="slot-warning-chip warn">⚠ ${escapeHtml(sessionGeneratorText.warningShortGap)}</span>` : ''}
-                </div>
-              </div>
-            `;
-          }).join('');
-          groupTimelineRoot.innerHTML = itemsHtml;
+            fragment.appendChild(createGroupTimelineItem(row, hasShortGap));
+          });
+          groupTimelineRoot.replaceChildren(fragment);
         };
 
         const updateBlockReasonMessage = (button) => {
@@ -2601,15 +2668,11 @@
             }
             if (!holder) return;
             if (!slotRows.length) {
-              holder.innerHTML = '';
+              holder.replaceChildren();
               button.classList.remove('is-assigned');
             } else {
               button.classList.add('is-assigned');
-              const rowsHtml = slotRows.slice(0, 2).map((item) => renderAssignmentCardHtml(item)).join('');
-              const moreHtml = slotRows.length > 2
-                ? `<div class="small text-muted">${escapeHtml(formatClientMoreLabel(slotRows.length - 2))}</div>`
-                : '';
-              holder.innerHTML = `<div class="slot-assignment-stack">${rowsHtml}${moreHtml}</div>`;
+              holder.replaceChildren(createSlotAssignmentStack(slotRows));
             }
             const slotConflict = liveConflictState && liveConflictState.slot_conflicts
               ? liveConflictState.slot_conflicts[currentSlotKey]
@@ -2619,7 +2682,8 @@
               slotWarnings.push(...buildWarningsForCandidate(row, getAssessmentAssignments(), slotConflict));
             });
             if (conflictHolder) {
-              conflictHolder.innerHTML = renderWarningHtml(slotWarnings);
+              const warningStack = createWarningStack(slotWarnings);
+              conflictHolder.replaceChildren(...(warningStack ? [warningStack] : []));
             }
             button.classList.toggle('is-conflict', slotWarnings.length > 0);
             const hasSubjectSelection = Number(manualSubjectSelect && manualSubjectSelect.value ? manualSubjectSelect.value : 0) > 0;

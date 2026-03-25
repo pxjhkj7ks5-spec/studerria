@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.64",
+      "date": "2026-03-25",
+      "items": [
+        "refactor(session-generator-helper-module): move reusable session-generator parsing, return-href, and conflict-shaping helpers into `lib/sessionGenerator.js` so the planner flow can be tested without reaching through `app.js`",
+        "test(session-generator-helpers): add focused `node:test` coverage for strategy normalization, flag/int bounds, scoped return URLs, conflict slot aggregation, and conflict summary shaping",
+        "fix(session-generator-safe-planner-render): replace the remaining string-based warning, assignment-card, and group-timeline rendering in `/admin/session-generator` with DOM-node rendering so planner previews stay on the safer client-side pattern"
+      ]
+    },
+    {
       "version": "1.2.63",
       "date": "2026-03-25",
       "items": [

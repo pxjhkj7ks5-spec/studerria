@@ -19,6 +19,7 @@ const journalInsightHelpers = require('./lib/journalInsights');
 const roomHelpers = require('./lib/rooms');
 const pathwayHelpers = require('./lib/pathways');
 const securityHelpers = require('./lib/security');
+const sessionGeneratorHelpers = require('./lib/sessionGenerator');
 const versionFile = path.join(__dirname, 'version.json');
 const changelogFile = path.join(__dirname, 'changelog.json');
 let appVersion = pkg.version || '0.0.0';
@@ -30872,30 +30873,9 @@ const normalizeSessionCreditSequence = (value) => {
   return 'credit_only';
 };
 
-const normalizeSessionGeneratorStrategy = (value) => {
-  const raw = String(value || '').trim().toLowerCase();
-  if (raw === 'credits_first') return 'credits_first';
-  if (raw === 'balanced') return 'balanced';
-  return 'exams_first';
-};
-
-const parseSessionGeneratorFlag = (value, fallback = false) => {
-  if (value === undefined || value === null || value === '') return !!fallback;
-  const raw = String(value).trim().toLowerCase();
-  if (['1', 'true', 't', 'yes', 'on'].includes(raw)) return true;
-  if (['0', 'false', 'f', 'no', 'off'].includes(raw)) return false;
-  return !!fallback;
-};
-
-const parseSessionGeneratorInt = (value, fallback, min, max) => {
-  if (value === undefined || value === null || String(value).trim() === '') return fallback;
-  const num = Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  const rounded = Math.round(num);
-  if (Number.isFinite(min) && rounded < min) return min;
-  if (Number.isFinite(max) && rounded > max) return max;
-  return rounded;
-};
+const normalizeSessionGeneratorStrategy = sessionGeneratorHelpers.normalizeSessionGeneratorStrategy;
+const parseSessionGeneratorFlag = sessionGeneratorHelpers.parseSessionGeneratorFlag;
+const parseSessionGeneratorInt = sessionGeneratorHelpers.parseSessionGeneratorInt;
 
 async function listRoomsForCourse(courseId, options = {}) {
   const normalizedCourseId = Number(courseId || 0);
@@ -30923,21 +30903,13 @@ async function listRoomsForCourse(courseId, options = {}) {
   }
 }
 
-const buildSessionGeneratorReturnHref = (payload = {}, messageKind = '', messageText = '') => {
-  const params = new URLSearchParams();
-  const push = (key, value) => {
-    if (value === undefined || value === null || value === '') return;
-    params.set(key, String(value));
-  };
-  push('location', normalizeGeneratorLocation(payload.location || 'kyiv'));
-  push('course_id', parseSessionGeneratorInt(payload.course_id, null, 1, Number.MAX_SAFE_INTEGER));
-  push('semester_id', parseSessionGeneratorInt(payload.semester_id, null, 1, Number.MAX_SAFE_INTEGER));
-  push('draft_id', parseSessionGeneratorInt(payload.draft_id, null, 1, Number.MAX_SAFE_INTEGER));
-  if (messageKind && messageText) {
-    params.set(messageKind, String(messageText));
-  }
-  return `/admin/session-generator${params.toString() ? `?${params.toString()}` : ''}`;
-};
+const buildSessionGeneratorReturnHref = (payload = {}, messageKind = '', messageText = '') =>
+  sessionGeneratorHelpers.buildSessionGeneratorReturnHref(
+    payload,
+    messageKind,
+    messageText,
+    normalizeGeneratorLocation
+  );
 
 const parseSessionManualAssignments = (rawValue) => {
   if (rawValue === undefined || rawValue === null || rawValue === '') return [];
