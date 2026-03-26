@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.99",
+      "date": "2026-03-27",
+      "items": [
+        "refactor(admin-academic-scope-service): move the canonical admin academic scope resolver out of `app.js` into `lib/academicSetup.js`, so track/program/admission/stage/campus context selection now lives in one reusable service instead of route-adjacent monolith code",
+        "refactor(promotion-context-service): move next-stage context resolution for cohort promotion into `lib/academicSetup.js`, keeping `app.js` as a thin transport wrapper while preserving preset application and legacy compatibility behavior for `promote +1`",
+        "fix(scope-filter-service-parity): preserve the old semantics for empty `allowedCourseIds` filters during admin scope resolution, so restricted staff with zero accessible courses do not accidentally fall back to an unscoped academic selector"
+      ]
+    },
+    {
       "version": "1.2.98",
       "date": "2026-03-27",
       "items": [

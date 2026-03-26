@@ -4260,52 +4260,24 @@ async function createAcademicIntakeYear(admissionYear, programIds = []) {
 }
 
 async function ensureNextStudyContextForPromotion(placement) {
-  if (!placement || !placement.admission_id) {
-    return null;
-  }
-  const nextStage = normalizeStudyContextStage(Number(placement.stage || 0) + 1, 1);
-  const campusKey = normalizeCourseCampus(placement.campus_key || 'kyiv');
-  const directMatch = await db.get(
-    `
-      SELECT sc.id
-      FROM study_contexts sc
-      JOIN cohorts coh ON coh.id = sc.cohort_id
-      WHERE coh.legacy_admission_id = ?
-        AND sc.stage_number = ?
-        AND sc.campus_key = ?
-      ORDER BY sc.id ASC
-      LIMIT 1
-    `,
-    [placement.admission_id, nextStage, campusKey]
-  ).catch((err) => {
+  try {
+    return await academicSetupHelpers.ensureNextStudyContextForPromotion({
+      placement,
+      store: {
+        get: (sql, params) => db.get(sql, params),
+      },
+      loadCourses: () => getCoursesCached(),
+      courseMatchesRegistrationTrack: (course, trackKey) => courseMatchesRegistrationTrack(course, trackKey),
+      inferLegacyCourseOrdinal: (courseName) => inferLegacyCourseOrdinal(courseName),
+      ensureStudyContextForLegacyPlacement: (payload) => ensureStudyContextForLegacyPlacement(payload),
+      applyProgramPresetToStudyContext: (studyContextId) => applyProgramPresetToStudyContext(studyContextId),
+    });
+  } catch (err) {
     if (isDbSchemaCompatibilityError(err)) {
       return null;
     }
     throw err;
-  });
-  if (directMatch && directMatch.id) {
-    return parsePositiveIntStrict(directMatch.id);
   }
-
-  const candidateCourses = (await getCoursesCached())
-    .filter((course) => courseMatchesRegistrationTrack(course, placement.track_key))
-    .filter((course) => normalizeCourseCampus(course.location || 'kyiv') === campusKey)
-    .filter((course) => normalizeStudyContextStage(inferLegacyCourseOrdinal(course.name), 0) === nextStage);
-  if (candidateCourses.length !== 1) {
-    return null;
-  }
-  const ensuredContextId = await ensureStudyContextForLegacyPlacement({
-    courseId: candidateCourses[0].id,
-    admissionId: placement.admission_id,
-    programId: placement.program_id,
-    trackKey: placement.track_key,
-    preferredCampus: campusKey,
-    preferredStage: nextStage,
-  });
-  if (ensuredContextId) {
-    await applyProgramPresetToStudyContext(ensuredContextId);
-  }
-  return ensuredContextId;
 }
 
 function normalizeRegistrationTrack(rawTrack, fallback = 'bachelor') {
@@ -9403,19 +9375,6 @@ function ensureUsersSchema(cb) {
   return cb(true);
 }
 
-function buildAcademicTrackOrderKey(trackKey) {
-  switch (String(trackKey || '').trim().toLowerCase()) {
-    case 'bachelor':
-      return 0;
-    case 'master':
-      return 1;
-    case 'teacher':
-      return 2;
-    default:
-      return 99;
-  }
-}
-
 function buildAdminScopeBasePath(req) {
   if (hasSessionRole(req, 'deanery') && !hasSessionRole(req, 'admin')) {
     return '/deanery';
@@ -9490,7 +9449,7 @@ async function buildAdminAcademicScopeState(req, options = {}) {
   const courses = Array.isArray(options.courses)
     ? options.courses
     : await getCoursesCached();
-  const rawStudyContexts = Array.isArray(options.studyContexts)
+  const studyContexts = Array.isArray(options.studyContexts)
     ? options.studyContexts
     : await listStudyContextOptions();
   const allowedCourseIdSet = options.allowedCourseIds instanceof Set
@@ -9502,244 +9461,49 @@ async function buildAdminAcademicScopeState(req, options = {}) {
           .filter((value) => Number.isInteger(value) && value > 0)
       )
       : null);
-  const studyContexts = (rawStudyContexts || [])
-    .filter((context) => {
-      const courseId = Number(context && context.course_id ? context.course_id : 0);
-      if (!allowedCourseIdSet) {
-        return true;
-      }
-      if (!courseId) {
-        return false;
-      }
-      return allowedCourseIdSet.has(courseId);
-    })
-    .sort((a, b) => {
-      const trackDiff = buildAcademicTrackOrderKey(a.track_key) - buildAcademicTrackOrderKey(b.track_key);
-      if (trackDiff !== 0) return trackDiff;
-      const programDiff = String(a.program_name || a.program_code || '').localeCompare(String(b.program_name || b.program_code || ''), 'uk', { sensitivity: 'base' });
-      if (programDiff !== 0) return programDiff;
-      const yearDiff = Number(b.admission_year || 0) - Number(a.admission_year || 0);
-      if (yearDiff !== 0) return yearDiff;
-      const stageDiff = Number(a.stage || 0) - Number(b.stage || 0);
-      if (stageDiff !== 0) return stageDiff;
-      return String(a.campus_key || '').localeCompare(String(b.campus_key || ''));
-    });
-
   const storedScope = getStoredAdminAcademicScope(req);
-  const queryOrBodyTrack = String(
-    (req.body && (req.body.track || req.body.mode))
-    || (req.query && (req.query.track || req.query.mode))
-    || storedScope.track
-    || ''
-  ).trim().toLowerCase();
   const requestedScope = {
-    track: ['bachelor', 'master', 'teacher'].includes(queryOrBodyTrack) ? queryOrBodyTrack : '',
-    programId: parsePositiveIntStrict(
-      (req.body && (req.body.program_id || req.body.programId))
+    track: (req.body && (req.body.track || req.body.mode))
+      || (req.query && (req.query.track || req.query.mode))
+      || '',
+    programId: (req.body && (req.body.program_id || req.body.programId))
       || (req.query && (req.query.program_id || req.query.programId))
-      || storedScope.programId
-    ),
-    admissionId: parsePositiveIntStrict(
-      (req.body && (req.body.admission_id || req.body.admissionId))
+      || null,
+    admissionId: (req.body && (req.body.admission_id || req.body.admissionId))
       || (req.query && (req.query.admission_id || req.query.admissionId))
-      || storedScope.admissionId
-    ),
-    stage: parsePositiveIntStrict(
-      (req.body && (req.body.stage || req.body.stage_number))
+      || null,
+    stage: (req.body && (req.body.stage || req.body.stage_number))
       || (req.query && (req.query.stage || req.query.stage_number))
-      || storedScope.stage
-    ),
-    campus: parseCourseCampus(
-      (req.body && (req.body.campus || req.body.campus_key))
+      || null,
+    campus: (req.body && (req.body.campus || req.body.campus_key))
       || (req.query && (req.query.campus || req.query.campus_key))
-      || storedScope.campus
-      || ''
-    ),
-    studyContextId: parsePositiveIntStrict(
-      (req.body && (req.body.study_context_id || req.body.studyContextId))
+      || '',
+    studyContextId: (req.body && (req.body.study_context_id || req.body.studyContextId))
       || (req.query && (req.query.study_context_id || req.query.studyContextId))
-      || storedScope.studyContextId
-    ),
-    courseId: parsePositiveIntStrict(
-      (req.body && (req.body.course_id || req.body.course))
+      || null,
+    courseId: (req.body && (req.body.course_id || req.body.course))
       || (req.query && (req.query.course_id || req.query.course))
-      || storedScope.courseId
-      || req.session.adminCourse
-      || options.fallbackCourseId
-      || (req.session.user && req.session.user.course_id)
-      || ((courses && courses[0] && courses[0].id) || null)
-    ),
+      || null,
   };
-
-  const explicitContext = requestedScope.studyContextId
-    ? (studyContexts.find((context) => Number(context.id || 0) === Number(requestedScope.studyContextId || 0)) || null)
-    : null;
-  const fallbackCourse = requestedScope.courseId
-    ? ((courses || []).find((course) => Number(course.id || 0) === Number(requestedScope.courseId || 0)) || null)
-    : null;
-  let selectedTrack = explicitContext
-    ? normalizeRegistrationTrack(explicitContext.track_key, 'bachelor')
-    : requestedScope.track;
-  if (!selectedTrack) {
-    selectedTrack = fallbackCourse ? inferRegistrationTrackFromCourse(fallbackCourse) : '';
-  }
-  const trackSet = Array.from(new Set(
-    studyContexts
-      .map((context) => normalizeRegistrationTrack(context.track_key, 'bachelor'))
-      .filter(Boolean)
-  ));
-  trackSet.sort((a, b) => buildAcademicTrackOrderKey(a) - buildAcademicTrackOrderKey(b));
-  if (!trackSet.includes(selectedTrack)) {
-    selectedTrack = trackSet[0] || selectedTrack || 'bachelor';
-  }
-  const trackContexts = studyContexts.filter((context) => normalizeRegistrationTrack(context.track_key, 'bachelor') === selectedTrack);
-  const programOptions = Array.from(new Map(
-    trackContexts
-      .map((context) => [Number(context.program_id || 0), {
-        id: Number(context.program_id || 0) || null,
-        label: context.program_code
-          ? `${String(context.program_name || '').trim()} (${String(context.program_code || '').trim()})`
-          : String(context.program_name || context.program_code || '').trim(),
-      }])
-      .filter(([programId]) => Number.isInteger(programId) && programId > 0)
-  ).values()).sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'uk', { sensitivity: 'base' }));
-  let selectedProgramId = explicitContext && Number(explicitContext.program_id || 0) > 0
-    ? Number(explicitContext.program_id || 0)
-    : requestedScope.programId;
-  if (!programOptions.some((option) => Number(option.id || 0) === Number(selectedProgramId || 0))) {
-    selectedProgramId = programOptions[0] ? Number(programOptions[0].id || 0) : null;
-  }
-
-  const programContexts = trackContexts.filter((context) => Number(context.program_id || 0) === Number(selectedProgramId || 0));
-  const admissionOptions = Array.from(new Map(
-    programContexts
-      .map((context) => [Number(context.admission_id || 0), {
-        id: Number(context.admission_id || 0) || null,
-        admission_year: Number(context.admission_year || 0) || null,
-        label: Number(context.admission_year || 0) || context.admission_id || '',
-      }])
-      .filter(([admissionId]) => Number.isInteger(admissionId) && admissionId > 0)
-  ).values()).sort((a, b) => Number(b.admission_year || 0) - Number(a.admission_year || 0));
-  let selectedAdmissionId = explicitContext && Number(explicitContext.admission_id || 0) > 0
-    ? Number(explicitContext.admission_id || 0)
-    : requestedScope.admissionId;
-  if (!admissionOptions.some((option) => Number(option.id || 0) === Number(selectedAdmissionId || 0))) {
-    selectedAdmissionId = admissionOptions[0] ? Number(admissionOptions[0].id || 0) : null;
-  }
-
-  const admissionContexts = programContexts.filter((context) => Number(context.admission_id || 0) === Number(selectedAdmissionId || 0));
-  const stageOptions = Array.from(new Map(
-    admissionContexts
-      .map((context) => {
-        const stageNumber = normalizeStudyContextStage(context.stage, 1);
-        return [stageNumber, {
-          value: stageNumber,
-          label: academicSetupHelpers.buildStageLabel(stageNumber, selectedTrack, 'uk'),
-        }];
-      })
-  ).values()).sort((a, b) => Number(a.value || 0) - Number(b.value || 0));
-  let selectedStage = explicitContext ? normalizeStudyContextStage(explicitContext.stage, 1) : requestedScope.stage;
-  if (!stageOptions.some((option) => Number(option.value || 0) === Number(selectedStage || 0))) {
-    selectedStage = stageOptions[0] ? Number(stageOptions[0].value || 0) : 1;
-  }
-
-  const stageContexts = admissionContexts.filter((context) => normalizeStudyContextStage(context.stage, 1) === Number(selectedStage || 0));
-  const campusOptions = Array.from(new Map(
-    stageContexts
-      .map((context) => {
-        const campusKey = normalizeCourseCampus(context.campus_key || context.course_location || '', 'kyiv');
-        return [campusKey, {
-          value: campusKey,
-          label: campusKey === 'munich' ? 'Munich' : 'Kyiv',
-        }];
-      })
-  ).values()).sort((a, b) => String(a.label || '').localeCompare(String(b.label || '')));
-  let selectedCampus = explicitContext
-    ? normalizeCourseCampus(explicitContext.campus_key || explicitContext.course_location || '', 'kyiv')
-    : requestedScope.campus;
-  if (!campusOptions.some((option) => option.value === selectedCampus)) {
-    selectedCampus = campusOptions[0] ? String(campusOptions[0].value || '') : normalizeCourseCampus((fallbackCourse && fallbackCourse.location) || '', 'kyiv');
-  }
-
-  const scopedContextOptions = stageContexts.filter(
-    (context) => normalizeCourseCampus(context.campus_key || context.course_location || '', 'kyiv') === selectedCampus
-  );
-  let selectedContext = explicitContext
-    && scopedContextOptions.some((context) => Number(context.id || 0) === Number(explicitContext.id || 0))
-    ? explicitContext
-    : null;
-  if (!selectedContext && requestedScope.studyContextId) {
-    selectedContext = scopedContextOptions.find((context) => Number(context.id || 0) === Number(requestedScope.studyContextId || 0)) || null;
-  }
-  if (!selectedContext && requestedScope.courseId) {
-    selectedContext = scopedContextOptions.find((context) => Number(context.course_id || 0) === Number(requestedScope.courseId || 0)) || null;
-  }
-  if (!selectedContext && scopedContextOptions.length === 1) {
-    selectedContext = scopedContextOptions[0];
-  }
-  if (!selectedContext && scopedContextOptions.length > 1) {
-    selectedContext = scopedContextOptions[0];
-  }
-
-  const selectedCourseId = selectedContext && Number(selectedContext.course_id || 0) > 0
-    ? Number(selectedContext.course_id || 0)
-    : requestedScope.courseId
-      || parsePositiveIntStrict(options.fallbackCourseId)
-      || parsePositiveIntStrict(req.session.user && req.session.user.course_id)
-      || ((courses && courses[0] && Number(courses[0].id || 0)) || null);
-  const selectedCourse = (courses || []).find((course) => Number(course.id || 0) === Number(selectedCourseId || 0)) || fallbackCourse || null;
-  if (selectedContext) {
-    selectedTrack = normalizeRegistrationTrack(selectedContext.track_key, selectedTrack || 'bachelor');
-    selectedProgramId = Number(selectedContext.program_id || 0) || selectedProgramId || null;
-    selectedAdmissionId = Number(selectedContext.admission_id || 0) || selectedAdmissionId || null;
-    selectedStage = normalizeStudyContextStage(selectedContext.stage, selectedStage || 1);
-    selectedCampus = normalizeCourseCampus(selectedContext.campus_key || selectedContext.course_location || selectedCampus || '', 'kyiv');
-  }
-
-  const trackOptions = trackSet.map((trackKey) => ({
-    value: trackKey,
-    label: trackKey === 'master' ? 'Masters' : (trackKey === 'teacher' ? 'Teachers' : 'Bachelors'),
-  }));
-  const selectedProgram = programOptions.find((option) => Number(option.id || 0) === Number(selectedProgramId || 0)) || null;
-  const selectedAdmission = admissionOptions.find((option) => Number(option.id || 0) === Number(selectedAdmissionId || 0)) || null;
-  const selectedStageOption = stageOptions.find((option) => Number(option.value || 0) === Number(selectedStage || 0)) || null;
-  const selectedCampusOption = campusOptions.find((option) => String(option.value || '') === String(selectedCampus || '')) || null;
-  const selectedLabel = selectedContext
-    ? (selectedContext.label_uk || selectedContext.label || buildStudyContextLabel(selectedContext, 'uk'))
-    : (selectedCourse && selectedCourse.name ? String(selectedCourse.name) : (selectedProgram ? selectedProgram.label : 'Academic scope'));
-
-  const storedPayload = {
-    track: selectedTrack,
-    programId: selectedProgramId || null,
-    admissionId: selectedAdmissionId || null,
-    stage: selectedStage || null,
-    campus: selectedCampus || '',
-    studyContextId: selectedContext ? Number(selectedContext.id || 0) || null : null,
-    courseId: selectedCourseId || null,
-  };
+  const resolvedScopeState = academicSetupHelpers.resolveAdminAcademicScopeState({
+    courses,
+    studyContexts,
+    storedScope,
+    requestedScope,
+    fallbackCourseId: options.fallbackCourseId || req.session.adminCourse || null,
+    currentUserCourseId: req.session.user && req.session.user.course_id,
+    allowedCourseIds: allowedCourseIdSet,
+    buildStudyContextLabel: (context, lang) => buildStudyContextLabel(context, lang),
+    inferTrackFromCourse: (course) => inferRegistrationTrackFromCourse(course),
+  });
+  const storedPayload = buildAdminScopeStatePayload(resolvedScopeState);
   req.session.adminAcademicScope = storedPayload;
   if (storedPayload.courseId) {
     req.session.adminCourse = storedPayload.courseId;
   }
-
   return {
+    ...resolvedScopeState,
     ...storedPayload,
-    label: selectedLabel,
-    selectedCourse,
-    selectedContext,
-    selectedTrackLabel: trackOptions.find((option) => option.value === selectedTrack)?.label || selectedTrack,
-    selectedProgramLabel: selectedProgram ? selectedProgram.label : '',
-    selectedAdmissionYear: selectedAdmission ? Number(selectedAdmission.admission_year || 0) || null : null,
-    selectedStageLabel: selectedStageOption ? selectedStageOption.label : '',
-    selectedCampusLabel: selectedCampusOption ? selectedCampusOption.label : (selectedCampus === 'munich' ? 'Munich' : 'Kyiv'),
-    trackOptions,
-    programOptions,
-    admissionOptions,
-    stageOptions,
-    campusOptions,
-    contextOptions: scopedContextOptions,
-    availableStudyContexts: studyContexts,
-    availableCourseIds: allowedCourseIdSet ? Array.from(allowedCourseIdSet.values()) : (courses || []).map((course) => Number(course.id || 0)).filter((value) => Number.isInteger(value) && value > 0),
   };
 }
 
