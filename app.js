@@ -4726,7 +4726,7 @@ const registerLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 5,
   keyFn: (req) => `register:${getClientIp(req)}`,
-  onLimit: (req, res) => res.redirect('/register?error=Too%20many%20requests'),
+  onLimit: (req, res) => res.redirect('/register?error=too-many-requests'),
 });
 
 const writeLimiter = createRateLimiter({
@@ -9084,11 +9084,19 @@ app.get('/register', async (req, res) => {
 app.post('/register', registerLimiter, async (req, res) => {
   const full_name = String(req.body.full_name || '').trim();
   const password = String(req.body.password || '');
+  const confirm_password = String(req.body.confirm_password || '');
+  const agreeValue = String(req.body.agree || '').trim().toLowerCase();
   const remember_me = req.body.remember_me;
+  const hasConsent = agreeValue === 'on' || agreeValue === '1' || agreeValue === 'true';
+  const redirectRegisterError = (code) =>
+    res.redirect(`/register?error=${encodeURIComponent(String(code || 'db-error'))}`);
 
-  if (!full_name || password.length < 4) {
-    return res.redirect('/register?error=Check%20your%20details');
-  }
+  if (!full_name) return redirectRegisterError('missing-name');
+  if (!password) return redirectRegisterError('missing-password');
+  if (password.length < 4) return redirectRegisterError('short-password');
+  if (!confirm_password) return redirectRegisterError('missing-confirm-password');
+  if (password !== confirm_password) return redirectRegisterError('password-mismatch');
+  if (!hasConsent) return redirectRegisterError('consent-required');
 
   const normalizedName = full_name.replace(/\s+/g, ' ');
   const pendingUserId = Number(req.session.pendingUserId || 0);
@@ -9109,7 +9117,7 @@ app.post('/register', registerLimiter, async (req, res) => {
       return res.redirect('/register/course');
     } catch (err) {
       console.error('Register pending update failed', err);
-      return res.redirect('/register?error=Database%20error');
+      return redirectRegisterError('db-error');
     }
   }
 
@@ -9117,7 +9125,7 @@ app.post('/register', registerLimiter, async (req, res) => {
     await ensureDbReady();
     const existing = await db.get('SELECT id FROM users WHERE LOWER(full_name) = LOWER(?)', [normalizedName]);
     if (existing) {
-      return res.redirect('/register?error=User%20already%20exists');
+      return redirectRegisterError('user-exists');
     }
     const hash = await bcrypt.hash(password, 10);
     const preferredLang = getPreferredLang(req);
@@ -9126,7 +9134,7 @@ app.post('/register', registerLimiter, async (req, res) => {
       [normalizedName, 'student', hash, 1, 'A', null, preferredLang]
     );
     if (!row || !row.id) {
-      return res.redirect('/register?error=Database%20error');
+      return redirectRegisterError('db-error');
     }
     let registrationSignals = null;
     try {
@@ -9173,7 +9181,7 @@ app.post('/register', registerLimiter, async (req, res) => {
     return res.redirect('/register/course');
   } catch (err) {
     console.error('Register failed', err);
-    return res.redirect('/register?error=Database%20error');
+    return redirectRegisterError('db-error');
   }
 });
 

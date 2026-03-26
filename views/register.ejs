@@ -1,4 +1,27 @@
 <!doctype html>
+<%
+  const registerErrorCode = String(error || '').trim();
+  const registerErrorText = (() => {
+    if (!registerErrorCode) return '';
+    const errorKeyMap = {
+      'missing-name': 'register.errorFullNameRequired',
+      'missing-password': 'register.errorPasswordRequired',
+      'short-password': 'register.errorPasswordTooShort',
+      'missing-confirm-password': 'register.errorConfirmPasswordRequired',
+      'password-mismatch': 'register.errorPasswordMismatch',
+      'consent-required': 'register.errorConsentRequired',
+      'user-exists': 'register.errorUserExists',
+      'db-error': 'register.errorDb',
+      'too-many-requests': 'register.errorTooManyRequests',
+      'Check your details': 'register.errorCheckDetails',
+      'User already exists': 'register.errorUserExists',
+      'Database error': 'register.errorDb',
+      'Too many requests': 'register.errorTooManyRequests',
+    };
+    const translationKey = errorKeyMap[registerErrorCode];
+    return translationKey ? t(translationKey) : registerErrorCode;
+  })();
+%>
 <html lang="<%= lang %>">
   <head>
     <meta charset="utf-8" />
@@ -449,8 +472,8 @@
             <div class="card-body p-4">
               <h1 class="h4 mb-3 text-center"><%= t('register.title') %></h1>
 
-              <% if (error) { %>
-              <div class="alert alert-danger" role="alert"><%= error %></div>
+              <% if (registerErrorText) { %>
+              <div class="alert alert-danger" role="alert"><%= registerErrorText %></div>
               <% } %>
 
               <form id="registerForm" method="POST" action="/register" novalidate>
@@ -461,14 +484,14 @@
                 <div class="mb-3">
                   <label for="password" class="form-label"><%= t('register.password') %></label>
                   <div class="input-with-icon">
-                    <input id="password" name="password" type="password" class="form-control" placeholder="<%= t('register.passwordPlaceholder') %>" required />
+                    <input id="password" name="password" type="password" class="form-control" placeholder="<%= t('register.passwordPlaceholder') %>" minlength="4" required />
                     <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">👀</button>
                   </div>
                 </div>
                 <div class="mb-3">
                   <label for="confirm_password" class="form-label"><%= t('register.confirmPassword') %></label>
                   <div class="input-with-icon">
-                    <input id="confirm_password" name="confirm_password" type="password" class="form-control" placeholder="<%= t('register.confirmPasswordPlaceholder') %>" required />
+                    <input id="confirm_password" name="confirm_password" type="password" class="form-control" placeholder="<%= t('register.confirmPasswordPlaceholder') %>" minlength="4" required />
                     <button class="icon-btn" type="button" id="toggleConfirmPassword" aria-label="Показати пароль">👀</button>
                   </div>
                 </div>
@@ -531,6 +554,15 @@
       crossorigin="anonymous"
     ></script>
     <script>
+      const registerValidationCopy = {
+        checkField: <%- JSON.stringify(t('schedule.validation.checkField')) %>,
+        fullNameRequired: <%- JSON.stringify(t('register.errorFullNameRequired')) %>,
+        passwordRequired: <%- JSON.stringify(t('register.errorPasswordRequired')) %>,
+        passwordTooShort: <%- JSON.stringify(t('register.errorPasswordTooShort')) %>,
+        confirmPasswordRequired: <%- JSON.stringify(t('register.errorConfirmPasswordRequired')) %>,
+        passwordMismatch: <%- JSON.stringify(t('register.errorPasswordMismatch')) %>,
+        consentRequired: <%- JSON.stringify(t('register.errorConsentRequired')) %>,
+      };
       function showCustomTooltip(el, message) {
         document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
         const anchor = el.closest('.form-check') || el.closest('.input-group') || el;
@@ -538,6 +570,39 @@
         const tip = document.createElement('div');
         tip.className = 'custom-tooltip';
         tip.textContent = message || 'Перевірте поле';
+        if (key) tip.dataset.for = key;
+        document.body.appendChild(tip);
+
+        const rect = anchor.getBoundingClientRect();
+        const tipRect = tip.getBoundingClientRect();
+        const margin = 10;
+        let top = rect.bottom + margin;
+        let left = rect.left;
+        let placeBelow = true;
+        if (top + tipRect.height > window.innerHeight - 8) {
+          top = rect.top - tipRect.height - margin;
+          placeBelow = false;
+        }
+        if (left + tipRect.width > window.innerWidth - 8) {
+          left = window.innerWidth - tipRect.width - 8;
+        }
+        if (left < 8) left = 8;
+        tip.style.top = `${Math.round(top)}px`;
+        tip.style.left = `${Math.round(left)}px`;
+        if (placeBelow) tip.classList.add('below');
+        requestAnimationFrame(() => tip.classList.add('show'));
+        const remove = () => tip.remove();
+        tip.addEventListener('click', remove);
+        setTimeout(remove, 3500);
+      }
+
+      function showCustomTooltip(el, message) {
+        document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
+        const anchor = el.closest('.form-check') || el.closest('.input-group') || el;
+        const key = el.id || el.name || anchor.id || '';
+        const tip = document.createElement('div');
+        tip.className = 'custom-tooltip';
+        tip.textContent = message || registerValidationCopy.checkField;
         if (key) tip.dataset.for = key;
         document.body.appendChild(tip);
 
@@ -624,6 +689,28 @@
         }
         if (el === agreeInput && !agreeInput.checked) {
           return 'Поставте прапорець згоди';
+        }
+        return '';
+      }
+
+      function getFieldValidationMessage(el) {
+        if (el === nameInput && !nameInput.value.trim()) {
+          return registerValidationCopy.fullNameRequired;
+        }
+        if (el === passwordInput && !passwordInput.value) {
+          return registerValidationCopy.passwordRequired;
+        }
+        if (el === passwordInput && passwordInput.value.length < 4) {
+          return registerValidationCopy.passwordTooShort;
+        }
+        if (el === confirmInput && !confirmInput.value) {
+          return registerValidationCopy.confirmPasswordRequired;
+        }
+        if (el === confirmInput && passwordInput && confirmInput.value !== passwordInput.value) {
+          return registerValidationCopy.passwordMismatch;
+        }
+        if (el === agreeInput && !agreeInput.checked) {
+          return registerValidationCopy.consentRequired;
         }
         return '';
       }

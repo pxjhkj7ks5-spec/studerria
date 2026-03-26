@@ -688,4 +688,14 @@
   "journalInsights.empty.gradeTrend": "Для вибраних фільтрів немає даних про тренд оцінок.",
   "journalInsights.empty.attendanceTrend": "Для вибраних фільтрів немає даних про тренд відвідуваності.",
   "journalInsights.trend.absent": "пропусків"
+  ,"register.errorCheckDetails": "Перевірте дані реєстрації."
+  ,"register.errorFullNameRequired": "Введіть ПІБ."
+  ,"register.errorPasswordRequired": "Введіть пароль."
+  ,"register.errorPasswordTooShort": "Пароль має містити щонайменше 4 символи."
+  ,"register.errorConfirmPasswordRequired": "Підтвердіть пароль."
+  ,"register.errorPasswordMismatch": "Паролі не співпадають."
+  ,"register.errorConsentRequired": "Підтвердьте згоду на обробку персональних даних."
+  ,"register.errorUserExists": "Користувач із таким ПІБ уже існує."
+  ,"register.errorTooManyRequests": "Забагато спроб реєстрації. Зачекайте хвилину й спробуйте ще раз."
+  ,"register.errorDb": "Не вдалося завершити реєстрацію. Спробуйте ще раз."
 }

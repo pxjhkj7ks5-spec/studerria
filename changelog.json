@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.87",
+      "date": "2026-03-26",
+      "items": [
+        "fix(register-specific-error-codes): replace the generic `Check your details` signup failure with explicit server-side error codes for missing name, missing password, short password, missing confirmation, password mismatch, consent, duplicate user, rate limit, and database failure",
+        "fix(register-validation-parity): enforce the same registration rules on the form itself, including minimum password length and localized field-level guidance, so the user sees the exact problem before submit instead of a blind round-trip",
+        "tune(register-error-localization): map register error codes into localized alert copy for both Ukrainian and English, while still translating the legacy generic messages if an old redirect reaches the page"
+      ]
+    },
+    {
       "version": "1.2.86",
       "date": "2026-03-26",
       "items": [
