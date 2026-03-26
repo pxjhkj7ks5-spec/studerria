@@ -18,7 +18,7 @@
         admissionYear: 'Admission year',
         campus: 'Campus',
         campusReadyTeacherHint: 'Choosing a campus automatically links the correct teacher course.',
-        campusReadyStudentHint: 'The admission year defines the cohort. Choosing a campus automatically links the correct course.',
+        campusReadyStudentHint: 'The admission year defines the cohort. Choosing a campus automatically resolves the academic context.',
         chooseProgramFirstTitle: 'Choose a program first',
         chooseProgramFirstSubtitle: 'Available admission years will appear after that.',
         chooseProgramFirstTeacherSubtitle: 'For teachers, the campus is determined within the selected program.',
@@ -37,9 +37,9 @@
         oneLinkedCourse: '1 linked course',
         linkedCoursesSuffix: 'linked courses',
         oneVisibleCourseNeeded: 'Exactly one visible course per campus is required, otherwise the student can land in the wrong subject flow.',
-        readyToRegister: 'Ready: Studerria can resolve one stable course for this campus.',
+        readyToRegister: 'Ready: Studerria can resolve one stable academic context for this campus.',
         ambiguousCampusHint: 'Campus mapping is ambiguous. Ask an administrator to leave one visible course per campus, otherwise subject registration becomes unstable.',
-        chooseValidCampus: 'Choose a valid campus before continuing, otherwise Studerria cannot resolve the correct course.',
+        chooseValidCampus: 'Choose a valid campus before continuing, otherwise Studerria cannot resolve the correct academic context.',
       }
     : {
         themeToggleAria: 'Змінити тему',
@@ -582,6 +582,10 @@
                   <div class="pathway-grid" id="campusOptions"></div>
                 </div>
                 <p class="pathway-hint mb-3" id="campusHint"><%= registerCourseText.campusReadyStudentHint %></p>
+                <div class="glass mb-3 p-3" id="academicContextSummaryCard">
+                  <div class="small text-muted mb-1">Academic context preview</div>
+                  <div class="fw-semibold" id="academicContextSummary">Select track, program, admission year, and campus.</div>
+                </div>
                 <div class="auth-action-stack auth-action-stack--grid">
                   <button type="submit" class="btn btn-primary register-action-btn auth-action-btn"><%= t('registerCourse.continue') %></button>
                   <a href="/register" class="btn btn-outline-primary register-action-btn auth-action-btn"><%= t('registerCourse.backToRegister') %></a>
@@ -607,6 +611,9 @@
       const pathwayAdmissions = Array.isArray(pathwayPayload.admissions) ? pathwayPayload.admissions : [];
       const pathwayLinks = Array.isArray(pathwayPayload.links) ? pathwayPayload.links : [];
       const pathwayCourses = Array.isArray(pathwayPayload.courses) ? pathwayPayload.courses : [];
+      const programById = new Map(pathwayPrograms.map((program) => [Number(program.id || 0), program]));
+      const admissionById = new Map(pathwayAdmissions.map((admission) => [Number(admission.id || 0), admission]));
+      const academicContextSummaryEl = document.getElementById('academicContextSummary');
       const trackInputs = Array.from(document.querySelectorAll('input[name="study_track"]'));
       const programSelect = document.getElementById('studyProgramSelect');
       const programField = document.getElementById('programField');
@@ -662,6 +669,14 @@
           : registerCourseText.campusKyiv;
       }
 
+      function formatTrackLabelClient(trackKey) {
+        const normalized = String(trackKey || '').trim().toLowerCase();
+        if (normalized === 'bachelor') return registerCourseText.trackBachelor;
+        if (normalized === 'master') return registerCourseText.trackMaster;
+        if (normalized === 'teacher') return registerCourseText.trackTeacher;
+        return trackKey || normalized;
+      }
+
       function localizeAdmissionLabel(rawLabel) {
         const normalized = String(rawLabel || '').trim();
         if (isEnglishRegisterCourse) return normalized;
@@ -678,6 +693,29 @@
         return isTeacherTrack(trackKey)
           ? registerCourseText.campusReadyTeacherHint
           : registerCourseText.campusReadyStudentHint;
+      }
+
+      function updateAcademicContextSummary() {
+        if (!academicContextSummaryEl) return;
+        const trackKey = getSelectedTrack();
+        const programId = Number(programSelect?.value || selectedProgramSeed || 0);
+        const admissionId = Number(admissionInput?.value || selectedAdmissionSeed || 0);
+        const courseId = Number(courseIdInput?.value || selectedCourseSeed || 0);
+        const program = programById.get(programId);
+        const admission = admissionById.get(admissionId);
+        const course = courseById.get(courseId);
+        const parts = [];
+        parts.push(formatTrackLabelClient(trackKey));
+        if (program) {
+          parts.push(program.code ? `${program.name} (${program.code})` : program.name);
+        }
+        if (admission) {
+          parts.push(`Cohort ${admission.admission_year}`);
+        }
+        if (course) {
+          parts.push(`${course.name || 'Course'} / ${formatCampusLabelClient(course.location)}`);
+        }
+        academicContextSummaryEl.textContent = parts.filter(Boolean).join(' / ') || 'Select track, program, admission year, and campus to resolve the academic context.';
       }
 
       function syncTrackCards() {
@@ -961,6 +999,7 @@
         } else {
           setCampusHint(getCampusReadyHint(trackKey));
         }
+        updateAcademicContextSummary();
       }
 
       function refreshPathwaySelections() {
@@ -968,6 +1007,7 @@
         refreshProgramOptions();
         refreshAdmissionOptions();
         renderCampusOptions();
+        updateAcademicContextSummary();
       }
 
       trackInputs.forEach((input) => {
@@ -978,6 +1018,7 @@
         programSelect.addEventListener('change', () => {
           refreshAdmissionOptions();
           renderCampusOptions();
+          updateAcademicContextSummary();
         });
       }
 
@@ -989,6 +1030,8 @@
           }
         });
       }
+
+      updateAcademicContextSummary();
 
       refreshPathwaySelections();
 

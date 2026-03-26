@@ -1026,7 +1026,7 @@
               <button class="admin-nav-link" type="button" data-admin-nav="admin-courses">Courses</button>
             <% } %>
             <% if (canManagePathways) { %>
-              <a class="admin-nav-link" href="<%= pathwaysPanelHref || '/admin/pathways' %>">Pathways</a>
+              <a class="admin-nav-link" href="<%= pathwaysPanelHref || '/admin/pathways' %>">Academic Setup</a>
             <% } %>
             <% if (sectionAllowed('admin-homework')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-homework">Homework</button>
@@ -1094,7 +1094,7 @@
             <button class="btn btn-outline-secondary btn-sm admin-mobile-top" type="button" id="adminMobileTopButton">Вгору</button>
           </div>
           <% if (canManagePathways) { %>
-            <a class="btn btn-outline-secondary btn-sm admin-mobile-pathway" href="/admin/pathways">Pathways</a>
+            <a class="btn btn-outline-secondary btn-sm admin-mobile-pathway" href="/admin/pathways">Academic Setup</a>
           <% } %>
         </div>
       </div>
@@ -2361,6 +2361,9 @@
                   <% const rowRiskScore = Number(u.security_risk_score || 0); %>
                   <% const rowRiskClass = rowRiskLevel === 'high-risk' ? 'danger' : (rowRiskLevel === 'watch' ? 'warning' : 'secondary'); %>
                   <% const rowRiskLabel = rowRiskLevel === 'high-risk' ? 'High-risk' : (rowRiskLevel === 'watch' ? 'Watch' : 'Normal'); %>
+                  <% const rowContextLabel = String(u.study_context_label || u.study_context_name || u.study_context || u.cohort_label || '').trim(); %>
+                  <% const rowContextCourseId = Number(u.study_context_course_id || u.course_id || 0); %>
+                  <% const rowContextOptions = Array.isArray(u.study_context_options) ? u.study_context_options : (Array.isArray(u.context_options) ? u.context_options : []); %>
                   <tr
                     class="user-row"
                     data-user-id="<%= u.id %>"
@@ -2368,8 +2371,12 @@
                     data-user-role="<%= rowPrimaryRole %>"
                     data-user-roles="<%= rowRoleKeys.join(',') %>"
                     data-user-group="<%= u.schedule_group %>"
-                    data-user-course="<%= courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %>"
-                    data-user-course-id="<%= u.course_id || 1 %>"
+                    data-user-course="<%= rowContextLabel || courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %>"
+                    data-user-course-id="<%= rowContextCourseId || 1 %>"
+                    data-user-context-label="<%= rowContextLabel %>"
+                    data-user-context-id="<%= Number(u.study_context_id || 0) %>"
+                    data-user-context-course-id="<%= rowContextCourseId || 0 %>"
+                    data-user-context-options="<%- JSON.stringify(rowContextOptions).replace(/'/g, '&#39;') %>"
                     data-user-active="<%= u.is_active %>"
                     data-user-ip="<%= u.last_login_ip || '' %>"
                     data-user-agent="<%= u.last_user_agent || '' %>"
@@ -2386,6 +2393,9 @@
                     </td>
                     <td><%= u.full_name %></td>
                     <td>
+                      <% if (rowContextLabel) { %>
+                        <div class="small text-muted mb-1"><%= rowContextLabel %></div>
+                      <% } %>
                       <span class="badge text-bg-<%= rowPrimaryRole === 'admin' ? 'primary' : (rowPrimaryRole === 'starosta' ? 'warning' : (rowPrimaryRole === 'deanery' ? 'info' : 'secondary')) %>">
                         <%= rowRolesLabel %>
                       </span>
@@ -2772,7 +2782,7 @@
                     </div>
                     <div class="form-check">
                       <input class="form-check-input" type="checkbox" id="subjectBulkSyncPathways" name="sync_pathways" value="1" checked />
-                      <label class="form-check-label" for="subjectBulkSyncPathways">Sync admission visibility from source subject (pathways)</label>
+            <label class="form-check-label" for="subjectBulkSyncPathways">Sync admission visibility from source subject (academic setup)</label>
                     </div>
                   </div>
 
@@ -4332,6 +4342,7 @@
             <div class="mb-2"><strong>Roles:</strong> <span id="uaRoles"></span></div>
             <div class="mb-2"><strong>Active:</strong> <span id="uaActive"></span></div>
             <div class="mb-2"><strong>Schedule Group:</strong> <span id="uaGroup"></span></div>
+            <div class="mb-2"><strong>Academic context:</strong> <span id="uaContext"></span></div>
             <div class="mb-2"><strong>Course:</strong> <span id="uaCourse"></span></div>
             <div class="mb-2"><strong>Last Login IP:</strong> <span id="uaIp"></span></div>
             <div class="mb-2"><strong>Device:</strong> <span id="uaAgent"></span></div>
@@ -4430,8 +4441,10 @@
 
             <form method="POST" action="/admin/users/course" class="mb-3">
               <input type="hidden" name="user_id" id="uaCourseUserId" />
-              <label class="form-label">Change course</label>
-              <div class="d-flex gap-2">
+              <input type="hidden" name="study_context_id" id="uaStudyContextId" value="" />
+              <label class="form-label">Change academic context</label>
+              <div class="d-flex gap-2 flex-column flex-md-row">
+                <select class="form-select" id="uaContextSelect" style="display:none;"></select>
                 <select class="form-select" name="course_id" id="uaCourseSelect" required>
                   <% (courses || []).forEach(function(c) { %>
                     <option value="<%= c.id %>"><%= c.name %></option>
@@ -4439,6 +4452,7 @@
                 </select>
                 <button class="btn btn-outline-primary glass" type="submit">Save</button>
               </div>
+              <div class="small text-muted mt-2" id="uaContextHint"></div>
             </form>
 
             <form method="POST" action="/admin/users/reset-password" class="mb-3">
@@ -7151,6 +7165,138 @@
         bulkBar.classList.toggle('is-visible', selected > 0);
       }
 
+      function safeParseJson(raw, fallback = []) {
+        if (!raw || typeof raw !== 'string') return fallback;
+        try {
+          return JSON.parse(raw);
+        } catch (err) {
+          return fallback;
+        }
+      }
+
+      function normalizeStudyContextOption(raw) {
+        const option = raw && typeof raw === 'object' ? raw : {};
+        const id = Number(option.id || option.study_context_id || option.context_id || 0);
+        const courseId = Number(option.course_id || option.context_course_id || option.bound_course_id || option.courseId || 0);
+        const label = String(option.label || option.name || option.title || option.study_context_label || option.context_label || '').trim();
+        const trackLabel = String(option.track_label || option.track || option.study_track || '').trim();
+        const programLabel = String(option.program_label || option.program || option.study_program || '').trim();
+        const cohortLabel = String(option.cohort_label || option.admission_year || option.cohort || option.year_label || '').trim();
+        const campusLabel = String(option.campus_label || option.campus || option.location || '').trim();
+        const detailParts = [trackLabel, programLabel, cohortLabel, campusLabel].filter(Boolean);
+        const summary = [label, detailParts.join(' / ')].filter(Boolean).join(' - ');
+        return {
+          id,
+          courseId,
+          label: label || summary || (courseId ? `Course ${courseId}` : ''),
+          trackLabel,
+          programLabel,
+          cohortLabel,
+          campusLabel,
+          summary: summary || label || (courseId ? `Course ${courseId}` : ''),
+        };
+      }
+
+      function normalizeStudyContextOptions(rawOptions) {
+        const options = Array.isArray(rawOptions) ? rawOptions : [];
+        return options
+          .map((option) => normalizeStudyContextOption(option))
+          .filter((option) => option.id || option.courseId || option.label);
+      }
+
+      function buildStudyContextSummary(option) {
+        if (!option) return '';
+        const parts = [];
+        if (option.label) parts.push(option.label);
+        const details = [option.trackLabel, option.programLabel, option.cohortLabel, option.campusLabel].filter(Boolean);
+        if (details.length) parts.push(details.join(' / '));
+        return parts.join(' - ');
+      }
+
+      function populateStudyContextEditor(row) {
+        const contextSelect = document.getElementById('uaContextSelect');
+        const contextHint = document.getElementById('uaContextHint');
+        const contextIdInput = document.getElementById('uaStudyContextId');
+        const courseSelect = document.getElementById('uaCourseSelect');
+        const contextLabelEl = document.getElementById('uaContext');
+        const courseLabelEl = document.getElementById('uaCourse');
+        if (!contextSelect || !courseSelect || !contextIdInput || !row) return;
+
+        const contextLabel = String(row.dataset.userContextLabel || '').trim();
+        const contextId = Number(row.dataset.userContextId || 0);
+        const contextCourseId = Number(row.dataset.userContextCourseId || row.dataset.userCourseId || 0);
+        const contextOptions = normalizeStudyContextOptions(safeParseJson(row.dataset.userContextOptions, []));
+        const selectedContext = contextOptions.find((option) => Number(option.id) === contextId)
+          || contextOptions.find((option) => Number(option.courseId) === contextCourseId)
+          || contextOptions[0]
+          || null;
+        const hasContextOptions = contextOptions.length > 0;
+        const resolvedContextLabel = buildStudyContextSummary(selectedContext)
+          || contextLabel
+          || row.dataset.userCourse
+          || '';
+        const resolvedCourseLabel = row.dataset.userCourse || '';
+
+        if (contextLabelEl) {
+          contextLabelEl.textContent = resolvedContextLabel || '-';
+        }
+        if (courseLabelEl) {
+          courseLabelEl.textContent = resolvedCourseLabel || '-';
+        }
+        if (contextIdInput) {
+          contextIdInput.value = selectedContext && Number(selectedContext.id) ? String(selectedContext.id) : '';
+        }
+
+        if (hasContextOptions) {
+          contextSelect.style.display = '';
+          contextSelect.innerHTML = '';
+          const placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.textContent = 'Select academic context';
+          contextSelect.appendChild(placeholder);
+          contextOptions.forEach((option) => {
+            const opt = document.createElement('option');
+            opt.value = String(option.id || '');
+            opt.textContent = buildStudyContextSummary(option) || option.label || (option.courseId ? `Course ${option.courseId}` : 'Academic context');
+            opt.dataset.courseId = String(option.courseId || '');
+            if ((selectedContext && Number(selectedContext.id) === Number(option.id)) || (!selectedContext && Number(option.courseId) === contextCourseId)) {
+              opt.selected = true;
+            }
+            contextSelect.appendChild(opt);
+          });
+          courseSelect.style.display = 'none';
+          courseSelect.required = false;
+          if (selectedContext) {
+            contextSelect.value = String(selectedContext.id || '');
+            if (selectedContext.courseId) {
+              courseSelect.value = String(selectedContext.courseId);
+            }
+          }
+          if (contextHint) {
+            contextHint.textContent = 'Context-first editing is active. The legacy course value is synced automatically.';
+          }
+          contextSelect.onchange = () => {
+            const option = contextSelect.selectedOptions[0];
+            const selectedCourseId = Number(option && option.dataset ? option.dataset.courseId || 0 : 0);
+            contextIdInput.value = contextSelect.value || '';
+            if (selectedCourseId) {
+              courseSelect.value = String(selectedCourseId);
+            }
+          };
+        } else {
+          contextSelect.style.display = 'none';
+          courseSelect.style.display = '';
+          courseSelect.required = true;
+          courseSelect.value = String(contextCourseId || courseSelect.value || '');
+          if (contextHint) {
+            contextHint.textContent = contextLabel
+              ? `Current academic context: ${contextLabel}`
+              : 'Legacy course selection is shown until context metadata becomes available.';
+          }
+          contextSelect.onchange = null;
+        }
+      }
+
       function renderUsersTable(data) {
         const tbody = document.getElementById('usersTableBody');
         if (!tbody) return;
@@ -7188,6 +7334,14 @@
             const securityRiskLevel = String(u.security_risk_level || 'normal');
             const securityRiskStatus = String(u.security_case_status || 'open');
             const securityRiskScore = Number(u.security_risk_score || 0);
+            const contextOptions = normalizeStudyContextOptions(Array.isArray(u.study_context_options) ? u.study_context_options : (Array.isArray(u.context_options) ? u.context_options : []));
+            const contextLabel = String(u.study_context_label || u.study_context_name || u.study_context || u.cohort_label || '').trim();
+            const contextCourseId = Number(u.study_context_course_id || u.course_id || 0);
+            const selectedContext = contextOptions.find((option) => Number(option.id) === Number(u.study_context_id || 0))
+              || contextOptions.find((option) => Number(option.courseId) === contextCourseId)
+              || contextOptions[0]
+              || null;
+            const contextSummary = buildStudyContextSummary(selectedContext) || contextLabel;
             const riskBadgeClass = securityRiskLevel === 'high-risk'
               ? 'danger'
               : (securityRiskLevel === 'watch' ? 'warning' : 'secondary');
@@ -7227,8 +7381,12 @@
                   data-user-role="${primaryRole}"
                   data-user-roles="${roleKeys.join(',')}"
                   data-user-group="${u.schedule_group}"
-                  data-user-course="${courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}"
-                  data-user-course-id="${u.course_id || 1}"
+                  data-user-course="${contextSummary || courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}"
+                  data-user-course-id="${contextCourseId || 1}"
+                  data-user-context-label="${contextLabel}"
+                  data-user-context-id="${Number(u.study_context_id || 0)}"
+                  data-user-context-course-id="${contextCourseId || 0}"
+                  data-user-context-options='${JSON.stringify(Array.isArray(u.study_context_options) ? u.study_context_options : (Array.isArray(u.context_options) ? u.context_options : [])).replace(/'/g, '&#39;')}'
                   data-user-active="${isActive}"
                   data-user-ip="${u.last_login_ip || ''}"
                   data-user-agent="${(u.last_user_agent || '').replace(/\"/g, '&quot;')}"
@@ -7238,7 +7396,10 @@
                   data-security-risk-score="${securityRiskScore}"
                   data-security-case-updated="${u.security_case_updated_at || ''}">
                 <td>${checkbox}</td>
-                <td>${u.full_name}</td>
+                <td>
+                  ${u.full_name}
+                  ${contextSummary ? `<div class="small text-muted mt-1">${escapeHtml(contextSummary)}</div>` : ''}
+                </td>
                 <td>
                   <span class="badge text-bg-${badgeClass}">${escapeHtml(rolesLabel)}</span>
                   <div class="mt-1">
@@ -7448,6 +7609,10 @@
       const uaForensicsGraphMeta = document.getElementById('uaForensicsGraphMeta');
       const uaForensicsGraphNodes = document.getElementById('uaForensicsGraphNodes');
       const uaForensicsGraphEdges = document.getElementById('uaForensicsGraphEdges');
+      const uaContextSelect = document.getElementById('uaContextSelect');
+      const uaContextHint = document.getElementById('uaContextHint');
+      const uaStudyContextId = document.getElementById('uaStudyContextId');
+      const uaCourseSelect = document.getElementById('uaCourseSelect');
 
       const setRiskCaseMeta = (caseRow) => {
         if (!uaRiskCaseMeta) return;
@@ -7739,12 +7904,16 @@
             const userRiskLevel = row.dataset.securityRiskLevel || 'normal';
             const userRiskStatus = row.dataset.securityRiskStatus || 'open';
             const userRiskScore = Number(row.dataset.securityRiskScore || 0);
+            const userContext = buildStudyContextSummary(normalizeStudyContextOptions(safeParseJson(row.dataset.userContextOptions, []))[0])
+              || row.dataset.userContextLabel
+              || userCourse;
 
             document.getElementById('uaName').textContent = userName;
             document.getElementById('uaRole').textContent = getRoleLabel(userRole);
             document.getElementById('uaRoles').textContent = mapRoleKeysToLabels(userRoleKeys);
             document.getElementById('uaGroup').textContent = userGroup;
             document.getElementById('uaActive').textContent = userActive;
+            document.getElementById('uaContext').textContent = userContext || '-';
             document.getElementById('uaCourse').textContent = userCourse;
             document.getElementById('uaIp').textContent = userIp;
             document.getElementById('uaAgent').textContent = userAgent;
@@ -7758,9 +7927,7 @@
             if (uaRiskStatusInput) uaRiskStatusInput.value = String(userRiskStatus || 'open');
             populateRoleEditor(roleCatalogBootstrap, userRoleKeys, userRole);
             hydrateUserRoleEditor(userId, userRoleKeys, userRole);
-            if (document.getElementById('uaCourseSelect')) {
-              document.getElementById('uaCourseSelect').value = row.dataset.userCourseId || '';
-            }
+            populateStudyContextEditor(row);
 
             const modal = new bootstrap.Modal(document.getElementById('userActionsModal'));
             modal.show();
