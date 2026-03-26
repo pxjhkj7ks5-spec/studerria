@@ -9,6 +9,75 @@
   padding-bottom: 1.5rem !important;
 }
 
+.page-journal .journal-closure-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.page-journal .journal-closure-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.page-journal .journal-closure-status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.page-journal .journal-closure-impact {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.page-journal .journal-closure-impact-card {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 80%, transparent);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--surface-soft) 82%, transparent);
+}
+
+.page-journal .journal-closure-impact-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ds-text0);
+  line-height: 1.05;
+}
+
+.page-journal .journal-closure-actions-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 78%, transparent);
+  border-radius: 18px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.page-journal .journal-closure-actions-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.page-journal .journal-closure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.page-journal .journal-closure-action-form {
+  margin: 0;
+}
+
 body.theme-dark.page-journal .form-control,
 body.theme-dark.page-journal .form-select,
 body.theme-dark.page-journal input.form-control,
@@ -509,6 +578,9 @@ body.theme-light.page-journal .journal-attendance-details,
 body.theme-light.page-journal .journal-attendance-quick-panel,
 body.theme-light.page-journal .journal-attendance-workflow,
 body.theme-light.page-journal .journal-cell-overview,
+body.theme-light.page-journal .journal-closure-impact-card,
+body.theme-light.page-journal .journal-closure-actions-panel,
+body.theme-light.page-journal .journal-review-state,
 body.theme-light.page-journal .journal-student-attendance-card,
 body.theme-light.page-journal .journal-attendance-quick-student {
   border-color: var(--studerria-panel-border);
@@ -677,6 +749,20 @@ body.theme-light.page-journal .final-col {
   border-radius: 14px;
   padding: 12px;
   background: color-mix(in srgb, var(--surface-soft) 88%, transparent);
+}
+
+.page-journal .journal-review-state {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 80%, transparent);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.page-journal .journal-review-state-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .page-journal .journal-cell-overview {
@@ -1014,6 +1100,10 @@ body.theme-light.page-journal .alert-success {
 }
 
 @media (max-width: 900px) {
+  .page-journal .journal-closure-impact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .page-journal .journal-grading-summary {
     align-items: flex-start;
   }
@@ -1038,6 +1128,21 @@ body.theme-light.page-journal .alert-success {
 }
 
 @media (max-width: 640px) {
+  .page-journal .journal-closure-impact {
+    grid-template-columns: 1fr;
+  }
+
+  .page-journal .journal-closure-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .page-journal .journal-closure-actions > .btn,
+  .page-journal .journal-closure-actions > .journal-closure-action-form,
+  .page-journal .journal-closure-actions > .journal-closure-action-form .btn {
+    width: 100%;
+  }
+
   .page-journal .journal-attendance-workflow-actions {
     width: 100%;
     margin-left: 0;

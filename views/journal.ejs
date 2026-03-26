@@ -28,6 +28,18 @@
         reopenSubjectConfirm: 'Reopen this subject and unlock the journal?',
         reopenSubject: 'Reopen subject',
         exportStatement: 'Export statement',
+        closureImpactTitle: 'Impact preview',
+        closureImpactColumnsHint: 'Active grading columns',
+        closureImpactStudentsHint: 'Students in current scope',
+        closureImpactSnapshotHint: 'Export snapshot',
+        closureImpactSnapshotReady: 'Ready for audit',
+        closureImpactSnapshotPending: 'Generated on close',
+        closureActionTitle: 'Next action',
+        closureActionOpenTitle: 'Freeze this subject for export',
+        closureActionOpenNote: 'Use after the final review, when grades and attendance are ready to be locked.',
+        closureActionClosedTitle: 'Return this subject to editing',
+        closureActionClosedNote: 'Reopen only if you need to correct grades or finish unresolved review flows.',
+        closureActionExportNote: 'The latest export snapshot stays available for audit and download.',
         attendanceTitleTeacher: 'Attendance',
         attendanceTitleStudent: 'My attendance',
         classLabel: 'Class',
@@ -88,6 +100,23 @@
         cellSummaryStudentAppealNote: 'This grade is available for review. If needed, submit an appeal from this screen.',
         cellSummaryModerationNeedsGrade: 'Moderation becomes available after the primary score is saved.',
         cellSummaryModerationNeedsSecondReviewer: 'Moderation requires a different reviewer than the teacher who saved the original score.',
+        reviewStateOpen: 'Open',
+        reviewStatePaused: 'Paused',
+        reviewStateStudent: 'Student view',
+        reviewStateRetakeManage: 'Plan retakes from this cell, set deadlines, and decide whether the outcome should count in the final score.',
+        reviewStateRetakeReadonly: 'This screen shows the current retake trail, while planning stays in the teacher workflow.',
+        reviewStateRetakePaused: 'Retake management is paused for this cell.',
+        reviewStateAppealCreate: 'You can submit an appeal here as soon as the saved score needs clarification or review.',
+        reviewStateAppealManage: 'Review the appeal queue here, keep the SLA moving, and optionally apply the resolved score back to the main grade.',
+        reviewStateAppealReadonly: 'This screen shows the full appeal history, but new appeals open only for a saved grade in an open subject.',
+        reviewStateAppealPaused: 'Appeal actions are paused for this cell.',
+        reviewStateModerationManage: 'Second review is ready: confirm, adjust, or reject the primary score as an independent reviewer.',
+        reviewStateModerationNeedsGrade: 'Save the original score before moderation can begin.',
+        reviewStateModerationSecondReviewer: 'The teacher who saved the primary grade cannot moderate the same cell.',
+        reviewStateModerationPaused: 'Moderation is paused by the current subject or column state.',
+        reviewStateCompetencyManage: 'Signal competencies from this work while the grading context is still open.',
+        reviewStateCompetencyReadonly: 'This screen shows the recorded competency trail, while updates stay in the teacher workflow.',
+        reviewStateCompetencyPaused: 'Competency updates are paused for this cell.',
         gradingSummaryTeacher: 'Grading system settings',
         gradingSummaryStudent: 'How the grade is calculated',
         gradingSummaryHint: 'Click to',
@@ -186,6 +215,18 @@
         reopenSubjectConfirm: 'Відкрити предмет і розблокувати журнал?',
         reopenSubject: 'Відкрити предмет',
         exportStatement: 'Експорт відомості',
+        closureImpactTitle: 'Превʼю впливу',
+        closureImpactColumnsHint: 'Активні колонки оцінювання',
+        closureImpactStudentsHint: 'Студенти в поточному scope',
+        closureImpactSnapshotHint: 'Експортний snapshot',
+        closureImpactSnapshotReady: 'Готовий до аудиту',
+        closureImpactSnapshotPending: 'Буде згенерований при закритті',
+        closureActionTitle: 'Наступна дія',
+        closureActionOpenTitle: 'Зафіксувати предмет для експорту',
+        closureActionOpenNote: 'Використовуйте після фінальної перевірки, коли оцінки й відвідуваність уже готові до блокування.',
+        closureActionClosedTitle: 'Повернути предмет у редагування',
+        closureActionClosedNote: 'Відкривайте повторно лише якщо треба виправити оцінки або дозакрити review-flow.',
+        closureActionExportNote: 'Останній export snapshot лишається доступним для аудиту та завантаження.',
         attendanceTitleTeacher: 'Відвідуваність',
         attendanceTitleStudent: 'Моя відвідуваність',
         classLabel: 'Пара',
@@ -246,6 +287,23 @@
         cellSummaryStudentAppealNote: 'Оцінку вже можна перевірити. Якщо потрібно, подайте апеляцію прямо з цього екрана.',
         cellSummaryModerationNeedsGrade: 'Модерація стане доступною після збереження основного балу.',
         cellSummaryModerationNeedsSecondReviewer: 'Модерацію має робити інший рецензент, ніж той, хто зберіг первинний бал.',
+        reviewStateOpen: 'Відкрито',
+        reviewStatePaused: 'Пауза',
+        reviewStateStudent: 'Перегляд студента',
+        reviewStateRetakeManage: 'Плануйте перездачі прямо з цієї клітинки, ставте дедлайни й вирішуйте, чи рахувати результат у фінал.',
+        reviewStateRetakeReadonly: 'Тут видно поточну історію перездач, а саме керування лишається у викладацькому режимі.',
+        reviewStateRetakePaused: 'Керування перездачами для цієї клітинки зараз на паузі.',
+        reviewStateAppealCreate: 'Тут можна подати апеляцію, якщо збережений бал потребує перегляду або уточнення.',
+        reviewStateAppealManage: 'Тут зручно вести SLA, фіксувати рішення й за потреби повертати скоригований бал у основну оцінку.',
+        reviewStateAppealReadonly: 'Тут видно повну історію апеляцій, але нові звернення відкриваються лише для збереженого бала у відкритому предметі.',
+        reviewStateAppealPaused: 'Дії з апеляціями для цієї клітинки зараз призупинені.',
+        reviewStateModerationManage: 'Другий рецензент може підтвердити, скоригувати або відхилити первинний бал прямо звідси.',
+        reviewStateModerationNeedsGrade: 'Спочатку потрібно зберегти первинний бал.',
+        reviewStateModerationSecondReviewer: 'Модерацію має виконати інший рецензент, а не той, хто зберіг первинний бал.',
+        reviewStateModerationPaused: 'Модерацію призупинено через поточний стан предмета або колонки.',
+        reviewStateCompetencyManage: 'Фіксуйте competency signals по цій роботі, поки grading context ще відкритий.',
+        reviewStateCompetencyReadonly: 'Тут видно записаний competency trail, а оновлення лишаються у викладацькому режимі.',
+        reviewStateCompetencyPaused: 'Оновлення competency signals для цієї клітинки зараз призупинені.',
         gradingSummaryTeacher: 'Налаштування системи оцінювання',
         gradingSummaryStudent: 'Як формується оцінка',
         gradingSummaryHint: 'Натисніть, щоб',
@@ -469,75 +527,100 @@
           const latestClosureEvent = subjectClosure && subjectClosure.latest_event ? subjectClosure.latest_event : null;
         %>
         <section class="glass liquid-card p-3 mb-3">
-          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div>
-              <div class="fw-semibold"><%= journalCopy.closureTitle %></div>
-              <% if (subjectClosure && subjectClosure.is_closed) { %>
-                <div class="text-muted small">
-                  <%= journalCopy.closureClosedPrefix %> <%= subjectClosure.closed_at ? new Date(subjectClosure.closed_at).toLocaleString(localeCode) : '' %>. <%= journalCopy.closureClosedSuffix %>
+          <div class="journal-closure-shell">
+            <div class="journal-closure-copy">
+              <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                <div>
+                  <div class="fw-semibold"><%= journalCopy.closureTitle %></div>
+                  <% if (subjectClosure && subjectClosure.is_closed) { %>
+                    <div class="text-muted small">
+                      <%= journalCopy.closureClosedPrefix %> <%= subjectClosure.closed_at ? new Date(subjectClosure.closed_at).toLocaleString(localeCode) : '' %>. <%= journalCopy.closureClosedSuffix %>
+                    </div>
+                  <% } else { %>
+                    <div class="text-muted small"><%= journalCopy.closureOpenHint %></div>
+                  <% } %>
                 </div>
-              <% } else { %>
-                <div class="text-muted small"><%= journalCopy.closureOpenHint %></div>
-              <% } %>
-              <div class="d-flex flex-wrap gap-2 mt-2">
-                <span class="status-chip status-chip--neutral">
-                  <%= lang === 'en' ? 'Columns' : 'Колонки' %>: <%= activeColumnCount %>
-                </span>
-                <span class="status-chip status-chip--neutral">
-                  <%= lang === 'en' ? 'Students' : 'Студенти' %>: <%= closureStudentCount %>
-                </span>
-                <% if (subjectClosure && subjectClosure.is_closed && latestClosureEvent && (Number(latestClosureEvent.export_rows_count || 0) > 0 || Number(latestClosureEvent.export_columns_count || 0) > 0)) { %>
-                  <span class="status-chip status-chip--info">
-                    <%= lang === 'en' ? 'Snapshot' : 'Знімок' %>: <%= Number(latestClosureEvent.export_rows_count || 0) %> × <%= Number(latestClosureEvent.export_columns_count || 0) %>
-                  </span>
-                <% } %>
-              </div>
-              <div class="text-muted small mt-2">
-                <% if (subjectClosure && subjectClosure.is_closed) { %>
-                  <%= lang === 'en'
-                    ? 'Reopen returns editing to the subject, while the exported snapshot stays available for audit and download.'
-                    : 'Повторне відкриття повертає редагування, а експортований snapshot лишається доступним для аудиту й завантаження.' %>
-                <% } else { %>
-                  <%= lang === 'en'
-                    ? `Closing will lock ${activeColumnCount} active columns for ${closureStudentCount} students and generate an export snapshot.`
-                    : `Закриття заблокує ${activeColumnCount} активних колонок для ${closureStudentCount} студентів і згенерує export snapshot.` %>
-                <% } %>
+                <div class="journal-closure-status-chips">
+                  <% if (subjectClosure && subjectClosure.is_closed) { %>
+                    <span class="status-chip status-chip--danger"><%= journalCopy.subjectClosed %></span>
+                  <% } else { %>
+                    <span class="status-chip status-chip--success"><%= journalCopy.journalOpen %></span>
+                  <% } %>
+                  <% if (canManageAllSubjects) { %>
+                    <span class="status-chip status-chip--info"><%= journalCopy.fullAccess %></span>
+                  <% } %>
+                </div>
               </div>
             </div>
-            <div class="d-flex flex-wrap gap-2">
-              <% if (canCloseSubject) { %>
-                <form method="POST" action="/journal/subject/close" onsubmit="return confirm(<%- JSON.stringify(journalCopy.closeSubjectConfirm) %>)">
-                  <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
-                  <% if (attendance && attendance.date) { %>
-                    <input type="hidden" name="attendance_date" value="<%= attendance.date %>" />
-                  <% } %>
-                  <% if (attendance && attendance.class_number) { %>
-                    <input type="hidden" name="attendance_class_number" value="<%= attendance.class_number %>" />
-                  <% } %>
-                  <% if (attendanceQuickAutoOpen) { %>
-                    <input type="hidden" name="attendance_quick" value="1" />
-                  <% } %>
-                  <button class="btn btn-outline-danger btn-sm" type="submit"><%= journalCopy.closeSubject %></button>
-                </form>
-              <% } %>
-              <% if (canReopenSubject) { %>
-                <form method="POST" action="/journal/subject/reopen" onsubmit="return confirm(<%- JSON.stringify(journalCopy.reopenSubjectConfirm) %>)">
-                  <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
-                  <% if (attendance && attendance.date) { %>
-                    <input type="hidden" name="attendance_date" value="<%= attendance.date %>" />
-                  <% } %>
-                  <% if (attendance && attendance.class_number) { %>
-                    <input type="hidden" name="attendance_class_number" value="<%= attendance.class_number %>" />
-                  <% } %>
-                  <% if (attendanceQuickAutoOpen) { %>
-                    <input type="hidden" name="attendance_quick" value="1" />
-                  <% } %>
-                  <button class="btn btn-outline-success btn-sm" type="submit"><%= journalCopy.reopenSubject %></button>
-                </form>
-              <% } %>
-              <% if (teacherJournalMode && subjectClosure && subjectClosure.is_closed && (canManageAllSubjects || selectedSubject.has_all_groups)) { %>
-                <a class="btn btn-outline-secondary btn-sm" href="<%= journalCloseExportHref %>"><%= journalCopy.exportStatement %></a>
-              <% } %>
+            <div class="journal-closure-impact">
+              <article class="journal-closure-impact-card">
+                <div class="text-muted small"><%= lang === 'en' ? 'Columns' : 'Колонки' %></div>
+                <div class="journal-closure-impact-value"><%= activeColumnCount %></div>
+                <div class="small text-muted"><%= journalCopy.closureImpactColumnsHint %></div>
+              </article>
+              <article class="journal-closure-impact-card">
+                <div class="text-muted small"><%= lang === 'en' ? 'Students' : 'Студенти' %></div>
+                <div class="journal-closure-impact-value"><%= closureStudentCount %></div>
+                <div class="small text-muted"><%= journalCopy.closureImpactStudentsHint %></div>
+              </article>
+              <article class="journal-closure-impact-card">
+                <div class="text-muted small"><%= lang === 'en' ? 'Snapshot' : 'Знімок' %></div>
+                <% if (subjectClosure && subjectClosure.is_closed && latestClosureEvent && (Number(latestClosureEvent.export_rows_count || 0) > 0 || Number(latestClosureEvent.export_columns_count || 0) > 0)) { %>
+                  <div class="journal-closure-impact-value"><%= Number(latestClosureEvent.export_rows_count || 0) %> × <%= Number(latestClosureEvent.export_columns_count || 0) %></div>
+                  <div class="small text-muted"><%= journalCopy.closureImpactSnapshotReady %></div>
+                <% } else { %>
+                  <div class="journal-closure-impact-value"><%= journalCopy.dash %></div>
+                  <div class="small text-muted"><%= journalCopy.closureImpactSnapshotPending %></div>
+                <% } %>
+              </article>
+            </div>
+            <div class="journal-closure-actions-panel">
+              <div class="journal-closure-actions-copy">
+                <div class="text-muted small"><%= journalCopy.closureActionTitle %></div>
+                <% if (subjectClosure && subjectClosure.is_closed) { %>
+                  <div class="fw-semibold"><%= journalCopy.closureActionClosedTitle %></div>
+                  <div class="small text-muted"><%= journalCopy.closureActionClosedNote %></div>
+                  <div class="small text-muted"><%= journalCopy.closureActionExportNote %></div>
+                <% } else { %>
+                  <div class="fw-semibold"><%= journalCopy.closureActionOpenTitle %></div>
+                  <div class="small text-muted"><%= journalCopy.closureActionOpenNote %></div>
+                <% } %>
+              </div>
+              <div class="journal-closure-actions">
+                <% if (canCloseSubject) { %>
+                  <form class="journal-closure-action-form" method="POST" action="/journal/subject/close" onsubmit="return confirm(<%- JSON.stringify(journalCopy.closeSubjectConfirm) %>)">
+                    <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                    <% if (attendance && attendance.date) { %>
+                      <input type="hidden" name="attendance_date" value="<%= attendance.date %>" />
+                    <% } %>
+                    <% if (attendance && attendance.class_number) { %>
+                      <input type="hidden" name="attendance_class_number" value="<%= attendance.class_number %>" />
+                    <% } %>
+                    <% if (attendanceQuickAutoOpen) { %>
+                      <input type="hidden" name="attendance_quick" value="1" />
+                    <% } %>
+                    <button class="btn btn-danger btn-sm" type="submit"><%= journalCopy.closeSubject %></button>
+                  </form>
+                <% } %>
+                <% if (canReopenSubject) { %>
+                  <form class="journal-closure-action-form" method="POST" action="/journal/subject/reopen" onsubmit="return confirm(<%- JSON.stringify(journalCopy.reopenSubjectConfirm) %>)">
+                    <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                    <% if (attendance && attendance.date) { %>
+                      <input type="hidden" name="attendance_date" value="<%= attendance.date %>" />
+                    <% } %>
+                    <% if (attendance && attendance.class_number) { %>
+                      <input type="hidden" name="attendance_class_number" value="<%= attendance.class_number %>" />
+                    <% } %>
+                    <% if (attendanceQuickAutoOpen) { %>
+                      <input type="hidden" name="attendance_quick" value="1" />
+                    <% } %>
+                    <button class="btn btn-success btn-sm" type="submit"><%= journalCopy.reopenSubject %></button>
+                  </form>
+                <% } %>
+                <% if (teacherJournalMode && subjectClosure && subjectClosure.is_closed && (canManageAllSubjects || selectedSubject.has_all_groups)) { %>
+                  <a class="btn btn-outline-secondary btn-sm" href="<%= journalCloseExportHref %>"><%= journalCopy.exportStatement %></a>
+                <% } %>
+              </div>
             </div>
           </div>
         </section>
@@ -1160,6 +1243,9 @@
                   <div class="small text-muted">Спроби, дедлайни, статус і внесення у фінальний бал.</div>
                 </div>
               </div>
+              <div id="journalRetakeState" class="journal-review-state mb-3">
+                <div class="text-muted small"><%= journalCopy.dash %></div>
+              </div>
               <div id="journalRetakeList" class="journal-retake-list">
                 <div class="text-muted small">Спроб поки немає.</div>
               </div>
@@ -1196,6 +1282,9 @@
                   <div class="text-muted small mb-1">Апеляції оцінок</div>
                   <div class="small text-muted">Статус розгляду, SLA відповіді та історія рішення.</div>
                 </div>
+              </div>
+              <div id="journalAppealState" class="journal-review-state mb-3">
+                <div class="text-muted small"><%= journalCopy.dash %></div>
               </div>
               <div id="journalAppealList" class="journal-appeal-list">
                 <div class="text-muted small">Апеляцій поки немає.</div>
@@ -1235,6 +1324,9 @@
                   <div class="small text-muted">Для екзаменів/заліків: підтвердження або коригування оцінки незалежним рецензентом.</div>
                 </div>
               </div>
+              <div id="journalModerationState" class="journal-review-state mb-3">
+                <div class="text-muted small"><%= journalCopy.dash %></div>
+              </div>
               <div id="journalModerationCurrent" class="journal-moderation-current">
                 <div class="text-muted small">Модерація недоступна для цього типу колонки.</div>
               </div>
@@ -1268,6 +1360,9 @@
                   <div class="text-muted small mb-1">Компетентнісні сигнали</div>
                   <div class="small text-muted">Швидка оцінка 8 компетентностей по цій роботі: чекбокс = +1, без чекбокса = +0.</div>
                 </div>
+              </div>
+              <div id="journalCompetencyState" class="journal-review-state mb-3">
+                <div class="text-muted small"><%= journalCopy.dash %></div>
               </div>
               <div id="journalCompetencyList" class="journal-competency-list">
                 <div class="text-muted small">Сигналів поки немає.</div>
@@ -1508,12 +1603,14 @@
       const prevCellBtn = document.getElementById('journalPrevCellBtn');
       const nextCellBtn = document.getElementById('journalNextCellBtn');
       const retakeSectionEl = document.getElementById('journalRetakeSection');
+      const retakeStateEl = document.getElementById('journalRetakeState');
       const retakeListEl = document.getElementById('journalRetakeList');
       const retakeCreateForm = document.getElementById('journalRetakeCreateForm');
       const retakeCreateColumnInput = document.getElementById('journalRetakeCreateColumnId');
       const retakeCreateStudentInput = document.getElementById('journalRetakeCreateStudentId');
       const retakeCreateSubmitBtn = document.getElementById('journalRetakeCreateSubmitBtn');
       const appealSectionEl = document.getElementById('journalAppealSection');
+      const appealStateEl = document.getElementById('journalAppealState');
       const appealListEl = document.getElementById('journalAppealList');
       const appealCreateForm = document.getElementById('journalAppealCreateForm');
       const appealCreateColumnInput = document.getElementById('journalAppealCreateColumnId');
@@ -1522,6 +1619,7 @@
       const appealCreateReason = document.getElementById('journalAppealCreateReason');
       const appealCreateSubmitBtn = document.getElementById('journalAppealCreateSubmitBtn');
       const moderationSectionEl = document.getElementById('journalModerationSection');
+      const moderationStateEl = document.getElementById('journalModerationState');
       const moderationCurrentEl = document.getElementById('journalModerationCurrent');
       const moderationForm = document.getElementById('journalModerationForm');
       const moderationColumnInput = document.getElementById('journalModerationColumnId');
@@ -1531,6 +1629,7 @@
       const moderationCommentInput = document.getElementById('journalModerationComment');
       const moderationSubmitBtn = document.getElementById('journalModerationSubmitBtn');
       const competencySectionEl = document.getElementById('journalCompetencySection');
+      const competencyStateEl = document.getElementById('journalCompetencyState');
       const competencyListEl = document.getElementById('journalCompetencyList');
       const competencyChecklistForm = document.getElementById('journalCompetencyChecklistForm');
       const competencyChecklistColumnInput = document.getElementById('journalCompetencyChecklistColumnId');
@@ -2076,6 +2175,22 @@
         }
       }
 
+      function renderReviewState(node, { chipClass = '', chipText = '', body = '' } = {}) {
+        if (!node) return;
+        const children = [];
+        if (chipText) {
+          children.push(createStatusChipNode(chipClass || 'status-chip--neutral', chipText));
+        }
+        children.push(createElement('div', {
+          className: 'small text-muted',
+          text: String(body || journalText.dash),
+        }));
+        renderNodeChildren(node, createElement('div', {
+          className: 'journal-review-state-inner',
+          children,
+        }));
+      }
+
       function renderSubmission(submission, column) {
         if (!(submissionBox instanceof HTMLElement)) {
           return;
@@ -2163,6 +2278,8 @@
         if (!retakeSectionEl || !retakeListEl) return;
         const attempts = Array.isArray(data && data.retake_attempts) ? data.retake_attempts : [];
         const canManage = Boolean(canEditJournal && data && data.can_manage_retakes);
+        const isClosed = Boolean(data && data.subject_is_closed);
+        const isLocked = Boolean(data && data.column && data.column.is_locked);
         const retakeMeta = data && data.retake_meta ? data.retake_meta : {};
         const statusOptions = Array.isArray(retakeMeta.statuses) && retakeMeta.statuses.length
           ? retakeMeta.statuses
@@ -2175,6 +2292,28 @@
         const noteMaxLength = Number(retakeMeta.note_max_length || 1200);
         const commentMaxLength = Number(retakeMeta.comment_max_length || 2000);
         const maxScore = Number(data && data.column ? data.column.max_points : 0);
+
+        renderReviewState(retakeStateEl, canManage
+          ? {
+              chipClass: 'status-chip--info',
+              chipText: journalText.reviewStateOpen,
+              body: journalText.reviewStateRetakeManage,
+            }
+          : canEditJournal
+            ? {
+                chipClass: 'status-chip--danger',
+                chipText: journalText.reviewStatePaused,
+                body: isClosed
+                  ? journalText.cellSummaryClosedNote
+                  : isLocked
+                    ? journalText.cellSummaryLockedNote
+                    : journalText.reviewStateRetakePaused,
+              }
+            : {
+                chipClass: 'status-chip--neutral',
+                chipText: journalText.reviewStateStudent,
+                body: journalText.reviewStateRetakeReadonly,
+              });
 
         if (retakeCreateColumnInput) retakeCreateColumnInput.value = String(currentCellColumnId || 0);
         if (retakeCreateStudentInput) retakeCreateStudentInput.value = String(currentCellStudentId || 0);
@@ -2392,10 +2531,13 @@
         const appeals = Array.isArray(data && data.appeals) ? data.appeals : [];
         const canCreate = Boolean(data && data.can_create_appeals);
         const canManage = Boolean(canEditJournal && data && data.can_manage_appeals);
+        const isClosed = Boolean(data && data.subject_is_closed);
+        const isLocked = Boolean(data && data.column && data.column.is_locked);
         const appealMeta = data && data.appeal_meta ? data.appeal_meta : {};
         const reasonMaxLength = Number(appealMeta.reason_max_length || 2400);
         const commentMaxLength = Number(appealMeta.comment_max_length || 2400);
         const maxScore = Number(data && data.column ? data.column.max_points : 0);
+        const hasGrade = Boolean(data && data.grade && Number.isFinite(Number(data.grade.original_score)));
         const statusOptions = Array.isArray(appealMeta.statuses) && appealMeta.statuses.length
           ? appealMeta.statuses
           : [
@@ -2404,6 +2546,46 @@
               { key: 'approved', label: 'Підтверджено' },
               { key: 'rejected', label: 'Відхилено' },
             ];
+
+        renderReviewState(appealStateEl, canManage
+          ? {
+              chipClass: 'status-chip--info',
+              chipText: journalText.reviewStateOpen,
+              body: journalText.reviewStateAppealManage,
+            }
+          : canCreate
+            ? {
+                chipClass: 'status-chip--warning',
+                chipText: journalText.reviewStateOpen,
+                body: journalText.reviewStateAppealCreate,
+              }
+            : canEditJournal && !hasGrade && !isClosed && !isLocked
+              ? {
+                  chipClass: 'status-chip--neutral',
+                  chipText: journalText.cellSummaryNoGrade,
+                  body: journalText.cellSummaryNoGradeHint,
+                }
+            : canEditJournal
+              ? {
+                  chipClass: 'status-chip--danger',
+                  chipText: journalText.reviewStatePaused,
+                  body: isClosed
+                    ? journalText.cellSummaryClosedNote
+                    : isLocked
+                      ? journalText.cellSummaryLockedNote
+                      : journalText.reviewStateAppealPaused,
+                }
+              : hasGrade
+                ? {
+                    chipClass: 'status-chip--neutral',
+                    chipText: journalText.reviewStateStudent,
+                    body: journalText.reviewStateAppealReadonly,
+                  }
+                : {
+                    chipClass: 'status-chip--neutral',
+                    chipText: journalText.cellSummaryNoGrade,
+                    body: journalText.cellSummaryNoGradeHint,
+                  });
 
         if (appealCreateColumnInput) appealCreateColumnInput.value = String(currentCellColumnId || 0);
         if (appealCreateStudentInput) appealCreateStudentInput.value = String(currentCellStudentId || 0);
@@ -2598,6 +2780,8 @@
         const moderation = data && data.moderation ? data.moderation : null;
         const required = Boolean(moderationMeta.required);
         const canManage = Boolean(canEditJournal && data && data.can_manage_moderation);
+        const isClosed = Boolean(data && data.subject_is_closed);
+        const isLocked = Boolean(data && data.column && data.column.is_locked);
         const maxScore = Number(data && data.column ? data.column.max_points : 0);
         const statuses = Array.isArray(moderationMeta.statuses) && moderationMeta.statuses.length
           ? moderationMeta.statuses
@@ -2617,7 +2801,48 @@
         const statusClass = getModerationStatusChipClass(statusKey);
 
         moderationSectionEl.classList.toggle('d-none', !required);
-        if (!required) return;
+        if (!required) {
+          renderReviewState(moderationStateEl, {
+            chipClass: 'status-chip--neutral',
+            chipText: journalText.cellSummaryModerationNotRequired,
+            body: journalText.cellSummaryStudentActionNote,
+          });
+          return;
+        }
+
+        renderReviewState(moderationStateEl, canManage
+          ? {
+              chipClass: 'status-chip--info',
+              chipText: journalText.reviewStateOpen,
+              body: journalText.reviewStateModerationManage,
+            }
+          : !hasGrade
+            ? {
+                chipClass: 'status-chip--neutral',
+                chipText: journalText.cellSummaryNoGrade,
+                body: journalText.reviewStateModerationNeedsGrade,
+              }
+            : canEditJournal && !isClosed && !isLocked
+              ? {
+                  chipClass: 'status-chip--warning',
+                  chipText: journalText.reviewStatePaused,
+                  body: journalText.reviewStateModerationSecondReviewer,
+                }
+              : canEditJournal
+                ? {
+                    chipClass: 'status-chip--danger',
+                    chipText: journalText.reviewStatePaused,
+                    body: isClosed
+                      ? journalText.cellSummaryClosedNote
+                      : isLocked
+                        ? journalText.cellSummaryLockedNote
+                        : journalText.reviewStateModerationPaused,
+                  }
+                : {
+                    chipClass: 'status-chip--neutral',
+                    chipText: journalText.reviewStateStudent,
+                    body: journalText.cellSummaryStudentActionNote,
+                  });
 
         if (!hasGrade) {
           renderNodeChildren(moderationCurrentEl, createEmptyStateNode('Спочатку потрібно виставити оцінку в цій клітинці.'));
@@ -2730,9 +2955,33 @@
         const definitions = Array.isArray(competencyMeta.definitions) ? competencyMeta.definitions : [];
         const signals = Array.isArray(data && data.competency_signals) ? data.competency_signals : [];
         const canAdd = Boolean(canEditJournal && data && data.can_add_competency_signal);
+        const isClosed = Boolean(data && data.subject_is_closed);
+        const isLocked = Boolean(data && data.column && data.column.is_locked);
         const quickValuesRaw = (data && data.competency_quick_values && typeof data.competency_quick_values === 'object')
           ? data.competency_quick_values
           : {};
+
+        renderReviewState(competencyStateEl, canAdd
+          ? {
+              chipClass: 'status-chip--info',
+              chipText: journalText.reviewStateOpen,
+              body: journalText.reviewStateCompetencyManage,
+            }
+          : canEditJournal
+            ? {
+                chipClass: 'status-chip--danger',
+                chipText: journalText.reviewStatePaused,
+                body: isClosed
+                  ? journalText.cellSummaryClosedNote
+                  : isLocked
+                    ? journalText.cellSummaryLockedNote
+                    : journalText.reviewStateCompetencyPaused,
+              }
+            : {
+                chipClass: 'status-chip--neutral',
+                chipText: journalText.reviewStateStudent,
+                body: journalText.reviewStateCompetencyReadonly,
+              });
 
         if (!signals.length) {
           renderNodeChildren(competencyListEl, createEmptyStateNode('Сигналів поки немає.'));

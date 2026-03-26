@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.83",
+      "date": "2026-03-26",
+      "items": [
+        "feat(journal-guided-closure-panel): rebuild the `/journal` subject close/reopen block into a guided impact-and-action surface with explicit column, student, and export snapshot preview cards plus stronger primary closure actions",
+        "tune(journal-review-availability-states): add explicit open, paused, student-view, and no-grade state summaries above retakes, appeals, moderation, and competencies so each review workflow now explains whether the current cell can be acted on and why",
+        "tune(journal-closure-mobile-surface): add Tahoe/Liquid Glass styling and mobile-responsive layout rules for the new closure panel and review-state cards, keeping the workflow readable in both light and dark themes"
+      ]
+    },
+    {
       "version": "1.2.82",
       "date": "2026-03-26",
       "items": [
