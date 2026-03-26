@@ -3771,19 +3771,66 @@ async function cloneAdmissionConfigurationFromLatest(programId, targetAdmissionI
   );
 }
 
-async function getRegistrationSubjects(courseId, admissionId) {
+function buildLegacySubjectOfferingDedupeKey(subjectId) {
+  const normalizedSubjectId = parsePositiveIntStrict(subjectId);
+  return normalizedSubjectId ? `legacy-subject:${normalizedSubjectId}` : '';
+}
+
+function parseLegacySubjectIdFromOfferingDedupeKey(value) {
+  const match = String(value || '').trim().match(/^legacy-subject:(\d+)$/);
+  return match ? (parsePositiveIntStrict(match[1]) || null) : null;
+}
+
+async function ensureRuntimeSubjectCatalogId(subjectId, rawName) {
+  const normalizedSubjectId = parsePositiveIntStrict(subjectId);
+  const normalizedName = normalizeSubjectDraftName(rawName, 140);
+  const catalogKey = normalizeSubjectCatalogName(normalizedName);
+  if (!catalogKey) {
+    return null;
+  }
+  try {
+    const row = await db.get(
+      `
+        INSERT INTO subject_catalog (name, normalized_name, created_at, updated_at)
+        VALUES (?, ?, NOW(), NOW())
+        ON CONFLICT (normalized_name)
+        DO UPDATE SET
+          name = EXCLUDED.name,
+          updated_at = NOW()
+        RETURNING id
+      `,
+      [normalizedName, catalogKey]
+    );
+    const catalogId = parsePositiveIntStrict(row && row.id);
+    if (catalogId && normalizedSubjectId) {
+      await db.run(
+        `
+          UPDATE subjects
+          SET catalog_id = COALESCE(catalog_id, ?)
+          WHERE id = ?
+        `,
+        [catalogId, normalizedSubjectId]
+      );
+    }
+    return catalogId;
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+async function getLegacyRegistrationSubjects(courseId, admissionId) {
   const normalizedCourseId = Number(courseId || 0);
   if (!Number.isFinite(normalizedCourseId) || normalizedCourseId < 1) {
     return [];
   }
-  const normalizedAdmissionId = Number(admissionId || 0);
-  const cacheKey = `${normalizedCourseId}|${normalizedAdmissionId > 0 ? normalizedAdmissionId : 'none'}`;
-  const cached = cacheGet(referenceCache.registrationSubjects, cacheKey);
-  if (cached) return cached;
 
   const visibleSubjects = await getSubjectsCached(normalizedCourseId, { visibleOnly: true });
+  const normalizedAdmissionId = Number(admissionId || 0);
   if (!Number.isFinite(normalizedAdmissionId) || normalizedAdmissionId < 1) {
-    return cacheSet(referenceCache.registrationSubjects, cacheKey, visibleSubjects || []);
+    return visibleSubjects || [];
   }
 
   try {
@@ -3796,7 +3843,7 @@ async function getRegistrationSubjects(courseId, admissionId) {
       [normalizedAdmissionId]
     );
     if (!overrideRows || !overrideRows.length) {
-      return cacheSet(referenceCache.registrationSubjects, cacheKey, visibleSubjects || []);
+      return visibleSubjects || [];
     }
     const visibilityBySubject = new Map();
     (overrideRows || []).forEach((row) => {
@@ -3805,18 +3852,444 @@ async function getRegistrationSubjects(courseId, admissionId) {
       const isVisible = row.is_visible === true || Number(row.is_visible) === 1;
       visibilityBySubject.set(subjectId, isVisible);
     });
-    const filtered = (visibleSubjects || []).filter((subject) => {
+    return (visibleSubjects || []).filter((subject) => {
       const subjectId = Number(subject.id || 0);
       if (!visibilityBySubject.has(subjectId)) return true;
       return visibilityBySubject.get(subjectId) === true;
     });
-    return cacheSet(referenceCache.registrationSubjects, cacheKey, filtered);
   } catch (err) {
     if (err && (err.code === '42P01' || err.code === '42703')) {
-      return cacheSet(referenceCache.registrationSubjects, cacheKey, visibleSubjects || []);
+      return visibleSubjects || [];
     }
     throw err;
   }
+}
+
+async function listStudyContextSemesters(studyContextId, options = {}) {
+  const normalizedStudyContextId = parsePositiveIntStrict(studyContextId);
+  if (!normalizedStudyContextId) {
+    return [];
+  }
+  const activeOnly = options.activeOnly === true;
+  const includeArchived = options.includeArchived === true;
+  const where = ['study_context_id = ?'];
+  if (activeOnly) {
+    where.push('is_active = true');
+  }
+  if (!includeArchived) {
+    where.push('COALESCE(is_archived, false) = false');
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT id, semester_number, title, is_active, is_archived, legacy_semester_id
+        FROM study_context_semesters
+        WHERE ${where.join('\n          AND ')}
+        ORDER BY semester_number ASC, id ASC
+      `,
+      [normalizedStudyContextId]
+    );
+    return (rows || []).map((row) => ({
+      id: Number(row.id || 0) || null,
+      semester_number: Number(row.semester_number || 0) || null,
+      title: sanitizeCompactText(row.title || '', 120),
+      is_active: row.is_active === true || Number(row.is_active) === 1,
+      is_archived: row.is_archived === true || Number(row.is_archived) === 1,
+      legacy_semester_id: Number(row.legacy_semester_id || 0) || null,
+    })).filter((row) => row.id);
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function syncSubjectOfferingsForStudyContext(studyContextId) {
+  const normalizedStudyContextId = parsePositiveIntStrict(studyContextId);
+  if (!normalizedStudyContextId) {
+    return { contextId: null, subjectIds: [], offeringIds: [] };
+  }
+  try {
+    const context = await getStudyContextById(normalizedStudyContextId);
+    if (!context || !context.course_id) {
+      return { contextId: normalizedStudyContextId, subjectIds: [], offeringIds: [] };
+    }
+
+    const subjects = await getLegacyRegistrationSubjects(context.course_id, context.admission_id);
+    const contextSemesters = await listStudyContextSemesters(normalizedStudyContextId, { includeArchived: false });
+    const desiredOfferingIds = [];
+    const desiredSubjectIds = [];
+
+    await db.run(
+      `
+        DELETE FROM subject_offering_semesters sos
+        USING study_context_semesters scs
+        WHERE sos.study_context_semester_id = scs.id
+          AND scs.study_context_id = ?
+      `,
+      [normalizedStudyContextId]
+    );
+
+    for (const subject of subjects || []) {
+      const subjectId = parsePositiveIntStrict(subject.id);
+      if (!subjectId) continue;
+      const catalogId = parsePositiveIntStrict(subject.catalog_id) || await ensureRuntimeSubjectCatalogId(subjectId, subject.catalog_name || subject.name);
+      if (!catalogId) continue;
+      const dedupeKey = buildLegacySubjectOfferingDedupeKey(subjectId);
+      if (!dedupeKey) continue;
+      const offeringRow = await db.get(
+        `
+          INSERT INTO subject_offerings
+            (dedupe_key, subject_catalog_id, title, is_shared, sort_order, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, true, NOW(), NOW())
+          ON CONFLICT (dedupe_key)
+          DO UPDATE SET
+            subject_catalog_id = EXCLUDED.subject_catalog_id,
+            title = EXCLUDED.title,
+            is_shared = EXCLUDED.is_shared,
+            sort_order = EXCLUDED.sort_order,
+            is_active = true,
+            updated_at = NOW()
+          RETURNING id
+        `,
+        [
+          dedupeKey,
+          catalogId,
+          normalizeSubjectDraftName(subject.catalog_name || subject.name, 140) || normalizeSubjectDraftName(subject.name, 140) || `Subject ${subjectId}`,
+          subject.is_shared === true || Number(subject.is_shared) === 1,
+          Number(subject.sort_order || subjectId),
+        ]
+      );
+      const offeringId = parsePositiveIntStrict(offeringRow && offeringRow.id);
+      if (!offeringId) continue;
+      desiredOfferingIds.push(offeringId);
+      desiredSubjectIds.push(subjectId);
+
+      await db.run(
+        `
+          INSERT INTO subject_offering_contexts
+            (subject_offering_id, study_context_id, is_primary, created_at, updated_at)
+          VALUES (?, ?, ?, NOW(), NOW())
+          ON CONFLICT (subject_offering_id, study_context_id)
+          DO UPDATE SET
+            is_primary = EXCLUDED.is_primary,
+            updated_at = NOW()
+        `,
+        [
+          offeringId,
+          normalizedStudyContextId,
+          Number(subject.owner_course_id || subject.course_id || 0) === Number(context.course_id || 0),
+        ]
+      );
+
+      for (const semester of contextSemesters) {
+        await db.run(
+          `
+            INSERT INTO subject_offering_semesters
+              (subject_offering_id, study_context_semester_id, is_active, created_at, updated_at)
+            VALUES (?, ?, true, NOW(), NOW())
+            ON CONFLICT (subject_offering_id, study_context_semester_id)
+            DO UPDATE SET
+              is_active = true,
+              updated_at = NOW()
+          `,
+          [offeringId, semester.id]
+        );
+      }
+    }
+
+    if (desiredOfferingIds.length) {
+      await db.run(
+        `
+          DELETE FROM subject_offering_contexts
+          WHERE study_context_id = ?
+            AND NOT (subject_offering_id = ANY(?::int[]))
+        `,
+        [normalizedStudyContextId, desiredOfferingIds]
+      );
+    } else {
+      await db.run(
+        `
+          DELETE FROM subject_offering_contexts
+          WHERE study_context_id = ?
+        `,
+        [normalizedStudyContextId]
+      );
+    }
+
+    return {
+      contextId: normalizedStudyContextId,
+      subjectIds: Array.from(new Set(desiredSubjectIds)),
+      offeringIds: Array.from(new Set(desiredOfferingIds)),
+    };
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return { contextId: normalizedStudyContextId, subjectIds: [], offeringIds: [] };
+    }
+    throw err;
+  }
+}
+
+async function applyTeacherAssignmentTemplatesForStudyContexts(studyContextIds = []) {
+  const normalizedContextIds = Array.from(new Set(
+    (Array.isArray(studyContextIds) ? studyContextIds : [studyContextIds])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (!normalizedContextIds.length) {
+    return 0;
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT
+          tat.id AS template_id,
+          tat.user_id,
+          tat.program_id AS template_program_id,
+          tat.track_key AS template_track_key,
+          tat.stage_number AS template_stage_number,
+          tat.campus_key AS template_campus_key,
+          tat.preference_order,
+          tat.notes,
+          so.id AS subject_offering_id,
+          sc.id AS study_context_id,
+          coh.program_id,
+          p.track_key,
+          sc.stage_number,
+          sc.campus_key
+        FROM teacher_assignment_templates tat
+        JOIN subject_offering_contexts soc ON soc.study_context_id = ANY(?::int[])
+        JOIN subject_offerings so
+          ON so.id = soc.subject_offering_id
+         AND so.subject_catalog_id = tat.subject_catalog_id
+         AND so.is_active = true
+        JOIN study_contexts sc ON sc.id = soc.study_context_id
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        JOIN study_programs p ON p.id = coh.program_id
+        WHERE tat.is_active = true
+          AND (tat.program_id IS NULL OR tat.program_id = coh.program_id)
+          AND (tat.track_key IS NULL OR tat.track_key = p.track_key)
+          AND (tat.stage_number IS NULL OR tat.stage_number = sc.stage_number)
+          AND (tat.campus_key IS NULL OR tat.campus_key = sc.campus_key)
+        ORDER BY
+          tat.user_id ASC,
+          so.id ASC,
+          (
+            CASE WHEN tat.program_id IS NULL THEN 0 ELSE 1 END
+            + CASE WHEN tat.track_key IS NULL THEN 0 ELSE 1 END
+            + CASE WHEN tat.stage_number IS NULL THEN 0 ELSE 1 END
+            + CASE WHEN tat.campus_key IS NULL THEN 0 ELSE 1 END
+          ) DESC,
+          tat.preference_order ASC,
+          tat.id ASC
+      `,
+      [normalizedContextIds]
+    );
+    const bestRows = new Map();
+    for (const row of rows || []) {
+      const teacherId = parsePositiveIntStrict(row.user_id);
+      const offeringId = parsePositiveIntStrict(row.subject_offering_id);
+      if (!teacherId || !offeringId) continue;
+      const key = `${teacherId}|${offeringId}`;
+      if (!bestRows.has(key)) {
+        bestRows.set(key, row);
+      }
+    }
+    let upsertedCount = 0;
+    for (const row of bestRows.values()) {
+      let groupNumber = null;
+      try {
+        const parsed = row.notes ? JSON.parse(String(row.notes)) : null;
+        const candidate = parsePositiveIntStrict(parsed && parsed.group_number);
+        groupNumber = candidate || null;
+      } catch (_) {
+        groupNumber = null;
+      }
+      await db.run(
+        `
+          INSERT INTO teacher_offering_assignments
+            (teacher_id, subject_offering_id, template_id, group_number, is_primary, sort_order, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+          ON CONFLICT (teacher_id, subject_offering_id)
+          DO UPDATE SET
+            template_id = COALESCE(teacher_offering_assignments.template_id, EXCLUDED.template_id),
+            group_number = COALESCE(teacher_offering_assignments.group_number, EXCLUDED.group_number),
+            sort_order = LEAST(teacher_offering_assignments.sort_order, EXCLUDED.sort_order),
+            updated_at = NOW()
+        `,
+        [
+          parsePositiveIntStrict(row.user_id),
+          parsePositiveIntStrict(row.subject_offering_id),
+          parsePositiveIntStrict(row.template_id) || null,
+          groupNumber,
+          Number(row.preference_order || 0) === 0,
+          Number(row.preference_order || 0),
+        ]
+      );
+      upsertedCount += 1;
+    }
+    return upsertedCount;
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return 0;
+    }
+    throw err;
+  }
+}
+
+async function syncSubjectOfferingsForAdmission(admissionId) {
+  const normalizedAdmissionId = parsePositiveIntStrict(admissionId);
+  if (!normalizedAdmissionId) {
+    return { contextIds: [], subjectIds: [], offeringIds: [], teacherAssignments: 0 };
+  }
+  try {
+    await syncStudyContextsForAdmission(normalizedAdmissionId);
+    const rows = await db.all(
+      `
+        SELECT sc.id
+        FROM study_contexts sc
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        WHERE coh.legacy_admission_id = ?
+      `,
+      [normalizedAdmissionId]
+    );
+    const contextIds = [];
+    const subjectIds = new Set();
+    const offeringIds = new Set();
+    for (const row of rows || []) {
+      const contextId = parsePositiveIntStrict(row.id);
+      if (!contextId) continue;
+      contextIds.push(contextId);
+      const result = await syncSubjectOfferingsForStudyContext(contextId);
+      (result.subjectIds || []).forEach((value) => subjectIds.add(value));
+      (result.offeringIds || []).forEach((value) => offeringIds.add(value));
+    }
+    const teacherAssignments = await applyTeacherAssignmentTemplatesForStudyContexts(contextIds);
+    return {
+      contextIds,
+      subjectIds: Array.from(subjectIds),
+      offeringIds: Array.from(offeringIds),
+      teacherAssignments,
+    };
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return { contextIds: [], subjectIds: [], offeringIds: [], teacherAssignments: 0 };
+    }
+    throw err;
+  }
+}
+
+async function syncSubjectOfferingsForSubjectIds(subjectIds = []) {
+  const normalizedSubjectIds = Array.from(new Set(
+    (Array.isArray(subjectIds) ? subjectIds : [subjectIds])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (!normalizedSubjectIds.length) {
+    return { admissionIds: [], contextIds: [], offeringIds: [] };
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT DISTINCT pac.admission_id
+        FROM subject_course_bindings scb
+        JOIN program_admission_courses pac ON pac.course_id = scb.course_id
+        WHERE scb.subject_id = ANY(?::int[])
+      `,
+      [normalizedSubjectIds]
+    );
+    const admissionIds = Array.from(new Set(
+      (rows || [])
+        .map((row) => parsePositiveIntStrict(row.admission_id))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ));
+    const contextIds = new Set();
+    const offeringIds = new Set();
+    for (const admissionId of admissionIds) {
+      const result = await syncSubjectOfferingsForAdmission(admissionId);
+      (result.contextIds || []).forEach((value) => contextIds.add(value));
+      (result.offeringIds || []).forEach((value) => offeringIds.add(value));
+    }
+    return {
+      admissionIds,
+      contextIds: Array.from(contextIds),
+      offeringIds: Array.from(offeringIds),
+    };
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return { admissionIds: [], contextIds: [], offeringIds: [] };
+    }
+    throw err;
+  }
+}
+
+async function getRegistrationSubjects(courseId, admissionId, options = {}) {
+  const normalizedCourseId = Number(courseId || 0);
+  if (!Number.isFinite(normalizedCourseId) || normalizedCourseId < 1) {
+    return [];
+  }
+  const normalizedAdmissionId = Number(admissionId || 0);
+  const normalizedStudyContextId = parsePositiveIntStrict(options.studyContextId);
+  const cacheKey = `${normalizedCourseId}|${normalizedAdmissionId > 0 ? normalizedAdmissionId : 'none'}|${normalizedStudyContextId || 'legacy'}`;
+  const cached = cacheGet(referenceCache.registrationSubjects, cacheKey);
+  if (cached) return cached;
+
+  if (normalizedStudyContextId) {
+    try {
+      await syncSubjectOfferingsForStudyContext(normalizedStudyContextId);
+      const activeSemesters = await listStudyContextSemesters(normalizedStudyContextId, { activeOnly: true, includeArchived: false });
+      const params = [normalizedStudyContextId];
+      let semesterJoin = '';
+      let semesterWhere = '';
+      if (activeSemesters.length) {
+        semesterJoin = `
+          JOIN subject_offering_semesters sos ON sos.subject_offering_id = so.id
+        `;
+        semesterWhere = `
+          AND sos.study_context_semester_id = ANY(?::int[])
+          AND sos.is_active = true
+        `;
+        params.push(activeSemesters.map((semester) => semester.id));
+      }
+      const offeringRows = await db.all(
+        `
+          SELECT DISTINCT so.id, so.dedupe_key
+          FROM subject_offerings so
+          JOIN subject_offering_contexts soc ON soc.subject_offering_id = so.id
+          ${semesterJoin}
+          WHERE soc.study_context_id = ?
+            AND so.is_active = true
+            ${semesterWhere}
+        `,
+        params
+      );
+      const offeringBySubjectId = new Map();
+      (offeringRows || []).forEach((row) => {
+        const subjectId = parseLegacySubjectIdFromOfferingDedupeKey(row.dedupe_key);
+        const offeringId = parsePositiveIntStrict(row.id);
+        if (!subjectId || !offeringId || offeringBySubjectId.has(subjectId)) return;
+        offeringBySubjectId.set(subjectId, offeringId);
+      });
+      if (offeringBySubjectId.size) {
+        const legacySubjects = await getLegacyRegistrationSubjects(normalizedCourseId, normalizedAdmissionId);
+        const scopedSubjects = (legacySubjects || [])
+          .filter((subject) => offeringBySubjectId.has(parsePositiveIntStrict(subject.id)))
+          .map((subject) => ({
+            ...subject,
+            subject_offering_id: offeringBySubjectId.get(parsePositiveIntStrict(subject.id)) || null,
+          }));
+        return cacheSet(referenceCache.registrationSubjects, cacheKey, scopedSubjects);
+      }
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+    }
+  }
+
+  const legacySubjects = await getLegacyRegistrationSubjects(normalizedCourseId, normalizedAdmissionId);
+  return cacheSet(referenceCache.registrationSubjects, cacheKey, legacySubjects || []);
 }
 
 function normalizeSubjectCatalogName(value) {
@@ -8270,6 +8743,172 @@ async function getTeacherSelections(userId) {
   return map;
 }
 
+function buildTeacherAssignmentTemplateNotes(groupNumber) {
+  const normalizedGroupNumber = parsePositiveIntStrict(groupNumber);
+  return JSON.stringify({
+    group_number: normalizedGroupNumber || null,
+  });
+}
+
+async function syncTeacherAcademicAssignments(userId, selections = []) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  if (!normalizedUserId) {
+    return { templateCount: 0, assignmentCount: 0 };
+  }
+
+  const normalizedSelections = (Array.isArray(selections) ? selections : [])
+    .map((item, index) => ({
+      subject_id: parsePositiveIntStrict(item && item.subject_id),
+      group_number: parsePositiveIntStrict(item && item.group_number) || null,
+      sort_order: index,
+    }))
+    .filter((item) => item.subject_id);
+
+  if (!normalizedSelections.length) {
+    try {
+      await db.run('DELETE FROM teacher_offering_assignments WHERE teacher_id = ?', [normalizedUserId]);
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+    }
+    return { templateCount: 0, assignmentCount: 0 };
+  }
+
+  const subjectIds = Array.from(new Set(normalizedSelections.map((item) => item.subject_id)));
+  const selectionBySubjectId = new Map(normalizedSelections.map((item) => [item.subject_id, item]));
+
+  try {
+    await syncSubjectOfferingsForSubjectIds(subjectIds);
+
+    const offeringRows = await db.all(
+      `
+        SELECT
+          so.id AS subject_offering_id,
+          so.subject_catalog_id,
+          so.dedupe_key,
+          soc.study_context_id,
+          coh.program_id,
+          p.track_key,
+          sc.stage_number,
+          sc.campus_key
+        FROM subject_offerings so
+        JOIN subject_offering_contexts soc ON soc.subject_offering_id = so.id
+        JOIN study_contexts sc ON sc.id = soc.study_context_id
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        JOIN study_programs p ON p.id = coh.program_id
+        WHERE so.dedupe_key = ANY(?::text[])
+          AND so.is_active = true
+      `,
+      [subjectIds.map((subjectId) => buildLegacySubjectOfferingDedupeKey(subjectId))]
+    );
+
+    const templateRows = new Map();
+    const assignmentRows = new Map();
+    for (const row of offeringRows || []) {
+      const subjectId = parseLegacySubjectIdFromOfferingDedupeKey(row.dedupe_key);
+      const offeringId = parsePositiveIntStrict(row.subject_offering_id);
+      const catalogId = parsePositiveIntStrict(row.subject_catalog_id);
+      const selection = subjectId ? selectionBySubjectId.get(subjectId) : null;
+      if (!subjectId || !offeringId || !catalogId || !selection) {
+        continue;
+      }
+
+      const templateKey = [
+        normalizedUserId,
+        catalogId,
+        parsePositiveIntStrict(row.program_id) || 0,
+        normalizeRegistrationTrack(row.track_key, ''),
+        normalizeStudyContextStage(row.stage_number, 1),
+        normalizeCourseCampus(row.campus_key || 'kyiv'),
+      ].join(':');
+      if (!templateRows.has(templateKey)) {
+        templateRows.set(templateKey, {
+          dedupe_key: `teacher-template:${templateKey}`,
+          user_id: normalizedUserId,
+          subject_catalog_id: catalogId,
+          program_id: parsePositiveIntStrict(row.program_id) || null,
+          track_key: normalizeRegistrationTrack(row.track_key, '') || null,
+          stage_number: normalizeStudyContextStage(row.stage_number, 1),
+          campus_key: normalizeCourseCampus(row.campus_key || 'kyiv'),
+          preference_order: Number(selection.sort_order || 0),
+          notes: buildTeacherAssignmentTemplateNotes(selection.group_number),
+        });
+      }
+
+      if (!assignmentRows.has(offeringId)) {
+        assignmentRows.set(offeringId, {
+          subject_offering_id: offeringId,
+          group_number: selection.group_number,
+          sort_order: Number(selection.sort_order || 0),
+        });
+      }
+    }
+
+    let templateCount = 0;
+    for (const row of templateRows.values()) {
+      await db.run(
+        `
+          INSERT INTO teacher_assignment_templates
+            (dedupe_key, user_id, subject_catalog_id, program_id, track_key, stage_number, campus_key, preference_order, is_active, notes, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, true, ?, NOW(), NOW())
+          ON CONFLICT (dedupe_key)
+          DO UPDATE SET
+            preference_order = EXCLUDED.preference_order,
+            is_active = true,
+            notes = EXCLUDED.notes,
+            updated_at = NOW()
+        `,
+        [
+          row.dedupe_key,
+          row.user_id,
+          row.subject_catalog_id,
+          row.program_id,
+          row.track_key,
+          row.stage_number,
+          row.campus_key,
+          row.preference_order,
+          row.notes,
+        ]
+      );
+      templateCount += 1;
+    }
+
+    await db.run('DELETE FROM teacher_offering_assignments WHERE teacher_id = ?', [normalizedUserId]);
+    let assignmentCount = 0;
+    for (const row of assignmentRows.values()) {
+      await db.run(
+        `
+          INSERT INTO teacher_offering_assignments
+            (teacher_id, subject_offering_id, template_id, group_number, is_primary, sort_order, created_at, updated_at)
+          VALUES (?, ?, NULL, ?, ?, ?, NOW(), NOW())
+          ON CONFLICT (teacher_id, subject_offering_id)
+          DO UPDATE SET
+            group_number = EXCLUDED.group_number,
+            is_primary = EXCLUDED.is_primary,
+            sort_order = EXCLUDED.sort_order,
+            updated_at = NOW()
+        `,
+        [
+          normalizedUserId,
+          row.subject_offering_id,
+          row.group_number,
+          Number(row.sort_order || 0) === 0,
+          row.sort_order,
+        ]
+      );
+      assignmentCount += 1;
+    }
+
+    return { templateCount, assignmentCount };
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return { templateCount: 0, assignmentCount: 0 };
+    }
+    throw err;
+  }
+}
+
 function normalizeTemplateTagsInput(rawValue) {
   const unique = new Set();
   const list = String(rawValue || '')
@@ -8287,6 +8926,7 @@ async function getTeacherAssignedSubjects(userId) {
       `
         SELECT
           ts.subject_id,
+          COALESCE(toa.subject_offering_id, so.id) AS subject_offering_id,
           ts.group_number,
           s.name AS subject_name,
           s.group_count,
@@ -8300,6 +8940,10 @@ async function getTeacherAssignedSubjects(userId) {
         JOIN subjects s ON s.id = ts.subject_id
         JOIN subject_course_bindings scb ON scb.subject_id = s.id
         JOIN courses c ON c.id = scb.course_id
+        LEFT JOIN subject_offerings so ON so.dedupe_key = CONCAT('legacy-subject:', s.id::text)
+        LEFT JOIN teacher_offering_assignments toa
+          ON toa.teacher_id = ts.user_id
+         AND toa.subject_offering_id = so.id
         WHERE ts.user_id = ?
           AND s.visible = 1
         ORDER BY scb.course_id ASC, s.name ASC, ts.group_number NULLS FIRST
@@ -8312,7 +8956,7 @@ async function getTeacherAssignedSubjects(userId) {
     }
     return db.all(
       `
-        SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count, s.is_general,
+        SELECT ts.subject_id, NULL AS subject_offering_id, ts.group_number, s.name AS subject_name, s.group_count, s.is_general,
                s.show_in_teamwork,
                s.course_id, s.course_id AS owner_course_id, c.name AS course_name, false AS is_shared
         FROM teacher_subjects ts
@@ -9014,7 +9658,8 @@ async function saveTeacherSubjects(userId, body, options = {}) {
       [userId, nextStatus]
     );
   }
-  return { ok: true, status: nextStatus, selections };
+  const academicAssignments = await syncTeacherAcademicAssignments(userId, selections);
+  return { ok: true, status: nextStatus, selections, academicAssignments };
 }
 
 function broadcast(type, payload, options = {}) {
@@ -10239,7 +10884,9 @@ app.post('/register/course', registerLimiter, async (req, res) => {
     }
 
     if (!teacherCourse && selectedAdmissionId) {
-      const scopedSubjects = await getRegistrationSubjects(courseId, selectedAdmissionId);
+      const scopedSubjects = await getRegistrationSubjects(courseId, selectedAdmissionId, {
+        studyContextId,
+      });
       if (!(scopedSubjects || []).length) {
         return redirectRegistrationFlowIssue('empty_subject_scope');
       }
@@ -10286,7 +10933,9 @@ app.get('/register/subjects', async (req, res) => {
     }
 
     const [subjects, allCourseSubjects, baseVisibleSubjects, admissionMappedCourses] = await Promise.all([
-      getRegistrationSubjects(placement.course_id, placement.admission_id),
+      getRegistrationSubjects(placement.course_id, placement.admission_id, {
+        studyContextId: placement.study_context_id,
+      }),
       getSubjectsCached(placement.course_id, { visibleOnly: false }),
       getSubjectsCached(placement.course_id, { visibleOnly: true }),
       getAdmissionRegistrationCourses(placement.admission_id),
@@ -10413,7 +11062,9 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
       return res.redirect('/register/course');
     }
 
-    const subjects = await getRegistrationSubjects(placement.course_id, placement.admission_id);
+    const subjects = await getRegistrationSubjects(placement.course_id, placement.admission_id, {
+      studyContextId: placement.study_context_id,
+    });
     const isRequired = (subject) =>
       subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
     let hasMissingRequired = false;
@@ -30296,6 +30947,7 @@ app.post('/admin/pathways/catalog/assign', requirePathwaysSectionAccess, writeLi
 
     if (Array.isArray(summary.touchedSubjectIds) && summary.touchedSubjectIds.length) {
       await invalidateSubjectCachesForSubjectIds(summary.touchedSubjectIds);
+      await syncSubjectOfferingsForSubjectIds(summary.touchedSubjectIds);
     }
     (summary.touchedCourseIds || []).forEach((targetCourseId) => invalidateSubjectsCache(targetCourseId));
     invalidateRegistrationPathwaysCache();
@@ -30382,6 +31034,7 @@ app.post('/admin/pathways/subjects/:subjectId/course/:courseId/remove', requireP
     });
 
     await invalidateSubjectCachesForSubjectIds([subjectId]);
+    await syncSubjectOfferingsForSubjectIds([subjectId]);
     invalidateSubjectsCache(targetCourseId);
     invalidateRegistrationPathwaysCache();
 
@@ -30578,6 +31231,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
     if (admissionId) {
       await cloneAdmissionConfigurationFromLatest(programId, admissionId);
       await syncStudyContextsForAdmission(admissionId);
+      await syncSubjectOfferingsForAdmission(admissionId);
     }
     invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
@@ -30654,6 +31308,7 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
       [programId, admissionYear, label || null, isActive, admissionId]
     );
     await syncStudyContextsForAdmission(admissionId);
+    await syncSubjectOfferingsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
@@ -30730,6 +31385,7 @@ app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAc
       );
     }
     await syncStudyContextsForAdmission(admissionId);
+    await syncSubjectOfferingsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
@@ -30848,6 +31504,7 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
     );
 
     await syncStudyContextsForAdmission(admissionId);
+    await syncSubjectOfferingsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
@@ -30965,6 +31622,7 @@ app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSec
     }
 
     await syncStudyContextsForAdmission(admissionId);
+    await syncSubjectOfferingsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
@@ -31403,6 +32061,7 @@ app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionA
         [admissionId, subjectId, visibilityFlag]
       );
     }
+    await syncSubjectOfferingsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
     invalidateSubjectsCache(selectedCourseId);
     return res.redirect(buildAdminPathwaysUrl({
@@ -31556,6 +32215,7 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
       [admissionId, sourceAdmissionId, selectedCourseId]
     );
 
+    await syncSubjectOfferingsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
     invalidateSubjectsCache(selectedCourseId);
     return res.redirect(buildAdminPathwaysUrl({
@@ -42424,7 +43084,7 @@ app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
       isShared: false,
     });
     return Number(inserted && inserted.id ? inserted.id : 0) || null;
-  }).then((subjectId) => {
+  }).then(async (subjectId) => {
     logAction(db, req, 'subject_add', {
       subject_id: subjectId,
       name,
@@ -42451,7 +43111,9 @@ app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
       },
       courseId
     );
+    await syncSubjectOfferingsForSubjectIds([subjectId]);
     invalidateSubjectsCache(courseId);
+    invalidateRegistrationPathwaysCache();
     return res.redirect('/admin?ok=Subject%20added');
   }).catch((err) => {
     if (err && err.redirectPath) {
@@ -42475,6 +43137,7 @@ app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
             return res.redirect('/admin?err=Database%20error');
           }
           invalidateSubjectsCache(courseId);
+          invalidateRegistrationPathwaysCache();
           return res.redirect('/admin?ok=Subject%20added');
         }
       );
@@ -42730,10 +43393,9 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
     insertedCourseIds.forEach((courseId) => invalidateSubjectsCache(courseId));
     if (touchedSubjectIds.size) {
       await invalidateSubjectCachesForSubjectIds(Array.from(touchedSubjectIds.values()));
+      await syncSubjectOfferingsForSubjectIds(Array.from(touchedSubjectIds.values()));
     }
-    if (syncPathways && (pathwaysSyncedCount > 0 || pathwaysResetCount > 0)) {
-      invalidateRegistrationPathwaysCache();
-    }
+    invalidateRegistrationPathwaysCache();
 
     logAction(db, req, 'subject_bulk_assign', {
       source_subject_id: sourceSubjectId,
@@ -42865,6 +43527,8 @@ app.post('/admin/subjects/edit/:id', requireSubjectsSectionAccess, (req, res) =>
       courseId
     );
     await invalidateSubjectCachesForSubjectIds([id]);
+    await syncSubjectOfferingsForSubjectIds([id]);
+    invalidateRegistrationPathwaysCache();
     return res.redirect('/admin?ok=Subject%20updated');
   }).catch((err) => {
     if (err && err.redirectPath) {
@@ -42899,7 +43563,9 @@ app.post('/admin/api/subjects/:subjectId/clone', requireScheduleSectionAccess, a
       });
     });
     await invalidateSubjectCachesForSubjectIds([row && row.id ? row.id : null]);
+    await syncSubjectOfferingsForSubjectIds([row && row.id ? row.id : null]);
     invalidateSubjectsCache(courseId);
+    invalidateRegistrationPathwaysCache();
     return res.json({ ok: true, id: row?.id });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
@@ -43067,7 +43733,9 @@ app.post('/admin/subjects/delete/:id', requireSubjectsSectionAccess, (req, res) 
     logAction(db, req, 'subject_unbind_course', { id, course_id: courseId });
     logActivity(db, req, 'subject_unbind_course', 'subject', Number(id) || null, { course_id: courseId }, courseId);
     await invalidateSubjectCachesForSubjectIds([id]);
+    await syncSubjectOfferingsForSubjectIds([id]);
     invalidateSubjectsCache(courseId);
+    invalidateRegistrationPathwaysCache();
     return res.redirect('/admin?ok=Subject%20removed%20from%20course');
   }).catch((err) => {
     if (err && err.redirectPath) {

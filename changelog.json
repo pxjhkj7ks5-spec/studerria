@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.90",
+      "date": "2026-03-26",
+      "items": [
+        "feat(academic-setup-offering-bridge): sync `subject_offerings`, context bindings, and context-semester links from legacy subject visibility so each cohort context now gets a live offering layer without dropping the existing subject model",
+        "feat(academic-setup-registration-context-read): let registration resolve visible subjects through `study_context_id` first, with automatic fallback to the legacy admission/course path when the new offering layer is unavailable or still empty",
+        "feat(academic-setup-teacher-template-seeding): seed `teacher_assignment_templates` and `teacher_offering_assignments` whenever teachers save their subject list, and auto-apply matching templates when cohort offerings are refreshed"
+      ]
+    },
+    {
       "version": "1.2.89",
       "date": "2026-03-26",
       "items": [
