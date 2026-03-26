@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.92",
+      "date": "2026-03-26",
+      "items": [
+        "feat(academic-setup-presets-and-intake): add program-preset CRUD routes and a new Academic Setup UI for multi-program intake creation, preset selection, stage subject/semester scaffolding, and canonical `preset_id` focus inside `/admin/pathways`",
+        "feat(academic-setup-apply-preview): surface context-level and cohort-level preset apply previews plus explicit apply/reapply actions, so admins can snapshot semesters and offerings into live `study_contexts` without falling back to manual admission-course mapping",
+        "feat(academic-setup-moderation-and-promotion): add an Academic Moderation Queue UI with resolve/ignore/assign-context actions, and upgrade cohort promotion to resolve or create next-stage `study_contexts` before moving users through the canonical placement model"
+      ]
+    },
+    {
       "version": "1.2.91",
       "date": "2026-03-26",
       "items": [

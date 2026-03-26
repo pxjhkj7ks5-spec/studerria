@@ -15,6 +15,7 @@ const navMiddleware = require('./middleware/nav');
 const supportHelpers = require('./lib/support');
 const messageHelpers = require('./lib/messages');
 const teacherTemplateHelpers = require('./lib/teacherTemplates');
+const academicSetupHelpers = require('./lib/academicSetup');
 const journalInsightHelpers = require('./lib/journalInsights');
 const roomHelpers = require('./lib/rooms');
 const pathwayHelpers = require('./lib/pathways');
@@ -3388,6 +3389,1054 @@ async function syncStudyContextsForAdmission(admissionId) {
   }
 }
 
+async function listProgramPresetOptions(programId) {
+  const normalizedProgramId = parsePositiveIntStrict(programId);
+  if (!normalizedProgramId) {
+    return [];
+  }
+  try {
+    return await academicSetupHelpers.loadProgramPresets(db, normalizedProgramId);
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function resolveProgramPreset(programId, requestedPresetId = null) {
+  const presets = await listProgramPresetOptions(programId);
+  const normalizedRequestedPresetId = parsePositiveIntStrict(requestedPresetId);
+  const selectedPreset = presets.find((preset) => Number(preset.id || 0) === normalizedRequestedPresetId)
+    || presets.find((preset) => preset.is_default)
+    || presets[0]
+    || null;
+  return {
+    presets,
+    selectedPreset,
+    selectedPresetId: selectedPreset ? Number(selectedPreset.id || 0) : 0,
+  };
+}
+
+async function ensureProgramPresetRecord({
+  presetId = null,
+  programId,
+  name,
+  isDefault = false,
+  isActive = true,
+  stageCount = null,
+}) {
+  const normalizedProgramId = parsePositiveIntStrict(programId);
+  const normalizedPresetId = parsePositiveIntStrict(presetId);
+  const presetName = sanitizeCompactText(name || '', 140);
+  if (!normalizedProgramId || !presetName) {
+    return null;
+  }
+
+  return withTransaction(async (client) => {
+    let program = null;
+    if (normalizedPresetId) {
+      program = await txGet(
+        client,
+        `
+          SELECT
+            pp.id,
+            pp.program_id,
+            p.track_key
+          FROM program_presets pp
+          JOIN study_programs p ON p.id = pp.program_id
+          WHERE pp.id = ?
+          LIMIT 1
+        `,
+        [normalizedPresetId]
+      );
+    } else {
+      program = await txGet(
+        client,
+        `
+          SELECT id, track_key
+          FROM study_programs
+          WHERE id = ?
+          LIMIT 1
+        `,
+        [normalizedProgramId]
+      );
+    }
+    if (!program) {
+      return null;
+    }
+    const resolvedProgramId = parsePositiveIntStrict(program.program_id || program.id);
+    const trackKey = normalizeRegistrationTrack(program.track_key, 'bachelor');
+    const resolvedStageCount = academicSetupHelpers.normalizeStageCountByTrack(trackKey, stageCount);
+
+    let resolvedPresetId = normalizedPresetId;
+    if (resolvedPresetId) {
+      await txRun(
+        client,
+        `
+          UPDATE program_presets
+          SET
+            name = ?,
+            is_active = ?,
+            updated_at = NOW()
+          WHERE id = ?
+        `,
+        [presetName, isActive ? 1 : 0, resolvedPresetId]
+      );
+    } else {
+      const insertedPreset = await txGet(
+        client,
+        `
+          INSERT INTO program_presets
+            (program_id, name, is_default, is_active, created_at, updated_at)
+          VALUES (?, ?, false, ?, NOW(), NOW())
+          RETURNING id
+        `,
+        [resolvedProgramId, presetName, isActive ? 1 : 0]
+      );
+      resolvedPresetId = parsePositiveIntStrict(insertedPreset && insertedPreset.id);
+    }
+    if (!resolvedPresetId) {
+      return null;
+    }
+
+    for (let stageNumber = 1; stageNumber <= resolvedStageCount; stageNumber += 1) {
+      await txRun(
+        client,
+        `
+          INSERT INTO program_preset_stages
+            (preset_id, stage_number, label, sort_order, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, true, NOW(), NOW())
+          ON CONFLICT (preset_id, stage_number)
+          DO UPDATE SET
+            label = EXCLUDED.label,
+            sort_order = EXCLUDED.sort_order,
+            is_active = true,
+            updated_at = NOW()
+        `,
+        [
+          resolvedPresetId,
+          stageNumber,
+          academicSetupHelpers.buildStageLabel(stageNumber, trackKey, 'uk'),
+          stageNumber,
+        ]
+      );
+    }
+
+    await txRun(
+      client,
+      `
+        UPDATE program_preset_stages
+        SET
+          is_active = CASE WHEN stage_number <= ? THEN true ELSE false END,
+          updated_at = NOW()
+        WHERE preset_id = ?
+      `,
+      [resolvedStageCount, resolvedPresetId]
+    );
+
+    if (isDefault) {
+      await txRun(
+        client,
+        `
+          UPDATE program_presets
+          SET
+            is_default = CASE WHEN id = ? THEN true ELSE false END,
+            updated_at = NOW()
+          WHERE program_id = ?
+        `,
+        [resolvedPresetId, resolvedProgramId]
+      );
+    }
+
+    return {
+      id: resolvedPresetId,
+      program_id: resolvedProgramId,
+    };
+  });
+}
+
+async function upsertProgramPresetSemester({
+  presetId,
+  stageNumber,
+  semesterNumber,
+  title,
+  startDate = '',
+  weeksCount = 16,
+  isActive = false,
+  isArchived = false,
+}) {
+  const normalizedPresetId = parsePositiveIntStrict(presetId);
+  const normalizedStageNumber = Math.max(1, Number(stageNumber || 1) || 1);
+  const normalizedSemesterNumber = Math.max(1, Number(semesterNumber || 1) || 1);
+  const normalizedTitle = sanitizeCompactText(title || '', 120);
+  if (!normalizedPresetId || !normalizedTitle) {
+    return null;
+  }
+  return withTransaction(async (client) => {
+    const stage = await txGet(
+      client,
+      `
+        SELECT id
+        FROM program_preset_stages
+        WHERE preset_id = ?
+          AND stage_number = ?
+        LIMIT 1
+      `,
+      [normalizedPresetId, normalizedStageNumber]
+    );
+    if (!stage || !stage.id) {
+      return null;
+    }
+    return txGet(
+      client,
+      `
+        INSERT INTO program_preset_semesters
+          (preset_stage_id, semester_number, title, start_date, weeks_count, is_active, is_archived, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ON CONFLICT (preset_stage_id, semester_number)
+        DO UPDATE SET
+          title = EXCLUDED.title,
+          start_date = EXCLUDED.start_date,
+          weeks_count = EXCLUDED.weeks_count,
+          is_active = EXCLUDED.is_active,
+          is_archived = EXCLUDED.is_archived,
+          sort_order = EXCLUDED.sort_order,
+          updated_at = NOW()
+        RETURNING id
+      `,
+      [
+        parsePositiveIntStrict(stage.id),
+        normalizedSemesterNumber,
+        normalizedTitle,
+        startDate && isValidDateString(startDate) ? startDate : null,
+        Math.max(1, Math.min(30, Math.round(Number(weeksCount || 16) || 16))),
+        isActive ? 1 : 0,
+        isArchived ? 1 : 0,
+        normalizedSemesterNumber,
+      ]
+    );
+  });
+}
+
+async function deleteProgramPresetSemester(semesterId) {
+  const normalizedSemesterId = parsePositiveIntStrict(semesterId);
+  if (!normalizedSemesterId) {
+    return null;
+  }
+  return db.get(
+    `
+      DELETE FROM program_preset_semesters
+      WHERE id = ?
+      RETURNING id
+    `,
+    [normalizedSemesterId]
+  );
+}
+
+async function upsertProgramPresetStageSubject({
+  presetId,
+  stageNumber,
+  subjectCatalogId,
+  label,
+  groupCount = 1,
+  defaultGroup = 1,
+  isRequired = true,
+  isShared = false,
+  semesterIds = [],
+}) {
+  const normalizedPresetId = parsePositiveIntStrict(presetId);
+  const normalizedStageNumber = Math.max(1, Number(stageNumber || 1) || 1);
+  const normalizedCatalogId = parsePositiveIntStrict(subjectCatalogId);
+  const normalizedLabel = sanitizeCompactText(label || '', 140);
+  const normalizedSemesterIds = Array.from(new Set(
+    (Array.isArray(semesterIds) ? semesterIds : [semesterIds])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (!normalizedPresetId || !normalizedCatalogId || !normalizedLabel) {
+    return null;
+  }
+  return withTransaction(async (client) => {
+    const stage = await txGet(
+      client,
+      `
+        SELECT id
+        FROM program_preset_stages
+        WHERE preset_id = ?
+          AND stage_number = ?
+        LIMIT 1
+      `,
+      [normalizedPresetId, normalizedStageNumber]
+    );
+    if (!stage || !stage.id) {
+      return null;
+    }
+    const safeGroupCount = Math.max(1, Math.min(3, Math.round(Number(groupCount || 1) || 1)));
+    const safeDefaultGroup = Math.max(1, Math.min(safeGroupCount, Math.round(Number(defaultGroup || 1) || 1)));
+    const row = await txGet(
+      client,
+      `
+        INSERT INTO program_preset_stage_subjects
+          (preset_stage_id, subject_catalog_id, label, group_count, default_group, is_required, is_shared, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ON CONFLICT (preset_stage_id, subject_catalog_id)
+        DO UPDATE SET
+          label = EXCLUDED.label,
+          group_count = EXCLUDED.group_count,
+          default_group = EXCLUDED.default_group,
+          is_required = EXCLUDED.is_required,
+          is_shared = EXCLUDED.is_shared,
+          sort_order = EXCLUDED.sort_order,
+          updated_at = NOW()
+        RETURNING id
+      `,
+      [
+        parsePositiveIntStrict(stage.id),
+        normalizedCatalogId,
+        normalizedLabel,
+        safeGroupCount,
+        safeDefaultGroup,
+        isRequired ? 1 : 0,
+        isShared ? 1 : 0,
+        normalizedCatalogId,
+      ]
+    );
+    const presetStageSubjectId = parsePositiveIntStrict(row && row.id);
+    if (!presetStageSubjectId) {
+      return null;
+    }
+    await txRun(
+      client,
+      `
+        DELETE FROM program_preset_stage_subject_semesters
+        WHERE preset_stage_subject_id = ?
+      `,
+      [presetStageSubjectId]
+    );
+    for (let index = 0; index < normalizedSemesterIds.length; index += 1) {
+      await txRun(
+        client,
+        `
+          INSERT INTO program_preset_stage_subject_semesters
+            (preset_stage_subject_id, preset_semester_id, sort_order, created_at)
+          VALUES (?, ?, ?, NOW())
+          ON CONFLICT (preset_stage_subject_id, preset_semester_id)
+          DO UPDATE SET
+            sort_order = EXCLUDED.sort_order
+        `,
+        [presetStageSubjectId, normalizedSemesterIds[index], index]
+      );
+    }
+    return {
+      id: presetStageSubjectId,
+    };
+  });
+}
+
+async function deleteProgramPresetStageSubject(presetStageSubjectId) {
+  const normalizedPresetStageSubjectId = parsePositiveIntStrict(presetStageSubjectId);
+  if (!normalizedPresetStageSubjectId) {
+    return null;
+  }
+  return db.get(
+    `
+      DELETE FROM program_preset_stage_subjects
+      WHERE id = ?
+      RETURNING id
+    `,
+    [normalizedPresetStageSubjectId]
+  );
+}
+
+async function ensureLegacyPresetSubjectInstance(client, context, presetSubject) {
+  const contextId = parsePositiveIntStrict(context && context.id);
+  const courseId = parsePositiveIntStrict(context && context.course_id);
+  const admissionId = parsePositiveIntStrict(context && context.admission_id);
+  const presetStageSubjectId = parsePositiveIntStrict(presetSubject && presetSubject.id);
+  const catalogId = parsePositiveIntStrict(presetSubject && presetSubject.subject_catalog_id);
+  if (!contextId || !courseId || !admissionId || !presetStageSubjectId || !catalogId) {
+    return null;
+  }
+
+  const existingOffering = await txGet(
+    client,
+    `
+      SELECT so.dedupe_key
+      FROM subject_offerings so
+      JOIN subject_offering_contexts soc ON soc.subject_offering_id = so.id
+      WHERE soc.study_context_id = ?
+        AND so.preset_stage_subject_id = ?
+      LIMIT 1
+    `,
+    [contextId, presetStageSubjectId]
+  );
+  let legacySubjectId = parseLegacySubjectIdFromOfferingDedupeKey(existingOffering && existingOffering.dedupe_key);
+  if (!legacySubjectId) {
+    const existingSubject = await txGet(
+      client,
+      `
+        SELECT s.id
+        FROM subjects s
+        JOIN subject_course_bindings scb ON scb.subject_id = s.id
+        WHERE scb.course_id = ?
+          AND s.catalog_id = ?
+        ORDER BY
+          CASE WHEN COALESCE(s.is_shared, false) = true THEN 0 ELSE 1 END,
+          s.id ASC
+        LIMIT 1
+      `,
+      [courseId, catalogId]
+    );
+    legacySubjectId = parsePositiveIntStrict(existingSubject && existingSubject.id);
+  }
+
+  const settings = buildSubjectSettingsDraft({
+    group_count: presetSubject.group_count,
+    default_group: presetSubject.default_group,
+    show_in_teamwork: 1,
+    visible: 1,
+    is_required: presetSubject.is_required ? 1 : 0,
+    is_general: 1,
+  });
+
+  if (!legacySubjectId) {
+    const created = await createSubjectInstanceWithBinding(client, {
+      name: presetSubject.label || presetSubject.catalog_name,
+      ownerCourseId: courseId,
+      catalogId,
+      isShared: presetSubject.is_shared ? 1 : 0,
+      settings,
+    });
+    legacySubjectId = parsePositiveIntStrict(created && created.id);
+  } else {
+    await txRun(
+      client,
+      `
+        UPDATE subjects
+        SET
+          name = ?,
+          group_count = ?,
+          default_group = ?,
+          show_in_teamwork = ?,
+          visible = ?,
+          is_required = ?,
+          is_general = ?,
+          catalog_id = ?,
+          is_shared = ?,
+          course_id = ?
+        WHERE id = ?
+      `,
+      [
+        normalizeSubjectDraftName(presetSubject.label || presetSubject.catalog_name, 140),
+        settings.group_count,
+        settings.default_group,
+        settings.show_in_teamwork,
+        settings.visible,
+        settings.is_required,
+        settings.is_general,
+        catalogId,
+        presetSubject.is_shared ? 1 : 0,
+        courseId,
+        legacySubjectId,
+      ]
+    );
+    await txRun(
+      client,
+      `
+        INSERT INTO subject_course_bindings (subject_id, course_id, created_at, updated_at)
+        VALUES (?, ?, NOW(), NOW())
+        ON CONFLICT (subject_id, course_id)
+        DO UPDATE SET updated_at = NOW()
+      `,
+      [legacySubjectId, courseId]
+    );
+  }
+
+  await txRun(
+    client,
+    `
+      INSERT INTO subject_visibility_by_admission
+        (admission_id, subject_id, is_visible, created_at, updated_at)
+      VALUES (?, ?, true, NOW(), NOW())
+      ON CONFLICT (admission_id, subject_id)
+      DO UPDATE SET
+        is_visible = true,
+        updated_at = NOW()
+    `,
+    [admissionId, legacySubjectId]
+  );
+
+  return {
+    subject_id: legacySubjectId,
+  };
+}
+
+async function buildAdmissionPresetPreview(admissionId, presetId = null) {
+  const normalizedAdmissionId = parsePositiveIntStrict(admissionId);
+  if (!normalizedAdmissionId) {
+    return null;
+  }
+  const rows = await db.all(
+    `
+      SELECT sc.id
+      FROM study_contexts sc
+      JOIN cohorts coh ON coh.id = sc.cohort_id
+      WHERE coh.legacy_admission_id = ?
+      ORDER BY sc.stage_number ASC, sc.id ASC
+    `,
+    [normalizedAdmissionId]
+  ).catch((err) => {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  });
+  const summary = {
+    context_count: 0,
+    create_semesters: 0,
+    update_semesters: 0,
+    archive_semesters: 0,
+    create_offerings: 0,
+    update_offerings: 0,
+    archive_offerings: 0,
+    teacher_assignments: 0,
+  };
+  for (const row of rows || []) {
+    const preview = await academicSetupHelpers.buildContextApplyPreview(db, {
+      studyContextId: parsePositiveIntStrict(row.id),
+      presetId,
+    });
+    if (!preview) continue;
+    summary.context_count += 1;
+    summary.create_semesters += Number(preview.create_semesters || 0);
+    summary.update_semesters += Number(preview.update_semesters || 0);
+    summary.archive_semesters += Number(preview.archive_semesters || 0);
+    summary.create_offerings += Number(preview.create_offerings || 0);
+    summary.update_offerings += Number(preview.update_offerings || 0);
+    summary.archive_offerings += Number(preview.archive_offerings || 0);
+    summary.teacher_assignments += Number(preview.teacher_assignments || 0);
+  }
+  return summary;
+}
+
+async function applyProgramPresetToStudyContext(studyContextId, options = {}) {
+  const normalizedStudyContextId = parsePositiveIntStrict(studyContextId);
+  if (!normalizedStudyContextId) {
+    return null;
+  }
+  const context = await getStudyContextById(normalizedStudyContextId);
+  if (!context || !context.course_id) {
+    return null;
+  }
+  const { selectedPreset: preset } = await resolveProgramPreset(context.program_id, options.presetId);
+  if (!preset) {
+    return null;
+  }
+  const presetStage = (preset.stages || []).find((stage) => Number(stage.stage_number || 0) === Number(context.stage || 0)) || null;
+  if (!presetStage) {
+    return {
+      context_id: normalizedStudyContextId,
+      preset_id: Number(preset.id || 0),
+      created_semesters: 0,
+      updated_semesters: 0,
+      archived_semesters: 0,
+      created_offerings: 0,
+      updated_offerings: 0,
+      archived_offerings: 0,
+      teacher_assignments: 0,
+    };
+  }
+
+  const desiredPresetSemesterIds = new Set((presetStage.semesters || []).map((item) => Number(item.id || 0)).filter(Boolean));
+  const desiredPresetSubjectIds = new Set((presetStage.subjects || []).map((item) => Number(item.id || 0)).filter(Boolean));
+  const result = {
+    context_id: normalizedStudyContextId,
+    preset_id: Number(preset.id || 0),
+    created_semesters: 0,
+    updated_semesters: 0,
+    archived_semesters: 0,
+    created_offerings: 0,
+    updated_offerings: 0,
+    archived_offerings: 0,
+    teacher_assignments: 0,
+  };
+
+  await withTransaction(async (client) => {
+    const currentSemesters = await txAll(
+      client,
+      `
+        SELECT id, semester_number, preset_semester_id
+        FROM study_context_semesters
+        WHERE study_context_id = ?
+      `,
+      [normalizedStudyContextId]
+    );
+    const contextSemestersByPresetId = new Map(
+      (currentSemesters || [])
+        .filter((row) => Number(row.preset_semester_id || 0) > 0)
+        .map((row) => [Number(row.preset_semester_id), row])
+    );
+    const contextSemestersByNumber = new Map(
+      (currentSemesters || []).map((row) => [Number(row.semester_number || 0), row])
+    );
+
+    for (const presetSemester of presetStage.semesters || []) {
+      const existing = contextSemestersByPresetId.get(Number(presetSemester.id || 0))
+        || contextSemestersByNumber.get(Number(presetSemester.semester_number || 0))
+        || null;
+      await txGet(
+        client,
+        `
+          INSERT INTO study_context_semesters
+            (study_context_id, semester_number, title, start_date, weeks_count, is_active, is_archived, preset_semester_id, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+          ON CONFLICT (study_context_id, semester_number)
+          DO UPDATE SET
+            title = EXCLUDED.title,
+            start_date = EXCLUDED.start_date,
+            weeks_count = EXCLUDED.weeks_count,
+            is_active = EXCLUDED.is_active,
+            is_archived = EXCLUDED.is_archived,
+            preset_semester_id = EXCLUDED.preset_semester_id,
+            updated_at = NOW()
+          RETURNING id
+        `,
+        [
+          normalizedStudyContextId,
+          Number(presetSemester.semester_number || 0),
+          sanitizeCompactText(presetSemester.title || `Semester ${presetSemester.semester_number}`, 120),
+          presetSemester.start_date || null,
+          Number(presetSemester.weeks_count || 0) || 16,
+          presetSemester.is_active ? 1 : 0,
+          presetSemester.is_archived ? 1 : 0,
+          Number(presetSemester.id || 0),
+        ]
+      );
+      if (existing) {
+        result.updated_semesters += 1;
+      } else {
+        result.created_semesters += 1;
+      }
+    }
+
+    const archivedSemesterRows = await txAll(
+      client,
+      `
+        UPDATE study_context_semesters
+        SET
+          is_archived = true,
+          is_active = false,
+          updated_at = NOW()
+        WHERE study_context_id = ?
+          AND preset_semester_id IS NOT NULL
+          AND NOT (preset_semester_id = ANY(?::int[]))
+        RETURNING id
+      `,
+      [normalizedStudyContextId, Array.from(desiredPresetSemesterIds.size ? desiredPresetSemesterIds : [0])]
+    );
+    result.archived_semesters = Array.isArray(archivedSemesterRows) ? archivedSemesterRows.length : 0;
+
+    const effectiveSemesters = await txAll(
+      client,
+      `
+        SELECT id, preset_semester_id, is_archived
+        FROM study_context_semesters
+        WHERE study_context_id = ?
+      `,
+      [normalizedStudyContextId]
+    );
+    const contextSemesterIdByPresetId = new Map();
+    const allLiveContextSemesterIds = [];
+    (effectiveSemesters || []).forEach((row) => {
+      const rowId = parsePositiveIntStrict(row.id);
+      if (!rowId) return;
+      if (!(row.is_archived === true || Number(row.is_archived) === 1)) {
+        allLiveContextSemesterIds.push(rowId);
+      }
+      const presetSemesterIdValue = parsePositiveIntStrict(row.preset_semester_id);
+      if (presetSemesterIdValue) {
+        contextSemesterIdByPresetId.set(presetSemesterIdValue, rowId);
+      }
+    });
+
+    for (const presetSubject of presetStage.subjects || []) {
+      const ensuredLegacy = await ensureLegacyPresetSubjectInstance(client, context, presetSubject);
+      const legacySubjectId = parsePositiveIntStrict(ensuredLegacy && ensuredLegacy.subject_id);
+      if (!legacySubjectId) continue;
+
+      const existingOffering = await txGet(
+        client,
+        `
+          SELECT so.id
+          FROM subject_offerings so
+          JOIN subject_offering_contexts soc ON soc.subject_offering_id = so.id
+          WHERE soc.study_context_id = ?
+            AND so.preset_stage_subject_id = ?
+          LIMIT 1
+        `,
+        [normalizedStudyContextId, parsePositiveIntStrict(presetSubject.id)]
+      );
+      const offeringRow = await txGet(
+        client,
+        `
+          INSERT INTO subject_offerings
+            (dedupe_key, subject_catalog_id, preset_stage_subject_id, title, is_shared, sort_order, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, true, NOW(), NOW())
+          ON CONFLICT (dedupe_key)
+          DO UPDATE SET
+            subject_catalog_id = EXCLUDED.subject_catalog_id,
+            preset_stage_subject_id = EXCLUDED.preset_stage_subject_id,
+            title = EXCLUDED.title,
+            is_shared = EXCLUDED.is_shared,
+            sort_order = EXCLUDED.sort_order,
+            is_active = true,
+            updated_at = NOW()
+          RETURNING id
+        `,
+        [
+          buildLegacySubjectOfferingDedupeKey(legacySubjectId),
+          parsePositiveIntStrict(presetSubject.subject_catalog_id),
+          parsePositiveIntStrict(presetSubject.id),
+          sanitizeCompactText(presetSubject.label || presetSubject.catalog_name, 140),
+          presetSubject.is_shared ? 1 : 0,
+          Number(presetSubject.sort_order || legacySubjectId),
+        ]
+      );
+      const offeringId = parsePositiveIntStrict(offeringRow && offeringRow.id);
+      if (!offeringId) continue;
+      if (existingOffering && existingOffering.id) {
+        result.updated_offerings += 1;
+      } else {
+        result.created_offerings += 1;
+      }
+
+      await txRun(
+        client,
+        `
+          INSERT INTO subject_offering_contexts
+            (subject_offering_id, study_context_id, is_primary, created_at, updated_at)
+          VALUES (?, ?, true, NOW(), NOW())
+          ON CONFLICT (subject_offering_id, study_context_id)
+          DO UPDATE SET
+            is_primary = true,
+            updated_at = NOW()
+        `,
+        [offeringId, normalizedStudyContextId]
+      );
+
+      const desiredSemesterIds = Array.isArray(presetSubject.semester_ids) && presetSubject.semester_ids.length
+        ? presetSubject.semester_ids
+          .map((value) => contextSemesterIdByPresetId.get(parsePositiveIntStrict(value)))
+          .filter((value) => Number.isInteger(value) && value > 0)
+        : allLiveContextSemesterIds;
+
+      await txRun(
+        client,
+        `
+          UPDATE subject_offering_semesters sos
+          SET
+            is_active = false,
+            updated_at = NOW()
+          FROM study_context_semesters scs
+          WHERE sos.study_context_semester_id = scs.id
+            AND sos.subject_offering_id = ?
+            AND scs.study_context_id = ?
+        `,
+        [offeringId, normalizedStudyContextId]
+      );
+      for (const semesterId of desiredSemesterIds) {
+        await txRun(
+          client,
+          `
+            INSERT INTO subject_offering_semesters
+              (subject_offering_id, study_context_semester_id, is_active, created_at, updated_at)
+            VALUES (?, ?, true, NOW(), NOW())
+            ON CONFLICT (subject_offering_id, study_context_semester_id)
+            DO UPDATE SET
+              is_active = true,
+              updated_at = NOW()
+          `,
+          [offeringId, semesterId]
+        );
+      }
+    }
+
+    const staleOfferingRows = await txAll(
+      client,
+      `
+        SELECT so.id, so.dedupe_key
+        FROM subject_offerings so
+        JOIN subject_offering_contexts soc ON soc.subject_offering_id = so.id
+        WHERE soc.study_context_id = ?
+          AND so.preset_stage_subject_id IS NOT NULL
+          AND NOT (so.preset_stage_subject_id = ANY(?::int[]))
+      `,
+      [normalizedStudyContextId, Array.from(desiredPresetSubjectIds.size ? desiredPresetSubjectIds : [0])]
+    );
+    result.archived_offerings = (staleOfferingRows || []).length;
+    for (const staleOffering of staleOfferingRows || []) {
+      const offeringId = parsePositiveIntStrict(staleOffering && staleOffering.id);
+      const legacySubjectId = parseLegacySubjectIdFromOfferingDedupeKey(staleOffering && staleOffering.dedupe_key);
+      if (!offeringId) continue;
+      await txRun(
+        client,
+        `
+          UPDATE subject_offering_semesters sos
+          SET
+            is_active = false,
+            updated_at = NOW()
+          FROM study_context_semesters scs
+          WHERE sos.study_context_semester_id = scs.id
+            AND sos.subject_offering_id = ?
+            AND scs.study_context_id = ?
+        `,
+        [offeringId, normalizedStudyContextId]
+      );
+      await txRun(
+        client,
+        `
+          UPDATE subject_offerings
+          SET
+            is_active = false,
+            updated_at = NOW()
+          WHERE id = ?
+        `,
+        [offeringId]
+      );
+      if (legacySubjectId) {
+        await txRun(
+          client,
+          `
+            INSERT INTO subject_visibility_by_admission
+              (admission_id, subject_id, is_visible, created_at, updated_at)
+            VALUES (?, ?, false, NOW(), NOW())
+            ON CONFLICT (admission_id, subject_id)
+            DO UPDATE SET
+              is_visible = false,
+              updated_at = NOW()
+          `,
+          [parsePositiveIntStrict(context.admission_id), legacySubjectId]
+        );
+      }
+    }
+  });
+
+  result.teacher_assignments = await applyTeacherAssignmentTemplatesForStudyContexts([normalizedStudyContextId]);
+  invalidateRegistrationPathwaysCache();
+  invalidateSubjectsCache(context.course_id);
+  return result;
+}
+
+async function applyProgramPresetToAdmission(admissionId, options = {}) {
+  const normalizedAdmissionId = parsePositiveIntStrict(admissionId);
+  if (!normalizedAdmissionId) {
+    return null;
+  }
+  await syncStudyContextsForAdmission(normalizedAdmissionId);
+  const contextRows = await db.all(
+    `
+      SELECT sc.id
+      FROM study_contexts sc
+      JOIN cohorts coh ON coh.id = sc.cohort_id
+      WHERE coh.legacy_admission_id = ?
+      ORDER BY sc.stage_number ASC, sc.id ASC
+    `,
+    [normalizedAdmissionId]
+  ).catch((err) => {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  });
+  const summary = {
+    context_count: 0,
+    created_semesters: 0,
+    updated_semesters: 0,
+    archived_semesters: 0,
+    created_offerings: 0,
+    updated_offerings: 0,
+    archived_offerings: 0,
+    teacher_assignments: 0,
+  };
+  for (const row of contextRows || []) {
+    const result = await applyProgramPresetToStudyContext(parsePositiveIntStrict(row.id), options);
+    if (!result) continue;
+    summary.context_count += 1;
+    summary.created_semesters += Number(result.created_semesters || 0);
+    summary.updated_semesters += Number(result.updated_semesters || 0);
+    summary.archived_semesters += Number(result.archived_semesters || 0);
+    summary.created_offerings += Number(result.created_offerings || 0);
+    summary.updated_offerings += Number(result.updated_offerings || 0);
+    summary.archived_offerings += Number(result.archived_offerings || 0);
+    summary.teacher_assignments += Number(result.teacher_assignments || 0);
+  }
+  return summary;
+}
+
+async function createAcademicIntakeYear(admissionYear, programIds = []) {
+  const normalizedYear = Number(admissionYear || 0);
+  const normalizedProgramIds = Array.from(new Set(
+    (Array.isArray(programIds) ? programIds : [programIds])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (!Number.isInteger(normalizedYear) || normalizedYear < 2000 || !normalizedProgramIds.length) {
+    return { admissionIds: [], created: 0, existing: 0, applied: 0 };
+  }
+  const programRows = await db.all(
+    `
+      SELECT id, name, track_key
+      FROM study_programs
+      WHERE id = ANY(?::int[])
+    `,
+    [normalizedProgramIds]
+  );
+  const programById = new Map((programRows || []).map((row) => [Number(row.id || 0), row]));
+  const createdAdmissions = [];
+  let created = 0;
+  let existing = 0;
+
+  await withTransaction(async (client) => {
+    for (const programId of normalizedProgramIds) {
+      const program = programById.get(programId);
+      if (!program) continue;
+      const existingAdmission = await txGet(
+        client,
+        `
+          SELECT id
+          FROM program_admissions
+          WHERE program_id = ?
+            AND admission_year = ?
+          LIMIT 1
+        `,
+        [programId, normalizedYear]
+      );
+      if (existingAdmission && existingAdmission.id) {
+        createdAdmissions.push({ admission_id: parsePositiveIntStrict(existingAdmission.id), program_id: programId, created: false });
+        existing += 1;
+        continue;
+      }
+      const inserted = await txGet(
+        client,
+        `
+          INSERT INTO program_admissions
+            (program_id, admission_year, label, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, true, NOW(), NOW())
+          RETURNING id
+        `,
+        [programId, normalizedYear, sanitizeCompactText(`${program.name || `Program ${programId}`} ${normalizedYear}`, 120)]
+      );
+      const admissionId = parsePositiveIntStrict(inserted && inserted.id);
+      if (!admissionId) continue;
+      createdAdmissions.push({ admission_id: admissionId, program_id: programId, created: true });
+      created += 1;
+    }
+  });
+
+  let applied = 0;
+  for (const item of createdAdmissions) {
+    const program = programById.get(Number(item.program_id || 0));
+    if (!program) continue;
+    if (item.created) {
+      await cloneAdmissionConfigurationFromLatest(item.program_id, item.admission_id);
+    }
+    await syncStudyContextsForAdmission(item.admission_id);
+    let defaultPreset = (await resolveProgramPreset(item.program_id)).selectedPreset;
+    if (!defaultPreset) {
+      await withTransaction(async (client) => {
+        await academicSetupHelpers.ensureDefaultPreset(client, {
+          programId: item.program_id,
+          programName: program.name,
+          trackKey: program.track_key,
+          presetName: `${sanitizeCompactText(program.name, 120)} default preset`,
+        });
+      });
+      defaultPreset = (await resolveProgramPreset(item.program_id)).selectedPreset;
+    }
+    const stageOneContexts = await db.all(
+      `
+        SELECT sc.id
+        FROM study_contexts sc
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        WHERE coh.legacy_admission_id = ?
+          AND sc.stage_number = 1
+      `,
+      [item.admission_id]
+    ).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return [];
+      }
+      throw err;
+    });
+    for (const row of stageOneContexts || []) {
+      const appliedResult = await applyProgramPresetToStudyContext(parsePositiveIntStrict(row.id), {
+        presetId: defaultPreset ? defaultPreset.id : null,
+      });
+      if (appliedResult) {
+        applied += 1;
+      }
+    }
+    await syncSubjectOfferingsForAdmission(item.admission_id);
+  }
+
+  return {
+    admissionIds: createdAdmissions.map((item) => item.admission_id).filter(Boolean),
+    created,
+    existing,
+    applied,
+  };
+}
+
+async function ensureNextStudyContextForPromotion(placement) {
+  if (!placement || !placement.admission_id) {
+    return null;
+  }
+  const nextStage = normalizeStudyContextStage(Number(placement.stage || 0) + 1, 1);
+  const campusKey = normalizeCourseCampus(placement.campus_key || 'kyiv');
+  const directMatch = await db.get(
+    `
+      SELECT sc.id
+      FROM study_contexts sc
+      JOIN cohorts coh ON coh.id = sc.cohort_id
+      WHERE coh.legacy_admission_id = ?
+        AND sc.stage_number = ?
+        AND sc.campus_key = ?
+      ORDER BY sc.id ASC
+      LIMIT 1
+    `,
+    [placement.admission_id, nextStage, campusKey]
+  ).catch((err) => {
+    if (isDbSchemaCompatibilityError(err)) {
+      return null;
+    }
+    throw err;
+  });
+  if (directMatch && directMatch.id) {
+    return parsePositiveIntStrict(directMatch.id);
+  }
+
+  const candidateCourses = (await getCoursesCached())
+    .filter((course) => courseMatchesRegistrationTrack(course, placement.track_key))
+    .filter((course) => normalizeCourseCampus(course.location || 'kyiv') === campusKey)
+    .filter((course) => normalizeStudyContextStage(inferLegacyCourseOrdinal(course.name), 0) === nextStage);
+  if (candidateCourses.length !== 1) {
+    return null;
+  }
+  const ensuredContextId = await ensureStudyContextForLegacyPlacement({
+    courseId: candidateCourses[0].id,
+    admissionId: placement.admission_id,
+    programId: placement.program_id,
+    trackKey: placement.track_key,
+    preferredCampus: campusKey,
+    preferredStage: nextStage,
+  });
+  if (ensuredContextId) {
+    await applyProgramPresetToStudyContext(ensuredContextId);
+  }
+  return ensuredContextId;
+}
+
 function normalizeRegistrationTrack(rawTrack, fallback = 'bachelor') {
   return pathwayHelpers.normalizeRegistrationTrack(rawTrack, fallback);
 }
@@ -6077,7 +7126,7 @@ function logActivity(dbRef, req, actionType, targetType, targetId, details, cour
       targetId,
       details ? JSON.stringify(details) : null,
       createdAt,
-      courseId,
+      ...redirectState,
       semesterId,
     ]
   );
@@ -8010,6 +9059,10 @@ function buildAdminPathwaysUrl(params = {}) {
   if (admissionId) query.set('admission_id', String(admissionId));
   const studyContextId = parsePositiveIntStrict(params.studyContextId);
   if (studyContextId) query.set('study_context_id', String(studyContextId));
+  const presetId = parsePositiveIntStrict(params.presetId);
+  if (presetId) query.set('preset_id', String(presetId));
+  const moderationStatus = String(params.moderationStatus || '').trim().toLowerCase();
+  if (moderationStatus && moderationStatus !== 'open') query.set('moderation_status', moderationStatus);
   if (params.error) query.set('error', String(params.error));
   if (params.ok) query.set('ok', String(params.ok));
   const queryString = query.toString();
@@ -30103,6 +31156,59 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       }
     }
 
+    const requestedPresetId = parsePositiveIntStrict(req.query.preset_id);
+    let programPresets = [];
+    let selectedProgramPreset = null;
+    let selectedProgramPresetId = 0;
+    let selectedContextPresetPreview = null;
+    let selectedAdmissionPresetPreview = null;
+    if (selectedProgramId) {
+      const presetState = await resolveProgramPreset(selectedProgramId, requestedPresetId);
+      programPresets = presetState.presets || [];
+      selectedProgramPreset = presetState.selectedPreset || null;
+      selectedProgramPresetId = Number(presetState.selectedPresetId || 0);
+      if (selectedStudyContextId && selectedProgramPresetId) {
+        selectedContextPresetPreview = await academicSetupHelpers.buildContextApplyPreview(db, {
+          studyContextId: selectedStudyContextId,
+          presetId: selectedProgramPresetId,
+        }).catch((err) => {
+          if (isDbSchemaCompatibilityError(err)) {
+            return null;
+          }
+          throw err;
+        });
+      }
+      if (selectedAdmissionId && selectedProgramPresetId) {
+        selectedAdmissionPresetPreview = await buildAdmissionPresetPreview(selectedAdmissionId, selectedProgramPresetId);
+      }
+    }
+
+    const presetSubjectCatalogOptions = await db.all(
+      `
+        SELECT id, name
+        FROM subject_catalog
+        ORDER BY name ASC
+      `
+    ).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return [];
+      }
+      throw err;
+    });
+
+    const moderationStatus = ['open', 'reviewing', 'resolved', 'ignored'].includes(String(req.query.moderation_status || '').trim().toLowerCase())
+      ? String(req.query.moderation_status || '').trim().toLowerCase()
+      : 'open';
+    const moderationQueue = await academicSetupHelpers.listAcademicModerationItems(db, {
+      status: moderationStatus,
+      limit: 40,
+    }).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return [];
+      }
+      throw err;
+    });
+
     const selectedCourse = courseById.get(Number(selectedCourseId || 0)) || null;
     const selectedCourseLabel = selectedCourse
       ? `${sanitizeCompactText(selectedCourse.name || '', 120)} / ${formatPathwaysCampusLabel(selectedCourse.location)}${isTeacherCourseRecord(selectedCourse) ? ` / ${pathwaysText.teacherBadge}` : ''}`
@@ -30587,6 +31693,14 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       selectedStudyContextId,
       selectedStudyContext,
       selectedStudyContextSemesters,
+      programPresets,
+      selectedProgramPreset,
+      selectedProgramPresetId,
+      selectedContextPresetPreview,
+      selectedAdmissionPresetPreview,
+      presetSubjectCatalogOptions,
+      moderationStatus,
+      moderationQueue,
       selectedCohortHealth,
       registrationExperienceSummary: selectedRegistrationExperience,
       cohortAlerts,
@@ -30604,7 +31718,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
 
 function getPathwaysRouteMessages(req) {
   const isUk = getPreferredLang(req) === 'uk';
-  return isUk ? {
+  const messages = isUk ? {
     databaseError: 'Помилка бази даних',
     programNameRequired: 'Назва програми обов\'язкова',
     programAdded: 'Програму додано',
@@ -30725,6 +31839,47 @@ function getPathwaysRouteMessages(req) {
     studyContextSemesterUpdated: 'Context semester updated',
     studyContextSemesterDeleted: 'Context semester deleted',
   };
+  return Object.assign(messages, isUk ? {
+    presetNameRequired: 'Назва шаблону обов’язкова',
+    invalidPreset: 'Некоректний шаблон програми',
+    invalidPresetStage: 'Некоректний stage шаблону',
+    presetSaved: 'Шаблон програми збережено',
+    presetSemesterSaved: 'Семестр шаблону збережено',
+    presetSemesterDeleted: 'Семестр шаблону видалено',
+    invalidSubjectCatalog: 'Некоректний предмет із каталогу',
+    presetSubjectSaved: 'Предмет шаблону збережено',
+    presetSubjectDeleted: 'Предмет шаблону видалено',
+    selectAtLeastOneIntakeProgram: 'Оберіть хоча б одну програму для intake',
+    intakeCreated: (created, existing, applied, year) => `Intake ${year}: створено ${created}, уже існувало ${existing}, застосовано ${applied}`,
+    presetAppliedToContext: (label) => `Шаблон застосовано до ${label}`,
+    presetAppliedToAdmission: (count) => count === 1
+      ? 'Шаблон застосовано до 1 context'
+      : `Шаблон застосовано до ${count} contexts`,
+    moderationItemNotFound: 'Елемент moderation queue не знайдено',
+    moderationActionInvalid: 'Некоректна дія для moderation queue',
+    moderationAssignContextRequired: 'Для assign context потрібно обрати study context',
+    moderationResolved: 'Елемент moderation queue оновлено',
+    promotedUsers: (promoted, skipped) => `Підвищено ${promoted} користувачів, пропущено ${skipped}`,
+  } : {
+    presetNameRequired: 'Preset name is required',
+    invalidPreset: 'Invalid program preset',
+    invalidPresetStage: 'Invalid preset stage',
+    presetSaved: 'Program preset saved',
+    presetSemesterSaved: 'Preset semester saved',
+    presetSemesterDeleted: 'Preset semester deleted',
+    invalidSubjectCatalog: 'Invalid catalog subject',
+    presetSubjectSaved: 'Preset subject saved',
+    presetSubjectDeleted: 'Preset subject deleted',
+    selectAtLeastOneIntakeProgram: 'Select at least one program for intake',
+    intakeCreated: (created, existing, applied, year) => `Intake ${year}: created ${created}, existing ${existing}, applied ${applied}`,
+    presetAppliedToContext: (label) => `Preset applied to ${label}`,
+    presetAppliedToAdmission: (count) => `Preset applied to ${count} context${count === 1 ? '' : 's'}`,
+    moderationItemNotFound: 'Moderation queue item not found',
+    moderationActionInvalid: 'Invalid moderation action',
+    moderationAssignContextRequired: 'Assign context action requires a study context',
+    moderationResolved: 'Moderation queue item updated',
+    promotedUsers: (promoted, skipped) => `Promoted ${promoted} users, skipped ${skipped}`,
+  });
 }
 
 async function getAdmissionPathwayContext(admissionId) {
@@ -30778,6 +31933,454 @@ async function getAdmissionCourseScope(admissionId, trackKey) {
   };
 }
 
+function getPathwaysRedirectState(req, overrides = {}) {
+  const moderationStatusValue = String(
+    (req.body && req.body.moderation_status)
+    || (req.query && req.query.moderation_status)
+    || 'open'
+  ).trim().toLowerCase();
+  return Object.assign({
+    courseId: parsePositiveIntStrict(
+      (req.body && req.body.course_id) || (req.query && req.query.course),
+      getAdminCourse(req)
+    ),
+    track: normalizePathwayTrackFilter(
+      (req.body && req.body.track) || (req.query && req.query.track),
+      'all'
+    ),
+    programId: parsePositiveIntStrict((req.body && req.body.program_id) || (req.query && req.query.program_id)),
+    admissionId: parsePositiveIntStrict((req.body && req.body.admission_id) || (req.query && req.query.admission_id)),
+    studyContextId: parsePositiveIntStrict((req.body && req.body.study_context_id) || (req.query && req.query.study_context_id)),
+    presetId: parsePositiveIntStrict((req.body && req.body.preset_id) || (req.query && req.query.preset_id)),
+    moderationStatus: ['open', 'reviewing', 'resolved', 'ignored'].includes(moderationStatusValue) ? moderationStatusValue : 'open',
+  }, overrides || {});
+}
+
+app.post('/admin/pathways/presets/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const redirectState = getPathwaysRedirectState(req);
+  const programId = parsePositiveIntStrict(req.body.program_id);
+  const presetId = parsePositiveIntStrict(req.body.preset_id);
+  const presetName = sanitizeCompactText(req.body.name, 140);
+  const stageCountRaw = Number(req.body.stage_count || 0);
+  const stageCount = Number.isInteger(stageCountRaw) && stageCountRaw > 0 ? stageCountRaw : null;
+
+  if (!programId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.selectProgram,
+    }));
+  }
+  if (!presetName) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      programId,
+      error: msg.presetNameRequired,
+    }));
+  }
+
+  try {
+    const savedPreset = await ensureProgramPresetRecord({
+      presetId,
+      programId,
+      name: presetName,
+      isDefault: parseBooleanFlag(req.body.is_default, false),
+      isActive: parseBooleanFlag(req.body.is_active, true),
+      stageCount,
+    });
+    if (!savedPreset || !savedPreset.id) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        programId,
+        error: msg.invalidPreset,
+      }));
+    }
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      programId: Number(savedPreset.program_id || programId),
+      presetId: Number(savedPreset.id || 0),
+      ok: msg.presetSaved,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.presets.save');
+  }
+});
+
+app.post('/admin/pathways/presets/:presetId/stages/:stageNumber/semesters/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const redirectState = getPathwaysRedirectState(req, {
+    presetId: parsePositiveIntStrict(req.params.presetId),
+  });
+  const presetId = parsePositiveIntStrict(req.params.presetId);
+  const stageNumber = Math.max(1, Number(req.params.stageNumber || 1) || 1);
+  const semesterNumber = Math.max(1, Number(req.body.semester_number || 0) || 0);
+  const title = sanitizeCompactText(req.body.title, 120);
+  const weeksCount = Number(req.body.weeks_count || 0);
+  const startDate = String(req.body.start_date || '').trim();
+
+  if (!presetId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidPreset,
+    }));
+  }
+  if (!Number.isInteger(stageNumber) || stageNumber < 1) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidPresetStage,
+    }));
+  }
+  if (!title) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.studyContextSemesterTitleRequired,
+    }));
+  }
+  if (!Number.isInteger(semesterNumber) || semesterNumber < 1) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidStudyContextSemesterNumber,
+    }));
+  }
+  if (!Number.isInteger(Math.round(weeksCount)) || Number(weeksCount) < 1 || Number(weeksCount) > 30) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidStudyContextSemesterWeeks,
+    }));
+  }
+  if (startDate && !isValidDateString(startDate)) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidStudyContextSemesterDate,
+    }));
+  }
+
+  try {
+    const row = await upsertProgramPresetSemester({
+      presetId,
+      stageNumber,
+      semesterNumber,
+      title,
+      startDate,
+      weeksCount,
+      isActive: parseBooleanFlag(req.body.is_active, false),
+      isArchived: parseBooleanFlag(req.body.is_archived, false),
+    });
+    if (!row || !row.id) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: msg.invalidPreset,
+      }));
+    }
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      ok: msg.presetSemesterSaved,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.presets.semesters.save');
+  }
+});
+
+app.post('/admin/pathways/presets/semesters/:semesterId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const redirectState = getPathwaysRedirectState(req);
+  const semesterId = parsePositiveIntStrict(req.params.semesterId);
+
+  if (!semesterId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidStudyContextSemester,
+    }));
+  }
+
+  try {
+    const deleted = await deleteProgramPresetSemester(semesterId);
+    if (!deleted || !deleted.id) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: msg.invalidStudyContextSemester,
+      }));
+    }
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      ok: msg.presetSemesterDeleted,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.presets.semesters.delete');
+  }
+});
+
+app.post('/admin/pathways/presets/:presetId/stages/:stageNumber/subjects/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const redirectState = getPathwaysRedirectState(req, {
+    presetId: parsePositiveIntStrict(req.params.presetId),
+  });
+  const presetId = parsePositiveIntStrict(req.params.presetId);
+  const stageNumber = Math.max(1, Number(req.params.stageNumber || 1) || 1);
+  const subjectCatalogId = parsePositiveIntStrict(req.body.subject_catalog_id);
+  const subjectLabel = sanitizeCompactText(req.body.label, 140);
+  const rawSemesterIds = Array.isArray(req.body.semester_ids) ? req.body.semester_ids : (req.body.semester_ids ? [req.body.semester_ids] : []);
+  const groupCount = Math.max(1, Math.min(3, Math.round(Number(req.body.group_count || 1) || 1)));
+  const defaultGroup = Math.max(1, Math.min(groupCount, Math.round(Number(req.body.default_group || 1) || 1)));
+
+  if (!presetId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidPreset,
+    }));
+  }
+  if (!Number.isInteger(stageNumber) || stageNumber < 1) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidPresetStage,
+    }));
+  }
+  if (!subjectCatalogId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidSubjectCatalog,
+    }));
+  }
+  if (!subjectLabel) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.subjectCatalogNameRequired,
+    }));
+  }
+
+  try {
+    const row = await upsertProgramPresetStageSubject({
+      presetId,
+      stageNumber,
+      subjectCatalogId,
+      label: subjectLabel,
+      groupCount,
+      defaultGroup,
+      isRequired: parseBooleanFlag(req.body.is_required, true),
+      isShared: parseBooleanFlag(req.body.is_shared, false),
+      semesterIds: rawSemesterIds,
+    });
+    if (!row || !row.id) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: msg.invalidPreset,
+      }));
+    }
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      ok: msg.presetSubjectSaved,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.presets.subjects.save');
+  }
+});
+
+app.post('/admin/pathways/presets/subjects/:presetStageSubjectId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const redirectState = getPathwaysRedirectState(req);
+  const presetStageSubjectId = parsePositiveIntStrict(req.params.presetStageSubjectId);
+
+  if (!presetStageSubjectId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidSubjectCatalog,
+    }));
+  }
+
+  try {
+    const deleted = await deleteProgramPresetStageSubject(presetStageSubjectId);
+    if (!deleted || !deleted.id) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: msg.invalidSubjectCatalog,
+      }));
+    }
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      ok: msg.presetSubjectDeleted,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.presets.subjects.delete');
+  }
+});
+
+app.post('/admin/pathways/intake/create', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const redirectState = getPathwaysRedirectState(req);
+  const admissionYearRaw = Number(req.body.admission_year || 0);
+  const admissionYear = Number.isFinite(admissionYearRaw) ? Math.max(2000, Math.min(2100, Math.round(admissionYearRaw))) : 0;
+  const rawProgramIds = Array.isArray(req.body.program_ids) ? req.body.program_ids : (req.body.program_ids ? [req.body.program_ids] : []);
+  const fallbackProgramId = parsePositiveIntStrict(req.body.program_id);
+  const programIds = Array.from(new Set(
+    (rawProgramIds.length ? rawProgramIds : [fallbackProgramId])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+
+  if (!admissionYear) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.admissionYearRequired,
+    }));
+  }
+  if (!programIds.length) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.selectAtLeastOneIntakeProgram,
+    }));
+  }
+
+  try {
+    const intakeResult = await createAcademicIntakeYear(admissionYear, programIds);
+    const focusAdmissionId = parsePositiveIntStrict(intakeResult && intakeResult.admissionIds && intakeResult.admissionIds[0]);
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      programId: programIds.length === 1 ? programIds[0] : redirectState.programId,
+      admissionId: focusAdmissionId || redirectState.admissionId,
+      ok: msg.intakeCreated(
+        Number(intakeResult && intakeResult.created || 0),
+        Number(intakeResult && intakeResult.existing || 0),
+        Number(intakeResult && intakeResult.applied || 0),
+        admissionYear
+      ),
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.intake.create');
+  }
+});
+
+app.post('/admin/pathways/contexts/:id/apply-preset', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const contextId = parsePositiveIntStrict(req.params.id);
+  const redirectState = getPathwaysRedirectState(req, {
+    studyContextId: contextId,
+  });
+  if (!contextId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidStudyContext,
+    }));
+  }
+
+  try {
+    const context = await getStudyContextById(contextId);
+    if (!context) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: msg.invalidStudyContext,
+      }));
+    }
+    const result = await applyProgramPresetToStudyContext(contextId, {
+      presetId: redirectState.presetId || null,
+    });
+    if (!result) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: msg.invalidPreset,
+      }));
+    }
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      programId: Number(context.program_id || redirectState.programId || 0),
+      admissionId: Number(context.admission_id || redirectState.admissionId || 0),
+      ok: msg.presetAppliedToContext(sanitizeCompactText(context.label || `Context ${contextId}`, 140)),
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.context.applyPreset');
+  }
+});
+
+app.post('/admin/pathways/admissions/:id/apply-preset', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const admissionId = parsePositiveIntStrict(req.params.id);
+  const redirectState = getPathwaysRedirectState(req, {
+    admissionId,
+  });
+  if (!admissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidAdmissionYear,
+    }));
+  }
+
+  try {
+    const admission = await getAdmissionPathwayContext(admissionId);
+    if (!admission) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: msg.admissionNotFound,
+      }));
+    }
+    const result = await applyProgramPresetToAdmission(admissionId, {
+      presetId: redirectState.presetId || null,
+    });
+    if (!result) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: msg.invalidPreset,
+      }));
+    }
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      programId: Number(admission.program_id || redirectState.programId || 0),
+      ok: msg.presetAppliedToAdmission(Number(result.context_count || 0)),
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.admission.applyPreset');
+  }
+});
+
+app.post('/admin/pathways/moderation/:id/resolve', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const queueId = parsePositiveIntStrict(req.params.id);
+  const redirectState = getPathwaysRedirectState(req);
+  const action = String(req.body.action || '').trim().toLowerCase();
+  const helperAction = action === 'ignore' ? 'ignored' : 'resolved';
+  const assignedStudyContextId = parsePositiveIntStrict(req.body.study_context_id);
+
+  if (!queueId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.moderationItemNotFound,
+    }));
+  }
+  if (!['assign_context', 'ignore', 'mark_resolved'].includes(action)) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.moderationActionInvalid,
+    }));
+  }
+  if (action === 'assign_context' && !assignedStudyContextId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.moderationAssignContextRequired,
+    }));
+  }
+
+  try {
+    const result = await academicSetupHelpers.resolveAcademicModerationItem({
+      db,
+      queueId,
+      action: helperAction,
+      resolvedBy: req.session && req.session.user ? parsePositiveIntStrict(req.session.user.id) : null,
+      assignedStudyContextId: action === 'assign_context' ? assignedStudyContextId : null,
+    });
+    if (!result) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: msg.moderationItemNotFound,
+      }));
+    }
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      studyContextId: action === 'assign_context' ? assignedStudyContextId : redirectState.studyContextId,
+      ok: msg.moderationResolved,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.moderation.resolve');
+  }
+});
+
 app.post('/admin/pathways/contexts/:id/semesters/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);
   const contextId = parsePositiveIntStrict(req.params.id);
@@ -30797,7 +32400,6 @@ app.post('/admin/pathways/contexts/:id/semesters/add', requirePathwaysSectionAcc
       courseId,
       track: trackFilter,
       programId,
-      admissionId,
       studyContextId,
       error: msg.invalidStudyContext,
     }));
@@ -31760,8 +33362,7 @@ app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, wr
 
 app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);
-  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
-  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const redirectState = getPathwaysRedirectState(req);
   const programId = parsePositiveIntStrict(req.body.program_id);
   const focusProgramId = parsePositiveIntStrict(req.body.focus_program_id);
   const focusAdmissionId = parsePositiveIntStrict(req.body.focus_admission_id);
@@ -31771,8 +33372,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
 
   if (!programId) {
     return res.redirect(buildAdminPathwaysUrl({
-      courseId,
-      track: trackFilter,
+      ...redirectState,
       programId: focusProgramId,
       admissionId: focusAdmissionId,
       error: msg.selectProgram,
@@ -31780,8 +33380,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
   }
   if (!admissionYear) {
     return res.redirect(buildAdminPathwaysUrl({
-      courseId,
-      track: trackFilter,
+      ...redirectState,
       programId,
       admissionId: focusProgramId ? focusAdmissionId : null,
       error: msg.admissionYearRequired,
@@ -31789,34 +33388,42 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
   }
 
   try {
-    const inserted = await db.get(
-      `
-        INSERT INTO program_admissions
-          (program_id, admission_year, label, is_active, created_at, updated_at)
-        VALUES (?, ?, ?, true, NOW(), NOW())
-        RETURNING id
-      `,
-      [programId, admissionYear, label || null]
-    );
-    const admissionId = parsePositiveIntStrict(inserted && inserted.id);
+    const intakeResult = await createAcademicIntakeYear(admissionYear, [programId]);
+    const admissionId = parsePositiveIntStrict(intakeResult && intakeResult.admissionIds && intakeResult.admissionIds[0]);
     if (admissionId) {
-      await cloneAdmissionConfigurationFromLatest(programId, admissionId);
-      await syncStudyContextsForAdmission(admissionId);
-      await syncSubjectOfferingsForAdmission(admissionId);
+      if (label) {
+        await db.run(
+          `
+            UPDATE program_admissions
+            SET label = ?, updated_at = NOW()
+            WHERE id = ?
+          `,
+          [label, admissionId]
+        );
+      }
+      invalidateRegistrationPathwaysCache();
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        programId,
+        admissionId,
+        ok: msg.intakeCreated(
+          Number(intakeResult && intakeResult.created || 0),
+          Number(intakeResult && intakeResult.existing || 0),
+          Number(intakeResult && intakeResult.applied || 0),
+          admissionYear
+        ),
+      }));
     }
-    invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
-      courseId,
-      track: trackFilter,
+      ...redirectState,
       programId,
-      admissionId,
-      ok: msg.admissionAdded,
+      admissionId: focusProgramId === programId ? focusAdmissionId : null,
+      error: msg.databaseError,
     }));
   } catch (err) {
     if (err && err.code === '23505') {
       return res.redirect(buildAdminPathwaysUrl({
-        courseId,
-        track: trackFilter,
+        ...redirectState,
         programId,
         admissionId: focusProgramId === programId ? focusAdmissionId : null,
         error: msg.admissionExistsForProgram,
@@ -31922,10 +33529,7 @@ app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAc
     const admissionRow = await getAdmissionPathwayContext(admissionId);
     if (!admissionRow) {
       return res.redirect(buildAdminPathwaysUrl({
-        courseId,
-        track: trackFilter,
-        programId,
-        admissionId,
+        ...redirectState,
         error: msg.admissionNotFound,
       }));
     }
@@ -32121,10 +33725,7 @@ app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSec
     );
     if (!admissionRow) {
       return res.redirect(buildAdminPathwaysUrl({
-        courseId,
-        track: trackFilter,
-        programId,
-        admissionId,
+        ...redirectState,
         error: msg.admissionNotFound,
       }));
     }
@@ -32258,10 +33859,7 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
     );
     if (!admissionRow) {
       return res.redirect(buildAdminPathwaysUrl({
-        courseId,
-        track: trackFilter,
-        programId,
-        admissionId,
+        ...redirectState,
         error: msg.admissionNotFound,
       }));
     }
@@ -32396,15 +33994,13 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
 app.post('/admin/pathways/admissions/:id/promote', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);
   const admissionId = parsePositiveIntStrict(req.params.id);
-  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
-  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
-  const programId = parsePositiveIntStrict(req.body.program_id);
+  const redirectState = getPathwaysRedirectState(req, {
+    admissionId,
+  });
 
   if (!admissionId) {
     return res.redirect(buildAdminPathwaysUrl({
-      courseId,
-      track: trackFilter,
-      programId,
+      ...redirectState,
       error: msg.invalidAdmissionYear,
     }));
   }
@@ -32425,10 +34021,7 @@ app.post('/admin/pathways/admissions/:id/promote', requirePathwaysSectionAccess,
     );
     if (!admissionRow) {
       return res.redirect(buildAdminPathwaysUrl({
-        courseId,
-        track: trackFilter,
-        programId,
-        admissionId,
+        ...redirectState,
         error: msg.admissionNotFound,
       }));
     }
@@ -32451,35 +34044,13 @@ app.post('/admin/pathways/admissions/:id/promote', requirePathwaysSectionAccess,
     const cohortId = parsePositiveIntStrict(cohortRow && cohortRow.id);
     if (!cohortId) {
       return res.redirect(buildAdminPathwaysUrl({
-        courseId,
-        track: trackFilter,
+        ...redirectState,
         programId: Number(admissionRow.program_id || 0),
-        admissionId,
         error: getPreferredLang(req) === 'uk'
           ? 'Для цієї когорти ще не створено study contexts'
           : 'No study contexts exist for this cohort yet',
       }));
     }
-
-    const contextRows = await db.all(
-      `
-        SELECT id, stage_number AS stage, campus_key
-        FROM study_contexts
-        WHERE cohort_id = ?
-          AND is_active = true
-        ORDER BY stage_number ASC, id ASC
-      `,
-      [cohortId]
-    );
-    const nextContextByKey = new Map();
-    (contextRows || []).forEach((row) => {
-      const stage = normalizeStudyContextStage(row.stage, 1);
-      const nextKey = `${stage - 1}|${normalizeCourseCampus(row.campus_key || 'kyiv')}`;
-      if (stage > 1 && !nextContextByKey.has(nextKey)) {
-        nextContextByKey.set(nextKey, Number(row.id || 0));
-      }
-    });
-
     const users = await db.all(
       `
         SELECT
@@ -32508,9 +34079,7 @@ app.post('/admin/pathways/admissions/:id/promote', requirePathwaysSectionAccess,
         skippedCount += 1;
         continue;
       }
-      const nextContextId = nextContextByKey.get(
-        `${normalizeStudyContextStage(placement.stage, 1)}|${normalizeCourseCampus(placement.campus_key || 'kyiv')}`
-      );
+      const nextContextId = await ensureNextStudyContextForPromotion(placement);
       if (!nextContextId) {
         skippedCount += 1;
         continue;
@@ -32527,8 +34096,7 @@ app.post('/admin/pathways/admissions/:id/promote', requirePathwaysSectionAccess,
     });
     broadcast('users_updated');
     return res.redirect(buildAdminPathwaysUrl({
-      courseId,
-      track: trackFilter,
+      ...redirectState,
       programId: Number(admissionRow.program_id || 0),
       admissionId,
       ok: getPreferredLang(req) === 'uk'

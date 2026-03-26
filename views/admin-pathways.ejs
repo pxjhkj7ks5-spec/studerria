@@ -12,6 +12,22 @@
     : (studyContextList.find((item) => Number(item.id) === requestedStudyContextValue) || null);
   const selectedStudyContextValue = Number((selectedStudyContextItem && selectedStudyContextItem.id) || requestedStudyContextValue || 0);
   const selectedStudyContextSemestersList = Array.isArray(selectedStudyContextSemesters) ? selectedStudyContextSemesters : [];
+  const programPresetList = Array.isArray(programPresets) ? programPresets : [];
+  const requestedProgramPresetValue = Number(selectedProgramPresetId || 0);
+  const selectedProgramPresetItem = (selectedProgramPreset && Number(selectedProgramPreset.id || 0) > 0)
+    ? selectedProgramPreset
+    : (programPresetList.find((item) => Number(item.id) === requestedProgramPresetValue) || null);
+  const selectedProgramPresetValue = Number((selectedProgramPresetItem && selectedProgramPresetItem.id) || requestedProgramPresetValue || 0);
+  const selectedProgramPresetStages = Array.isArray(selectedProgramPresetItem && selectedProgramPresetItem.stages)
+    ? selectedProgramPresetItem.stages
+    : [];
+  const presetSubjectCatalogList = Array.isArray(presetSubjectCatalogOptions) ? presetSubjectCatalogOptions : [];
+  const selectedContextPresetPreviewValue = selectedContextPresetPreview || null;
+  const selectedAdmissionPresetPreviewValue = selectedAdmissionPresetPreview || null;
+  const moderationQueueList = Array.isArray(moderationQueue) ? moderationQueue : [];
+  const moderationStatusValue = ['open', 'reviewing', 'resolved', 'ignored'].includes(String(moderationStatus || '').trim().toLowerCase())
+    ? String(moderationStatus || '').trim().toLowerCase()
+    : 'open';
   const copyAdmissions = Array.isArray(admissionCopyOptions) ? admissionCopyOptions : [];
   const subjectCatalogList = Array.isArray(subjectCatalogEntries) ? subjectCatalogEntries : [];
   const campusBindingList = Array.isArray(registrationCampusBindings) ? registrationCampusBindings : [];
@@ -537,6 +553,99 @@
     teacherSearch: 'teacher',
     regularSearch: 'regular',
   };
+  const setupUi = isUk ? {
+    navIntake: 'Intake',
+    navPresets: 'Шаблони',
+    navModeration: 'Модерація',
+    intakeTitle: 'Новий intake',
+    intakeSubtitle: 'Створіть admission year одразу для кількох програм. Для нових cohort система автоматично створить stage 1 contexts і застосує default preset.',
+    intakePrograms: 'Програми для intake',
+    createIntake: 'Створити intake',
+    presetsTitle: 'Program presets',
+    presetsSubtitle: 'Шаблони описують stages, semesters і preset subjects. Вони не оновлюють live cohort автоматично, а застосовуються через explicit apply/reapply.',
+    presetSelection: 'Фокус шаблону',
+    presetEmpty: 'У цієї програми ще немає preset. Створіть перший шаблон нижче.',
+    presetName: 'Назва шаблону',
+    defaultPreset: 'Default preset',
+    stageCount: 'Кількість stage',
+    selectPreset: 'Відкрити шаблон',
+    presetStages: 'Preset stages',
+    presetSemesters: 'Preset semesters',
+    presetSubjects: 'Preset subjects',
+    applyPresetContext: 'Apply to context',
+    applyPresetAdmission: 'Apply to cohort',
+    previewTitle: 'Preview apply/reapply',
+    previewCreate: 'Створить',
+    previewUpdate: 'Оновить',
+    previewArchive: 'Архівує',
+    previewTeachers: 'Teacher carry-forward',
+    noPresetSelected: 'Оберіть або створіть preset, щоб побачити stages, preview і apply actions.',
+    subjectLabel: 'Назва предмета в preset',
+    applyToAllSemesters: 'Якщо семестри не вибрані, subject буде доступний в усіх live semesters цього context.',
+    moderationTitle: 'Academic moderation queue',
+    moderationSubtitle: 'Тут збираються конфліктні або неповні кейси міграції та setup. Queue можна закривати без ручних SQL-правок.',
+    moderationEmpty: 'Черга пуста для цього статусу.',
+    moderationStatus: 'Статус',
+    moderationAssignContext: 'Assign context',
+    moderationIgnore: 'Ignore',
+    moderationResolve: 'Mark resolved',
+    moderationPayload: 'Payload',
+    moderationSource: 'Джерело',
+    moderationIssue: 'Issue',
+    moderationSeverity: 'Severity',
+    moderationOpen: 'Open',
+    moderationReviewing: 'Reviewing',
+    moderationResolved: 'Resolved',
+    moderationIgnored: 'Ignored',
+    semesterLinks: 'Семестри предмета',
+    semesterAll: 'Усі semester links',
+  } : {
+    navIntake: 'Intake',
+    navPresets: 'Presets',
+    navModeration: 'Moderation',
+    intakeTitle: 'New intake',
+    intakeSubtitle: 'Create one admission year for multiple programs at once. New cohorts get stage 1 contexts and the default preset snapshot automatically.',
+    intakePrograms: 'Programs for intake',
+    createIntake: 'Create intake',
+    presetsTitle: 'Program presets',
+    presetsSubtitle: 'Presets define stages, semesters, and preset subjects. They do not change live cohorts until you explicitly apply or reapply them.',
+    presetSelection: 'Preset focus',
+    presetEmpty: 'This program does not have a preset yet. Create the first one below.',
+    presetName: 'Preset name',
+    defaultPreset: 'Default preset',
+    stageCount: 'Stage count',
+    selectPreset: 'Open preset',
+    presetStages: 'Preset stages',
+    presetSemesters: 'Preset semesters',
+    presetSubjects: 'Preset subjects',
+    applyPresetContext: 'Apply to context',
+    applyPresetAdmission: 'Apply to cohort',
+    previewTitle: 'Apply/reapply preview',
+    previewCreate: 'Creates',
+    previewUpdate: 'Updates',
+    previewArchive: 'Archives',
+    previewTeachers: 'Teacher carry-forward',
+    noPresetSelected: 'Select or create a preset to see stages, preview, and apply actions.',
+    subjectLabel: 'Preset subject title',
+    applyToAllSemesters: 'If no semesters are selected, the subject is linked to every live semester of the context.',
+    moderationTitle: 'Academic moderation queue',
+    moderationSubtitle: 'Conflicting or incomplete migration/setup cases land here so admins can resolve them without manual SQL edits.',
+    moderationEmpty: 'No queue items for this status.',
+    moderationStatus: 'Status',
+    moderationAssignContext: 'Assign context',
+    moderationIgnore: 'Ignore',
+    moderationResolve: 'Mark resolved',
+    moderationPayload: 'Payload',
+    moderationSource: 'Source',
+    moderationIssue: 'Issue',
+    moderationSeverity: 'Severity',
+    moderationOpen: 'Open',
+    moderationReviewing: 'Reviewing',
+    moderationResolved: 'Resolved',
+    moderationIgnored: 'Ignored',
+    semesterLinks: 'Subject semesters',
+    semesterAll: 'All semester links',
+  };
   const trackLabels = {
     all: ui.trackAll,
     bachelor: ui.trackBachelor,
@@ -550,12 +659,15 @@
   const sectionLinks = [
     { href: '#pathways-scope', label: ui.navScope },
     { href: '#pathways-programs', label: ui.navPrograms },
+    { href: '#pathways-intake', label: setupUi.navIntake },
     { href: '#pathways-admissions', label: ui.navAdmissions },
+    { href: '#pathways-presets', label: setupUi.navPresets },
     { href: '#pathways-contexts', label: ui.navContexts },
     { href: '#pathways-mapping', label: ui.navMapping },
     { href: '#pathways-subjects', label: ui.navSubjects },
     { href: '#pathways-campuses', label: ui.navCampuses },
     { href: '#pathways-migration', label: ui.navMigration },
+    { href: '#pathways-moderation', label: setupUi.navModeration },
     { href: '#pathways-catalog', label: ui.navCatalog },
   ];
   const courseChecklistPropsJson = JSON.stringify({
@@ -626,15 +738,24 @@
       program_id: selectedProgramValue,
       admission_id: selectedAdmissionValue,
       study_context_id: selectedStudyContextValue,
+      preset_id: selectedProgramPresetValue,
+      moderation_status: moderationStatusValue,
     }, overrides || {});
     const hasStudyContextOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'study_context_id');
     const hasProgramOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'program_id');
     const hasAdmissionOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'admission_id');
+    const hasPresetOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'preset_id');
     if (!hasStudyContextOverride) {
       const programChanged = hasProgramOverride && Number(next.program_id || 0) !== Number(selectedProgramValue || 0);
       const admissionChanged = hasAdmissionOverride && Number(next.admission_id || 0) !== Number(selectedAdmissionValue || 0);
       if (programChanged || admissionChanged || !next.program_id || !next.admission_id) {
         next.study_context_id = null;
+      }
+    }
+    if (!hasPresetOverride) {
+      const programChanged = hasProgramOverride && Number(next.program_id || 0) !== Number(selectedProgramValue || 0);
+      if (programChanged || !next.program_id) {
+        next.preset_id = null;
       }
     }
 
@@ -643,6 +764,7 @@
       if (value === null || typeof value === 'undefined') return;
       if (String(value) === '' || String(value) === '0') return;
       if (key === 'track' && String(value) === 'all') return;
+      if (key === 'moderation_status' && String(value) === 'open') return;
       params.set(key, String(value));
     });
 
@@ -1247,6 +1369,12 @@
           <% if (selectedStudyContextValue > 0) { %>
             <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
           <% } %>
+          <% if (selectedProgramPresetValue > 0) { %>
+            <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+          <% } %>
+          <% if (moderationStatusValue !== 'open') { %>
+            <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
+          <% } %>
         </form>
         <div class="scope-summary-grid">
           <div class="scope-summary-card">
@@ -1361,6 +1489,54 @@
             </div>
           <% } %>
         </div>
+      </section>
+
+      <section class="glass section mb-3" id="pathways-intake">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><%= setupUi.intakeTitle %></h2>
+            <p class="section-subtitle"><%= setupUi.intakeSubtitle %></p>
+          </div>
+          <span class="chip"><%= (filteredPrograms || []).length || (programs || []).length %></span>
+        </div>
+        <form method="POST" action="/admin/pathways/intake/create" class="soft-panel">
+          <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+          <input type="hidden" name="track" value="<%= activeTrack %>" />
+          <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+          <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+          <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+          <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+          <div class="row g-3">
+            <div class="col-12 col-lg-3">
+              <label class="form-label small"><%= ui.admissionYear %></label>
+              <input class="form-control compact-input" type="number" name="admission_year" min="2000" max="2100" value="<%= selectedAdmission ? Number(selectedAdmission.admission_year || 0) + 1 : '' %>" placeholder="2027" required />
+            </div>
+            <div class="col-12 col-lg-9">
+              <label class="form-label small d-block"><%= setupUi.intakePrograms %></label>
+              <div class="d-grid gap-2">
+                <% ((filteredPrograms && filteredPrograms.length) ? filteredPrograms : (programs || [])).forEach((program) => { %>
+                  <label class="subject-row" data-checklist-row data-checklist-text="<%= `${program.name} ${program.code || ''} ${trackLabels[String(program.track_key)] || program.track_key}` %>">
+                    <span>
+                      <span class="row-label"><%= program.name %></span>
+                      <span class="muted d-block"><%= program.code || '—' %> / <%= trackLabels[String(program.track_key)] || program.track_key %></span>
+                    </span>
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="program_ids[]"
+                        value="<%= program.id %>"
+                        <%= Number(selectedProgramValue) === Number(program.id) || (((filteredPrograms || []).length || (programs || []).length) === 1) ? 'checked' : '' %>
+                      />
+                  </label>
+                <% }) %>
+              </div>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
+              <button class="btn btn-primary btn-pill" type="submit"><%= setupUi.createIntake %></button>
+              <span class="muted"><%= selectedProgramValue > 0 ? `${ui.programLabel}: ${selectedProgram ? selectedProgram.name : ''}` : setupUi.intakePrograms %></span>
+            </div>
+          </div>
+        </form>
       </section>
 
       <section class="glass section mb-3" id="pathways-admissions">
@@ -1481,6 +1657,269 @@
         </div>
       </section>
 
+      <section class="glass section mb-3" id="pathways-presets">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><%= setupUi.presetsTitle %></h2>
+            <p class="section-subtitle"><%= setupUi.presetsSubtitle %></p>
+          </div>
+          <span class="chip"><%= programPresetList.length %></span>
+        </div>
+        <% if (selectedProgramValue > 0) { %>
+          <% if (programPresetList.length) { %>
+            <div class="program-grid mb-3">
+              <% programPresetList.forEach((preset) => { %>
+                <article class="soft-panel program-card <%= Number(preset.id || 0) === Number(selectedProgramPresetValue || 0) ? 'is-selected' : '' %>">
+                  <div class="program-card__header">
+                    <div>
+                      <div class="program-card__eyebrow"><%= setupUi.presetSelection %> #<%= preset.id %></div>
+                      <div class="row-label"><%= preset.name %></div>
+                    </div>
+                    <div class="program-card__actions">
+                      <% if (preset.is_default) { %>
+                        <span class="chip"><%= setupUi.defaultPreset %></span>
+                      <% } %>
+                      <a class="btn btn-soft btn-sm btn-pill" href="<%= buildPathwaysUrl({ preset_id: preset.id }) %>"><%= setupUi.selectPreset %></a>
+                    </div>
+                  </div>
+                  <div class="admission-card__metrics">
+                    <div class="mini-stat">
+                      <span class="mini-stat__label"><%= setupUi.presetStages %></span>
+                      <strong class="mini-stat__value"><%= Array.isArray(preset.stages) ? preset.stages.length : 0 %></strong>
+                    </div>
+                    <div class="mini-stat">
+                      <span class="mini-stat__label"><%= setupUi.presetSemesters %></span>
+                      <strong class="mini-stat__value"><%= (preset.stages || []).reduce((sum, stage) => sum + Number((stage.semesters || []).length || 0), 0) %></strong>
+                    </div>
+                    <div class="mini-stat">
+                      <span class="mini-stat__label"><%= setupUi.presetSubjects %></span>
+                      <strong class="mini-stat__value"><%= (preset.stages || []).reduce((sum, stage) => sum + Number((stage.subjects || []).length || 0), 0) %></strong>
+                    </div>
+                  </div>
+                </article>
+              <% }) %>
+            </div>
+          <% } %>
+          <form method="POST" action="/admin/pathways/presets/save" class="soft-panel mb-3">
+            <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+            <input type="hidden" name="track" value="<%= activeTrack %>" />
+            <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+            <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+            <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+            <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+            <div class="row g-2">
+              <div class="col-12 col-lg-6">
+                <label class="form-label small"><%= setupUi.presetName %></label>
+                <input class="form-control compact-input" type="text" name="name" maxlength="140" required value="<%= selectedProgramPresetItem ? selectedProgramPresetItem.name : '' %>" />
+              </div>
+              <div class="col-12 col-lg-2">
+                <label class="form-label small"><%= setupUi.stageCount %></label>
+                <input class="form-control compact-input" type="number" name="stage_count" min="1" max="8" value="<%= selectedProgramPresetStages.length || (String(selectedProgram && selectedProgram.track_key || '') === 'master' ? 2 : (String(selectedProgram && selectedProgram.track_key || '') === 'teacher' ? 1 : 4)) %>" />
+              </div>
+              <div class="col-6 col-lg-2 align-self-end">
+                <div class="form-check mt-1">
+                  <input class="form-check-input" type="checkbox" id="preset_default_toggle" name="is_default" value="1" <%= selectedProgramPresetItem && selectedProgramPresetItem.is_default ? 'checked' : '' %> />
+                  <label class="form-check-label" for="preset_default_toggle"><%= setupUi.defaultPreset %></label>
+                </div>
+              </div>
+              <div class="col-6 col-lg-2 align-self-end">
+                <div class="form-check mt-1">
+                  <input class="form-check-input" type="checkbox" id="preset_active_toggle" name="is_active" value="1" <%= !selectedProgramPresetItem || selectedProgramPresetItem.is_active ? 'checked' : '' %> />
+                  <label class="form-check-label" for="preset_active_toggle"><%= ui.activeToggle %></label>
+                </div>
+              </div>
+              <div class="col-12 d-grid">
+                <button class="btn btn-primary btn-pill" type="submit"><%= ui.save %></button>
+              </div>
+            </div>
+          </form>
+          <% if (selectedProgramPresetItem) { %>
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-xl-6">
+                <div class="soft-panel h-100">
+                  <div class="section-header mb-2">
+                    <div>
+                      <h3 class="section-title h5 mb-1"><%= selectedStudyContextItem ? selectedStudyContextItem.label : setupUi.applyPresetContext %></h3>
+                      <p class="section-subtitle mb-0"><%= setupUi.previewTitle %></p>
+                    </div>
+                  </div>
+                  <% if (selectedStudyContextItem && selectedContextPresetPreviewValue) { %>
+                    <div class="scope-summary-grid">
+                      <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewCreate %> sem</span><strong><%= Number(selectedContextPresetPreviewValue.create_semesters || 0) %></strong></div>
+                      <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewUpdate %> sem</span><strong><%= Number(selectedContextPresetPreviewValue.update_semesters || 0) %></strong></div>
+                      <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewArchive %> sem</span><strong><%= Number(selectedContextPresetPreviewValue.archive_semesters || 0) %></strong></div>
+                      <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewCreate %> off</span><strong><%= Number(selectedContextPresetPreviewValue.create_offerings || 0) %></strong></div>
+                      <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewUpdate %> off</span><strong><%= Number(selectedContextPresetPreviewValue.update_offerings || 0) %></strong></div>
+                      <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewTeachers %></span><strong><%= Number(selectedContextPresetPreviewValue.teacher_assignments || 0) %></strong></div>
+                    </div>
+                    <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/apply-preset" class="mt-3">
+                      <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                      <input type="hidden" name="track" value="<%= activeTrack %>" />
+                      <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                      <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                      <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+                      <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                      <button class="btn btn-primary btn-pill" type="submit"><%= setupUi.applyPresetContext %></button>
+                    </form>
+                  <% } else { %>
+                    <div class="muted"><%= ui.selectAdmissionFirst %></div>
+                  <% } %>
+                </div>
+              </div>
+              <div class="col-12 col-xl-6">
+                <div class="soft-panel h-100">
+                  <div class="section-header mb-2">
+                    <div>
+                      <h3 class="section-title h5 mb-1"><%= selectedAdmission ? `${selectedAdmission.admission_year}${selectedAdmission.label ? ` · ${selectedAdmission.label}` : ''}` : setupUi.applyPresetAdmission %></h3>
+                      <p class="section-subtitle mb-0"><%= setupUi.previewTitle %></p>
+                    </div>
+                  </div>
+                  <% if (selectedAdmissionValue > 0 && selectedAdmissionPresetPreviewValue) { %>
+                    <div class="scope-summary-grid">
+                      <div class="scope-summary-card"><span class="scope-summary-card__label">Contexts</span><strong><%= Number(selectedAdmissionPresetPreviewValue.context_count || 0) %></strong></div>
+                      <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewCreate %> sem</span><strong><%= Number(selectedAdmissionPresetPreviewValue.create_semesters || 0) %></strong></div>
+                      <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewUpdate %> sem</span><strong><%= Number(selectedAdmissionPresetPreviewValue.update_semesters || 0) %></strong></div>
+                      <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewCreate %> off</span><strong><%= Number(selectedAdmissionPresetPreviewValue.create_offerings || 0) %></strong></div>
+                      <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewArchive %> off</span><strong><%= Number(selectedAdmissionPresetPreviewValue.archive_offerings || 0) %></strong></div>
+                      <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewTeachers %></span><strong><%= Number(selectedAdmissionPresetPreviewValue.teacher_assignments || 0) %></strong></div>
+                    </div>
+                    <form method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/apply-preset" class="mt-3">
+                      <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                      <input type="hidden" name="track" value="<%= activeTrack %>" />
+                      <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                      <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                      <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+                      <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                      <button class="btn btn-primary btn-pill" type="submit"><%= setupUi.applyPresetAdmission %></button>
+                    </form>
+                  <% } else { %>
+                    <div class="muted"><%= ui.selectAdmissionFirst %></div>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+            <div class="d-grid gap-3">
+              <% selectedProgramPresetStages.forEach((stage) => { %>
+                <article class="soft-panel">
+                  <div class="section-header mb-2">
+                    <div>
+                      <h3 class="section-title h5 mb-1"><%= stage.label || formatStageLabel(stage.stage_number, selectedProgram && selectedProgram.track_key) %></h3>
+                      <p class="section-subtitle mb-0"><%= setupUi.presetStages %> <%= stage.stage_number %></p>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                      <span class="chip"><%= (stage.semesters || []).length %> sem</span>
+                      <span class="chip"><%= (stage.subjects || []).length %> subj</span>
+                    </div>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-12 col-xl-4">
+                      <div class="row-label mb-2"><%= setupUi.presetSemesters %></div>
+                      <div class="d-grid gap-2 mb-3">
+                        <% (stage.semesters || []).forEach((semester) => { %>
+                          <div class="d-flex justify-content-between align-items-center gap-2 soft-panel">
+                            <div>
+                              <div class="row-label"><%= semester.title || `${ui.semesterTitle} ${semester.semester_number}` %></div>
+                              <div class="catalog-subject-meta">#<%= semester.semester_number %> / <%= semester.start_date || '—' %> / <%= Number(semester.weeks_count || 0) || 16 %>w</div>
+                            </div>
+                            <form method="POST" action="/admin/pathways/presets/semesters/<%= semester.id %>/delete">
+                              <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                              <input type="hidden" name="track" value="<%= activeTrack %>" />
+                              <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                              <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                              <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+                              <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                              <button class="btn btn-soft btn-pill" type="submit"><%= ui.deleteSemester %></button>
+                            </form>
+                          </div>
+                        <% }) %>
+                      </div>
+                      <form method="POST" action="/admin/pathways/presets/<%= selectedProgramPresetValue %>/stages/<%= stage.stage_number %>/semesters/save" class="row g-2">
+                        <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                        <input type="hidden" name="track" value="<%= activeTrack %>" />
+                        <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                        <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                        <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+                        <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                        <div class="col-4"><input class="form-control compact-input" type="number" name="semester_number" min="1" max="12" value="<%= Math.max(1, (stage.semesters || []).length + 1) %>" required /></div>
+                        <div class="col-8"><input class="form-control compact-input" type="text" name="title" maxlength="120" placeholder="<%= ui.semesterTitle %>" required /></div>
+                        <div class="col-6"><input class="form-control compact-input" type="date" name="start_date" /></div>
+                        <div class="col-6"><input class="form-control compact-input" type="number" name="weeks_count" min="1" max="30" value="16" /></div>
+                        <div class="col-12 d-grid"><button class="btn btn-soft btn-pill" type="submit"><%= ui.add %></button></div>
+                      </form>
+                    </div>
+                    <div class="col-12 col-xl-8">
+                      <div class="row-label mb-2"><%= setupUi.presetSubjects %></div>
+                      <div class="d-grid gap-2 mb-3">
+                        <% (stage.subjects || []).forEach((subject) => { %>
+                          <div class="soft-panel d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                              <div class="row-label"><%= subject.label || subject.catalog_name || '' %></div>
+                              <div class="catalog-subject-meta"><%= subject.catalog_name || '' %> / g<%= Number(subject.group_count || 1) %> / <%= subject.is_shared ? ui.sharedSubject : ui.catalogInstanceSeparate %></div>
+                              <div class="catalog-subject-meta">
+                                <%= setupUi.semesterLinks %>:
+                                <%= (subject.semester_ids || []).length
+                                  ? (subject.semester_ids || []).map((semesterId) => {
+                                      const sem = (stage.semesters || []).find((item) => Number(item.id || 0) === Number(semesterId || 0));
+                                      return sem ? (sem.title || `#${sem.semester_number}`) : `#${semesterId}`;
+                                    }).join(', ')
+                                  : setupUi.semesterAll %>
+                              </div>
+                            </div>
+                            <form method="POST" action="/admin/pathways/presets/subjects/<%= subject.id %>/delete">
+                              <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                              <input type="hidden" name="track" value="<%= activeTrack %>" />
+                              <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                              <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                              <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+                              <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                              <button class="btn btn-soft btn-pill" type="submit"><%= ui.catalogCourseRemove %></button>
+                            </form>
+                          </div>
+                        <% }) %>
+                      </div>
+                      <form method="POST" action="/admin/pathways/presets/<%= selectedProgramPresetValue %>/stages/<%= stage.stage_number %>/subjects/save" class="row g-2">
+                        <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                        <input type="hidden" name="track" value="<%= activeTrack %>" />
+                        <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                        <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                        <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+                        <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                        <div class="col-12 col-lg-4">
+                          <select class="form-select compact-select" name="subject_catalog_id" required>
+                            <option value=""><%= isUk ? 'Оберіть предмет' : 'Select subject' %></option>
+                            <% presetSubjectCatalogList.forEach((catalogItem) => { %>
+                              <option value="<%= catalogItem.id %>"><%= catalogItem.name %></option>
+                            <% }) %>
+                          </select>
+                        </div>
+                        <div class="col-12 col-lg-4"><input class="form-control compact-input" type="text" name="label" maxlength="140" placeholder="<%= setupUi.subjectLabel %>" required /></div>
+                        <div class="col-6 col-lg-2"><input class="form-control compact-input" type="number" name="group_count" min="1" max="3" value="1" /></div>
+                        <div class="col-6 col-lg-2"><input class="form-control compact-input" type="number" name="default_group" min="1" max="3" value="1" /></div>
+                        <div class="col-12 d-flex flex-wrap gap-3">
+                          <div class="form-check"><input class="form-check-input" type="checkbox" id="preset_req_new_<%= stage.stage_number %>" name="is_required" value="1" checked /><label class="form-check-label" for="preset_req_new_<%= stage.stage_number %>"><%= isUk ? 'Обов’язковий' : 'Required' %></label></div>
+                          <div class="form-check"><input class="form-check-input" type="checkbox" id="preset_shared_new_<%= stage.stage_number %>" name="is_shared" value="1" /><label class="form-check-label" for="preset_shared_new_<%= stage.stage_number %>"><%= ui.sharedSubject %></label></div>
+                        </div>
+                        <div class="col-12 d-flex flex-wrap gap-2">
+                          <% (stage.semesters || []).forEach((semester) => { %>
+                            <label class="chip">
+                              <input class="form-check-input me-1" type="checkbox" name="semester_ids[]" value="<%= semester.id %>" />
+                              <span><%= semester.title || `#${semester.semester_number}` %></span>
+                            </label>
+                          <% }) %>
+                        </div>
+                        <div class="col-12 d-grid"><button class="btn btn-soft btn-pill" type="submit"><%= ui.add %></button></div>
+                      </form>
+                    </div>
+                  </div>
+                </article>
+              <% }) %>
+            </div>
+          <% } %>
+        <% } else { %>
+          <div class="soft-panel muted"><%= setupUi.presetEmpty %></div>
+        <% } %>
+      </section>
+
       <section class="glass section mb-3" id="pathways-contexts">
         <div class="section-header">
           <div>
@@ -1540,6 +1979,7 @@
                     <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
                     <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
                     <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
+                    <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
                     <div class="section-header mb-2">
                       <div>
                         <h3 class="section-title h5 mb-1"><%= ui.addSemesterTitle %></h3>
@@ -1595,6 +2035,7 @@
                             <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
                             <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
                             <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
+                            <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
                             <div class="col-12 col-md-2">
                               <label class="form-label small"><%= ui.semesterNumber %></label>
                               <input class="form-control compact-input" type="number" name="semester_number" min="1" max="12" value="<%= Number(semester.semester_number || 1) %>" required />
@@ -1640,6 +2081,7 @@
                               <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
                               <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
                               <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
+                              <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
                               <button class="btn btn-soft btn-pill" type="submit"><%= ui.deleteSemester %></button>
                             </form>
                           </div>
@@ -2036,6 +2478,7 @@
                       <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
                       <input type="hidden" name="track" value="<%= activeTrack %>" />
                       <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                      <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
                       <button class="btn btn-soft btn-pill" type="submit"><%= isUk ? 'Підвищити курс +1' : 'Promote stage +1' %></button>
                     </form>
                   </div>
@@ -2051,6 +2494,90 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <section class="glass section mb-3" id="pathways-moderation">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><%= setupUi.moderationTitle %></h2>
+            <p class="section-subtitle"><%= setupUi.moderationSubtitle %></p>
+          </div>
+          <span class="chip"><%= moderationQueueList.length %></span>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <% [
+            { key: 'open', label: setupUi.moderationOpen },
+            { key: 'reviewing', label: setupUi.moderationReviewing },
+            { key: 'resolved', label: setupUi.moderationResolved },
+            { key: 'ignored', label: setupUi.moderationIgnored },
+          ].forEach((statusItem) => { %>
+            <a class="btn <%= moderationStatusValue === statusItem.key ? 'btn-primary' : 'btn-soft' %> btn-pill" href="<%= buildPathwaysUrl({ moderation_status: statusItem.key }) %>"><%= statusItem.label %></a>
+          <% }) %>
+        </div>
+        <% if (moderationQueueList.length) { %>
+          <div class="d-grid gap-3">
+            <% moderationQueueList.forEach((item) => { %>
+              <article class="soft-panel">
+                <div class="section-header mb-2">
+                  <div>
+                    <h3 class="section-title h5 mb-1"><%= item.title || `Queue #${item.id}` %></h3>
+                    <p class="section-subtitle mb-0"><%= item.summary || '' %></p>
+                  </div>
+                  <div class="d-flex flex-wrap gap-2">
+                    <span class="chip"><%= item.severity || 'medium' %></span>
+                    <span class="chip"><%= item.status || moderationStatusValue %></span>
+                  </div>
+                </div>
+                <div class="catalog-subject-meta mb-2"><%= setupUi.moderationSource %>: <%= item.source_kind || '—' %>#<%= item.source_id || '—' %> / <%= setupUi.moderationIssue %>: <%= item.issue_code || '—' %></div>
+                <% if (item.payload && Object.keys(item.payload).length) { %>
+                  <pre class="soft-panel mb-3" style="white-space: pre-wrap;"><%= JSON.stringify(item.payload, null, 2) %></pre>
+                <% } %>
+                <div class="d-flex flex-wrap gap-2">
+                  <form method="POST" action="/admin/pathways/moderation/<%= item.id %>/resolve" class="d-flex flex-wrap gap-2 align-items-center">
+                    <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                    <input type="hidden" name="track" value="<%= activeTrack %>" />
+                    <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                    <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                    <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                    <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
+                    <select class="form-select compact-select" name="study_context_id">
+                      <option value=""><%= setupUi.moderationAssignContext %></option>
+                      <% studyContextList.forEach((context) => { %>
+                        <option value="<%= context.id %>"><%= context.label %></option>
+                      <% }) %>
+                    </select>
+                    <input type="hidden" name="action" value="assign_context" />
+                    <button class="btn btn-primary btn-pill" type="submit"><%= setupUi.moderationAssignContext %></button>
+                  </form>
+                  <form method="POST" action="/admin/pathways/moderation/<%= item.id %>/resolve">
+                    <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                    <input type="hidden" name="track" value="<%= activeTrack %>" />
+                    <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                    <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                    <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+                    <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                    <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
+                    <input type="hidden" name="action" value="mark_resolved" />
+                    <button class="btn btn-soft btn-pill" type="submit"><%= setupUi.moderationResolve %></button>
+                  </form>
+                  <form method="POST" action="/admin/pathways/moderation/<%= item.id %>/resolve">
+                    <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                    <input type="hidden" name="track" value="<%= activeTrack %>" />
+                    <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                    <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                    <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+                    <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                    <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
+                    <input type="hidden" name="action" value="ignore" />
+                    <button class="btn btn-soft btn-pill" type="submit"><%= setupUi.moderationIgnore %></button>
+                  </form>
+                </div>
+              </article>
+            <% }) %>
+          </div>
+        <% } else { %>
+          <div class="soft-panel muted"><%= setupUi.moderationEmpty %></div>
+        <% } %>
       </section>
 
       <section class="glass section mb-3" id="pathways-catalog">
