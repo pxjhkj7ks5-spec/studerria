@@ -16383,6 +16383,7 @@ const JOURNAL_GRADE_UNDO_SECONDS = 30;
 const JOURNAL_SUBJECT_CLOSE_EVENT_TYPE = 'closed';
 const JOURNAL_SUBJECT_REOPEN_EVENT_TYPE = 'reopened';
 const JOURNAL_SUBJECT_CLOSED_ERROR = 'Предмет закрито. Редагування журналу вимкнено.';
+const JOURNAL_COLUMN_LOCKED_ERROR = 'Колонка заблокована для редагування';
 const SEMESTER_ARCHIVE_UPLOADS_DIR = 'semester-archives';
 const JOURNAL_RETAKE_KINDS = ['retake', 'makeup'];
 const JOURNAL_RETAKE_KIND_META = {
@@ -16656,6 +16657,29 @@ const buildJournalRedirectPathFromRequest = (req, overrides = {}) => {
     err: overrides.err,
   });
 };
+
+const buildJournalSubjectRedirectPathFromRequest = (req, subjectId, overrides = {}) => (
+  buildJournalRedirectPathFromRequest(req, {
+    subjectId,
+    ...overrides,
+  })
+);
+
+const buildJournalCellRedirectPathFromRequest = (req, params = {}, overrides = {}) => (
+  buildJournalRedirectPathFromRequest(req, {
+    subjectId: params.subjectId,
+    openColumnId: params.columnId,
+    openStudentId: params.studentId,
+    prefillComment: params.prefillComment,
+    ...overrides,
+  })
+);
+
+const buildJournalClosedRedirectPathFromRequest = (req, subjectId, message = JOURNAL_SUBJECT_CLOSED_ERROR) => (
+  buildJournalSubjectRedirectPathFromRequest(req, subjectId, {
+    err: message || JOURNAL_SUBJECT_CLOSED_ERROR,
+  })
+);
 
 const resolveStoredUploadAbsolutePath = (storedPath) => {
   const normalized = String(storedPath || '').trim();
@@ -20733,8 +20757,7 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
   const attendanceDate = String(req.body.attendance_date || '').trim();
   const attendanceClassNumber = Number(req.body.attendance_class_number);
   const rowsRaw = String(req.body.rows_json || '[]').trim() || '[]';
-  const baseAttendanceRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
-    subjectId,
+  const baseAttendanceRedirect = (overrides = {}) => buildJournalSubjectRedirectPathFromRequest(req, subjectId, {
     attendanceDate,
     attendanceClassNumber,
     ...overrides,
@@ -20926,9 +20949,6 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
       semesterId
     );
     return res.redirect(baseAttendanceRedirect({ ok: 'Відвідуваність збережено' }));
-    return res.redirect(
-      `/journal?subject_id=${subjectId}&attendance_date=${encodeURIComponent(attendanceDate)}&attendance_class_number=${attendanceClassNumber}&ok=Відвідуваність%20збережено`
-    );
   } catch (err) {
     return res.redirect(baseAttendanceRedirect({ err: 'Database error' }));
   }
@@ -20936,10 +20956,7 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
 
 app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) => {
   const subjectId = Number(req.body.subject_id);
-  const subjectCloseRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
-    subjectId,
-    ...overrides,
-  });
+  const subjectCloseRedirect = (overrides = {}) => buildJournalSubjectRedirectPathFromRequest(req, subjectId, overrides);
   if (!Number.isFinite(subjectId) || subjectId < 1) {
     return res.redirect(subjectCloseRedirect({ err: 'Invalid subject' }));
   }
@@ -20962,11 +20979,6 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
         err: 'Для закриття предмета потрібен доступ до всіх груп',
       }));
     }
-    if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
-      return res.redirect(
-        `/journal?subject_id=${subjectId}&err=${encodeURIComponent('Для закриття предмета потрібен доступ до всіх груп')}`
-      );
-    }
 
     const selectedCourseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
     const selectedSemester = await getActiveSemester(selectedCourseId);
@@ -20975,9 +20987,6 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
     if (subjectClosure.is_closed) {
       return res.redirect(subjectCloseRedirect({ ok: 'Предмет уже закрито' }));
-    }
-    if (subjectClosure.is_closed) {
-      return res.redirect(`/journal?subject_id=${subjectId}&ok=${encodeURIComponent('Предмет уже закрито')}`);
     }
 
     const matrix = await buildJournalMatrix({
@@ -21250,10 +21259,7 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
 
 app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res) => {
   const subjectId = Number(req.body.subject_id);
-  const subjectReopenRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
-    subjectId,
-    ...overrides,
-  });
+  const subjectReopenRedirect = (overrides = {}) => buildJournalSubjectRedirectPathFromRequest(req, subjectId, overrides);
   if (!Number.isFinite(subjectId) || subjectId < 1) {
     return res.redirect(subjectReopenRedirect({ err: 'Invalid subject' }));
   }
@@ -21276,11 +21282,6 @@ app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res)
         err: 'Для повторного відкриття предмета потрібен доступ до всіх груп',
       }));
     }
-    if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
-      return res.redirect(
-        `/journal?subject_id=${subjectId}&err=${encodeURIComponent('Для повторного відкриття предмета потрібен доступ до всіх груп')}`
-      );
-    }
 
     const selectedCourseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
     const selectedSemester = await getActiveSemester(selectedCourseId);
@@ -21289,9 +21290,6 @@ app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res)
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
     if (!subjectClosure.is_closed) {
       return res.redirect(subjectReopenRedirect({ ok: 'Предмет уже відкрито' }));
-    }
-    if (!subjectClosure.is_closed) {
-      return res.redirect(`/journal?subject_id=${subjectId}&ok=${encodeURIComponent('Предмет уже відкрито')}`);
     }
 
     const actorUserId = Number(req.session.user.id);
@@ -21460,9 +21458,7 @@ app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res)
       selectedCourseId,
       semesterId
     );
-    return res.redirect(
-      `/journal?subject_id=${subjectId}&ok=${encodeURIComponent('Предмет повторно відкрито. Журнал розблоковано')}`
-    );
+    return res.redirect(subjectReopenRedirect({ ok: 'Предмет повторно відкрито. Журнал розблоковано' }));
   } catch (err) {
     return res.redirect(subjectReopenRedirect({ err: 'Database error' }));
   }
@@ -21930,12 +21926,11 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
   const studentId = Number(req.body.student_id);
   const scoreRaw = req.body.score;
   const teacherComment = String(req.body.teacher_comment || '').trim();
-  const gradeRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
-    openColumnId: columnId,
-    openStudentId: studentId,
+  const gradeRedirect = (overrides = {}) => buildJournalCellRedirectPathFromRequest(req, {
+    columnId,
+    studentId,
     prefillComment: teacherComment,
-    ...overrides,
-  });
+  }, overrides);
 
   if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
     return res.redirect(gradeRedirect({ err: 'Invalid grade target' }));
@@ -21980,7 +21975,10 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
       return res.redirect(gradeRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+      return res.redirect(gradeRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_COLUMN_LOCKED_ERROR,
+      }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
@@ -22130,8 +22128,9 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
   const subjectIdFromBody = Number(req.body.subject_id);
   const columnId = Number(req.body.column_id);
   const entriesRaw = String(req.body.entries_json || '').trim();
+  const bulkRedirect = (overrides = {}) => buildJournalSubjectRedirectPathFromRequest(req, subjectIdFromBody, overrides);
   if (!Number.isFinite(columnId) || columnId < 1 || !entriesRaw) {
-    return res.redirect('/journal?err=Invalid%20bulk%20payload');
+    return res.redirect(bulkRedirect({ err: 'Invalid bulk payload' }));
   }
 
   let entries = [];
@@ -22139,7 +22138,7 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
     const parsed = JSON.parse(entriesRaw);
     entries = Array.isArray(parsed) ? parsed : [];
   } catch (err) {
-    return res.redirect('/journal?err=Invalid%20bulk%20payload');
+    return res.redirect(bulkRedirect({ err: 'Invalid bulk payload' }));
   }
 
   const normalizedEntries = entries
@@ -22151,13 +22150,13 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
     .filter((entry) => Number.isFinite(entry.student_id) && entry.student_id > 0);
 
   if (!normalizedEntries.length) {
-    return res.redirect('/journal?err=No%20grades%20to%20save');
+    return res.redirect(bulkRedirect({ err: 'No grades to save' }));
   }
   if (normalizedEntries.length > 500) {
-    return res.redirect('/journal?err=Bulk%20limit%20exceeded');
+    return res.redirect(bulkRedirect({ err: 'Bulk limit exceeded' }));
   }
   if (!isStepUpPhraseValid(req.body.stepup_code, STEPUP_CODE_BULK)) {
-    return res.redirect('/journal?err=Type%20BULK%20to%20confirm');
+    return res.redirect(bulkRedirect({ err: 'Type BULK to confirm' }));
   }
 
   try {
@@ -22196,14 +22195,17 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
       [columnId]
     );
     if (!column) {
-      return res.redirect('/journal?err=Column%20not%20found');
+      return res.redirect(bulkRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+      return res.redirect(bulkRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_COLUMN_LOCKED_ERROR,
+      }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(buildJournalClosedRedirectPathFromRequest(req, Number(column.subject_id || 0)));
     }
 
     if (!journalScope.fullAccess) {
@@ -22239,7 +22241,10 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
       for (const studentId of uniqueStudentIds) {
         const groupNumber = Number(studentGroups.get(studentId) || 0);
         if (!groupNumber) {
-          return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+          return res.redirect(bulkRedirect({
+            subjectId: Number(column.subject_id || 0),
+            err: 'Student is not assigned to subject',
+          }));
         }
         if (!access.allowAll && !access.groups.has(groupNumber)) {
           return res.status(403).send('Forbidden (journal)');
@@ -22248,7 +22253,10 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
     } else {
       for (const studentId of uniqueStudentIds) {
         if (!studentGroups.has(studentId)) {
-          return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+          return res.redirect(bulkRedirect({
+            subjectId: Number(column.subject_id || 0),
+            err: 'Student is not assigned to subject',
+          }));
         }
       }
     }
@@ -22288,12 +22296,16 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
       const parsedScore = Number(scoreText.replace(',', '.'));
       const score = Number.isFinite(parsedScore) ? Math.round(parsedScore * 100) / 100 : NaN;
       if (!Number.isFinite(score) || score < 0 || score > maxPoints) {
-        return res.redirect(
-          `/journal?subject_id=${column.subject_id}&err=Bulk%20score%20must%20be%20between%200%20and%20${encodeURIComponent(String(maxPoints))}`
-        );
+        return res.redirect(bulkRedirect({
+          subjectId: Number(column.subject_id || 0),
+          err: `Bulk score must be between 0 and ${String(maxPoints)}`,
+        }));
       }
       if (entry.teacher_comment.length > 2000) {
-        return res.redirect(`/journal?subject_id=${column.subject_id}&err=Comment%20is%20too%20long`);
+        return res.redirect(bulkRedirect({
+          subjectId: Number(column.subject_id || 0),
+          err: 'Comment is too long',
+        }));
       }
       const beforeGradeRow = await db.get(
         `
@@ -22361,7 +22373,10 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
     }
 
     if (updatedCount < 1) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=No%20grades%20to%20save`);
+      return res.redirect(bulkRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'No grades to save',
+      }));
     }
 
     logActivity(
@@ -22378,20 +22393,22 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
       column.semester_id ? Number(column.semester_id) : null
     );
     const subjectId = Number(column.subject_id || subjectIdFromBody || 0);
-    return res.redirect(`/journal?subject_id=${subjectId}&ok=Масове%20оцінювання%20збережено%20(${updatedCount})`);
+    return res.redirect(bulkRedirect({
+      subjectId,
+      ok: `Масове оцінювання збережено (${updatedCount})`,
+    }));
   } catch (err) {
-    return res.redirect(gradeDeleteRedirect({ err: 'Database error' }));
+    return res.redirect(bulkRedirect({ err: 'Database error' }));
   }
 });
 
 app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) => {
   const columnId = Number(req.body.column_id);
   const studentId = Number(req.body.student_id);
-  const gradeDeleteRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
-    openColumnId: columnId,
-    openStudentId: studentId,
-    ...overrides,
-  });
+  const gradeDeleteRedirect = (overrides = {}) => buildJournalCellRedirectPathFromRequest(req, {
+    columnId,
+    studentId,
+  }, overrides);
   if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
     return res.redirect(gradeDeleteRedirect({ err: 'Invalid grade target' }));
   }
@@ -22420,7 +22437,10 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
       return res.redirect(gradeDeleteRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+      return res.redirect(gradeDeleteRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_COLUMN_LOCKED_ERROR,
+      }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
@@ -22464,7 +22484,10 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
       [columnId, studentId]
     );
     if (!activeGrade) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Оцінка%20не%20знайдена`);
+      return res.redirect(gradeDeleteRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Оцінка не знайдена',
+      }));
     }
     const beforeGradeState = buildGradeAuditState(activeGrade);
 
@@ -22529,9 +22552,6 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
       undoUntil,
       ok: 'Оцінку видалено',
     }));
-    return res.redirect(
-      `/journal?subject_id=${column.subject_id}&ok=Оцінку%20видалено&undo_column_id=${columnId}&undo_student_id=${studentId}&undo_until=${undoUntil}`
-    );
   } catch (err) {
     return res.redirect(gradeDeleteRedirect({ err: 'Database error' }));
   }
@@ -22540,11 +22560,10 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
 app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res) => {
   const columnId = Number(req.body.column_id);
   const studentId = Number(req.body.student_id);
-  const gradeRestoreRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
-    openColumnId: columnId,
-    openStudentId: studentId,
-    ...overrides,
-  });
+  const gradeRestoreRedirect = (overrides = {}) => buildJournalCellRedirectPathFromRequest(req, {
+    columnId,
+    studentId,
+  }, overrides);
   if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
     return res.redirect(gradeRestoreRedirect({ err: 'Invalid grade target' }));
   }
@@ -22573,7 +22592,10 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
       return res.redirect(gradeRestoreRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+      return res.redirect(gradeRestoreRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_COLUMN_LOCKED_ERROR,
+      }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
@@ -22622,7 +22644,6 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
         subjectId: Number(column.subject_id || 0),
         err: 'Час на відновлення оцінки минув',
       }));
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Час%20на%20відновлення%20оцінки%20минув`);
     }
     const beforeGradeState = buildGradeAuditState(restorable);
 
@@ -22670,7 +22691,10 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(`/journal?subject_id=${column.subject_id}&ok=Оцінку%20відновлено`);
+    return res.redirect(gradeRestoreRedirect({
+      subjectId: Number(column.subject_id || 0),
+      ok: 'Оцінку відновлено',
+    }));
   } catch (err) {
     return res.redirect(gradeRestoreRedirect({ err: 'Database error' }));
   }
@@ -22682,11 +22706,10 @@ app.post('/journal/retakes/create', requireLogin, writeLimiter, async (req, res)
   const kind = normalizeJournalRetakeKind(req.body.kind);
   const dueDateRaw = String(req.body.due_date || '').trim();
   const note = normalizeJournalRetakeNote(req.body.note);
-  const retakeCreateRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
-    openColumnId: columnId,
-    openStudentId: studentId,
-    ...overrides,
-  });
+  const retakeCreateRedirect = (overrides = {}) => buildJournalCellRedirectPathFromRequest(req, {
+    columnId,
+    studentId,
+  }, overrides);
 
   if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
     return res.redirect(retakeCreateRedirect({ err: 'Invalid retake target' }));
@@ -22720,7 +22743,10 @@ app.post('/journal/retakes/create', requireLogin, writeLimiter, async (req, res)
       return res.redirect(retakeCreateRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+      return res.redirect(retakeCreateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_COLUMN_LOCKED_ERROR,
+      }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
@@ -22800,9 +22826,10 @@ app.post('/journal/retakes/create', requireLogin, writeLimiter, async (req, res)
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(
-      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Спробу додано')}`
-    );
+    return res.redirect(retakeCreateRedirect({
+      subjectId: Number(column.subject_id || 0),
+      ok: 'Спробу додано',
+    }));
   } catch (err) {
     return res.redirect(retakeCreateRedirect({ err: 'Database error' }));
   }
@@ -22820,11 +22847,10 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
   const scoreText = String(req.body.score || '').trim();
   const parsedScore = scoreText ? Number(scoreText.replace(',', '.')) : NaN;
   const score = scoreText ? (Number.isFinite(parsedScore) ? Math.round(parsedScore * 100) / 100 : NaN) : null;
-  const retakeUpdateRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
-    openColumnId: columnId,
-    openStudentId: studentId,
-    ...overrides,
-  });
+  const retakeUpdateRedirect = (overrides = {}) => buildJournalCellRedirectPathFromRequest(req, {
+    columnId,
+    studentId,
+  }, overrides);
 
   if (!Number.isFinite(attemptId) || attemptId < 1 || !Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
     return res.redirect(retakeUpdateRedirect({ err: 'Invalid retake target' }));
@@ -22836,10 +22862,10 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
     return res.redirect(retakeUpdateRedirect({ err: 'Invalid retake score' }));
   }
   if (status === 'graded' && !Number.isFinite(score)) {
-    return res.redirect('/journal?err=Для%20статусу%20Оцінено%20потрібно%20вказати%20бал');
+    return res.redirect(retakeUpdateRedirect({ err: 'Для статусу Оцінено потрібно вказати бал' }));
   }
   if (countInFinal === 1 && (status !== 'graded' || !Number.isFinite(score))) {
-    return res.redirect('/journal?err=Щоб%20врахувати%20у%20фіналі,%20потрібно%20вказати%20оцінений%20бал');
+    return res.redirect(retakeUpdateRedirect({ err: 'Щоб врахувати у фіналі, потрібно вказати оцінений бал' }));
   }
   const dueDate = dueDateRaw && isValidDateString(dueDateRaw) ? dueDateRaw : null;
 
@@ -22867,7 +22893,10 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
       return res.redirect(retakeUpdateRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+      return res.redirect(retakeUpdateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_COLUMN_LOCKED_ERROR,
+      }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
@@ -22923,7 +22952,6 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
         subjectId: Number(column.subject_id || 0),
         err: 'Спробу не знайдено',
       }));
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Спроба%20не%20знайдена`);
     }
 
     const beforeGradeState = (countInFinal === 1 && Number.isFinite(score))
@@ -23083,9 +23111,10 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(
-      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Спробу оновлено')}`
-    );
+    return res.redirect(retakeUpdateRedirect({
+      subjectId: Number(column.subject_id || 0),
+      ok: 'Спробу оновлено',
+    }));
   } catch (err) {
     return res.redirect(retakeUpdateRedirect({ err: 'Database error' }));
   }
@@ -23100,18 +23129,16 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
   const requestedScore = requestedScoreRaw
     ? (Number.isFinite(parsedRequestedScore) ? Math.round(parsedRequestedScore * 100) / 100 : NaN)
     : null;
-  const appealCreateRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
-    openColumnId: columnId,
-    openStudentId: studentId,
-    ...overrides,
-  });
+  const appealCreateRedirect = (overrides = {}) => buildJournalCellRedirectPathFromRequest(req, {
+    columnId,
+    studentId,
+  }, overrides);
 
   if (!Number.isFinite(columnId) || columnId < 1 || !Number.isFinite(studentId) || studentId < 1) {
     return res.redirect(appealCreateRedirect({ err: 'Invalid appeal target' }));
   }
   if (!reason) {
     return res.redirect(appealCreateRedirect({ err: 'Вкажіть причину апеляції' }));
-    return res.redirect('/journal?err=Вкажіть%20причину%20апеляції');
   }
   if (requestedScoreRaw && !Number.isFinite(requestedScore)) {
     return res.redirect(appealCreateRedirect({ err: 'Invalid requested score' }));
@@ -23176,7 +23203,6 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
         subjectId: Number(column.subject_id || 0),
         err: 'Немає оцінки для апеляції',
       }));
-      return res.redirect(`/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&err=${encodeURIComponent('Немає оцінки для апеляції')}`);
     }
 
     const activeAppeal = await db.get(
@@ -23195,7 +23221,6 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
         subjectId: Number(column.subject_id || 0),
         err: 'Вже є активна апеляція для цієї клітинки',
       }));
-      return res.redirect(`/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&err=${encodeURIComponent('Вже є активна апеляція для цієї клітинки')}`);
     }
 
     await db.run(
@@ -23235,9 +23260,10 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(
-      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Апеляцію подано')}`
-    );
+    return res.redirect(appealCreateRedirect({
+      subjectId: Number(column.subject_id || 0),
+      ok: 'Апеляцію подано',
+    }));
   } catch (err) {
     return res.redirect(appealCreateRedirect({ err: 'Database error' }));
   }
@@ -23255,11 +23281,10 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
     ? (Number.isFinite(parsedResolvedScore) ? Math.round(parsedResolvedScore * 100) / 100 : NaN)
     : null;
   const applyResolvedScore = parseBinaryFlag(req.body.apply_resolved_score, 0) === 1;
-  const appealUpdateRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
-    openColumnId: columnId,
-    openStudentId: studentId,
-    ...overrides,
-  });
+  const appealUpdateRedirect = (overrides = {}) => buildJournalCellRedirectPathFromRequest(req, {
+    columnId,
+    studentId,
+  }, overrides);
 
   if (
     !Number.isFinite(appealId) || appealId < 1
@@ -23272,7 +23297,7 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
     return res.redirect(appealUpdateRedirect({ err: 'Invalid resolved score' }));
   }
   if (applyResolvedScore && !Number.isFinite(resolvedScore)) {
-    return res.redirect('/journal?err=Щоб%20застосувати%20новий%20бал,%20вкажіть%20коректне%20значення');
+    return res.redirect(appealUpdateRedirect({ err: 'Щоб застосувати новий бал, вкажіть коректне значення' }));
   }
 
   try {
@@ -23299,7 +23324,10 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
       return res.redirect(appealUpdateRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+      return res.redirect(appealUpdateRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_COLUMN_LOCKED_ERROR,
+      }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
@@ -23348,7 +23376,6 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
         subjectId: Number(column.subject_id || 0),
         err: 'Апеляцію не знайдено',
       }));
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Апеляцію%20не%20знайдено`);
     }
 
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
@@ -23464,9 +23491,10 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(
-      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Апеляцію оновлено')}`
-    );
+    return res.redirect(appealUpdateRedirect({
+      subjectId: Number(column.subject_id || 0),
+      ok: 'Апеляцію оновлено',
+    }));
   } catch (err) {
     return res.redirect(appealUpdateRedirect({ err: 'Database error' }));
   }
@@ -23482,11 +23510,10 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
   const moderatedScore = moderatedScoreRaw
     ? (Number.isFinite(parsedModeratedScore) ? Math.round(parsedModeratedScore * 100) / 100 : NaN)
     : null;
-  const moderationRedirect = (overrides = {}) => buildJournalRedirectPathFromRequest(req, {
-    openColumnId: columnId,
-    openStudentId: studentId,
-    ...overrides,
-  });
+  const moderationRedirect = (overrides = {}) => buildJournalCellRedirectPathFromRequest(req, {
+    columnId,
+    studentId,
+  }, overrides);
 
   if (
     !Number.isFinite(columnId) || columnId < 1
@@ -23498,7 +23525,7 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
     return res.redirect(moderationRedirect({ err: 'Invalid moderation score' }));
   }
   if (status === 'adjusted' && !Number.isFinite(moderatedScore)) {
-    return res.redirect('/journal?err=Для%20статусу%20Скориговано%20потрібно%20вказати%20новий%20бал');
+    return res.redirect(moderationRedirect({ err: 'Для статусу Скориговано потрібно вказати новий бал' }));
   }
 
   try {
@@ -23525,7 +23552,10 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
       return res.redirect(moderationRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+      return res.redirect(moderationRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_COLUMN_LOCKED_ERROR,
+      }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
@@ -23535,7 +23565,10 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
       }));
     }
     if (!isJournalModerationRequiredColumn(column)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Модерація%20доступна%20лише%20для%20екзаменів%20та%20заліків`);
+      return res.redirect(moderationRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Модерація доступна лише для екзаменів та заліків',
+      }));
     }
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     if (Number.isFinite(moderatedScore) && (moderatedScore < 0 || moderatedScore > maxPoints)) {
@@ -23584,14 +23617,12 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
         subjectId: Number(column.subject_id || 0),
         err: 'Немає оцінки для модерації',
       }));
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Немає%20оцінки%20для%20модерації`);
     }
     if (Number(req.session.user.id) === Number(grade.graded_by || 0)) {
       return res.redirect(moderationRedirect({
         subjectId: Number(column.subject_id || 0),
         err: 'Той самий викладач не може погодити власну оцінку',
       }));
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Той%20самий%20викладач%20не%20може%20погодити%20власну%20оцінку`);
     }
 
     const moderatedScoreToStore = status === 'adjusted' && Number.isFinite(moderatedScore)
@@ -23658,11 +23689,12 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(
-      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Модерацію оцінки оновлено')}`
-    );
+    return res.redirect(moderationRedirect({
+      subjectId: Number(column.subject_id || 0),
+      ok: 'Модерацію оцінки оновлено',
+    }));
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(moderationRedirect({ err: 'Database error' }));
   }
 });
 
@@ -23672,18 +23704,24 @@ app.post('/journal/competency/add', requireLogin, writeLimiter, async (req, res)
   const competencyKey = normalizeCompetencyKey(req.body.competency_key);
   const score = parseCompetencyScore(req.body.score);
   const note = normalizeCompetencyNote(req.body.note);
+  const competencyRedirect = (overrides = {}) => buildJournalCellRedirectPathFromRequest(req, {
+    columnId,
+    studentId,
+  }, overrides);
 
   if (
     !Number.isFinite(columnId) || columnId < 1
     || !Number.isFinite(studentId) || studentId < 1
   ) {
-    return res.redirect('/journal?err=Invalid%20competency%20target');
+    return res.redirect(competencyRedirect({ err: 'Invalid competency target' }));
   }
   if (!competencyKey) {
-    return res.redirect('/journal?err=Invalid%20competency%20key');
+    return res.redirect(competencyRedirect({ err: 'Invalid competency key' }));
   }
   if (!Number.isFinite(score)) {
-    return res.redirect(`/journal?err=Competency%20score%20must%20be%20between%20${COMPETENCY_SCORE_MIN}%20and%20${COMPETENCY_SCORE_MAX}`);
+    return res.redirect(competencyRedirect({
+      err: `Competency score must be between ${COMPETENCY_SCORE_MIN} and ${COMPETENCY_SCORE_MAX}`,
+    }));
   }
 
   try {
@@ -23707,19 +23745,25 @@ app.post('/journal/competency/add', requireLogin, writeLimiter, async (req, res)
       [columnId]
     );
     if (!column) {
-      return res.redirect('/journal?err=Column%20not%20found');
+      return res.redirect(competencyRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+      return res.redirect(competencyRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_COLUMN_LOCKED_ERROR,
+      }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(buildJournalClosedRedirectPathFromRequest(req, Number(column.subject_id || 0)));
     }
 
     const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+      return res.redirect(competencyRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Student is not assigned to subject',
+      }));
     }
 
     if (!journalScope.fullAccess) {
@@ -23785,11 +23829,12 @@ app.post('/journal/competency/add', requireLogin, writeLimiter, async (req, res)
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(
-      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Компетентнісний сигнал додано')}`
-    );
+    return res.redirect(competencyRedirect({
+      subjectId: Number(column.subject_id || 0),
+      ok: 'Компетентнісний сигнал додано',
+    }));
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(competencyRedirect({ err: 'Database error' }));
   }
 });
 
@@ -23797,12 +23842,16 @@ app.post('/journal/competency/checklist/save', requireLogin, writeLimiter, async
   const columnId = Number(req.body.column_id);
   const studentId = Number(req.body.student_id);
   const checkedKeysSet = new Set(normalizeCompetencyKeyArray(req.body.competency_keys));
+  const competencyChecklistRedirect = (overrides = {}) => buildJournalCellRedirectPathFromRequest(req, {
+    columnId,
+    studentId,
+  }, overrides);
 
   if (
     !Number.isFinite(columnId) || columnId < 1
     || !Number.isFinite(studentId) || studentId < 1
   ) {
-    return res.redirect('/journal?err=Invalid%20competency%20target');
+    return res.redirect(competencyChecklistRedirect({ err: 'Invalid competency target' }));
   }
 
   try {
@@ -23826,19 +23875,25 @@ app.post('/journal/competency/checklist/save', requireLogin, writeLimiter, async
       [columnId]
     );
     if (!column) {
-      return res.redirect('/journal?err=Column%20not%20found');
+      return res.redirect(competencyChecklistRedirect({ err: 'Column not found' }));
     }
     if (isJournalColumnLocked(column)) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Колонка%20заблокована%20для%20редагування`);
+      return res.redirect(competencyChecklistRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: JOURNAL_COLUMN_LOCKED_ERROR,
+      }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(buildJournalClosedRedirectPathFromRequest(req, Number(column.subject_id || 0)));
     }
 
     const studentRow = await getJournalStudentGroup(column.subject_id, studentId);
     if (!studentRow) {
-      return res.redirect(`/journal?subject_id=${column.subject_id}&err=Student%20is%20not%20assigned%20to%20subject`);
+      return res.redirect(competencyChecklistRedirect({
+        subjectId: Number(column.subject_id || 0),
+        err: 'Student is not assigned to subject',
+      }));
     }
 
     if (!journalScope.fullAccess) {
@@ -23920,11 +23975,12 @@ app.post('/journal/competency/checklist/save', requireLogin, writeLimiter, async
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(
-      `/journal?subject_id=${column.subject_id}&open_column_id=${columnId}&open_student_id=${studentId}&ok=${encodeURIComponent('Компетентності збережено (+1/+0)')}`
-    );
+    return res.redirect(competencyChecklistRedirect({
+      subjectId: Number(column.subject_id || 0),
+      ok: 'Компетентності збережено (+1/+0)',
+    }));
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(competencyChecklistRedirect({ err: 'Database error' }));
   }
 });
 
@@ -23932,8 +23988,9 @@ app.post('/journal/columns/final-toggle', requireLogin, writeLimiter, async (req
   const subjectId = Number(req.body.subject_id);
   const columnId = Number(req.body.column_id);
   const includeInFinal = parseBinaryFlag(req.body.include_in_final, 1) === 1 ? 1 : 0;
+  const finalToggleRedirect = (overrides = {}) => buildJournalSubjectRedirectPathFromRequest(req, subjectId, overrides);
   if (!Number.isFinite(subjectId) || subjectId < 1 || !Number.isFinite(columnId) || columnId < 1) {
-    return res.redirect('/journal?err=Invalid%20column%20target');
+    return res.redirect(finalToggleRedirect({ err: 'Invalid column target' }));
   }
 
   try {
@@ -23963,11 +24020,11 @@ app.post('/journal/columns/final-toggle', requireLogin, writeLimiter, async (req
       [columnId, subjectId]
     );
     if (!column) {
-      return res.redirect(`/journal?subject_id=${subjectId}&err=Column%20not%20found`);
+      return res.redirect(finalToggleRedirect({ err: 'Column not found' }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(buildJournalClosedRedirectPathFromRequest(req, Number(column.subject_id || 0)));
     }
 
     if (!journalScope.fullAccess) {
@@ -24004,9 +24061,9 @@ app.post('/journal/columns/final-toggle', requireLogin, writeLimiter, async (req
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(`/journal?subject_id=${subjectId}&ok=Налаштування%20колонки%20оновлено`);
+    return res.redirect(finalToggleRedirect({ ok: 'Налаштування колонки оновлено' }));
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(finalToggleRedirect({ err: 'Database error' }));
   }
 });
 
@@ -24014,8 +24071,9 @@ app.post('/journal/columns/lock-toggle', requireLogin, writeLimiter, async (req,
   const subjectId = Number(req.body.subject_id);
   const columnId = Number(req.body.column_id);
   const isLocked = parseBinaryFlag(req.body.is_locked, 0) === 1 ? 1 : 0;
+  const lockToggleRedirect = (overrides = {}) => buildJournalSubjectRedirectPathFromRequest(req, subjectId, overrides);
   if (!Number.isFinite(subjectId) || subjectId < 1 || !Number.isFinite(columnId) || columnId < 1) {
-    return res.redirect('/journal?err=Invalid%20column%20target');
+    return res.redirect(lockToggleRedirect({ err: 'Invalid column target' }));
   }
 
   try {
@@ -24045,11 +24103,11 @@ app.post('/journal/columns/lock-toggle', requireLogin, writeLimiter, async (req,
       [columnId, subjectId]
     );
     if (!column) {
-      return res.redirect(`/journal?subject_id=${subjectId}&err=Column%20not%20found`);
+      return res.redirect(lockToggleRedirect({ err: 'Column not found' }));
     }
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(column.subject_id));
+      return res.redirect(buildJournalClosedRedirectPathFromRequest(req, Number(column.subject_id || 0)));
     }
 
     if (!journalScope.fullAccess) {
@@ -24088,9 +24146,9 @@ app.post('/journal/columns/lock-toggle', requireLogin, writeLimiter, async (req,
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(`/journal?subject_id=${subjectId}&ok=${isLocked ? 'Колонку%20заблоковано' : 'Колонку%20розблоковано'}`);
+    return res.redirect(lockToggleRedirect({ ok: isLocked ? 'Колонку заблоковано' : 'Колонку розблоковано' }));
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(lockToggleRedirect({ err: 'Database error' }));
   }
 });
 
@@ -24102,9 +24160,10 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
   const includeInFinal = parseBinaryFlag(req.body.include_in_final, 1) === 1 ? 1 : 0;
   const isCredit = typeRaw === 'credit' || requestedCredit === '1' || requestedCredit === 'true' || requestedCredit === 'on';
   const columnType = isCredit ? 'credit' : typeRaw;
+  const createColumnRedirect = (overrides = {}) => buildJournalSubjectRedirectPathFromRequest(req, subjectId, overrides);
 
   if (!Number.isFinite(subjectId) || subjectId < 1 || !title) {
-    return res.redirect('/journal?err=Invalid%20column%20data');
+    return res.redirect(createColumnRedirect({ err: 'Invalid column data' }));
   }
 
   try {
@@ -24125,11 +24184,11 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
       [subjectId]
     );
     if (!subject) {
-      return res.redirect('/journal?err=Subject%20not%20found');
+      return res.redirect(createColumnRedirect({ err: 'Subject not found' }));
     }
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(subjectId));
+      return res.redirect(buildJournalClosedRedirectPathFromRequest(req, subjectId));
     }
     if (!journalScope.fullAccess) {
       const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
@@ -24145,7 +24204,7 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
     const defaultMax = getDefaultMaxPointsByType(gradingSettings, columnType);
     const maxPoints = parsePositiveDecimal(req.body.max_points, defaultMax);
     if (!Number.isFinite(maxPoints) || maxPoints <= 0) {
-      return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20max%20points`);
+      return res.redirect(createColumnRedirect({ err: 'Invalid max points' }));
     }
 
     const positionParams = [subjectId, courseId];
@@ -24203,16 +24262,17 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
       courseId,
       semesterId
     );
-    return res.redirect(`/journal?subject_id=${subjectId}&ok=Колонку%20додано`);
+    return res.redirect(createColumnRedirect({ ok: 'Колонку додано' }));
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(createColumnRedirect({ err: 'Database error' }));
   }
 });
 
 app.post('/journal/template/import-previous', requireLogin, writeLimiter, async (req, res) => {
   const subjectId = Number(req.body.subject_id);
+  const importTemplateRedirect = (overrides = {}) => buildJournalSubjectRedirectPathFromRequest(req, subjectId, overrides);
   if (!Number.isFinite(subjectId) || subjectId < 1) {
-    return res.redirect('/journal?err=Invalid%20subject');
+    return res.redirect(importTemplateRedirect({ err: 'Invalid subject' }));
   }
 
   try {
@@ -24233,17 +24293,17 @@ app.post('/journal/template/import-previous', requireLogin, writeLimiter, async 
     const activeSemester = await getActiveSemester(courseId);
     const semesterId = activeSemester ? Number(activeSemester.id) : null;
     if (!Number.isFinite(semesterId) || semesterId < 1) {
-      return res.redirect(`/journal?subject_id=${subjectId}&err=${encodeURIComponent('Активний семестр не знайдено')}`);
+      return res.redirect(importTemplateRedirect({ err: 'Активний семестр не знайдено' }));
     }
 
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(subjectId));
+      return res.redirect(buildJournalClosedRedirectPathFromRequest(req, subjectId));
     }
 
     const previousSemester = await getPreviousSemesterForCourse(courseId, activeSemester);
     if (!previousSemester || !Number.isFinite(Number(previousSemester.id))) {
-      return res.redirect(`/journal?subject_id=${subjectId}&err=${encodeURIComponent('Попередній семестр для імпорту не знайдено')}`);
+      return res.redirect(importTemplateRedirect({ err: 'Попередній семестр для імпорту не знайдено' }));
     }
     const previousSemesterId = Number(previousSemester.id);
 
@@ -24269,9 +24329,7 @@ app.post('/journal/template/import-previous', requireLogin, writeLimiter, async 
       [subjectId, courseId, previousSemesterId]
     );
     if (!Array.isArray(sourceColumns) || !sourceColumns.length) {
-      return res.redirect(
-        `/journal?subject_id=${subjectId}&err=${encodeURIComponent('У попередньому семестрі немає ручних колонок для імпорту')}`
-      );
+      return res.redirect(importTemplateRedirect({ err: 'У попередньому семестрі немає ручних колонок для імпорту' }));
     }
 
     const currentColumns = await db.all(
@@ -24363,9 +24421,7 @@ app.post('/journal/template/import-previous', requireLogin, writeLimiter, async 
     }
 
     if (insertedCount < 1) {
-      return res.redirect(
-        `/journal?subject_id=${subjectId}&ok=${encodeURIComponent('Шаблон уже актуальний: нових колонок для імпорту немає')}`
-      );
+      return res.redirect(importTemplateRedirect({ ok: 'Шаблон уже актуальний: нових колонок для імпорту немає' }));
     }
 
     logActivity(
@@ -24384,18 +24440,19 @@ app.post('/journal/template/import-previous', requireLogin, writeLimiter, async 
       courseId,
       semesterId
     );
-    return res.redirect(
-      `/journal?subject_id=${subjectId}&ok=${encodeURIComponent(`Імпортовано ${insertedCount} колонок з попереднього семестру`)}`
-    );
+    return res.redirect(importTemplateRedirect({
+      ok: `Імпортовано ${insertedCount} колонок з попереднього семестру`,
+    }));
   } catch (err) {
-    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
+    return res.redirect(importTemplateRedirect({ err: 'Database error' }));
   }
 });
 
 app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) => {
   const subjectId = Number(req.body.subject_id);
+  const configRedirect = (overrides = {}) => buildJournalSubjectRedirectPathFromRequest(req, subjectId, overrides);
   if (!Number.isFinite(subjectId) || subjectId < 1) {
-    return res.redirect('/journal?err=Invalid%20subject');
+    return res.redirect(configRedirect({ err: 'Invalid subject' }));
   }
 
   try {
@@ -24416,11 +24473,11 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
       [subjectId]
     );
     if (!subject) {
-      return res.redirect('/journal?err=Subject%20not%20found');
+      return res.redirect(configRedirect({ err: 'Subject not found' }));
     }
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
     if (subjectClosure.is_closed) {
-      return res.redirect(buildJournalClosedRedirectPath(subjectId));
+      return res.redirect(buildJournalClosedRedirectPathFromRequest(req, subjectId));
     }
     if (!journalScope.fullAccess) {
       const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
@@ -24445,7 +24502,7 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
       const maxPoints = parsePositiveDecimal(req.body[maxField], DEFAULT_SUBJECT_GRADING_SETTINGS[maxField]);
       const weightPoints = parseNonNegativeDecimal(req.body[weightField], DEFAULT_SUBJECT_GRADING_SETTINGS[weightField]);
       if (!Number.isFinite(maxPoints) || maxPoints <= 0 || !Number.isFinite(weightPoints) || weightPoints < 0) {
-        return res.redirect(`/journal?subject_id=${subjectId}&err=Invalid%20grading%20config`);
+        return res.redirect(configRedirect({ err: 'Invalid grading config' }));
       }
 
       nextSettings[enabledField] = enabled;
@@ -24459,10 +24516,10 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
     }
 
     if (enabledTypesCount < 1) {
-      return res.redirect(`/journal?subject_id=${subjectId}&err=Enable%20at%20least%20one%20activity%20type`);
+      return res.redirect(configRedirect({ err: 'Enable at least one activity type' }));
     }
     if (enabledWeightTotal > 100.0001) {
-      return res.redirect(`/journal?subject_id=${subjectId}&err=Total%20enabled%20weight%20cannot%20exceed%20100`);
+      return res.redirect(configRedirect({ err: 'Total enabled weight cannot exceed 100' }));
     }
 
     await db.run(
@@ -24537,9 +24594,9 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
       courseId,
       semesterId
     );
-    return res.redirect(`/journal?subject_id=${subjectId}&ok=Налаштування%20оцінювання%20оновлено`);
+    return res.redirect(configRedirect({ ok: 'Налаштування оцінювання оновлено' }));
   } catch (err) {
-    return res.redirect('/journal?err=Database%20error');
+    return res.redirect(configRedirect({ err: 'Database error' }));
   }
 });
 

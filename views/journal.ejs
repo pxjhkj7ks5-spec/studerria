@@ -1339,6 +1339,12 @@
       const canEditAttendance = <%- canEditAttendance ? 'true' : 'false' %>;
       const journalText = <%- JSON.stringify(journalCopy).replace(/</g, '\\u003c') %>;
       const attendanceQuickAutoOpen = <%- attendanceQuickAutoOpen ? 'true' : 'false' %>;
+      const journalRequestContext = <%- JSON.stringify({
+        subjectId: selectedJournalSubjectId,
+        attendanceDate: attendanceContext && attendanceContext.date ? String(attendanceContext.date) : '',
+        attendanceClassNumber: attendanceContext && attendanceContext.class_number ? Number(attendanceContext.class_number) : 0,
+        attendanceQuick: attendanceQuickAutoOpen ? 1 : 0,
+      }).replace(/</g, '\\u003c') %>;
       const queryParams = new URLSearchParams(window.location.search);
       const autoOpenColumnId = Number(queryParams.get('open_column_id') || 0);
       const autoOpenStudentId = Number(queryParams.get('open_student_id') || 0);
@@ -1421,6 +1427,14 @@
       const bulkPreviewMetaEl = document.getElementById('journalBulkPreviewMeta');
       const bulkSubmitBtn = document.getElementById('journalBulkSubmitBtn');
       const bulkLockedAlert = document.getElementById('journalBulkLockedAlert');
+      const workflowContextForms = Array.from(document.querySelectorAll([
+        'form[action="/journal/grades/restore"]',
+        'form[action="/journal/template/import-previous"]',
+        'form[action="/journal/config/save"]',
+        'form[action="/journal/columns/create"]',
+        'form[action="/journal/columns/final-toggle"]',
+        'form[action="/journal/columns/lock-toggle"]',
+      ].join(', ')));
       const attendanceForm = document.getElementById('journalAttendanceForm');
       const attendanceRowsJsonInput = document.getElementById('journalAttendanceRowsJson');
       const attendanceRowEls = Array.from(document.querySelectorAll('[data-attendance-row]'));
@@ -1526,6 +1540,39 @@
         attrs: { type: 'hidden', name },
         props: { value: String(value == null ? '' : value) },
       });
+      const upsertHiddenInput = (formEl, name, value) => {
+        if (!formEl || !name) return;
+        const existing = formEl.querySelector(`input[type="hidden"][name="${name}"]`);
+        const shouldRemove = value == null || value === '' || value === false || Number.isNaN(value);
+        if (shouldRemove) {
+          if (existing) existing.remove();
+          return;
+        }
+        const input = existing || createHiddenInput(name, value);
+        input.value = String(value);
+        if (!existing) formEl.appendChild(input);
+      };
+      const syncWorkflowContextInputs = (formEl, { includeOpenCell = false } = {}) => {
+        if (!formEl) return;
+        upsertHiddenInput(formEl, 'subject_id', Number(journalRequestContext.subjectId || 0) || '');
+        upsertHiddenInput(formEl, 'attendance_date', String(journalRequestContext.attendanceDate || '').trim());
+        upsertHiddenInput(formEl, 'attendance_class_number', Number(journalRequestContext.attendanceClassNumber || 0) || '');
+        upsertHiddenInput(formEl, 'attendance_quick', Number(journalRequestContext.attendanceQuick || 0) === 1 ? 1 : '');
+        if (includeOpenCell) {
+          upsertHiddenInput(formEl, 'open_column_id', Number(currentCellColumnId || 0) || '');
+          upsertHiddenInput(formEl, 'open_student_id', Number(currentCellStudentId || 0) || '');
+        }
+      };
+      const syncStaticWorkflowForms = () => {
+        workflowContextForms.forEach((formEl) => syncWorkflowContextInputs(formEl));
+        syncWorkflowContextInputs(gradeForm, { includeOpenCell: true });
+        syncWorkflowContextInputs(deleteForm, { includeOpenCell: true });
+        syncWorkflowContextInputs(retakeCreateForm, { includeOpenCell: true });
+        syncWorkflowContextInputs(appealCreateForm, { includeOpenCell: true });
+        syncWorkflowContextInputs(moderationForm, { includeOpenCell: true });
+        syncWorkflowContextInputs(competencyChecklistForm, { includeOpenCell: true });
+        syncWorkflowContextInputs(bulkForm);
+      };
       const populateSelectOptions = (selectEl, items, selectedValue) => {
         if (!selectEl) return;
         clearNodeChildren(selectEl);
@@ -1971,6 +2018,7 @@
               createHiddenInput('column_id', currentCellColumnId),
               createHiddenInput('student_id', currentCellStudentId),
             ]);
+            syncWorkflowContextInputs(form, { includeOpenCell: true });
 
             const topRow = createElement('div', { className: 'row g-2 align-items-end' });
             const statusCol = createElement('div', { className: 'col-12 col-md-4' });
@@ -2192,6 +2240,7 @@
               createHiddenInput('column_id', currentCellColumnId),
               createHiddenInput('student_id', currentCellStudentId),
             ]);
+            syncWorkflowContextInputs(form, { includeOpenCell: true });
 
             const topRow = createElement('div', { className: 'row g-2 align-items-end' });
             const statusCol = createElement('div', { className: 'col-12 col-md-4' });
@@ -2566,6 +2615,7 @@
           currentCellColumnId = Number(columnId);
           currentCellStudentId = Number(studentId);
           currentCellLocked = Boolean(data && data.column && data.column.is_locked);
+          syncStaticWorkflowForms();
           renderRetakes(data || null);
           renderAppeals(data || null);
           renderModeration(data || null);
@@ -3051,6 +3101,7 @@
           await submitAndRefreshCell(competencyChecklistForm, journalText.loadingSave);
         });
       }
+      syncStaticWorkflowForms();
       if (feedbackTemplateButtons.length && commentEl) {
         feedbackTemplateButtons.forEach((button) => {
           button.addEventListener('click', () => {

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.81",
+      "date": "2026-03-26",
+      "items": [
+        "refactor(journal-unified-workflow-redirects): route journal bulk grading, grade delete/restore, retakes, appeals, moderation, competency actions, column toggles, config saves, and template import through shared journal redirect helpers so subject, attendance, and active workflow context survive success and error round-trips consistently",
+        "fix(journal-bulk-save-error-path): replace the broken bulk-save catch path that still referenced `gradeDeleteRedirect`, and remove several stale unreachable redirect branches left behind by the earlier journal workflow refactor",
+        "fix(journal-modal-context-sync): sync subject, attendance, and active-cell hidden inputs into journal page forms and cell-modal forms, including dynamically rendered retake and appeal update forms, so async modal submits and fallback redirects land back in the same operational scope"
+      ]
+    },
+    {
       "version": "1.2.80",
       "date": "2026-03-26",
       "items": [
