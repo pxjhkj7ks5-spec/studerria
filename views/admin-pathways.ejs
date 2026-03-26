@@ -701,8 +701,7 @@
     { href: '#pathways-admissions', label: ui.navAdmissions },
     { href: '#pathways-presets', label: setupUi.navPresets },
     { href: '#pathways-contexts', label: ui.navContexts },
-    { href: '#pathways-mapping', label: ui.navMapping },
-    { href: '#pathways-subjects', label: ui.navSubjects },
+    { href: '#pathways-compatibility', label: isUk ? 'Compatibility tools' : 'Compatibility tools' },
     { href: '#pathways-campuses', label: ui.navCampuses },
     { href: '#pathways-migration', label: ui.navMigration },
     { href: '#pathways-moderation', label: setupUi.navModeration },
@@ -808,6 +807,26 @@
 
     const query = params.toString();
     return `/admin/pathways${query ? `?${query}` : ''}`;
+  };
+
+  const buildAdminScopeUrl = (context, tab) => {
+    const params = new URLSearchParams();
+    const contextId = Number(context && context.id ? context.id : 0) || 0;
+    const courseId = Number(context && context.course_id ? context.course_id : selectedCourseValue) || 0;
+    const trackValue = String((context && context.track_key) || activeTrack || '').trim();
+    const programValue = Number((context && context.program_id) || selectedProgramValue || 0) || 0;
+    const admissionValue = Number((context && context.admission_id) || selectedAdmissionValue || 0) || 0;
+    const stageValue = Number((context && context.stage) || 0) || 0;
+    const campusValue = String((context && context.campus_key) || '').trim();
+    if (tab) params.set('tab', String(tab));
+    if (courseId) params.set('course', String(courseId));
+    if (trackValue) params.set('track', trackValue);
+    if (programValue) params.set('program_id', String(programValue));
+    if (admissionValue) params.set('admission_id', String(admissionValue));
+    if (stageValue) params.set('stage', String(stageValue));
+    if (campusValue) params.set('campus', campusValue);
+    if (contextId) params.set('study_context_id', String(contextId));
+    return `/admin?${params.toString()}`;
   };
   const formatCampusLabel = (location) => String(location || 'kyiv').trim().toLowerCase() === 'munich' ? ui.campusMunich : ui.campusKyiv;
   const isTeacherCourse = (course) => course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
@@ -2003,6 +2022,16 @@
                       <strong class="mini-stat__value"><%= Number(context.user_count || 0) %></strong>
                     </div>
                   </div>
+                  <div class="d-flex flex-wrap gap-2 mt-2">
+                    <% if (Number(context.id || 0) !== Number(selectedStudyContextValue || 0)) { %>
+                      <a class="btn btn-soft btn-sm btn-pill" href="<%= buildPathwaysUrl({ study_context_id: context.id }) %>"><%= ui.focusCohort %></a>
+                    <% } %>
+                    <a class="btn btn-soft btn-sm btn-pill" href="<%= `${buildPathwaysUrl({ study_context_id: context.id })}#pathways-contexts` %>"><%= isUk ? 'Offerings' : 'Offerings' %></a>
+                    <a class="btn btn-soft btn-sm btn-pill" href="<%= `${buildPathwaysUrl({ study_context_id: context.id })}#pathways-presets` %>"><%= isUk ? 'Apply preset' : 'Apply preset' %></a>
+                    <a class="btn btn-soft btn-sm btn-pill" href="<%= `${buildPathwaysUrl({ study_context_id: context.id })}#pathways-admissions` %>"><%= isUk ? 'Promote +1' : 'Promote +1' %></a>
+                    <a class="btn btn-soft btn-sm btn-pill" href="<%= buildAdminScopeUrl(context, 'admin-users') %>"><%= isUk ? 'Юзери' : 'Users' %></a>
+                    <a class="btn btn-soft btn-sm btn-pill" href="<%= buildAdminScopeUrl(context, 'admin-teachers') %>"><%= isUk ? 'Teachers' : 'Teachers' %></a>
+                  </div>
                   <div class="program-card__footer muted"><%= ui.contextCourse %>: <%= context.primary_course_label || ui.noCourseSelected %></div>
                 </article>
               <% }) %>
@@ -2310,7 +2339,7 @@
             <div class="soft-panel muted">
               <div><%= ui.contextsEmpty %></div>
               <div class="mt-2">
-                <a class="btn btn-soft btn-pill" href="#pathways-mapping"><%= ui.reviewMapping %></a>
+                <a class="btn btn-soft btn-pill" href="#pathways-compatibility"><%= ui.reviewMapping %></a>
               </div>
             </div>
           <% } %>
@@ -2329,8 +2358,8 @@
           <article class="glass section h-100" id="pathways-mapping">
             <div class="section-header">
               <div>
-                <h2 class="section-title"><%= ui.mappingTitle %></h2>
-                <p class="section-subtitle"><%= ui.mappingSubtitle %></p>
+                <h2 class="section-title"><%= isUk ? `Legacy ${ui.mappingTitle}` : `Legacy ${ui.mappingTitle}` %></h2>
+                <p class="section-subtitle"><%= isUk ? 'Compatibility mirror для legacy course-to-admission routing. Використовуйте тільки для bridge/debug, не як primary setup flow.' : 'Compatibility mirror for legacy course-to-admission routing. Use this only for bridge/debug work, not as the primary setup flow.' %></p>
               </div>
               <span class="chip"><%= Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) %>/<%= Number(mappingSummary && mappingSummary.total ? mappingSummary.total : 0) %></span>
             </div>
@@ -2433,8 +2462,8 @@
           <article class="glass section h-100" id="pathways-subjects">
             <div class="section-header">
               <div>
-                <h2 class="section-title"><%= ui.subjectsTitle %></h2>
-                <p class="section-subtitle"><%= ui.subjectsSubtitle %></p>
+                <h2 class="section-title"><%= isUk ? `Legacy ${ui.subjectsTitle}` : `Legacy ${ui.subjectsTitle}` %></h2>
+                <p class="section-subtitle"><%= isUk ? 'Compatibility mirror для legacy subject visibility. Live offerings і context semesters залишаються primary editor.' : 'Compatibility mirror for legacy subject visibility. Live offerings and context semesters remain the primary editor.' %></p>
               </div>
               <span class="chip"><%= Number(visibilitySummary && visibilitySummary.visible ? visibilitySummary.visible : 0) %>/<%= Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) %></span>
             </div>
@@ -2531,7 +2560,14 @@
         </div>
       </section>
 
-      <section class="glass section mb-3">
+      <section class="glass section mb-3" id="pathways-compatibility">
+        <div class="section-header mb-3">
+          <div>
+            <h2 class="section-title"><%= isUk ? 'Compatibility tools' : 'Compatibility tools' %></h2>
+            <p class="section-subtitle"><%= isUk ? 'Legacy mapping і subject visibility лишаються тут тільки як compatibility/debug layer. Primary setup flow іде через presets, contexts, semesters і live offerings.' : 'Legacy mapping and subject visibility stay here only as a compatibility/debug layer. The primary setup flow now goes through presets, contexts, semesters, and live offerings.' %></p>
+          </div>
+          <span class="chip"><%= isUk ? 'Legacy' : 'Legacy' %></span>
+        </div>
         <div class="row g-3">
           <div class="col-12 col-xl-5">
             <div id="pathways-campuses">
@@ -2578,7 +2614,7 @@
                     <div class="soft-panel muted">
                       <div><%= ui.noCampusBindings %></div>
                       <div class="mt-2">
-                        <a class="btn btn-soft btn-pill" href="#pathways-mapping"><%= ui.reviewMapping %></a>
+                        <a class="btn btn-soft btn-pill" href="#pathways-compatibility"><%= ui.reviewMapping %></a>
                       </div>
                     </div>
                   <% } %>

@@ -4,6 +4,8 @@
   const selectedProgramValue = Number.isFinite(Number(selectedProgramId)) ? Number(selectedProgramId) : null;
   const selectedAdmissionValue = Number.isFinite(Number(selectedAdmissionId)) ? Number(selectedAdmissionId) : null;
   const selectedCampusValue = typeof selectedCampus === 'string' ? selectedCampus : '';
+  const selectedStudyContextValue = Number.isFinite(Number(selectedStudyContextId)) ? Number(selectedStudyContextId) : null;
+  const registrationContexts = Array.isArray(registrationStudyContexts) ? registrationStudyContexts : [];
   const registerCourseText = lang === 'en'
     ? {
         themeToggleAria: 'Change theme',
@@ -578,6 +580,7 @@
                 <div class="mb-3">
                   <label class="pathway-label"><%= registerCourseText.campus %></label>
                   <input type="hidden" name="course_id" id="selectedCourseIdInput" value="<%= Number(selectedCourseId || 0) || '' %>" />
+                  <input type="hidden" name="study_context_id" id="selectedStudyContextInput" value="<%= selectedStudyContextValue || '' %>" />
                   <input type="hidden" name="campus" id="selectedCampusInput" value="<%= selectedCampusValue %>" />
                   <div class="pathway-grid" id="campusOptions"></div>
                 </div>
@@ -611,6 +614,7 @@
       const pathwayAdmissions = Array.isArray(pathwayPayload.admissions) ? pathwayPayload.admissions : [];
       const pathwayLinks = Array.isArray(pathwayPayload.links) ? pathwayPayload.links : [];
       const pathwayCourses = Array.isArray(pathwayPayload.courses) ? pathwayPayload.courses : [];
+      const registrationContextPayload = <%- JSON.stringify(registrationContexts) %>;
       const programById = new Map(pathwayPrograms.map((program) => [Number(program.id || 0), program]));
       const admissionById = new Map(pathwayAdmissions.map((admission) => [Number(admission.id || 0), admission]));
       const academicContextSummaryEl = document.getElementById('academicContextSummary');
@@ -623,6 +627,7 @@
       const admissionInput = document.getElementById('selectedAdmissionInput');
       const admissionOptions = document.getElementById('admissionOptions');
       const courseIdInput = document.getElementById('selectedCourseIdInput');
+      const studyContextInput = document.getElementById('selectedStudyContextInput');
       const campusInput = document.getElementById('selectedCampusInput');
       const campusOptions = document.getElementById('campusOptions');
       const campusHint = document.getElementById('campusHint');
@@ -630,9 +635,13 @@
       const selectedProgramSeed = Number(programSelect?.dataset.selectedProgram || 0);
       const selectedAdmissionSeed = Number(admissionInput?.value || 0);
       const selectedCourseSeed = Number(courseIdInput?.value || 0);
+      const selectedStudyContextSeed = Number(studyContextInput?.value || 0);
       const selectedCampusSeed = String(campusInput?.value || '').trim().toLowerCase();
       const courseById = new Map(
         pathwayCourses.map((course) => [Number(course.id || 0), course])
+      );
+      const contextById = new Map(
+        (Array.isArray(registrationContextPayload) ? registrationContextPayload : []).map((context) => [Number(context.id || 0), context])
       );
 
       function formatLinkedCourseCount(count) {
@@ -700,9 +709,11 @@
         const trackKey = getSelectedTrack();
         const programId = Number(programSelect?.value || selectedProgramSeed || 0);
         const admissionId = Number(admissionInput?.value || selectedAdmissionSeed || 0);
-        const courseId = Number(courseIdInput?.value || selectedCourseSeed || 0);
+        const studyContextId = Number(studyContextInput?.value || 0);
+        const courseId = Number(courseIdInput?.value || 0);
         const program = programById.get(programId);
         const admission = admissionById.get(admissionId);
+        const studyContext = contextById.get(studyContextId);
         const course = courseById.get(courseId);
         const parts = [];
         parts.push(formatTrackLabelClient(trackKey));
@@ -712,7 +723,9 @@
         if (admission) {
           parts.push(`Cohort ${admission.admission_year}`);
         }
-        if (course) {
+        if (studyContext) {
+          parts.push(String(studyContext.label_uk || studyContext.label || '').trim() || `${formatCampusLabelClient(studyContext.campus_key)} / Year ${Number(studyContext.stage || studyContext.stage_number || 1)}`);
+        } else if (course) {
           parts.push(`${course.name || 'Course'} / ${formatCampusLabelClient(course.location)}`);
         }
         academicContextSummaryEl.textContent = parts.filter(Boolean).join(' / ') || 'Select track, program, admission year, and campus to resolve the academic context.';
@@ -858,7 +871,62 @@
           });
       }
 
-      function buildCampusChoices(admissionId, trackKey) {
+      function getRegistrationContextsForAdmission(admissionId, programId, trackKey) {
+        const targetAdmissionId = Number(admissionId || 0);
+        const targetProgramId = Number(programId || 0);
+        const normalizedTrack = String(trackKey || '').trim().toLowerCase();
+        if (!targetAdmissionId || !targetProgramId) return [];
+        return (Array.isArray(registrationContextPayload) ? registrationContextPayload : []).filter((context) => {
+          const contextStage = Number(context.stage || context.stage_number || 0);
+          const contextTrack = String(context.track_key || context.track || '').trim().toLowerCase();
+          return Number(context.admission_id || 0) === targetAdmissionId
+            && Number(context.program_id || 0) === targetProgramId
+            && contextTrack === normalizedTrack
+            && contextStage === 1;
+        });
+      }
+
+      function buildCampusChoices(admissionId, programId, trackKey) {
+        const contextRows = getRegistrationContextsForAdmission(admissionId, programId, trackKey);
+        if (contextRows.length) {
+          const campusMap = new Map();
+          contextRows.forEach((context) => {
+            const campusKey = normalizeCampusKey(context.campus_key || context.course_location || context.location);
+            const courseId = Number(context.course_id || 0);
+            const contextId = Number(context.id || 0);
+            if (!campusMap.has(campusKey)) {
+              campusMap.set(campusKey, {
+                campusKey,
+                campusLabel: formatCampusLabelClient(campusKey),
+                courseIds: [],
+                contextIds: [],
+              });
+            }
+            if (courseId) {
+              campusMap.get(campusKey).courseIds.push(courseId);
+            }
+            if (contextId) {
+              campusMap.get(campusKey).contextIds.push(contextId);
+            }
+          });
+
+          return ['kyiv', 'munich']
+            .map((campusKey) => campusMap.get(campusKey))
+            .filter(Boolean)
+            .map((entry) => {
+              const uniqueCourseIds = Array.from(new Set(entry.courseIds));
+              const uniqueContextIds = Array.from(new Set(entry.contextIds));
+              return {
+                campusKey: entry.campusKey,
+                campusLabel: entry.campusLabel,
+                courseCount: uniqueContextIds.length || uniqueCourseIds.length,
+                courseId: uniqueCourseIds.length === 1 ? uniqueCourseIds[0] : null,
+                studyContextId: uniqueContextIds.length === 1 ? uniqueContextIds[0] : null,
+                isAmbiguous: uniqueContextIds.length !== 1 || uniqueCourseIds.length !== 1,
+              };
+            });
+        }
+
         const campusMap = new Map();
         getAdmissionCourses(admissionId, trackKey).forEach((course) => {
           const courseId = Number(course.id || 0);
@@ -884,6 +952,7 @@
               campusLabel: entry.campusLabel,
               courseCount: uniqueIds.length,
               courseId: uniqueIds.length === 1 ? uniqueIds[0] : null,
+              studyContextId: null,
               isAmbiguous: uniqueIds.length !== 1,
             };
           });
@@ -900,14 +969,18 @@
         const trackKey = getSelectedTrack();
         const programId = Number(programSelect?.value || 0);
         const admissionId = Number(admissionInput?.value || 0);
-        const campusChoices = buildCampusChoices(admissionId, trackKey);
+        const campusChoices = buildCampusChoices(admissionId, programId, trackKey);
         const preferredCourse = courseById.get(selectedCourseSeed);
         const preferredCampus = selectedCampusSeed || (preferredCourse ? normalizeCampusKey(preferredCourse.location) : '');
         const activeCourseId = Number(courseIdInput.value || 0);
+        const activeStudyContextId = Number(studyContextInput?.value || 0);
         const activeCampusKey = String(campusInput.value || preferredCampus || '').trim().toLowerCase();
 
         campusOptions.innerHTML = '';
         courseIdInput.value = '';
+        if (studyContextInput) {
+          studyContextInput.value = '';
+        }
         campusInput.value = '';
 
         if (!admissionId) {
@@ -949,7 +1022,9 @@
           return;
         }
 
-        let selectedChoice = campusChoices.find((choice) => choice.courseId === activeCourseId) || null;
+        let selectedChoice = campusChoices.find((choice) => Number(choice.studyContextId || 0) === activeStudyContextId)
+          || campusChoices.find((choice) => choice.courseId === activeCourseId)
+          || null;
         if (!selectedChoice && activeCampusKey) {
           selectedChoice = campusChoices.find((choice) => choice.campusKey === activeCampusKey && !choice.isAmbiguous) || null;
         }
@@ -967,6 +1042,9 @@
           if (selectedChoice && selectedChoice.campusKey === choice.campusKey && !choice.isAmbiguous) {
             button.classList.add('is-selected');
             courseIdInput.value = String(choice.courseId || '');
+            if (studyContextInput) {
+              studyContextInput.value = String(choice.studyContextId || '');
+            }
             campusInput.value = choice.campusKey;
           }
 
@@ -986,6 +1064,9 @@
               campusOptions.querySelectorAll('.campus-option').forEach((item) => item.classList.remove('is-selected'));
               button.classList.add('is-selected');
               courseIdInput.value = String(choice.courseId || '');
+              if (studyContextInput) {
+                studyContextInput.value = String(choice.studyContextId || '');
+              }
               campusInput.value = choice.campusKey;
               setCampusHint(getCampusReadyHint(trackKey));
             });
@@ -994,7 +1075,7 @@
           campusOptions.appendChild(button);
         });
 
-        if (!courseIdInput.value || !campusInput.value) {
+        if (!courseIdInput.value || !campusInput.value || (Array.isArray(registrationContextPayload) && registrationContextPayload.length && studyContextInput && !studyContextInput.value)) {
           setCampusHint(registerCourseText.ambiguousCampusHint, true);
         } else {
           setCampusHint(getCampusReadyHint(trackKey));
@@ -1024,7 +1105,7 @@
 
       if (registerCourseForm) {
         registerCourseForm.addEventListener('submit', (event) => {
-          if (courseIdInput && !courseIdInput.value) {
+          if ((studyContextInput && !studyContextInput.value) || (courseIdInput && !courseIdInput.value)) {
             event.preventDefault();
             setCampusHint(registerCourseText.chooseValidCampus, true);
           }

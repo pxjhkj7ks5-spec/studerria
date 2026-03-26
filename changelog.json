@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.96",
+      "date": "2026-03-26",
+      "items": [
+        "feat(admin-academic-scope-topbar): replace the old course-only switcher in `/admin`, `/starosta`, and `/deanery` with a canonical academic scope stack (`track/program/admission/stage/campus`), persist that scope in query and session state, and keep legacy course-based panels running on a derived `course_id`",
+        "feat(context-first-users-admin): move the users API and moderation UI onto `study_context_id` as the primary academic placement, enrich `/admin/users.json` with resolved program/admission/stage/campus metadata, add batch moves between study contexts, and preserve the current admin scope after user actions like password reset, delete, and compatibility course moves",
+        "feat(pathways-compatibility-and-context-actions): keep registration and pathways focused on canonical study contexts by resolving `study_context_id` in the registration flow, demoting legacy mapping/visibility into `Compatibility tools`, and adding direct context actions from Academic Setup into offerings, preset apply flow, users, and teacher-related admin surfaces"
+      ]
+    },
+    {
       "version": "1.2.95",
       "date": "2026-03-26",
       "items": [

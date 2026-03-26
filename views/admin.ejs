@@ -896,26 +896,59 @@
     <% const sectionAllowed = (id) => !allowedSectionsList || allowedSectionsList.includes(id); %>
     <% const courseMap = {}; %>
     <% (courses || []).forEach(function(c) { courseMap[c.id] = c.name; }); %>
+    <% const scopeState = adminAcademicScope && typeof adminAcademicScope === 'object' ? adminAcademicScope : {}; %>
+    <% const scopeTrackOptions = Array.isArray(scopeState.trackOptions) ? scopeState.trackOptions : []; %>
+    <% const scopeProgramOptions = Array.isArray(scopeState.programOptions) ? scopeState.programOptions : []; %>
+    <% const scopeAdmissionOptions = Array.isArray(scopeState.admissionOptions) ? scopeState.admissionOptions : []; %>
+    <% const scopeStageOptions = Array.isArray(scopeState.stageOptions) ? scopeState.stageOptions : []; %>
+    <% const scopeCampusOptions = Array.isArray(scopeState.campusOptions) ? scopeState.campusOptions : []; %>
+    <% const scopeAvailableContexts = Array.isArray(scopeState.availableStudyContexts) ? scopeState.availableStudyContexts : []; %>
     <% const selectedCourse = (courses || []).find(function(c) { return Number(c.id) === Number(selectedCourseId); }) || {}; %>
     <% const selectedCourseLabel = selectedCourse.name || (courseMap[selectedCourseId] || ('Course ' + selectedCourseId)); %>
     <% const selectedCourseCampus = selectedCourse.is_teacher_course ? 'Teachers' : (String(selectedCourse.location || 'kyiv').toLowerCase() === 'munich' ? 'Munich' : 'Kyiv'); %>
-    <% const canSwitchCourse = typeof allowCourseSelect !== 'undefined' ? allowCourseSelect : !isLimitedView; %>
+    <% const selectedScopeLabel = scopeState.label || selectedCourseLabel; %>
+    <% const selectedScopeCampus = scopeState.selectedCampusLabel || selectedCourseCampus; %>
+    <% const canSwitchAcademicScope = (typeof allowCourseSelect !== 'undefined' ? allowCourseSelect : !isLimitedView) && Boolean(scopeTrackOptions.length || scopeProgramOptions.length || scopeAdmissionOptions.length || scopeStageOptions.length || scopeCampusOptions.length); %>
+    <% const scopeFormAction = role === 'deanery' ? '/deanery' : (role === 'starosta' ? '/starosta' : '/admin'); %>
     <nav class="navbar navbar-expand-lg admin-nav">
       <div class="container">
         <div class="admin-topbar-left">
           <span class="navbar-brand"><%= isLimitedView && role === 'starosta' ? t('admin.starostaPanel') : t('admin.title') %></span>
           <div class="admin-course-chip">
-            <span class="admin-course-label"><%= selectedCourseLabel %></span>
-            <span class="badge admin-campus-badge"><%= selectedCourseCampus %></span>
-            <% if (canSwitchCourse) { %>
-              <form class="admin-course-form" method="GET" action="<%= role === 'deanery' ? '/deanery' : (role === 'starosta' ? '/starosta' : '/admin') %>">
-                <select name="course" class="form-select form-select-sm" onchange="this.form.submit()">
-                  <% (courses || []).forEach(function(c) { %>
-                    <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>>
-                      <%= c.name %>
-                    </option>
-                  <% }); %>
-                </select>
+            <span class="admin-course-label"><%= selectedScopeLabel %></span>
+            <span class="badge admin-campus-badge"><%= selectedScopeCampus %></span>
+            <% if (canSwitchAcademicScope) { %>
+              <form class="admin-course-form admin-scope-form" method="GET" action="<%= scopeFormAction %>">
+                <% if (activeAdminTab) { %>
+                  <input type="hidden" name="tab" value="<%= activeAdminTab %>" />
+                <% } %>
+                <div class="admin-scope-fields">
+                  <select name="track" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <% scopeTrackOptions.forEach(function(option) { %>
+                      <option value="<%= option.value %>" <%= String(scopeState.track || '') === String(option.value || '') ? 'selected' : '' %>><%= option.label %></option>
+                    <% }); %>
+                  </select>
+                  <select name="program_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <% scopeProgramOptions.forEach(function(option) { %>
+                      <option value="<%= option.id %>" <%= Number(scopeState.programId || 0) === Number(option.id || 0) ? 'selected' : '' %>><%= option.label %></option>
+                    <% }); %>
+                  </select>
+                  <select name="admission_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <% scopeAdmissionOptions.forEach(function(option) { %>
+                      <option value="<%= option.id %>" <%= Number(scopeState.admissionId || 0) === Number(option.id || 0) ? 'selected' : '' %>><%= option.admission_year || option.label %></option>
+                    <% }); %>
+                  </select>
+                  <select name="stage" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <% scopeStageOptions.forEach(function(option) { %>
+                      <option value="<%= option.value %>" <%= Number(scopeState.stage || 0) === Number(option.value || 0) ? 'selected' : '' %>><%= option.label %></option>
+                    <% }); %>
+                  </select>
+                  <select name="campus" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <% scopeCampusOptions.forEach(function(option) { %>
+                      <option value="<%= option.value %>" <%= String(scopeState.campus || '') === String(option.value || '') ? 'selected' : '' %>><%= option.label %></option>
+                    <% }); %>
+                  </select>
+                </div>
               </form>
             <% } %>
           </div>
@@ -2273,7 +2306,16 @@
                 data-bs-parent="#usersFilterAccordion"
               >
                 <div class="accordion-body">
-                  <form method="GET" action="/admin">
+                  <form method="GET" action="<%= scopeFormAction %>">
+                    <% if (activeAdminTab) { %>
+                      <input type="hidden" name="tab" value="<%= activeAdminTab %>" />
+                    <% } %>
+                    <input type="hidden" name="track" value="<%= scopeState.track || '' %>" />
+                    <input type="hidden" name="program_id" value="<%= scopeState.programId || '' %>" />
+                    <input type="hidden" name="admission_id" value="<%= scopeState.admissionId || '' %>" />
+                    <input type="hidden" name="stage" value="<%= scopeState.stage || '' %>" />
+                    <input type="hidden" name="campus" value="<%= scopeState.campus || '' %>" />
+                    <input type="hidden" name="study_context_id" value="<%= scopeState.studyContextId || '' %>" />
                     <div class="row g-2 align-items-end">
                       <div class="col-12 col-md-5">
                         <label class="form-label"><%= t('admin.searchByName') %></label>
@@ -2305,6 +2347,22 @@
           <div class="bulk-bar" id="usersBulkBar">
             <div class="bulk-bar-content">
               <span class="bulk-count">Selected: <span id="usersBulkCount">0</span></span>
+              <form id="moveUsersContextForm" method="POST" action="/admin/users/study-context/batch" class="d-flex flex-wrap align-items-center gap-2">
+                <input type="hidden" name="track" value="<%= scopeState.track || '' %>" />
+                <input type="hidden" name="program_id" value="<%= scopeState.programId || '' %>" />
+                <input type="hidden" name="admission_id" value="<%= scopeState.admissionId || '' %>" />
+                <input type="hidden" name="stage" value="<%= scopeState.stage || '' %>" />
+                <input type="hidden" name="campus" value="<%= scopeState.campus || '' %>" />
+                <input type="hidden" name="study_context_id" value="<%= scopeState.studyContextId || '' %>" />
+                <div id="usersBulkContextIds"></div>
+                <select class="form-select form-select-sm" name="target_study_context_id" id="usersBulkContextSelect">
+                  <option value="">Move to context</option>
+                  <% scopeAvailableContexts.forEach(function(context) { %>
+                    <option value="<%= context.id %>"><%= context.label_uk || context.label %></option>
+                  <% }); %>
+                </select>
+                <button class="btn btn-outline-primary btn-sm" type="submit">Move context</button>
+              </form>
               <button class="btn btn-danger btn-sm" type="submit" form="deleteUsersForm" data-confirm="Delete selected users?" data-confirm-level="danger">Delete selected</button>
             </div>
           </div>
@@ -2340,6 +2398,12 @@
                 data-status="<%= usersStatus || 'active' %>"
                 data-role-filter="all"
                 data-course-id="<%= selectedCourseId || 1 %>"
+                data-track="<%= scopeState.track || '' %>"
+                data-program-id="<%= scopeState.programId || '' %>"
+                data-admission-id="<%= scopeState.admissionId || '' %>"
+                data-stage="<%= scopeState.stage || '' %>"
+                data-campus="<%= scopeState.campus || '' %>"
+                data-study-context-id="<%= scopeState.studyContextId || '' %>"
                 data-search="<%= (filters && filters.users_q) || '' %>"
                 data-group="<%= (filters && filters.users_group) || '' %>"
               >
@@ -4439,13 +4503,13 @@
               </div>
             </form>
 
-            <form method="POST" action="/admin/users/course" class="mb-3">
+            <form method="POST" action="/admin/users/study-context" class="mb-3" id="uaStudyContextForm">
               <input type="hidden" name="user_id" id="uaCourseUserId" />
               <input type="hidden" name="study_context_id" id="uaStudyContextId" value="" />
               <label class="form-label">Change academic context</label>
               <div class="d-flex gap-2 flex-column flex-md-row">
                 <select class="form-select" id="uaContextSelect" style="display:none;"></select>
-                <select class="form-select" name="course_id" id="uaCourseSelect" required>
+                <select class="form-select" name="course_id" id="uaCourseSelect">
                   <% (courses || []).forEach(function(c) { %>
                     <option value="<%= c.id %>"><%= c.name %></option>
                   <% }); %>
@@ -7163,6 +7227,29 @@
         const selected = document.querySelectorAll('input[name="delete_user_ids"]:checked').length;
         countEl.textContent = selected;
         bulkBar.classList.toggle('is-visible', selected > 0);
+        syncUsersBulkContextForm();
+      }
+
+      function syncUsersBulkContextForm() {
+        const form = document.getElementById('moveUsersContextForm');
+        const idsHost = document.getElementById('usersBulkContextIds');
+        const select = document.getElementById('usersBulkContextSelect');
+        if (!form || !idsHost || !select) return;
+        const selectedIds = Array.from(document.querySelectorAll('input[name="delete_user_ids"]:checked'))
+          .map((input) => String(input.value || '').trim())
+          .filter(Boolean);
+        idsHost.innerHTML = '';
+        selectedIds.forEach((userId) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'user_ids[]';
+          input.value = userId;
+          idsHost.appendChild(input);
+        });
+        const submitButton = form.querySelector('button[type="submit"]');
+        if (submitButton) {
+          submitButton.disabled = !(selectedIds.length && String(select.value || '').trim());
+        }
       }
 
       function safeParseJson(raw, fallback = []) {
@@ -7214,6 +7301,7 @@
       }
 
       function populateStudyContextEditor(row) {
+        const contextForm = document.getElementById('uaStudyContextForm');
         const contextSelect = document.getElementById('uaContextSelect');
         const contextHint = document.getElementById('uaContextHint');
         const contextIdInput = document.getElementById('uaStudyContextId');
@@ -7248,6 +7336,9 @@
         }
 
         if (hasContextOptions) {
+          if (contextForm) {
+            contextForm.action = '/admin/users/study-context';
+          }
           contextSelect.style.display = '';
           contextSelect.innerHTML = '';
           const placeholder = document.createElement('option');
@@ -7284,6 +7375,9 @@
             }
           };
         } else {
+          if (contextForm) {
+            contextForm.action = '/admin/users/course';
+          }
           contextSelect.style.display = 'none';
           courseSelect.style.display = '';
           courseSelect.required = true;
@@ -7466,13 +7560,26 @@
           `).join('');
           const status = tbodyEl.dataset.status || 'active';
           const courseId = tbodyEl.dataset.courseId || '1';
+          const track = tbodyEl.dataset.track || '';
+          const programId = tbodyEl.dataset.programId || '';
+          const admissionId = tbodyEl.dataset.admissionId || '';
+          const stage = tbodyEl.dataset.stage || '';
+          const campus = tbodyEl.dataset.campus || '';
+          const studyContextId = tbodyEl.dataset.studyContextId || '';
           const q = tbodyEl.dataset.search || '';
           const group = tbodyEl.dataset.group || '';
-          const res = await fetch(
-            `/admin/users.json?status=${encodeURIComponent(status)}&course=${encodeURIComponent(courseId)}&q=${encodeURIComponent(
-              q
-            )}&group=${encodeURIComponent(group)}`
-          );
+          const params = new URLSearchParams();
+          params.set('status', status);
+          params.set('course', courseId);
+          if (track) params.set('track', track);
+          if (programId) params.set('program_id', programId);
+          if (admissionId) params.set('admission_id', admissionId);
+          if (stage) params.set('stage', stage);
+          if (campus) params.set('campus', campus);
+          if (studyContextId) params.set('study_context_id', studyContextId);
+          if (q) params.set('q', q);
+          if (group) params.set('group', group);
+          const res = await fetch(`/admin/users.json?${params.toString()}`);
           if (!res.ok) return;
           const data = await res.json();
           const roleFilter = tbodyEl.dataset.roleFilter || 'all';
@@ -7490,6 +7597,7 @@
           renderUsersTable(filtered);
           bindUserRowClicks();
           bindSubjectButtons();
+          syncUsersBulkContextForm();
         } catch (err) {
           return;
         }
@@ -8165,6 +8273,23 @@
           schedule.value = '';
         }
       }
+
+      const bulkContextSelect = document.getElementById('usersBulkContextSelect');
+      if (bulkContextSelect) {
+        bulkContextSelect.addEventListener('change', syncUsersBulkContextForm);
+      }
+      const bulkContextForm = document.getElementById('moveUsersContextForm');
+      if (bulkContextForm) {
+        bulkContextForm.addEventListener('submit', (event) => {
+          syncUsersBulkContextForm();
+          const selectedIds = document.querySelectorAll('#usersBulkContextIds input[name="user_ids[]"]').length;
+          const targetContextId = String(bulkContextSelect && bulkContextSelect.value ? bulkContextSelect.value : '').trim();
+          if (!selectedIds || !targetContextId) {
+            event.preventDefault();
+          }
+        });
+      }
+      syncUsersBulkContextForm();
 
       const messageTarget = document.getElementById('messageTargetType');
       if (messageTarget) {

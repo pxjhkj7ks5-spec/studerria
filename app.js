@@ -9589,7 +9589,351 @@ function ensureUsersSchema(cb) {
   return cb(true);
 }
 
+function buildAcademicTrackOrderKey(trackKey) {
+  switch (String(trackKey || '').trim().toLowerCase()) {
+    case 'bachelor':
+      return 0;
+    case 'master':
+      return 1;
+    case 'teacher':
+      return 2;
+    default:
+      return 99;
+  }
+}
+
+function buildAdminScopeBasePath(req) {
+  if (hasSessionRole(req, 'deanery') && !hasSessionRole(req, 'admin')) {
+    return '/deanery';
+  }
+  if (hasSessionRole(req, 'starosta') && !hasSessionRole(req, 'admin')) {
+    return '/starosta';
+  }
+  return '/admin';
+}
+
+function getStoredAdminAcademicScope(req) {
+  const scope = req?.session?.adminAcademicScope;
+  if (!scope || typeof scope !== 'object') {
+    return {};
+  }
+  return scope;
+}
+
+function buildAdminScopeStatePayload(scopeState = {}, overrides = {}) {
+  const next = Object.assign({}, scopeState || {}, overrides || {});
+  const track = String(next.track || next.mode || '').trim().toLowerCase();
+  const campus = String(next.campus || next.campusKey || '').trim().toLowerCase();
+  return {
+    track: ['bachelor', 'master', 'teacher'].includes(track) ? track : '',
+    programId: parsePositiveIntStrict(next.programId || next.program_id),
+    admissionId: parsePositiveIntStrict(next.admissionId || next.admission_id),
+    stage: parsePositiveIntStrict(next.stage || next.stage_number),
+    campus: campus === 'munich' ? 'munich' : (campus === 'kyiv' ? 'kyiv' : ''),
+    studyContextId: parsePositiveIntStrict(next.studyContextId || next.study_context_id),
+    courseId: parsePositiveIntStrict(next.courseId || next.course || next.course_id),
+  };
+}
+
+function buildStaffPanelScopeUrl(req, scopeState = {}, overrides = {}) {
+  const state = buildAdminScopeStatePayload(scopeState, overrides);
+  const params = new URLSearchParams();
+  if (state.courseId) {
+    params.set('course', String(state.courseId));
+  }
+  if (state.track) {
+    params.set('track', state.track);
+  }
+  if (state.programId) {
+    params.set('program_id', String(state.programId));
+  }
+  if (state.admissionId) {
+    params.set('admission_id', String(state.admissionId));
+  }
+  if (state.stage) {
+    params.set('stage', String(state.stage));
+  }
+  if (state.campus) {
+    params.set('campus', state.campus);
+  }
+  if (state.studyContextId) {
+    params.set('study_context_id', String(state.studyContextId));
+  }
+  const basePath = buildAdminScopeBasePath(req);
+  const query = params.toString();
+  return query ? `${basePath}?${query}` : basePath;
+}
+
+function appendQueryParamToUrl(url, key, value) {
+  if (!url || !key || typeof value === 'undefined' || value === null || value === '') {
+    return url;
+  }
+  const separator = String(url).includes('?') ? '&' : '?';
+  return `${url}${separator}${encodeURIComponent(String(key))}=${encodeURIComponent(String(value))}`;
+}
+
+async function buildAdminAcademicScopeState(req, options = {}) {
+  const courses = Array.isArray(options.courses)
+    ? options.courses
+    : await getCoursesCached();
+  const rawStudyContexts = Array.isArray(options.studyContexts)
+    ? options.studyContexts
+    : await listStudyContextOptions();
+  const allowedCourseIdSet = options.allowedCourseIds instanceof Set
+    ? options.allowedCourseIds
+    : (Array.isArray(options.allowedCourseIds)
+      ? new Set(
+        options.allowedCourseIds
+          .map((value) => parsePositiveIntStrict(value))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      )
+      : null);
+  const studyContexts = (rawStudyContexts || [])
+    .filter((context) => {
+      const courseId = Number(context && context.course_id ? context.course_id : 0);
+      if (!allowedCourseIdSet) {
+        return true;
+      }
+      if (!courseId) {
+        return false;
+      }
+      return allowedCourseIdSet.has(courseId);
+    })
+    .sort((a, b) => {
+      const trackDiff = buildAcademicTrackOrderKey(a.track_key) - buildAcademicTrackOrderKey(b.track_key);
+      if (trackDiff !== 0) return trackDiff;
+      const programDiff = String(a.program_name || a.program_code || '').localeCompare(String(b.program_name || b.program_code || ''), 'uk', { sensitivity: 'base' });
+      if (programDiff !== 0) return programDiff;
+      const yearDiff = Number(b.admission_year || 0) - Number(a.admission_year || 0);
+      if (yearDiff !== 0) return yearDiff;
+      const stageDiff = Number(a.stage || 0) - Number(b.stage || 0);
+      if (stageDiff !== 0) return stageDiff;
+      return String(a.campus_key || '').localeCompare(String(b.campus_key || ''));
+    });
+
+  const storedScope = getStoredAdminAcademicScope(req);
+  const queryOrBodyTrack = String(
+    (req.body && (req.body.track || req.body.mode))
+    || (req.query && (req.query.track || req.query.mode))
+    || storedScope.track
+    || ''
+  ).trim().toLowerCase();
+  const requestedScope = {
+    track: ['bachelor', 'master', 'teacher'].includes(queryOrBodyTrack) ? queryOrBodyTrack : '',
+    programId: parsePositiveIntStrict(
+      (req.body && (req.body.program_id || req.body.programId))
+      || (req.query && (req.query.program_id || req.query.programId))
+      || storedScope.programId
+    ),
+    admissionId: parsePositiveIntStrict(
+      (req.body && (req.body.admission_id || req.body.admissionId))
+      || (req.query && (req.query.admission_id || req.query.admissionId))
+      || storedScope.admissionId
+    ),
+    stage: parsePositiveIntStrict(
+      (req.body && (req.body.stage || req.body.stage_number))
+      || (req.query && (req.query.stage || req.query.stage_number))
+      || storedScope.stage
+    ),
+    campus: parseCourseCampus(
+      (req.body && (req.body.campus || req.body.campus_key))
+      || (req.query && (req.query.campus || req.query.campus_key))
+      || storedScope.campus
+      || ''
+    ),
+    studyContextId: parsePositiveIntStrict(
+      (req.body && (req.body.study_context_id || req.body.studyContextId))
+      || (req.query && (req.query.study_context_id || req.query.studyContextId))
+      || storedScope.studyContextId
+    ),
+    courseId: parsePositiveIntStrict(
+      (req.body && (req.body.course_id || req.body.course))
+      || (req.query && (req.query.course_id || req.query.course))
+      || storedScope.courseId
+      || req.session.adminCourse
+      || options.fallbackCourseId
+      || (req.session.user && req.session.user.course_id)
+      || ((courses && courses[0] && courses[0].id) || null)
+    ),
+  };
+
+  const explicitContext = requestedScope.studyContextId
+    ? (studyContexts.find((context) => Number(context.id || 0) === Number(requestedScope.studyContextId || 0)) || null)
+    : null;
+  const fallbackCourse = requestedScope.courseId
+    ? ((courses || []).find((course) => Number(course.id || 0) === Number(requestedScope.courseId || 0)) || null)
+    : null;
+  let selectedTrack = explicitContext
+    ? normalizeRegistrationTrack(explicitContext.track_key, 'bachelor')
+    : requestedScope.track;
+  if (!selectedTrack) {
+    selectedTrack = fallbackCourse ? inferRegistrationTrackFromCourse(fallbackCourse) : '';
+  }
+  const trackSet = Array.from(new Set(
+    studyContexts
+      .map((context) => normalizeRegistrationTrack(context.track_key, 'bachelor'))
+      .filter(Boolean)
+  ));
+  trackSet.sort((a, b) => buildAcademicTrackOrderKey(a) - buildAcademicTrackOrderKey(b));
+  if (!trackSet.includes(selectedTrack)) {
+    selectedTrack = trackSet[0] || selectedTrack || 'bachelor';
+  }
+  const trackContexts = studyContexts.filter((context) => normalizeRegistrationTrack(context.track_key, 'bachelor') === selectedTrack);
+  const programOptions = Array.from(new Map(
+    trackContexts
+      .map((context) => [Number(context.program_id || 0), {
+        id: Number(context.program_id || 0) || null,
+        label: context.program_code
+          ? `${String(context.program_name || '').trim()} (${String(context.program_code || '').trim()})`
+          : String(context.program_name || context.program_code || '').trim(),
+      }])
+      .filter(([programId]) => Number.isInteger(programId) && programId > 0)
+  ).values()).sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'uk', { sensitivity: 'base' }));
+  let selectedProgramId = explicitContext && Number(explicitContext.program_id || 0) > 0
+    ? Number(explicitContext.program_id || 0)
+    : requestedScope.programId;
+  if (!programOptions.some((option) => Number(option.id || 0) === Number(selectedProgramId || 0))) {
+    selectedProgramId = programOptions[0] ? Number(programOptions[0].id || 0) : null;
+  }
+
+  const programContexts = trackContexts.filter((context) => Number(context.program_id || 0) === Number(selectedProgramId || 0));
+  const admissionOptions = Array.from(new Map(
+    programContexts
+      .map((context) => [Number(context.admission_id || 0), {
+        id: Number(context.admission_id || 0) || null,
+        admission_year: Number(context.admission_year || 0) || null,
+        label: Number(context.admission_year || 0) || context.admission_id || '',
+      }])
+      .filter(([admissionId]) => Number.isInteger(admissionId) && admissionId > 0)
+  ).values()).sort((a, b) => Number(b.admission_year || 0) - Number(a.admission_year || 0));
+  let selectedAdmissionId = explicitContext && Number(explicitContext.admission_id || 0) > 0
+    ? Number(explicitContext.admission_id || 0)
+    : requestedScope.admissionId;
+  if (!admissionOptions.some((option) => Number(option.id || 0) === Number(selectedAdmissionId || 0))) {
+    selectedAdmissionId = admissionOptions[0] ? Number(admissionOptions[0].id || 0) : null;
+  }
+
+  const admissionContexts = programContexts.filter((context) => Number(context.admission_id || 0) === Number(selectedAdmissionId || 0));
+  const stageOptions = Array.from(new Map(
+    admissionContexts
+      .map((context) => {
+        const stageNumber = normalizeStudyContextStage(context.stage, 1);
+        return [stageNumber, {
+          value: stageNumber,
+          label: academicSetupHelpers.buildStageLabel(stageNumber, selectedTrack, 'uk'),
+        }];
+      })
+  ).values()).sort((a, b) => Number(a.value || 0) - Number(b.value || 0));
+  let selectedStage = explicitContext ? normalizeStudyContextStage(explicitContext.stage, 1) : requestedScope.stage;
+  if (!stageOptions.some((option) => Number(option.value || 0) === Number(selectedStage || 0))) {
+    selectedStage = stageOptions[0] ? Number(stageOptions[0].value || 0) : 1;
+  }
+
+  const stageContexts = admissionContexts.filter((context) => normalizeStudyContextStage(context.stage, 1) === Number(selectedStage || 0));
+  const campusOptions = Array.from(new Map(
+    stageContexts
+      .map((context) => {
+        const campusKey = normalizeCourseCampus(context.campus_key || context.course_location || '', 'kyiv');
+        return [campusKey, {
+          value: campusKey,
+          label: campusKey === 'munich' ? 'Munich' : 'Kyiv',
+        }];
+      })
+  ).values()).sort((a, b) => String(a.label || '').localeCompare(String(b.label || '')));
+  let selectedCampus = explicitContext
+    ? normalizeCourseCampus(explicitContext.campus_key || explicitContext.course_location || '', 'kyiv')
+    : requestedScope.campus;
+  if (!campusOptions.some((option) => option.value === selectedCampus)) {
+    selectedCampus = campusOptions[0] ? String(campusOptions[0].value || '') : normalizeCourseCampus((fallbackCourse && fallbackCourse.location) || '', 'kyiv');
+  }
+
+  const scopedContextOptions = stageContexts.filter(
+    (context) => normalizeCourseCampus(context.campus_key || context.course_location || '', 'kyiv') === selectedCampus
+  );
+  let selectedContext = explicitContext
+    && scopedContextOptions.some((context) => Number(context.id || 0) === Number(explicitContext.id || 0))
+    ? explicitContext
+    : null;
+  if (!selectedContext && requestedScope.studyContextId) {
+    selectedContext = scopedContextOptions.find((context) => Number(context.id || 0) === Number(requestedScope.studyContextId || 0)) || null;
+  }
+  if (!selectedContext && requestedScope.courseId) {
+    selectedContext = scopedContextOptions.find((context) => Number(context.course_id || 0) === Number(requestedScope.courseId || 0)) || null;
+  }
+  if (!selectedContext && scopedContextOptions.length === 1) {
+    selectedContext = scopedContextOptions[0];
+  }
+  if (!selectedContext && scopedContextOptions.length > 1) {
+    selectedContext = scopedContextOptions[0];
+  }
+
+  const selectedCourseId = selectedContext && Number(selectedContext.course_id || 0) > 0
+    ? Number(selectedContext.course_id || 0)
+    : requestedScope.courseId
+      || parsePositiveIntStrict(options.fallbackCourseId)
+      || parsePositiveIntStrict(req.session.user && req.session.user.course_id)
+      || ((courses && courses[0] && Number(courses[0].id || 0)) || null);
+  const selectedCourse = (courses || []).find((course) => Number(course.id || 0) === Number(selectedCourseId || 0)) || fallbackCourse || null;
+  if (selectedContext) {
+    selectedTrack = normalizeRegistrationTrack(selectedContext.track_key, selectedTrack || 'bachelor');
+    selectedProgramId = Number(selectedContext.program_id || 0) || selectedProgramId || null;
+    selectedAdmissionId = Number(selectedContext.admission_id || 0) || selectedAdmissionId || null;
+    selectedStage = normalizeStudyContextStage(selectedContext.stage, selectedStage || 1);
+    selectedCampus = normalizeCourseCampus(selectedContext.campus_key || selectedContext.course_location || selectedCampus || '', 'kyiv');
+  }
+
+  const trackOptions = trackSet.map((trackKey) => ({
+    value: trackKey,
+    label: trackKey === 'master' ? 'Masters' : (trackKey === 'teacher' ? 'Teachers' : 'Bachelors'),
+  }));
+  const selectedProgram = programOptions.find((option) => Number(option.id || 0) === Number(selectedProgramId || 0)) || null;
+  const selectedAdmission = admissionOptions.find((option) => Number(option.id || 0) === Number(selectedAdmissionId || 0)) || null;
+  const selectedStageOption = stageOptions.find((option) => Number(option.value || 0) === Number(selectedStage || 0)) || null;
+  const selectedCampusOption = campusOptions.find((option) => String(option.value || '') === String(selectedCampus || '')) || null;
+  const selectedLabel = selectedContext
+    ? (selectedContext.label_uk || selectedContext.label || buildStudyContextLabel(selectedContext, 'uk'))
+    : (selectedCourse && selectedCourse.name ? String(selectedCourse.name) : (selectedProgram ? selectedProgram.label : 'Academic scope'));
+
+  const storedPayload = {
+    track: selectedTrack,
+    programId: selectedProgramId || null,
+    admissionId: selectedAdmissionId || null,
+    stage: selectedStage || null,
+    campus: selectedCampus || '',
+    studyContextId: selectedContext ? Number(selectedContext.id || 0) || null : null,
+    courseId: selectedCourseId || null,
+  };
+  req.session.adminAcademicScope = storedPayload;
+  if (storedPayload.courseId) {
+    req.session.adminCourse = storedPayload.courseId;
+  }
+
+  return {
+    ...storedPayload,
+    label: selectedLabel,
+    selectedCourse,
+    selectedContext,
+    selectedTrackLabel: trackOptions.find((option) => option.value === selectedTrack)?.label || selectedTrack,
+    selectedProgramLabel: selectedProgram ? selectedProgram.label : '',
+    selectedAdmissionYear: selectedAdmission ? Number(selectedAdmission.admission_year || 0) || null : null,
+    selectedStageLabel: selectedStageOption ? selectedStageOption.label : '',
+    selectedCampusLabel: selectedCampusOption ? selectedCampusOption.label : (selectedCampus === 'munich' ? 'Munich' : 'Kyiv'),
+    trackOptions,
+    programOptions,
+    admissionOptions,
+    stageOptions,
+    campusOptions,
+    contextOptions: scopedContextOptions,
+    availableStudyContexts: studyContexts,
+    availableCourseIds: allowedCourseIdSet ? Array.from(allowedCourseIdSet.values()) : (courses || []).map((course) => Number(course.id || 0)).filter((value) => Number.isInteger(value) && value > 0),
+  };
+}
+
 function getAdminCourse(req) {
+  const scopedCourse = Number(req?.session?.adminAcademicScope?.courseId || 0);
+  if (!Number.isNaN(scopedCourse) && scopedCourse > 0) {
+    return scopedCourse;
+  }
   if (hasSessionRole(req, 'admin')) {
     const queryCourse = Number(req.query.course);
     if (!Number.isNaN(queryCourse) && queryCourse > 0) {
@@ -9607,6 +9951,10 @@ function getAdminCourse(req) {
 }
 
 function getStaffCourse(req) {
+  const scopedCourse = Number(req?.session?.adminAcademicScope?.courseId || 0);
+  if (!Number.isNaN(scopedCourse) && scopedCourse > 0) {
+    return scopedCourse;
+  }
   if (hasSessionRole(req, 'admin')) {
     return getAdminCourse(req);
   }
@@ -13521,13 +13869,19 @@ app.get('/register/course', async (req, res) => {
   }
   try {
     await ensureDbReady();
-    const [courses, pendingUser, registrationPathways] = await Promise.all([
+    const [courses, pendingUser, registrationPathways, registrationStudyContexts] = await Promise.all([
       getCoursesCached(),
       db.get(
         'SELECT course_id, study_track, study_program_id, admission_id, study_context_id FROM users WHERE id = ?',
         [req.session.pendingUserId]
       ),
       getRegistrationPathways(),
+      listStudyContextOptions().catch((err) => {
+        if (isDbSchemaCompatibilityError(err)) {
+          return [];
+        }
+        throw err;
+      }),
     ]);
     if (!pendingUser) {
       req.session.pendingUserId = null;
@@ -13558,6 +13912,7 @@ app.get('/register/course', async (req, res) => {
       selectedProgramId,
       selectedAdmissionId,
       registrationPathways,
+      registrationStudyContexts,
       selectedStudyContextId: pendingPlacement && pendingPlacement.study_context_id ? Number(pendingPlacement.study_context_id) : null,
       pendingStudyContext: pendingPlacement,
       error: req.query.error || '',
@@ -13592,6 +13947,15 @@ app.post('/register/course', registerLimiter, async (req, res) => {
 
   try {
     await ensureDbReady();
+
+    if (studyContextId && !courseId) {
+      const selectedContext = await getStudyContextById(studyContextId);
+      if (selectedContext) {
+        courseId = parsePositiveIntStrict(selectedContext.course_id) || courseId;
+        selectedProgramId = selectedProgramId || parsePositiveIntStrict(selectedContext.program_id);
+        selectedAdmissionId = selectedAdmissionId || parsePositiveIntStrict(selectedContext.admission_id);
+      }
+    }
 
     if (trackFromBody === 'teacher' && !selectedAdmissionId && selectedProgramId) {
       selectedAdmissionId = await resolveLatestRegistrationAdmissionId(selectedProgramId, {
@@ -31711,6 +32075,7 @@ const buildAdminTemplateLocals = (overrides = {}) => ({
   semestersByCourse: {},
   activeSemester: null,
   selectedCourseId: null,
+  adminAcademicScope: null,
   limitedStaffView: false,
   allowedSections: null,
   allowCourseSelect: false,
@@ -31765,7 +32130,15 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
       : (hasSessionRole(req, 'starosta')
         ? 'starosta'
         : normalizeRoleKey(req.session.role || 'student')));
-  const courseId = getAdminCourse(req);
+  let adminAcademicScope = null;
+  try {
+    adminAcademicScope = await buildAdminAcademicScopeState(req);
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scope');
+  }
+  const courseId = adminAcademicScope && adminAcademicScope.courseId
+    ? Number(adminAcademicScope.courseId)
+    : getAdminCourse(req);
   const {
     group_number,
     day,
@@ -32460,7 +32833,8 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         semestersByCourse,
         activeSemester,
         selectedCourseId: courseId,
-        adminHomeHref: getStaffPanelBase(req, courseId),
+        adminAcademicScope,
+        adminHomeHref: buildStaffPanelScopeUrl(req, adminAcademicScope || { courseId }),
         allowCourseSelect: isAdminPanelOwner && Array.isArray(courses) && courses.length > 1,
         limitedStaffView: !isAdminPanelOwner,
         allowedSections,
@@ -36161,22 +36535,26 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
         missingContextCourseIds.push(sourceCourseId);
         continue;
       }
-      const updatedRows = await db.all(
+      const usersToMigrate = await db.all(
         `
-          UPDATE users
-          SET
-            study_context_id = ?,
-            course_id = ?,
-            study_track = ?,
-            study_program_id = ?,
-            admission_id = ?
+          SELECT id
+          FROM users
           WHERE course_id = ?
             AND LOWER(COALESCE(role, '')) <> 'admin'
-          RETURNING id
         `,
-        [targetContextId, sourceCourseId, admissionRow.track_key, resolvedProgramId, admissionId, sourceCourseId]
+        [sourceCourseId]
       );
-      migratedCount += Array.isArray(updatedRows) ? updatedRows.length : 0;
+      for (const userRow of usersToMigrate || []) {
+        await assignUserStudyContext(Number(userRow.id || 0), targetContextId, {
+          courseId: sourceCourseId,
+          trackKey: admissionRow.track_key,
+          programId: resolvedProgramId,
+          admissionId,
+        });
+        if (Number(userRow.id || 0) > 0) {
+          migratedCount += 1;
+        }
+      }
     }
 
     if (missingContextCourseIds.length) {
@@ -43753,16 +44131,87 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
   const status = rawStatus === 'inactive' || rawStatus === 'all' ? rawStatus : 'active';
   const q = req.query.q;
   const group = req.query.group;
-  const courseId = getAdminCourse(req);
-  ensureUsersSchema(() => {
-    const userFilters = ['u.course_id = ?'];
-    const userParams = [courseId];
+  ensureUsersSchema(() => {});
+  try {
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const courseId = adminAcademicScope && adminAcademicScope.courseId
+      ? Number(adminAcademicScope.courseId)
+      : getAdminCourse(req);
+    const userFilters = [];
+    const userParams = [];
+    if (adminAcademicScope && adminAcademicScope.studyContextId) {
+      userFilters.push(
+        `
+          (
+            u.study_context_id = ?
+            OR (
+              u.study_context_id IS NULL
+              AND u.course_id = ?
+              AND COALESCE(u.study_program_id, 0) = ?
+              AND COALESCE(u.admission_id, 0) = ?
+              AND LOWER(COALESCE(NULLIF(TRIM(u.study_track), ''), ?)) = ?
+            )
+          )
+        `
+      );
+      userParams.push(
+        Number(adminAcademicScope.studyContextId || 0),
+        Number(courseId || 0),
+        Number(adminAcademicScope.programId || 0),
+        Number(adminAcademicScope.admissionId || 0),
+        String(adminAcademicScope.track || 'bachelor'),
+        String(adminAcademicScope.track || 'bachelor')
+      );
+    } else {
+      userFilters.push('u.course_id = ?');
+      userParams.push(Number(courseId || 0));
+    }
     if (usersHasIsActive) {
       if (status === 'inactive') {
         userFilters.push('u.is_active = 0');
       } else if (status === 'active') {
         userFilters.push('u.is_active = 1');
       }
+    }
+    if (adminAcademicScope && adminAcademicScope.programId && !adminAcademicScope.studyContextId) {
+      userFilters.push('COALESCE(coh.program_id, u.study_program_id) = ?');
+      userParams.push(Number(adminAcademicScope.programId || 0));
+    }
+    if (adminAcademicScope && adminAcademicScope.admissionId && !adminAcademicScope.studyContextId) {
+      userFilters.push('COALESCE(coh.legacy_admission_id, u.admission_id) = ?');
+      userParams.push(Number(adminAcademicScope.admissionId || 0));
+    }
+    if (adminAcademicScope && adminAcademicScope.track && !adminAcademicScope.studyContextId) {
+      userFilters.push(
+        `
+          LOWER(
+            COALESCE(
+              NULLIF(TRIM(p.track_key), ''),
+              NULLIF(TRIM(u.study_track), ''),
+              CASE WHEN COALESCE(course_meta.is_teacher_course, 0) = 1 THEN 'teacher' ELSE 'bachelor' END
+            )
+          ) = ?
+        `
+      );
+      userParams.push(String(adminAcademicScope.track || 'bachelor'));
+    }
+    if (adminAcademicScope && adminAcademicScope.stage && !adminAcademicScope.studyContextId) {
+      userFilters.push('COALESCE(sc.stage_number, ?) = ?');
+      userParams.push(Number(adminAcademicScope.stage || 1), Number(adminAcademicScope.stage || 1));
+    }
+    if (adminAcademicScope && adminAcademicScope.campus && !adminAcademicScope.studyContextId) {
+      userFilters.push(
+        `
+          LOWER(
+            COALESCE(
+              NULLIF(TRIM(sc.campus_key), ''),
+              NULLIF(TRIM(course_meta.location), ''),
+              'kyiv'
+            )
+          ) = ?
+        `
+      );
+      userParams.push(String(adminAcademicScope.campus || 'kyiv'));
     }
     if (q) {
       userFilters.push('u.full_name ILIKE ?');
@@ -43774,7 +44223,7 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
     }
     const userWhere = userFilters.length ? `WHERE ${userFilters.join(' AND ')}` : '';
     const activeColumn = usersHasIsActive ? 'u.is_active,' : '';
-    db.all(
+    const users = await db.all(
       `
         SELECT
           u.id,
@@ -43795,6 +44244,10 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
           COALESCE(usc.risk_score, 0)::int AS security_risk_score,
           usc.updated_at AS security_case_updated_at
         FROM users u
+        LEFT JOIN study_contexts sc ON sc.id = u.study_context_id
+        LEFT JOIN cohorts coh ON coh.id = sc.cohort_id
+        LEFT JOIN study_programs p ON p.id = coh.program_id
+        LEFT JOIN courses course_meta ON course_meta.id = u.course_id
         LEFT JOIN LATERAL (
           SELECT re.ip, re.user_agent
           FROM user_registration_events re
@@ -43806,141 +44259,140 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
         ${userWhere}
         ORDER BY u.full_name
       `,
-      userParams,
-      (userErr, users) => {
-        if (userErr) {
-          console.error('Database error (admin.users.json.users)', userErr);
-          return res.status(500).json({ error: 'Database error' });
-        }
-        getSubjectsCached(courseId)
-          .then((subjects) => {
-            getCoursesCached()
-              .then((courses) => {
-                db.all(
-                  `
-                    SELECT sg.student_id, sg.subject_id, sg.group_number
-                    FROM student_groups sg
-                    JOIN subjects s ON s.id = sg.subject_id
-                    JOIN subject_course_bindings scb ON scb.subject_id = s.id
-                    WHERE scb.course_id = ?
-                  `,
-                  [courseId],
-                  (sgErr, studentGroups) => {
-                    if (sgErr) {
-                      console.error('Database error (admin.users.json.studentGroups)', sgErr);
-                      return res.status(500).json({ error: 'Database error' });
-                    }
-                    (async () => {
-                      const userIds = (users || []).map((user) => Number(user.id)).filter((id) => Number.isFinite(id));
-                      const assignment = await getUserRoleAssignmentsForUserIds(userIds);
-                      const placementRows = await db.all(
-                        `
-                          SELECT
-                            u.id AS user_id,
-                            sc.id AS study_context_id,
-                            sc.stage_number AS stage,
-                            sc.campus_key,
-                            coh.id AS cohort_id,
-                            coh.admission_year,
-                            coh.legacy_admission_id AS admission_id,
-                            p.id AS program_id,
-                            p.code AS program_code,
-                            p.name AS program_name,
-                            p.track_key,
-                            primary_binding.course_id,
-                            c.name AS course_name
-                          FROM users u
-                          LEFT JOIN study_contexts sc ON sc.id = u.study_context_id
-                          LEFT JOIN cohorts coh ON coh.id = sc.cohort_id
-                          LEFT JOIN study_programs p ON p.id = coh.program_id
-                          LEFT JOIN LATERAL (
-                            SELECT sccb.course_id
-                            FROM study_context_course_bindings sccb
-                            WHERE sccb.study_context_id = sc.id
-                            ORDER BY sccb.is_primary DESC, sccb.course_id ASC
-                            LIMIT 1
-                          ) primary_binding ON true
-                          LEFT JOIN courses c ON c.id = primary_binding.course_id
-                          WHERE u.id = ANY(?::int[])
-                        `,
-                        [userIds.length ? userIds : [0]]
-                      ).catch((err) => {
-                        if (isDbSchemaCompatibilityError(err)) {
-                          return [];
-                        }
-                        throw err;
-                      });
-                      const placementByUserId = new Map();
-                      (placementRows || []).forEach((row) => {
-                        const userId = Number(row.user_id || 0);
-                        if (!userId) return;
-                        const context = {
-                          id: Number(row.study_context_id || 0) || null,
-                          course_id: Number(row.course_id || 0) || null,
-                          stage: normalizeStudyContextStage(row.stage, 1),
-                          campus_key: normalizeCourseCampus(row.campus_key || 'kyiv'),
-                          cohort_id: Number(row.cohort_id || 0) || null,
-                          admission_id: Number(row.admission_id || 0) || null,
-                          admission_year: Number(row.admission_year || 0) || null,
-                          program_id: Number(row.program_id || 0) || null,
-                          program_code: sanitizeCompactText(row.program_code || '', 40),
-                          program_name: sanitizeCompactText(row.program_name || '', 140),
-                          track_key: normalizeRegistrationTrack(row.track_key, 'bachelor'),
-                          course_name: sanitizeCompactText(row.course_name || '', 140),
-                        };
-                        placementByUserId.set(userId, {
-                          ...context,
-                          label: context.id ? buildStudyContextLabel(context, 'en') : '',
-                          label_uk: context.id ? buildStudyContextLabel(context, 'uk') : '',
-                        });
-                      });
-                      const studyContexts = await listStudyContextOptions();
-                      const usersWithRoles = (users || []).map((user) => {
-                        const userId = Number(user.id);
-                        const roleKeys = assignment.roleKeysByUser[userId] || [normalizeRoleKey(user.role || 'student')];
-                        const primaryRole = assignment.primaryRoleByUser[userId]
-                          || normalizeRoleKey(user.role || roleKeys[0] || 'student');
-                        const placement = placementByUserId.get(userId) || null;
-                        return {
-                          ...user,
-                          role_keys: roleKeys,
-                          primary_role: primaryRole,
-                          study_context: placement,
-                          study_context_id: placement && placement.id ? placement.id : null,
-                          study_context_label: placement && placement.label_uk ? placement.label_uk : '',
-                          study_context_name: placement && placement.label_uk ? placement.label_uk : '',
-                          study_context_course_id: placement && placement.course_id ? placement.course_id : null,
-                          study_context_options: studyContexts,
-                          context_options: studyContexts,
-                        };
-                      });
-                      res.json({
-                        users: usersWithRoles,
-                        subjects,
-                        studentGroups,
-                        courses,
-                        studyContexts,
-                        selectedCourseId: courseId,
-                      });
-                    })().catch((roleErr) => {
-                      console.error('Database error (admin.users.json.roles)', roleErr);
-                      return res.status(500).json({ error: 'Database error' });
-                    });
-                  }
-                );
-              })
-              .catch((courseErr) => {
-                console.error('Database error (admin.users.json.courses)', courseErr);
-                return res.status(500).json({ error: 'Database error' });
-              });
-          })
-          .catch((subjectErr) => {
-            console.error('Database error (admin.users.json.subjects)', subjectErr);
-            return res.status(500).json({ error: 'Database error' });
-          });
-      }
+      userParams
     );
-  });
+    const [subjects, courses, studentGroups] = await Promise.all([
+      getSubjectsCached(courseId),
+      getCoursesCached(),
+      db.all(
+        `
+          SELECT sg.student_id, sg.subject_id, sg.group_number
+          FROM student_groups sg
+          JOIN subjects s ON s.id = sg.subject_id
+          JOIN subject_course_bindings scb ON scb.subject_id = s.id
+          WHERE scb.course_id = ?
+        `,
+        [courseId]
+      ),
+    ]);
+    const userIds = (users || []).map((user) => Number(user.id)).filter((id) => Number.isFinite(id));
+    const assignment = await getUserRoleAssignmentsForUserIds(userIds);
+    const placementRows = await db.all(
+      `
+        SELECT
+          u.id AS user_id,
+          sc.id AS study_context_id,
+          sc.stage_number AS stage,
+          sc.campus_key,
+          coh.id AS cohort_id,
+          coh.admission_year,
+          coh.legacy_admission_id AS admission_id,
+          p.id AS program_id,
+          p.code AS program_code,
+          p.name AS program_name,
+          p.track_key,
+          primary_binding.course_id,
+          c.name AS course_name
+        FROM users u
+        LEFT JOIN study_contexts sc ON sc.id = u.study_context_id
+        LEFT JOIN cohorts coh ON coh.id = sc.cohort_id
+        LEFT JOIN study_programs p ON p.id = coh.program_id
+        LEFT JOIN LATERAL (
+          SELECT sccb.course_id
+          FROM study_context_course_bindings sccb
+          WHERE sccb.study_context_id = sc.id
+          ORDER BY sccb.is_primary DESC, sccb.course_id ASC
+          LIMIT 1
+        ) primary_binding ON true
+        LEFT JOIN courses c ON c.id = primary_binding.course_id
+        WHERE u.id = ANY(?::int[])
+      `,
+      [userIds.length ? userIds : [0]]
+    ).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return [];
+      }
+      throw err;
+    });
+    const placementByUserId = new Map();
+    (placementRows || []).forEach((row) => {
+      const userId = Number(row.user_id || 0);
+      if (!userId) return;
+      const context = {
+        id: Number(row.study_context_id || 0) || null,
+        course_id: Number(row.course_id || 0) || null,
+        stage: normalizeStudyContextStage(row.stage, 1),
+        campus_key: normalizeCourseCampus(row.campus_key || 'kyiv'),
+        cohort_id: Number(row.cohort_id || 0) || null,
+        admission_id: Number(row.admission_id || 0) || null,
+        admission_year: Number(row.admission_year || 0) || null,
+        program_id: Number(row.program_id || 0) || null,
+        program_code: sanitizeCompactText(row.program_code || '', 40),
+        program_name: sanitizeCompactText(row.program_name || '', 140),
+        track_key: normalizeRegistrationTrack(row.track_key, 'bachelor'),
+        course_name: sanitizeCompactText(row.course_name || '', 140),
+      };
+      placementByUserId.set(userId, {
+        ...context,
+        label: context.id ? buildStudyContextLabel(context, 'en') : '',
+        label_uk: context.id ? buildStudyContextLabel(context, 'uk') : '',
+      });
+    });
+    const studyContexts = adminAcademicScope && Array.isArray(adminAcademicScope.availableStudyContexts)
+      ? adminAcademicScope.availableStudyContexts
+      : await listStudyContextOptions();
+    const usersWithRoles = (users || []).map((user) => {
+      const userId = Number(user.id);
+      const roleKeys = assignment.roleKeysByUser[userId] || [normalizeRoleKey(user.role || 'student')];
+      const primaryRole = assignment.primaryRoleByUser[userId]
+        || normalizeRoleKey(user.role || roleKeys[0] || 'student');
+      const placement = placementByUserId.get(userId) || null;
+      const derivedProgramId = placement && placement.program_id
+        ? Number(placement.program_id)
+        : (parsePositiveIntStrict(user.study_program_id) || null);
+      const derivedAdmissionId = placement && placement.admission_id
+        ? Number(placement.admission_id)
+        : (parsePositiveIntStrict(user.admission_id) || null);
+      const derivedCourseId = placement && placement.course_id
+        ? Number(placement.course_id)
+        : (parsePositiveIntStrict(user.course_id) || null);
+      const derivedTrackKey = placement && placement.track_key
+        ? normalizeRegistrationTrack(placement.track_key, 'bachelor')
+        : normalizeRegistrationTrack(user.study_track, 'bachelor');
+      return {
+        ...user,
+        role_keys: roleKeys,
+        primary_role: primaryRole,
+        study_context: placement,
+        study_context_id: placement && placement.id ? placement.id : null,
+        study_context_label: placement && placement.label_uk ? placement.label_uk : '',
+        study_context_name: placement && placement.label_uk ? placement.label_uk : '',
+        study_context_course_id: placement && placement.course_id ? placement.course_id : null,
+        program_id: derivedProgramId,
+        program_name: placement && placement.program_name ? placement.program_name : '',
+        admission_id: derivedAdmissionId,
+        admission_year: placement && placement.admission_year ? Number(placement.admission_year) : null,
+        stage_number: placement ? normalizeStudyContextStage(placement.stage, 1) : null,
+        campus_key: placement && placement.campus_key ? placement.campus_key : '',
+        derived_course_id: derivedCourseId,
+        track_key: derivedTrackKey,
+        study_context_options: studyContexts,
+        context_options: studyContexts,
+      };
+    });
+    return res.json({
+      users: usersWithRoles,
+      subjects,
+      studentGroups,
+      courses,
+      studyContexts,
+      selectedCourseId: courseId,
+      adminAcademicScope: buildAdminScopeStatePayload(adminAcademicScope, {}),
+    });
+  } catch (err) {
+    console.error('Database error (admin.users.json)', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 app.post('/admin/import/validate', requireImportExportSectionAccess, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
@@ -46243,12 +46695,30 @@ app.get('/starosta', requireStaff, async (req, res) => {
   if (!allowedCourses.length) {
     return res.status(403).send('Forbidden (course access)');
   }
-  const requestedCourse = Number(req.query.course);
-  let courseId = allowedCourseIds.has(requestedCourse) ? requestedCourse : baseCourseId;
-  if (allowedCourses.length && !allowedCourses.some((course) => Number(course.id) === Number(courseId))) {
-    courseId = Number(allowedCourses[0].id);
+  let adminAcademicScope = null;
+  try {
+    adminAcademicScope = await buildAdminAcademicScopeState(req, {
+      courses: allowedCourses,
+      allowedCourseIds: Array.from(allowedCourseIds),
+      fallbackCourseId: baseCourseId,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'starosta.scope');
   }
-  const allowCourseSelect = allowedCourses.length > 1;
+  let courseId = adminAcademicScope && adminAcademicScope.courseId
+    ? Number(adminAcademicScope.courseId)
+    : baseCourseId;
+  if (!allowedCourses.some((course) => Number(course.id || 0) === Number(courseId || 0))) {
+    courseId = Number(allowedCourses[0].id || baseCourseId);
+    req.session.adminCourse = courseId;
+  }
+  const allowCourseSelect = Boolean(adminAcademicScope && (
+    (adminAcademicScope.trackOptions || []).length > 1
+    || (adminAcademicScope.programOptions || []).length > 1
+    || (adminAcademicScope.admissionOptions || []).length > 1
+    || (adminAcademicScope.stageOptions || []).length > 1
+    || (adminAcademicScope.campusOptions || []).length > 1
+  ));
 
   const {
     group_number,
@@ -46511,7 +46981,8 @@ app.get('/starosta', requireStaff, async (req, res) => {
       semesters,
       activeSemester,
       selectedCourseId: courseId,
-      adminHomeHref: getStaffPanelBase(req, courseId),
+      adminAcademicScope,
+      adminHomeHref: buildStaffPanelScopeUrl(req, adminAcademicScope || { courseId }),
       limitedStaffView: true,
       allowedSections,
       allowCourseSelect,
@@ -46869,14 +47340,30 @@ app.get('/deanery', requireDeanery, async (req, res) => {
   if (!allowedCourses.length) {
     return res.status(403).send('Forbidden (course access)');
   }
-
-  const requestedCourse = Number(req.query.course);
-  let courseId = allowedCourseIds.has(requestedCourse) ? requestedCourse : baseCourseId;
-  if (allowedCourses.length && !allowedCourses.some((course) => Number(course.id) === Number(courseId))) {
-    courseId = Number(allowedCourses[0].id);
+  let adminAcademicScope = null;
+  try {
+    adminAcademicScope = await buildAdminAcademicScopeState(req, {
+      courses: allowedCourses,
+      allowedCourseIds: Array.from(allowedCourseIds),
+      fallbackCourseId: baseCourseId,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'deanery.scope');
   }
-  req.session.adminCourse = courseId;
-  const allowCourseSelect = allowedCourses.length > 1;
+  let courseId = adminAcademicScope && adminAcademicScope.courseId
+    ? Number(adminAcademicScope.courseId)
+    : baseCourseId;
+  if (!allowedCourses.some((course) => Number(course.id || 0) === Number(courseId || 0))) {
+    courseId = Number(allowedCourses[0].id || baseCourseId);
+    req.session.adminCourse = courseId;
+  }
+  const allowCourseSelect = Boolean(adminAcademicScope && (
+    (adminAcademicScope.trackOptions || []).length > 1
+    || (adminAcademicScope.programOptions || []).length > 1
+    || (adminAcademicScope.admissionOptions || []).length > 1
+    || (adminAcademicScope.stageOptions || []).length > 1
+    || (adminAcademicScope.campusOptions || []).length > 1
+  ));
 
   let allowedSections = null;
   try {
@@ -46972,7 +47459,8 @@ app.get('/deanery', requireDeanery, async (req, res) => {
       semesters,
       activeSemester,
       selectedCourseId: courseId,
-      adminHomeHref: getStaffPanelBase(req, courseId),
+      adminAcademicScope,
+      adminHomeHref: buildStaffPanelScopeUrl(req, adminAcademicScope || { courseId }),
       limitedStaffView: true,
       allowedSections,
       allowCourseSelect,
@@ -49735,26 +50223,35 @@ app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async 
 app.post('/admin/users/study-context', requireUsersSectionAccess, async (req, res) => {
   const userId = Number(req.body.user_id);
   const studyContextId = Number(req.body.study_context_id);
-  const currentCourse = getAdminCourse(req);
-  if (!Number.isFinite(userId) || userId <= 0 || !Number.isFinite(studyContextId) || studyContextId <= 0) {
-    return res.redirect('/admin?err=Invalid%20study%20context');
-  }
   try {
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const redirectBase = buildStaffPanelScopeUrl(req, adminAcademicScope || {});
+    if (!Number.isFinite(userId) || userId <= 0 || !Number.isFinite(studyContextId) || studyContextId <= 0) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Invalid study context'));
+    }
+    const allowedStudyContextIds = new Set(
+      (adminAcademicScope && Array.isArray(adminAcademicScope.availableStudyContexts) ? adminAcademicScope.availableStudyContexts : [])
+        .map((context) => Number(context && context.id ? context.id : 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
     const [context, user] = await Promise.all([
       getStudyContextById(studyContextId),
       db.get(
-        'SELECT id, role, full_name, course_id FROM users WHERE id = ? AND course_id = ?',
-        [userId, currentCourse]
+        'SELECT id, role, full_name, course_id, study_context_id FROM users WHERE id = ?',
+        [userId]
       ),
     ]);
     if (!context) {
-      return res.redirect('/admin?err=Study%20context%20not%20found');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Study context not found'));
+    }
+    if (allowedStudyContextIds.size && !allowedStudyContextIds.has(Number(context.id || 0))) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Study context outside current scope'));
     }
     if (!user) {
-      return res.redirect('/admin?err=User%20not%20found');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'User not found'));
     }
     if (normalizeRoleKey(user.role) === 'admin') {
-      return res.redirect('/admin?err=Cannot%20change%20admin%20context');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Cannot change admin context'));
     }
     await assignUserStudyContext(userId, studyContextId);
     logAction(db, req, 'user_study_context_change', {
@@ -49763,9 +50260,76 @@ app.post('/admin/users/study-context', requireUsersSectionAccess, async (req, re
       course_id: context.course_id,
     });
     broadcast('users_updated');
-    return res.redirect(`/admin?course=${currentCourse}&ok=Study%20context%20updated`);
+    return res.redirect(
+      appendQueryParamToUrl(
+        buildStaffPanelScopeUrl(req, adminAcademicScope || {}, {
+          track: context.track_key,
+          programId: context.program_id,
+          admissionId: context.admission_id,
+          stage: context.stage,
+          campus: context.campus_key,
+          studyContextId: context.id,
+          courseId: context.course_id,
+        }),
+        'ok',
+        'Study context updated'
+      )
+    );
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(appendQueryParamToUrl(buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req)), 'err', 'Database error'));
+  }
+});
+
+app.post('/admin/users/study-context/batch', requireUsersSectionAccess, async (req, res) => {
+  const targetStudyContextId = parsePositiveIntStrict(req.body.target_study_context_id || req.body.study_context_id);
+  const userIds = Array.from(new Set(
+    (Array.isArray(req.body.user_ids) ? req.body.user_ids : [req.body.user_ids])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  try {
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const redirectBase = buildStaffPanelScopeUrl(req, adminAcademicScope || {});
+    if (!targetStudyContextId || !userIds.length) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Select users and target context'));
+    }
+    const allowedStudyContextIds = new Set(
+      (adminAcademicScope && Array.isArray(adminAcademicScope.availableStudyContexts) ? adminAcademicScope.availableStudyContexts : [])
+        .map((context) => Number(context && context.id ? context.id : 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
+    const context = await getStudyContextById(targetStudyContextId);
+    if (!context) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Study context not found'));
+    }
+    if (allowedStudyContextIds.size && !allowedStudyContextIds.has(Number(context.id || 0))) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Study context outside current scope'));
+    }
+    const users = await db.all(
+      `
+        SELECT id, role
+        FROM users
+        WHERE id = ANY(?::int[])
+      `,
+      [userIds]
+    );
+    const movableUsers = (users || []).filter((user) => normalizeRoleKey(user.role || 'student') !== 'admin');
+    if (!movableUsers.length) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No movable users selected'));
+    }
+    for (const user of movableUsers) {
+      await assignUserStudyContext(user.id, targetStudyContextId);
+    }
+    logAction(db, req, 'user_study_context_batch_move', {
+      study_context_id: targetStudyContextId,
+      course_id: context.course_id,
+      user_count: movableUsers.length,
+    });
+    broadcast('users_updated');
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', `Moved ${movableUsers.length} users`));
+  } catch (err) {
+    console.error('Batch study context move failed', err);
+    return res.redirect(appendQueryParamToUrl(buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req)), 'err', 'Database error'));
   }
 });
 
@@ -49774,8 +50338,9 @@ app.post('/admin/users/course', requireUsersSectionAccess, async (req, res) => {
   const userId = Number(user_id);
   const courseId = Number(course_id);
   const currentCourse = getAdminCourse(req);
+  const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
   if (Number.isNaN(userId) || Number.isNaN(courseId)) {
-    return res.redirect('/admin?err=Invalid%20course');
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Invalid course'));
   }
   try {
     const [courseRow, user] = await Promise.all([
@@ -49798,13 +50363,13 @@ app.post('/admin/users/course', requireUsersSectionAccess, async (req, res) => {
       ),
     ]);
     if (!courseRow) {
-      return res.redirect('/admin?err=Invalid%20course');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Invalid course'));
     }
     if (!user) {
-      return res.redirect('/admin?err=User%20not%20found');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'User not found'));
     }
     if (normalizeRoleKey(user.role) === 'admin') {
-      return res.redirect('/admin?err=Cannot%20change%20admin%20course');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Cannot change admin course'));
     }
 
     const placement = await resolveUserAcademicPlacement(user);
@@ -49857,23 +50422,38 @@ app.post('/admin/users/course', requireUsersSectionAccess, async (req, res) => {
         admissionId: user.admission_id,
       });
     } else {
-      await db.run('UPDATE users SET course_id = ? WHERE id = ?', [courseId, userId]);
+      await assignUserStudyContext(userId, null, {
+        courseId,
+        trackKey: user.study_track,
+        programId: user.study_program_id,
+        admissionId: user.admission_id,
+      });
     }
     logAction(db, req, 'user_course_change', { user_id: userId, course_id: courseId, study_context_id: targetStudyContextId });
     broadcast('users_updated');
-    return res.redirect(`/admin?course=${currentCourse}&ok=Course%20updated`);
+    return res.redirect(
+      appendQueryParamToUrl(
+        buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req), {
+          courseId,
+          studyContextId: targetStudyContextId || null,
+        }),
+        'ok',
+        'Course updated'
+      )
+    );
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
   }
 });
 
 app.post('/admin/users/reset-password', requireUsersSectionAccess, (req, res) => {
   const { user_id, new_password } = req.body;
+  const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
   if (!user_id || !new_password) {
-    return res.redirect('/admin?err=Password%20required');
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Password required'));
   }
   if (new_password.length < 4) {
-    return res.redirect('/admin?err=Password%20too%20short');
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Password too short'));
   }
   const hash = bcrypt.hashSync(new_password, 10);
   db.run(
@@ -49881,11 +50461,11 @@ app.post('/admin/users/reset-password', requireUsersSectionAccess, (req, res) =>
     [hash, user_id],
     (err) => {
       if (err) {
-        return res.redirect('/admin?err=Database%20error');
+        return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
       }
       logAction(db, req, 'user_password_reset', { user_id });
       broadcast('users_updated');
-      return res.redirect('/admin?ok=Password%20updated');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', 'Password updated'));
     }
   );
 });
@@ -49944,8 +50524,9 @@ app.post('/admin/homework/migrate', requireHomeworkSectionAccess, (req, res) => 
 app.post('/admin/users/delete-multiple', requireUsersSectionAccess, (req, res) => {
   const ids = req.body.delete_user_ids;
   const courseId = getAdminCourse(req);
+  const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
   if (!ids) {
-    return res.redirect('/admin?err=No%20users%20selected');
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No users selected'));
   }
   const list = Array.isArray(ids) ? ids : [ids];
   const placeholders = list.map(() => '?').join(',');
@@ -49954,20 +50535,20 @@ app.post('/admin/users/delete-multiple', requireUsersSectionAccess, (req, res) =
     [courseId, ...list],
     (err, rows) => {
       if (err) {
-        return res.redirect('/admin?err=Database%20error');
+        return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
       }
       const deleteIds = rows.filter((u) => u.role !== 'admin').map((u) => u.id);
       if (!deleteIds.length) {
-        return res.redirect('/admin?err=No%20students%20to%20delete');
+        return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No students to delete'));
       }
       const delPlaceholders = deleteIds.map(() => '?').join(',');
       db.run(`UPDATE users SET is_active = 0 WHERE id IN (${delPlaceholders})`, deleteIds, (delErr) => {
         if (delErr) {
-          return res.redirect('/admin?err=Database%20error');
+          return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
         }
         logAction(db, req, 'users_deactivate_multiple', { ids: deleteIds });
         broadcast('users_updated');
-        return res.redirect('/admin?ok=Users%20deactivated');
+        return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', 'Users deactivated'));
       });
     }
   );
@@ -49975,22 +50556,23 @@ app.post('/admin/users/delete-multiple', requireUsersSectionAccess, (req, res) =
 
 app.post('/admin/users/clear-all', requireUsersSectionAccess, (req, res) => {
   const courseId = getAdminCourse(req);
+  const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
   db.all('SELECT id FROM users WHERE role != ? AND course_id = ?', ['admin', courseId], (err, rows) => {
     if (err) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
     }
     const ids = rows.map((r) => r.id);
     if (!ids.length) {
-      return res.redirect('/admin?err=No%20students%20to%20delete');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No students to delete'));
     }
     const placeholders = ids.map(() => '?').join(',');
     db.run(`UPDATE users SET is_active = 0 WHERE id IN (${placeholders})`, ids, (delErr) => {
       if (delErr) {
-        return res.redirect('/admin?err=Database%20error');
+        return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
       }
       logAction(db, req, 'users_deactivate_all', { ids });
       broadcast('users_updated');
-      return res.redirect('/admin?ok=All%20students%20deactivated');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', 'All students deactivated'));
     });
   });
 });
@@ -50039,16 +50621,17 @@ app.post('/admin/users/delete-permanent', requireUsersSectionAccess, async (req,
   const { user_id } = req.body;
   const userId = Number(user_id);
   const courseId = getAdminCourse(req);
+  const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
   if (Number.isNaN(userId)) {
-    return res.redirect('/admin?err=Invalid%20user');
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Invalid user'));
   }
   try {
     const user = await db.get('SELECT role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
     if (!user) {
-      return res.redirect('/admin?err=User%20not%20found');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'User not found'));
     }
     if (user.role === 'admin') {
-      return res.redirect('/admin?err=Cannot%20delete%20admin');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Cannot delete admin'));
     }
     await db.run('DELETE FROM student_groups WHERE student_id = ?', [userId]);
     await db.run('DELETE FROM login_history WHERE user_id = ?', [userId]);
@@ -50062,9 +50645,9 @@ app.post('/admin/users/delete-permanent', requireUsersSectionAccess, async (req,
     await db.run('DELETE FROM users WHERE id = ?', [userId]);
     logAction(db, req, 'user_delete_permanent', { user_id: userId });
     broadcast('users_updated');
-    return res.redirect('/admin?ok=User%20deleted');
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', 'User deleted'));
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
   }
 });
 

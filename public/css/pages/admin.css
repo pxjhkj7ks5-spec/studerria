@@ -592,6 +592,21 @@ body.theme-light .admin-campus-badge {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.admin-scope-form {
+  display: flex;
+  align-items: center;
+}
+
+.admin-scope-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-scope-fields select {
+  min-width: 138px;
+}
+
 body.theme-light .admin-course-form select {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 244, 255, 0.88));
   border-color: rgba(148, 163, 184, 0.22);
@@ -1202,6 +1217,10 @@ body.theme-light .admin-toast.is-error {
 
   .admin-course-form {
     flex: 1 1 220px;
+    width: 100%;
+  }
+
+  .admin-scope-fields {
     width: 100%;
   }
 
