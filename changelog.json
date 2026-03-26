@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.82",
+      "date": "2026-03-26",
+      "items": [
+        "feat(journal-attendance-dirty-state): add a live attendance workflow bar in `/journal` with marked, changed, and removed counters, row-level dirty highlighting, and a disabled save action until the teacher actually changes the current attendance snapshot",
+        "tune(journal-attendance-save-feedback): make attendance quick-edit changes immediately update the same editor summary and switch the save state chip into a pending state on submit, so the attendance flow now reads like one guided workflow instead of a blind form dump",
+        "feat(journal-cell-operational-summary): add a top-of-modal operational summary card for journal cells that surfaces effective score, moderation state, retake and appeal counts, competency activity, and the exact reason a cell is editable, locked, closed, read-only, or waiting for a second reviewer"
+      ]
+    },
+    {
       "version": "1.2.81",
       "date": "2026-03-26",
       "items": [

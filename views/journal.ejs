@@ -54,10 +54,40 @@
         attendanceReasonPlaceholder: 'Optional absence reason or a short comment',
         saveAttendance: 'Save attendance',
         emptyStatusMeansRemoved: 'An empty status means the record will be removed.',
+        attendanceMarkedNow: 'Marked now',
+        attendanceChanged: 'Changed',
+        attendanceRemoved: 'Removed',
+        attendanceStatusClean: 'No changes',
+        attendanceStatusDirty: 'Unsaved',
         currentSubjectSnapshot: 'Current subject snapshot',
         attendanceRate: 'Attendance',
         attendanceNoRecords: 'No attendance records yet.',
         attendanceReason: 'Reason',
+        cellSummaryTitle: 'Operational state',
+        cellSummaryEffective: 'Effective score',
+        cellSummaryOriginal: 'Original',
+        cellSummaryNoGrade: 'No grade yet',
+        cellSummaryNoGradeHint: 'Save a primary grade to unlock moderation and review flows.',
+        cellSummaryRetakes: 'Retakes',
+        cellSummaryAppeals: 'Appeals',
+        cellSummaryModeration: 'Moderation',
+        cellSummaryModerationNotRequired: 'Not required',
+        cellSummaryCompetencies: 'Signals',
+        cellSummaryEditable: 'Editable',
+        cellSummaryReadOnly: 'Read only',
+        cellSummaryClosed: 'Subject closed',
+        cellSummaryLocked: 'Column locked',
+        cellSummaryReviewPending: 'Review pending',
+        cellSummaryAppealAvailable: 'Appeal available',
+        cellSummaryGradeSaved: 'Primary score is active.',
+        cellSummaryGradeAdjusted: 'Effective score reflects moderation.',
+        cellSummaryClosedNote: 'This subject is closed. Grades and review flows stay visible for audit, but changes are frozen.',
+        cellSummaryLockedNote: 'This column is locked. Unlock it to resume grading, retakes, appeals, and competency updates.',
+        cellSummaryTeacherActionNote: 'You can grade this work, review supporting evidence, and manage follow-up flows from one place.',
+        cellSummaryStudentActionNote: 'This is a read-only review view. You can inspect the full grading trail here.',
+        cellSummaryStudentAppealNote: 'This grade is available for review. If needed, submit an appeal from this screen.',
+        cellSummaryModerationNeedsGrade: 'Moderation becomes available after the primary score is saved.',
+        cellSummaryModerationNeedsSecondReviewer: 'Moderation requires a different reviewer than the teacher who saved the original score.',
         gradingSummaryTeacher: 'Grading system settings',
         gradingSummaryStudent: 'How the grade is calculated',
         gradingSummaryHint: 'Click to',
@@ -182,10 +212,40 @@
         attendanceReasonPlaceholder: 'Опц. причина відсутності або короткий коментар',
         saveAttendance: 'Зберегти відвідуваність',
         emptyStatusMeansRemoved: 'Порожній статус означає: запис буде прибрано.',
+        attendanceMarkedNow: 'Відмічено зараз',
+        attendanceChanged: 'Змінено',
+        attendanceRemoved: 'Прибрано',
+        attendanceStatusClean: 'Без змін',
+        attendanceStatusDirty: 'Є незбережені зміни',
         currentSubjectSnapshot: 'Поточний зріз по предмету',
         attendanceRate: 'Відвідуваність',
         attendanceNoRecords: 'Ще немає записів відвідуваності.',
         attendanceReason: 'Причина',
+        cellSummaryTitle: 'Операційний стан',
+        cellSummaryEffective: 'Ефективний бал',
+        cellSummaryOriginal: 'Початковий',
+        cellSummaryNoGrade: 'Оцінку ще не виставлено',
+        cellSummaryNoGradeHint: 'Спершу збережіть основний бал, щоб відкрити модерацію та review-flow.',
+        cellSummaryRetakes: 'Перездачі',
+        cellSummaryAppeals: 'Апеляції',
+        cellSummaryModeration: 'Модерація',
+        cellSummaryModerationNotRequired: 'Не потрібна',
+        cellSummaryCompetencies: 'Сигнали',
+        cellSummaryEditable: 'Можна редагувати',
+        cellSummaryReadOnly: 'Лише перегляд',
+        cellSummaryClosed: 'Предмет закрито',
+        cellSummaryLocked: 'Колонку заблоковано',
+        cellSummaryReviewPending: 'Очікує review',
+        cellSummaryAppealAvailable: 'Апеляція доступна',
+        cellSummaryGradeSaved: 'Основний бал уже активний.',
+        cellSummaryGradeAdjusted: 'Ефективний бал вже враховує модерацію.',
+        cellSummaryClosedNote: 'Предмет закрито. Оцінки та review-flow лишаються видимими для аудиту, але зміни заблоковані.',
+        cellSummaryLockedNote: 'Колонку заблоковано. Розблокуйте її, щоб знову редагувати оцінки, перездачі, апеляції та competency signals.',
+        cellSummaryTeacherActionNote: 'Тут можна одразу оцінити роботу, переглянути докази й керувати наступними кроками без втрати контексту.',
+        cellSummaryStudentActionNote: 'Це режим перегляду. Тут видно повну історію оцінювання та review-flow.',
+        cellSummaryStudentAppealNote: 'Оцінку вже можна перевірити. Якщо потрібно, подайте апеляцію прямо з цього екрана.',
+        cellSummaryModerationNeedsGrade: 'Модерація стане доступною після збереження основного балу.',
+        cellSummaryModerationNeedsSecondReviewer: 'Модерацію має робити інший рецензент, ніж той, хто зберіг первинний бал.',
         gradingSummaryTeacher: 'Налаштування системи оцінювання',
         gradingSummaryStudent: 'Як формується оцінка',
         gradingSummaryHint: 'Натисніть, щоб',
@@ -388,6 +448,7 @@
           const attendanceMarkedRate = attendanceSummary.students_total
             ? Math.round((Number(attendanceSummary.marked_total || 0) / Number(attendanceSummary.students_total || 1)) * 100)
             : 0;
+          const attendanceMarkedCount = attendanceRows.filter((row) => String(row && row.status ? row.status : '').trim()).length;
           const gradingTypeRows = [
             { key: 'homework', label: journalCopy.gradingTypeHomework },
             { key: 'seminar', label: journalCopy.gradingTypeSeminar },
@@ -606,6 +667,8 @@
                                 data-student-id="<%= row.student_id %>"
                                 data-student-name="<%= row.full_name %>"
                                 data-group-number="<%= row.group_number || '' %>"
+                                data-initial-status="<%= row.status || '' %>"
+                                data-initial-reason="<%= row.reason || '' %>"
                               >
                                 <td>
                                   <div class="fw-semibold"><%= row.full_name %></div>
@@ -639,9 +702,25 @@
                           </tbody>
                         </table>
                       </div>
-                      <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
-                        <button class="btn btn-primary btn-sm" type="submit"><%= journalCopy.saveAttendance %></button>
-                        <span class="text-muted small"><%= journalCopy.emptyStatusMeansRemoved %></span>
+                      <div class="journal-attendance-workflow mt-3">
+                        <div class="journal-attendance-workflow-main">
+                          <div class="journal-attendance-workflow-chips">
+                            <span class="status-chip status-chip--success">
+                              <%= journalCopy.attendanceMarkedNow %>: <span id="journalAttendanceMarkedCount"><%= attendanceMarkedCount %></span>
+                            </span>
+                            <span class="status-chip status-chip--warning">
+                              <%= journalCopy.attendanceChanged %>: <span id="journalAttendanceChangedCount">0</span>
+                            </span>
+                            <span class="status-chip status-chip--danger">
+                              <%= journalCopy.attendanceRemoved %>: <span id="journalAttendanceRemovedCount">0</span>
+                            </span>
+                          </div>
+                          <span class="text-muted small"><%= journalCopy.emptyStatusMeansRemoved %></span>
+                        </div>
+                        <div class="journal-attendance-workflow-actions">
+                          <span class="status-chip status-chip--neutral" id="journalAttendanceStateChip"><%= journalCopy.attendanceStatusClean %></span>
+                          <button class="btn btn-primary btn-sm" type="submit" id="journalAttendanceSaveBtn" disabled><%= journalCopy.saveAttendance %></button>
+                        </div>
                       </div>
                     </form>
                   <% } %>
@@ -1036,6 +1115,41 @@
             <div class="alert alert-warning d-none py-2" id="journalLockedNotice">
               Колонка заблокована: редагування оцінок вимкнено.
             </div>
+            <div id="journalCellOverview" class="journal-cell-overview mb-4">
+              <div class="journal-cell-overview-head">
+                <div class="journal-cell-overview-copy">
+                  <div class="text-muted small"><%= journalCopy.cellSummaryTitle %></div>
+                  <div class="small text-muted"><%= journalCopy.cellSummaryEffective %></div>
+                  <div class="journal-cell-overview-scoreline">
+                    <span class="journal-cell-overview-score" id="journalCellOverviewScore"><%= journalCopy.dash %></span>
+                    <span class="journal-cell-overview-max" id="journalCellOverviewMax"></span>
+                  </div>
+                  <div class="small text-muted" id="journalCellOverviewMeta"><%= journalCopy.cellSummaryNoGrade %></div>
+                </div>
+                <div class="journal-cell-overview-chips" id="journalCellOverviewChips"></div>
+              </div>
+              <div class="journal-cell-overview-grid">
+                <div class="journal-cell-overview-metric">
+                  <span class="text-muted small"><%= journalCopy.cellSummaryRetakes %></span>
+                  <strong class="journal-cell-overview-value" id="journalCellRetakeCount">0</strong>
+                </div>
+                <div class="journal-cell-overview-metric">
+                  <span class="text-muted small"><%= journalCopy.cellSummaryAppeals %></span>
+                  <strong class="journal-cell-overview-value" id="journalCellAppealCount">0</strong>
+                </div>
+                <div class="journal-cell-overview-metric">
+                  <span class="text-muted small"><%= journalCopy.cellSummaryModeration %></span>
+                  <strong class="journal-cell-overview-value" id="journalCellModerationState"><%= journalCopy.cellSummaryModerationNotRequired %></strong>
+                </div>
+                <div class="journal-cell-overview-metric">
+                  <span class="text-muted small"><%= journalCopy.cellSummaryCompetencies %></span>
+                  <strong class="journal-cell-overview-value" id="journalCellCompetencyCount">0</strong>
+                </div>
+              </div>
+              <div class="journal-cell-overview-note" id="journalCellOverviewNote">
+                <div class="small text-muted"><%= journalCopy.cellSummaryNoGradeHint %></div>
+              </div>
+            </div>
             <div id="journalSubmissionBox" class="journal-submission-box mb-4">
               <div class="text-muted">Здача відсутня.</div>
             </div>
@@ -1382,6 +1496,15 @@
       const deleteStudentInput = document.getElementById('journalGradeDeleteStudentId');
       const deleteBtn = document.getElementById('journalGradeDeleteBtn');
       const lockedNotice = document.getElementById('journalLockedNotice');
+      const cellOverviewScoreEl = document.getElementById('journalCellOverviewScore');
+      const cellOverviewMaxEl = document.getElementById('journalCellOverviewMax');
+      const cellOverviewMetaEl = document.getElementById('journalCellOverviewMeta');
+      const cellOverviewChipsEl = document.getElementById('journalCellOverviewChips');
+      const cellOverviewNoteEl = document.getElementById('journalCellOverviewNote');
+      const cellRetakeCountEl = document.getElementById('journalCellRetakeCount');
+      const cellAppealCountEl = document.getElementById('journalCellAppealCount');
+      const cellModerationStateEl = document.getElementById('journalCellModerationState');
+      const cellCompetencyCountEl = document.getElementById('journalCellCompetencyCount');
       const prevCellBtn = document.getElementById('journalPrevCellBtn');
       const nextCellBtn = document.getElementById('journalNextCellBtn');
       const retakeSectionEl = document.getElementById('journalRetakeSection');
@@ -1436,6 +1559,11 @@
         'form[action="/journal/columns/lock-toggle"]',
       ].join(', ')));
       const attendanceForm = document.getElementById('journalAttendanceForm');
+      const attendanceSaveBtn = document.getElementById('journalAttendanceSaveBtn');
+      const attendanceStateChipEl = document.getElementById('journalAttendanceStateChip');
+      const attendanceMarkedCountEl = document.getElementById('journalAttendanceMarkedCount');
+      const attendanceChangedCountEl = document.getElementById('journalAttendanceChangedCount');
+      const attendanceRemovedCountEl = document.getElementById('journalAttendanceRemovedCount');
       const attendanceRowsJsonInput = document.getElementById('journalAttendanceRowsJson');
       const attendanceRowEls = Array.from(document.querySelectorAll('[data-attendance-row]'));
       const attendanceToggleEditorBtn = document.getElementById('journalAttendanceToggleEditorBtn');
@@ -1831,6 +1959,121 @@
         }
         statusEl.className = 'status-chip status-chip--neutral';
         statusEl.textContent = 'Ще не здано';
+      }
+
+      function renderCellOverview(data) {
+        const grade = data && data.grade ? data.grade : null;
+        const column = data && data.column ? data.column : null;
+        const retakes = Array.isArray(data && data.retake_attempts) ? data.retake_attempts : [];
+        const appeals = Array.isArray(data && data.appeals) ? data.appeals : [];
+        const signals = Array.isArray(data && data.competency_signals) ? data.competency_signals : [];
+        const moderationMeta = data && data.moderation_meta ? data.moderation_meta : {};
+        const moderation = data && data.moderation ? data.moderation : null;
+        const moderationRequired = Boolean(moderationMeta.required);
+        const maxPoints = Number(column && column.max_points);
+        const hasMaxPoints = Number.isFinite(maxPoints) && maxPoints > 0;
+        const hasGrade = Boolean(grade && Number.isFinite(Number(grade.original_score)));
+        const originalScore = hasGrade ? formatNumber(grade.original_score) : journalText.dash;
+        const effectiveScore = hasGrade ? formatNumber(grade.score) : journalText.dash;
+        const moderationAdjusted = Boolean(
+          moderation
+          && Number.isFinite(Number(moderation.moderated_score))
+          && Number(moderation.moderated_score) !== Number(grade && grade.original_score)
+        );
+
+        if (cellOverviewScoreEl) {
+          cellOverviewScoreEl.textContent = hasGrade ? effectiveScore : journalText.dash;
+        }
+        if (cellOverviewMaxEl) {
+          cellOverviewMaxEl.textContent = hasMaxPoints ? `/ ${formatNumber(maxPoints)}` : '';
+        }
+        if (cellOverviewMetaEl) {
+          if (hasGrade) {
+            const maxText = hasMaxPoints ? ` / ${formatNumber(maxPoints)}` : '';
+            const tail = moderationAdjusted ? journalText.cellSummaryGradeAdjusted : journalText.cellSummaryGradeSaved;
+            cellOverviewMetaEl.textContent = `${journalText.cellSummaryOriginal}: ${originalScore}${maxText}. ${tail}`;
+          } else {
+            cellOverviewMetaEl.textContent = `${journalText.cellSummaryNoGrade}. ${journalText.cellSummaryNoGradeHint}`;
+          }
+        }
+        if (cellRetakeCountEl) cellRetakeCountEl.textContent = String(retakes.length);
+        if (cellAppealCountEl) cellAppealCountEl.textContent = String(appeals.length);
+        if (cellCompetencyCountEl) cellCompetencyCountEl.textContent = String(signals.length);
+        if (cellModerationStateEl) {
+          cellModerationStateEl.textContent = moderationRequired
+            ? (moderation
+                ? String(moderation.status_label || moderation.status || journalText.cellSummaryReviewPending)
+                : (hasGrade ? journalText.cellSummaryReviewPending : journalText.cellSummaryNoGrade))
+            : journalText.cellSummaryModerationNotRequired;
+        }
+
+        if (cellOverviewChipsEl) {
+          const chips = [];
+          if (data && data.subject_is_closed) {
+            chips.push(createStatusChipNode('status-chip--danger', journalText.cellSummaryClosed));
+          }
+          if (column && column.is_locked) {
+            chips.push(createStatusChipNode('status-chip--danger', journalText.cellSummaryLocked));
+          }
+          if (canEditJournal) {
+            chips.push(createStatusChipNode(
+              data && data.can_edit ? 'status-chip--success' : 'status-chip--neutral',
+              data && data.can_edit ? journalText.cellSummaryEditable : journalText.cellSummaryReadOnly
+            ));
+          } else {
+            chips.push(createStatusChipNode('status-chip--neutral', journalText.cellSummaryReadOnly));
+            if (data && data.can_create_appeals) {
+              chips.push(createStatusChipNode('status-chip--warning', journalText.cellSummaryAppealAvailable));
+            }
+          }
+          if (!hasGrade) {
+            chips.push(createStatusChipNode('status-chip--neutral', journalText.cellSummaryNoGrade));
+          }
+          if (moderationRequired) {
+            const moderationChipClass = moderation
+              ? getModerationStatusChipClass(moderation.status)
+              : (hasGrade ? 'status-chip--warning' : 'status-chip--neutral');
+            const moderationChipLabel = moderation
+              ? String(moderation.status_label || moderation.status || journalText.cellSummaryReviewPending)
+              : (hasGrade ? journalText.cellSummaryReviewPending : journalText.cellSummaryModeration);
+            chips.push(createStatusChipNode(moderationChipClass, moderationChipLabel));
+          }
+          renderNodeChildren(cellOverviewChipsEl, chips);
+        }
+
+        if (cellOverviewNoteEl) {
+          const notes = [];
+          if (data && data.subject_is_closed) {
+            notes.push(journalText.cellSummaryClosedNote);
+          } else if (column && column.is_locked) {
+            notes.push(journalText.cellSummaryLockedNote);
+          } else if (canEditJournal && data && data.can_edit) {
+            notes.push(journalText.cellSummaryTeacherActionNote);
+          } else if (!canEditJournal && data && data.can_create_appeals) {
+            notes.push(journalText.cellSummaryStudentAppealNote);
+          } else if (!canEditJournal) {
+            notes.push(journalText.cellSummaryStudentActionNote);
+          }
+          if (moderationRequired && !hasGrade) {
+            notes.push(journalText.cellSummaryModerationNeedsGrade);
+          } else if (
+            moderationRequired
+            && hasGrade
+            && canEditJournal
+            && !(data && data.can_manage_moderation)
+            && !(data && data.subject_is_closed)
+            && !(column && column.is_locked)
+          ) {
+            notes.push(journalText.cellSummaryModerationNeedsSecondReviewer);
+          }
+          renderNodeChildren(
+            cellOverviewNoteEl,
+            (notes.length ? notes : [journalText.cellSummaryNoGradeHint]).map((line) => createElement('div', {
+              className: 'small text-muted',
+              text: line,
+            }))
+          );
+        }
       }
 
       function renderSubmission(submission, column) {
@@ -2611,6 +2854,7 @@
           titleEl.textContent = data && data.column ? data.column.title : 'Оцінювання';
           studentEl.textContent = data && data.student ? data.student.full_name : '-';
           setStatusLabel(data ? data.submission_status : '');
+          renderCellOverview(data || null);
           renderSubmission(data ? data.submission : null, data ? data.column : null);
           currentCellColumnId = Number(columnId);
           currentCellStudentId = Number(studentId);
@@ -2770,6 +3014,59 @@
         return `${journalText.classLabel} ${classNumber}`;
       };
 
+      const normalizeAttendanceRowState = (row) => {
+        const status = String(row && row.status ? row.status : '').trim();
+        const reasonRaw = String(row && row.reason ? row.reason : '').trim();
+        return {
+          status,
+          reason: status ? reasonRaw : '',
+        };
+      };
+
+      const getAttendanceInitialRowState = (rowEl) => normalizeAttendanceRowState({
+        status: rowEl ? rowEl.dataset.initialStatus : '',
+        reason: rowEl ? rowEl.dataset.initialReason : '',
+      });
+
+      const getAttendanceCurrentRowState = (rowEl) => {
+        const statusEl = rowEl ? rowEl.querySelector('[data-attendance-status]') : null;
+        const reasonEl = rowEl ? rowEl.querySelector('[data-attendance-reason]') : null;
+        return normalizeAttendanceRowState({
+          status: statusEl ? statusEl.value : '',
+          reason: reasonEl ? reasonEl.value : '',
+        });
+      };
+
+      const renderAttendanceWorkflowState = () => {
+        let marked = 0;
+        let changed = 0;
+        let removed = 0;
+        attendanceRowEls.forEach((rowEl) => {
+          const initial = getAttendanceInitialRowState(rowEl);
+          const current = getAttendanceCurrentRowState(rowEl);
+          const isDirty = initial.status !== current.status || initial.reason !== current.reason;
+          if (current.status) marked += 1;
+          if (isDirty) changed += 1;
+          if (initial.status && !current.status) removed += 1;
+          rowEl.classList.toggle('is-dirty', isDirty);
+        });
+        if (attendanceMarkedCountEl) attendanceMarkedCountEl.textContent = String(marked);
+        if (attendanceChangedCountEl) attendanceChangedCountEl.textContent = String(changed);
+        if (attendanceRemovedCountEl) attendanceRemovedCountEl.textContent = String(removed);
+        if (attendanceStateChipEl) {
+          attendanceStateChipEl.className = changed > 0
+            ? 'status-chip status-chip--warning'
+            : 'status-chip status-chip--neutral';
+          attendanceStateChipEl.textContent = changed > 0
+            ? journalText.attendanceStatusDirty
+            : journalText.attendanceStatusClean;
+        }
+        if (attendanceSaveBtn) {
+          attendanceSaveBtn.disabled = changed < 1;
+        }
+        return { marked, changed, removed };
+      };
+
       const setAttendanceEditorVisible = (visible) => {
         if (!attendanceEditorEl || !attendanceToggleEditorBtn) return;
         attendanceEditorEl.classList.toggle('d-none', !visible);
@@ -2814,6 +3111,7 @@
         const reasonEl = rowEl.querySelector('[data-attendance-reason]');
         if (statusEl) statusEl.value = String(entry.status || '').trim();
         if (reasonEl) reasonEl.value = String(entry.reason || '').trim();
+        renderAttendanceWorkflowState();
       };
 
       const countAttendanceQuickSummary = (rows) => {
@@ -3062,9 +3360,35 @@
         });
       }
       if (attendanceForm && attendanceRowsJsonInput) {
-        attendanceForm.addEventListener('submit', () => {
+        attendanceRowEls.forEach((rowEl) => {
+          const statusEl = rowEl.querySelector('[data-attendance-status]');
+          const reasonEl = rowEl.querySelector('[data-attendance-reason]');
+          if (statusEl) {
+            statusEl.addEventListener('input', renderAttendanceWorkflowState);
+            statusEl.addEventListener('change', renderAttendanceWorkflowState);
+          }
+          if (reasonEl) {
+            reasonEl.addEventListener('input', renderAttendanceWorkflowState);
+            reasonEl.addEventListener('change', renderAttendanceWorkflowState);
+          }
+        });
+        renderAttendanceWorkflowState();
+        attendanceForm.addEventListener('submit', (event) => {
+          const workflowState = renderAttendanceWorkflowState();
+          if (workflowState.changed < 1) {
+            event.preventDefault();
+            return;
+          }
           const rows = serializeAttendanceRows();
           attendanceRowsJsonInput.value = JSON.stringify(rows);
+          if (attendanceSaveBtn) {
+            attendanceSaveBtn.disabled = true;
+            attendanceSaveBtn.textContent = journalText.loadingSave;
+          }
+          if (attendanceStateChipEl) {
+            attendanceStateChipEl.className = 'status-chip status-chip--info';
+            attendanceStateChipEl.textContent = journalText.loadingSave;
+          }
         });
       }
       if (retakeCreateForm) {

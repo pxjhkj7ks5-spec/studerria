@@ -275,6 +275,37 @@ body.theme-dark.page-journal .dropdown-item:focus {
   padding-top: 12px;
 }
 
+.page-journal .journal-attendance-workflow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 82%, transparent);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--surface-soft) 84%, transparent);
+}
+
+.page-journal .journal-attendance-workflow-main {
+  display: grid;
+  gap: 8px;
+}
+
+.page-journal .journal-attendance-workflow-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.page-journal .journal-attendance-workflow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .page-journal .journal-attendance-quick-progress {
   display: flex;
   flex-wrap: wrap;
@@ -476,6 +507,8 @@ body.theme-light.page-journal .liquid-card,
 body.theme-light.page-journal .journal-grading-details,
 body.theme-light.page-journal .journal-attendance-details,
 body.theme-light.page-journal .journal-attendance-quick-panel,
+body.theme-light.page-journal .journal-attendance-workflow,
+body.theme-light.page-journal .journal-cell-overview,
 body.theme-light.page-journal .journal-student-attendance-card,
 body.theme-light.page-journal .journal-attendance-quick-student {
   border-color: var(--studerria-panel-border);
@@ -604,6 +637,14 @@ body.theme-light.page-journal .journal-cell-btn.is-missing {
   border-color: rgba(239, 68, 68, 0.42);
 }
 
+body.theme-dark.page-journal .journal-attendance-table tbody tr.is-dirty > * {
+  background: rgba(245, 158, 11, 0.12) !important;
+}
+
+body.theme-light.page-journal .journal-attendance-table tbody tr.is-dirty > * {
+  background: rgba(254, 243, 199, 0.82) !important;
+}
+
 .page-journal .final-col {
   position: sticky;
   right: 0;
@@ -636,6 +677,86 @@ body.theme-light.page-journal .final-col {
   border-radius: 14px;
   padding: 12px;
   background: color-mix(in srgb, var(--surface-soft) 88%, transparent);
+}
+
+.page-journal .journal-cell-overview {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 82%, transparent);
+  border-radius: 18px;
+  padding: 14px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, transparent), color-mix(in srgb, var(--surface-soft) 82%, transparent));
+  display: grid;
+  gap: 12px;
+}
+
+.page-journal .journal-cell-overview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-journal .journal-cell-overview-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.page-journal .journal-cell-overview-scoreline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.page-journal .journal-cell-overview-score {
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ds-text0);
+}
+
+.page-journal .journal-cell-overview-max {
+  font-size: 0.98rem;
+  color: var(--ds-text2);
+}
+
+.page-journal .journal-cell-overview-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.page-journal .journal-cell-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.page-journal .journal-cell-overview-metric {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 78%, transparent);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--surface-soft) 74%, transparent);
+}
+
+.page-journal .journal-cell-overview-value {
+  font-size: 1.02rem;
+  font-weight: 650;
+  color: var(--ds-text0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-journal .journal-cell-overview-note {
+  display: grid;
+  gap: 6px;
 }
 
 .page-journal .journal-submission-text {
@@ -909,6 +1030,22 @@ body.theme-light.page-journal .alert-success {
 
   .page-journal .journal-th-column {
     min-width: 145px;
+  }
+
+  .page-journal .journal-cell-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .page-journal .journal-attendance-workflow-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
+  }
+
+  .page-journal .journal-cell-overview-grid {
+    grid-template-columns: 1fr;
   }
 }
 
