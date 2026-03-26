@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.97",
+      "date": "2026-03-27",
+      "items": [
+        "refactor(academic-setup-visibility-bridge): move legacy `subject_visibility_by_admission` writes behind helper functions in `lib/academicSetup.js`, including single-row upsert/delete, subject-to-subject mirroring across admissions, and course-scoped visibility copy between admission years",
+        "refactor(teacher-legacy-bridge): move legacy `teacher_subjects` and `teacher_requests` writes into `lib/teacherTemplates.js`, so teacher selection, mirror sync, and request approval/rejection flows stop issuing route-level SQL directly from `app.js`",
+        "tune(app-service-boundaries): slim down Academic Setup and teacher runtime code in `app.js` by routing compatibility writes through service-layer adapters, keeping canonical study-context and offering flows intact while freezing more legacy tables behind bridge helpers"
+      ]
+    },
+    {
       "version": "1.2.96",
       "date": "2026-03-26",
       "items": [

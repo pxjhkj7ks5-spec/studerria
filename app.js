@@ -3853,19 +3853,13 @@ async function ensureLegacyPresetSubjectInstance(client, context, presetSubject)
     );
   }
 
-  await txRun(
-    client,
-    `
-      INSERT INTO subject_visibility_by_admission
-        (admission_id, subject_id, is_visible, created_at, updated_at)
-      VALUES (?, ?, true, NOW(), NOW())
-      ON CONFLICT (admission_id, subject_id)
-      DO UPDATE SET
-        is_visible = true,
-        updated_at = NOW()
-    `,
-    [admissionId, legacySubjectId]
-  );
+  await academicSetupHelpers.writeLegacySubjectVisibility({
+    run: (sql, params) => txRun(client, sql, params),
+  }, {
+    admissionId,
+    subjectId: legacySubjectId,
+    isVisible: true,
+  });
 
   return {
     subject_id: legacySubjectId,
@@ -4205,19 +4199,13 @@ async function applyProgramPresetToStudyContext(studyContextId, options = {}) {
         [offeringId]
       );
       if (legacySubjectId) {
-        await txRun(
-          client,
-          `
-            INSERT INTO subject_visibility_by_admission
-              (admission_id, subject_id, is_visible, created_at, updated_at)
-            VALUES (?, ?, false, NOW(), NOW())
-            ON CONFLICT (admission_id, subject_id)
-            DO UPDATE SET
-              is_visible = false,
-              updated_at = NOW()
-          `,
-          [parsePositiveIntStrict(context.admission_id), legacySubjectId]
-        );
+        await academicSetupHelpers.writeLegacySubjectVisibility({
+          run: (sql, params) => txRun(client, sql, params),
+        }, {
+          admissionId: parsePositiveIntStrict(context.admission_id),
+          subjectId: legacySubjectId,
+          isVisible: false,
+        });
       }
     }
   });
@@ -4813,20 +4801,12 @@ async function cloneAdmissionConfigurationFromLatest(programId, targetAdmissionI
     [normalizedTargetAdmissionId, sourceAdmissionId]
   );
 
-  await db.run(
-    `
-      INSERT INTO subject_visibility_by_admission
-        (admission_id, subject_id, is_visible, created_at, updated_at)
-      SELECT ?, sva.subject_id, sva.is_visible, NOW(), NOW()
-      FROM subject_visibility_by_admission sva
-      WHERE sva.admission_id = ?
-      ON CONFLICT (admission_id, subject_id)
-      DO UPDATE SET
-        is_visible = EXCLUDED.is_visible,
-        updated_at = NOW()
-    `,
-    [normalizedTargetAdmissionId, sourceAdmissionId]
-  );
+  await academicSetupHelpers.copyLegacySubjectVisibility({
+    run: (sql, params) => db.run(sql, params),
+  }, {
+    sourceAdmissionId,
+    targetAdmissionId: normalizedTargetAdmissionId,
+  });
 }
 
 function buildLegacySubjectOfferingDedupeKey(subjectId) {
@@ -5431,37 +5411,25 @@ async function upsertStudyContextOffering(payload = {}) {
 
     for (const targetContext of targetContexts) {
       if (!targetContext.admission_id) continue;
-      await txRun(
-        client,
-        `
-          INSERT INTO subject_visibility_by_admission
-            (admission_id, subject_id, is_visible, created_at, updated_at)
-          VALUES (?, ?, true, NOW(), NOW())
-          ON CONFLICT (admission_id, subject_id)
-          DO UPDATE SET
-            is_visible = true,
-            updated_at = NOW()
-        `,
-        [targetContext.admission_id, legacySubjectId]
-      );
+      await academicSetupHelpers.writeLegacySubjectVisibility({
+        run: (sql, params) => txRun(client, sql, params),
+      }, {
+        admissionId: targetContext.admission_id,
+        subjectId: legacySubjectId,
+        isVisible: true,
+      });
     }
     for (const removedContextId of existingContextIds.filter((contextId) => !targetContextIds.includes(contextId))) {
       const removedContext = existingContextRows.find((row) => Number(row.id || 0) === Number(removedContextId || 0))
         || targetContextRows.find((row) => Number(row.id || 0) === Number(removedContextId || 0));
       if (!removedContext || !removedContext.admission_id) continue;
-      await txRun(
-        client,
-        `
-          INSERT INTO subject_visibility_by_admission
-            (admission_id, subject_id, is_visible, created_at, updated_at)
-          VALUES (?, ?, false, NOW(), NOW())
-          ON CONFLICT (admission_id, subject_id)
-          DO UPDATE SET
-            is_visible = false,
-            updated_at = NOW()
-        `,
-        [removedContext.admission_id, legacySubjectId]
-      );
+      await academicSetupHelpers.writeLegacySubjectVisibility({
+        run: (sql, params) => txRun(client, sql, params),
+      }, {
+        admissionId: removedContext.admission_id,
+        subjectId: legacySubjectId,
+        isVisible: false,
+      });
     }
 
     const remainingContext = await txGet(
@@ -5595,19 +5563,13 @@ async function archiveStudyContextOfferingForContext(studyContextId, subjectOffe
       );
     }
     if (legacySubjectId && context.admission_id) {
-      await txRun(
-        client,
-        `
-          INSERT INTO subject_visibility_by_admission
-            (admission_id, subject_id, is_visible, created_at, updated_at)
-          VALUES (?, ?, false, NOW(), NOW())
-          ON CONFLICT (admission_id, subject_id)
-          DO UPDATE SET
-            is_visible = false,
-            updated_at = NOW()
-        `,
-        [parsePositiveIntStrict(context.admission_id), legacySubjectId]
-      );
+      await academicSetupHelpers.writeLegacySubjectVisibility({
+        run: (sql, params) => txRun(client, sql, params),
+      }, {
+        admissionId: parsePositiveIntStrict(context.admission_id),
+        subjectId: legacySubjectId,
+        isVisible: false,
+      });
     }
   });
 
@@ -6742,45 +6704,14 @@ async function syncSubjectAdmissionVisibility(client, sourceSubjectId, targetSub
   if (!admissionIds.length) {
     return;
   }
-  const visibilityRows = await txAll(
-    client,
-    `
-      SELECT admission_id, is_visible
-      FROM subject_visibility_by_admission
-      WHERE subject_id = ?
-        AND admission_id = ANY(?::int[])
-    `,
-    [normalizedSourceSubjectId, admissionIds]
-  );
-  const visibilityMap = new Map();
-  (visibilityRows || []).forEach((row) => {
-    const admissionId = Number(row.admission_id || 0);
-    if (!admissionId) return;
-    visibilityMap.set(admissionId, row.is_visible === true || Number(row.is_visible) === 1 ? 1 : 0);
+  await academicSetupHelpers.mirrorLegacySubjectVisibilityByAdmissions({
+    all: (sql, params) => txAll(client, sql, params),
+    run: (sql, params) => txRun(client, sql, params),
+  }, {
+    sourceSubjectId: normalizedSourceSubjectId,
+    targetSubjectId: normalizedTargetSubjectId,
+    admissionIds,
   });
-  for (const admissionId of admissionIds) {
-    if (visibilityMap.has(admissionId)) {
-      await txRun(
-        client,
-        `
-          INSERT INTO subject_visibility_by_admission
-            (admission_id, subject_id, is_visible, created_at, updated_at)
-          VALUES (?, ?, ?, NOW(), NOW())
-          ON CONFLICT (admission_id, subject_id)
-          DO UPDATE SET
-            is_visible = EXCLUDED.is_visible,
-            updated_at = NOW()
-        `,
-        [admissionId, normalizedTargetSubjectId, visibilityMap.get(admissionId)]
-      );
-    } else {
-      await txRun(
-        client,
-        'DELETE FROM subject_visibility_by_admission WHERE admission_id = ? AND subject_id = ?',
-        [admissionId, normalizedTargetSubjectId]
-      );
-    }
-  }
 }
 
 async function removeSubjectBindingFromCourse(client, subjectId, courseId) {
@@ -10917,14 +10848,9 @@ async function syncTeacherSubjectMirrorFromAssignmentsTx(client, userId) {
       });
     });
 
-    await txRun(client, 'DELETE FROM teacher_subjects WHERE user_id = ?', [normalizedUserId]);
-    for (const row of uniqueMirrorRows.values()) {
-      await txRun(
-        client,
-        'INSERT INTO teacher_subjects (user_id, subject_id, group_number) VALUES (?, ?, ?)',
-        [normalizedUserId, row.subject_id, row.group_number]
-      );
-    }
+    await teacherTemplateHelpers.replaceTeacherSubjectsMirror({
+      run: (sql, params) => txRun(client, sql, params),
+    }, normalizedUserId, Array.from(uniqueMirrorRows.values()));
     return uniqueMirrorRows.size;
   } catch (err) {
     if (isDbSchemaCompatibilityError(err)) {
@@ -12734,28 +12660,10 @@ async function upsertTeacherRequestStatus(userId, options = {}) {
   if (!normalizedUserId) {
     return 'pending';
   }
-  const allowPendingReset = options.allowPendingReset === true;
-  const existing = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [normalizedUserId]);
-  let nextStatus = existing ? String(existing.status || 'pending') : 'pending';
-  if (nextStatus === 'rejected') {
-    nextStatus = 'pending';
-  }
-  if (existing) {
-    if (nextStatus !== 'approved' || allowPendingReset) {
-      await db.run(
-        'UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?',
-        [nextStatus, normalizedUserId]
-      );
-    } else {
-      await db.run('UPDATE teacher_requests SET updated_at = NOW() WHERE user_id = ?', [normalizedUserId]);
-    }
-  } else {
-    await db.run(
-      'INSERT INTO teacher_requests (user_id, status) VALUES (?, ?)',
-      [normalizedUserId, nextStatus]
-    );
-  }
-  return nextStatus;
+  return teacherTemplateHelpers.upsertTeacherRequestStatus({
+    get: (sql, params) => db.get(sql, params),
+    run: (sql, params) => db.run(sql, params),
+  }, normalizedUserId, options);
 }
 
 function extractTeacherOfferingSelectionIds(body = {}) {
@@ -12824,13 +12732,9 @@ async function saveTeacherOfferingSelections(userId, body, options = {}) {
     });
   }
 
-  await db.run('DELETE FROM teacher_subjects WHERE user_id = ?', [userId]);
-  for (const item of selections) {
-    await db.run(
-      'INSERT INTO teacher_subjects (user_id, subject_id, group_number) VALUES (?, ?, ?)',
-      [userId, item.subject_id, item.group_number]
-    );
-  }
+  await teacherTemplateHelpers.replaceTeacherSubjectsMirror({
+    run: (sql, params) => db.run(sql, params),
+  }, userId, selections);
   const nextStatus = await upsertTeacherRequestStatus(userId, options);
   const academicAssignments = await syncTeacherAcademicAssignments(
     userId,
@@ -12877,13 +12781,9 @@ async function saveTeacherSubjects(userId, body, options = {}) {
   if (!hasAny) {
     return { ok: false, error: 'Select%20subject' };
   }
-  await db.run('DELETE FROM teacher_subjects WHERE user_id = ?', [userId]);
-  for (const item of selections) {
-    await db.run(
-      'INSERT INTO teacher_subjects (user_id, subject_id, group_number) VALUES (?, ?, ?)',
-      [userId, item.subject_id, item.group_number]
-    );
-  }
+  await teacherTemplateHelpers.replaceTeacherSubjectsMirror({
+    run: (sql, params) => db.run(sql, params),
+  }, userId, selections);
   const nextStatus = await upsertTeacherRequestStatus(userId, options);
   const academicAssignments = await syncTeacherAcademicAssignments(userId, selections);
   return { ok: true, status: nextStatus, selections, academicAssignments };
@@ -36807,25 +36707,23 @@ app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionA
       if (!subjectId) continue;
       const baseVisible = subject.visible === true || Number(subject.visible) === 1;
       if (!baseVisible) {
-        await db.run(
-          'DELETE FROM subject_visibility_by_admission WHERE admission_id = ? AND subject_id = ?',
-          [admissionId, subjectId]
-        );
+        await academicSetupHelpers.writeLegacySubjectVisibility({
+          run: (sql, params) => db.run(sql, params),
+        }, {
+          admissionId,
+          subjectId,
+          mode: 'delete',
+        });
         continue;
       }
       const visibilityFlag = parseBooleanFlag(req.body[`subject_${subjectId}`], false);
-      await db.run(
-        `
-          INSERT INTO subject_visibility_by_admission
-            (admission_id, subject_id, is_visible, created_at, updated_at)
-          VALUES (?, ?, ?, NOW(), NOW())
-          ON CONFLICT (admission_id, subject_id)
-          DO UPDATE SET
-            is_visible = EXCLUDED.is_visible,
-            updated_at = NOW()
-        `,
-        [admissionId, subjectId, visibilityFlag]
-      );
+      await academicSetupHelpers.writeLegacySubjectVisibility({
+        run: (sql, params) => db.run(sql, params),
+      }, {
+        admissionId,
+        subjectId,
+        isVisible: visibilityFlag,
+      });
     }
     await syncSubjectOfferingsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
@@ -36944,42 +36842,13 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
       }));
     }
 
-    await db.run(
-      `
-        DELETE FROM subject_visibility_by_admission
-        WHERE admission_id = ?
-          AND subject_id IN (
-            SELECT scb.subject_id
-            FROM subject_course_bindings scb
-            WHERE scb.course_id = ?
-          )
-      `,
-      [admissionId, selectedCourseId]
-    );
-
-    await db.run(
-      `
-        INSERT INTO subject_visibility_by_admission
-          (admission_id, subject_id, is_visible, created_at, updated_at)
-        SELECT
-          ?,
-          sva.subject_id,
-          sva.is_visible,
-          NOW(),
-          NOW()
-        FROM subject_visibility_by_admission sva
-        JOIN subject_course_bindings scb ON scb.subject_id = sva.subject_id
-        JOIN subjects s ON s.id = scb.subject_id
-        WHERE sva.admission_id = ?
-          AND scb.course_id = ?
-          AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
-        ON CONFLICT (admission_id, subject_id)
-        DO UPDATE SET
-          is_visible = EXCLUDED.is_visible,
-          updated_at = NOW()
-      `,
-      [admissionId, sourceAdmissionId, selectedCourseId]
-    );
+    await academicSetupHelpers.copyLegacySubjectVisibilityForCourse({
+      run: (sql, params) => db.run(sql, params),
+    }, {
+      sourceAdmissionId,
+      targetAdmissionId: admissionId,
+      courseId: selectedCourseId,
+    });
 
     await syncSubjectOfferingsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
@@ -48240,24 +48109,22 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
         for (const admissionId of admissions) {
           if (sourceVisibilityByAdmission.has(Number(admissionId))) {
             const visibilityFlag = sourceVisibilityByAdmission.get(Number(admissionId)) ? 1 : 0;
-            await db.run(
-              `
-                INSERT INTO subject_visibility_by_admission
-                  (admission_id, subject_id, is_visible, created_at, updated_at)
-                VALUES (?, ?, ?, NOW(), NOW())
-                ON CONFLICT (admission_id, subject_id)
-                DO UPDATE SET
-                  is_visible = EXCLUDED.is_visible,
-                  updated_at = NOW()
-              `,
-              [admissionId, targetSubjectId, visibilityFlag]
-            );
+            await academicSetupHelpers.writeLegacySubjectVisibility({
+              run: (sql, params) => db.run(sql, params),
+            }, {
+              admissionId,
+              subjectId: targetSubjectId,
+              isVisible: visibilityFlag,
+            });
             pathwaysSyncedCount += 1;
           } else {
-            await db.run(
-              'DELETE FROM subject_visibility_by_admission WHERE admission_id = ? AND subject_id = ?',
-              [admissionId, targetSubjectId]
-            );
+            await academicSetupHelpers.writeLegacySubjectVisibility({
+              run: (sql, params) => db.run(sql, params),
+            }, {
+              admissionId,
+              subjectId: targetSubjectId,
+              mode: 'delete',
+            });
             pathwaysResetCount += 1;
           }
         }
@@ -48802,7 +48669,10 @@ app.post('/admin/teacher-requests/:userId/approve', requireTeachersSectionAccess
     }
     const targetCourseId = Number(targetUser.course_id || courseId || 1);
     const beforeSnapshot = await getUserRoleSnapshot(userId, targetUser.role || 'student');
-    await db.run('UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?', ['approved', userId]);
+    await teacherTemplateHelpers.upsertTeacherRequestStatus({
+      get: (sql, params) => db.get(sql, params),
+      run: (sql, params) => db.run(sql, params),
+    }, userId, { status: 'approved', allowPendingReset: true });
     await assignUserRoles(userId, ['teacher'], { preferredPrimary: 'teacher' });
     await recordUserRoleChangeEvent({
       userId,
@@ -48845,7 +48715,10 @@ app.post('/admin/teacher-requests/:userId/reject', requireTeachersSectionAccess,
     }
     const targetCourseId = Number(targetUser.course_id || courseId || 1);
     const beforeSnapshot = await getUserRoleSnapshot(userId, targetUser.role || 'student');
-    await db.run('UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?', ['rejected', userId]);
+    await teacherTemplateHelpers.upsertTeacherRequestStatus({
+      get: (sql, params) => db.get(sql, params),
+      run: (sql, params) => db.run(sql, params),
+    }, userId, { status: 'rejected', allowPendingReset: true });
     await assignUserRoles(userId, ['student'], { preferredPrimary: 'student' });
     await recordUserRoleChangeEvent({
       userId,
