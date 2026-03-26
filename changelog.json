@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.98",
+      "date": "2026-03-27",
+      "items": [
+        "refactor(academic-setup-user-placement-service): move canonical user placement resolution and assignment into `lib/academicSetup.js`, so `resolveUserAcademicPlacement` and `assignUserStudyContext` stop carrying the full implementation inside `app.js`",
+        "tune(app-placement-wrappers): keep thin wrappers in `app.js` that only inject database access and local label/course helpers into the new Academic Setup service layer, reducing duplication before the next extraction pass on admin scope and promotion flows",
+        "tune(service-boundary-canonical-placement): consolidate the core `study_context_id` placement engine behind one reusable module path, which makes later refactors of admin scope, moderation, and migration flows safer because canonical placement no longer lives as route-adjacent monolith code"
+      ]
+    },
+    {
       "version": "1.2.97",
       "date": "2026-03-27",
       "items": [

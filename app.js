@@ -3013,10 +3013,10 @@ async function resolveRegistrationStudyContext({ admissionId, programId, trackKe
 }
 
 async function resolveUserAcademicPlacement(userOrId, options = {}) {
-  const lang = options.lang === 'en' ? 'en' : 'uk';
-  const userRow = typeof userOrId === 'object' && userOrId
-    ? userOrId
-    : await db.get(
+  return academicSetupHelpers.resolveUserAcademicPlacement({
+    userOrId,
+    lang: options.lang === 'en' ? 'en' : 'uk',
+    loadUserById: (userId) => db.get(
       `
         SELECT
           id,
@@ -3028,144 +3028,27 @@ async function resolveUserAcademicPlacement(userOrId, options = {}) {
         FROM users
         WHERE id = ?
       `,
-      [parsePositiveIntStrict(userOrId)]
-    );
-  if (!userRow) {
-    return null;
-  }
-
-  const studyContextId = parsePositiveIntStrict(userRow.study_context_id);
-  const placement = {
-    user_id: Number(userRow.id || 0) || null,
-    study_context_id: studyContextId || null,
-    course_id: parsePositiveIntStrict(userRow.course_id) || null,
-    admission_id: parsePositiveIntStrict(userRow.admission_id) || null,
-    program_id: parsePositiveIntStrict(userRow.study_program_id) || null,
-    track_key: normalizeRegistrationTrack(userRow.study_track, 'bachelor'),
-    campus_key: '',
-    stage: 1,
-    course_name: '',
-    program_code: '',
-    program_name: '',
-    admission_year: null,
-    cohort_label: '',
-    context_label: '',
-  };
-
-  if (studyContextId) {
-    const context = await getStudyContextById(studyContextId);
-    if (context) {
-      return {
-        ...placement,
-        study_context_id: context.id,
-        course_id: context.course_id,
-        admission_id: context.admission_id || placement.admission_id,
-        program_id: context.program_id || placement.program_id,
-        track_key: context.track_key,
-        campus_key: context.campus_key,
-        stage: context.stage,
-        course_name: context.course_name,
-        program_code: context.program_code,
-        program_name: context.program_name,
-        admission_year: context.admission_year,
-        cohort_label: context.cohort_label,
-        context_label: buildStudyContextLabel(context, lang),
-        raw_context: context,
-      };
-    }
-  }
-
-  if (placement.course_id && placement.admission_id) {
-    const ensuredContextId = await ensureStudyContextForLegacyPlacement({
-      courseId: placement.course_id,
-      admissionId: placement.admission_id,
-      programId: placement.program_id,
-      trackKey: placement.track_key,
-    });
-    if (ensuredContextId) {
-      const context = await getStudyContextById(ensuredContextId);
-      if (context) {
-        return {
-          ...placement,
-          study_context_id: context.id,
-          course_id: context.course_id,
-          admission_id: context.admission_id || placement.admission_id,
-          program_id: context.program_id || placement.program_id,
-          track_key: context.track_key,
-          campus_key: context.campus_key,
-          stage: context.stage,
-          course_name: context.course_name,
-          program_code: context.program_code,
-          program_name: context.program_name,
-          admission_year: context.admission_year,
-          cohort_label: context.cohort_label,
-          context_label: buildStudyContextLabel(context, lang),
-          raw_context: context,
-        };
-      }
-    }
-  }
-
-  const course = placement.course_id ? await getCourseById(placement.course_id) : null;
-  placement.campus_key = normalizeCourseCampus((course && course.location) || '', 'kyiv');
-  placement.stage = normalizeStudyContextStage(inferLegacyCourseOrdinal((course && course.name) || ''), 1);
-  placement.course_name = sanitizeCompactText((course && course.name) || '', 140);
-  placement.context_label = buildStudyContextLabel({
-    program_code: placement.program_code,
-    program_name: placement.program_name || (placement.track_key === 'teacher' ? 'Teacher Track' : ''),
-    admission_year: placement.admission_year,
-    campus_key: placement.campus_key,
-    stage: placement.stage,
-    track_key: placement.track_key,
-  }, lang);
-  return placement;
+      [parsePositiveIntStrict(userId)]
+    ),
+    loadStudyContextById: (studyContextId) => getStudyContextById(studyContextId),
+    ensureStudyContextForLegacyPlacement: (payload) => ensureStudyContextForLegacyPlacement(payload),
+    loadCourseById: (courseId) => getCourseById(courseId),
+    buildStudyContextLabel: (context, lang) => buildStudyContextLabel(context, lang),
+    inferLegacyCourseOrdinal: (courseName) => inferLegacyCourseOrdinal(courseName || ''),
+    sanitizeText: (value, maxLength) => sanitizeCompactText(value || '', maxLength),
+  });
 }
 
 async function assignUserStudyContext(userId, studyContextId, fallback = {}) {
-  const normalizedUserId = parsePositiveIntStrict(userId);
-  if (!normalizedUserId) {
-    return null;
-  }
-  const normalizedStudyContextId = parsePositiveIntStrict(studyContextId);
-  const context = normalizedStudyContextId ? await getStudyContextById(normalizedStudyContextId) : null;
-  const nextCourseId = context
-    ? (context.course_id || null)
-    : (parsePositiveIntStrict(fallback.courseId) || null);
-  const nextTrackKey = context
-    ? context.track_key
-    : normalizeRegistrationTrack(fallback.trackKey, '');
-  const nextProgramId = context
-    ? (context.program_id || null)
-    : (parsePositiveIntStrict(fallback.programId) || null);
-  const nextAdmissionId = context
-    ? (context.admission_id || parsePositiveIntStrict(fallback.admissionId) || null)
-    : (parsePositiveIntStrict(fallback.admissionId) || null);
-
-  await db.run(
-    `
-      UPDATE users
-      SET
-        study_context_id = ?,
-        course_id = ?,
-        study_track = ?,
-        study_program_id = ?,
-        admission_id = ?
-      WHERE id = ?
-    `,
-    [
-      normalizedStudyContextId || null,
-      nextCourseId,
-      nextTrackKey || null,
-      nextProgramId,
-      nextAdmissionId,
-      normalizedUserId,
-    ]
-  );
-
-  if (!normalizedStudyContextId || !context) {
-    return null;
-  }
-  return context;
+  return academicSetupHelpers.assignUserStudyContext({
+    store: {
+      run: (sql, params) => db.run(sql, params),
+    },
+    userId,
+    studyContextId,
+    fallback,
+    loadStudyContextById: (contextId) => getStudyContextById(contextId),
+  });
 }
 
 async function listStudyContextOptions(options = {}) {
