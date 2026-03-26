@@ -37,6 +37,7 @@
         closureActionTitle: 'Next action',
         closureActionOpenTitle: 'Freeze this subject for export',
         closureActionOpenNote: 'Use after the final review, when grades and attendance are ready to be locked.',
+        closureActionOpenReturnNote: 'Closing keeps you in the journal and unlocks the export snapshot as a separate action.',
         closureActionClosedTitle: 'Return this subject to editing',
         closureActionClosedNote: 'Reopen only if you need to correct grades or finish unresolved review flows.',
         closureActionExportNote: 'The latest export snapshot stays available for audit and download.',
@@ -224,6 +225,7 @@
         closureActionTitle: 'Наступна дія',
         closureActionOpenTitle: 'Зафіксувати предмет для експорту',
         closureActionOpenNote: 'Використовуйте після фінальної перевірки, коли оцінки й відвідуваність уже готові до блокування.',
+        closureActionOpenReturnNote: 'Після закриття ви лишаєтесь у журналі, а export snapshot стає доступним окремою дією.',
         closureActionClosedTitle: 'Повернути предмет у редагування',
         closureActionClosedNote: 'Відкривайте повторно лише якщо треба виправити оцінки або дозакрити review-flow.',
         closureActionExportNote: 'Останній export snapshot лишається доступним для аудиту та завантаження.',
@@ -584,6 +586,7 @@
                 <% } else { %>
                   <div class="fw-semibold"><%= journalCopy.closureActionOpenTitle %></div>
                   <div class="small text-muted"><%= journalCopy.closureActionOpenNote %></div>
+                  <div class="small text-muted"><%= journalCopy.closureActionOpenReturnNote %></div>
                 <% } %>
               </div>
               <div class="journal-closure-actions">

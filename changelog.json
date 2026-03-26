@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.84",
+      "date": "2026-03-26",
+      "items": [
+        "fix(journal-close-stay-in-context): change `/journal/subject/close` from a raw CSV response into a guided redirect back to `/journal`, so closing a subject now preserves the active journal scope and shows the success state in-place instead of throwing the teacher out of the workflow",
+        "fix(journal-close-export-stateful-link): build the closed-subject export link with the same subject, attendance, quick-attendance, and open-cell context as the journal page, reducing another redirect drift between the closure card and the main journal surface",
+        "tune(journal-close-export-error-redirects): route missing export, unavailable file, invalid subject, and database-error paths from `/journal/subject/close-export` back through the shared journal redirect helper, and update the closure panel copy to explain that export is now a separate follow-up action after close"
+      ]
+    },
+    {
       "version": "1.2.83",
       "date": "2026-03-26",
       "items": [

@@ -16658,6 +16658,64 @@ const buildJournalRedirectPathFromRequest = (req, overrides = {}) => {
   });
 };
 
+const buildJournalCloseExportPath = (params = {}) => {
+  const query = new URLSearchParams();
+  const subjectId = parsePositiveIntStrict(params.subjectId);
+  if (subjectId) query.set('subject_id', String(subjectId));
+  const attendanceDate = String(params.attendanceDate || '').trim();
+  if (isValidDateString(attendanceDate)) query.set('attendance_date', attendanceDate);
+  const attendanceClassNumber = parsePositiveIntStrict(params.attendanceClassNumber);
+  if (attendanceClassNumber && bellSchedule[attendanceClassNumber]) {
+    query.set('attendance_class_number', String(attendanceClassNumber));
+  }
+  if (parseBinaryFlag(params.attendanceQuick, 0) === 1) query.set('attendance_quick', '1');
+  const openColumnId = parsePositiveIntStrict(params.openColumnId);
+  if (openColumnId) query.set('open_column_id', String(openColumnId));
+  const openStudentId = parsePositiveIntStrict(params.openStudentId);
+  if (openStudentId) query.set('open_student_id', String(openStudentId));
+  const queryString = query.toString();
+  return `/journal/subject/close-export${queryString ? `?${queryString}` : ''}`;
+};
+
+const buildJournalCloseExportPathFromRequest = (req, subjectId, overrides = {}) => {
+  const body = req?.body && typeof req.body === 'object' ? req.body : {};
+  const query = req?.query && typeof req.query === 'object' ? req.query : {};
+  const refererQuery = getJournalRefererSearchParams(req);
+  return buildJournalCloseExportPath({
+    subjectId,
+    attendanceDate: pickJournalRequestValue(
+      overrides.attendanceDate,
+      body.attendance_date,
+      query.attendance_date,
+      refererQuery.get('attendance_date')
+    ),
+    attendanceClassNumber: pickJournalRequestValue(
+      overrides.attendanceClassNumber,
+      body.attendance_class_number,
+      query.attendance_class_number,
+      refererQuery.get('attendance_class_number')
+    ),
+    attendanceQuick: pickJournalRequestValue(
+      overrides.attendanceQuick,
+      body.attendance_quick,
+      query.attendance_quick,
+      refererQuery.get('attendance_quick')
+    ),
+    openColumnId: pickJournalRequestValue(
+      overrides.openColumnId,
+      body.open_column_id,
+      query.open_column_id,
+      refererQuery.get('open_column_id')
+    ),
+    openStudentId: pickJournalRequestValue(
+      overrides.openStudentId,
+      body.open_student_id,
+      query.open_student_id,
+      refererQuery.get('open_student_id')
+    ),
+  });
+};
+
 const buildJournalSubjectRedirectPathFromRequest = (req, subjectId, overrides = {}) => (
   buildJournalRedirectPathFromRequest(req, {
     subjectId,
@@ -20688,7 +20746,11 @@ app.get('/journal', requireLogin, async (req, res) => {
         returnAttendanceClassNumber: attendanceContext?.class_number || '',
         returnAttendanceQuick: attendanceQuickEnabled ? 1 : 0,
       }),
-      closeExportHref: `/journal/subject/close-export?subject_id=${Number(selectedSubject.subject_id || 0)}`,
+      closeExportHref: buildJournalCloseExportPathFromRequest(req, Number(selectedSubject.subject_id || 0), {
+        attendanceDate: attendanceContext?.date || '',
+        attendanceClassNumber: attendanceContext?.class_number || '',
+        attendanceQuick: attendanceQuickEnabled ? 1 : 0,
+      }),
     };
 
     await renderViewToResponse(res, 'journal', {
@@ -21249,9 +21311,9 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
       selectedCourseId,
       semesterId
     );
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${exportFile.fileName}"`);
-    return res.send(exportPayload.csv);
+    return res.redirect(subjectCloseRedirect({
+      ok: 'Предмет закрито. Журнал заблоковано, export snapshot готовий до завантаження.',
+    }));
   } catch (err) {
     return res.redirect(subjectCloseRedirect({ err: 'Database error' }));
   }
@@ -21467,8 +21529,9 @@ app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res)
 app.get('/journal/subject/close-export', requireLogin, readLimiter, async (req, res) => {
   const subjectId = Number(req.query.subject_id);
   if (!Number.isFinite(subjectId) || subjectId < 1) {
-    return res.redirect('/journal?err=Invalid%20subject');
+    return res.redirect(buildJournalRedirectPathFromRequest(req, { err: 'Invalid subject' }));
   }
+  const closeExportRedirect = (overrides = {}) => buildJournalSubjectRedirectPathFromRequest(req, subjectId, overrides);
 
   try {
     await ensureDbReady();
@@ -21489,15 +21552,15 @@ app.get('/journal/subject/close-export', requireLogin, readLimiter, async (req, 
 
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
     if (!subjectClosure.is_closed || !subjectClosure.latest_export_path) {
-      return res.redirect(
-        `/journal?subject_id=${subjectId}&err=${encodeURIComponent('Експорт для закритого предмета не знайдено')}`
-      );
+      return res.redirect(closeExportRedirect({
+        err: 'Експорт для закритого предмета не знайдено',
+      }));
     }
     const absolutePath = resolveStoredUploadAbsolutePath(subjectClosure.latest_export_path);
     if (!absolutePath || !fs.existsSync(absolutePath)) {
-      return res.redirect(
-        `/journal?subject_id=${subjectId}&err=${encodeURIComponent('Файл експорту недоступний')}`
-      );
+      return res.redirect(closeExportRedirect({
+        err: 'Файл експорту недоступний',
+      }));
     }
 
     return res.download(
@@ -21505,7 +21568,7 @@ app.get('/journal/subject/close-export', requireLogin, readLimiter, async (req, 
       subjectClosure.latest_export_name || path.basename(absolutePath)
     );
   } catch (err) {
-    return res.redirect(`/journal?subject_id=${subjectId}&err=Database%20error`);
+    return res.redirect(closeExportRedirect({ err: 'Database error' }));
   }
 });
 
