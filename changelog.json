@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.91",
+      "date": "2026-03-26",
+      "items": [
+        "feat(academic-setup-context-workspace): add a new `Contexts and semesters` section to `/admin/pathways` that surfaces live `study_context` cards by cohort with stage, campus, semester, offering, and user counts so admins can focus the real academic runtime container instead of only legacy course mappings",
+        "feat(academic-setup-context-semesters): add context-level semester CRUD on `/admin/pathways/contexts/:id/semesters/*`, letting admins create, edit, activate, archive, and delete `study_context_semesters` without going through the legacy course-semester admin flow",
+        "fix(academic-setup-semester-bridge): sync `study_context_semesters` with legacy semester titles, start dates, and week counts, and keep `subject_offerings` refreshed after context-semester changes so the new cohort-stage-campus layer carries semester metadata instead of dropping back to course-only defaults"
+      ]
+    },
+    {
       "version": "1.2.90",
       "date": "2026-03-26",
       "items": [

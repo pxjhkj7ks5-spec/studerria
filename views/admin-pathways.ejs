@@ -3,8 +3,15 @@
   const activeTrack = trackFilter || 'all';
   const selectedProgramValue = Number(selectedProgramId || 0);
   const selectedAdmissionValue = Number(selectedAdmissionId || 0);
+  const requestedStudyContextValue = Number(selectedStudyContextId || 0);
   const selectedProgram = (programs || []).find((item) => Number(item.id) === selectedProgramValue) || null;
   const selectedAdmission = (admissions || []).find((item) => Number(item.id) === selectedAdmissionValue) || null;
+  const studyContextList = Array.isArray(studyContexts) ? studyContexts : [];
+  const selectedStudyContextItem = (selectedStudyContext && Number(selectedStudyContext.id || 0) > 0)
+    ? selectedStudyContext
+    : (studyContextList.find((item) => Number(item.id) === requestedStudyContextValue) || null);
+  const selectedStudyContextValue = Number((selectedStudyContextItem && selectedStudyContextItem.id) || requestedStudyContextValue || 0);
+  const selectedStudyContextSemestersList = Array.isArray(selectedStudyContextSemesters) ? selectedStudyContextSemesters : [];
   const copyAdmissions = Array.isArray(admissionCopyOptions) ? admissionCopyOptions : [];
   const subjectCatalogList = Array.isArray(subjectCatalogEntries) ? subjectCatalogEntries : [];
   const campusBindingList = Array.isArray(registrationCampusBindings) ? registrationCampusBindings : [];
@@ -130,6 +137,7 @@
     navSubjects: 'Предмети',
     navCampuses: 'Кампуси',
     navMigration: 'Міграція',
+    navContexts: 'Контексти',
     navCatalog: 'Каталог',
     openSection: 'Відкрити розділ',
     scopeTitle: 'Академічний контекст',
@@ -171,6 +179,29 @@
     openPrograms: 'До програм',
     openAdmissions: 'До років вступу',
     addFirstAdmission: 'Додати першу когорту',
+    contextsTitle: 'Live-контексти і семестри',
+    contextsSubtitle: 'Тут cohort розкладається на stage/campus contexts. Саме вони стають live-контейнерами для semesters, offerings, users і подальшого щорічного просування.',
+    contextSelection: 'Фокус study context',
+    contextStage: 'Курс',
+    contextCampus: 'Кампус',
+    contextCourse: 'Primary course',
+    contextSemesters: 'Семестри',
+    contextOfferings: 'Offerings',
+    contextUsers: 'Користувачі',
+    contextsEmpty: 'Для цієї когорти ще немає live-контекстів. Спершу завершіть mapping курсів, щоб система створила stage/campus contexts.',
+    openContexts: 'До контекстів',
+    addSemesterTitle: 'Додати семестр у context',
+    addSemesterSubtitle: 'Семестри тепер живуть на рівні selected study context. Один offering може бути прив’язаний до одного, кількох або всіх семестрів цього context.',
+    semesterTitle: 'Назва семестру',
+    semesterNumber: 'Номер семестру',
+    startDate: 'Дата старту',
+    weeksCount: 'Тижнів',
+    makeActive: 'Зробити активним',
+    archivedToggle: 'Архівний',
+    saveSemester: 'Зберегти семестр',
+    deleteSemester: 'Видалити семестр',
+    noContextSemesters: 'У цьому context ще немає жодного live semester.',
+    selectedContext: 'У фокусі',
     reviewScope: 'До контексту',
     reviewMapping: 'До мапінгу',
     reviewCatalog: 'До каталогу',
@@ -320,6 +351,7 @@
     navSubjects: 'Subjects',
     navCampuses: 'Campuses',
     navMigration: 'Migration',
+    navContexts: 'Contexts',
     navCatalog: 'Catalog',
     openSection: 'Open section',
     scopeTitle: 'Academic context',
@@ -361,6 +393,29 @@
     openPrograms: 'Go to programs',
     openAdmissions: 'Go to admissions',
     addFirstAdmission: 'Add first cohort',
+    contextsTitle: 'Live contexts and semesters',
+    contextsSubtitle: 'This is where a cohort expands into stage/campus contexts. These contexts become the live containers for semesters, offerings, users, and yearly promotion.',
+    contextSelection: 'Study context focus',
+    contextStage: 'Stage',
+    contextCampus: 'Campus',
+    contextCourse: 'Primary course',
+    contextSemesters: 'Semesters',
+    contextOfferings: 'Offerings',
+    contextUsers: 'Users',
+    contextsEmpty: 'This cohort does not have any live contexts yet. Finish course mapping first so the system can create stage/campus contexts.',
+    openContexts: 'Go to contexts',
+    addSemesterTitle: 'Add context semester',
+    addSemesterSubtitle: 'Semesters now live on the selected study context. One offering can be attached to one, several, or all semesters of this context.',
+    semesterTitle: 'Semester title',
+    semesterNumber: 'Semester number',
+    startDate: 'Start date',
+    weeksCount: 'Weeks',
+    makeActive: 'Make active',
+    archivedToggle: 'Archived',
+    saveSemester: 'Save semester',
+    deleteSemester: 'Delete semester',
+    noContextSemesters: 'This context does not have any live semesters yet.',
+    selectedContext: 'Focused',
     reviewScope: 'Go to scope',
     reviewMapping: 'Go to mapping',
     reviewCatalog: 'Go to catalog',
@@ -496,6 +551,7 @@
     { href: '#pathways-scope', label: ui.navScope },
     { href: '#pathways-programs', label: ui.navPrograms },
     { href: '#pathways-admissions', label: ui.navAdmissions },
+    { href: '#pathways-contexts', label: ui.navContexts },
     { href: '#pathways-mapping', label: ui.navMapping },
     { href: '#pathways-subjects', label: ui.navSubjects },
     { href: '#pathways-campuses', label: ui.navCampuses },
@@ -554,6 +610,13 @@
     `${Number(visibleCount || 0)}/${Number(totalCount || 0)} ${ui.coursesShort.toLowerCase()}`;
   const formatVisibilityOptionSummary = (visibleCount, totalCount) =>
     `${Number(visibleCount || 0)}/${Number(totalCount || 0)} ${ui.visibleShort}`;
+  const formatStageLabel = (stage, trackKey) => {
+    const normalizedStage = Math.max(1, Number(stage || 1));
+    if (String(trackKey || '') === 'teacher') {
+      return isUk ? 'Викладацький контекст' : 'Teacher context';
+    }
+    return isUk ? `${normalizedStage} курс` : `Year ${normalizedStage}`;
+  };
 
   const buildPathwaysUrl = (overrides) => {
     const params = new URLSearchParams();
@@ -562,7 +625,18 @@
       track: activeTrack,
       program_id: selectedProgramValue,
       admission_id: selectedAdmissionValue,
+      study_context_id: selectedStudyContextValue,
     }, overrides || {});
+    const hasStudyContextOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'study_context_id');
+    const hasProgramOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'program_id');
+    const hasAdmissionOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'admission_id');
+    if (!hasStudyContextOverride) {
+      const programChanged = hasProgramOverride && Number(next.program_id || 0) !== Number(selectedProgramValue || 0);
+      const admissionChanged = hasAdmissionOverride && Number(next.admission_id || 0) !== Number(selectedAdmissionValue || 0);
+      if (programChanged || admissionChanged || !next.program_id || !next.admission_id) {
+        next.study_context_id = null;
+      }
+    }
 
     Object.keys(next).forEach((key) => {
       const value = next[key];
@@ -1170,6 +1244,9 @@
           <% if (selectedAdmissionValue > 0) { %>
             <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
           <% } %>
+          <% if (selectedStudyContextValue > 0) { %>
+            <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+          <% } %>
         </form>
         <div class="scope-summary-grid">
           <div class="scope-summary-card">
@@ -1402,6 +1479,195 @@
             </div>
           <% } %>
         </div>
+      </section>
+
+      <section class="glass section mb-3" id="pathways-contexts">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><%= ui.contextsTitle %></h2>
+            <p class="section-subtitle"><%= ui.contextsSubtitle %></p>
+          </div>
+          <span class="chip"><%= studyContextList.length %></span>
+        </div>
+        <% if (selectedAdmissionValue > 0) { %>
+          <% if (studyContextList.length) { %>
+            <div class="program-grid mb-3">
+              <% studyContextList.forEach((context) => { %>
+                <article class="soft-panel program-card <%= Number(context.id || 0) === Number(selectedStudyContextValue || 0) ? 'is-selected' : '' %>">
+                  <div class="program-card__header">
+                    <div>
+                      <div class="program-card__eyebrow"><%= ui.contextSelection %> #<%= context.id %></div>
+                      <div class="row-label"><%= context.label %></div>
+                    </div>
+                    <div class="program-card__actions">
+                      <span class="chip"><%= context.campus_label || formatCampusLabel(context.campus_key) %></span>
+                      <% if (Number(context.id || 0) === Number(selectedStudyContextValue || 0)) { %>
+                        <span class="status-pill status-pill--focus"><%= ui.selectedContext %></span>
+                      <% } else { %>
+                        <a class="btn btn-soft btn-sm btn-pill" href="<%= buildPathwaysUrl({ study_context_id: context.id }) %>"><%= ui.focusCohort %></a>
+                      <% } %>
+                    </div>
+                  </div>
+                  <div class="admission-card__metrics">
+                    <div class="mini-stat">
+                      <span class="mini-stat__label"><%= ui.contextStage %></span>
+                      <strong class="mini-stat__value"><%= context.stage_label || formatStageLabel(context.stage, context.track_key) %></strong>
+                    </div>
+                    <div class="mini-stat">
+                      <span class="mini-stat__label"><%= ui.contextSemesters %></span>
+                      <strong class="mini-stat__value"><%= Number(context.active_semester_count || 0) %>/<%= Number(context.semester_count || 0) %></strong>
+                    </div>
+                    <div class="mini-stat">
+                      <span class="mini-stat__label"><%= ui.contextOfferings %></span>
+                      <strong class="mini-stat__value"><%= Number(context.offering_count || 0) %></strong>
+                    </div>
+                    <div class="mini-stat">
+                      <span class="mini-stat__label"><%= ui.contextUsers %></span>
+                      <strong class="mini-stat__value"><%= Number(context.user_count || 0) %></strong>
+                    </div>
+                  </div>
+                  <div class="program-card__footer muted"><%= ui.contextCourse %>: <%= context.primary_course_label || ui.noCourseSelected %></div>
+                </article>
+              <% }) %>
+            </div>
+
+            <% if (selectedStudyContextItem) { %>
+              <div class="row g-3">
+                <div class="col-12 col-xl-4">
+                  <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/semesters/add" class="soft-panel h-100">
+                    <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                    <input type="hidden" name="track" value="<%= activeTrack %>" />
+                    <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                    <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                    <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
+                    <div class="section-header mb-2">
+                      <div>
+                        <h3 class="section-title h5 mb-1"><%= ui.addSemesterTitle %></h3>
+                        <p class="section-subtitle mb-0"><%= ui.addSemesterSubtitle %></p>
+                      </div>
+                    </div>
+                    <div class="catalog-subject-meta mb-3"><%= selectedStudyContextItem.label %></div>
+                    <div class="row g-2">
+                      <div class="col-12 col-sm-4">
+                        <label class="form-label small"><%= ui.semesterNumber %></label>
+                        <input class="form-control compact-input" type="number" name="semester_number" min="1" max="12" value="<%= Math.max(1, Number((selectedStudyContextSemestersList || []).length || 0) + 1) %>" required />
+                      </div>
+                      <div class="col-12 col-sm-8">
+                        <label class="form-label small"><%= ui.semesterTitle %></label>
+                        <input class="form-control compact-input" type="text" name="title" maxlength="120" placeholder="<%= isUk ? 'Осінній семестр' : 'Fall semester' %>" required />
+                      </div>
+                      <div class="col-12 col-sm-6">
+                        <label class="form-label small"><%= ui.startDate %></label>
+                        <input class="form-control compact-input" type="date" name="start_date" />
+                      </div>
+                      <div class="col-12 col-sm-6">
+                        <label class="form-label small"><%= ui.weeksCount %></label>
+                        <input class="form-control compact-input" type="number" name="weeks_count" min="1" max="30" value="16" required />
+                      </div>
+                      <div class="col-12">
+                        <div class="form-check mt-1">
+                          <input class="form-check-input" type="checkbox" id="context_semester_active_new" name="is_active" value="1" />
+                          <label class="form-check-label" for="context_semester_active_new"><%= ui.makeActive %></label>
+                        </div>
+                      </div>
+                      <div class="col-12 d-grid">
+                        <button class="btn btn-primary btn-pill" type="submit"><%= ui.add %></button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+
+                <div class="col-12 col-xl-8">
+                  <div class="section-header mb-2">
+                    <div>
+                      <h3 class="section-title h5 mb-1"><%= ui.contextSemesters %></h3>
+                      <p class="section-subtitle mb-0"><%= selectedStudyContextItem.label %></p>
+                    </div>
+                    <span class="chip"><%= Number(selectedStudyContextSemestersList.length || 0) %></span>
+                  </div>
+                  <% if (selectedStudyContextSemestersList.length) { %>
+                    <div class="d-grid gap-2">
+                      <% selectedStudyContextSemestersList.forEach((semester) => { %>
+                        <div class="soft-panel">
+                          <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/semesters/<%= semester.id %>/update" class="row g-2">
+                            <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                            <input type="hidden" name="track" value="<%= activeTrack %>" />
+                            <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                            <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                            <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
+                            <div class="col-12 col-md-2">
+                              <label class="form-label small"><%= ui.semesterNumber %></label>
+                              <input class="form-control compact-input" type="number" name="semester_number" min="1" max="12" value="<%= Number(semester.semester_number || 1) %>" required />
+                            </div>
+                            <div class="col-12 col-md-4">
+                              <label class="form-label small"><%= ui.semesterTitle %></label>
+                              <input class="form-control compact-input" type="text" name="title" maxlength="120" value="<%= semester.title || '' %>" required />
+                            </div>
+                            <div class="col-12 col-md-3">
+                              <label class="form-label small"><%= ui.startDate %></label>
+                              <input class="form-control compact-input" type="date" name="start_date" value="<%= semester.start_date || '' %>" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                              <label class="form-label small"><%= ui.weeksCount %></label>
+                              <input class="form-control compact-input" type="number" name="weeks_count" min="1" max="30" value="<%= Number(semester.weeks_count || 16) %>" required />
+                            </div>
+                            <div class="col-12 col-md-4">
+                              <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="context_semester_active_<%= semester.id %>" name="is_active" value="1" <%= semester.is_active ? 'checked' : '' %> />
+                                <label class="form-check-label" for="context_semester_active_<%= semester.id %>"><%= ui.makeActive %></label>
+                              </div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                              <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="context_semester_archived_<%= semester.id %>" name="is_archived" value="1" <%= semester.is_archived ? 'checked' : '' %> />
+                                <label class="form-check-label" for="context_semester_archived_<%= semester.id %>"><%= ui.archivedToggle %></label>
+                              </div>
+                            </div>
+                            <div class="col-12 col-md-4 align-self-end d-grid">
+                              <button class="btn btn-primary btn-pill" type="submit"><%= ui.saveSemester %></button>
+                            </div>
+                          </form>
+                          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2">
+                            <span class="catalog-subject-meta">
+                              #<%= semester.id %>
+                              <% if (semester.legacy_semester_id) { %>
+                                / legacy #<%= semester.legacy_semester_id %>
+                              <% } %>
+                            </span>
+                            <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/semesters/<%= semester.id %>/delete">
+                              <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                              <input type="hidden" name="track" value="<%= activeTrack %>" />
+                              <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                              <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                              <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
+                              <button class="btn btn-soft btn-pill" type="submit"><%= ui.deleteSemester %></button>
+                            </form>
+                          </div>
+                        </div>
+                      <% }) %>
+                    </div>
+                  <% } else { %>
+                    <div class="soft-panel muted"><%= ui.noContextSemesters %></div>
+                  <% } %>
+                </div>
+              </div>
+            <% } %>
+          <% } else { %>
+            <div class="soft-panel muted">
+              <div><%= ui.contextsEmpty %></div>
+              <div class="mt-2">
+                <a class="btn btn-soft btn-pill" href="#pathways-mapping"><%= ui.reviewMapping %></a>
+              </div>
+            </div>
+          <% } %>
+        <% } else { %>
+          <div class="soft-panel muted">
+            <div><%= ui.selectAdmissionFirst %></div>
+            <div class="mt-2">
+              <a class="btn btn-soft btn-pill" href="<%= selectedProgramValue > 0 ? '#pathways-admissions' : '#pathways-programs' %>"><%= selectedProgramValue > 0 ? ui.openAdmissions : ui.openPrograms %></a>
+            </div>
+          </div>
+        <% } %>
       </section>
 
       <section class="row g-3">

@@ -2774,7 +2774,12 @@ async function ensureStudyContextSemesters(contextId, courseId) {
   try {
     const semesters = await db.all(
       `
-        SELECT id, name, weeks_count, is_active
+        SELECT
+          id,
+          title,
+          start_date,
+          weeks_count,
+          is_active
         FROM semesters
         WHERE course_id = ?
         ORDER BY id ASC
@@ -2789,12 +2794,13 @@ async function ensureStudyContextSemesters(contextId, courseId) {
       await db.run(
         `
           INSERT INTO study_context_semesters
-            (study_context_id, legacy_semester_id, semester_number, title, weeks_count, is_active, is_archived, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, false, NOW(), NOW())
+            (study_context_id, legacy_semester_id, semester_number, title, start_date, weeks_count, is_active, is_archived, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, false, NOW(), NOW())
           ON CONFLICT (study_context_id, semester_number)
           DO UPDATE SET
             semester_number = EXCLUDED.semester_number,
             title = EXCLUDED.title,
+            start_date = EXCLUDED.start_date,
             weeks_count = EXCLUDED.weeks_count,
             is_active = EXCLUDED.is_active,
             legacy_semester_id = COALESCE(study_context_semesters.legacy_semester_id, EXCLUDED.legacy_semester_id),
@@ -2804,7 +2810,10 @@ async function ensureStudyContextSemesters(contextId, courseId) {
           normalizedContextId,
           semesterId,
           semesterNumber,
-          sanitizeCompactText(semester.name || `Semester ${semesterNumber}`, 120),
+          sanitizeCompactText(semester.title || `Semester ${semesterNumber}`, 120),
+          isValidDateString(String(semester.start_date || '').trim())
+            ? String(semester.start_date).trim()
+            : null,
           Number(semester.weeks_count || 0) || 0,
           semester.is_active === true || Number(semester.is_active) === 1,
         ]
@@ -3882,7 +3891,7 @@ async function listStudyContextSemesters(studyContextId, options = {}) {
   try {
     const rows = await db.all(
       `
-        SELECT id, semester_number, title, is_active, is_archived, legacy_semester_id
+        SELECT id, semester_number, title, start_date, weeks_count, is_active, is_archived, legacy_semester_id
         FROM study_context_semesters
         WHERE ${where.join('\n          AND ')}
         ORDER BY semester_number ASC, id ASC
@@ -3893,6 +3902,10 @@ async function listStudyContextSemesters(studyContextId, options = {}) {
       id: Number(row.id || 0) || null,
       semester_number: Number(row.semester_number || 0) || null,
       title: sanitizeCompactText(row.title || '', 120),
+      start_date: isValidDateString(String(row.start_date || '').trim())
+        ? String(row.start_date).trim()
+        : '',
+      weeks_count: Number(row.weeks_count || 0) || 0,
       is_active: row.is_active === true || Number(row.is_active) === 1,
       is_archived: row.is_archived === true || Number(row.is_archived) === 1,
       legacy_semester_id: Number(row.legacy_semester_id || 0) || null,
@@ -7995,6 +8008,8 @@ function buildAdminPathwaysUrl(params = {}) {
   if (programId) query.set('program_id', String(programId));
   const admissionId = parsePositiveIntStrict(params.admissionId);
   if (admissionId) query.set('admission_id', String(admissionId));
+  const studyContextId = parsePositiveIntStrict(params.studyContextId);
+  if (studyContextId) query.set('study_context_id', String(studyContextId));
   if (params.error) query.set('error', String(params.error));
   if (params.ok) query.set('ok', String(params.ok));
   const queryString = query.toString();
@@ -29974,6 +29989,120 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       pending_users: 0,
     });
 
+    let studyContexts = [];
+    let selectedStudyContextId = 0;
+    let selectedStudyContext = null;
+    let selectedStudyContextSemesters = [];
+    if (selectedAdmissionId && selectedProgramId && selectedTrackKey) {
+      const requestedStudyContextId = parsePositiveIntStrict(req.query.study_context_id);
+      const contextOptions = await listStudyContextOptions({
+        programId: selectedProgramId,
+        admissionId: selectedAdmissionId,
+        trackKey: selectedTrackKey,
+      });
+      const contextIds = (contextOptions || [])
+        .map((context) => Number(context.id || 0))
+        .filter((value) => Number.isInteger(value) && value > 0);
+      if (contextIds.length) {
+        const [semesterMetricRows, offeringMetricRows, userMetricRows] = await Promise.all([
+          db.all(
+            `
+              SELECT
+                study_context_id,
+                COUNT(*) FILTER (
+                  WHERE COALESCE(is_archived, false) = false
+                )::int AS semester_count,
+                COUNT(*) FILTER (
+                  WHERE COALESCE(is_archived, false) = false
+                    AND is_active = true
+                )::int AS active_semester_count
+              FROM study_context_semesters
+              WHERE study_context_id = ANY(?::int[])
+              GROUP BY study_context_id
+            `,
+            [contextIds]
+          ),
+          db.all(
+            `
+              SELECT
+                study_context_id,
+                COUNT(DISTINCT subject_offering_id)::int AS offering_count
+              FROM subject_offering_contexts
+              WHERE study_context_id = ANY(?::int[])
+              GROUP BY study_context_id
+            `,
+            [contextIds]
+          ),
+          db.all(
+            `
+              SELECT
+                study_context_id,
+                COUNT(*) FILTER (
+                  WHERE LOWER(COALESCE(role, '')) <> 'admin'
+                )::int AS user_count
+              FROM users
+              WHERE study_context_id = ANY(?::int[])
+              GROUP BY study_context_id
+            `,
+            [contextIds]
+          ),
+        ]);
+        const semesterMetricsByContext = new Map();
+        (semesterMetricRows || []).forEach((row) => {
+          const contextId = Number(row.study_context_id || 0);
+          if (!contextId) return;
+          semesterMetricsByContext.set(contextId, {
+            semester_count: Number(row.semester_count || 0),
+            active_semester_count: Number(row.active_semester_count || 0),
+          });
+        });
+        const offeringMetricsByContext = new Map();
+        (offeringMetricRows || []).forEach((row) => {
+          const contextId = Number(row.study_context_id || 0);
+          if (!contextId) return;
+          offeringMetricsByContext.set(contextId, Number(row.offering_count || 0));
+        });
+        const userMetricsByContext = new Map();
+        (userMetricRows || []).forEach((row) => {
+          const contextId = Number(row.study_context_id || 0);
+          if (!contextId) return;
+          userMetricsByContext.set(contextId, Number(row.user_count || 0));
+        });
+
+        studyContexts = (contextOptions || []).map((context) => {
+          const course = courseById.get(Number(context.course_id || 0)) || null;
+          const semesterMetrics = semesterMetricsByContext.get(Number(context.id || 0)) || {
+            semester_count: 0,
+            active_semester_count: 0,
+          };
+          return {
+            ...context,
+            stage_label: formatStudyContextStageLabel(context.stage, context.track_key, pathwaysLang),
+            campus_label: formatStudyContextCampusLabel(context.campus_key, pathwaysLang),
+            primary_course_label: course
+              ? `${sanitizeCompactText(course.name || '', 120)} / ${formatPathwaysCampusLabel(course.location)}${isTeacherCourseRecord(course) ? ` / ${pathwaysText.teacherBadge}` : ''}`
+              : sanitizeCompactText(context.course_name || '', 120),
+            semester_count: Number(semesterMetrics.semester_count || 0),
+            active_semester_count: Number(semesterMetrics.active_semester_count || 0),
+            offering_count: Number(offeringMetricsByContext.get(Number(context.id || 0)) || 0),
+            user_count: Number(userMetricsByContext.get(Number(context.id || 0)) || 0),
+          };
+        });
+
+        const fallbackStudyContext = studyContexts.find((context) => Number(context.id || 0) === Number(requestedStudyContextId || 0))
+          || studyContexts.find((context) => Number(context.course_id || 0) === Number(selectedCourseId || 0))
+          || studyContexts[0]
+          || null;
+        if (fallbackStudyContext) {
+          selectedStudyContextId = Number(fallbackStudyContext.id || 0);
+          selectedStudyContext = fallbackStudyContext;
+          selectedStudyContextSemesters = await listStudyContextSemesters(selectedStudyContextId, {
+            includeArchived: true,
+          });
+        }
+      }
+    }
+
     const selectedCourse = courseById.get(Number(selectedCourseId || 0)) || null;
     const selectedCourseLabel = selectedCourse
       ? `${sanitizeCompactText(selectedCourse.name || '', 120)} / ${formatPathwaysCampusLabel(selectedCourse.location)}${isTeacherCourseRecord(selectedCourse) ? ` / ${pathwaysText.teacherBadge}` : ''}`
@@ -30454,6 +30583,10 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       mappingSummary,
       migrationSummary,
       selectedCourseLabel,
+      studyContexts,
+      selectedStudyContextId,
+      selectedStudyContext,
+      selectedStudyContextSemesters,
       selectedCohortHealth,
       registrationExperienceSummary: selectedRegistrationExperience,
       cohortAlerts,
@@ -30523,6 +30656,16 @@ function getPathwaysRouteMessages(req) {
     },
     subjectBindingRemoved: 'Предмет прибрано з курсу',
     subjectInstanceNotFound: 'Прив’язку предмета не знайдено',
+    invalidStudyContext: 'Некоректний study context',
+    invalidStudyContextSemester: 'Некоректний semester context',
+    studyContextSemesterTitleRequired: 'Назва семестру обов’язкова',
+    invalidStudyContextSemesterNumber: 'Некоректний номер семестру',
+    invalidStudyContextSemesterWeeks: 'Некоректна тривалість семестру',
+    invalidStudyContextSemesterDate: 'Некоректна дата старту семестру',
+    studyContextSemesterExists: 'Семестр з цим номером уже є в context',
+    studyContextSemesterAdded: 'Семестр context додано',
+    studyContextSemesterUpdated: 'Семестр context оновлено',
+    studyContextSemesterDeleted: 'Семестр context видалено',
   } : {
     databaseError: 'Database error',
     programNameRequired: 'Program name is required',
@@ -30571,6 +30714,16 @@ function getPathwaysRouteMessages(req) {
     },
     subjectBindingRemoved: 'Subject removed from the course',
     subjectInstanceNotFound: 'Subject binding not found',
+    invalidStudyContext: 'Invalid study context',
+    invalidStudyContextSemester: 'Invalid context semester',
+    studyContextSemesterTitleRequired: 'Semester title is required',
+    invalidStudyContextSemesterNumber: 'Invalid semester number',
+    invalidStudyContextSemesterWeeks: 'Invalid semester duration',
+    invalidStudyContextSemesterDate: 'Invalid semester start date',
+    studyContextSemesterExists: 'A semester with this number already exists in the context',
+    studyContextSemesterAdded: 'Context semester added',
+    studyContextSemesterUpdated: 'Context semester updated',
+    studyContextSemesterDeleted: 'Context semester deleted',
   };
 }
 
@@ -30624,6 +30777,424 @@ async function getAdmissionCourseScope(admissionId, trackKey) {
     visibleCourseIdSet,
   };
 }
+
+app.post('/admin/pathways/contexts/:id/semesters/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const contextId = parsePositiveIntStrict(req.params.id);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  let programId = parsePositiveIntStrict(req.body.program_id);
+  let admissionId = parsePositiveIntStrict(req.body.admission_id);
+  const studyContextId = parsePositiveIntStrict(req.body.study_context_id, contextId) || contextId;
+  const semesterNumber = parsePositiveIntStrict(req.body.semester_number);
+  const title = sanitizeCompactText(req.body.title, 120);
+  const startDate = String(req.body.start_date || '').trim();
+  const weeksCount = Number(req.body.weeks_count || 0);
+  const isActive = parseBooleanFlag(req.body.is_active, false);
+
+  if (!contextId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId,
+      error: msg.invalidStudyContext,
+    }));
+  }
+  if (!title) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId,
+      error: msg.studyContextSemesterTitleRequired,
+    }));
+  }
+  if (!semesterNumber) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId,
+      error: msg.invalidStudyContextSemesterNumber,
+    }));
+  }
+  if (!Number.isFinite(weeksCount) || weeksCount < 1 || weeksCount > 30) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId,
+      error: msg.invalidStudyContextSemesterWeeks,
+    }));
+  }
+  if (startDate && !isValidDateString(startDate)) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId,
+      error: msg.invalidStudyContextSemesterDate,
+    }));
+  }
+
+  try {
+    const context = await getStudyContextById(contextId);
+    if (!context) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        studyContextId,
+        error: msg.invalidStudyContext,
+      }));
+    }
+    programId = programId || parsePositiveIntStrict(context.program_id);
+    admissionId = admissionId || parsePositiveIntStrict(context.admission_id);
+
+    await withTransaction(async (client) => {
+      const existing = await txGet(
+        client,
+        `
+          SELECT id
+          FROM study_context_semesters
+          WHERE study_context_id = ?
+            AND semester_number = ?
+          LIMIT 1
+        `,
+        [contextId, semesterNumber]
+      );
+      if (existing && existing.id) {
+        const conflict = new Error('PATHWAYS_CONTEXT_SEMESTER_EXISTS');
+        throw conflict;
+      }
+      if (isActive) {
+        await txRun(
+          client,
+          `
+            UPDATE study_context_semesters
+            SET is_active = false,
+                updated_at = NOW()
+            WHERE study_context_id = ?
+          `,
+          [contextId]
+        );
+      }
+      await txRun(
+        client,
+        `
+          INSERT INTO study_context_semesters
+            (study_context_id, semester_number, title, start_date, weeks_count, is_active, is_archived, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, false, NOW(), NOW())
+        `,
+        [
+          contextId,
+          semesterNumber,
+          title,
+          startDate || null,
+          Math.round(weeksCount),
+          isActive,
+        ]
+      );
+    });
+
+    await syncSubjectOfferingsForStudyContext(contextId);
+    logAction(db, req, 'pathways_context_semester_add', {
+      study_context_id: contextId,
+      semester_number: semesterNumber,
+      title,
+      start_date: startDate || null,
+      weeks_count: Math.round(weeksCount),
+      is_active: isActive ? 1 : 0,
+    });
+
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId: contextId,
+      ok: msg.studyContextSemesterAdded,
+    }));
+  } catch (err) {
+    if (err && err.message === 'PATHWAYS_CONTEXT_SEMESTER_EXISTS') {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        studyContextId: contextId,
+        error: msg.studyContextSemesterExists,
+      }));
+    }
+    return handleDbError(res, err, 'admin.pathways.contextSemesters.add');
+  }
+});
+
+app.post('/admin/pathways/contexts/:contextId/semesters/:semesterId/update', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const contextId = parsePositiveIntStrict(req.params.contextId);
+  const semesterId = parsePositiveIntStrict(req.params.semesterId);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  let programId = parsePositiveIntStrict(req.body.program_id);
+  let admissionId = parsePositiveIntStrict(req.body.admission_id);
+  const studyContextId = parsePositiveIntStrict(req.body.study_context_id, contextId) || contextId;
+  const semesterNumber = parsePositiveIntStrict(req.body.semester_number);
+  const title = sanitizeCompactText(req.body.title, 120);
+  const startDate = String(req.body.start_date || '').trim();
+  const weeksCount = Number(req.body.weeks_count || 0);
+  const isArchived = parseBooleanFlag(req.body.is_archived, false);
+  const isActive = !isArchived && parseBooleanFlag(req.body.is_active, false);
+
+  if (!contextId || !semesterId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId,
+      error: msg.invalidStudyContextSemester,
+    }));
+  }
+  if (!title) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId,
+      error: msg.studyContextSemesterTitleRequired,
+    }));
+  }
+  if (!semesterNumber) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId,
+      error: msg.invalidStudyContextSemesterNumber,
+    }));
+  }
+  if (!Number.isFinite(weeksCount) || weeksCount < 1 || weeksCount > 30) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId,
+      error: msg.invalidStudyContextSemesterWeeks,
+    }));
+  }
+  if (startDate && !isValidDateString(startDate)) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId,
+      error: msg.invalidStudyContextSemesterDate,
+    }));
+  }
+
+  try {
+    const context = await getStudyContextById(contextId);
+    if (!context) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        studyContextId,
+        error: msg.invalidStudyContext,
+      }));
+    }
+    programId = programId || parsePositiveIntStrict(context.program_id);
+    admissionId = admissionId || parsePositiveIntStrict(context.admission_id);
+
+    await withTransaction(async (client) => {
+      const existing = await txGet(
+        client,
+        `
+          SELECT id
+          FROM study_context_semesters
+          WHERE id = ?
+            AND study_context_id = ?
+          LIMIT 1
+        `,
+        [semesterId, contextId]
+      );
+      if (!existing || !existing.id) {
+        const missing = new Error('PATHWAYS_CONTEXT_SEMESTER_NOT_FOUND');
+        throw missing;
+      }
+      if (isActive) {
+        await txRun(
+          client,
+          `
+            UPDATE study_context_semesters
+            SET is_active = false,
+                updated_at = NOW()
+            WHERE study_context_id = ?
+              AND id <> ?
+          `,
+          [contextId, semesterId]
+        );
+      }
+      await txRun(
+        client,
+        `
+          UPDATE study_context_semesters
+          SET
+            semester_number = ?,
+            title = ?,
+            start_date = ?,
+            weeks_count = ?,
+            is_active = ?,
+            is_archived = ?,
+            updated_at = NOW()
+          WHERE id = ?
+            AND study_context_id = ?
+        `,
+        [
+          semesterNumber,
+          title,
+          startDate || null,
+          Math.round(weeksCount),
+          isActive,
+          isArchived,
+          semesterId,
+          contextId,
+        ]
+      );
+    });
+
+    await syncSubjectOfferingsForStudyContext(contextId);
+    logAction(db, req, 'pathways_context_semester_update', {
+      study_context_id: contextId,
+      semester_id: semesterId,
+      semester_number: semesterNumber,
+      title,
+      start_date: startDate || null,
+      weeks_count: Math.round(weeksCount),
+      is_active: isActive ? 1 : 0,
+      is_archived: isArchived ? 1 : 0,
+    });
+
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId: contextId,
+      ok: msg.studyContextSemesterUpdated,
+    }));
+  } catch (err) {
+    if (err && err.message === 'PATHWAYS_CONTEXT_SEMESTER_NOT_FOUND') {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        studyContextId: contextId,
+        error: msg.invalidStudyContextSemester,
+      }));
+    }
+    if (err && err.code === '23505') {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        studyContextId: contextId,
+        error: msg.studyContextSemesterExists,
+      }));
+    }
+    return handleDbError(res, err, 'admin.pathways.contextSemesters.update');
+  }
+});
+
+app.post('/admin/pathways/contexts/:contextId/semesters/:semesterId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const contextId = parsePositiveIntStrict(req.params.contextId);
+  const semesterId = parsePositiveIntStrict(req.params.semesterId);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  let programId = parsePositiveIntStrict(req.body.program_id);
+  let admissionId = parsePositiveIntStrict(req.body.admission_id);
+  const studyContextId = parsePositiveIntStrict(req.body.study_context_id, contextId) || contextId;
+
+  if (!contextId || !semesterId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId,
+      error: msg.invalidStudyContextSemester,
+    }));
+  }
+
+  try {
+    const context = await getStudyContextById(contextId);
+    if (!context) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        studyContextId,
+        error: msg.invalidStudyContext,
+      }));
+    }
+    programId = programId || parsePositiveIntStrict(context.program_id);
+    admissionId = admissionId || parsePositiveIntStrict(context.admission_id);
+
+    const deleted = await db.get(
+      `
+        DELETE FROM study_context_semesters
+        WHERE id = ?
+          AND study_context_id = ?
+        RETURNING id
+      `,
+      [semesterId, contextId]
+    );
+    if (!deleted || !deleted.id) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        studyContextId: contextId,
+        error: msg.invalidStudyContextSemester,
+      }));
+    }
+
+    await syncSubjectOfferingsForStudyContext(contextId);
+    logAction(db, req, 'pathways_context_semester_delete', {
+      study_context_id: contextId,
+      semester_id: semesterId,
+    });
+
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      admissionId,
+      studyContextId: contextId,
+      ok: msg.studyContextSemesterDeleted,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.contextSemesters.delete');
+  }
+});
 
 app.post('/admin/pathways/catalog/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);
