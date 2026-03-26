@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.94",
+      "date": "2026-03-26",
+      "items": [
+        "feat(teacher-workspace-live-editor): turn `/teacher/workspace` into a primary live-offering assignment surface with scoped editing by course, study context, and semester instead of only a read-only summary of current assignments",
+        "feat(teacher-workspace-scope-save): add `/teacher/workspace/offerings` so teachers can update only the visible offering scope, keep out-of-scope assignments untouched, and mirror the resulting live selection back into legacy `teacher_subjects` for compatibility",
+        "feat(teacher-workspace-template-sync): let the workspace optionally sync recurring `teacher_assignment_templates` from the same scoped editor, so live overrides and future cohort defaults can now be managed from one place"
+      ]
+    },
+    {
       "version": "1.2.93",
       "date": "2026-03-26",
       "items": [

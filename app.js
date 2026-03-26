@@ -10472,6 +10472,120 @@ function buildTeacherAssignmentTemplateNotes(groupNumber) {
   });
 }
 
+function buildTeacherAssignmentTemplateDedupeKey({
+  userId,
+  subjectCatalogId,
+  programId = null,
+  trackKey = null,
+  stageNumber = null,
+  campusKey = null,
+} = {}) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  const normalizedSubjectCatalogId = parsePositiveIntStrict(subjectCatalogId);
+  if (!normalizedUserId || !normalizedSubjectCatalogId) {
+    return '';
+  }
+  return `teacher-template:${[
+    normalizedUserId,
+    normalizedSubjectCatalogId,
+    parsePositiveIntStrict(programId) || 0,
+    normalizeRegistrationTrack(trackKey, '') || '',
+    normalizeStudyContextStage(stageNumber, 1),
+    normalizeCourseCampus(campusKey || 'kyiv'),
+  ].join(':')}`;
+}
+
+function buildTeacherAssignmentTemplateRowsForOffering(userId, offering, groupNumber, preferenceOrder = 0) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  const normalizedCatalogId = parsePositiveIntStrict(offering && offering.subject_catalog_id);
+  if (!normalizedUserId || !normalizedCatalogId) {
+    return [];
+  }
+  const rowsByKey = new Map();
+  const contexts = Array.isArray(offering && offering.contexts) ? offering.contexts : [];
+  contexts.forEach((context) => {
+    const dedupeKey = buildTeacherAssignmentTemplateDedupeKey({
+      userId: normalizedUserId,
+      subjectCatalogId: normalizedCatalogId,
+      programId: parsePositiveIntStrict(context && context.program_id) || null,
+      trackKey: context && context.track_key,
+      stageNumber: context && context.stage_number,
+      campusKey: context && context.campus_key,
+    });
+    if (!dedupeKey || rowsByKey.has(dedupeKey)) {
+      return;
+    }
+    rowsByKey.set(dedupeKey, {
+      dedupe_key: dedupeKey,
+      user_id: normalizedUserId,
+      subject_catalog_id: normalizedCatalogId,
+      program_id: parsePositiveIntStrict(context && context.program_id) || null,
+      track_key: normalizeRegistrationTrack(context && context.track_key, '') || null,
+      stage_number: normalizeStudyContextStage(context && context.stage_number, 1),
+      campus_key: normalizeCourseCampus((context && context.campus_key) || 'kyiv'),
+      preference_order: Number.isFinite(Number(preferenceOrder)) ? Number(preferenceOrder) : 0,
+      notes: buildTeacherAssignmentTemplateNotes(groupNumber),
+    });
+  });
+  return Array.from(rowsByKey.values());
+}
+
+async function syncTeacherSubjectMirrorFromAssignmentsTx(client, userId) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  if (!normalizedUserId) {
+    return 0;
+  }
+  try {
+    const rows = await txAll(
+      client,
+      `
+        SELECT
+          toa.group_number,
+          so.dedupe_key,
+          legacy_subject.id AS legacy_subject_id
+        FROM teacher_offering_assignments toa
+        JOIN subject_offerings so ON so.id = toa.subject_offering_id
+        LEFT JOIN subjects legacy_subject ON so.dedupe_key = CONCAT('legacy-subject:', legacy_subject.id::text)
+        WHERE toa.teacher_id = ?
+        ORDER BY toa.sort_order ASC, toa.id ASC
+      `,
+      [normalizedUserId]
+    );
+    const uniqueMirrorRows = new Map();
+    (rows || []).forEach((row) => {
+      const subjectId = parsePositiveIntStrict(row.legacy_subject_id)
+        || parseLegacySubjectIdFromOfferingDedupeKey(row.dedupe_key);
+      if (!subjectId) {
+        return;
+      }
+      const groupNumber = parsePositiveIntStrict(row.group_number) || null;
+      const dedupeKey = `${subjectId}:${groupNumber || 0}`;
+      if (uniqueMirrorRows.has(dedupeKey)) {
+        return;
+      }
+      uniqueMirrorRows.set(dedupeKey, {
+        subject_id: subjectId,
+        group_number: groupNumber,
+      });
+    });
+
+    await txRun(client, 'DELETE FROM teacher_subjects WHERE user_id = ?', [normalizedUserId]);
+    for (const row of uniqueMirrorRows.values()) {
+      await txRun(
+        client,
+        'INSERT INTO teacher_subjects (user_id, subject_id, group_number) VALUES (?, ?, ?)',
+        [normalizedUserId, row.subject_id, row.group_number]
+      );
+    }
+    return uniqueMirrorRows.size;
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return 0;
+    }
+    throw err;
+  }
+}
+
 async function syncTeacherAcademicAssignments(userId, selections = []) {
   const normalizedUserId = parsePositiveIntStrict(userId);
   if (!normalizedUserId) {
@@ -10536,17 +10650,17 @@ async function syncTeacherAcademicAssignments(userId, selections = []) {
         continue;
       }
 
-      const templateKey = [
-        normalizedUserId,
-        catalogId,
-        parsePositiveIntStrict(row.program_id) || 0,
-        normalizeRegistrationTrack(row.track_key, ''),
-        normalizeStudyContextStage(row.stage_number, 1),
-        normalizeCourseCampus(row.campus_key || 'kyiv'),
-      ].join(':');
+      const templateKey = buildTeacherAssignmentTemplateDedupeKey({
+        userId: normalizedUserId,
+        subjectCatalogId: catalogId,
+        programId: parsePositiveIntStrict(row.program_id) || null,
+        trackKey: row.track_key,
+        stageNumber: row.stage_number,
+        campusKey: row.campus_key || 'kyiv',
+      });
       if (!templateRows.has(templateKey)) {
         templateRows.set(templateKey, {
-          dedupe_key: `teacher-template:${templateKey}`,
+          dedupe_key: templateKey,
           user_id: normalizedUserId,
           subject_catalog_id: catalogId,
           program_id: parsePositiveIntStrict(row.program_id) || null,
@@ -10629,6 +10743,266 @@ async function syncTeacherAcademicAssignments(userId, selections = []) {
     }
     throw err;
   }
+}
+
+async function saveTeacherWorkspaceOfferingAssignments(userId, body = {}) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  if (!normalizedUserId) {
+    return { ok: false, error: 'Invalid teacher' };
+  }
+
+  const offeringCatalog = await listTeacherOfferingCatalog();
+  if (!offeringCatalog.length) {
+    return { ok: false, error: 'Offering catalog is not ready' };
+  }
+
+  const catalogById = new Map(
+    (offeringCatalog || [])
+      .map((offering) => [parsePositiveIntStrict(offering && offering.id), offering])
+      .filter((entry) => Number.isInteger(entry[0]) && entry[0] > 0)
+  );
+  const scopeOfferingIds = Array.from(new Set(
+    (Array.isArray(body.visible_offering_ids) ? body.visible_offering_ids : [body.visible_offering_ids])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0 && catalogById.has(value))
+  ));
+  if (!scopeOfferingIds.length) {
+    return { ok: false, error: 'No live offerings in scope' };
+  }
+
+  const existingAssignmentRows = await db.all(
+    `
+      SELECT subject_offering_id, template_id, sort_order
+      FROM teacher_offering_assignments
+      WHERE teacher_id = ?
+        AND subject_offering_id = ANY(?::int[])
+    `,
+    [normalizedUserId, scopeOfferingIds]
+  ).catch((err) => {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  });
+  const existingAssignmentsByOfferingId = new Map(
+    (existingAssignmentRows || [])
+      .map((row) => [
+        parsePositiveIntStrict(row.subject_offering_id),
+        {
+          template_id: parsePositiveIntStrict(row.template_id) || null,
+          sort_order: Number.isFinite(Number(row.sort_order)) ? Number(row.sort_order) : null,
+        },
+      ])
+      .filter((entry) => Number.isInteger(entry[0]) && entry[0] > 0)
+  );
+
+  const selectedOfferingIds = scopeOfferingIds.filter((offeringId) => (
+    parseBooleanFlag(body[`assign_offering_${offeringId}`], false)
+    || parseBooleanFlag(body[`offering_${offeringId}`], false)
+  ));
+  const selectionRows = [];
+  for (let index = 0; index < selectedOfferingIds.length; index += 1) {
+    const offeringId = selectedOfferingIds[index];
+    const offering = catalogById.get(offeringId);
+    if (!offering || !parsePositiveIntStrict(offering.legacy_subject_id)) {
+      return { ok: false, error: 'Offering not ready' };
+    }
+    let groupNumber = null;
+    if (!(offering.is_general === true || Number(offering.is_general) === 1)) {
+      const parsedGroup = parsePositiveIntStrict(body[`group_offering_${offeringId}`]);
+      if (!parsedGroup || parsedGroup > Math.max(1, Number(offering.group_count || 1) || 1)) {
+        return { ok: false, error: 'Select group' };
+      }
+      groupNumber = parsedGroup;
+    }
+    const existingAssignment = existingAssignmentsByOfferingId.get(offeringId) || null;
+    selectionRows.push({
+      subject_offering_id: offeringId,
+      legacy_subject_id: parsePositiveIntStrict(offering.legacy_subject_id),
+      group_number: groupNumber,
+      sort_order: existingAssignment && Number.isFinite(existingAssignment.sort_order)
+        ? Number(existingAssignment.sort_order)
+        : index,
+      offering,
+      existing_template_id: existingAssignment ? existingAssignment.template_id : null,
+    });
+  }
+
+  const syncTemplates = parseBooleanFlag(body.sync_templates, false);
+  let templateCount = 0;
+  await withTransaction(async (client) => {
+    const selectedByOfferingId = new Map(
+      selectionRows.map((row) => [Number(row.subject_offering_id || 0), row])
+    );
+    const selectedTemplateRows = new Map();
+    const deselectedTemplateKeys = new Set();
+
+    if (syncTemplates) {
+      scopeOfferingIds.forEach((offeringId) => {
+        const selectedRow = selectedByOfferingId.get(offeringId) || null;
+        const offering = catalogById.get(offeringId) || null;
+        if (!offering) {
+          return;
+        }
+        const templateRows = buildTeacherAssignmentTemplateRowsForOffering(
+          normalizedUserId,
+          offering,
+          selectedRow ? selectedRow.group_number : null,
+          selectedRow ? selectedRow.sort_order : 0
+        );
+        if (selectedRow) {
+          templateRows.forEach((templateRow) => {
+            if (!selectedTemplateRows.has(templateRow.dedupe_key)) {
+              selectedTemplateRows.set(templateRow.dedupe_key, templateRow);
+            }
+          });
+        } else {
+          templateRows.forEach((templateRow) => {
+            deselectedTemplateKeys.add(templateRow.dedupe_key);
+          });
+        }
+      });
+
+      for (const templateRow of selectedTemplateRows.values()) {
+        await txRun(
+          client,
+          `
+            INSERT INTO teacher_assignment_templates
+              (dedupe_key, user_id, subject_catalog_id, program_id, track_key, stage_number, campus_key, preference_order, is_active, notes, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, true, ?, NOW(), NOW())
+            ON CONFLICT (dedupe_key)
+            DO UPDATE SET
+              preference_order = EXCLUDED.preference_order,
+              is_active = true,
+              notes = EXCLUDED.notes,
+              updated_at = NOW()
+          `,
+          [
+            templateRow.dedupe_key,
+            templateRow.user_id,
+            templateRow.subject_catalog_id,
+            templateRow.program_id,
+            templateRow.track_key,
+            templateRow.stage_number,
+            templateRow.campus_key,
+            templateRow.preference_order,
+            templateRow.notes,
+          ]
+        );
+        templateCount += 1;
+      }
+
+      const keysToDeactivate = Array.from(deselectedTemplateKeys)
+        .filter((key) => !selectedTemplateRows.has(key));
+      if (keysToDeactivate.length) {
+        await txRun(
+          client,
+          `
+            UPDATE teacher_assignment_templates
+            SET
+              is_active = false,
+              updated_at = NOW()
+            WHERE user_id = ?
+              AND dedupe_key = ANY(?::text[])
+          `,
+          [normalizedUserId, keysToDeactivate]
+        );
+      }
+    }
+
+    if (selectedOfferingIds.length) {
+      await txRun(
+        client,
+        `
+          DELETE FROM teacher_offering_assignments
+          WHERE teacher_id = ?
+            AND subject_offering_id = ANY(?::int[])
+            AND NOT (subject_offering_id = ANY(?::int[]))
+        `,
+        [normalizedUserId, scopeOfferingIds, selectedOfferingIds]
+      );
+    } else {
+      await txRun(
+        client,
+        `
+          DELETE FROM teacher_offering_assignments
+          WHERE teacher_id = ?
+            AND subject_offering_id = ANY(?::int[])
+        `,
+        [normalizedUserId, scopeOfferingIds]
+      );
+    }
+
+    let activeTemplateIdByKey = new Map();
+    if (syncTemplates && selectedTemplateRows.size) {
+      const activeTemplateRows = await txAll(
+        client,
+        `
+          SELECT id, dedupe_key
+          FROM teacher_assignment_templates
+          WHERE user_id = ?
+            AND dedupe_key = ANY(?::text[])
+            AND is_active = true
+        `,
+        [normalizedUserId, Array.from(selectedTemplateRows.keys())]
+      );
+      activeTemplateIdByKey = new Map(
+        (activeTemplateRows || [])
+          .map((row) => [String(row.dedupe_key || ''), parsePositiveIntStrict(row.id) || null])
+          .filter((entry) => entry[0] && entry[1])
+      );
+    }
+
+    for (let index = 0; index < selectionRows.length; index += 1) {
+      const row = selectionRows[index];
+      let templateId = row.existing_template_id || null;
+      if (syncTemplates) {
+        const templateRows = buildTeacherAssignmentTemplateRowsForOffering(
+          normalizedUserId,
+          row.offering,
+          row.group_number,
+          row.sort_order
+        );
+        const primaryTemplateKey = templateRows.length ? templateRows[0].dedupe_key : '';
+        templateId = primaryTemplateKey
+          ? (activeTemplateIdByKey.get(primaryTemplateKey) || null)
+          : null;
+      }
+      await txRun(
+        client,
+        `
+          INSERT INTO teacher_offering_assignments
+            (teacher_id, subject_offering_id, template_id, group_number, is_primary, sort_order, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+          ON CONFLICT (teacher_id, subject_offering_id)
+          DO UPDATE SET
+            template_id = COALESCE(EXCLUDED.template_id, teacher_offering_assignments.template_id),
+            group_number = EXCLUDED.group_number,
+            is_primary = EXCLUDED.is_primary,
+            sort_order = EXCLUDED.sort_order,
+            updated_at = NOW()
+        `,
+        [
+          normalizedUserId,
+          row.subject_offering_id,
+          templateId,
+          row.group_number,
+          index === 0,
+          row.sort_order,
+        ]
+      );
+    }
+
+    await syncTeacherSubjectMirrorFromAssignmentsTx(client, normalizedUserId);
+  });
+
+  return {
+    ok: true,
+    scope_count: scopeOfferingIds.length,
+    assignment_count: selectedOfferingIds.length,
+    template_count: templateCount,
+    templates_synced: syncTemplates,
+  };
 }
 
 function normalizeTemplateTagsInput(rawValue) {
@@ -13734,6 +14108,36 @@ app.post('/teacher/subjects', requireLogin, async (req, res) => {
   }
 });
 
+function buildTeacherWorkspaceUrl({
+  courseId = null,
+  studyContextId = null,
+  semesterId = null,
+  ok = '',
+  error = '',
+} = {}) {
+  const params = new URLSearchParams();
+  const normalizedCourseId = parsePositiveIntStrict(courseId);
+  const normalizedStudyContextId = parsePositiveIntStrict(studyContextId);
+  const normalizedSemesterId = parsePositiveIntStrict(semesterId);
+  if (normalizedCourseId) {
+    params.set('course', String(normalizedCourseId));
+  }
+  if (normalizedStudyContextId) {
+    params.set('study_context_id', String(normalizedStudyContextId));
+  }
+  if (normalizedSemesterId) {
+    params.set('semester_id', String(normalizedSemesterId));
+  }
+  if (ok) {
+    params.set('ok', String(ok));
+  }
+  if (error) {
+    params.set('error', String(error));
+  }
+  const query = params.toString();
+  return query ? `/teacher/workspace?${query}` : '/teacher/workspace';
+}
+
 app.get('/teacher/workspace', requireLogin, async (req, res) => {
   try {
     await ensureDbReady();
@@ -13753,20 +14157,41 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     }
   };
   try {
-    const teacherSubjects = await getTeacherAssignedSubjects(userId);
-    const teacherAssignedOfferings = await getTeacherAssignedOfferings(userId);
+    const [teacherSubjects, teacherAssignedOfferings, teacherOfferingCatalog, teacherOfferingSelections] = await Promise.all([
+      getTeacherAssignedSubjects(userId),
+      getTeacherAssignedOfferings(userId),
+      listTeacherOfferingCatalog(),
+      getTeacherOfferingSelections(userId),
+    ]);
     const teacherCourses = buildTeacherCourseList(teacherSubjects);
     const requestedCourseId = Number(req.query.course);
     const requestedStudyContextId = parsePositiveIntStrict(req.query.study_context_id);
     const requestedSemesterId = parsePositiveIntStrict(req.query.semester_id);
+    const workspaceCourseOptions = Array.from(new Map(
+      (teacherOfferingCatalog || [])
+        .flatMap((offering) => Array.isArray(offering.contexts) ? offering.contexts : [])
+        .map((context) => [Number(context.course_id || 0), {
+          id: Number(context.course_id || 0) || null,
+          name: String(context.course_name || ''),
+        }])
+        .filter((entry) => Number.isInteger(entry[0]) && entry[0] > 0)
+    ).values()).sort((a, b) => {
+      const byId = Number(a.id || 0) - Number(b.id || 0);
+      if (byId !== 0) return byId;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'uk', { sensitivity: 'base' });
+    });
+    const selectedWorkspaceCourse = workspaceCourseOptions.find((course) => Number(course.id || 0) === requestedCourseId) || null;
     const selectedCourse = teacherCourses.find((course) => Number(course.id) === requestedCourseId) || null;
-    let selectedCourseId = selectedCourse
-      ? Number(selectedCourse.id)
-      : (teacherCourses.length === 1 ? Number(teacherCourses[0].id) : null);
+    let selectedCourseId = selectedWorkspaceCourse
+      ? Number(selectedWorkspaceCourse.id || 0)
+      : (selectedCourse
+        ? Number(selectedCourse.id)
+        : (teacherCourses.length === 1 ? Number(teacherCourses[0].id) : null));
 
     const workspaceContextOptions = Array.from(new Map(
-      (teacherAssignedOfferings || [])
+      (teacherOfferingCatalog || [])
         .flatMap((offering) => Array.isArray(offering.contexts) ? offering.contexts : [])
+        .filter((context) => !selectedCourseId || Number(context.course_id || 0) === Number(selectedCourseId || 0))
         .map((context) => [Number(context.id || 0), {
           id: Number(context.id || 0) || null,
           label: String(context.label || ''),
@@ -13797,7 +14222,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
             title: String((selectedWorkspaceContext.semester_titles || [])[index] || `Semester ${(selectedWorkspaceContext.semester_numbers || [])[index] || index + 1}`),
             semester_number: Number((selectedWorkspaceContext.semester_numbers || [])[index] || 0) || null,
           }))
-        : (teacherAssignedOfferings || []).flatMap((offering) => (
+        : (teacherOfferingCatalog || []).flatMap((offering) => (
             Array.isArray(offering.contexts)
               ? offering.contexts.flatMap((context) => (
                   (context.semester_ids || []).map((semesterId, index) => ({
@@ -13819,8 +14244,13 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       ? Number(requestedSemesterId || 0)
       : null;
 
-    const scopedTeacherOfferings = (teacherAssignedOfferings || []).filter((offering) => {
+    const matchesWorkspaceScope = (offering) => {
       const contexts = Array.isArray(offering.contexts) ? offering.contexts : [];
+      const courseMatch = !selectedCourseId
+        || contexts.some((context) => Number(context.course_id || 0) === Number(selectedCourseId || 0));
+      if (!courseMatch) {
+        return false;
+      }
       const contextMatch = !selectedWorkspaceContextId
         || contexts.some((context) => Number(context.id || 0) === Number(selectedWorkspaceContextId || 0));
       if (!contextMatch) {
@@ -13832,7 +14262,14 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
         return false;
       }
       return true;
-    });
+    };
+    const scopedTeacherOfferings = (teacherAssignedOfferings || []).filter(matchesWorkspaceScope);
+    const workspaceCatalogOfferings = (teacherOfferingCatalog || []).filter(matchesWorkspaceScope);
+    const workspaceAssignedOfferingDetails = new Map(
+      (teacherAssignedOfferings || [])
+        .map((offering) => [Number(offering.id || 0), offering])
+        .filter((entry) => Number.isInteger(entry[0]) && entry[0] > 0)
+    );
 
     const [templates, assets, recentHomework] = await Promise.all([
       getTeacherHomeworkTemplates(userId, {
@@ -13887,12 +14324,16 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       username,
       settings: settingsCache,
       teacherCourses,
+      workspaceCourseOptions,
       selectedCourseId,
       workspaceContextOptions,
       selectedWorkspaceContextId,
       workspaceSemesterOptions,
       selectedWorkspaceSemesterId,
       teacherOfferings: scopedTeacherOfferings,
+      workspaceCatalogOfferings,
+      workspaceOfferingSelections: teacherOfferingSelections,
+      workspaceAssignedOfferingDetails,
       teacherSubjects: scopedTeacherSubjects,
       teacherSubjectsAll: allTeacherSubjects,
       templates,
@@ -13903,6 +14344,56 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     });
   } catch (err) {
     return handleDbError(res, err, 'teacher.workspace');
+  }
+});
+
+app.post('/teacher/workspace/offerings', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.workspace.offerings.save.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
+  }
+  const userId = Number(req.session.user.id || 0);
+  const redirectState = {
+    courseId: parsePositiveIntStrict(req.body.course),
+    studyContextId: parsePositiveIntStrict(req.body.study_context_id),
+    semesterId: parsePositiveIntStrict(req.body.semester_id),
+  };
+  try {
+    const result = await saveTeacherWorkspaceOfferingAssignments(userId, req.body);
+    if (!result.ok) {
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: result.error || 'Database error',
+      }));
+    }
+    logAction(db, req, 'teacher_workspace_offering_assignments_save', {
+      user_id: userId,
+      course_id: redirectState.courseId || null,
+      study_context_id: redirectState.studyContextId || null,
+      semester_id: redirectState.semesterId || null,
+      scope_count: Number(result.scope_count || 0),
+      assignment_count: Number(result.assignment_count || 0),
+      template_count: Number(result.template_count || 0),
+      templates_synced: result.templates_synced ? 1 : 0,
+    });
+    broadcast('users_updated');
+    const okMessage = result.templates_synced
+      ? 'Assignments and recurring templates updated'
+      : 'Live assignments updated';
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      ok: okMessage,
+    }));
+  } catch (err) {
+    console.error('Teacher workspace offering save failed', err);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Database error',
+    }));
   }
 });
 

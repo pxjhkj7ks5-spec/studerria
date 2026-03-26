@@ -1,5 +1,13 @@
 <%
   const teacherOfferingList = Array.isArray(teacherOfferings) ? teacherOfferings : [];
+  const workspaceCatalogOfferingList = Array.isArray(workspaceCatalogOfferings) ? workspaceCatalogOfferings : [];
+  const workspaceSelectionMap = workspaceOfferingSelections && typeof workspaceOfferingSelections.get === 'function'
+    ? workspaceOfferingSelections
+    : new Map();
+  const workspaceAssignedOfferingMap = workspaceAssignedOfferingDetails && typeof workspaceAssignedOfferingDetails.get === 'function'
+    ? workspaceAssignedOfferingDetails
+    : new Map();
+  const workspaceCourseList = Array.isArray(workspaceCourseOptions) ? workspaceCourseOptions : [];
   const workspaceContextList = Array.isArray(workspaceContextOptions) ? workspaceContextOptions : [];
   const workspaceSemesterList = Array.isArray(workspaceSemesterOptions) ? workspaceSemesterOptions : [];
 %>
@@ -516,6 +524,70 @@
         background: rgba(255, 255, 255, 0.94);
         border-color: rgba(15, 23, 42, 0.12);
       }
+      .workspace-assignment-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .workspace-assignment-list {
+        display: grid;
+        gap: 12px;
+      }
+      .workspace-assignment-card {
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.2);
+      }
+      body.theme-light .workspace-assignment-card {
+        background: rgba(255, 255, 255, 0.9);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .workspace-assignment-card.is-selected {
+        border-color: rgba(56, 189, 248, 0.5);
+        box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.22);
+      }
+      .workspace-assignment-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+      }
+      .workspace-assignment-description {
+        color: rgba(203, 213, 225, 0.78);
+        font-size: 0.84rem;
+      }
+      body.theme-light .workspace-assignment-description {
+        color: rgba(15, 23, 42, 0.64);
+      }
+      .workspace-assignment-controls {
+        display: grid;
+        justify-items: end;
+        gap: 10px;
+        min-width: 180px;
+      }
+      .workspace-assignment-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .workspace-assignment-footer {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      @media (max-width: 991.98px) {
+        .workspace-assignment-grid {
+          grid-template-columns: 1fr;
+        }
+        .workspace-assignment-controls {
+          justify-items: stretch;
+        }
+      }
     </style>
     <link rel="stylesheet" href="/css/design-system.css" />
     <link rel="stylesheet" href="/css/studerria-ui.css" />
@@ -583,8 +655,8 @@
           <div class="col-12 col-lg-4">
             <label class="form-label" for="workspaceCourseId">Course scope</label>
             <select class="form-select" id="workspaceCourseId" name="course">
-              <option value="">All my courses</option>
-              <% (teacherCourses || []).forEach(function(course) { %>
+              <option value="">All visible courses</option>
+              <% workspaceCourseList.forEach(function(course) { %>
                 <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
               <% }) %>
             </select>
@@ -627,6 +699,117 @@
           </div>
         <% } else { %>
           <div class="alert alert-info mb-0">No live offerings assigned yet. Use <a href="/teacher/subjects">teacher subjects</a> to choose offerings and groups.</div>
+        <% } %>
+      </section>
+
+      <section class="glass workspace-panel mb-3">
+        <% const scopedSelectedCount = workspaceCatalogOfferingList.reduce((total, offering) => (
+          workspaceSelectionMap.has(Number(offering.id || 0)) ? total + 1 : total
+        ), 0); %>
+        <div class="workspace-assignment-toolbar mb-3">
+          <div>
+            <h5 class="mb-1">Edit live assignments</h5>
+            <p class="hint mb-0">This is the primary live editor for the visible scope. Save only live overrides, or also update recurring template rules for future cohorts.</p>
+          </div>
+          <div class="workspace-assignment-status">
+            <span class="badge bg-secondary"><%= workspaceCatalogOfferingList.length %> visible</span>
+            <span class="badge bg-info-subtle text-info-emphasis" id="workspaceSelectedOfferingsCount"><%= scopedSelectedCount %> selected</span>
+          </div>
+        </div>
+        <% if (workspaceCatalogOfferingList.length) { %>
+          <form method="POST" action="/teacher/workspace/offerings" class="d-grid gap-3">
+            <input type="hidden" name="course" value="<%= selectedCourseId || '' %>" />
+            <input type="hidden" name="study_context_id" value="<%= selectedWorkspaceContextId || '' %>" />
+            <input type="hidden" name="semester_id" value="<%= selectedWorkspaceSemesterId || '' %>" />
+            <% workspaceCatalogOfferingList.forEach(function(offering) { %>
+              <input type="hidden" name="visible_offering_ids" value="<%= offering.id %>" />
+            <% }) %>
+
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="workspaceSyncTemplates" name="sync_templates" value="1" />
+              <label class="form-check-label" for="workspaceSyncTemplates">
+                Also update recurring template rules for these visible offerings
+              </label>
+            </div>
+
+            <div class="workspace-assignment-list">
+              <% workspaceCatalogOfferingList.forEach(function(offering) { %>
+                <% const selectedGroup = workspaceSelectionMap.get(Number(offering.id || 0)); %>
+                <% const isSelected = workspaceSelectionMap.has(Number(offering.id || 0)); %>
+                <% const assignedOffering = workspaceAssignedOfferingMap.get(Number(offering.id || 0)) || null; %>
+                <article class="workspace-assignment-card <%= isSelected ? 'is-selected' : '' %>" data-offering-card="<%= offering.id %>">
+                  <div class="workspace-assignment-grid">
+                    <div>
+                      <div class="workspace-scope-head">
+                        <div>
+                          <h6 class="workspace-scope-title"><%= offering.name %></h6>
+                          <div class="workspace-scope-meta">
+                            <%= Array.isArray(offering.course_labels) && offering.course_labels.length ? offering.course_labels.join(' • ') : 'Course not bound yet' %>
+                          </div>
+                        </div>
+                        <span class="badge bg-<%= assignedOffering && assignedOffering.template_id ? 'info' : (isSelected ? 'secondary' : 'light text-dark') %>">
+                          <%= assignedOffering && assignedOffering.template_id ? 'template matched' : (isSelected ? 'live override' : 'available') %>
+                        </span>
+                      </div>
+                      <div class="workspace-scope-chip-row">
+                        <span class="workspace-scope-chip">Contexts: <%= Array.isArray(offering.contexts) ? offering.contexts.length : 0 %></span>
+                        <% if (offering.is_shared) { %><span class="workspace-scope-chip">Shared</span><% } %>
+                        <% if (offering.is_general) { %><span class="workspace-scope-chip">General</span><% } %>
+                        <% if (!offering.is_general) { %><span class="workspace-scope-chip">Groups: <%= Number(offering.group_count || 1) %></span><% } %>
+                      </div>
+                      <div class="workspace-assignment-description mt-2"><%= Array.isArray(offering.context_labels) ? offering.context_labels.join(' • ') : '' %></div>
+                      <% if (Array.isArray(offering.semester_labels) && offering.semester_labels.length) { %>
+                        <div class="workspace-scope-chip-row">
+                          <% offering.semester_labels.forEach(function(label) { %>
+                            <span class="workspace-scope-chip"><%= label %></span>
+                          <% }) %>
+                        </div>
+                      <% } %>
+                    </div>
+
+                    <div class="workspace-assignment-controls">
+                      <div class="form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          id="assign_offering_<%= offering.id %>"
+                          name="assign_offering_<%= offering.id %>"
+                          value="1"
+                          data-offering-toggle="<%= offering.id %>"
+                          <%= isSelected ? 'checked' : '' %>
+                        />
+                        <label class="form-check-label" for="assign_offering_<%= offering.id %>">Assigned</label>
+                      </div>
+                      <% if (!offering.is_general) { %>
+                        <div class="w-100">
+                          <label class="form-label small" for="group_offering_<%= offering.id %>">Group</label>
+                          <select
+                            class="form-select"
+                            id="group_offering_<%= offering.id %>"
+                            name="group_offering_<%= offering.id %>"
+                            data-offering-group="<%= offering.id %>"
+                          >
+                            <option value="">Select group</option>
+                            <% for (let g = 1; g <= Number(offering.group_count || 1); g += 1) { %>
+                              <option value="<%= g %>" <%= Number(selectedGroup) === g ? 'selected' : '' %>><%= g %></option>
+                            <% } %>
+                          </select>
+                        </div>
+                      <% } %>
+                    </div>
+                  </div>
+                </article>
+              <% }) %>
+            </div>
+
+            <div class="workspace-assignment-footer">
+              <p class="hint mb-0">Only offerings visible in the current filter scope will change. Everything outside this scope stays untouched.</p>
+              <button class="btn btn-primary" type="submit">Save live assignments</button>
+            </div>
+          </form>
+        <% } else { %>
+          <div class="alert alert-info mb-0">No live offerings in the current scope. Change the course, context, or semester filter first.</div>
         <% } %>
       </section>
 
@@ -1829,6 +2012,34 @@
           }
         });
       }
+
+      const workspaceSelectedOfferingsCount = document.getElementById('workspaceSelectedOfferingsCount');
+      const workspaceOfferingToggles = Array.from(document.querySelectorAll('[data-offering-toggle]'));
+      function syncWorkspaceOfferingEditor() {
+        let selectedCount = 0;
+        workspaceOfferingToggles.forEach((toggle) => {
+          const offeringId = toggle.getAttribute('data-offering-toggle');
+          const card = document.querySelector(`[data-offering-card="${offeringId}"]`);
+          const groupSelect = document.querySelector(`[data-offering-group="${offeringId}"]`);
+          if (toggle.checked) {
+            selectedCount += 1;
+          }
+          if (card) {
+            card.classList.toggle('is-selected', toggle.checked);
+          }
+          if (groupSelect) {
+            groupSelect.disabled = !toggle.checked;
+          }
+        });
+        if (workspaceSelectedOfferingsCount) {
+          workspaceSelectedOfferingsCount.textContent = `${selectedCount} selected`;
+        }
+      }
+      workspaceOfferingToggles.forEach((toggle) => {
+        toggle.addEventListener('change', syncWorkspaceOfferingEditor);
+      });
+      syncWorkspaceOfferingEditor();
+
       syncTemplateSelectionState();
 
       document.querySelectorAll('[data-template-edit]').forEach((button) => {
