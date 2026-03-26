@@ -38,6 +38,7 @@ const supportRequestMessages = require('./037_support_request_messages');
 const messageArchiveCleanup = require('./038_message_archive_cleanup');
 const roomsAndAssetLibrary = require('./039_rooms_and_asset_library');
 const ratingPublicationSnapshots = require('./040_rating_publication_snapshots');
+const academicSetupContexts = require('./041_academic_setup_contexts');
 
 module.exports = [
   init,
@@ -80,4 +81,5 @@ module.exports = [
   messageArchiveCleanup,
   roomsAndAssetLibrary,
   ratingPublicationSnapshots,
+  academicSetupContexts,
 ];

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.88",
+      "date": "2026-03-26",
+      "items": [
+        "feat(academic-setup-schema-foundation): add the new cohort, study-context, preset, offering, teacher-assignment, and moderation tables that will underpin the academic setup refactor",
+        "feat(academic-setup-backfill): backfill cohorts and study contexts from legacy program admissions, course mappings, and campuses, while preserving a course-to-context binding layer for future migration work",
+        "feat(academic-setup-user-context): add `users.study_context_id` and backfill it for unambiguous legacy user placements so the new canonical academic link is available without removing legacy fields"
+      ]
+    },
+    {
       "version": "1.2.87",
       "date": "2026-03-26",
       "items": [
