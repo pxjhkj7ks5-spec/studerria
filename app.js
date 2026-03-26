@@ -11005,6 +11005,210 @@ async function saveTeacherWorkspaceOfferingAssignments(userId, body = {}) {
   };
 }
 
+async function buildTeacherWorkspaceTemplateScopePlan(
+  userId,
+  offerings = [],
+  selectionMap = new Map(),
+  assignedOfferingMap = new Map(),
+) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  if (!normalizedUserId) {
+    return {
+      visible_count: 0,
+      selected_count: 0,
+      counts: { create: 0, update: 0, deactivate: 0, keep: 0, idle: 0 },
+      items: [],
+    };
+  }
+
+  const normalizedSelectionMap = selectionMap && typeof selectionMap.get === 'function'
+    ? selectionMap
+    : new Map();
+  const normalizedAssignedOfferingMap = assignedOfferingMap && typeof assignedOfferingMap.get === 'function'
+    ? assignedOfferingMap
+    : new Map();
+
+  const planRowsByKey = new Map();
+  (Array.isArray(offerings) ? offerings : []).forEach((offering, index) => {
+    const offeringId = parsePositiveIntStrict(offering && offering.id);
+    const subjectCatalogId = parsePositiveIntStrict(offering && offering.subject_catalog_id);
+    if (!offeringId || !subjectCatalogId) {
+      return;
+    }
+    const isSelected = normalizedSelectionMap.has(offeringId);
+    const assignedOffering = normalizedAssignedOfferingMap.get(offeringId) || null;
+    const groupNumber = isSelected
+      ? (parsePositiveIntStrict(normalizedSelectionMap.get(offeringId)) || null)
+      : (assignedOffering ? parsePositiveIntStrict(assignedOffering.group_number) || null : null);
+    const sortOrder = assignedOffering && Number.isFinite(Number(assignedOffering.assignment_sort_order))
+      ? Number(assignedOffering.assignment_sort_order)
+      : index;
+    const templateRows = buildTeacherAssignmentTemplateRowsForOffering(
+      normalizedUserId,
+      offering,
+      groupNumber,
+      sortOrder,
+    );
+    templateRows.forEach((templateRow) => {
+      if (!planRowsByKey.has(templateRow.dedupe_key)) {
+        planRowsByKey.set(templateRow.dedupe_key, {
+          ...templateRow,
+          selected: isSelected,
+          offering_ids: [offeringId],
+          offering_names: [sanitizeCompactText(offering.name || offering.title || '', 140)].filter(Boolean),
+          context_labels: Array.isArray(offering.context_labels) ? offering.context_labels.slice() : [],
+          group_number: groupNumber,
+          preference_order: sortOrder,
+        });
+        return;
+      }
+      const current = planRowsByKey.get(templateRow.dedupe_key);
+      current.selected = current.selected || isSelected;
+      current.offering_ids = Array.from(new Set([...(current.offering_ids || []), offeringId]));
+      const nextOfferingName = sanitizeCompactText(offering.name || offering.title || '', 140);
+      if (nextOfferingName && !(current.offering_names || []).includes(nextOfferingName)) {
+        current.offering_names.push(nextOfferingName);
+      }
+      current.context_labels = Array.from(new Set([
+        ...(current.context_labels || []),
+        ...((Array.isArray(offering.context_labels) ? offering.context_labels : []).filter(Boolean)),
+      ]));
+      if (isSelected) {
+        current.group_number = groupNumber;
+        current.preference_order = Math.min(
+          Number.isFinite(Number(current.preference_order)) ? Number(current.preference_order) : sortOrder,
+          sortOrder,
+        );
+        current.notes = buildTeacherAssignmentTemplateNotes(groupNumber);
+      }
+    });
+  });
+
+  const dedupeKeys = Array.from(planRowsByKey.keys());
+  const existingRows = dedupeKeys.length
+    ? await db.all(
+        `
+          SELECT id, dedupe_key, preference_order, is_active, notes
+          FROM teacher_assignment_templates
+          WHERE user_id = ?
+            AND dedupe_key = ANY(?::text[])
+        `,
+        [normalizedUserId, dedupeKeys],
+      ).catch((err) => {
+        if (isDbSchemaCompatibilityError(err)) {
+          return [];
+        }
+        throw err;
+      })
+    : [];
+  const existingByKey = new Map(
+    (existingRows || [])
+      .map((row) => [String(row.dedupe_key || ''), row])
+      .filter((entry) => entry[0])
+  );
+
+  const counts = { create: 0, update: 0, deactivate: 0, keep: 0, idle: 0 };
+  const items = Array.from(planRowsByKey.values())
+    .map((row) => {
+      const existing = existingByKey.get(row.dedupe_key) || null;
+      let status = 'idle';
+      if (row.selected) {
+        if (!existing) {
+          status = 'create';
+        } else if (
+          !(existing.is_active === true || Number(existing.is_active) === 1)
+          || Number(existing.preference_order || 0) !== Number(row.preference_order || 0)
+          || String(existing.notes || '') !== String(row.notes || '')
+        ) {
+          status = 'update';
+        } else {
+          status = 'keep';
+        }
+      } else if (existing && (existing.is_active === true || Number(existing.is_active) === 1)) {
+        status = 'deactivate';
+      }
+      counts[status] += 1;
+      return {
+        ...row,
+        existing_template_id: parsePositiveIntStrict(existing && existing.id) || null,
+        status,
+      };
+    })
+    .sort((a, b) => {
+      const priority = { create: 0, update: 1, deactivate: 2, keep: 3, idle: 4 };
+      const byStatus = Number(priority[a.status] || 9) - Number(priority[b.status] || 9);
+      if (byStatus !== 0) return byStatus;
+      return String((a.offering_names || [])[0] || '').localeCompare(String((b.offering_names || [])[0] || ''), 'uk', { sensitivity: 'base' });
+    });
+
+  return {
+    visible_count: Array.isArray(offerings) ? offerings.length : 0,
+    selected_count: Array.from(planRowsByKey.values()).filter((row) => row.selected).length,
+    counts,
+    items,
+  };
+}
+
+async function applyTeacherWorkspaceTemplateScopePlan(userId, plan) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  const planItems = Array.isArray(plan && plan.items) ? plan.items : [];
+  if (!normalizedUserId || !planItems.length) {
+    return { create: 0, update: 0, deactivate: 0, keep: 0 };
+  }
+
+  const counts = { create: 0, update: 0, deactivate: 0, keep: 0 };
+  await withTransaction(async (client) => {
+    for (const item of planItems) {
+      if (item.status === 'create' || item.status === 'update' || item.status === 'keep') {
+        await txRun(
+          client,
+          `
+            INSERT INTO teacher_assignment_templates
+              (dedupe_key, user_id, subject_catalog_id, program_id, track_key, stage_number, campus_key, preference_order, is_active, notes, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, true, ?, NOW(), NOW())
+            ON CONFLICT (dedupe_key)
+            DO UPDATE SET
+              preference_order = EXCLUDED.preference_order,
+              is_active = true,
+              notes = EXCLUDED.notes,
+              updated_at = NOW()
+          `,
+          [
+            item.dedupe_key,
+            normalizedUserId,
+            item.subject_catalog_id,
+            item.program_id,
+            item.track_key,
+            item.stage_number,
+            item.campus_key,
+            item.preference_order,
+            item.notes,
+          ],
+        );
+        counts[item.status] += 1;
+        continue;
+      }
+      if (item.status === 'deactivate') {
+        await txRun(
+          client,
+          `
+            UPDATE teacher_assignment_templates
+            SET
+              is_active = false,
+              updated_at = NOW()
+            WHERE user_id = ?
+              AND dedupe_key = ?
+          `,
+          [normalizedUserId, item.dedupe_key],
+        );
+        counts.deactivate += 1;
+      }
+    }
+  });
+
+  return counts;
+}
+
 function normalizeTemplateTagsInput(rawValue) {
   const unique = new Set();
   const list = String(rawValue || '')
@@ -14270,6 +14474,12 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
         .map((offering) => [Number(offering.id || 0), offering])
         .filter((entry) => Number.isInteger(entry[0]) && entry[0] > 0)
     );
+    const workspaceTemplatePlan = await buildTeacherWorkspaceTemplateScopePlan(
+      userId,
+      workspaceCatalogOfferings,
+      teacherOfferingSelections,
+      workspaceAssignedOfferingDetails,
+    );
 
     const [templates, assets, recentHomework] = await Promise.all([
       getTeacherHomeworkTemplates(userId, {
@@ -14334,6 +14544,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       workspaceCatalogOfferings,
       workspaceOfferingSelections: teacherOfferingSelections,
       workspaceAssignedOfferingDetails,
+      workspaceTemplatePlan,
       teacherSubjects: scopedTeacherSubjects,
       teacherSubjectsAll: allTeacherSubjects,
       templates,
@@ -14344,6 +14555,76 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     });
   } catch (err) {
     return handleDbError(res, err, 'teacher.workspace');
+  }
+});
+
+app.post('/teacher/workspace/offering-templates/sync', requireLogin, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'teacher.workspace.offeringTemplates.sync.init');
+  }
+  if (!hasSessionRole(req, 'teacher')) {
+    return res.redirect('/schedule');
+  }
+  const userId = Number(req.session.user.id || 0);
+  const redirectState = {
+    courseId: parsePositiveIntStrict(req.body.course),
+    studyContextId: parsePositiveIntStrict(req.body.study_context_id),
+    semesterId: parsePositiveIntStrict(req.body.semester_id),
+  };
+  try {
+    const scopeOfferingIds = Array.from(new Set(
+      (Array.isArray(req.body.visible_offering_ids) ? req.body.visible_offering_ids : [req.body.visible_offering_ids])
+        .map((value) => parsePositiveIntStrict(value))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ));
+    if (!scopeOfferingIds.length) {
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: 'No visible offering scope to sync',
+      }));
+    }
+    const [teacherOfferingCatalog, teacherOfferingSelections, teacherAssignedOfferings] = await Promise.all([
+      listTeacherOfferingCatalog(),
+      getTeacherOfferingSelections(userId),
+      getTeacherAssignedOfferings(userId),
+    ]);
+    const scopedOfferings = (teacherOfferingCatalog || [])
+      .filter((offering) => scopeOfferingIds.includes(Number(offering.id || 0)));
+    const workspaceAssignedOfferingDetails = new Map(
+      (teacherAssignedOfferings || [])
+        .map((offering) => [Number(offering.id || 0), offering])
+        .filter((entry) => Number.isInteger(entry[0]) && entry[0] > 0)
+    );
+    const plan = await buildTeacherWorkspaceTemplateScopePlan(
+      userId,
+      scopedOfferings,
+      teacherOfferingSelections,
+      workspaceAssignedOfferingDetails,
+    );
+    const result = await applyTeacherWorkspaceTemplateScopePlan(userId, plan);
+    logAction(db, req, 'teacher_workspace_template_scope_sync', {
+      user_id: userId,
+      course_id: redirectState.courseId || null,
+      study_context_id: redirectState.studyContextId || null,
+      semester_id: redirectState.semesterId || null,
+      create_count: Number(result.create || 0),
+      update_count: Number(result.update || 0),
+      deactivate_count: Number(result.deactivate || 0),
+      keep_count: Number(result.keep || 0),
+    });
+    broadcast('users_updated');
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      ok: 'Recurring template rules synced',
+    }));
+  } catch (err) {
+    console.error('Teacher workspace template scope sync failed', err);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Database error',
+    }));
   }
 });
 

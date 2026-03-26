@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.95",
+      "date": "2026-03-26",
+      "items": [
+        "feat(teacher-workspace-template-preview): add an explicit recurring template preview panel to `/teacher/workspace` with create, update, deactivate, and keep counters plus per-rule scope cards built from the visible live offering filter",
+        "feat(teacher-workspace-template-sync-route): add `/teacher/workspace/offering-templates/sync` so teachers can apply recurring `teacher_assignment_templates` changes separately from live assignment saves while staying inside the same scoped workspace flow",
+        "tune(teacher-workspace-template-scope-state): pass `workspaceTemplatePlan` into the teacher workspace view, keep sync requests pinned to the current course/context/semester filters via visible offering ids, and explain that template preview reads from saved live assignments rather than unsaved draft toggles"
+      ]
+    },
+    {
       "version": "1.2.94",
       "date": "2026-03-26",
       "items": [

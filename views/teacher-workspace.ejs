@@ -10,6 +10,36 @@
   const workspaceCourseList = Array.isArray(workspaceCourseOptions) ? workspaceCourseOptions : [];
   const workspaceContextList = Array.isArray(workspaceContextOptions) ? workspaceContextOptions : [];
   const workspaceSemesterList = Array.isArray(workspaceSemesterOptions) ? workspaceSemesterOptions : [];
+  const workspaceTemplatePlanValue = workspaceTemplatePlan && typeof workspaceTemplatePlan === 'object'
+    ? workspaceTemplatePlan
+    : {
+        visible_count: workspaceCatalogOfferingList.length,
+        selected_count: 0,
+        counts: { create: 0, update: 0, deactivate: 0, keep: 0, idle: 0 },
+        items: [],
+      };
+  const workspaceTemplatePlanItems = Array.isArray(workspaceTemplatePlanValue.items)
+    ? workspaceTemplatePlanValue.items
+    : [];
+  const workspaceTemplatePreviewItems = workspaceTemplatePlanItems.filter((item) => item && item.status !== 'idle');
+  const workspaceTemplateActionCount = ['create', 'update', 'deactivate'].reduce(
+    (total, key) => total + Number((workspaceTemplatePlanValue.counts || {})[key] || 0),
+    0,
+  );
+  const workspaceTemplateStatusBadgeMap = {
+    create: 'success',
+    update: 'warning text-dark',
+    deactivate: 'danger',
+    keep: 'secondary',
+    idle: 'light text-dark',
+  };
+  const workspaceTemplateStatusLabelMap = {
+    create: 'Create rule',
+    update: 'Update rule',
+    deactivate: 'Deactivate rule',
+    keep: 'Keep active',
+    idle: 'No action',
+  };
 %>
 <!doctype html>
 <html lang="<%= lang %>">
@@ -580,6 +610,63 @@
         justify-content: space-between;
         gap: 12px;
       }
+      .template-preview-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .template-preview-status-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .template-preview-list {
+        display: grid;
+        gap: 12px;
+      }
+      .template-preview-card {
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.2);
+      }
+      body.theme-light .template-preview-card {
+        background: rgba(255, 255, 255, 0.9);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .template-preview-card.status-create {
+        border-color: rgba(34, 197, 94, 0.48);
+      }
+      .template-preview-card.status-update {
+        border-color: rgba(245, 158, 11, 0.48);
+      }
+      .template-preview-card.status-deactivate {
+        border-color: rgba(248, 113, 113, 0.48);
+      }
+      .template-preview-card.status-keep {
+        border-color: rgba(148, 163, 184, 0.34);
+      }
+      .template-preview-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .template-preview-meta {
+        margin-top: 6px;
+        font-size: 0.82rem;
+        color: rgba(203, 213, 225, 0.78);
+      }
+      body.theme-light .template-preview-meta {
+        color: rgba(15, 23, 42, 0.62);
+      }
+      .template-preview-scope {
+        margin-top: 10px;
+        display: grid;
+        gap: 8px;
+      }
       @media (max-width: 991.98px) {
         .workspace-assignment-grid {
           grid-template-columns: 1fr;
@@ -810,6 +897,82 @@
           </form>
         <% } else { %>
           <div class="alert alert-info mb-0">No live offerings in the current scope. Change the course, context, or semester filter first.</div>
+        <% } %>
+      </section>
+
+      <section class="glass workspace-panel mb-3">
+        <div class="template-preview-toolbar mb-3">
+          <div>
+            <h5 class="mb-1">Recurring template preview</h5>
+            <p class="hint mb-0">This preview is built from the current saved live assignments in the visible scope. Save live assignments first if you changed the toggles above.</p>
+          </div>
+          <div class="workspace-assignment-status">
+            <span class="badge bg-secondary"><%= Number(workspaceTemplatePlanValue.visible_count || 0) %> visible</span>
+            <span class="badge bg-info-subtle text-info-emphasis"><%= Number(workspaceTemplatePlanValue.selected_count || 0) %> selected</span>
+          </div>
+        </div>
+        <% if (workspaceCatalogOfferingList.length) { %>
+          <div class="template-preview-status-grid mb-3">
+            <span class="badge bg-success-subtle text-success-emphasis"><%= Number((workspaceTemplatePlanValue.counts || {}).create || 0) %> create</span>
+            <span class="badge bg-warning-subtle text-warning-emphasis"><%= Number((workspaceTemplatePlanValue.counts || {}).update || 0) %> update</span>
+            <span class="badge bg-danger-subtle text-danger-emphasis"><%= Number((workspaceTemplatePlanValue.counts || {}).deactivate || 0) %> deactivate</span>
+            <span class="badge bg-secondary-subtle text-secondary-emphasis"><%= Number((workspaceTemplatePlanValue.counts || {}).keep || 0) %> keep</span>
+          </div>
+
+          <% if (workspaceTemplatePreviewItems.length) { %>
+            <div class="template-preview-list mb-3">
+              <% workspaceTemplatePreviewItems.forEach(function(item) { %>
+                <% const statusKey = String(item.status || 'idle'); %>
+                <% const statusBadge = workspaceTemplateStatusBadgeMap[statusKey] || 'secondary'; %>
+                <% const statusLabel = workspaceTemplateStatusLabelMap[statusKey] || statusKey; %>
+                <article class="template-preview-card status-<%= statusKey %>">
+                  <div class="template-preview-head">
+                    <div>
+                      <h6 class="workspace-scope-title mb-0"><%= Array.isArray(item.offering_names) && item.offering_names.length ? item.offering_names.join(' / ') : 'Recurring rule' %></h6>
+                      <div class="template-preview-meta">
+                        <%= Array.isArray(item.context_labels) && item.context_labels.length ? item.context_labels.join(' • ') : 'No study context labels yet' %>
+                      </div>
+                    </div>
+                    <span class="badge bg-<%= statusBadge %>"><%= statusLabel %></span>
+                  </div>
+                  <div class="template-preview-scope">
+                    <div class="workspace-scope-chip-row">
+                      <span class="workspace-scope-chip">Offerings: <%= Array.isArray(item.offering_ids) ? item.offering_ids.length : 0 %></span>
+                      <% if (item.group_number) { %><span class="workspace-scope-chip">Group: <%= item.group_number %></span><% } %>
+                      <% if (item.stage_number) { %><span class="workspace-scope-chip">Stage: <%= item.stage_number %></span><% } %>
+                      <% if (item.campus_key) { %><span class="workspace-scope-chip">Campus: <%= item.campus_key %></span><% } %>
+                      <% if (item.track_key) { %><span class="workspace-scope-chip">Track: <%= item.track_key %></span><% } %>
+                    </div>
+                    <div class="template-preview-meta">
+                      <span>Dedup key: <code><%= item.dedupe_key %></code></span>
+                      <% if (item.existing_template_id) { %>
+                        <span class="ms-2">Existing rule #<%= item.existing_template_id %></span>
+                      <% } %>
+                    </div>
+                  </div>
+                </article>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <div class="alert alert-info mb-3">
+              No recurring template changes are pending for the current scope. The visible live assignments already match the saved recurring rules.
+            </div>
+          <% } %>
+
+          <form method="POST" action="/teacher/workspace/offering-templates/sync" class="workspace-assignment-footer">
+            <input type="hidden" name="course" value="<%= selectedCourseId || '' %>" />
+            <input type="hidden" name="study_context_id" value="<%= selectedWorkspaceContextId || '' %>" />
+            <input type="hidden" name="semester_id" value="<%= selectedWorkspaceSemesterId || '' %>" />
+            <% workspaceCatalogOfferingList.forEach(function(offering) { %>
+              <input type="hidden" name="visible_offering_ids" value="<%= offering.id %>" />
+            <% }) %>
+            <p class="hint mb-0">Sync touches only recurring template rules that match the visible offerings. It does not change live assignments by itself.</p>
+            <button class="btn btn-outline-primary" type="submit" <%= workspaceTemplateActionCount > 0 ? '' : 'disabled' %>>
+              Sync recurring templates
+            </button>
+          </form>
+        <% } else { %>
+          <div class="alert alert-info mb-0">No live offerings in the current scope, so there are no recurring template rules to preview or sync.</div>
         <% } %>
       </section>
 
