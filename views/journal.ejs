@@ -118,6 +118,52 @@
         reviewStateCompetencyManage: 'Signal competencies from this work while the grading context is still open.',
         reviewStateCompetencyReadonly: 'This screen shows the recorded competency trail, while updates stay in the teacher workflow.',
         reviewStateCompetencyPaused: 'Competency updates are paused for this cell.',
+        reviewMetricTotal: 'Total',
+        reviewMetricActive: 'Active',
+        reviewMetricResolved: 'Resolved',
+        reviewMetricFinal: 'In final',
+        reviewMetricSignals: 'Signals',
+        reviewMetricSelected: 'Selected now',
+        reviewMetricPrimary: 'Primary',
+        reviewMetricEffective: 'Effective',
+        reviewMetricStatus: 'Status',
+        reviewSummaryNextAction: 'Next move',
+        reviewRetakeStartTitle: 'Start the retake flow',
+        reviewRetakeStartNote: 'No retakes exist for this cell yet. Create the first attempt while the grading context is still open.',
+        reviewRetakePendingTitle: 'Review active retakes',
+        reviewRetakePendingNote: 'Some attempts are still planned or waiting for grading. Move them forward from this queue.',
+        reviewRetakeCurrentTitle: 'Retake trail is current',
+        reviewRetakeCurrentNote: 'The existing retake history is already aligned. Add another attempt only if the student needs one more recovery path.',
+        reviewRetakeStudentTitle: 'Track the retake trail',
+        reviewRetakeStudentNote: 'This view shows every attempt, deadline, and teacher note for the selected cell.',
+        reviewAppealCreateTitle: 'Appeal can be submitted now',
+        reviewAppealCreateNote: 'The saved grade can already be challenged from this screen if clarification or re-check is needed.',
+        reviewAppealQueueTitle: 'Review the appeal queue',
+        reviewAppealQueueNote: 'There are active appeals waiting for a teacher decision or a resolved score.',
+        reviewAppealCurrentTitle: 'Appeal trail is current',
+        reviewAppealCurrentNote: 'No open appeals need action right now. Keep the history visible for audit.',
+        reviewAppealStudentTitle: 'Track the appeal history',
+        reviewAppealStudentNote: 'This view shows the full decision trail and any resolved score for the current cell.',
+        reviewModerationReadyTitle: 'Second review can be completed',
+        reviewModerationReadyNote: 'The primary score is saved and this cell is ready for an independent moderation decision.',
+        reviewModerationWaitingTitle: 'Moderation is waiting',
+        reviewModerationWaitingNote: 'This cell either needs the primary score first or must be handled by another reviewer.',
+        reviewModerationLockedTitle: 'Moderation is paused',
+        reviewModerationLockedNote: 'The current subject or column state blocks moderation changes right now.',
+        reviewModerationStudentTitle: 'Moderation trail only',
+        reviewModerationStudentNote: 'Students can inspect the moderation outcome here, but not change it.',
+        reviewCompetencyStartTitle: 'Capture competency signals',
+        reviewCompetencyStartNote: 'Use the quick checklist while the work is still fresh and the journal stays open for editing.',
+        reviewCompetencyCurrentTitle: 'Competency summary is current',
+        reviewCompetencyCurrentNote: 'The checklist already reflects this work. Update it only if the competency reading changed.',
+        reviewCompetencyStudentTitle: 'Competency trail only',
+        reviewCompetencyStudentNote: 'Students can review the recorded competency signals here.',
+        actionAddAttempt: 'Add attempt',
+        actionReviewAttempts: 'Review attempts',
+        actionOpenAppeal: 'Open appeal',
+        actionReviewAppeals: 'Review appeals',
+        actionModerateNow: 'Moderate now',
+        actionOpenChecklist: 'Open checklist',
         gradingSummaryTeacher: 'Grading system settings',
         gradingSummaryStudent: 'How the grade is calculated',
         gradingSummaryHint: 'Click to',
@@ -306,6 +352,52 @@
         reviewStateCompetencyManage: 'Фіксуйте competency signals по цій роботі, поки grading context ще відкритий.',
         reviewStateCompetencyReadonly: 'Тут видно записаний competency trail, а оновлення лишаються у викладацькому режимі.',
         reviewStateCompetencyPaused: 'Оновлення competency signals для цієї клітинки зараз призупинені.',
+        reviewMetricTotal: 'Всього',
+        reviewMetricActive: 'Активні',
+        reviewMetricResolved: 'Закриті',
+        reviewMetricFinal: 'У фіналі',
+        reviewMetricSignals: 'Сигнали',
+        reviewMetricSelected: 'Обрано зараз',
+        reviewMetricPrimary: 'Первинний',
+        reviewMetricEffective: 'Ефективний',
+        reviewMetricStatus: 'Стан',
+        reviewSummaryNextAction: 'Наступний крок',
+        reviewRetakeStartTitle: 'Почніть recovery-flow',
+        reviewRetakeStartNote: 'Для цієї клітинки ще немає жодної перездачі. Додайте першу спробу, поки grading context ще відкритий.',
+        reviewRetakePendingTitle: 'Перегляньте активні перездачі',
+        reviewRetakePendingNote: 'Є спроби, які ще заплановані або чекають оцінювання. Зручно довести їх далі прямо з цієї черги.',
+        reviewRetakeCurrentTitle: 'Історія перездач актуальна',
+        reviewRetakeCurrentNote: 'Поточний recovery trail вже вирівняний. Нову спробу додавайте лише якщо студенту справді потрібен ще один шлях закриття.',
+        reviewRetakeStudentTitle: 'Відстежуйте історію перездач',
+        reviewRetakeStudentNote: 'Тут видно всі спроби, дедлайни та нотатки викладача для вибраної клітинки.',
+        reviewAppealCreateTitle: 'Апеляцію вже можна подати',
+        reviewAppealCreateNote: 'Збережений бал уже можна оскаржити прямо з цього екрана, якщо потрібне уточнення або повторна перевірка.',
+        reviewAppealQueueTitle: 'Перегляньте чергу апеляцій',
+        reviewAppealQueueNote: 'Є активні апеляції, які чекають рішення викладача або фінального скоригованого бала.',
+        reviewAppealCurrentTitle: 'Історія апеляцій актуальна',
+        reviewAppealCurrentNote: 'Зараз немає відкритих апеляцій, які потребують дії. Історія лишається під рукою для аудиту.',
+        reviewAppealStudentTitle: 'Відстежуйте історію апеляцій',
+        reviewAppealStudentNote: 'Тут видно повний decision trail і скоригований бал, якщо його вже затверджено.',
+        reviewModerationReadyTitle: 'Другий review можна завершити',
+        reviewModerationReadyNote: 'Первинний бал уже збережено, і ця клітинка готова до незалежного moderation decision.',
+        reviewModerationWaitingTitle: 'Модерація очікує',
+        reviewModerationWaitingNote: 'Для цієї клітинки або ще потрібен первинний бал, або її має відкрити інший рецензент.',
+        reviewModerationLockedTitle: 'Модерацію призупинено',
+        reviewModerationLockedNote: 'Поточний стан предмета або колонки блокує зміни модерації прямо зараз.',
+        reviewModerationStudentTitle: 'Лише moderation trail',
+        reviewModerationStudentNote: 'Студент тут бачить результат модерації, але не змінює його.',
+        reviewCompetencyStartTitle: 'Зафіксуйте competency signals',
+        reviewCompetencyStartNote: 'Використайте quick checklist, поки робота ще свіжа в контексті, а журнал відкритий для редагування.',
+        reviewCompetencyCurrentTitle: 'Competency summary актуальний',
+        reviewCompetencyCurrentNote: 'Чекліст уже відображає цю роботу. Оновлюйте його лише якщо competency reading змінився.',
+        reviewCompetencyStudentTitle: 'Лише competency trail',
+        reviewCompetencyStudentNote: 'Студент тут переглядає вже записані competency signals.',
+        actionAddAttempt: 'Додати спробу',
+        actionReviewAttempts: 'Переглянути спроби',
+        actionOpenAppeal: 'Подати апеляцію',
+        actionReviewAppeals: 'Переглянути апеляції',
+        actionModerateNow: 'Відкрити модерацію',
+        actionOpenChecklist: 'Відкрити checklist',
         gradingSummaryTeacher: 'Налаштування системи оцінювання',
         gradingSummaryStudent: 'Як формується оцінка',
         gradingSummaryHint: 'Натисніть, щоб',
@@ -1249,6 +1341,9 @@
               <div id="journalRetakeState" class="journal-review-state mb-3">
                 <div class="text-muted small"><%= journalCopy.dash %></div>
               </div>
+              <div id="journalRetakeSummary" class="journal-review-summary mb-3">
+                <div class="text-muted small"><%= journalCopy.dash %></div>
+              </div>
               <div id="journalRetakeList" class="journal-retake-list">
                 <div class="text-muted small">Спроб поки немає.</div>
               </div>
@@ -1269,7 +1364,7 @@
                       <input class="form-control form-control-sm" type="date" name="due_date" id="journalRetakeCreateDueDate" />
                     </div>
                     <div class="col-12 col-md-4">
-                      <button class="btn btn-sm btn-outline-info w-100" type="submit" id="journalRetakeCreateSubmitBtn">Додати спробу</button>
+                      <button class="btn btn-sm btn-info w-100" type="submit" id="journalRetakeCreateSubmitBtn">Додати спробу</button>
                     </div>
                   </div>
                   <div class="mt-2">
@@ -1287,6 +1382,9 @@
                 </div>
               </div>
               <div id="journalAppealState" class="journal-review-state mb-3">
+                <div class="text-muted small"><%= journalCopy.dash %></div>
+              </div>
+              <div id="journalAppealSummary" class="journal-review-summary mb-3">
                 <div class="text-muted small"><%= journalCopy.dash %></div>
               </div>
               <div id="journalAppealList" class="journal-appeal-list">
@@ -1315,7 +1413,7 @@
                     </div>
                   </div>
                   <div class="d-flex justify-content-end mt-2">
-                    <button class="btn btn-sm btn-outline-warning" type="submit" id="journalAppealCreateSubmitBtn">Подати апеляцію</button>
+                    <button class="btn btn-sm btn-warning" type="submit" id="journalAppealCreateSubmitBtn">Подати апеляцію</button>
                   </div>
                 </form>
               <% } %>
@@ -1328,6 +1426,9 @@
                 </div>
               </div>
               <div id="journalModerationState" class="journal-review-state mb-3">
+                <div class="text-muted small"><%= journalCopy.dash %></div>
+              </div>
+              <div id="journalModerationSummary" class="journal-review-summary mb-3">
                 <div class="text-muted small"><%= journalCopy.dash %></div>
               </div>
               <div id="journalModerationCurrent" class="journal-moderation-current">
@@ -1347,7 +1448,7 @@
                       <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="moderated_score" id="journalModerationScore" />
                     </div>
                     <div class="col-12 col-md-4">
-                      <button class="btn btn-sm btn-outline-primary w-100" type="submit" id="journalModerationSubmitBtn">Зберегти модерацію</button>
+                      <button class="btn btn-sm btn-primary w-100" type="submit" id="journalModerationSubmitBtn">Зберегти модерацію</button>
                     </div>
                   </div>
                   <div class="mt-2">
@@ -1365,6 +1466,9 @@
                 </div>
               </div>
               <div id="journalCompetencyState" class="journal-review-state mb-3">
+                <div class="text-muted small"><%= journalCopy.dash %></div>
+              </div>
+              <div id="journalCompetencySummary" class="journal-review-summary mb-3">
                 <div class="text-muted small"><%= journalCopy.dash %></div>
               </div>
               <div id="journalCompetencyList" class="journal-competency-list">
@@ -1385,7 +1489,7 @@
                   </div>
                   <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mt-2">
                     <span class="small text-muted">Після збереження система оновить усі 8 компетентностей як +1 або +0.</span>
-                    <button class="btn btn-sm btn-outline-info" type="submit" id="journalCompetencyChecklistSubmitBtn">Зберегти +1/+0</button>
+                    <button class="btn btn-sm btn-info" type="submit" id="journalCompetencyChecklistSubmitBtn">Зберегти +1/+0</button>
                   </div>
                 </form>
               <% } %>
@@ -1607,13 +1711,16 @@
       const nextCellBtn = document.getElementById('journalNextCellBtn');
       const retakeSectionEl = document.getElementById('journalRetakeSection');
       const retakeStateEl = document.getElementById('journalRetakeState');
+      const retakeSummaryEl = document.getElementById('journalRetakeSummary');
       const retakeListEl = document.getElementById('journalRetakeList');
       const retakeCreateForm = document.getElementById('journalRetakeCreateForm');
+      const retakeCreateKindInput = document.getElementById('journalRetakeCreateKind');
       const retakeCreateColumnInput = document.getElementById('journalRetakeCreateColumnId');
       const retakeCreateStudentInput = document.getElementById('journalRetakeCreateStudentId');
       const retakeCreateSubmitBtn = document.getElementById('journalRetakeCreateSubmitBtn');
       const appealSectionEl = document.getElementById('journalAppealSection');
       const appealStateEl = document.getElementById('journalAppealState');
+      const appealSummaryEl = document.getElementById('journalAppealSummary');
       const appealListEl = document.getElementById('journalAppealList');
       const appealCreateForm = document.getElementById('journalAppealCreateForm');
       const appealCreateColumnInput = document.getElementById('journalAppealCreateColumnId');
@@ -1623,6 +1730,7 @@
       const appealCreateSubmitBtn = document.getElementById('journalAppealCreateSubmitBtn');
       const moderationSectionEl = document.getElementById('journalModerationSection');
       const moderationStateEl = document.getElementById('journalModerationState');
+      const moderationSummaryEl = document.getElementById('journalModerationSummary');
       const moderationCurrentEl = document.getElementById('journalModerationCurrent');
       const moderationForm = document.getElementById('journalModerationForm');
       const moderationColumnInput = document.getElementById('journalModerationColumnId');
@@ -1633,6 +1741,7 @@
       const moderationSubmitBtn = document.getElementById('journalModerationSubmitBtn');
       const competencySectionEl = document.getElementById('journalCompetencySection');
       const competencyStateEl = document.getElementById('journalCompetencyState');
+      const competencySummaryEl = document.getElementById('journalCompetencySummary');
       const competencyListEl = document.getElementById('journalCompetencyList');
       const competencyChecklistForm = document.getElementById('journalCompetencyChecklistForm');
       const competencyChecklistColumnInput = document.getElementById('journalCompetencyChecklistColumnId');
@@ -2194,6 +2303,100 @@
         }));
       }
 
+      function focusReviewTarget(target) {
+        if (!(target instanceof HTMLElement)) return;
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        try {
+          target.focus({ preventScroll: true });
+        } catch (_err) {
+          try {
+            target.focus();
+          } catch (_ignore) {
+            // noop
+          }
+        }
+      }
+
+      function findFocusableReviewTarget(root, selector = 'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href]') {
+        if (!(root instanceof HTMLElement)) return null;
+        return root.querySelector(selector);
+      }
+
+      function createReviewSummaryMetricNode(label, value) {
+        return createElement('div', {
+          className: 'journal-review-summary-metric',
+          children: [
+            createElement('span', {
+              className: 'text-muted small',
+              text: String(label || journalText.dash),
+            }),
+            createElement('strong', {
+              className: 'journal-review-summary-value',
+              text: String(value == null || value === '' ? journalText.dash : value),
+            }),
+          ],
+        });
+      }
+
+      function renderReviewSummary(node, {
+        title = '',
+        note = '',
+        metrics = [],
+        actionLabel = '',
+        actionClassName = 'btn btn-sm btn-primary',
+        actionDisabled = false,
+        onAction = null,
+      } = {}) {
+        if (!node) return;
+        const shellChildren = [
+          createElement('div', {
+            className: 'journal-review-summary-copy',
+            children: [
+              createElement('div', {
+                className: 'text-muted small',
+                text: journalText.reviewSummaryNextAction,
+              }),
+              createElement('div', {
+                className: 'fw-semibold',
+                text: String(title || journalText.dash),
+              }),
+              createElement('div', {
+                className: 'small text-muted',
+                text: String(note || journalText.dash),
+              }),
+            ],
+          }),
+        ];
+        if (Array.isArray(metrics) && metrics.length) {
+          shellChildren.push(createElement('div', {
+            className: 'journal-review-summary-metrics',
+            children: metrics.map((metric) => createReviewSummaryMetricNode(metric && metric.label, metric && metric.value)),
+          }));
+        }
+        if (actionLabel) {
+          const actionButton = createElement('button', {
+            className: actionClassName,
+            attrs: { type: 'button' },
+            props: { disabled: Boolean(actionDisabled) },
+            text: actionLabel,
+          });
+          if (typeof onAction === 'function') {
+            actionButton.addEventListener('click', (event) => {
+              event.preventDefault();
+              onAction();
+            });
+          }
+          shellChildren.push(createElement('div', {
+            className: 'journal-review-summary-actions',
+            children: [actionButton],
+          }));
+        }
+        renderNodeChildren(node, createElement('div', {
+          className: 'journal-review-summary-shell',
+          children: shellChildren,
+        }));
+      }
+
       function renderSubmission(submission, column) {
         if (!(submissionBox instanceof HTMLElement)) {
           return;
@@ -2283,6 +2486,11 @@
         const canManage = Boolean(canEditJournal && data && data.can_manage_retakes);
         const isClosed = Boolean(data && data.subject_is_closed);
         const isLocked = Boolean(data && data.column && data.column.is_locked);
+        const activeAttemptCount = attempts.filter((attempt) => {
+          const status = String(attempt && attempt.status ? attempt.status : 'planned');
+          return status !== 'graded' && status !== 'cancelled';
+        }).length;
+        const finalAttemptCount = attempts.filter((attempt) => Boolean(attempt && attempt.count_in_final)).length;
         const retakeMeta = data && data.retake_meta ? data.retake_meta : {};
         const statusOptions = Array.isArray(retakeMeta.statuses) && retakeMeta.statuses.length
           ? retakeMeta.statuses
@@ -2316,6 +2524,69 @@
                 chipClass: 'status-chip--neutral',
                 chipText: journalText.reviewStateStudent,
                 body: journalText.reviewStateRetakeReadonly,
+              });
+
+        renderReviewSummary(retakeSummaryEl, canManage
+          ? (!attempts.length
+            ? {
+                title: journalText.reviewRetakeStartTitle,
+                note: journalText.reviewRetakeStartNote,
+                metrics: [
+                  { label: journalText.reviewMetricTotal, value: 0 },
+                  { label: journalText.reviewMetricActive, value: 0 },
+                  { label: journalText.reviewMetricFinal, value: 0 },
+                ],
+                actionLabel: journalText.actionAddAttempt,
+                actionClassName: 'btn btn-sm btn-info',
+                onAction: () => focusReviewTarget(retakeCreateKindInput || findFocusableReviewTarget(retakeCreateForm)),
+              }
+            : activeAttemptCount > 0
+              ? {
+                  title: journalText.reviewRetakePendingTitle,
+                  note: journalText.reviewRetakePendingNote,
+                  metrics: [
+                    { label: journalText.reviewMetricTotal, value: attempts.length },
+                    { label: journalText.reviewMetricActive, value: activeAttemptCount },
+                    { label: journalText.reviewMetricFinal, value: finalAttemptCount },
+                  ],
+                  actionLabel: journalText.actionReviewAttempts,
+                  actionClassName: 'btn btn-sm btn-primary',
+                  onAction: () => focusReviewTarget(findFocusableReviewTarget(retakeListEl)),
+                }
+              : {
+                  title: journalText.reviewRetakeCurrentTitle,
+                  note: journalText.reviewRetakeCurrentNote,
+                  metrics: [
+                    { label: journalText.reviewMetricTotal, value: attempts.length },
+                    { label: journalText.reviewMetricActive, value: activeAttemptCount },
+                    { label: journalText.reviewMetricFinal, value: finalAttemptCount },
+                  ],
+                  actionLabel: journalText.actionAddAttempt,
+                  actionClassName: 'btn btn-sm btn-outline-info',
+                  onAction: () => focusReviewTarget(retakeCreateKindInput || findFocusableReviewTarget(retakeCreateForm)),
+                })
+          : canEditJournal
+            ? {
+                title: journalText.reviewStatePaused,
+                note: isClosed
+                  ? journalText.cellSummaryClosedNote
+                  : isLocked
+                    ? journalText.cellSummaryLockedNote
+                    : journalText.reviewStateRetakePaused,
+                metrics: [
+                  { label: journalText.reviewMetricTotal, value: attempts.length },
+                  { label: journalText.reviewMetricActive, value: activeAttemptCount },
+                  { label: journalText.reviewMetricFinal, value: finalAttemptCount },
+                ],
+              }
+            : {
+                title: journalText.reviewRetakeStudentTitle,
+                note: journalText.reviewRetakeStudentNote,
+                metrics: [
+                  { label: journalText.reviewMetricTotal, value: attempts.length },
+                  { label: journalText.reviewMetricActive, value: activeAttemptCount },
+                  { label: journalText.reviewMetricFinal, value: finalAttemptCount },
+                ],
               });
 
         if (retakeCreateColumnInput) retakeCreateColumnInput.value = String(currentCellColumnId || 0);
@@ -2536,6 +2807,11 @@
         const canManage = Boolean(canEditJournal && data && data.can_manage_appeals);
         const isClosed = Boolean(data && data.subject_is_closed);
         const isLocked = Boolean(data && data.column && data.column.is_locked);
+        const activeAppealCount = appeals.filter((appeal) => {
+          const status = String(appeal && appeal.status ? appeal.status : 'pending');
+          return status === 'pending' || status === 'in_review';
+        }).length;
+        const resolvedAppealCount = appeals.length - activeAppealCount;
         const appealMeta = data && data.appeal_meta ? data.appeal_meta : {};
         const reasonMaxLength = Number(appealMeta.reason_max_length || 2400);
         const commentMaxLength = Number(appealMeta.comment_max_length || 2400);
@@ -2589,6 +2865,71 @@
                     chipText: journalText.cellSummaryNoGrade,
                     body: journalText.cellSummaryNoGradeHint,
                   });
+
+        renderReviewSummary(appealSummaryEl, canManage
+          ? (activeAppealCount > 0
+            ? {
+                title: journalText.reviewAppealQueueTitle,
+                note: journalText.reviewAppealQueueNote,
+                metrics: [
+                  { label: journalText.reviewMetricTotal, value: appeals.length },
+                  { label: journalText.reviewMetricActive, value: activeAppealCount },
+                  { label: journalText.reviewMetricResolved, value: resolvedAppealCount },
+                ],
+                actionLabel: journalText.actionReviewAppeals,
+                actionClassName: 'btn btn-sm btn-primary',
+                onAction: () => focusReviewTarget(findFocusableReviewTarget(appealListEl)),
+              }
+            : {
+                title: journalText.reviewAppealCurrentTitle,
+                note: journalText.reviewAppealCurrentNote,
+                metrics: [
+                  { label: journalText.reviewMetricTotal, value: appeals.length },
+                  { label: journalText.reviewMetricActive, value: activeAppealCount },
+                  { label: journalText.reviewMetricResolved, value: resolvedAppealCount },
+                ],
+              })
+          : canCreate
+            ? {
+                title: journalText.reviewAppealCreateTitle,
+                note: journalText.reviewAppealCreateNote,
+                metrics: [
+                  { label: journalText.reviewMetricTotal, value: appeals.length },
+                  { label: journalText.reviewMetricActive, value: activeAppealCount },
+                  { label: journalText.reviewMetricResolved, value: resolvedAppealCount },
+                ],
+                actionLabel: journalText.actionOpenAppeal,
+                actionClassName: 'btn btn-sm btn-warning',
+                onAction: () => focusReviewTarget(appealCreateRequestedScore || appealCreateReason || findFocusableReviewTarget(appealCreateForm)),
+                actionDisabled: !canCreate,
+              }
+            : canEditJournal
+              ? {
+                  title: !hasGrade
+                    ? journalText.cellSummaryNoGrade
+                    : journalText.reviewStatePaused,
+                  note: !hasGrade
+                    ? journalText.cellSummaryNoGradeHint
+                    : isClosed
+                      ? journalText.cellSummaryClosedNote
+                      : isLocked
+                        ? journalText.cellSummaryLockedNote
+                        : journalText.reviewStateAppealPaused,
+                  metrics: [
+                    { label: journalText.reviewMetricTotal, value: appeals.length },
+                    { label: journalText.reviewMetricActive, value: activeAppealCount },
+                    { label: journalText.reviewMetricResolved, value: resolvedAppealCount },
+                  ],
+                }
+              : {
+                  title: journalText.reviewAppealStudentTitle,
+                  note: journalText.reviewAppealStudentNote,
+                  metrics: [
+                    { label: journalText.reviewMetricTotal, value: appeals.length },
+                    { label: journalText.reviewMetricActive, value: activeAppealCount },
+                    { label: journalText.reviewMetricResolved, value: resolvedAppealCount },
+                  ],
+                });
 
         if (appealCreateColumnInput) appealCreateColumnInput.value = String(currentCellColumnId || 0);
         if (appealCreateStudentInput) appealCreateStudentInput.value = String(currentCellStudentId || 0);
@@ -2847,6 +3188,59 @@
                     body: journalText.cellSummaryStudentActionNote,
                   });
 
+        renderReviewSummary(moderationSummaryEl, canManage && hasGrade
+          ? {
+              title: journalText.reviewModerationReadyTitle,
+              note: journalText.reviewModerationReadyNote,
+              metrics: [
+                { label: journalText.reviewMetricPrimary, value: originalScore },
+                { label: journalText.reviewMetricEffective, value: effectiveScore },
+                { label: journalText.reviewMetricStatus, value: statusLabel },
+              ],
+              actionLabel: journalText.actionModerateNow,
+              actionClassName: 'btn btn-sm btn-primary',
+              onAction: () => focusReviewTarget(moderationStatusInput || findFocusableReviewTarget(moderationForm)),
+            }
+          : canEditJournal && !hasGrade
+            ? {
+                title: journalText.reviewModerationWaitingTitle,
+                note: journalText.reviewModerationWaitingNote,
+                metrics: [
+                  { label: journalText.reviewMetricPrimary, value: originalScore },
+                  { label: journalText.reviewMetricEffective, value: effectiveScore },
+                  { label: journalText.reviewMetricStatus, value: journalText.cellSummaryNoGrade },
+                ],
+              }
+            : canEditJournal && !isClosed && !isLocked
+              ? {
+                  title: journalText.reviewModerationWaitingTitle,
+                  note: journalText.reviewModerationWaitingNote,
+                  metrics: [
+                    { label: journalText.reviewMetricPrimary, value: originalScore },
+                    { label: journalText.reviewMetricEffective, value: effectiveScore },
+                    { label: journalText.reviewMetricStatus, value: statusLabel },
+                  ],
+                }
+              : canEditJournal
+                ? {
+                    title: journalText.reviewModerationLockedTitle,
+                    note: journalText.reviewModerationLockedNote,
+                    metrics: [
+                      { label: journalText.reviewMetricPrimary, value: originalScore },
+                      { label: journalText.reviewMetricEffective, value: effectiveScore },
+                      { label: journalText.reviewMetricStatus, value: statusLabel },
+                    ],
+                  }
+                : {
+                    title: journalText.reviewModerationStudentTitle,
+                    note: journalText.reviewModerationStudentNote,
+                    metrics: [
+                      { label: journalText.reviewMetricPrimary, value: originalScore },
+                      { label: journalText.reviewMetricEffective, value: effectiveScore },
+                      { label: journalText.reviewMetricStatus, value: statusLabel },
+                    ],
+                  });
+
         if (!hasGrade) {
           renderNodeChildren(moderationCurrentEl, createEmptyStateNode('Спочатку потрібно виставити оцінку в цій клітинці.'));
         } else if (!moderation) {
@@ -2963,6 +3357,10 @@
         const quickValuesRaw = (data && data.competency_quick_values && typeof data.competency_quick_values === 'object')
           ? data.competency_quick_values
           : {};
+        const selectedCompetencyCount = definitions.reduce((count, item) => {
+          const key = String(item && item.key ? item.key : '');
+          return count + (Number(quickValuesRaw[key] || 0) > 0 ? 1 : 0);
+        }, 0);
 
         renderReviewState(competencyStateEl, canAdd
           ? {
@@ -2984,6 +3382,40 @@
                 chipClass: 'status-chip--neutral',
                 chipText: journalText.reviewStateStudent,
                 body: journalText.reviewStateCompetencyReadonly,
+              });
+
+        renderReviewSummary(competencySummaryEl, canAdd
+          ? {
+              title: signals.length ? journalText.reviewCompetencyCurrentTitle : journalText.reviewCompetencyStartTitle,
+              note: signals.length ? journalText.reviewCompetencyCurrentNote : journalText.reviewCompetencyStartNote,
+              metrics: [
+                { label: journalText.reviewMetricSignals, value: signals.length },
+                { label: journalText.reviewMetricSelected, value: selectedCompetencyCount },
+              ],
+              actionLabel: journalText.actionOpenChecklist,
+              actionClassName: 'btn btn-sm btn-info',
+              onAction: () => focusReviewTarget(findFocusableReviewTarget(competencyChecklistForm)),
+            }
+          : canEditJournal
+            ? {
+                title: journalText.reviewStatePaused,
+                note: isClosed
+                  ? journalText.cellSummaryClosedNote
+                  : isLocked
+                    ? journalText.cellSummaryLockedNote
+                    : journalText.reviewStateCompetencyPaused,
+                metrics: [
+                  { label: journalText.reviewMetricSignals, value: signals.length },
+                  { label: journalText.reviewMetricSelected, value: selectedCompetencyCount },
+                ],
+              }
+            : {
+                title: journalText.reviewCompetencyStudentTitle,
+                note: journalText.reviewCompetencyStudentNote,
+                metrics: [
+                  { label: journalText.reviewMetricSignals, value: signals.length },
+                  { label: journalText.reviewMetricSelected, value: selectedCompetencyCount },
+                ],
               });
 
         if (!signals.length) {

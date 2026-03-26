@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.85",
+      "date": "2026-03-26",
+      "items": [
+        "feat(journal-review-summary-bars): add guided summary/action bars for retakes, appeals, moderation, and competency review inside the journal cell modal, so each workflow now surfaces its queue, current state, and next action before the user dives into the raw forms",
+        "tune(journal-modal-primary-actions): strengthen the main review actions visually by promoting the create/save buttons for retakes, appeals, moderation, and competency checklist, making the intended teacher and student flows read faster without hunting for the right control",
+        "tune(journal-review-summary-surface): add Tahoe/Liquid Glass styling and responsive metric cards for the new review summary panels, keeping the cell modal clearer on desktop and mobile while preserving the existing journal visual language"
+      ]
+    },
+    {
       "version": "1.2.84",
       "date": "2026-03-26",
       "items": [

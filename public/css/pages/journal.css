@@ -581,6 +581,7 @@ body.theme-light.page-journal .journal-cell-overview,
 body.theme-light.page-journal .journal-closure-impact-card,
 body.theme-light.page-journal .journal-closure-actions-panel,
 body.theme-light.page-journal .journal-review-state,
+body.theme-light.page-journal .journal-review-summary,
 body.theme-light.page-journal .journal-student-attendance-card,
 body.theme-light.page-journal .journal-attendance-quick-student {
   border-color: var(--studerria-panel-border);
@@ -762,6 +763,56 @@ body.theme-light.page-journal .final-col {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: 8px;
+}
+
+.page-journal .journal-review-summary {
+  border: 1px solid color-mix(in srgb, var(--surface-border) 80%, transparent);
+  border-radius: 16px;
+  padding: 12px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 84%, transparent), color-mix(in srgb, var(--surface-soft) 78%, transparent));
+}
+
+.page-journal .journal-review-summary-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.page-journal .journal-review-summary-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.page-journal .journal-review-summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.page-journal .journal-review-summary-metric {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 78%, transparent);
+  border-radius: 12px;
+  padding: 9px 10px;
+  background: color-mix(in srgb, var(--surface-soft) 76%, transparent);
+}
+
+.page-journal .journal-review-summary-value {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--ds-text0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.page-journal .journal-review-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -1104,6 +1155,10 @@ body.theme-light.page-journal .alert-success {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .page-journal .journal-review-summary-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .page-journal .journal-grading-summary {
     align-items: flex-start;
   }
@@ -1132,6 +1187,10 @@ body.theme-light.page-journal .alert-success {
     grid-template-columns: 1fr;
   }
 
+  .page-journal .journal-review-summary-metrics {
+    grid-template-columns: 1fr;
+  }
+
   .page-journal .journal-closure-actions {
     width: 100%;
     justify-content: flex-start;
@@ -1140,6 +1199,14 @@ body.theme-light.page-journal .alert-success {
   .page-journal .journal-closure-actions > .btn,
   .page-journal .journal-closure-actions > .journal-closure-action-form,
   .page-journal .journal-closure-actions > .journal-closure-action-form .btn {
+    width: 100%;
+  }
+
+  .page-journal .journal-review-summary-actions {
+    width: 100%;
+  }
+
+  .page-journal .journal-review-summary-actions > .btn {
     width: 100%;
   }
 
