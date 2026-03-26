@@ -12,6 +12,7 @@
     : (studyContextList.find((item) => Number(item.id) === requestedStudyContextValue) || null);
   const selectedStudyContextValue = Number((selectedStudyContextItem && selectedStudyContextItem.id) || requestedStudyContextValue || 0);
   const selectedStudyContextSemestersList = Array.isArray(selectedStudyContextSemesters) ? selectedStudyContextSemesters : [];
+  const selectedStudyContextOfferingsList = Array.isArray(selectedStudyContextOfferings) ? selectedStudyContextOfferings : [];
   const programPresetList = Array.isArray(programPresets) ? programPresets : [];
   const requestedProgramPresetValue = Number(selectedProgramPresetId || 0);
   const selectedProgramPresetItem = (selectedProgramPreset && Number(selectedProgramPreset.id || 0) > 0)
@@ -28,6 +29,43 @@
   const moderationStatusValue = ['open', 'reviewing', 'resolved', 'ignored'].includes(String(moderationStatus || '').trim().toLowerCase())
     ? String(moderationStatus || '').trim().toLowerCase()
     : 'open';
+  const contextOfferingUi = String(lang || '').toLowerCase() === 'uk' ? {
+    title: 'Live offerings',
+    subtitle: 'Primary editor for live context offerings. New writes land in subject_offerings first and legacy subject visibility stays a compatibility mirror.',
+    createTitle: 'Add or update offering',
+    targetContexts: 'Target contexts',
+    semesterLinks: 'Semester links',
+    semesterFallback: 'If you leave this empty, the offering will cover all live semesters in the selected context.',
+    titleLabel: 'Offering title',
+    catalogLabel: 'Catalog subject',
+    groupCount: 'Groups',
+    defaultGroup: 'Default group',
+    shared: 'Shared offering',
+    required: 'Required',
+    general: 'General',
+    teamwork: 'Show in teamwork',
+    save: 'Save offering',
+    delete: 'Remove from context',
+    empty: 'No live offerings in this context yet.',
+  } : {
+    title: 'Live offerings',
+    subtitle: 'Primary editor for live context offerings. New writes go to subject_offerings first while legacy subject visibility stays a compatibility mirror.',
+    createTitle: 'Add or update offering',
+    targetContexts: 'Target contexts',
+    semesterLinks: 'Semester links',
+    semesterFallback: 'If left empty, the offering covers all live semesters in the selected context.',
+    titleLabel: 'Offering title',
+    catalogLabel: 'Catalog subject',
+    groupCount: 'Groups',
+    defaultGroup: 'Default group',
+    shared: 'Shared offering',
+    required: 'Required',
+    general: 'General',
+    teamwork: 'Show in teamwork',
+    save: 'Save offering',
+    delete: 'Remove from context',
+    empty: 'No live offerings in this context yet.',
+  };
   const copyAdmissions = Array.isArray(admissionCopyOptions) ? admissionCopyOptions : [];
   const subjectCatalogList = Array.isArray(subjectCatalogEntries) ? subjectCatalogEntries : [];
   const campusBindingList = Array.isArray(registrationCampusBindings) ? registrationCampusBindings : [];
@@ -2091,6 +2129,180 @@
                   <% } else { %>
                     <div class="soft-panel muted"><%= ui.noContextSemesters %></div>
                   <% } %>
+                </div>
+
+                <div class="col-12">
+                  <div class="section-header mb-2">
+                    <div>
+                      <h3 class="section-title h5 mb-1"><%= contextOfferingUi.title %></h3>
+                      <p class="section-subtitle mb-0"><%= contextOfferingUi.subtitle %></p>
+                    </div>
+                    <span class="chip"><%= Number(selectedStudyContextOfferingsList.length || 0) %></span>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-12 col-xl-4">
+                      <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/offerings/save" class="soft-panel h-100">
+                        <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                        <input type="hidden" name="track" value="<%= activeTrack %>" />
+                        <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                        <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                        <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
+                        <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                        <div class="section-header mb-2">
+                          <div>
+                            <h4 class="section-title h6 mb-1"><%= contextOfferingUi.createTitle %></h4>
+                            <p class="section-subtitle mb-0"><%= selectedStudyContextItem.label %></p>
+                          </div>
+                        </div>
+                        <div class="row g-2">
+                          <div class="col-12">
+                            <label class="form-label small"><%= contextOfferingUi.catalogLabel %></label>
+                            <select class="form-select compact-select" name="subject_catalog_id" required>
+                              <option value=""><%= isUk ? 'Оберіть предмет' : 'Select subject' %></option>
+                              <% presetSubjectCatalogList.forEach((item) => { %>
+                                <option value="<%= item.id %>"><%= item.name %></option>
+                              <% }) %>
+                            </select>
+                          </div>
+                          <div class="col-12">
+                            <label class="form-label small"><%= contextOfferingUi.titleLabel %></label>
+                            <input class="form-control compact-input" type="text" name="title" maxlength="140" required />
+                          </div>
+                          <div class="col-6">
+                            <label class="form-label small"><%= contextOfferingUi.groupCount %></label>
+                            <input class="form-control compact-input" type="number" name="group_count" min="1" max="3" value="1" />
+                          </div>
+                          <div class="col-6">
+                            <label class="form-label small"><%= contextOfferingUi.defaultGroup %></label>
+                            <input class="form-control compact-input" type="number" name="default_group" min="1" max="3" value="1" />
+                          </div>
+                          <div class="col-12">
+                            <label class="form-label small"><%= contextOfferingUi.targetContexts %></label>
+                            <div class="d-grid gap-2">
+                              <% studyContextList.forEach((context) => { %>
+                                <label class="form-check soft-panel">
+                                  <input class="form-check-input" type="checkbox" name="target_context_ids" value="<%= context.id %>" <%= Number(context.id || 0) === Number(selectedStudyContextValue || 0) ? 'checked' : '' %> />
+                                  <span class="form-check-label"><%= context.label %></span>
+                                </label>
+                              <% }) %>
+                            </div>
+                          </div>
+                          <div class="col-12">
+                            <label class="form-label small"><%= contextOfferingUi.semesterLinks %></label>
+                            <div class="d-grid gap-2">
+                              <% selectedStudyContextSemestersList.forEach((semester) => { %>
+                                <% if (!semester.is_archived) { %>
+                                  <label class="form-check soft-panel">
+                                    <input class="form-check-input" type="checkbox" name="semester_ids" value="<%= semester.id %>" <%= semester.is_active ? 'checked' : '' %> />
+                                    <span class="form-check-label"><%= semester.title %></span>
+                                  </label>
+                                <% } %>
+                              <% }) %>
+                            </div>
+                            <div class="catalog-subject-meta mt-2"><%= contextOfferingUi.semesterFallback %></div>
+                          </div>
+                          <div class="col-12">
+                            <div class="form-check"><input class="form-check-input" type="checkbox" id="context_offering_shared_new" name="is_shared" value="1" /><label class="form-check-label" for="context_offering_shared_new"><%= contextOfferingUi.shared %></label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" id="context_offering_required_new" name="is_required" value="1" checked /><label class="form-check-label" for="context_offering_required_new"><%= contextOfferingUi.required %></label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" id="context_offering_general_new" name="is_general" value="1" checked /><label class="form-check-label" for="context_offering_general_new"><%= contextOfferingUi.general %></label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" id="context_offering_teamwork_new" name="show_in_teamwork" value="1" checked /><label class="form-check-label" for="context_offering_teamwork_new"><%= contextOfferingUi.teamwork %></label></div>
+                          </div>
+                          <div class="col-12 d-grid">
+                            <button class="btn btn-primary btn-pill" type="submit"><%= contextOfferingUi.save %></button>
+                          </div>
+                        </div>
+                      </form>
+                    </div>
+
+                    <div class="col-12 col-xl-8">
+                      <% if (selectedStudyContextOfferingsList.length) { %>
+                        <div class="d-grid gap-2">
+                          <% selectedStudyContextOfferingsList.forEach((offering) => { %>
+                            <div class="soft-panel">
+                              <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/offerings/save" class="row g-2">
+                                <input type="hidden" name="subject_offering_id" value="<%= offering.id %>" />
+                                <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                                <input type="hidden" name="track" value="<%= activeTrack %>" />
+                                <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                                <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                                <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
+                                <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                                <div class="col-12 col-lg-4">
+                                  <label class="form-label small"><%= contextOfferingUi.catalogLabel %></label>
+                                  <select class="form-select compact-select" name="subject_catalog_id" required>
+                                    <% presetSubjectCatalogList.forEach((item) => { %>
+                                      <option value="<%= item.id %>" <%= Number(item.id || 0) === Number(offering.subject_catalog_id || 0) ? 'selected' : '' %>><%= item.name %></option>
+                                    <% }) %>
+                                  </select>
+                                </div>
+                                <div class="col-12 col-lg-4">
+                                  <label class="form-label small"><%= contextOfferingUi.titleLabel %></label>
+                                  <input class="form-control compact-input" type="text" name="title" maxlength="140" value="<%= offering.title || '' %>" required />
+                                </div>
+                                <div class="col-6 col-lg-2">
+                                  <label class="form-label small"><%= contextOfferingUi.groupCount %></label>
+                                  <input class="form-control compact-input" type="number" name="group_count" min="1" max="3" value="<%= Number(offering.group_count || 1) %>" />
+                                </div>
+                                <div class="col-6 col-lg-2">
+                                  <label class="form-label small"><%= contextOfferingUi.defaultGroup %></label>
+                                  <input class="form-control compact-input" type="number" name="default_group" min="1" max="3" value="<%= Number(offering.default_group || 1) %>" />
+                                </div>
+                                <div class="col-12">
+                                  <label class="form-label small"><%= contextOfferingUi.targetContexts %></label>
+                                  <div class="d-grid gap-2">
+                                    <% studyContextList.forEach((context) => { %>
+                                      <label class="form-check soft-panel">
+                                        <input class="form-check-input" type="checkbox" name="target_context_ids" value="<%= context.id %>" <%= (offering.target_context_ids || []).includes(Number(context.id || 0)) || Number(context.id || 0) === Number(selectedStudyContextValue || 0) ? 'checked' : '' %> />
+                                        <span class="form-check-label"><%= context.label %></span>
+                                      </label>
+                                    <% }) %>
+                                  </div>
+                                </div>
+                                <div class="col-12">
+                                  <label class="form-label small"><%= contextOfferingUi.semesterLinks %></label>
+                                  <div class="d-grid gap-2">
+                                    <% selectedStudyContextSemestersList.forEach((semester) => { %>
+                                      <% if (!semester.is_archived) { %>
+                                        <label class="form-check soft-panel">
+                                          <input class="form-check-input" type="checkbox" name="semester_ids" value="<%= semester.id %>" <%= (offering.semester_ids || []).includes(Number(semester.id || 0)) ? 'checked' : '' %> />
+                                          <span class="form-check-label"><%= semester.title %></span>
+                                        </label>
+                                      <% } %>
+                                    <% }) %>
+                                  </div>
+                                </div>
+                                <div class="col-12 col-lg-8">
+                                  <div class="d-flex flex-wrap gap-3">
+                                    <div class="form-check"><input class="form-check-input" type="checkbox" id="context_offering_shared_<%= offering.id %>" name="is_shared" value="1" <%= offering.is_shared ? 'checked' : '' %> /><label class="form-check-label" for="context_offering_shared_<%= offering.id %>"><%= contextOfferingUi.shared %></label></div>
+                                    <div class="form-check"><input class="form-check-input" type="checkbox" id="context_offering_required_<%= offering.id %>" name="is_required" value="1" <%= offering.is_required ? 'checked' : '' %> /><label class="form-check-label" for="context_offering_required_<%= offering.id %>"><%= contextOfferingUi.required %></label></div>
+                                    <div class="form-check"><input class="form-check-input" type="checkbox" id="context_offering_general_<%= offering.id %>" name="is_general" value="1" <%= offering.is_general ? 'checked' : '' %> /><label class="form-check-label" for="context_offering_general_<%= offering.id %>"><%= contextOfferingUi.general %></label></div>
+                                    <div class="form-check"><input class="form-check-input" type="checkbox" id="context_offering_teamwork_<%= offering.id %>" name="show_in_teamwork" value="1" <%= offering.show_in_teamwork ? 'checked' : '' %> /><label class="form-check-label" for="context_offering_teamwork_<%= offering.id %>"><%= contextOfferingUi.teamwork %></label></div>
+                                  </div>
+                                </div>
+                                <div class="col-12 col-lg-4 d-grid">
+                                  <button class="btn btn-primary btn-pill" type="submit"><%= contextOfferingUi.save %></button>
+                                </div>
+                              </form>
+                              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2">
+                                <span class="catalog-subject-meta">#<%= offering.id %><% if (offering.is_shared) { %> / shared<% } %><% if (!offering.is_active) { %> / inactive<% } %></span>
+                                <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/offerings/<%= offering.id %>/delete">
+                                  <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                                  <input type="hidden" name="track" value="<%= activeTrack %>" />
+                                  <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                                  <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                                  <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
+                                  <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                                  <button class="btn btn-soft btn-pill" type="submit"><%= contextOfferingUi.delete %></button>
+                                </form>
+                              </div>
+                            </div>
+                          <% }) %>
+                        </div>
+                      <% } else { %>
+                        <div class="soft-panel muted"><%= contextOfferingUi.empty %></div>
+                      <% } %>
+                    </div>
+                  </div>
                 </div>
               </div>
             <% } %>

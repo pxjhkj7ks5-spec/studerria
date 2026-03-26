@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.93",
+      "date": "2026-03-26",
+      "items": [
+        "feat(academic-setup-live-offering-editor): add context-level live offering management inside `/admin/pathways`, including create/update/remove flows for `subject_offerings`, target study-context bindings, semester links, and legacy visibility mirroring from the new Academic Setup workspace",
+        "feat(teacher-offering-selection-mode): switch teacher subject registration and profile editing into offering-first mode when live offerings are available, preserving the existing checkbox/group UX while saving through `teacher_offering_assignments` and keeping `teacher_subjects` as a compatibility mirror",
+        "feat(teacher-workspace-live-scope): add a new live teaching scope panel to `/teacher/workspace` with study-context and semester filters, offering-level context metadata, template-match visibility, and better carry-through for shared/context-bound teaching assignments"
+      ]
+    },
+    {
       "version": "1.2.92",
       "date": "2026-03-26",
       "items": [

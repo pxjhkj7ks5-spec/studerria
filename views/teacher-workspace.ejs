@@ -1,3 +1,8 @@
+<%
+  const teacherOfferingList = Array.isArray(teacherOfferings) ? teacherOfferings : [];
+  const workspaceContextList = Array.isArray(workspaceContextOptions) ? workspaceContextOptions : [];
+  const workspaceSemesterList = Array.isArray(workspaceSemesterOptions) ? workspaceSemesterOptions : [];
+%>
 <!doctype html>
 <html lang="<%= lang %>">
   <head>
@@ -459,6 +464,58 @@
         border-color: rgba(15, 23, 42, 0.1);
         background: rgba(255, 255, 255, 0.96);
       }
+      .workspace-scope-list {
+        display: grid;
+        gap: 12px;
+      }
+      .workspace-scope-card {
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.2);
+      }
+      body.theme-light .workspace-scope-card {
+        background: rgba(255, 255, 255, 0.88);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      .workspace-scope-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .workspace-scope-title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 650;
+      }
+      .workspace-scope-meta {
+        margin-top: 6px;
+        font-size: 0.82rem;
+        color: rgba(203, 213, 225, 0.78);
+      }
+      body.theme-light .workspace-scope-meta {
+        color: rgba(15, 23, 42, 0.6);
+      }
+      .workspace-scope-chip-row {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .workspace-scope-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.26);
+        background: rgba(15, 23, 42, 0.34);
+        padding: 4px 10px;
+        font-size: 0.75rem;
+      }
+      body.theme-light .workspace-scope-chip {
+        background: rgba(255, 255, 255, 0.94);
+        border-color: rgba(15, 23, 42, 0.12);
+      }
     </style>
     <link rel="stylesheet" href="/css/design-system.css" />
     <link rel="stylesheet" href="/css/studerria-ui.css" />
@@ -494,6 +551,83 @@
           <a class="btn btn-glass" href="/teacher/subjects">My subjects</a>
           <a class="btn btn-glass" href="/journal">Journal</a>
         </div>
+      </section>
+
+      <section class="glass workspace-panel mb-3">
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+          <div>
+            <h5 class="mb-1">Live teaching scope</h5>
+            <p class="hint mb-0">This list now reads from `teacher_offering_assignments` and shows contexts and semesters attached to each live offering.</p>
+          </div>
+          <span class="badge bg-secondary"><%= teacherOfferingList.length %></span>
+        </div>
+        <form method="GET" action="/teacher/workspace" class="row g-2 mb-3">
+          <div class="col-12 col-lg-4">
+            <label class="form-label" for="workspaceContextId">Study context</label>
+            <select class="form-select" id="workspaceContextId" name="study_context_id">
+              <option value="">All contexts</option>
+              <% workspaceContextList.forEach(function(context) { %>
+                <option value="<%= context.id %>" <%= Number(selectedWorkspaceContextId) === Number(context.id) ? 'selected' : '' %>><%= context.label %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12 col-lg-4">
+            <label class="form-label" for="workspaceSemesterId">Semester</label>
+            <select class="form-select" id="workspaceSemesterId" name="semester_id">
+              <option value="">All semesters</option>
+              <% workspaceSemesterList.forEach(function(semester) { %>
+                <option value="<%= semester.id %>" <%= Number(selectedWorkspaceSemesterId) === Number(semester.id) ? 'selected' : '' %>><%= semester.title %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12 col-lg-4">
+            <label class="form-label" for="workspaceCourseId">Course scope</label>
+            <select class="form-select" id="workspaceCourseId" name="course">
+              <option value="">All my courses</option>
+              <% (teacherCourses || []).forEach(function(course) { %>
+                <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12 d-flex flex-wrap gap-2">
+            <button class="btn btn-primary" type="submit">Apply filters</button>
+            <a class="btn btn-outline-secondary" href="/teacher/workspace">Clear</a>
+            <a class="btn btn-outline-info" href="/teacher/subjects">Manage assignments</a>
+          </div>
+        </form>
+        <% if (teacherOfferingList.length) { %>
+          <div class="workspace-scope-list">
+            <% teacherOfferingList.forEach(function(offering) { %>
+              <article class="workspace-scope-card">
+                <div class="workspace-scope-head">
+                  <div>
+                    <h6 class="workspace-scope-title"><%= offering.name %></h6>
+                    <div class="workspace-scope-meta">
+                      <%= Array.isArray(offering.course_labels) && offering.course_labels.length ? offering.course_labels.join(' • ') : 'Course not bound yet' %>
+                    </div>
+                  </div>
+                  <span class="badge bg-<%= offering.template_id ? 'info' : 'secondary' %>"><%= offering.template_id ? 'template matched' : 'live override' %></span>
+                </div>
+                <div class="workspace-scope-chip-row">
+                  <span class="workspace-scope-chip">Group: <%= offering.group_number || 'all' %></span>
+                  <span class="workspace-scope-chip">Contexts: <%= Array.isArray(offering.contexts) ? offering.contexts.length : 0 %></span>
+                  <% if (offering.is_shared) { %><span class="workspace-scope-chip">Shared</span><% } %>
+                  <% if (offering.is_general) { %><span class="workspace-scope-chip">General</span><% } %>
+                </div>
+                <div class="workspace-scope-meta"><%= Array.isArray(offering.context_labels) ? offering.context_labels.join(' • ') : '' %></div>
+                <% if (Array.isArray(offering.semester_labels) && offering.semester_labels.length) { %>
+                  <div class="workspace-scope-chip-row">
+                    <% offering.semester_labels.forEach(function(label) { %>
+                      <span class="workspace-scope-chip"><%= label %></span>
+                    <% }) %>
+                  </div>
+                <% } %>
+              </article>
+            <% }) %>
+          </div>
+        <% } else { %>
+          <div class="alert alert-info mb-0">No live offerings assigned yet. Use <a href="/teacher/subjects">teacher subjects</a> to choose offerings and groups.</div>
+        <% } %>
       </section>
 
       <section class="row g-3">

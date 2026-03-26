@@ -4967,6 +4967,660 @@ async function listStudyContextSemesters(studyContextId, options = {}) {
   }
 }
 
+async function listStudyContextOfferings(studyContextId, options = {}) {
+  const normalizedStudyContextId = parsePositiveIntStrict(studyContextId);
+  if (!normalizedStudyContextId) {
+    return [];
+  }
+  const includeInactive = options.includeInactive === true;
+  const where = ['soc.study_context_id = ?'];
+  if (!includeInactive) {
+    where.push('so.is_active = true');
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT
+          so.id AS subject_offering_id,
+          so.dedupe_key,
+          so.subject_catalog_id,
+          so.preset_stage_subject_id,
+          so.title,
+          so.is_shared,
+          so.sort_order,
+          so.is_active,
+          cat.name AS catalog_name,
+          legacy_subject.id AS legacy_subject_id,
+          legacy_subject.group_count,
+          legacy_subject.default_group,
+          legacy_subject.show_in_teamwork,
+          legacy_subject.is_required,
+          legacy_subject.is_general,
+          linked_contexts.target_context_ids,
+          COALESCE(
+            ARRAY_AGG(DISTINCT scs.id) FILTER (WHERE scs.id IS NOT NULL),
+            ARRAY[]::int[]
+          ) AS semester_ids,
+          COALESCE(
+            ARRAY_AGG(DISTINCT scs.semester_number) FILTER (WHERE scs.id IS NOT NULL),
+            ARRAY[]::int[]
+          ) AS semester_numbers,
+          COALESCE(
+            ARRAY_AGG(DISTINCT scs.title) FILTER (WHERE scs.id IS NOT NULL),
+            ARRAY[]::text[]
+          ) AS semester_titles
+        FROM subject_offerings so
+        JOIN subject_offering_contexts soc ON soc.subject_offering_id = so.id
+        LEFT JOIN subject_catalog cat ON cat.id = so.subject_catalog_id
+        LEFT JOIN subjects legacy_subject ON so.dedupe_key = CONCAT('legacy-subject:', legacy_subject.id::text)
+        LEFT JOIN LATERAL (
+          SELECT ARRAY_AGG(study_context_id ORDER BY study_context_id ASC) AS target_context_ids
+          FROM subject_offering_contexts soc_all
+          WHERE soc_all.subject_offering_id = so.id
+        ) linked_contexts ON true
+        LEFT JOIN subject_offering_semesters sos
+          ON sos.subject_offering_id = so.id
+         AND sos.is_active = true
+        LEFT JOIN study_context_semesters scs
+          ON scs.id = sos.study_context_semester_id
+         AND scs.study_context_id = soc.study_context_id
+         AND COALESCE(scs.is_archived, false) = false
+        WHERE ${where.join('\n          AND ')}
+        GROUP BY
+          so.id,
+          so.dedupe_key,
+          so.subject_catalog_id,
+          so.preset_stage_subject_id,
+          so.title,
+          so.is_shared,
+          so.sort_order,
+          so.is_active,
+          cat.name,
+          legacy_subject.id,
+          legacy_subject.group_count,
+          legacy_subject.default_group,
+          legacy_subject.show_in_teamwork,
+          legacy_subject.is_required,
+          legacy_subject.is_general,
+          linked_contexts.target_context_ids
+        ORDER BY so.sort_order ASC, so.title ASC, so.id ASC
+      `,
+      [normalizedStudyContextId]
+    );
+    return (rows || []).map((row) => ({
+      id: Number(row.subject_offering_id || 0) || null,
+      subject_offering_id: Number(row.subject_offering_id || 0) || null,
+      dedupe_key: String(row.dedupe_key || ''),
+      subject_catalog_id: Number(row.subject_catalog_id || 0) || null,
+      preset_stage_subject_id: Number(row.preset_stage_subject_id || 0) || null,
+      title: sanitizeCompactText(row.title || row.catalog_name || '', 140),
+      catalog_name: sanitizeCompactText(row.catalog_name || row.title || '', 140),
+      is_shared: row.is_shared === true || Number(row.is_shared) === 1,
+      is_active: row.is_active === true || Number(row.is_active) === 1,
+      sort_order: Number(row.sort_order || 0) || 0,
+      legacy_subject_id: Number(row.legacy_subject_id || 0) || null,
+      group_count: Math.max(1, Number(row.group_count || 1) || 1),
+      default_group: Math.max(1, Number(row.default_group || 1) || 1),
+      show_in_teamwork: row.show_in_teamwork === true || Number(row.show_in_teamwork) === 1,
+      is_required: !(row.is_required === false || Number(row.is_required) === 0),
+      is_general: row.is_general === true || Number(row.is_general) === 1,
+      target_context_ids: parseDbIntegerArray(row.target_context_ids),
+      semester_ids: parseDbIntegerArray(row.semester_ids),
+      semester_numbers: parseDbIntegerArray(row.semester_numbers),
+      semester_titles: Array.isArray(row.semester_titles)
+        ? row.semester_titles.map((value) => sanitizeCompactText(value || '', 120)).filter(Boolean)
+        : [],
+    })).filter((item) => item.id);
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function upsertStudyContextOffering(payload = {}) {
+  const primaryStudyContextId = parsePositiveIntStrict(payload.studyContextId);
+  const subjectCatalogId = parsePositiveIntStrict(payload.subjectCatalogId);
+  const requestedOfferingId = parsePositiveIntStrict(payload.subjectOfferingId);
+  const title = normalizeSubjectDraftName(payload.title || payload.catalog_name, 140);
+  if (!primaryStudyContextId || !subjectCatalogId || !title) {
+    return null;
+  }
+
+  const primaryContext = await getStudyContextById(primaryStudyContextId);
+  if (!primaryContext || !primaryContext.course_id || !primaryContext.cohort_id) {
+    return null;
+  }
+
+  const isShared = payload.isShared === true || Number(payload.isShared) === 1;
+  const requestedTargetContextIds = Array.from(new Set(
+    (Array.isArray(payload.targetContextIds) ? payload.targetContextIds : [payload.targetContextIds])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const requestedSemesterIds = Array.from(new Set(
+    (Array.isArray(payload.semesterIds) ? payload.semesterIds : [payload.semesterIds])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const settings = buildSubjectSettingsDraft({
+    group_count: payload.groupCount,
+    default_group: payload.defaultGroup,
+    show_in_teamwork: payload.showInTeamwork ? 1 : 0,
+    visible: 1,
+    is_required: payload.isRequired ? 1 : 0,
+    is_general: payload.isGeneral ? 1 : 0,
+  });
+
+  const targetContextRows = await db.all(
+    `
+      SELECT
+        sc.id,
+        sc.cohort_id,
+        sc.stage_number,
+        sc.campus_key,
+        coh.legacy_admission_id AS admission_id,
+        binding.course_id
+      FROM study_contexts sc
+      JOIN cohorts coh ON coh.id = sc.cohort_id
+      LEFT JOIN LATERAL (
+        SELECT sccb.course_id
+        FROM study_context_course_bindings sccb
+        WHERE sccb.study_context_id = sc.id
+        ORDER BY sccb.is_primary DESC, sccb.course_id ASC
+        LIMIT 1
+      ) binding ON true
+      WHERE sc.id = ANY(?::int[])
+    `,
+    [Array.from(new Set([primaryStudyContextId, ...requestedTargetContextIds]))]
+  ).catch((err) => {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  });
+
+  const allowedTargetContexts = (targetContextRows || [])
+    .filter((row) => Number(row.cohort_id || 0) === Number(primaryContext.cohort_id || 0))
+    .filter((row) => parsePositiveIntStrict(row.course_id))
+    .map((row) => ({
+      id: Number(row.id || 0),
+      cohort_id: Number(row.cohort_id || 0),
+      stage_number: Number(row.stage_number || 0) || null,
+      campus_key: normalizeCourseCampus(row.campus_key || 'kyiv'),
+      admission_id: Number(row.admission_id || 0) || null,
+      course_id: Number(row.course_id || 0) || null,
+    }));
+  const primaryTargetContext = allowedTargetContexts.find((row) => Number(row.id || 0) === primaryStudyContextId) || null;
+  if (!primaryTargetContext) {
+    return null;
+  }
+
+  const targetContexts = isShared
+    ? allowedTargetContexts
+    : [primaryTargetContext];
+  const targetContextIds = targetContexts
+    .map((row) => Number(row.id || 0))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  const targetCourseIds = Array.from(new Set(
+    targetContexts
+      .map((row) => parsePositiveIntStrict(row.course_id))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+
+  let offeringId = requestedOfferingId || null;
+  let legacySubjectId = null;
+  let existingContextIds = [];
+  let existingContextRows = [];
+  if (offeringId) {
+    const existingOffering = await db.get(
+      `
+        SELECT
+          so.id,
+          so.dedupe_key,
+          legacy_subject.id AS legacy_subject_id
+        FROM subject_offerings so
+        LEFT JOIN subjects legacy_subject ON so.dedupe_key = CONCAT('legacy-subject:', legacy_subject.id::text)
+        WHERE so.id = ?
+        LIMIT 1
+      `,
+      [offeringId]
+    ).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return null;
+      }
+      throw err;
+    });
+    if (!existingOffering || !existingOffering.id) {
+      return null;
+    }
+    legacySubjectId = parsePositiveIntStrict(existingOffering.legacy_subject_id)
+      || parseLegacySubjectIdFromOfferingDedupeKey(existingOffering.dedupe_key);
+    const linkedContextRows = await db.all(
+      `
+        SELECT study_context_id
+        FROM subject_offering_contexts
+        WHERE subject_offering_id = ?
+      `,
+      [offeringId]
+    ).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return [];
+      }
+      throw err;
+    });
+    existingContextIds = Array.from(new Set(
+      (linkedContextRows || [])
+        .map((row) => parsePositiveIntStrict(row.study_context_id))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ));
+    if (existingContextIds.length) {
+      existingContextRows = await db.all(
+        `
+          SELECT
+            sc.id,
+            sc.cohort_id,
+            sc.stage_number,
+            sc.campus_key,
+            coh.legacy_admission_id AS admission_id,
+            binding.course_id
+          FROM study_contexts sc
+          JOIN cohorts coh ON coh.id = sc.cohort_id
+          LEFT JOIN LATERAL (
+            SELECT sccb.course_id
+            FROM study_context_course_bindings sccb
+            WHERE sccb.study_context_id = sc.id
+            ORDER BY sccb.is_primary DESC, sccb.course_id ASC
+            LIMIT 1
+          ) binding ON true
+          WHERE sc.id = ANY(?::int[])
+        `,
+        [existingContextIds]
+      ).catch((err) => {
+        if (isDbSchemaCompatibilityError(err)) {
+          return [];
+        }
+        throw err;
+      });
+    }
+  }
+
+  await withTransaction(async (client) => {
+    if (!legacySubjectId) {
+      const createdSubject = await createSubjectInstanceWithBinding(client, {
+        name: title,
+        ownerCourseId: primaryTargetContext.course_id,
+        catalogId: subjectCatalogId,
+        isShared,
+        settings,
+      });
+      legacySubjectId = parsePositiveIntStrict(createdSubject && createdSubject.id);
+    }
+    if (!legacySubjectId) {
+      return;
+    }
+    for (const courseId of targetCourseIds) {
+      await txRun(
+        client,
+        `
+          INSERT INTO subject_course_bindings (subject_id, course_id, created_at, updated_at)
+          VALUES (?, ?, NOW(), NOW())
+          ON CONFLICT (subject_id, course_id)
+          DO UPDATE SET updated_at = NOW()
+        `,
+        [legacySubjectId, courseId]
+      );
+    }
+    if (requestedOfferingId) {
+      await txRun(
+        client,
+        `
+          UPDATE subjects
+          SET
+            name = ?,
+            group_count = ?,
+            default_group = ?,
+            show_in_teamwork = ?,
+            visible = 1,
+            is_required = ?,
+            is_general = ?,
+            catalog_id = ?,
+            is_shared = ?,
+            course_id = ?
+          WHERE id = ?
+        `,
+        [
+          title,
+          settings.group_count,
+          settings.default_group,
+          settings.show_in_teamwork,
+          settings.is_required,
+          settings.is_general,
+          subjectCatalogId,
+          isShared ? 1 : 0,
+          primaryTargetContext.course_id,
+          legacySubjectId,
+        ]
+      );
+    }
+
+    const offeringRow = await txGet(
+      client,
+      `
+        INSERT INTO subject_offerings
+          (dedupe_key, subject_catalog_id, title, is_shared, sort_order, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, true, NOW(), NOW())
+        ON CONFLICT (dedupe_key)
+        DO UPDATE SET
+          subject_catalog_id = EXCLUDED.subject_catalog_id,
+          title = EXCLUDED.title,
+          is_shared = EXCLUDED.is_shared,
+          sort_order = EXCLUDED.sort_order,
+          is_active = true,
+          updated_at = NOW()
+        RETURNING id
+      `,
+      [
+        buildLegacySubjectOfferingDedupeKey(legacySubjectId),
+        subjectCatalogId,
+        title,
+        isShared ? 1 : 0,
+        Number(payload.sortOrder || 0) || legacySubjectId,
+      ]
+    );
+    offeringId = parsePositiveIntStrict(offeringRow && offeringRow.id);
+    if (!offeringId) {
+      return;
+    }
+
+    const semesterRows = await txAll(
+      client,
+      `
+        SELECT id, study_context_id, semester_number
+        FROM study_context_semesters
+        WHERE study_context_id = ANY(?::int[])
+          AND COALESCE(is_archived, false) = false
+      `,
+      [targetContextIds]
+    );
+    const primarySemesterNumberSet = new Set(
+      (semesterRows || [])
+        .filter((row) => Number(row.study_context_id || 0) === primaryStudyContextId)
+        .filter((row) => requestedSemesterIds.length
+          ? requestedSemesterIds.includes(Number(row.id || 0))
+          : true)
+        .map((row) => Number(row.semester_number || 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
+    const effectiveSemesterNumberSet = primarySemesterNumberSet.size
+      ? primarySemesterNumberSet
+      : new Set(
+          (semesterRows || [])
+            .filter((row) => Number(row.study_context_id || 0) === primaryStudyContextId)
+            .map((row) => Number(row.semester_number || 0))
+            .filter((value) => Number.isInteger(value) && value > 0)
+        );
+    const desiredSemesterIds = (semesterRows || [])
+      .filter((row) => targetContextIds.includes(Number(row.study_context_id || 0)))
+      .filter((row) => effectiveSemesterNumberSet.size
+        ? effectiveSemesterNumberSet.has(Number(row.semester_number || 0))
+        : true)
+      .map((row) => Number(row.id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0);
+
+    await txRun(
+      client,
+      `
+        UPDATE subject_offering_semesters sos
+        SET
+          is_active = false,
+          updated_at = NOW()
+        FROM study_context_semesters scs
+        WHERE sos.study_context_semester_id = scs.id
+          AND sos.subject_offering_id = ?
+          AND scs.study_context_id = ANY(?::int[])
+      `,
+      [offeringId, Array.from(new Set([...existingContextIds, ...targetContextIds]))]
+    );
+
+    for (let index = 0; index < targetContextIds.length; index += 1) {
+      await txRun(
+        client,
+        `
+          INSERT INTO subject_offering_contexts
+            (subject_offering_id, study_context_id, is_primary, created_at, updated_at)
+          VALUES (?, ?, ?, NOW(), NOW())
+          ON CONFLICT (subject_offering_id, study_context_id)
+          DO UPDATE SET
+            is_primary = EXCLUDED.is_primary,
+            updated_at = NOW()
+        `,
+        [offeringId, targetContextIds[index], index === 0]
+      );
+    }
+
+    const removedContextIds = existingContextIds.filter((contextId) => !targetContextIds.includes(contextId));
+    if (removedContextIds.length) {
+      await txRun(
+        client,
+        `
+          DELETE FROM subject_offering_contexts
+          WHERE subject_offering_id = ?
+            AND study_context_id = ANY(?::int[])
+        `,
+        [offeringId, removedContextIds]
+      );
+    }
+
+    for (const semesterId of desiredSemesterIds) {
+      await txRun(
+        client,
+        `
+          INSERT INTO subject_offering_semesters
+            (subject_offering_id, study_context_semester_id, is_active, created_at, updated_at)
+          VALUES (?, ?, true, NOW(), NOW())
+          ON CONFLICT (subject_offering_id, study_context_semester_id)
+          DO UPDATE SET
+            is_active = true,
+            updated_at = NOW()
+        `,
+        [offeringId, semesterId]
+      );
+    }
+
+    for (const targetContext of targetContexts) {
+      if (!targetContext.admission_id) continue;
+      await txRun(
+        client,
+        `
+          INSERT INTO subject_visibility_by_admission
+            (admission_id, subject_id, is_visible, created_at, updated_at)
+          VALUES (?, ?, true, NOW(), NOW())
+          ON CONFLICT (admission_id, subject_id)
+          DO UPDATE SET
+            is_visible = true,
+            updated_at = NOW()
+        `,
+        [targetContext.admission_id, legacySubjectId]
+      );
+    }
+    for (const removedContextId of existingContextIds.filter((contextId) => !targetContextIds.includes(contextId))) {
+      const removedContext = existingContextRows.find((row) => Number(row.id || 0) === Number(removedContextId || 0))
+        || targetContextRows.find((row) => Number(row.id || 0) === Number(removedContextId || 0));
+      if (!removedContext || !removedContext.admission_id) continue;
+      await txRun(
+        client,
+        `
+          INSERT INTO subject_visibility_by_admission
+            (admission_id, subject_id, is_visible, created_at, updated_at)
+          VALUES (?, ?, false, NOW(), NOW())
+          ON CONFLICT (admission_id, subject_id)
+          DO UPDATE SET
+            is_visible = false,
+            updated_at = NOW()
+        `,
+        [removedContext.admission_id, legacySubjectId]
+      );
+    }
+
+    const remainingContext = await txGet(
+      client,
+      `
+        SELECT 1
+        FROM subject_offering_contexts
+        WHERE subject_offering_id = ?
+        LIMIT 1
+      `,
+      [offeringId]
+    );
+    if (!remainingContext) {
+      await txRun(
+        client,
+        `
+          UPDATE subject_offerings
+          SET
+            is_active = false,
+            updated_at = NOW()
+          WHERE id = ?
+        `,
+        [offeringId]
+      );
+    }
+  });
+
+  const removedCourseIds = Array.from(new Set(
+    (existingContextRows || [])
+      .filter((row) => !targetContextIds.includes(Number(row.id || 0)))
+      .map((row) => parsePositiveIntStrict(row.course_id))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const cacheCourseIds = Array.from(new Set(
+    [...targetCourseIds, ...removedCourseIds, parsePositiveIntStrict(primaryContext.course_id)]
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  cacheCourseIds.forEach((courseId) => invalidateSubjectsCache(courseId));
+  invalidateRegistrationPathwaysCache();
+  await applyTeacherAssignmentTemplatesForStudyContexts(targetContextIds);
+  return {
+    id: offeringId,
+    subject_offering_id: offeringId,
+    legacy_subject_id: legacySubjectId,
+    target_context_ids: targetContextIds,
+  };
+}
+
+async function archiveStudyContextOfferingForContext(studyContextId, subjectOfferingId) {
+  const normalizedStudyContextId = parsePositiveIntStrict(studyContextId);
+  const normalizedSubjectOfferingId = parsePositiveIntStrict(subjectOfferingId);
+  if (!normalizedStudyContextId || !normalizedSubjectOfferingId) {
+    return null;
+  }
+  const context = await getStudyContextById(normalizedStudyContextId);
+  if (!context) {
+    return null;
+  }
+  const offering = await db.get(
+    `
+      SELECT
+        so.id,
+        so.dedupe_key,
+        legacy_subject.id AS legacy_subject_id
+      FROM subject_offerings so
+      JOIN subject_offering_contexts soc
+        ON soc.subject_offering_id = so.id
+       AND soc.study_context_id = ?
+      LEFT JOIN subjects legacy_subject ON so.dedupe_key = CONCAT('legacy-subject:', legacy_subject.id::text)
+      WHERE so.id = ?
+      LIMIT 1
+    `,
+    [normalizedStudyContextId, normalizedSubjectOfferingId]
+  ).catch((err) => {
+    if (isDbSchemaCompatibilityError(err)) {
+      return null;
+    }
+    throw err;
+  });
+  if (!offering || !offering.id) {
+    return null;
+  }
+  const legacySubjectId = parsePositiveIntStrict(offering.legacy_subject_id)
+    || parseLegacySubjectIdFromOfferingDedupeKey(offering.dedupe_key);
+
+  await withTransaction(async (client) => {
+    await txRun(
+      client,
+      `
+        UPDATE subject_offering_semesters sos
+        SET
+          is_active = false,
+          updated_at = NOW()
+        FROM study_context_semesters scs
+        WHERE sos.study_context_semester_id = scs.id
+          AND sos.subject_offering_id = ?
+          AND scs.study_context_id = ?
+      `,
+      [normalizedSubjectOfferingId, normalizedStudyContextId]
+    );
+    await txRun(
+      client,
+      `
+        DELETE FROM subject_offering_contexts
+        WHERE subject_offering_id = ?
+          AND study_context_id = ?
+      `,
+      [normalizedSubjectOfferingId, normalizedStudyContextId]
+    );
+    const remaining = await txGet(
+      client,
+      `
+        SELECT 1
+        FROM subject_offering_contexts
+        WHERE subject_offering_id = ?
+        LIMIT 1
+      `,
+      [normalizedSubjectOfferingId]
+    );
+    if (!remaining) {
+      await txRun(
+        client,
+        `
+          UPDATE subject_offerings
+          SET
+            is_active = false,
+            updated_at = NOW()
+          WHERE id = ?
+        `,
+        [normalizedSubjectOfferingId]
+      );
+    }
+    if (legacySubjectId && context.admission_id) {
+      await txRun(
+        client,
+        `
+          INSERT INTO subject_visibility_by_admission
+            (admission_id, subject_id, is_visible, created_at, updated_at)
+          VALUES (?, ?, false, NOW(), NOW())
+          ON CONFLICT (admission_id, subject_id)
+          DO UPDATE SET
+            is_visible = false,
+            updated_at = NOW()
+        `,
+        [parsePositiveIntStrict(context.admission_id), legacySubjectId]
+      );
+    }
+  });
+
+  invalidateRegistrationPathwaysCache();
+  if (context.course_id) {
+    invalidateSubjectsCache(context.course_id);
+  }
+  return {
+    id: normalizedSubjectOfferingId,
+    legacy_subject_id: legacySubjectId,
+  };
+}
+
 async function syncSubjectOfferingsForStudyContext(studyContextId) {
   const normalizedStudyContextId = parsePositiveIntStrict(studyContextId);
   if (!normalizedStudyContextId) {
@@ -9989,6 +10643,53 @@ function normalizeTemplateTagsInput(rawValue) {
 
 async function getTeacherAssignedSubjects(userId) {
   if (!Number.isFinite(Number(userId))) return [];
+  const assignedOfferings = await getTeacherAssignedOfferings(userId);
+  if (assignedOfferings.length) {
+    return assignedOfferings.flatMap((offering) => {
+      const baseRow = {
+        subject_id: Number(offering.legacy_subject_id || 0) || null,
+        subject_offering_id: Number(offering.subject_offering_id || 0) || null,
+        group_number: offering.group_number,
+        subject_name: String(offering.name || ''),
+        group_count: Math.max(1, Number(offering.group_count || 1) || 1),
+        is_general: offering.is_general === true || Number(offering.is_general) === 1,
+        show_in_teamwork: offering.show_in_teamwork === true || Number(offering.show_in_teamwork) === 1,
+        is_shared: offering.is_shared === true || Number(offering.is_shared) === 1,
+      };
+      if (Array.isArray(offering.contexts) && offering.contexts.length) {
+        return offering.contexts.map((context) => ({
+          ...baseRow,
+          course_id: Number(context.course_id || 0) || null,
+          owner_course_id: Number(context.course_id || 0) || null,
+          course_name: String(context.course_name || ''),
+          study_context_id: Number(context.id || 0) || null,
+          study_context_label: String(context.label || ''),
+          stage_number: Number(context.stage_number || 0) || null,
+          campus_key: String(context.campus_key || ''),
+          admission_year: Number(context.admission_year || 0) || null,
+          program_id: Number(context.program_id || 0) || null,
+          program_code: String(context.program_code || ''),
+          program_name: String(context.program_name || ''),
+          semester_titles: Array.isArray(context.semester_titles) ? context.semester_titles.slice() : [],
+        }));
+      }
+      return [{
+        ...baseRow,
+        course_id: null,
+        owner_course_id: null,
+        course_name: '',
+        study_context_id: null,
+        study_context_label: '',
+        stage_number: null,
+        campus_key: '',
+        admission_year: null,
+        program_id: null,
+        program_code: '',
+        program_name: '',
+        semester_titles: [],
+      }];
+    });
+  }
   try {
     return await db.all(
       `
@@ -10036,6 +10737,434 @@ async function getTeacherAssignedSubjects(userId) {
       [userId]
     );
   }
+}
+
+async function listTeacherOfferingCatalog() {
+  const buildOfferingsFromRows = (rows = []) => {
+    const offeringsById = new Map();
+    (rows || []).forEach((row) => {
+      const offeringId = parsePositiveIntStrict(row && row.subject_offering_id);
+      if (!offeringId) {
+        return;
+      }
+      if (!offeringsById.has(offeringId)) {
+        offeringsById.set(offeringId, {
+          id: offeringId,
+          subject_offering_id: offeringId,
+          subject_catalog_id: parsePositiveIntStrict(row && row.subject_catalog_id) || null,
+          legacy_subject_id: parsePositiveIntStrict(row && row.legacy_subject_id) || null,
+          name: sanitizeCompactText(row.subject_name || row.catalog_name || row.offering_title || '', 140),
+          catalog_name: sanitizeCompactText(row.catalog_name || row.subject_name || '', 140),
+          group_count: Math.max(1, Number(row.group_count || 1) || 1),
+          default_group: Math.max(1, Number(row.default_group || 1) || 1),
+          is_general: row.is_general === true || Number(row.is_general) === 1,
+          show_in_teamwork: row.show_in_teamwork === true || Number(row.show_in_teamwork) === 1,
+          is_shared: row.is_shared === true || Number(row.is_shared) === 1,
+          sort_order: Number(row.sort_order || 0) || 0,
+          contexts: [],
+          course_labels: [],
+          course_name: '',
+          context_labels: [],
+          semester_labels: [],
+          pathway_labels: '',
+          search_text: '',
+        });
+      }
+
+      const offering = offeringsById.get(offeringId);
+      const courseId = parsePositiveIntStrict(row && row.course_id) || null;
+      const studyContextId = parsePositiveIntStrict(row && row.study_context_id) || null;
+      const stageNumber = normalizeStudyContextStage(row && row.stage_number, 1);
+      const campusKey = normalizeCourseCampus(row && row.campus_key, 'kyiv');
+      const contextLabel = sanitizeCompactText(
+        (row && row.study_context_label)
+        || buildStudyContextLabel({
+          program_code: row && row.program_code,
+          program_name: row && row.program_name,
+          admission_year: Number(row && row.admission_year || 0) || null,
+          campus_key: campusKey,
+          stage: stageNumber,
+          track_key: row && row.track_key,
+        }, 'uk'),
+        180
+      );
+      const semesterTitles = Array.isArray(row && row.semester_titles)
+        ? row.semester_titles.map((value) => sanitizeCompactText(value || '', 120)).filter(Boolean)
+        : [];
+      const courseLabel = courseId
+        ? `${sanitizeCompactText(row.course_name || `Course ${courseId}`, 120)} / ${formatPathwaysCampusLabel(row.course_location || campusKey)}`
+        : sanitizeCompactText(row.course_name || '', 120);
+
+      if (courseLabel && !offering.course_labels.includes(courseLabel)) {
+        offering.course_labels.push(courseLabel);
+      }
+      if (contextLabel && !offering.context_labels.includes(contextLabel)) {
+        offering.context_labels.push(contextLabel);
+      }
+      semesterTitles.forEach((title) => {
+        if (!offering.semester_labels.includes(title)) {
+          offering.semester_labels.push(title);
+        }
+      });
+      if (studyContextId && !offering.contexts.some((context) => Number(context.id || 0) === studyContextId)) {
+        offering.contexts.push({
+          id: studyContextId,
+          course_id: courseId,
+          course_name: sanitizeCompactText(row.course_name || '', 120),
+          course_location: normalizeCourseCampus(row.course_location || campusKey),
+          stage_number: stageNumber,
+          campus_key: campusKey,
+          track_key: normalizeRegistrationTrack(row.track_key, 'bachelor'),
+          admission_year: Number(row.admission_year || 0) || null,
+          program_id: parsePositiveIntStrict(row.program_id) || null,
+          program_code: sanitizeCompactText(row.program_code || '', 40),
+          program_name: sanitizeCompactText(row.program_name || '', 140),
+          label: contextLabel,
+          semester_titles: semesterTitles,
+          semester_ids: parseDbIntegerArray(row.semester_ids),
+          semester_numbers: parseDbIntegerArray(row.semester_numbers),
+        });
+      }
+    });
+
+    return Array.from(offeringsById.values())
+      .map((item) => ({
+        ...item,
+        course_name: item.course_labels.join(' • '),
+        pathway_labels: item.context_labels.join(' • '),
+        search_text: [
+          item.name,
+          item.catalog_name,
+          item.course_labels.join(' '),
+          item.context_labels.join(' '),
+          item.semester_labels.join(' '),
+        ].join(' ').toLowerCase(),
+      }))
+      .sort((a, b) => {
+        const sortDiff = Number(a.sort_order || 0) - Number(b.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'uk', { sensitivity: 'base' });
+      });
+  };
+
+  const loadOfferingRows = async () => db.all(
+    `
+      SELECT
+        so.id AS subject_offering_id,
+        so.subject_catalog_id,
+        so.title AS offering_title,
+        so.is_shared,
+        so.sort_order,
+        cat.name AS catalog_name,
+        legacy_subject.id AS legacy_subject_id,
+        COALESCE(legacy_subject.name, so.title, cat.name) AS subject_name,
+        COALESCE(legacy_subject.group_count, 1) AS group_count,
+        COALESCE(legacy_subject.default_group, 1) AS default_group,
+        COALESCE(legacy_subject.is_general, true) AS is_general,
+        COALESCE(legacy_subject.show_in_teamwork, true) AS show_in_teamwork,
+        sc.id AS study_context_id,
+        sc.label AS study_context_label,
+        sc.stage_number,
+        sc.campus_key,
+        coh.admission_year,
+        coh.program_id,
+        p.code AS program_code,
+        p.name AS program_name,
+        p.track_key,
+        binding.course_id,
+        c.name AS course_name,
+        COALESCE(c.location, sc.campus_key, 'kyiv') AS course_location,
+        semester_scope.semester_ids,
+        semester_scope.semester_numbers,
+        semester_scope.semester_titles
+      FROM subject_offerings so
+      JOIN subject_offering_contexts soc ON soc.subject_offering_id = so.id
+      JOIN study_contexts sc ON sc.id = soc.study_context_id
+      JOIN cohorts coh ON coh.id = sc.cohort_id
+      JOIN study_programs p ON p.id = coh.program_id
+      LEFT JOIN subject_catalog cat ON cat.id = so.subject_catalog_id
+      LEFT JOIN subjects legacy_subject ON so.dedupe_key = CONCAT('legacy-subject:', legacy_subject.id::text)
+      LEFT JOIN LATERAL (
+        SELECT sccb.course_id
+        FROM study_context_course_bindings sccb
+        WHERE sccb.study_context_id = sc.id
+        ORDER BY sccb.is_primary DESC, sccb.course_id ASC
+        LIMIT 1
+      ) binding ON true
+      LEFT JOIN courses c ON c.id = binding.course_id
+      LEFT JOIN LATERAL (
+        SELECT
+          ARRAY_AGG(scs.id ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_ids,
+          ARRAY_AGG(scs.semester_number ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_numbers,
+          ARRAY_AGG(scs.title ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_titles
+        FROM subject_offering_semesters sos
+        JOIN study_context_semesters scs ON scs.id = sos.study_context_semester_id
+        WHERE sos.subject_offering_id = so.id
+          AND sos.is_active = true
+          AND scs.study_context_id = sc.id
+          AND COALESCE(scs.is_archived, false) = false
+      ) semester_scope ON true
+      WHERE so.is_active = true
+        AND sc.is_active = true
+      ORDER BY p.track_key ASC, coh.admission_year DESC, sc.stage_number ASC, so.sort_order ASC, so.id ASC
+    `
+  );
+
+  try {
+    let rows = await loadOfferingRows();
+    if ((!rows || !rows.length)) {
+      const legacySubjects = await getTeacherSubjectCatalog();
+      const legacySubjectIds = Array.from(new Set(
+        (legacySubjects || [])
+          .map((row) => parsePositiveIntStrict(row.id))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      ));
+      if (legacySubjectIds.length) {
+        await syncSubjectOfferingsForSubjectIds(legacySubjectIds);
+        rows = await loadOfferingRows();
+      }
+    }
+    return buildOfferingsFromRows(rows || []);
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function getTeacherOfferingSelections(userId) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  const selectionMap = new Map();
+  if (!normalizedUserId) {
+    return selectionMap;
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT subject_offering_id, group_number
+        FROM teacher_offering_assignments
+        WHERE teacher_id = ?
+      `,
+      [normalizedUserId]
+    );
+    (rows || []).forEach((row) => {
+      const offeringId = parsePositiveIntStrict(row.subject_offering_id);
+      if (!offeringId) return;
+      selectionMap.set(offeringId, parsePositiveIntStrict(row.group_number) || null);
+    });
+    if (selectionMap.size) {
+      return selectionMap;
+    }
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+
+  const legacySelections = await getTeacherSelections(normalizedUserId);
+  const legacySubjectIds = Array.from(new Set(
+    Array.from(legacySelections.keys())
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (!legacySubjectIds.length) {
+    return selectionMap;
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT id, dedupe_key
+        FROM subject_offerings
+        WHERE dedupe_key = ANY(?::text[])
+          AND is_active = true
+      `,
+      [legacySubjectIds.map((subjectId) => buildLegacySubjectOfferingDedupeKey(subjectId))]
+    );
+    (rows || []).forEach((row) => {
+      const offeringId = parsePositiveIntStrict(row.id);
+      const subjectId = parseLegacySubjectIdFromOfferingDedupeKey(row.dedupe_key);
+      if (!offeringId || !subjectId || !legacySelections.has(subjectId)) return;
+      selectionMap.set(offeringId, parsePositiveIntStrict(legacySelections.get(subjectId)) || null);
+    });
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+  return selectionMap;
+}
+
+async function getTeacherAssignedOfferings(userId) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  if (!normalizedUserId) {
+    return [];
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT
+          toa.subject_offering_id,
+          toa.group_number,
+          toa.template_id,
+          toa.is_primary,
+          toa.sort_order AS assignment_sort_order,
+          so.subject_catalog_id,
+          so.title AS offering_title,
+          so.is_shared,
+          so.sort_order,
+          so.dedupe_key,
+          cat.name AS catalog_name,
+          legacy_subject.id AS legacy_subject_id,
+          COALESCE(legacy_subject.name, so.title, cat.name) AS subject_name,
+          COALESCE(legacy_subject.group_count, 1) AS group_count,
+          COALESCE(legacy_subject.default_group, 1) AS default_group,
+          COALESCE(legacy_subject.is_general, true) AS is_general,
+          COALESCE(legacy_subject.show_in_teamwork, true) AS show_in_teamwork,
+          sc.id AS study_context_id,
+          sc.label AS study_context_label,
+          sc.stage_number,
+          sc.campus_key,
+          coh.admission_year,
+          coh.program_id,
+          p.code AS program_code,
+          p.name AS program_name,
+          p.track_key,
+          binding.course_id,
+          c.name AS course_name,
+          COALESCE(c.location, sc.campus_key, 'kyiv') AS course_location,
+          semester_scope.semester_ids,
+          semester_scope.semester_numbers,
+          semester_scope.semester_titles
+        FROM teacher_offering_assignments toa
+        JOIN subject_offerings so ON so.id = toa.subject_offering_id
+        JOIN subject_offering_contexts soc ON soc.subject_offering_id = so.id
+        JOIN study_contexts sc ON sc.id = soc.study_context_id
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        JOIN study_programs p ON p.id = coh.program_id
+        LEFT JOIN subject_catalog cat ON cat.id = so.subject_catalog_id
+        LEFT JOIN subjects legacy_subject ON so.dedupe_key = CONCAT('legacy-subject:', legacy_subject.id::text)
+        LEFT JOIN LATERAL (
+          SELECT sccb.course_id
+          FROM study_context_course_bindings sccb
+          WHERE sccb.study_context_id = sc.id
+          ORDER BY sccb.is_primary DESC, sccb.course_id ASC
+          LIMIT 1
+        ) binding ON true
+        LEFT JOIN courses c ON c.id = binding.course_id
+        LEFT JOIN LATERAL (
+          SELECT
+            ARRAY_AGG(scs.id ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_ids,
+            ARRAY_AGG(scs.semester_number ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_numbers,
+            ARRAY_AGG(scs.title ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_titles
+          FROM subject_offering_semesters sos
+          JOIN study_context_semesters scs ON scs.id = sos.study_context_semester_id
+          WHERE sos.subject_offering_id = so.id
+            AND sos.is_active = true
+            AND scs.study_context_id = sc.id
+            AND COALESCE(scs.is_archived, false) = false
+        ) semester_scope ON true
+        WHERE toa.teacher_id = ?
+          AND so.is_active = true
+          AND sc.is_active = true
+        ORDER BY c.id ASC NULLS LAST, p.track_key ASC, coh.admission_year DESC, sc.stage_number ASC, so.sort_order ASC, so.id ASC
+      `,
+      [normalizedUserId]
+    );
+    const offeringsById = new Map();
+    (rows || []).forEach((row) => {
+      const offeringId = parsePositiveIntStrict(row.subject_offering_id);
+      if (!offeringId) {
+        return;
+      }
+      if (!offeringsById.has(offeringId)) {
+        offeringsById.set(offeringId, {
+          id: offeringId,
+          subject_offering_id: offeringId,
+          subject_catalog_id: parsePositiveIntStrict(row.subject_catalog_id) || null,
+          legacy_subject_id: parsePositiveIntStrict(row.legacy_subject_id)
+            || parseLegacySubjectIdFromOfferingDedupeKey(row.dedupe_key),
+          group_number: parsePositiveIntStrict(row.group_number) || null,
+          template_id: parsePositiveIntStrict(row.template_id) || null,
+          is_primary: row.is_primary === true || Number(row.is_primary) === 1,
+          assignment_sort_order: Number(row.assignment_sort_order || 0) || 0,
+          name: sanitizeCompactText(row.subject_name || row.catalog_name || row.offering_title || '', 140),
+          catalog_name: sanitizeCompactText(row.catalog_name || row.subject_name || '', 140),
+          group_count: Math.max(1, Number(row.group_count || 1) || 1),
+          default_group: Math.max(1, Number(row.default_group || 1) || 1),
+          is_general: row.is_general === true || Number(row.is_general) === 1,
+          show_in_teamwork: row.show_in_teamwork === true || Number(row.show_in_teamwork) === 1,
+          is_shared: row.is_shared === true || Number(row.is_shared) === 1,
+          course_labels: [],
+          context_labels: [],
+          semester_labels: [],
+          contexts: [],
+        });
+      }
+      const offering = offeringsById.get(offeringId);
+      const campusKey = normalizeCourseCampus(row.campus_key || row.course_location, 'kyiv');
+      const contextLabel = sanitizeCompactText(
+        row.study_context_label || buildStudyContextLabel({
+          program_code: row.program_code,
+          program_name: row.program_name,
+          admission_year: Number(row.admission_year || 0) || null,
+          campus_key: campusKey,
+          stage: normalizeStudyContextStage(row.stage_number, 1),
+          track_key: row.track_key,
+        }, 'uk'),
+        180
+      );
+      const courseLabel = parsePositiveIntStrict(row.course_id)
+        ? `${sanitizeCompactText(row.course_name || `Course ${row.course_id}`, 120)} / ${formatPathwaysCampusLabel(row.course_location || campusKey)}`
+        : sanitizeCompactText(row.course_name || '', 120);
+      const semesterTitles = Array.isArray(row.semester_titles)
+        ? row.semester_titles.map((value) => sanitizeCompactText(value || '', 120)).filter(Boolean)
+        : [];
+      if (courseLabel && !offering.course_labels.includes(courseLabel)) {
+        offering.course_labels.push(courseLabel);
+      }
+      if (contextLabel && !offering.context_labels.includes(contextLabel)) {
+        offering.context_labels.push(contextLabel);
+      }
+      semesterTitles.forEach((title) => {
+        if (!offering.semester_labels.includes(title)) {
+          offering.semester_labels.push(title);
+        }
+      });
+      const studyContextId = parsePositiveIntStrict(row.study_context_id);
+      if (studyContextId && !offering.contexts.some((context) => Number(context.id || 0) === studyContextId)) {
+        offering.contexts.push({
+          id: studyContextId,
+          course_id: parsePositiveIntStrict(row.course_id) || null,
+          course_name: sanitizeCompactText(row.course_name || '', 120),
+          course_location: normalizeCourseCampus(row.course_location || campusKey),
+          track_key: normalizeRegistrationTrack(row.track_key, 'bachelor'),
+          program_id: parsePositiveIntStrict(row.program_id) || null,
+          program_code: sanitizeCompactText(row.program_code || '', 40),
+          program_name: sanitizeCompactText(row.program_name || '', 140),
+          admission_year: Number(row.admission_year || 0) || null,
+          stage_number: normalizeStudyContextStage(row.stage_number, 1),
+          campus_key: campusKey,
+          label: contextLabel,
+          semester_ids: parseDbIntegerArray(row.semester_ids),
+          semester_numbers: parseDbIntegerArray(row.semester_numbers),
+          semester_titles: semesterTitles,
+        });
+      }
+    });
+    if (offeringsById.size) {
+      return Array.from(offeringsById.values()).sort((a, b) => {
+        const sortDiff = Number(a.assignment_sort_order || 0) - Number(b.assignment_sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'uk', { sensitivity: 'base' });
+      });
+    }
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+  return [];
 }
 
 // Keep the teacher hub available on legacy DB variants where optional teacher tables lag behind.
@@ -10674,7 +11803,130 @@ async function maybeCreateTeacherTemplateFromHomework(req, payload = {}) {
   }
 }
 
+async function upsertTeacherRequestStatus(userId, options = {}) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  if (!normalizedUserId) {
+    return 'pending';
+  }
+  const allowPendingReset = options.allowPendingReset === true;
+  const existing = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [normalizedUserId]);
+  let nextStatus = existing ? String(existing.status || 'pending') : 'pending';
+  if (nextStatus === 'rejected') {
+    nextStatus = 'pending';
+  }
+  if (existing) {
+    if (nextStatus !== 'approved' || allowPendingReset) {
+      await db.run(
+        'UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?',
+        [nextStatus, normalizedUserId]
+      );
+    } else {
+      await db.run('UPDATE teacher_requests SET updated_at = NOW() WHERE user_id = ?', [normalizedUserId]);
+    }
+  } else {
+    await db.run(
+      'INSERT INTO teacher_requests (user_id, status) VALUES (?, ?)',
+      [normalizedUserId, nextStatus]
+    );
+  }
+  return nextStatus;
+}
+
+function extractTeacherOfferingSelectionIds(body = {}) {
+  const selectionMode = String(body.selection_mode || '').trim().toLowerCase();
+  const directIds = Array.from(new Set(
+    (Array.isArray(body.offering_ids) ? body.offering_ids : [body.offering_ids])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const legacyStyledIds = selectionMode === 'offering'
+    ? Object.keys(body || {})
+      .map((key) => {
+        const match = key.match(/^subject_(\d+)$/);
+        if (!match) return null;
+        const isSelected = ['1', 'true', 'on', 'yes'].includes(String(body[key] || '').trim().toLowerCase());
+        return isSelected ? parsePositiveIntStrict(match[1]) : null;
+      })
+      .filter((value) => Number.isInteger(value) && value > 0)
+    : [];
+  const keyedIds = Object.keys(body || {})
+    .map((key) => {
+      const match = key.match(/^offering_(\d+)$/);
+      if (!match) return null;
+      const isSelected = ['1', 'true', 'on', 'yes'].includes(String(body[key] || '').trim().toLowerCase());
+      return isSelected ? parsePositiveIntStrict(match[1]) : null;
+    })
+    .filter((value) => Number.isInteger(value) && value > 0);
+  return Array.from(new Set([...directIds, ...legacyStyledIds, ...keyedIds]));
+}
+
+async function saveTeacherOfferingSelections(userId, body, options = {}) {
+  const offeringCatalog = await listTeacherOfferingCatalog();
+  const selectedOfferingIds = extractTeacherOfferingSelectionIds(body);
+  if (!selectedOfferingIds.length) {
+    return { ok: false, error: 'Select%20subject' };
+  }
+  if (!offeringCatalog.length) {
+    return { ok: false, error: 'Offering%20catalog%20is%20not%20ready' };
+  }
+
+  const offeringsById = new Map(
+    (offeringCatalog || [])
+      .map((item) => [Number(item.id || 0), item])
+      .filter((entry) => Number.isInteger(entry[0]) && entry[0] > 0)
+  );
+  const selections = [];
+  for (const offeringId of selectedOfferingIds) {
+    const offering = offeringsById.get(offeringId);
+    if (!offering || !parsePositiveIntStrict(offering.legacy_subject_id)) {
+      return { ok: false, error: 'Offering%20not%20ready' };
+    }
+    const isGeneral = offering.is_general === true || Number(offering.is_general) === 1;
+    let groupNumber = null;
+    if (!isGeneral) {
+      const rawGroupValue = body[`group_offering_${offeringId}`] ?? body[`group_${offeringId}`];
+      const parsedGroupNumber = parsePositiveIntStrict(rawGroupValue);
+      if (!parsedGroupNumber || parsedGroupNumber > Number(offering.group_count || 1)) {
+        return { ok: false, error: 'Select%20group' };
+      }
+      groupNumber = parsedGroupNumber;
+    }
+    selections.push({
+      subject_id: parsePositiveIntStrict(offering.legacy_subject_id),
+      subject_offering_id: offeringId,
+      group_number: groupNumber,
+    });
+  }
+
+  await db.run('DELETE FROM teacher_subjects WHERE user_id = ?', [userId]);
+  for (const item of selections) {
+    await db.run(
+      'INSERT INTO teacher_subjects (user_id, subject_id, group_number) VALUES (?, ?, ?)',
+      [userId, item.subject_id, item.group_number]
+    );
+  }
+  const nextStatus = await upsertTeacherRequestStatus(userId, options);
+  const academicAssignments = await syncTeacherAcademicAssignments(
+    userId,
+    selections.map((item) => ({
+      subject_id: item.subject_id,
+      group_number: item.group_number,
+    }))
+  );
+  return {
+    ok: true,
+    status: nextStatus,
+    selections,
+    academicAssignments,
+  };
+}
+
 async function saveTeacherSubjects(userId, body, options = {}) {
+  const selectionMode = String(body && body.selection_mode || '').trim().toLowerCase();
+  const offeringIds = extractTeacherOfferingSelectionIds(body);
+  if (selectionMode === 'offering' || offeringIds.length) {
+    return saveTeacherOfferingSelections(userId, body, options);
+  }
   const catalog = await getTeacherSubjectCatalog();
   const selections = [];
   let hasAny = false;
@@ -10706,26 +11958,7 @@ async function saveTeacherSubjects(userId, body, options = {}) {
       [userId, item.subject_id, item.group_number]
     );
   }
-  const existing = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [userId]);
-  let nextStatus = existing ? String(existing.status || 'pending') : 'pending';
-  if (nextStatus === 'rejected') {
-    nextStatus = 'pending';
-  }
-  if (existing) {
-    if (nextStatus !== 'approved' || options.allowPendingReset) {
-      await db.run(
-        'UPDATE teacher_requests SET status = ?, updated_at = NOW() WHERE user_id = ?',
-        [nextStatus, userId]
-      );
-    } else {
-      await db.run('UPDATE teacher_requests SET updated_at = NOW() WHERE user_id = ?', [userId]);
-    }
-  } else {
-    await db.run(
-      'INSERT INTO teacher_requests (user_id, status) VALUES (?, ?)',
-      [userId, nextStatus]
-    );
-  }
+  const nextStatus = await upsertTeacherRequestStatus(userId, options);
   const academicAssignments = await syncTeacherAcademicAssignments(userId, selections);
   return { ok: true, status: nextStatus, selections, academicAssignments };
 }
@@ -12258,11 +13491,18 @@ app.get('/register/teacher-subjects', (req, res) => {
         if (!(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
           return res.redirect('/register/subjects');
         }
-        const subjects = await getTeacherSubjectCatalog();
-        const selections = await getTeacherSelections(user.id);
+        const teacherOfferingCatalog = await listTeacherOfferingCatalog();
+        const selectionMode = teacherOfferingCatalog.length ? 'offering' : 'legacy';
+        const subjects = selectionMode === 'offering'
+          ? teacherOfferingCatalog
+          : await getTeacherSubjectCatalog();
+        const selections = selectionMode === 'offering'
+          ? await getTeacherOfferingSelections(user.id)
+          : await getTeacherSelections(user.id);
         return res.render('register-teacher-subjects', {
           subjects,
           selections,
+          selectionMode,
           studyContext: placement,
           error: req.query.error || '',
           isProfileEdit: false,
@@ -12443,14 +13683,21 @@ app.get('/teacher/subjects', requireLogin, async (req, res) => {
     if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
       return res.redirect('/schedule');
     }
-    const subjects = await getTeacherSubjectCatalog();
-    const selections = await getTeacherSelections(userId);
+    const teacherOfferingCatalog = await listTeacherOfferingCatalog();
+    const selectionMode = teacherOfferingCatalog.length ? 'offering' : 'legacy';
+    const subjects = selectionMode === 'offering'
+      ? teacherOfferingCatalog
+      : await getTeacherSubjectCatalog();
+    const selections = selectionMode === 'offering'
+      ? await getTeacherOfferingSelections(userId)
+      : await getTeacherSelections(userId);
     return res.render('teacher-subjects', {
       role: 'teacher',
       username,
       settings: settingsCache,
       subjects,
       selections,
+      selectionMode,
       error: decodeMessage(req.query.error),
       success: decodeMessage(req.query.ok),
     });
@@ -12507,12 +13754,85 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
   };
   try {
     const teacherSubjects = await getTeacherAssignedSubjects(userId);
+    const teacherAssignedOfferings = await getTeacherAssignedOfferings(userId);
     const teacherCourses = buildTeacherCourseList(teacherSubjects);
     const requestedCourseId = Number(req.query.course);
+    const requestedStudyContextId = parsePositiveIntStrict(req.query.study_context_id);
+    const requestedSemesterId = parsePositiveIntStrict(req.query.semester_id);
     const selectedCourse = teacherCourses.find((course) => Number(course.id) === requestedCourseId) || null;
-    const selectedCourseId = selectedCourse
+    let selectedCourseId = selectedCourse
       ? Number(selectedCourse.id)
       : (teacherCourses.length === 1 ? Number(teacherCourses[0].id) : null);
+
+    const workspaceContextOptions = Array.from(new Map(
+      (teacherAssignedOfferings || [])
+        .flatMap((offering) => Array.isArray(offering.contexts) ? offering.contexts : [])
+        .map((context) => [Number(context.id || 0), {
+          id: Number(context.id || 0) || null,
+          label: String(context.label || ''),
+          course_id: Number(context.course_id || 0) || null,
+          course_name: String(context.course_name || ''),
+          course_location: String(context.course_location || ''),
+          program_name: String(context.program_name || ''),
+          program_code: String(context.program_code || ''),
+          admission_year: Number(context.admission_year || 0) || null,
+          stage_number: Number(context.stage_number || 0) || null,
+          campus_key: String(context.campus_key || ''),
+          semester_ids: Array.isArray(context.semester_ids) ? context.semester_ids.slice() : [],
+          semester_numbers: Array.isArray(context.semester_numbers) ? context.semester_numbers.slice() : [],
+          semester_titles: Array.isArray(context.semester_titles) ? context.semester_titles.slice() : [],
+        }])
+        .filter((entry) => Number.isInteger(entry[0]) && entry[0] > 0)
+    ).values());
+    const selectedWorkspaceContext = workspaceContextOptions.find((item) => Number(item.id || 0) === requestedStudyContextId) || null;
+    const selectedWorkspaceContextId = selectedWorkspaceContext ? Number(selectedWorkspaceContext.id) : null;
+    if (!selectedCourseId && selectedWorkspaceContext && selectedWorkspaceContext.course_id) {
+      selectedCourseId = Number(selectedWorkspaceContext.course_id || 0) || null;
+    }
+
+    const workspaceSemesterOptions = Array.from(new Map(
+      (selectedWorkspaceContext
+        ? (selectedWorkspaceContext.semester_ids || []).map((semesterId, index) => ({
+            id: Number(semesterId || 0) || null,
+            title: String((selectedWorkspaceContext.semester_titles || [])[index] || `Semester ${(selectedWorkspaceContext.semester_numbers || [])[index] || index + 1}`),
+            semester_number: Number((selectedWorkspaceContext.semester_numbers || [])[index] || 0) || null,
+          }))
+        : (teacherAssignedOfferings || []).flatMap((offering) => (
+            Array.isArray(offering.contexts)
+              ? offering.contexts.flatMap((context) => (
+                  (context.semester_ids || []).map((semesterId, index) => ({
+                    id: Number(semesterId || 0) || null,
+                    title: String((context.semester_titles || [])[index] || `Semester ${(context.semester_numbers || [])[index] || index + 1}`),
+                    semester_number: Number((context.semester_numbers || [])[index] || 0) || null,
+                  }))
+                ))
+              : []
+          )))
+        .filter((item) => Number.isInteger(Number(item.id || 0)) && Number(item.id || 0) > 0)
+        .map((item) => [Number(item.id || 0), item])
+    ).values()).sort((a, b) => {
+      const numberDiff = Number(a.semester_number || 0) - Number(b.semester_number || 0);
+      if (numberDiff !== 0) return numberDiff;
+      return String(a.title || '').localeCompare(String(b.title || ''));
+    });
+    const selectedWorkspaceSemesterId = workspaceSemesterOptions.find((item) => Number(item.id || 0) === requestedSemesterId)
+      ? Number(requestedSemesterId || 0)
+      : null;
+
+    const scopedTeacherOfferings = (teacherAssignedOfferings || []).filter((offering) => {
+      const contexts = Array.isArray(offering.contexts) ? offering.contexts : [];
+      const contextMatch = !selectedWorkspaceContextId
+        || contexts.some((context) => Number(context.id || 0) === Number(selectedWorkspaceContextId || 0));
+      if (!contextMatch) {
+        return false;
+      }
+      const semesterMatch = !selectedWorkspaceSemesterId
+        || contexts.some((context) => (context.semester_ids || []).some((semesterId) => Number(semesterId || 0) === Number(selectedWorkspaceSemesterId || 0)));
+      if (!semesterMatch) {
+        return false;
+      }
+      return true;
+    });
 
     const [templates, assets, recentHomework] = await Promise.all([
       getTeacherHomeworkTemplates(userId, {
@@ -12568,6 +13888,11 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       settings: settingsCache,
       teacherCourses,
       selectedCourseId,
+      workspaceContextOptions,
+      selectedWorkspaceContextId,
+      workspaceSemesterOptions,
+      selectedWorkspaceSemesterId,
+      teacherOfferings: scopedTeacherOfferings,
       teacherSubjects: scopedTeacherSubjects,
       teacherSubjectsAll: allTeacherSubjects,
       templates,
@@ -31046,6 +32371,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     let selectedStudyContextId = 0;
     let selectedStudyContext = null;
     let selectedStudyContextSemesters = [];
+    let selectedStudyContextOfferings = [];
     if (selectedAdmissionId && selectedProgramId && selectedTrackKey) {
       const requestedStudyContextId = parsePositiveIntStrict(req.query.study_context_id);
       const contextOptions = await listStudyContextOptions({
@@ -31151,6 +32477,9 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
           selectedStudyContext = fallbackStudyContext;
           selectedStudyContextSemesters = await listStudyContextSemesters(selectedStudyContextId, {
             includeArchived: true,
+          });
+          selectedStudyContextOfferings = await listStudyContextOfferings(selectedStudyContextId, {
+            includeInactive: true,
           });
         }
       }
@@ -31693,6 +33022,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       selectedStudyContextId,
       selectedStudyContext,
       selectedStudyContextSemesters,
+      selectedStudyContextOfferings,
       programPresets,
       selectedProgramPreset,
       selectedProgramPresetId,
@@ -32795,6 +34125,153 @@ app.post('/admin/pathways/contexts/:contextId/semesters/:semesterId/delete', req
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.contextSemesters.delete');
+  }
+});
+
+app.post('/admin/pathways/contexts/:id/offerings/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const isUk = getPreferredLang(req) === 'uk';
+  const offeringText = isUk
+    ? {
+        invalid: 'Некоректний context offering',
+        titleRequired: 'Назва offering обов’язкова',
+        saved: 'Context offering збережено',
+      }
+    : {
+        invalid: 'Invalid context offering',
+        titleRequired: 'Offering title is required',
+        saved: 'Context offering saved',
+      };
+  const contextId = parsePositiveIntStrict(req.params.id);
+  const redirectState = getPathwaysRedirectState(req, {
+    studyContextId: contextId,
+  });
+  const subjectOfferingId = parsePositiveIntStrict(req.body.subject_offering_id);
+  const subjectCatalogId = parsePositiveIntStrict(req.body.subject_catalog_id);
+  const title = sanitizeCompactText(req.body.title, 140);
+  const groupCount = Math.max(1, Math.min(3, Math.round(Number(req.body.group_count || 1) || 1)));
+  const defaultGroup = Math.max(1, Math.min(groupCount, Math.round(Number(req.body.default_group || 1) || 1)));
+  const rawTargetContextIds = Array.isArray(req.body.target_context_ids)
+    ? req.body.target_context_ids
+    : (req.body.target_context_ids ? [req.body.target_context_ids] : []);
+  const rawSemesterIds = Array.isArray(req.body.semester_ids)
+    ? req.body.semester_ids
+    : (req.body.semester_ids ? [req.body.semester_ids] : []);
+
+  if (!contextId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidStudyContext,
+    }));
+  }
+  if (!subjectCatalogId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidSubjectCatalog,
+    }));
+  }
+  if (!title) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: offeringText.titleRequired,
+    }));
+  }
+
+  try {
+    const result = await upsertStudyContextOffering({
+      studyContextId: contextId,
+      subjectOfferingId,
+      subjectCatalogId,
+      title,
+      groupCount,
+      defaultGroup,
+      isShared: parseBooleanFlag(req.body.is_shared, false),
+      isRequired: parseBooleanFlag(req.body.is_required, true),
+      isGeneral: parseBooleanFlag(req.body.is_general, true),
+      showInTeamwork: parseBooleanFlag(req.body.show_in_teamwork, true),
+      targetContextIds: rawTargetContextIds,
+      semesterIds: rawSemesterIds,
+    });
+    if (!result || !result.id) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: offeringText.invalid,
+      }));
+    }
+    logAction(db, req, 'pathways_context_offering_save', {
+      study_context_id: contextId,
+      subject_offering_id: Number(result.id || 0),
+      subject_catalog_id: subjectCatalogId,
+      title,
+      group_count: groupCount,
+      default_group: defaultGroup,
+      is_shared: parseBooleanFlag(req.body.is_shared, false) ? 1 : 0,
+      is_required: parseBooleanFlag(req.body.is_required, true) ? 1 : 0,
+      is_general: parseBooleanFlag(req.body.is_general, true) ? 1 : 0,
+      show_in_teamwork: parseBooleanFlag(req.body.show_in_teamwork, true) ? 1 : 0,
+      target_context_ids: Array.from(new Set(
+        rawTargetContextIds
+          .map((value) => parsePositiveIntStrict(value))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      )),
+      semester_ids: Array.from(new Set(
+        rawSemesterIds
+          .map((value) => parsePositiveIntStrict(value))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      )),
+    });
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      ok: offeringText.saved,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.contextOfferings.save');
+  }
+});
+
+app.post('/admin/pathways/contexts/:contextId/offerings/:offeringId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const isUk = getPreferredLang(req) === 'uk';
+  const offeringText = isUk
+    ? {
+        invalid: 'Некоректний context offering',
+        deleted: 'Context offering вилучено',
+      }
+    : {
+        invalid: 'Invalid context offering',
+        deleted: 'Context offering removed',
+      };
+  const contextId = parsePositiveIntStrict(req.params.contextId);
+  const offeringId = parsePositiveIntStrict(req.params.offeringId);
+  const redirectState = getPathwaysRedirectState(req, {
+    studyContextId: contextId,
+  });
+
+  if (!contextId || !offeringId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: offeringText.invalid,
+    }));
+  }
+
+  try {
+    const deleted = await archiveStudyContextOfferingForContext(contextId, offeringId);
+    if (!deleted || !deleted.id) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: offeringText.invalid,
+      }));
+    }
+    logAction(db, req, 'pathways_context_offering_delete', {
+      study_context_id: contextId,
+      subject_offering_id: offeringId,
+    });
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      ok: offeringText.deleted,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.contextOfferings.delete');
   }
 });
 

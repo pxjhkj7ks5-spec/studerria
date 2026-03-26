@@ -1,4 +1,5 @@
 <%
+  const teacherSelectionMode = selectionMode === 'offering' ? 'offering' : 'legacy';
   const teacherSubjects = Array.isArray(subjects) ? subjects : [];
   const selectedMap = selections && typeof selections.get === 'function' ? selections : new Map();
   const selectedCount = teacherSubjects.reduce((total, item) => (selectedMap.has(Number(item.id)) ? total + 1 : total), 0);
@@ -206,7 +207,7 @@
         <div class="chip-row">
           <span class="chip">Catalog: <%= teacherSubjects.length %></span>
           <span class="chip">Selected: <%= selectedCount %></span>
-          <span class="chip">Profile scope: teacher</span>
+          <span class="chip">Mode: <%= teacherSelectionMode === 'offering' ? 'live offerings' : 'legacy subjects' %></span>
         </div>
       </section>
 
@@ -217,6 +218,7 @@
         </p>
 
         <form id="teacherSubjectsForm" method="POST" action="/teacher/subjects" class="mt-3">
+          <input type="hidden" name="selection_mode" value="<%= teacherSelectionMode %>" />
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
             <span class="small text-muted">Bulk actions</span>
             <span

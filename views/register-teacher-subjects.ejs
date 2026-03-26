@@ -203,6 +203,9 @@
     <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
   <body class="studerria-theme theme-dark">
+    <% const teacherSelectionMode = selectionMode === 'offering' ? 'offering' : 'legacy'; %>
+    <% const teacherItems = Array.isArray(subjects) ? subjects : []; %>
+    <% const teacherSelectedMap = selections && typeof selections.get === 'function' ? selections : new Map(); %>
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
     <div class="container py-4">
@@ -219,6 +222,7 @@
       <% } %>
 
       <form method="POST" action="<%= isProfileEdit ? '/teacher/subjects' : '/register/teacher-subjects' %>">
+        <input type="hidden" name="selection_mode" value="<%= teacherSelectionMode %>" />
         <div class="mb-3">
           <label class="form-label small" for="teacherSubjectSearch">Quick search</label>
           <input
