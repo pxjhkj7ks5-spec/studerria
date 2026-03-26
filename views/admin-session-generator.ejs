@@ -87,6 +87,24 @@
         publishImpactJournalReady: 'Ready',
         publishImpactJournalReview: 'Needs review',
         publishImpactJournalIdle: 'Draft',
+        cleanupImpactTitle: 'Cleanup impact',
+        cleanupImpactDates: 'Dates',
+        cleanupImpactPublished: 'Published events',
+        cleanupImpactJournalColumns: 'Journal columns',
+        cleanupImpactSubjects: 'Affected subjects',
+        cleanupImpactDraft: 'Draft assignments',
+        cleanupScopeEmpty: 'Nothing to clean',
+        cleanupScopeDraftOnly: 'Draft only',
+        cleanupScopePublishedOnly: 'Published only',
+        cleanupScopeMixed: 'Published + draft',
+        cleanupWindowHintIdle: 'No published session events or matching draft assignments were found inside the current session window.',
+        cleanupWindowHintDraftOnly: 'Only the draft will change: the current window has no published [Session] events.',
+        cleanupWindowHintPublishedOnly: 'Published [Session] events and linked journal columns will be removed inside the current window.',
+        cleanupWindowHintMixed: 'The current window will remove published [Session] events and prune matching draft assignments.',
+        cleanupAllHintIdle: 'No active session events or draft assignments remain for the selected course and semester.',
+        cleanupAllHintDraftOnly: 'Only the draft will be cleared: there are no active published [Session] events left in this semester.',
+        cleanupAllHintPublishedOnly: 'All active published [Session] events and linked journal columns will be cleared for this semester.',
+        cleanupAllHintMixed: 'This will clear all active published [Session] events, linked journal columns, and the remaining draft assignments for this semester.',
         checkConflicts: 'Check conflicts',
         publishButton: 'Publish to timetable and journal',
         deleteConfirm: 'Delete session events in the selected week window?',
@@ -225,6 +243,24 @@
         publishImpactJournalReady: 'Готово',
         publishImpactJournalReview: 'Потрібна увага',
         publishImpactJournalIdle: 'Чернетка',
+        cleanupImpactTitle: 'Підсумок очищення',
+        cleanupImpactDates: 'Дати',
+        cleanupImpactPublished: 'Опубліковані події',
+        cleanupImpactJournalColumns: 'Колонки журналу',
+        cleanupImpactSubjects: 'Зачеплені предмети',
+        cleanupImpactDraft: 'Призначення у чернетці',
+        cleanupScopeEmpty: 'Нічого очищати',
+        cleanupScopeDraftOnly: 'Лише чернетка',
+        cleanupScopePublishedOnly: 'Лише опубліковане',
+        cleanupScopeMixed: 'Опубліковане + чернетка',
+        cleanupWindowHintIdle: 'У поточному вікні сесії не знайдено ані опублікованих подій, ані відповідних призначень у чернетці.',
+        cleanupWindowHintDraftOnly: 'Зміниться лише чернетка: у поточному вікні немає опублікованих [Сесія]-подій.',
+        cleanupWindowHintPublishedOnly: 'У поточному вікні буде прибрано опубліковані [Сесія]-події та пов’язані колонки журналу.',
+        cleanupWindowHintMixed: 'Поточне вікно прибере опубліковані [Сесія]-події й одночасно підчистить відповідні призначення у чернетці.',
+        cleanupAllHintIdle: 'Для вибраного курсу і семестру більше немає ані активних сесійних подій, ані призначень у чернетці.',
+        cleanupAllHintDraftOnly: 'Буде очищено лише чернетку: у семестрі вже немає активних опублікованих [Сесія]-подій.',
+        cleanupAllHintPublishedOnly: 'Для цього семестру буде повністю прибрано всі активні [Сесія]-події та пов’язані колонки журналу.',
+        cleanupAllHintMixed: 'Ця дія повністю прибере активні [Сесія]-події, пов’язані колонки журналу та решту призначень у чернетці для цього семестру.',
         checkConflicts: 'Перевірити конфлікти',
         publishButton: 'Опублікувати в розклад і журнал',
         deleteConfirm: 'Видалити сесійні події у вибраному вікні тижнів?',
@@ -297,6 +333,22 @@
     ? selectedSemesterId
     : (sessionGeneratorFormState.semester_id || '');
   const sessionGeneratorExplicitDates = Array.isArray(explicitSessionDates) ? explicitSessionDates : [];
+  const sessionGeneratorCleanupPreviewWindow = cleanupPreviewWindow && typeof cleanupPreviewWindow === 'object'
+    ? cleanupPreviewWindow
+    : {
+        targetDatesCount: sessionGeneratorExplicitDates.length,
+        publishedEventsCount: 0,
+        journalColumnsCount: 0,
+        subjectsCount: 0,
+      };
+  const sessionGeneratorCleanupPreviewAllActive = cleanupPreviewAllActive && typeof cleanupPreviewAllActive === 'object'
+    ? cleanupPreviewAllActive
+    : {
+        targetDatesCount: 0,
+        publishedEventsCount: 0,
+        journalColumnsCount: 0,
+        subjectsCount: 0,
+      };
   const sessionGeneratorNavBase = {
     location: activeLocation,
     course_id: sessionGeneratorFormState.course_id || '',
@@ -1938,9 +1990,37 @@
           </form>
 
           <form method="POST" action="/admin/session-generator/delete" class="card liquid-panel mb-4" data-session-action-form onsubmit='return window.confirm(<%- JSON.stringify(sessionGeneratorText.deleteConfirm) %>);'>
-            <div class="card-body d-grid gap-2">
-              <div class="fw-semibold"><%= sessionGeneratorText.deleteTitle %></div>
-              <div class="session-subtle"><%= sessionGeneratorText.deleteHint %></div>
+            <div class="card-body d-grid gap-3">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                  <div class="fw-semibold"><%= sessionGeneratorText.deleteTitle %></div>
+                  <div class="session-subtle" id="sessionDeleteWindowHint"><%= sessionGeneratorText.deleteHint %></div>
+                </div>
+                <span class="mark-pill muted" id="sessionDeleteWindowScopeStatus"><%= sessionGeneratorText.cleanupScopeEmpty %></span>
+              </div>
+              <div class="fw-semibold"><%= sessionGeneratorText.cleanupImpactTitle %></div>
+              <div class="session-stat-grid">
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.cleanupImpactDates %></div>
+                  <div class="session-stat-value" id="sessionDeleteWindowDateCount"><%= Number(sessionGeneratorCleanupPreviewWindow.targetDatesCount || sessionGeneratorExplicitDates.length || 0) %></div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.cleanupImpactPublished %></div>
+                  <div class="session-stat-value" id="sessionDeleteWindowPublishedCount"><%= Number(sessionGeneratorCleanupPreviewWindow.publishedEventsCount || 0) %></div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.cleanupImpactJournalColumns %></div>
+                  <div class="session-stat-value" id="sessionDeleteWindowJournalCount"><%= Number(sessionGeneratorCleanupPreviewWindow.journalColumnsCount || 0) %></div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.cleanupImpactSubjects %></div>
+                  <div class="session-stat-value" id="sessionDeleteWindowSubjectCount"><%= Number(sessionGeneratorCleanupPreviewWindow.subjectsCount || 0) %></div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.cleanupImpactDraft %></div>
+                  <div class="session-stat-value" id="sessionDeleteWindowDraftCount">0</div>
+                </div>
+              </div>
               <input type="hidden" name="location" value="<%= activeLocation %>" />
               <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
               <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
@@ -1964,14 +2044,41 @@
               <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
               <input type="hidden" name="explicit_dates_json" value='<%- JSON.stringify(explicitSessionDates || []) %>' />
               <input type="hidden" name="manual_assignments_json" data-manual-assignments-payload value="" />
-              <button class="btn btn-outline-danger" type="submit"><%= sessionGeneratorText.deleteButton %></button>
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="session-subtle"><%= sessionGeneratorText.deleteHint %></div>
+                <button class="btn btn-outline-danger" id="sessionDeleteWindowBtn" type="submit"><%= sessionGeneratorText.deleteButton %></button>
+              </div>
             </div>
           </form>
 
           <form method="POST" action="/admin/session-generator/delete-all-active" class="card liquid-panel mb-4" data-session-action-form onsubmit='return window.confirm(<%- JSON.stringify(sessionGeneratorText.deleteAllConfirm) %>);'>
-            <div class="card-body d-grid gap-2">
-              <div class="fw-semibold text-danger"><%= sessionGeneratorText.deleteAllTitle %></div>
-              <div class="session-subtle"><%= sessionGeneratorText.deleteAllHint %></div>
+            <div class="card-body d-grid gap-3">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                  <div class="fw-semibold text-danger"><%= sessionGeneratorText.deleteAllTitle %></div>
+                  <div class="session-subtle" id="sessionDeleteAllHint"><%= sessionGeneratorText.deleteAllHint %></div>
+                </div>
+                <span class="mark-pill muted" id="sessionDeleteAllScopeStatus"><%= sessionGeneratorText.cleanupScopeEmpty %></span>
+              </div>
+              <div class="fw-semibold"><%= sessionGeneratorText.cleanupImpactTitle %></div>
+              <div class="session-stat-grid">
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.cleanupImpactPublished %></div>
+                  <div class="session-stat-value" id="sessionDeleteAllPublishedCount"><%= Number(sessionGeneratorCleanupPreviewAllActive.publishedEventsCount || 0) %></div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.cleanupImpactJournalColumns %></div>
+                  <div class="session-stat-value" id="sessionDeleteAllJournalCount"><%= Number(sessionGeneratorCleanupPreviewAllActive.journalColumnsCount || 0) %></div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.cleanupImpactSubjects %></div>
+                  <div class="session-stat-value" id="sessionDeleteAllSubjectCount"><%= Number(sessionGeneratorCleanupPreviewAllActive.subjectsCount || 0) %></div>
+                </div>
+                <div class="session-stat">
+                  <div class="session-stat-label"><%= sessionGeneratorText.cleanupImpactDraft %></div>
+                  <div class="session-stat-value" id="sessionDeleteAllDraftCount">0</div>
+                </div>
+              </div>
               <input type="hidden" name="location" value="<%= activeLocation %>" />
               <input type="hidden" name="course_id" value="<%= form && form.course_id ? form.course_id : '' %>" />
               <input type="hidden" name="semester_id" value="<%= selectedSemesterId || (form && form.semester_id) || '' %>" />
@@ -1995,7 +2102,10 @@
               <input type="hidden" name="strategy" value="<%= form && form.strategy ? form.strategy : 'exams_first' %>" />
               <input type="hidden" name="explicit_dates_json" value='<%- JSON.stringify(explicitSessionDates || []) %>' />
               <input type="hidden" name="manual_assignments_json" data-manual-assignments-payload value="" />
-              <button class="btn btn-danger" type="submit"><%= sessionGeneratorText.deleteAllButton %></button>
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="session-subtle"><%= sessionGeneratorText.deleteAllHint %></div>
+                <button class="btn btn-danger" id="sessionDeleteAllBtn" type="submit"><%= sessionGeneratorText.deleteAllButton %></button>
+              </div>
             </div>
           </form>
         </div>
@@ -2181,6 +2291,21 @@
         const publishOutOfWindowCount = document.getElementById('sessionPublishOutOfWindowCount');
         const publishJournalStatus = document.getElementById('sessionPublishJournalStatus');
         const publishImpactHint = document.getElementById('sessionPublishImpactHint');
+        const deleteWindowBtn = document.getElementById('sessionDeleteWindowBtn');
+        const deleteWindowStatus = document.getElementById('sessionDeleteWindowScopeStatus');
+        const deleteWindowHint = document.getElementById('sessionDeleteWindowHint');
+        const deleteWindowDateCount = document.getElementById('sessionDeleteWindowDateCount');
+        const deleteWindowPublishedCount = document.getElementById('sessionDeleteWindowPublishedCount');
+        const deleteWindowJournalCount = document.getElementById('sessionDeleteWindowJournalCount');
+        const deleteWindowSubjectCount = document.getElementById('sessionDeleteWindowSubjectCount');
+        const deleteWindowDraftCount = document.getElementById('sessionDeleteWindowDraftCount');
+        const deleteAllBtn = document.getElementById('sessionDeleteAllBtn');
+        const deleteAllStatus = document.getElementById('sessionDeleteAllScopeStatus');
+        const deleteAllHint = document.getElementById('sessionDeleteAllHint');
+        const deleteAllPublishedCount = document.getElementById('sessionDeleteAllPublishedCount');
+        const deleteAllJournalCount = document.getElementById('sessionDeleteAllJournalCount');
+        const deleteAllSubjectCount = document.getElementById('sessionDeleteAllSubjectCount');
+        const deleteAllDraftCount = document.getElementById('sessionDeleteAllDraftCount');
         const sessionRoomForm = document.getElementById('sessionRoomForm');
         const sessionRoomIdInput = document.getElementById('sessionRoomId');
         const sessionRoomBuildingInput = document.getElementById('sessionRoomBuilding');
@@ -2196,6 +2321,8 @@
 
         const sessionGeneratorText = <%- JSON.stringify(sessionGeneratorText) %>;
         const sessionGeneratorTypeShortLabels = <%- JSON.stringify(sessionGeneratorTypeShortLabels) %>;
+        const cleanupPreviewWindowBase = <%- JSON.stringify(sessionGeneratorCleanupPreviewWindow || {}) %>;
+        const cleanupPreviewAllActiveBase = <%- JSON.stringify(sessionGeneratorCleanupPreviewAllActive || {}) %>;
         const sessionGeneratorRoomText = <%- JSON.stringify({
           room: lang === 'en' ? 'Room' : 'Кабінет',
           noRoom: lang === 'en' ? 'No room selected' : 'Без кабінету',
@@ -2226,6 +2353,19 @@
           summary: '',
           slot_conflicts: {},
         };
+        const cleanupPreviewWindow = {
+          targetDatesCount: Number(cleanupPreviewWindowBase && cleanupPreviewWindowBase.targetDatesCount ? cleanupPreviewWindowBase.targetDatesCount : sessionWindowExplicitDates.length) || 0,
+          publishedEventsCount: Number(cleanupPreviewWindowBase && cleanupPreviewWindowBase.publishedEventsCount ? cleanupPreviewWindowBase.publishedEventsCount : 0) || 0,
+          journalColumnsCount: Number(cleanupPreviewWindowBase && cleanupPreviewWindowBase.journalColumnsCount ? cleanupPreviewWindowBase.journalColumnsCount : 0) || 0,
+          subjectsCount: Number(cleanupPreviewWindowBase && cleanupPreviewWindowBase.subjectsCount ? cleanupPreviewWindowBase.subjectsCount : 0) || 0,
+        };
+        const cleanupPreviewAllActive = {
+          targetDatesCount: Number(cleanupPreviewAllActiveBase && cleanupPreviewAllActiveBase.targetDatesCount ? cleanupPreviewAllActiveBase.targetDatesCount : 0) || 0,
+          publishedEventsCount: Number(cleanupPreviewAllActiveBase && cleanupPreviewAllActiveBase.publishedEventsCount ? cleanupPreviewAllActiveBase.publishedEventsCount : 0) || 0,
+          journalColumnsCount: Number(cleanupPreviewAllActiveBase && cleanupPreviewAllActiveBase.journalColumnsCount ? cleanupPreviewAllActiveBase.journalColumnsCount : 0) || 0,
+          subjectsCount: Number(cleanupPreviewAllActiveBase && cleanupPreviewAllActiveBase.subjectsCount ? cleanupPreviewAllActiveBase.subjectsCount : 0) || 0,
+        };
+        const sessionWindowDateSet = new Set((sessionWindowExplicitDates || []).map((date) => String(date || '').slice(0, 10)).filter(Boolean));
         let lastHoveredSlotKey = '';
         let liveConflictRequestToken = 0;
         let saveDraftTimer = null;
@@ -2924,6 +3064,64 @@
           if (publishImpactHint) publishImpactHint.textContent = hintText;
         };
 
+        const setCleanupStatusPill = (element, variant) => {
+          if (!element) return;
+          element.classList.remove('muted', 'info', 'warn', 'danger');
+          element.classList.add(variant || 'muted');
+        };
+
+        const updateCleanupSummary = ({ preview, draftCount, scope, elements }) => {
+          if (!elements) return;
+          const targetDatesCount = Number(preview && preview.targetDatesCount ? preview.targetDatesCount : 0) || 0;
+          const publishedEventsCount = Number(preview && preview.publishedEventsCount ? preview.publishedEventsCount : 0) || 0;
+          const journalColumnsCount = Number(preview && preview.journalColumnsCount ? preview.journalColumnsCount : 0) || 0;
+          const subjectsCount = Number(preview && preview.subjectsCount ? preview.subjectsCount : 0) || 0;
+          const normalizedDraftCount = Number(draftCount || 0) || 0;
+          const hasPublishedCleanup = publishedEventsCount > 0 || journalColumnsCount > 0;
+          const hasDraftCleanup = normalizedDraftCount > 0;
+          let statusText = sessionGeneratorText.cleanupScopeEmpty;
+          let hintText = scope === 'window'
+            ? sessionGeneratorText.cleanupWindowHintIdle
+            : sessionGeneratorText.cleanupAllHintIdle;
+          let pillVariant = 'muted';
+
+          if (hasPublishedCleanup && hasDraftCleanup) {
+            statusText = sessionGeneratorText.cleanupScopeMixed;
+            hintText = scope === 'window'
+              ? sessionGeneratorText.cleanupWindowHintMixed
+              : sessionGeneratorText.cleanupAllHintMixed;
+            pillVariant = 'danger';
+          } else if (hasPublishedCleanup) {
+            statusText = sessionGeneratorText.cleanupScopePublishedOnly;
+            hintText = scope === 'window'
+              ? sessionGeneratorText.cleanupWindowHintPublishedOnly
+              : sessionGeneratorText.cleanupAllHintPublishedOnly;
+            pillVariant = 'warn';
+          } else if (hasDraftCleanup) {
+            statusText = sessionGeneratorText.cleanupScopeDraftOnly;
+            hintText = scope === 'window'
+              ? sessionGeneratorText.cleanupWindowHintDraftOnly
+              : sessionGeneratorText.cleanupAllHintDraftOnly;
+            pillVariant = 'info';
+          }
+
+          if (elements.dateCount) elements.dateCount.textContent = String(targetDatesCount);
+          if (elements.publishedCount) elements.publishedCount.textContent = String(publishedEventsCount);
+          if (elements.journalCount) elements.journalCount.textContent = String(journalColumnsCount);
+          if (elements.subjectCount) elements.subjectCount.textContent = String(subjectsCount);
+          if (elements.draftCount) elements.draftCount.textContent = String(normalizedDraftCount);
+          if (elements.status) {
+            elements.status.textContent = statusText;
+            setCleanupStatusPill(elements.status, pillVariant);
+          }
+          if (elements.hint) {
+            elements.hint.textContent = hintText;
+          }
+          if (elements.button) {
+            elements.button.disabled = !hasPublishedCleanup && !hasDraftCleanup;
+          }
+        };
+
         const serializeManualAssignments = (rows) => rows.map((row) => ({
           subject_id: Number(row.subject_id || 0),
           type: row.type === 'credit' ? 'credit' : (row.type === 'consultation' ? 'consultation' : 'exam'),
@@ -2933,6 +3131,42 @@
           room_id: row.room_id ? Number(row.room_id) : null,
           note: row.note || '',
         }));
+
+        const syncCleanupState = (rows) => {
+          const normalizedRows = Array.isArray(rows) ? rows : [];
+          const selectedWindowDraftCount = normalizedRows.filter((row) =>
+            row && row.date && sessionWindowDateSet.has(String(row.date).slice(0, 10))
+          ).length;
+          updateCleanupSummary({
+            preview: cleanupPreviewWindow,
+            draftCount: selectedWindowDraftCount,
+            scope: 'window',
+            elements: {
+              button: deleteWindowBtn,
+              status: deleteWindowStatus,
+              hint: deleteWindowHint,
+              dateCount: deleteWindowDateCount,
+              publishedCount: deleteWindowPublishedCount,
+              journalCount: deleteWindowJournalCount,
+              subjectCount: deleteWindowSubjectCount,
+              draftCount: deleteWindowDraftCount,
+            },
+          });
+          updateCleanupSummary({
+            preview: cleanupPreviewAllActive,
+            draftCount: normalizedRows.length,
+            scope: 'all',
+            elements: {
+              button: deleteAllBtn,
+              status: deleteAllStatus,
+              hint: deleteAllHint,
+              publishedCount: deleteAllPublishedCount,
+              journalCount: deleteAllJournalCount,
+              subjectCount: deleteAllSubjectCount,
+              draftCount: deleteAllDraftCount,
+            },
+          });
+        };
 
         const syncPublishState = () => {
           if (!publishBtn || !manualAssignmentsInput) return;
@@ -2955,6 +3189,7 @@
             publishCount.textContent = String(rows.length);
           }
           updatePublishImpactSummary(rows);
+          syncCleanupState(rows);
         };
 
         const setLiveConflictStatusText = (text, mode) => {

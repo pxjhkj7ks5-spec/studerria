@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.86",
+      "date": "2026-03-26",
+      "items": [
+        "feat(session-generator-cleanup-preview): add server-side cleanup impact previews for the selected session window and the full active semester scope, so the session generator now knows how many published session events, linked journal columns, and affected subjects each delete action will touch before the user commits it",
+        "feat(session-generator-guided-delete-cards): rebuild the selected-window and delete-all session cleanup panels into guided impact cards with Tahoe/Liquid Glass metric grids, explicit cleanup scope badges, and live draft-assignment counters instead of blind destructive buttons",
+        "fix(session-generator-cleanup-state-sync): keep delete actions in sync with the current manual planner by pushing the same serialized draft payload into cleanup forms, deriving draft counts from the live slot board, and disabling cleanup buttons when neither published nor draft session state remains"
+      ]
+    },
+    {
       "version": "1.2.85",
       "date": "2026-03-26",
       "items": [

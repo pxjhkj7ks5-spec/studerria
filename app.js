@@ -32389,6 +32389,111 @@ const buildSessionGeneratorSemesterFilter = (columnName, semesterId) => {
   };
 };
 
+async function getSessionGeneratorCleanupPreview({
+  courseId,
+  semesterId,
+  targetDates = [],
+  purgeResidualSessionColumns = false,
+}) {
+  const sessionHomeworkPrefixPattern = `${SESSION_HOMEWORK_PREFIX}%`;
+  const normalizedCourseId = Number(courseId || 0);
+  const normalizedSemesterId = Number(semesterId || 0) || null;
+  const normalizedTargetDates = Array.from(new Set((Array.isArray(targetDates) ? targetDates : [])
+    .map((value) => toDateOnly(value))
+    .filter((value) => isValidDateString(value))))
+    .sort();
+
+  if (!normalizedCourseId) {
+    return {
+      targetDatesCount: normalizedTargetDates.length,
+      publishedEventsCount: 0,
+      journalColumnsCount: 0,
+      subjectsCount: 0,
+    };
+  }
+
+  const homeworkSemesterFilter = buildSessionGeneratorSemesterFilter('semester_id', normalizedSemesterId);
+  let homeworkSql = `
+    SELECT id, subject_id
+    FROM homework
+    WHERE course_id = ?
+      AND LOWER(TRIM(COALESCE(description, ''))) LIKE ?
+      AND COALESCE(is_teacher_homework, 0) = 1
+      AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
+      ${homeworkSemesterFilter.clause}
+  `;
+  const homeworkParams = [normalizedCourseId, sessionHomeworkPrefixPattern, ...homeworkSemesterFilter.params];
+  if (normalizedTargetDates.length) {
+    homeworkSql += ' AND class_date = ANY(?)';
+    homeworkParams.push(normalizedTargetDates);
+  }
+  const homeworkRows = await db.all(homeworkSql, homeworkParams);
+  const homeworkIds = Array.from(new Set((homeworkRows || [])
+    .map((row) => Number(row.id))
+    .filter((id) => Number.isFinite(id) && id > 0)));
+  const touchedSubjectIds = new Set((homeworkRows || [])
+    .map((row) => Number(row.subject_id))
+    .filter((subjectId) => Number.isFinite(subjectId) && subjectId > 0));
+  const columnIds = new Set();
+
+  if (homeworkIds.length) {
+    const linkedColumnRows = await db.all(
+      `
+        SELECT id, subject_id
+        FROM journal_columns
+        WHERE source_homework_id = ANY(?)
+      `,
+      [homeworkIds]
+    );
+    (linkedColumnRows || []).forEach((row) => {
+      const columnId = Number(row.id || 0);
+      if (Number.isFinite(columnId) && columnId > 0) {
+        columnIds.add(columnId);
+      }
+      const subjectId = Number(row.subject_id || 0);
+      if (Number.isFinite(subjectId) && subjectId > 0) {
+        touchedSubjectIds.add(subjectId);
+      }
+    });
+  }
+
+  if (purgeResidualSessionColumns) {
+    const columnSemesterFilter = buildSessionGeneratorSemesterFilter('jc.semester_id', normalizedSemesterId);
+    const residualColumnRows = await db.all(
+      `
+        SELECT DISTINCT jc.id, jc.subject_id
+        FROM journal_columns jc
+        LEFT JOIN homework h ON h.id = jc.source_homework_id
+        WHERE jc.course_id = ?
+          AND COALESCE(jc.is_archived, 0) = 0
+          ${columnSemesterFilter.clause}
+          AND (
+            LOWER(TRIM(COALESCE(jc.title, ''))) LIKE ?
+            OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE ?
+          )
+      `,
+      [normalizedCourseId, ...columnSemesterFilter.params, sessionHomeworkPrefixPattern, sessionHomeworkPrefixPattern]
+    );
+    (residualColumnRows || []).forEach((row) => {
+      const columnId = Number(row.id || 0);
+      if (Number.isFinite(columnId) && columnId > 0) {
+        columnIds.add(columnId);
+      }
+      const subjectId = Number(row.subject_id || 0);
+      if (Number.isFinite(subjectId) && subjectId > 0) {
+        touchedSubjectIds.add(subjectId);
+      }
+    });
+  }
+
+  return {
+    targetDatesCount: normalizedTargetDates.length,
+    publishedEventsCount: homeworkIds.length,
+    journalColumnsCount: columnIds.size,
+    subjectsCount: touchedSubjectIds.size,
+  };
+}
+
 async function purgeSessionGeneratorHomework({
   courseId,
   semesterId,
@@ -33534,6 +33639,31 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     form.window_mode = windowDates.window_mode;
     form.session_weeks_set = windowDates.sessionWeeksSet;
     const explicitSessionDates = windowDates.explicitSessionDates;
+    let cleanupPreviewWindow = {
+      targetDatesCount: Array.isArray(explicitSessionDates) ? explicitSessionDates.length : 0,
+      publishedEventsCount: 0,
+      journalColumnsCount: 0,
+      subjectsCount: 0,
+    };
+    let cleanupPreviewAllActive = {
+      targetDatesCount: 0,
+      publishedEventsCount: 0,
+      journalColumnsCount: 0,
+      subjectsCount: 0,
+    };
+    if (selectedCourseId && selectedSemesterId) {
+      cleanupPreviewWindow = await getSessionGeneratorCleanupPreview({
+        courseId: selectedCourseId,
+        semesterId: selectedSemesterId,
+        targetDates: explicitSessionDates,
+        purgeResidualSessionColumns: false,
+      });
+      cleanupPreviewAllActive = await getSessionGeneratorCleanupPreview({
+        courseId: selectedCourseId,
+        semesterId: selectedSemesterId,
+        purgeResidualSessionColumns: true,
+      });
+    }
 
     const previewCleared = draftAction === 'clear';
     const preview = null;
@@ -33694,6 +33824,8 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       plannerItems,
       draftMeta,
       manualAssignmentsInitial,
+      cleanupPreviewWindow,
+      cleanupPreviewAllActive,
       rooms,
       roomTypeOptions: roomHelpers.ROOM_TYPES,
       sessionTeacherFilterOptions,
