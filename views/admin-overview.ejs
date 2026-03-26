@@ -321,20 +321,62 @@
 
       <% const courseMap = {}; %>
       <% (courses || []).forEach(function(c) { courseMap[c.id] = c.name; }); %>
-      <% const canSwitchCourse = typeof allowCourseSelect !== 'undefined' ? allowCourseSelect : !limitedStaffView; %>
-      <% if (canSwitchCourse) { %>
-        <form method="GET" action="/admin/overview" class="mb-3">
-          <div class="d-flex flex-wrap align-items-center gap-2">
-            <label class="form-label mb-0"><%= t('admin.course') %></label>
-            <select class="form-select w-auto" name="course" onchange="this.form.submit()">
-              <% (courses || []).forEach(function(c) { %>
-                <option value="<%= c.id %>" <%= Number(selectedCourseId) === Number(c.id) ? 'selected' : '' %>><%= c.name %></option>
-              <% }); %>
-            </select>
+      <% const scopeState = adminAcademicScope && typeof adminAcademicScope === 'object' ? adminAcademicScope : {}; %>
+      <% const scopeTrackOptions = Array.isArray(scopeState.trackOptions) ? scopeState.trackOptions : []; %>
+      <% const scopeProgramOptions = Array.isArray(scopeState.programOptions) ? scopeState.programOptions : []; %>
+      <% const scopeAdmissionOptions = Array.isArray(scopeState.admissionOptions) ? scopeState.admissionOptions : []; %>
+      <% const scopeStageOptions = Array.isArray(scopeState.stageOptions) ? scopeState.stageOptions : []; %>
+      <% const scopeCampusOptions = Array.isArray(scopeState.campusOptions) ? scopeState.campusOptions : []; %>
+      <% const selectedScopeLabel = scopeState.label || (courseMap[selectedCourseId] || ('Course ' + selectedCourseId)); %>
+      <% const canSwitchAcademicScope = Boolean(scopeTrackOptions.length || scopeProgramOptions.length || scopeAdmissionOptions.length || scopeStageOptions.length || scopeCampusOptions.length); %>
+      <% const overviewScopeAction = '/admin/overview'; %>
+      <% if (canSwitchAcademicScope) { %>
+        <form method="GET" action="<%= overviewScopeAction %>" class="mb-3">
+          <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-1">Track</label>
+              <select class="form-select" name="track" onchange="this.form.submit()">
+                <% scopeTrackOptions.forEach(function(option) { %>
+                  <option value="<%= option.value %>" <%= String(scopeState.track || '') === String(option.value || '') ? 'selected' : '' %>><%= option.label %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-1">Program</label>
+              <select class="form-select" name="program_id" onchange="this.form.submit()">
+                <% scopeProgramOptions.forEach(function(option) { %>
+                  <option value="<%= option.id %>" <%= Number(scopeState.programId || 0) === Number(option.id || 0) ? 'selected' : '' %>><%= option.label %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-1">Cohort</label>
+              <select class="form-select" name="admission_id" onchange="this.form.submit()">
+                <% scopeAdmissionOptions.forEach(function(option) { %>
+                  <option value="<%= option.id %>" <%= Number(scopeState.admissionId || 0) === Number(option.id || 0) ? 'selected' : '' %>><%= option.admission_year || option.label %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-1">Stage</label>
+              <select class="form-select" name="stage" onchange="this.form.submit()">
+                <% scopeStageOptions.forEach(function(option) { %>
+                  <option value="<%= option.value %>" <%= Number(scopeState.stage || 0) === Number(option.value || 0) ? 'selected' : '' %>><%= option.label %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-1">Campus</label>
+              <select class="form-select" name="campus" onchange="this.form.submit()">
+                <% scopeCampusOptions.forEach(function(option) { %>
+                  <option value="<%= option.value %>" <%= String(scopeState.campus || '') === String(option.value || '') ? 'selected' : '' %>><%= option.label %></option>
+                <% }); %>
+              </select>
+            </div>
           </div>
         </form>
       <% } else { %>
-        <div class="mb-3 text-muted"><%= t('admin.course') %>: <%= courseMap[selectedCourseId] || ('Course ' + selectedCourseId) %></div>
+        <div class="mb-3 text-muted"><%= selectedScopeLabel %></div>
       <% } %>
 
       <% const stats = dashboardStats || { users: 0, subjects: 0, homework: 0, teamworkTasks: 0, teamworkGroups: 0, teamworkMembers: 0 }; %>

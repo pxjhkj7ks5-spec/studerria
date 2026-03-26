@@ -910,6 +910,29 @@
     <% const selectedScopeCampus = scopeState.selectedCampusLabel || selectedCourseCampus; %>
     <% const canSwitchAcademicScope = (typeof allowCourseSelect !== 'undefined' ? allowCourseSelect : !isLimitedView) && Boolean(scopeTrackOptions.length || scopeProgramOptions.length || scopeAdmissionOptions.length || scopeStageOptions.length || scopeCampusOptions.length); %>
     <% const scopeFormAction = role === 'deanery' ? '/deanery' : (role === 'starosta' ? '/starosta' : '/admin'); %>
+    <% const buildScopedHref = function(basePath, extraParams) {
+      const params = new URLSearchParams();
+      const next = extraParams && typeof extraParams === 'object' ? extraParams : {};
+      const push = function(key, value) {
+        if (value === null || typeof value === 'undefined' || value === '') return;
+        params.set(key, String(value));
+      };
+      push('course', next.course || next.course_id || scopeState.courseId || selectedCourseId || '');
+      push('track', next.track || scopeState.track || '');
+      push('program_id', next.program_id || next.programId || scopeState.programId || '');
+      push('admission_id', next.admission_id || next.admissionId || scopeState.admissionId || '');
+      push('stage', next.stage || scopeState.stage || '');
+      push('campus', next.campus || next.campusKey || scopeState.campus || '');
+      push('study_context_id', next.study_context_id || next.studyContextId || scopeState.studyContextId || '');
+      Object.keys(next).forEach(function(key) {
+        if (['course', 'course_id', 'track', 'program_id', 'programId', 'admission_id', 'admissionId', 'stage', 'campus', 'campusKey', 'study_context_id', 'studyContextId'].includes(key)) {
+          return;
+        }
+        push(key, next[key]);
+      });
+      const query = params.toString();
+      return query ? `${basePath}?${query}` : basePath;
+    }; %>
     <nav class="navbar navbar-expand-lg admin-nav">
       <div class="container">
         <div class="admin-topbar-left">
@@ -1127,7 +1150,7 @@
             <button class="btn btn-outline-secondary btn-sm admin-mobile-top" type="button" id="adminMobileTopButton">Вгору</button>
           </div>
           <% if (canManagePathways) { %>
-            <a class="btn btn-outline-secondary btn-sm admin-mobile-pathway" href="/admin/pathways">Academic Setup</a>
+            <a class="btn btn-outline-secondary btn-sm admin-mobile-pathway" href="<%= buildScopedHref('/admin/pathways') %>">Academic Setup</a>
           <% } %>
         </div>
       </div>
@@ -1280,7 +1303,7 @@
                             <td><%= Number(row.schedule_total || 0) %></td>
                             <td><%= Number(row.homework_total || 0) %></td>
                             <td class="text-end">
-                              <a class="btn btn-outline-secondary btn-sm" href="<%= monitorBasePath %>?course=<%= row.course_id %>#admin-deanery-monitoring">Відкрити</a>
+                              <a class="btn btn-outline-secondary btn-sm" href="<%= `${buildScopedHref(monitorBasePath, { course: row.course_id })}#admin-deanery-monitoring` %>">Відкрити</a>
                             </td>
                           </tr>
                         <% }); %>
@@ -1856,7 +1879,7 @@
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
                   <a class="btn btn-outline-secondary btn-sm" href="/admin/export/schedule.csv">Export schedule CSV</a>
-                  <a class="btn btn-outline-secondary btn-sm" href="/admin/export/users.csv?course=<%= selectedCourseId || 1 %>">Export users CSV</a>
+                  <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/export/users.csv') %>">Export users CSV</a>
                   <a class="btn btn-outline-secondary btn-sm" href="/admin/export/subjects.csv">Export subjects CSV</a>
                 </div>
               </div>
@@ -1866,7 +1889,7 @@
                     <div class="fw-semibold">Імпорт завершено</div>
                     <div class="small text-muted"><%= msg && msg.success ? msg.success : '' %></div>
                   </div>
-                  <a class="btn btn-link btn-sm" href="/admin?tab=admin-history&history_q=<%= importOperation %>">Переглянути зміни</a>
+                  <a class="btn btn-link btn-sm" href="<%= buildScopedHref('/admin', { tab: 'admin-history', history_q: importOperation }) %>">Переглянути зміни</a>
                 </div>
               <% } %>
               <div class="import-grid">
@@ -3989,8 +4012,8 @@
         <div id="admin-messages" class="admin-panel" data-admin-title="Communications / Messages">
           <%
             const fallbackAdminHomeHref = role === 'deanery'
-              ? `/deanery?course=${selectedCourseId || 1}`
-              : `/admin?course=${selectedCourseId || 1}`;
+              ? buildScopedHref('/deanery')
+              : buildScopedHref('/admin');
             const resolvedAdminHomeHref = adminHomeHref || fallbackAdminHomeHref;
             const messagesPanelHref = `${resolvedAdminHomeHref}${resolvedAdminHomeHref.includes('?') ? '&' : '?'}tab=admin-messages`;
           %>
@@ -4193,7 +4216,7 @@
             const supportThread = selectedSupportRequest || null;
             const supportMessages = supportThread && Array.isArray(supportThread.messages) ? supportThread.messages : [];
             const activeSupportId = supportThread ? Number(supportThread.id || 0) : 0;
-            const supportBaseHref = `/admin?tab=admin-support&course=${encodeURIComponent(String(selectedCourseId || ''))}`;
+            const supportBaseHref = "<%= buildScopedHref('/admin', { tab: 'admin-support' }) %>";
             const supportStatusClass = (status) => (
               status === 'resolved'
                 ? 'bg-success'

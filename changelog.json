@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.00",
+      "date": "2026-03-27",
+      "items": [
+        "feat(academic-setup-moderation-safety-net): add service-layer moderation upserts and new issue producers for registration course fallback, missing stage-1 study contexts, failed promotion targets, contexts without active semesters, shared offering mismatches, and invalid teacher template matches",
+        "feat(canonical-scope-secondary-surfaces): move `/admin/overview`, import/export links, support links, mobile Academic Setup entry, and teacher workspace redirects/forms onto canonical academic scope preservation so `track/program/admission/stage/campus/study_context_id` survives secondary admin and teacher flows",
+        "refactor(context-first-registration-and-resolution): make `/register/course` treat `study_context_id` as the primary placement output, keep raw course resolution only as a compatibility branch with moderation logging, and route moderation context assignment through `assignUserStudyContext(...)` instead of direct user-row updates"
+      ]
+    },
+    {
       "version": "1.2.99",
       "date": "2026-03-27",
       "items": [

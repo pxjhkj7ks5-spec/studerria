@@ -3051,6 +3051,19 @@ async function assignUserStudyContext(userId, studyContextId, fallback = {}) {
   });
 }
 
+async function queueAcademicModerationItem(payload = {}) {
+  try {
+    return await academicSetupHelpers.upsertAcademicModerationItem({
+      run: (sql, params) => db.run(sql, params),
+    }, payload);
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return null;
+    }
+    throw err;
+  }
+}
+
 async function listStudyContextOptions(options = {}) {
   const normalizedProgramId = parsePositiveIntStrict(options.programId);
   const normalizedAdmissionId = parsePositiveIntStrict(options.admissionId);
@@ -5619,6 +5632,73 @@ async function applyTeacherAssignmentTemplatesForStudyContexts(studyContextIds =
       `,
       [normalizedContextIds]
     );
+    const applicableTemplateScopeRows = await db.all(
+      `
+        SELECT
+          tat.id AS template_id,
+          tat.user_id,
+          tat.subject_catalog_id,
+          tat.program_id AS template_program_id,
+          tat.track_key AS template_track_key,
+          tat.stage_number AS template_stage_number,
+          tat.campus_key AS template_campus_key,
+          sc.id AS study_context_id,
+          coh.program_id,
+          p.track_key,
+          sc.stage_number,
+          sc.campus_key
+        FROM teacher_assignment_templates tat
+        JOIN study_contexts sc ON sc.id = ANY(?::int[])
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        JOIN study_programs p ON p.id = coh.program_id
+        WHERE tat.is_active = true
+          AND (tat.program_id IS NULL OR tat.program_id = coh.program_id)
+          AND (tat.track_key IS NULL OR tat.track_key = p.track_key)
+          AND (tat.stage_number IS NULL OR tat.stage_number = sc.stage_number)
+          AND (tat.campus_key IS NULL OR tat.campus_key = sc.campus_key)
+      `,
+      [normalizedContextIds]
+    ).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return [];
+      }
+      throw err;
+    });
+    const matchedTemplateScopeKeys = new Set(
+      (rows || [])
+        .map((row) => {
+          const templateId = parsePositiveIntStrict(row.template_id);
+          const studyContextId = parsePositiveIntStrict(row.study_context_id);
+          return templateId && studyContextId ? `${templateId}|${studyContextId}` : '';
+        })
+        .filter(Boolean)
+    );
+    for (const templateScopeRow of applicableTemplateScopeRows || []) {
+      const templateId = parsePositiveIntStrict(templateScopeRow.template_id);
+      const studyContextId = parsePositiveIntStrict(templateScopeRow.study_context_id);
+      if (!templateId || !studyContextId || matchedTemplateScopeKeys.has(`${templateId}|${studyContextId}`)) {
+        continue;
+      }
+      await queueAcademicModerationItem({
+        dedupeKey: academicSetupHelpers.buildModerationKey('teacher-template-match', templateId, studyContextId),
+        sourceKind: 'teacher_template',
+        sourceId: templateId,
+        issueCode: 'invalid_teacher_template_match',
+        severity: 'medium',
+        title: 'Teacher template did not match any live offering',
+        summary: 'Auto-carry-forward could not find a live offering for an active teacher template in this study context.',
+        payload: {
+          teacher_id: parsePositiveIntStrict(templateScopeRow.user_id) || null,
+          template_id: templateId,
+          subject_catalog_id: parsePositiveIntStrict(templateScopeRow.subject_catalog_id) || null,
+          study_context_id: studyContextId,
+          program_id: parsePositiveIntStrict(templateScopeRow.program_id) || parsePositiveIntStrict(templateScopeRow.template_program_id) || null,
+          track_key: templateScopeRow.track_key || templateScopeRow.template_track_key || null,
+          stage_number: parsePositiveIntStrict(templateScopeRow.stage_number) || parsePositiveIntStrict(templateScopeRow.template_stage_number) || null,
+          campus_key: templateScopeRow.campus_key || templateScopeRow.template_campus_key || null,
+        },
+      });
+    }
     const bestRows = new Map();
     for (const row of rows || []) {
       const teacherId = parsePositiveIntStrict(row.user_id);
@@ -13491,6 +13571,8 @@ app.post('/register/course', registerLimiter, async (req, res) => {
   let selectedAdmissionId = Number.isFinite(requestedAdmissionId) && requestedAdmissionId > 0 ? requestedAdmissionId : null;
   let courseId = parsePositiveIntStrict(req.body.course_id);
   let studyContextId = parsePositiveIntStrict(req.body.study_context_id);
+  let usedCompatibilityCourseFallback = false;
+  let fallbackSource = '';
 
   try {
     await ensureDbReady();
@@ -13543,9 +13625,32 @@ app.post('/register/course', registerLimiter, async (req, res) => {
         return redirectRegistrationFlowIssue(resolvedCourse.reason || 'campus_not_available');
       }
       courseId = resolvedCourse.courseId;
+      usedCompatibilityCourseFallback = true;
+      fallbackSource = 'campus_course_resolution';
     }
 
     if (!courseId) {
+      if (selectedAdmissionId && requestedCampus) {
+        await queueAcademicModerationItem({
+          dedupeKey: academicSetupHelpers.buildModerationKey('registration-missing-stage-one', userId, selectedAdmissionId, requestedCampus, selectedProgramId || 0),
+          sourceKind: 'user',
+          sourceId: userId,
+          issueCode: 'missing_stage_one_context',
+          severity: 'high',
+          title: 'Registration could not resolve a stage 1 study context',
+          summary: 'Registration did not find a study context or compatibility course for the selected cohort and campus.',
+          payload: {
+            user_id: userId,
+            program_id: selectedProgramId,
+            admission_id: selectedAdmissionId,
+            track_key: trackFromBody || null,
+            campus_key: requestedCampus,
+            stage_number: 1,
+            course_id: null,
+            study_context_id: null,
+          },
+        });
+      }
       return redirectRegistrationFlowIssue('missing_campus');
     }
 
@@ -13670,6 +13775,53 @@ app.post('/register/course', registerLimiter, async (req, res) => {
         trackKey: selectedTrack,
         preferredCampus: requestedCampus,
         preferredStage: 1,
+      });
+    }
+    if (!studyContextId && courseId) {
+      usedCompatibilityCourseFallback = true;
+      fallbackSource = fallbackSource || (parsePositiveIntStrict(req.body.course_id) ? 'legacy_course_input' : 'derived_course_fallback');
+    }
+    if (!studyContextId && selectedAdmissionId) {
+      await queueAcademicModerationItem({
+        dedupeKey: academicSetupHelpers.buildModerationKey('registration-missing-stage-one', userId, selectedAdmissionId, requestedCampus || 'unknown', courseId || 0),
+        sourceKind: 'user',
+        sourceId: userId,
+        issueCode: 'missing_stage_one_context',
+        severity: 'high',
+        title: 'Registration missing study context assignment',
+        summary: 'Registration continued in compatibility mode because stage 1 study context was not resolved.',
+        payload: {
+          user_id: userId,
+          program_id: selectedProgramId,
+          admission_id: selectedAdmissionId,
+          track_key: selectedTrack,
+          campus_key: requestedCampus || null,
+          stage_number: 1,
+          course_id: courseId,
+          study_context_id: null,
+        },
+      });
+    }
+    if (usedCompatibilityCourseFallback && courseId) {
+      await queueAcademicModerationItem({
+        dedupeKey: academicSetupHelpers.buildModerationKey('registration-course-fallback', userId, selectedAdmissionId || 0, courseId, requestedCampus || 'unknown'),
+        sourceKind: 'user',
+        sourceId: userId,
+        issueCode: 'registration_course_fallback',
+        severity: 'medium',
+        title: 'Registration used compatibility course fallback',
+        summary: 'Registration resolved only a legacy course scope and had to continue without a canonical study context.',
+        payload: {
+          user_id: userId,
+          program_id: selectedProgramId,
+          admission_id: selectedAdmissionId,
+          track_key: selectedTrack,
+          campus_key: requestedCampus || null,
+          stage_number: 1,
+          course_id: courseId,
+          study_context_id: studyContextId || null,
+          fallback_source: fallbackSource || 'compatibility',
+        },
       });
     }
 
@@ -14253,6 +14405,29 @@ function buildTeacherWorkspaceUrl({
   return query ? `/teacher/workspace?${query}` : '/teacher/workspace';
 }
 
+function getTeacherWorkspaceRedirectState(source = {}, fallbackCourseId = null) {
+  const normalizedSource = source && typeof source === 'object' ? source : {};
+  return {
+    courseId: parsePositiveIntStrict(
+      normalizedSource.course
+      || normalizedSource.course_id
+      || normalizedSource.courseId
+      || normalizedSource.course_id_context,
+      parsePositiveIntStrict(fallbackCourseId)
+    ),
+    studyContextId: parsePositiveIntStrict(
+      normalizedSource.study_context_id
+      || normalizedSource.studyContextId
+      || normalizedSource.study_context_id_context
+    ),
+    semesterId: parsePositiveIntStrict(
+      normalizedSource.semester_id
+      || normalizedSource.semesterId
+      || normalizedSource.semester_id_context
+    ),
+  };
+}
+
 app.get('/teacher/workspace', requireLogin, async (req, res) => {
   try {
     await ensureDbReady();
@@ -14279,7 +14454,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       getTeacherOfferingSelections(userId),
     ]);
     const teacherCourses = buildTeacherCourseList(teacherSubjects);
-    const requestedCourseId = Number(req.query.course);
+    const requestedCourseId = parsePositiveIntStrict(req.query.course);
     const requestedStudyContextId = parsePositiveIntStrict(req.query.study_context_id);
     const requestedSemesterId = parsePositiveIntStrict(req.query.semester_id);
     const workspaceCourseOptions = Array.from(new Map(
@@ -14295,18 +14470,9 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       if (byId !== 0) return byId;
       return String(a.name || '').localeCompare(String(b.name || ''), 'uk', { sensitivity: 'base' });
     });
-    const selectedWorkspaceCourse = workspaceCourseOptions.find((course) => Number(course.id || 0) === requestedCourseId) || null;
-    const selectedCourse = teacherCourses.find((course) => Number(course.id) === requestedCourseId) || null;
-    let selectedCourseId = selectedWorkspaceCourse
-      ? Number(selectedWorkspaceCourse.id || 0)
-      : (selectedCourse
-        ? Number(selectedCourse.id)
-        : (teacherCourses.length === 1 ? Number(teacherCourses[0].id) : null));
-
-    const workspaceContextOptions = Array.from(new Map(
+    const allWorkspaceContextOptions = Array.from(new Map(
       (teacherOfferingCatalog || [])
         .flatMap((offering) => Array.isArray(offering.contexts) ? offering.contexts : [])
-        .filter((context) => !selectedCourseId || Number(context.course_id || 0) === Number(selectedCourseId || 0))
         .map((context) => [Number(context.id || 0), {
           id: Number(context.id || 0) || null,
           label: String(context.label || ''),
@@ -14324,12 +14490,34 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
         }])
         .filter((entry) => Number.isInteger(entry[0]) && entry[0] > 0)
     ).values());
-    const selectedWorkspaceContext = workspaceContextOptions.find((item) => Number(item.id || 0) === requestedStudyContextId) || null;
+    const selectedWorkspaceContext = allWorkspaceContextOptions.find((item) => Number(item.id || 0) === Number(requestedStudyContextId || 0)) || null;
     const selectedWorkspaceContextId = selectedWorkspaceContext ? Number(selectedWorkspaceContext.id) : null;
-    if (!selectedCourseId && selectedWorkspaceContext && selectedWorkspaceContext.course_id) {
-      selectedCourseId = Number(selectedWorkspaceContext.course_id || 0) || null;
+    const selectedWorkspaceCourse = !selectedWorkspaceContext && requestedCourseId
+      ? (workspaceCourseOptions.find((course) => Number(course.id || 0) === Number(requestedCourseId || 0)) || null)
+      : null;
+    const selectedTeacherCourse = !selectedWorkspaceContext && requestedCourseId
+      ? (teacherCourses.find((course) => Number(course.id) === Number(requestedCourseId || 0)) || null)
+      : null;
+    let selectedCourseId = selectedWorkspaceContext && selectedWorkspaceContext.course_id
+      ? Number(selectedWorkspaceContext.course_id || 0) || null
+      : (selectedWorkspaceCourse
+        ? Number(selectedWorkspaceCourse.id || 0)
+        : (selectedTeacherCourse
+          ? Number(selectedTeacherCourse.id || 0)
+          : (teacherCourses.length === 1 ? Number(teacherCourses[0].id) : null)));
+
+    const workspaceContextOptions = (selectedCourseId
+      ? allWorkspaceContextOptions.filter((context) => Number(context.course_id || 0) === Number(selectedCourseId || 0))
+      : allWorkspaceContextOptions);
+    if (!selectedWorkspaceContextId && !selectedCourseId && workspaceContextOptions.length === 1) {
+      selectedCourseId = Number(workspaceContextOptions[0].course_id || 0) || null;
     }
 
+    const semesterSourceContexts = selectedWorkspaceContext
+      ? [selectedWorkspaceContext]
+      : (selectedCourseId
+        ? allWorkspaceContextOptions.filter((context) => Number(context.course_id || 0) === Number(selectedCourseId || 0))
+        : allWorkspaceContextOptions);
     const workspaceSemesterOptions = Array.from(new Map(
       (selectedWorkspaceContext
         ? (selectedWorkspaceContext.semester_ids || []).map((semesterId, index) => ({
@@ -14337,16 +14525,12 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
             title: String((selectedWorkspaceContext.semester_titles || [])[index] || `Semester ${(selectedWorkspaceContext.semester_numbers || [])[index] || index + 1}`),
             semester_number: Number((selectedWorkspaceContext.semester_numbers || [])[index] || 0) || null,
           }))
-        : (teacherOfferingCatalog || []).flatMap((offering) => (
-            Array.isArray(offering.contexts)
-              ? offering.contexts.flatMap((context) => (
-                  (context.semester_ids || []).map((semesterId, index) => ({
-                    id: Number(semesterId || 0) || null,
-                    title: String((context.semester_titles || [])[index] || `Semester ${(context.semester_numbers || [])[index] || index + 1}`),
-                    semester_number: Number((context.semester_numbers || [])[index] || 0) || null,
-                  }))
-                ))
-              : []
+        : (semesterSourceContexts || []).flatMap((context) => (
+            (context.semester_ids || []).map((semesterId, index) => ({
+              id: Number(semesterId || 0) || null,
+              title: String((context.semester_titles || [])[index] || `Semester ${(context.semester_numbers || [])[index] || index + 1}`),
+              semester_number: Number((context.semester_numbers || [])[index] || 0) || null,
+            }))
           )))
         .filter((item) => Number.isInteger(Number(item.id || 0)) && Number(item.id || 0) > 0)
         .map((item) => [Number(item.id || 0), item])
@@ -14503,6 +14687,31 @@ app.post('/teacher/workspace/offering-templates/sync', requireLogin, async (req,
     ]);
     const scopedOfferings = (teacherOfferingCatalog || [])
       .filter((offering) => scopeOfferingIds.includes(Number(offering.id || 0)));
+    for (const offering of scopedOfferings) {
+      const hasSubjectCatalog = parsePositiveIntStrict(offering && offering.subject_catalog_id);
+      const hasContexts = Array.isArray(offering && offering.contexts) && offering.contexts.length > 0;
+      if (hasSubjectCatalog && hasContexts) {
+        continue;
+      }
+      await queueAcademicModerationItem({
+        dedupeKey: academicSetupHelpers.buildModerationKey('teacher-template-match', userId, Number(offering && offering.id || 0)),
+        sourceKind: 'subject_offering',
+        sourceId: Number(offering && offering.id || 0) || null,
+        issueCode: 'invalid_teacher_template_match',
+        severity: 'medium',
+        title: 'Teacher template sync skipped an invalid offering scope',
+        summary: 'Recurring template sync found an offering without the metadata needed to match teacher template rules.',
+        payload: {
+          teacher_id: userId,
+          offering_id: Number(offering && offering.id || 0) || null,
+          subject_catalog_id: parsePositiveIntStrict(offering && offering.subject_catalog_id),
+          study_context_id: redirectState.studyContextId || null,
+          semester_id: redirectState.semesterId || null,
+          course_id: redirectState.courseId || null,
+          has_contexts: hasContexts,
+        },
+      });
+    }
     const workspaceAssignedOfferingDetails = new Map(
       (teacherAssignedOfferings || [])
         .map((offering) => [Number(offering.id || 0), offering])
@@ -14601,9 +14810,12 @@ app.post('/teacher/workspace/assets', requireLogin, uploadLimiter, upload.single
   }
   const userId = Number(req.session.user.id || 0);
   const requestedCourseId = Number(req.body.course_id || req.session.user.course_id || 0);
-  const courseQuery = Number.isInteger(requestedCourseId) && requestedCourseId > 0 ? `?course=${requestedCourseId}` : '';
+  const redirectState = getTeacherWorkspaceRedirectState(req.body, requestedCourseId);
   if (!req.file) {
-    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Select%20a%20file`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Select a file',
+    }));
   }
   try {
     const assetId = await createAssetFromUpload({
@@ -14615,17 +14827,26 @@ app.post('/teacher/workspace/assets', requireLogin, uploadLimiter, upload.single
     });
     if (!assetId) {
       if (req.file) fs.unlink(req.file.path, () => {});
-      return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Asset%20storage%20is%20unavailable`);
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: 'Asset storage is unavailable',
+      }));
     }
     logAction(db, req, 'teacher_workspace_asset_create', {
       asset_id: assetId,
       course_id: requestedCourseId || null,
       original_name: req.file.originalname ? String(req.file.originalname) : '',
     });
-    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}ok=Asset%20uploaded`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      ok: 'Asset uploaded',
+    }));
   } catch (err) {
     if (req.file) fs.unlink(req.file.path, () => {});
-    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Database%20error`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Database error',
+    }));
   }
 });
 
@@ -14640,9 +14861,12 @@ app.post('/teacher/workspace/assets/:id/delete', requireLogin, async (req, res) 
   }
   const assetId = Number(req.params.id);
   const requestedCourseId = Number(req.body.course_id || req.session.user.course_id || 0);
-  const courseQuery = Number.isInteger(requestedCourseId) && requestedCourseId > 0 ? `?course=${requestedCourseId}` : '';
+  const redirectState = getTeacherWorkspaceRedirectState(req.body, requestedCourseId);
   if (!Number.isInteger(assetId) || assetId < 1) {
-    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Invalid%20asset`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Invalid asset',
+    }));
   }
   try {
     const asset = await db.get(
@@ -14650,7 +14874,10 @@ app.post('/teacher/workspace/assets/:id/delete', requireLogin, async (req, res) 
       [assetId]
     );
     if (!asset || Number(asset.user_id) !== Number(req.session.user.id)) {
-      return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Asset%20not%20found`);
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: 'Asset not found',
+      }));
     }
     const usage = await db.get(
       `
@@ -14661,16 +14888,25 @@ app.post('/teacher/workspace/assets/:id/delete', requireLogin, async (req, res) 
       [assetId, assetId]
     );
     if (Number(usage?.template_count || 0) > 0 || Number(usage?.homework_count || 0) > 0) {
-      return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Asset%20is%20still%20linked%20to%20templates%20or%20homework`);
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: 'Asset is still linked to templates or homework',
+      }));
     }
     await db.run('DELETE FROM assets WHERE id = ?', [assetId]);
     logAction(db, req, 'teacher_workspace_asset_delete', {
       asset_id: assetId,
       original_name: asset.original_name ? String(asset.original_name) : '',
     });
-    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}ok=Asset%20deleted`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      ok: 'Asset deleted',
+    }));
   } catch (err) {
-    return res.redirect(`/teacher/workspace${courseQuery}${courseQuery ? '&' : '?'}error=Database%20error`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Database error',
+    }));
   }
 });
 
@@ -14697,13 +14933,14 @@ app.post('/teacher/workspace/templates', requireLogin, uploadLimiter, upload.arr
   const assetIds = teacherTemplateHelpers.normalizeTemplateAssetIds(req.body.asset_ids, 48);
   const linkUrl = normalizeExternalUrl(req.body.link_url) || null;
   const meetingUrl = normalizeExternalUrl(req.body.meeting_url) || null;
-  const fallbackCourseQuery = Number.isInteger(requestedCourseId) && requestedCourseId > 0
-    ? `&course=${requestedCourseId}`
-    : (Number.isInteger(Number(fallbackCourseId)) && Number(fallbackCourseId) > 0 ? `&course=${Number(fallbackCourseId)}` : '');
+  const redirectState = getTeacherWorkspaceRedirectState(req.body, requestedCourseId || fallbackCourseId || null);
 
   if (!title || !description) {
     unlinkUploadedFiles(uploadedFiles);
-    return res.redirect(`/teacher/workspace?error=Title%20and%20description%20are%20required${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Title and description are required',
+    }));
   }
 
   let uploadedAssetIds = [];
@@ -14711,7 +14948,10 @@ app.post('/teacher/workspace/templates', requireLogin, uploadLimiter, upload.arr
     const resolvedScope = await resolveTeacherTemplateScope(userId, requestedCourseId, requestedSubjectId);
     if (!resolvedScope.ok) {
       unlinkUploadedFiles(uploadedFiles);
-      return res.redirect(`/teacher/workspace?error=${resolvedScope.error || 'Invalid%20template%20scope'}${fallbackCourseQuery}`);
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: resolvedScope.error || 'Invalid template scope',
+      }));
     }
     const { courseId, subjectId, validatedCourseId } = resolvedScope;
     uploadedAssetIds = await createAssetsFromUploads({
@@ -14774,11 +15014,11 @@ app.post('/teacher/workspace/templates', requireLogin, uploadLimiter, upload.arr
       uploaded_asset_ids: uploadedAssetIds,
     });
 
-    const redirectCourseId = courseId || (validatedCourseId || null);
-    const courseQuery = Number.isInteger(redirectCourseId) && redirectCourseId > 0
-      ? `&course=${redirectCourseId}`
-      : '';
-    return res.redirect(`/teacher/workspace?ok=Template%20saved${courseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      courseId: courseId || validatedCourseId || redirectState.courseId,
+      ok: 'Template saved',
+    }));
   } catch (err) {
     console.error('Teacher workspace template create failed', err);
     await cleanupFailedUploadedAssets({
@@ -14788,7 +15028,10 @@ app.post('/teacher/workspace/templates', requireLogin, uploadLimiter, upload.arr
     const errorMessage = err && err.code === 'ASSET_STORAGE_UNAVAILABLE'
       ? 'Asset%20storage%20is%20unavailable'
       : 'Database%20error';
-    return res.redirect(`/teacher/workspace?error=${errorMessage}${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: errorMessage === 'Database%20error' ? 'Database error' : 'Asset storage is unavailable',
+    }));
   }
 });
 
@@ -14806,17 +15049,20 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, uploadLimiter,
   }
   const { id: userId } = req.session.user;
   const templateId = Number(req.params.id);
-  if (!Number.isInteger(templateId) || templateId < 1) {
-    unlinkUploadedFiles(uploadedFiles);
-    return res.redirect('/teacher/workspace?error=Invalid%20template');
-  }
-
   const requestedCourseId = Number(req.body.course_id);
   const requestedSubjectId = Number(req.body.subject_id);
   const contextCourseId = Number(req.body.course_id_context);
   const fallbackCourseId = Number.isInteger(contextCourseId) && contextCourseId > 0
     ? contextCourseId
     : (Number.isInteger(requestedCourseId) && requestedCourseId > 0 ? requestedCourseId : null);
+  const redirectState = getTeacherWorkspaceRedirectState(req.body, fallbackCourseId);
+  if (!Number.isInteger(templateId) || templateId < 1) {
+    unlinkUploadedFiles(uploadedFiles);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Invalid template',
+    }));
+  }
   const title = String(req.body.title || '').trim();
   const description = String(req.body.description || '').trim();
   const tags = normalizeTemplateTagsInput(req.body.tags).join(', ');
@@ -14825,11 +15071,13 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, uploadLimiter,
   const meetingUrl = normalizeExternalUrl(req.body.meeting_url) || null;
   const isControl = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_control || '').toLowerCase()) ? 1 : 0;
   const isCredit = ['1', 'true', 'on', 'yes'].includes(String(req.body.is_credit || '').toLowerCase()) ? 1 : 0;
-  const fallbackCourseQuery = fallbackCourseId ? `&course=${fallbackCourseId}` : '';
 
   if (!title || !description) {
     unlinkUploadedFiles(uploadedFiles);
-    return res.redirect(`/teacher/workspace?error=Title%20and%20description%20are%20required${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Title and description are required',
+    }));
   }
 
   let uploadedAssetIds = [];
@@ -14845,7 +15093,10 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, uploadLimiter,
     );
     if (!existing) {
       unlinkUploadedFiles(uploadedFiles);
-      return res.redirect(`/teacher/workspace?error=Template%20not%20found${fallbackCourseQuery}`);
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: 'Template not found',
+      }));
     }
     if (Number(existing.user_id) !== Number(userId)) {
       unlinkUploadedFiles(uploadedFiles);
@@ -14855,7 +15106,10 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, uploadLimiter,
     const resolvedScope = await resolveTeacherTemplateScope(userId, requestedCourseId, requestedSubjectId);
     if (!resolvedScope.ok) {
       unlinkUploadedFiles(uploadedFiles);
-      return res.redirect(`/teacher/workspace?error=${resolvedScope.error || 'Invalid%20template%20scope'}${fallbackCourseQuery}`);
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: resolvedScope.error || 'Invalid template scope',
+      }));
     }
     const { courseId, subjectId, validatedCourseId } = resolvedScope;
     uploadedAssetIds = await createAssetsFromUploads({
@@ -14913,9 +15167,11 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, uploadLimiter,
       uploaded_asset_ids: uploadedAssetIds,
     });
 
-    const redirectCourseId = courseId || validatedCourseId || fallbackCourseId || null;
-    const courseQuery = redirectCourseId ? `&course=${redirectCourseId}` : '';
-    return res.redirect(`/teacher/workspace?ok=Template%20updated${courseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      courseId: courseId || validatedCourseId || redirectState.courseId,
+      ok: 'Template updated',
+    }));
   } catch (err) {
     console.error('Teacher workspace template update failed', err);
     await cleanupFailedUploadedAssets({
@@ -14925,7 +15181,10 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, uploadLimiter,
     const errorMessage = err && err.code === 'ASSET_STORAGE_UNAVAILABLE'
       ? 'Asset%20storage%20is%20unavailable'
       : 'Database%20error';
-    return res.redirect(`/teacher/workspace?error=${errorMessage}${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: errorMessage === 'Database%20error' ? 'Database error' : 'Asset storage is unavailable',
+    }));
   }
 });
 
@@ -14940,12 +15199,14 @@ app.post('/teacher/workspace/templates/:id/clone', requireLogin, async (req, res
   }
   const { id: userId } = req.session.user;
   const templateId = Number(req.params.id);
-  if (!Number.isInteger(templateId) || templateId < 1) {
-    return res.redirect('/teacher/workspace?error=Invalid%20template');
-  }
   const contextCourseId = Number(req.body.course_id_context);
-  const fallbackCourseId = Number.isInteger(contextCourseId) && contextCourseId > 0 ? contextCourseId : null;
-  const fallbackCourseQuery = fallbackCourseId ? `&course=${fallbackCourseId}` : '';
+  const redirectState = getTeacherWorkspaceRedirectState(req.body, contextCourseId);
+  if (!Number.isInteger(templateId) || templateId < 1) {
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Invalid template',
+    }));
+  }
   const rawTargetSubjectIds = req.body.target_subject_ids;
   const targetSubjectIds = Array.from(
     new Set(
@@ -14956,7 +15217,10 @@ app.post('/teacher/workspace/templates/:id/clone', requireLogin, async (req, res
   ).slice(0, 240);
 
   if (!targetSubjectIds.length) {
-    return res.redirect(`/teacher/workspace?error=Select%20at%20least%20one%20subject${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Select at least one subject',
+    }));
   }
 
   try {
@@ -14981,7 +15245,10 @@ app.post('/teacher/workspace/templates/:id/clone', requireLogin, async (req, res
       [templateId]
     );
     if (!sourceTemplate) {
-      return res.redirect(`/teacher/workspace?error=Template%20not%20found${fallbackCourseQuery}`);
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: 'Template not found',
+      }));
     }
     if (Number(sourceTemplate.user_id) !== Number(userId)) {
       return res.status(403).send('Forbidden');
@@ -15020,7 +15287,10 @@ app.post('/teacher/workspace/templates/:id/clone', requireLogin, async (req, res
       }
     });
     if (!targetMap.size) {
-      return res.redirect(`/teacher/workspace?error=Invalid%20subject%20selection${fallbackCourseQuery}`);
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: 'Invalid subject selection',
+      }));
     }
 
     const sourceTitle = String(sourceTemplate.title || '').trim();
@@ -15116,15 +15386,17 @@ app.post('/teacher/workspace/templates/:id/clone', requireLogin, async (req, res
       ? `Template cloned to ${createdCount} subject${createdCount === 1 ? '' : 's'}`
       : 'No templates were cloned';
     const fullMessage = suffixes.length ? `${baseMessage} (${suffixes.join(', ')})` : baseMessage;
-    const redirectCourseId = fallbackCourseId
-      || (Number.isInteger(Number(sourceTemplate.course_id)) && Number(sourceTemplate.course_id) > 0
-        ? Number(sourceTemplate.course_id)
-        : null);
-    const courseQuery = redirectCourseId ? `&course=${redirectCourseId}` : '';
-    return res.redirect(`/teacher/workspace?ok=${encodeURIComponent(fullMessage)}${courseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      courseId: redirectState.courseId || parsePositiveIntStrict(sourceTemplate.course_id),
+      ok: fullMessage,
+    }));
   } catch (err) {
     console.error('Teacher workspace template clone failed', err);
-    return res.redirect(`/teacher/workspace?error=Database%20error${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Database error',
+    }));
   }
 });
 
@@ -15139,8 +15411,7 @@ app.post('/teacher/workspace/templates/bulk-clone', requireLogin, async (req, re
   }
   const { id: userId } = req.session.user;
   const contextCourseId = Number(req.body.course_id_context);
-  const fallbackCourseId = Number.isInteger(contextCourseId) && contextCourseId > 0 ? contextCourseId : null;
-  const fallbackCourseQuery = fallbackCourseId ? `&course=${fallbackCourseId}` : '';
+  const redirectState = getTeacherWorkspaceRedirectState(req.body, contextCourseId);
   const rawSourceTemplateIds = req.body.source_template_ids;
   const sourceTemplateIds = Array.from(
     new Set(
@@ -15159,7 +15430,10 @@ app.post('/teacher/workspace/templates/bulk-clone', requireLogin, async (req, re
   ).slice(0, 240);
 
   if (!sourceTemplateIds.length || !targetSubjectIds.length) {
-    return res.redirect(`/teacher/workspace?error=Select%20templates%20and%20subjects%20for%20bulk%20clone${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Select templates and subjects for bulk clone',
+    }));
   }
 
   try {
@@ -15186,7 +15460,10 @@ app.post('/teacher/workspace/templates/bulk-clone', requireLogin, async (req, re
       [userId, ...sourceTemplateIds]
     );
     if (!sourceRows.length) {
-      return res.redirect(`/teacher/workspace?error=No%20source%20templates%20found${fallbackCourseQuery}`);
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: 'No source templates found',
+      }));
     }
 
     const targetPlaceholders = targetSubjectIds.map(() => '?').join(', ');
@@ -15222,7 +15499,10 @@ app.post('/teacher/workspace/templates/bulk-clone', requireLogin, async (req, re
       }
     });
     if (!targetMap.size) {
-      return res.redirect(`/teacher/workspace?error=Invalid%20target%20subjects${fallbackCourseQuery}`);
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: 'Invalid target subjects',
+      }));
     }
 
     let createdCount = 0;
@@ -15328,10 +15608,16 @@ app.post('/teacher/workspace/templates/bulk-clone', requireLogin, async (req, re
     const fullMessage = suffixes.length
       ? `${baseMessage}${scopeMessage} (${suffixes.join(', ')})`
       : `${baseMessage}${scopeMessage}`;
-    return res.redirect(`/teacher/workspace?ok=${encodeURIComponent(fullMessage)}${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      ok: fullMessage,
+    }));
   } catch (err) {
     console.error('Teacher workspace template bulk clone failed', err);
-    return res.redirect(`/teacher/workspace?error=Database%20error${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Database error',
+    }));
   }
 });
 
@@ -15346,8 +15632,7 @@ app.post('/teacher/workspace/templates/bulk-delete', requireLogin, async (req, r
   }
   const { id: userId } = req.session.user;
   const contextCourseId = Number(req.body.course_id_context);
-  const fallbackCourseId = Number.isInteger(contextCourseId) && contextCourseId > 0 ? contextCourseId : null;
-  const fallbackCourseQuery = fallbackCourseId ? `&course=${fallbackCourseId}` : '';
+  const redirectState = getTeacherWorkspaceRedirectState(req.body, contextCourseId);
   const rawSourceTemplateIds = req.body.source_template_ids;
   const sourceTemplateIds = Array.from(
     new Set(
@@ -15357,7 +15642,10 @@ app.post('/teacher/workspace/templates/bulk-delete', requireLogin, async (req, r
     )
   ).slice(0, 300);
   if (!sourceTemplateIds.length) {
-    return res.redirect(`/teacher/workspace?error=Select%20templates%20for%20bulk%20delete${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Select templates for bulk delete',
+    }));
   }
 
   try {
@@ -15372,7 +15660,10 @@ app.post('/teacher/workspace/templates/bulk-delete', requireLogin, async (req, r
       [userId, ...sourceTemplateIds]
     );
     if (!sourceRows.length) {
-      return res.redirect(`/teacher/workspace?error=No%20templates%20found%20for%20bulk%20delete${fallbackCourseQuery}`);
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: 'No templates found for bulk delete',
+      }));
     }
 
     let deletedCount = 0;
@@ -15410,10 +15701,16 @@ app.post('/teacher/workspace/templates/bulk-delete', requireLogin, async (req, r
     const fullMessage = suffixes.length
       ? `${baseMessage} (${suffixes.join(', ')})`
       : baseMessage;
-    return res.redirect(`/teacher/workspace?ok=${encodeURIComponent(fullMessage)}${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      ok: fullMessage,
+    }));
   } catch (err) {
     console.error('Teacher workspace template bulk delete failed', err);
-    return res.redirect(`/teacher/workspace?error=Database%20error${fallbackCourseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Database error',
+    }));
   }
 });
 
@@ -15427,9 +15724,13 @@ app.post('/teacher/workspace/templates/:id/delete', requireLogin, async (req, re
     return res.redirect('/schedule');
   }
   const { id: userId } = req.session.user;
+  const redirectState = getTeacherWorkspaceRedirectState(req.body);
   const templateId = Number(req.params.id);
   if (!Number.isInteger(templateId) || templateId < 1) {
-    return res.redirect('/teacher/workspace?error=Invalid%20template');
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Invalid template',
+    }));
   }
   try {
     const row = await db.get(
@@ -15437,7 +15738,10 @@ app.post('/teacher/workspace/templates/:id/delete', requireLogin, async (req, re
       [templateId]
     );
     if (!row) {
-      return res.redirect('/teacher/workspace?error=Template%20not%20found');
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        error: 'Template not found',
+      }));
     }
     if (Number(row.user_id) !== Number(userId)) {
       return res.status(403).send('Forbidden');
@@ -15449,15 +15753,17 @@ app.post('/teacher/workspace/templates/:id/delete', requireLogin, async (req, re
       subject_id: row.subject_id ? Number(row.subject_id) : null,
       title: row.title ? String(row.title) : '',
     });
-    const requestedCourseId = Number(req.body.course_id);
-    const redirectCourseId = Number.isInteger(requestedCourseId) && requestedCourseId > 0
-      ? requestedCourseId
-      : (Number.isInteger(Number(row.course_id)) && Number(row.course_id) > 0 ? Number(row.course_id) : null);
-    const courseQuery = redirectCourseId ? `&course=${redirectCourseId}` : '';
-    return res.redirect(`/teacher/workspace?ok=Template%20deleted${courseQuery}`);
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      courseId: redirectState.courseId || parsePositiveIntStrict(row.course_id),
+      ok: 'Template deleted',
+    }));
   } catch (err) {
     console.error('Teacher workspace template delete failed', err);
-    return res.redirect('/teacher/workspace?error=Database%20error');
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      error: 'Database error',
+    }));
   }
 });
 
@@ -33160,6 +33466,33 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
             user_count: Number(userMetricsByContext.get(Number(context.id || 0)) || 0),
           };
         });
+        for (const context of studyContexts) {
+          if (Number(context.active_semester_count || 0) > 0) {
+            continue;
+          }
+          await queueAcademicModerationItem({
+            dedupeKey: academicSetupHelpers.buildModerationKey('study-context-active-semester', Number(context.id || 0)),
+            sourceKind: 'study_context',
+            sourceId: Number(context.id || 0) || null,
+            issueCode: 'context_missing_active_semester',
+            severity: Number(context.user_count || 0) > 0 || Number(context.offering_count || 0) > 0 ? 'high' : 'medium',
+            title: 'Study context has no active semester',
+            summary: 'This study context currently has no active semester even though it already has live data.',
+            payload: {
+              study_context_id: Number(context.id || 0) || null,
+              course_id: Number(context.course_id || 0) || null,
+              program_id: Number(context.program_id || 0) || null,
+              admission_id: Number(context.admission_id || 0) || null,
+              track_key: context.track_key || null,
+              campus_key: context.campus_key || null,
+              stage_number: Number(context.stage || 0) || null,
+              semester_count: Number(context.semester_count || 0) || 0,
+              active_semester_count: Number(context.active_semester_count || 0) || 0,
+              offering_count: Number(context.offering_count || 0) || 0,
+              user_count: Number(context.user_count || 0) || 0,
+            },
+          });
+        }
 
         const fallbackStudyContext = studyContexts.find((context) => Number(context.id || 0) === Number(requestedStudyContextId || 0))
           || studyContexts.find((context) => Number(context.course_id || 0) === Number(selectedCourseId || 0))
@@ -33174,6 +33507,28 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
           selectedStudyContextOfferings = await listStudyContextOfferings(selectedStudyContextId, {
             includeInactive: true,
           });
+          for (const offering of selectedStudyContextOfferings || []) {
+            const linkedContextCount = Array.isArray(offering.target_context_ids) ? offering.target_context_ids.length : 0;
+            if (!(offering.is_shared === true || Number(offering.is_shared) === 1) || linkedContextCount > 1) {
+              continue;
+            }
+            await queueAcademicModerationItem({
+              dedupeKey: academicSetupHelpers.buildModerationKey('shared-offering-mismatch', Number(offering.id || 0)),
+              sourceKind: 'subject_offering',
+              sourceId: Number(offering.id || 0) || null,
+              issueCode: 'shared_offering_mismatch',
+              severity: 'medium',
+              title: 'Shared offering is linked to an incomplete context scope',
+              summary: 'A shared offering should be attached to multiple study contexts but currently has only one visible linked context.',
+              payload: {
+                offering_id: Number(offering.id || 0) || null,
+                study_context_id: selectedStudyContextId,
+                course_id: Number(selectedStudyContext.course_id || 0) || null,
+                target_context_ids: Array.isArray(offering.target_context_ids) ? offering.target_context_ids : [],
+                is_shared: true,
+              },
+            });
+          }
         }
       }
     }
@@ -34387,6 +34742,7 @@ app.post('/admin/pathways/moderation/:id/resolve', requirePathwaysSectionAccess,
       action: helperAction,
       resolvedBy: req.session && req.session.user ? parsePositiveIntStrict(req.session.user.id) : null,
       assignedStudyContextId: action === 'assign_context' ? assignedStudyContextId : null,
+      assignUserStudyContext: (userId, studyContextId) => assignUserStudyContext(userId, studyContextId),
     });
     if (!result) {
       return res.redirect(buildAdminPathwaysUrl({
@@ -36106,35 +36462,23 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
 
     if (missingContextCourseIds.length) {
       try {
-        await db.run(
-          `
-            INSERT INTO academic_moderation_queue
-              (dedupe_key, source_kind, source_id, issue_code, severity, status, title, summary, payload_json, created_at, updated_at)
-            SELECT
-              CONCAT('course-migration::', ?, '::', source_course_id),
-              'course_migration',
-              source_course_id,
-              'missing_target_context',
-              'high',
-              'open',
-              'Missing target study context for migration',
-              'Could not resolve a study context for the selected course during cohort migration.',
-              payload::jsonb,
-              NOW(),
-              NOW()
-            FROM UNNEST(?::int[], ?::text[]) AS t(source_course_id, payload)
-          `,
-          [
-            admissionId,
-            missingContextCourseIds,
-            missingContextCourseIds.map((courseIdValue) => JSON.stringify({
+        for (const missingCourseId of missingContextCourseIds) {
+          await queueAcademicModerationItem({
+            dedupeKey: academicSetupHelpers.buildModerationKey('course-migration', admissionId, missingCourseId),
+            sourceKind: 'course_migration',
+            sourceId: missingCourseId,
+            issueCode: 'missing_target_context',
+            severity: 'high',
+            title: 'Missing target study context for migration',
+            summary: 'Could not resolve a study context for the selected course during cohort migration.',
+            payload: {
               admission_id: admissionId,
-              course_id: courseIdValue,
+              course_id: missingCourseId,
               program_id: resolvedProgramId,
               track_key: admissionRow.track_key,
-            })),
-          ]
-        );
+            },
+          });
+        }
       } catch (queueErr) {
         if (!isDbSchemaCompatibilityError(queueErr)) {
           throw queueErr;
@@ -36250,11 +36594,47 @@ app.post('/admin/pathways/admissions/:id/promote', requirePathwaysSectionAccess,
     for (const user of users || []) {
       const placement = await resolveUserAcademicPlacement(user);
       if (!placement || !placement.study_context_id) {
+        await queueAcademicModerationItem({
+          dedupeKey: academicSetupHelpers.buildModerationKey('promotion-target', admissionId, Number(user.id || 0), 'missing-placement'),
+          sourceKind: 'user',
+          sourceId: Number(user.id || 0) || null,
+          issueCode: 'failed_promotion_target',
+          severity: 'high',
+          title: 'Promotion skipped user without canonical study context',
+          summary: 'Promotion could not continue because the user has no canonical study context placement.',
+          payload: {
+            user_id: Number(user.id || 0) || null,
+            admission_id: admissionId,
+            program_id: Number(admissionRow.program_id || 0) || null,
+            track_key: admissionRow.track_key || null,
+            course_id: Number(user.course_id || 0) || null,
+            study_context_id: Number(user.study_context_id || 0) || null,
+          },
+        });
         skippedCount += 1;
         continue;
       }
       const nextContextId = await ensureNextStudyContextForPromotion(placement);
       if (!nextContextId) {
+        await queueAcademicModerationItem({
+          dedupeKey: academicSetupHelpers.buildModerationKey('promotion-target', admissionId, Number(user.id || 0), Number(placement.study_context_id || 0)),
+          sourceKind: 'user',
+          sourceId: Number(user.id || 0) || null,
+          issueCode: 'failed_promotion_target',
+          severity: 'high',
+          title: 'Promotion could not resolve next study context',
+          summary: 'Promotion failed to find or create the next-stage study context for this user.',
+          payload: {
+            user_id: Number(user.id || 0) || null,
+            admission_id: admissionId,
+            program_id: Number(admissionRow.program_id || 0) || null,
+            track_key: placement.track_key || admissionRow.track_key || null,
+            course_id: Number(placement.course_id || 0) || null,
+            study_context_id: Number(placement.study_context_id || 0) || null,
+            campus_key: placement.campus_key || null,
+            stage_number: Number(placement.stage || 0) || null,
+          },
+        });
         skippedCount += 1;
         continue;
       }
@@ -43492,22 +43872,36 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.courses');
   }
-  let courseId = isAdmin ? getAdminCourse(req) : Number(req.session.user.course_id || 1);
+  let fallbackCourseId = isAdmin ? getAdminCourse(req) : Number(req.session.user.course_id || 1);
   let allowCourseSelect = isAdmin;
+  let allowedCourseIds = null;
   if (!isAdmin) {
     const baseCourseId = Number(req.session.user.course_id || 1);
-    const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
+    const scopedCourseAccess = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
+    const { allowedCourses } = scopedCourseAccess;
     if (!allowedCourses.length) {
       return res.status(403).send('Forbidden (course access)');
     }
     courses = allowedCourses;
-    const requested = Number(req.query.course);
-    courseId = allowedCourseIds.has(requested) ? requested : baseCourseId;
-    if (!allowedCourseIds.has(courseId) && courses.length) {
-      courseId = Number(courses[0].id);
-    }
+    allowedCourseIds = scopedCourseAccess.allowedCourseIds;
+    fallbackCourseId = allowedCourseIds.has(baseCourseId)
+      ? baseCourseId
+      : (courses.length ? Number(courses[0].id) : baseCourseId);
     allowCourseSelect = courses.length > 1;
   }
+  let adminAcademicScope = null;
+  try {
+    adminAcademicScope = await buildAdminAcademicScopeState(req, {
+      courses,
+      allowedCourseIds,
+      fallbackCourseId,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.overview.scope');
+  }
+  let courseId = adminAcademicScope && adminAcademicScope.courseId
+    ? Number(adminAcademicScope.courseId || 0)
+    : fallbackCourseId;
   if (courses.length && !courses.some((c) => Number(c.id) === Number(courseId))) {
     courseId = Number(courses[0].id);
   }
@@ -43626,11 +44020,10 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
       weeklyUserRoles,
       weeklyUserSeries,
       coursePulse,
+      adminAcademicScope,
       limitedStaffView: !isAdmin,
       allowCourseSelect,
-      backLink: isAdmin
-        ? `/admin?course=${courseId}`
-        : (isDeanery ? `/deanery?course=${courseId}` : `/admin?course=${courseId}`),
+      backLink: buildStaffPanelScopeUrl(req, adminAcademicScope || { courseId }),
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.stats');

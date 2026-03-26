@@ -987,6 +987,8 @@
               <span class="badge bg-secondary"><%= (assets || []).length %></span>
             </div>
             <form method="POST" action="/teacher/workspace/assets" enctype="multipart/form-data" class="row g-2 mb-3">
+              <input type="hidden" name="study_context_id" value="<%= selectedWorkspaceContextId || '' %>" />
+              <input type="hidden" name="semester_id" value="<%= selectedWorkspaceSemesterId || '' %>" />
               <div class="col-12 col-md-6">
                 <label class="form-label" for="assetCourseId">Course scope</label>
                 <select class="form-select" id="assetCourseId" name="course_id">
@@ -1022,6 +1024,8 @@
                       </div>
                       <form method="POST" action="/teacher/workspace/assets/<%= asset.id %>/delete">
                         <input type="hidden" name="course_id" value="<%= selectedCourseId || asset.course_id || '' %>" />
+                        <input type="hidden" name="study_context_id" value="<%= selectedWorkspaceContextId || '' %>" />
+                        <input type="hidden" name="semester_id" value="<%= selectedWorkspaceSemesterId || '' %>" />
                         <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
                       </form>
                     </div>
@@ -1038,6 +1042,8 @@
           <article class="glass workspace-panel h-100">
             <h5 class="mb-3">New template</h5>
             <form method="POST" action="/teacher/workspace/templates" enctype="multipart/form-data" autocomplete="off">
+              <input type="hidden" name="study_context_id" value="<%= selectedWorkspaceContextId || '' %>" />
+              <input type="hidden" name="semester_id" value="<%= selectedWorkspaceSemesterId || '' %>" />
               <div class="row g-2">
                 <div class="col-12 col-md-6">
                   <label for="templateCourseId" class="form-label">Course scope</label>
@@ -1260,6 +1266,8 @@
                         </button>
                         <form method="POST" action="/teacher/workspace/templates/<%= template.id %>/delete">
                           <input type="hidden" name="course_id" value="<%= selectedCourseId || '' %>" />
+                          <input type="hidden" name="study_context_id" value="<%= selectedWorkspaceContextId || '' %>" />
+                          <input type="hidden" name="semester_id" value="<%= selectedWorkspaceSemesterId || '' %>" />
                           <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
                         </form>
                       </div>
@@ -1314,6 +1322,8 @@
               </div>
               <div class="modal-body">
                 <input type="hidden" id="editTemplateCourseContext" name="course_id_context" value="<%= selectedCourseId || '' %>" />
+                <input type="hidden" name="study_context_id" value="<%= selectedWorkspaceContextId || '' %>" />
+                <input type="hidden" name="semester_id" value="<%= selectedWorkspaceSemesterId || '' %>" />
                 <div class="row g-2">
                   <div class="col-12 col-md-6">
                     <label for="editTemplateCourseId" class="form-label">Course scope</label>
@@ -1454,6 +1464,8 @@
               </div>
               <div class="modal-body">
                 <input type="hidden" id="cloneTemplateCourseContext" name="course_id_context" value="<%= selectedCourseId || '' %>" />
+                <input type="hidden" name="study_context_id" value="<%= selectedWorkspaceContextId || '' %>" />
+                <input type="hidden" name="semester_id" value="<%= selectedWorkspaceSemesterId || '' %>" />
                 <p class="mb-2 small text-muted">
                   Source:
                   <strong id="cloneTemplateSourceTitle">-</strong>
@@ -1512,6 +1524,8 @@
               </div>
               <div class="modal-body">
                 <input type="hidden" id="bulkCloneCourseContext" name="course_id_context" value="<%= selectedCourseId || '' %>" />
+                <input type="hidden" name="study_context_id" value="<%= selectedWorkspaceContextId || '' %>" />
+                <input type="hidden" name="semester_id" value="<%= selectedWorkspaceSemesterId || '' %>" />
                 <div id="bulkCloneSourceInputs"></div>
                 <p class="mb-2 small text-muted">
                   Sources:
@@ -1572,6 +1586,8 @@
               </div>
               <div class="modal-body">
                 <input type="hidden" id="bulkDeleteCourseContext" name="course_id_context" value="<%= selectedCourseId || '' %>" />
+                <input type="hidden" name="study_context_id" value="<%= selectedWorkspaceContextId || '' %>" />
+                <input type="hidden" name="semester_id" value="<%= selectedWorkspaceSemesterId || '' %>" />
                 <div id="bulkDeleteSourceInputs"></div>
                 <p class="mb-2 small text-muted">
                   Templates selected for deletion:
