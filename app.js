@@ -2573,6 +2573,812 @@ async function isTeacherCourse(courseId) {
   return course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
 }
 
+function normalizeStudyContextStage(rawValue, fallback = 1) {
+  const normalized = Number(rawValue || 0);
+  if (Number.isInteger(normalized) && normalized > 0) {
+    return normalized;
+  }
+  const safeFallback = Number(fallback || 0);
+  return Number.isInteger(safeFallback) && safeFallback > 0 ? safeFallback : 1;
+}
+
+function formatStudyContextCampusLabel(campusKey, lang = 'uk') {
+  const normalized = normalizeCourseCampus(campusKey);
+  if (lang === 'en') {
+    return normalized === 'munich' ? 'Munich' : 'Kyiv';
+  }
+  return normalized === 'munich' ? 'Мюнхен' : 'Київ';
+}
+
+function formatStudyContextStageLabel(stage, trackKey = 'bachelor', lang = 'uk') {
+  const normalizedStage = normalizeStudyContextStage(stage, 1);
+  if (lang === 'en') {
+    if (normalizeRegistrationTrack(trackKey, 'bachelor') === 'teacher') {
+      return 'Teacher context';
+    }
+    return `Year ${normalizedStage}`;
+  }
+  if (normalizeRegistrationTrack(trackKey, 'bachelor') === 'teacher') {
+    return 'Викладацький контекст';
+  }
+  return `${normalizedStage} курс`;
+}
+
+function buildStudyContextLabel(context = {}, lang = 'uk') {
+  const programCode = sanitizeCompactText(context.program_code || '', 32);
+  const programName = sanitizeCompactText(context.program_name || '', 120);
+  const admissionYear = Number(context.admission_year || 0);
+  const campusLabel = formatStudyContextCampusLabel(context.campus_key || context.course_location, lang);
+  const stageLabel = formatStudyContextStageLabel(context.stage, context.track_key, lang);
+  const codePrefix = programCode ? `${programCode} ` : '';
+  const yearLabel = admissionYear > 0 ? `${admissionYear}` : '';
+  const parts = [
+    `${codePrefix}${programName}`.trim(),
+    yearLabel,
+    stageLabel,
+    campusLabel,
+  ].filter(Boolean);
+  return parts.join(' / ');
+}
+
+async function ensureAcademicSetupCohort(programId, admissionYear, options = {}) {
+  const normalizedProgramId = parsePositiveIntStrict(programId);
+  const normalizedAdmissionYear = Number(admissionYear || 0);
+  const legacyAdmissionId = parsePositiveIntStrict(options.legacyAdmissionId);
+  const label = sanitizeCompactText(options.label || '', 140);
+  if (!normalizedProgramId || !Number.isInteger(normalizedAdmissionYear) || normalizedAdmissionYear < 2000) {
+    return null;
+  }
+
+  try {
+    if (legacyAdmissionId) {
+      const existing = await db.get(
+        `
+          SELECT id
+          FROM cohorts
+          WHERE legacy_admission_id = ?
+          LIMIT 1
+        `,
+        [legacyAdmissionId]
+      );
+      const existingId = parsePositiveIntStrict(existing && existing.id);
+      if (existingId) {
+        const updated = await db.get(
+          `
+            UPDATE cohorts
+            SET
+              program_id = ?,
+              admission_year = ?,
+              legacy_admission_id = ?,
+              label = ?,
+              is_active = true,
+              updated_at = NOW()
+            WHERE id = ?
+            RETURNING id
+          `,
+          [normalizedProgramId, normalizedAdmissionYear, legacyAdmissionId, label || null, existingId]
+        );
+        return parsePositiveIntStrict(updated && updated.id) || existingId;
+      }
+    }
+
+    const inserted = await db.get(
+      `
+        INSERT INTO cohorts
+          (program_id, admission_year, legacy_admission_id, label, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, true, NOW(), NOW())
+        ON CONFLICT (program_id, admission_year)
+        DO UPDATE SET
+          legacy_admission_id = COALESCE(cohorts.legacy_admission_id, EXCLUDED.legacy_admission_id),
+          label = COALESCE(NULLIF(cohorts.label, ''), EXCLUDED.label),
+          updated_at = NOW()
+        RETURNING id
+      `,
+      [normalizedProgramId, normalizedAdmissionYear, legacyAdmissionId, label || null]
+    );
+    return parsePositiveIntStrict(inserted && inserted.id);
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+async function getStudyContextById(studyContextId) {
+  const normalizedStudyContextId = parsePositiveIntStrict(studyContextId);
+  if (!normalizedStudyContextId) {
+    return null;
+  }
+  try {
+    const row = await db.get(
+      `
+        SELECT
+          sc.id,
+          sc.cohort_id,
+          sc.campus_key,
+          sc.stage_number AS stage,
+          sc.is_active,
+          sc.label,
+          coh.program_id,
+          coh.admission_year,
+          coh.legacy_admission_id AS admission_id,
+          coh.label AS cohort_label,
+          p.code AS program_code,
+          p.name AS program_name,
+          p.track_key,
+          primary_binding.course_id,
+          c.name AS course_name,
+          COALESCE(c.location, sc.campus_key, 'kyiv') AS course_location,
+          c.is_teacher_course
+        FROM study_contexts sc
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        JOIN study_programs p ON p.id = coh.program_id
+        LEFT JOIN LATERAL (
+          SELECT sccb.course_id
+          FROM study_context_course_bindings sccb
+          WHERE sccb.study_context_id = sc.id
+          ORDER BY sccb.is_primary DESC, sccb.course_id ASC
+          LIMIT 1
+        ) primary_binding ON true
+        LEFT JOIN courses c ON c.id = primary_binding.course_id
+        WHERE sc.id = ?
+        LIMIT 1
+      `,
+      [normalizedStudyContextId]
+    );
+    if (!row) {
+      return null;
+    }
+    const normalizedRow = {
+      ...row,
+      id: Number(row.id || 0),
+      cohort_id: Number(row.cohort_id || 0),
+      course_id: Number(row.course_id || 0) || null,
+      campus_key: normalizeCourseCampus(row.campus_key || row.course_location),
+      stage: normalizeStudyContextStage(row.stage, inferLegacyCourseOrdinal(row.course_name) || 1),
+      track_key: normalizeRegistrationTrack(row.track_key, inferRegistrationTrackFromCourse(row)),
+      program_id: Number(row.program_id || 0) || null,
+      admission_id: Number(row.admission_id || 0) || null,
+      admission_year: Number(row.admission_year || 0) || null,
+      is_active: row.is_active === true || Number(row.is_active) === 1,
+      is_registration_open: true,
+      course_name: sanitizeCompactText(row.course_name || '', 140),
+      program_code: sanitizeCompactText(row.program_code || '', 40),
+      program_name: sanitizeCompactText(row.program_name || '', 140),
+      cohort_label: sanitizeCompactText(row.cohort_label || '', 140),
+    };
+    normalizedRow.context_label = sanitizeCompactText(
+      row.label || buildStudyContextLabel(normalizedRow, 'uk'),
+      200
+    );
+    normalizedRow.context_label_en = sanitizeCompactText(
+      row.label || buildStudyContextLabel(normalizedRow, 'en'),
+      200
+    );
+    return normalizedRow;
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+async function ensureStudyContextSemesters(contextId, courseId) {
+  const normalizedContextId = parsePositiveIntStrict(contextId);
+  const normalizedCourseId = parsePositiveIntStrict(courseId);
+  if (!normalizedContextId || !normalizedCourseId) {
+    return;
+  }
+  try {
+    const semesters = await db.all(
+      `
+        SELECT id, name, weeks_count, is_active
+        FROM semesters
+        WHERE course_id = ?
+        ORDER BY id ASC
+      `,
+      [normalizedCourseId]
+    );
+    for (let index = 0; index < (semesters || []).length; index += 1) {
+      const semester = semesters[index];
+      const semesterId = Number(semester.id || 0);
+      if (!semesterId) continue;
+      const semesterNumber = index + 1;
+      await db.run(
+        `
+          INSERT INTO study_context_semesters
+            (study_context_id, legacy_semester_id, semester_number, title, weeks_count, is_active, is_archived, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, false, NOW(), NOW())
+          ON CONFLICT (study_context_id, semester_number)
+          DO UPDATE SET
+            semester_number = EXCLUDED.semester_number,
+            title = EXCLUDED.title,
+            weeks_count = EXCLUDED.weeks_count,
+            is_active = EXCLUDED.is_active,
+            legacy_semester_id = COALESCE(study_context_semesters.legacy_semester_id, EXCLUDED.legacy_semester_id),
+            updated_at = NOW()
+        `,
+        [
+          normalizedContextId,
+          semesterId,
+          semesterNumber,
+          sanitizeCompactText(semester.name || `Semester ${semesterNumber}`, 120),
+          Number(semester.weeks_count || 0) || 0,
+          semester.is_active === true || Number(semester.is_active) === 1,
+        ]
+      );
+    }
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+}
+
+async function ensureStudyContextForLegacyPlacement({ courseId, admissionId, programId, trackKey, preferredCampus, preferredStage } = {}) {
+  const normalizedCourseId = parsePositiveIntStrict(courseId);
+  const normalizedAdmissionId = parsePositiveIntStrict(admissionId);
+  const normalizedProgramId = parsePositiveIntStrict(programId);
+  if (!normalizedCourseId || !normalizedAdmissionId) {
+    return null;
+  }
+
+  let existing = null;
+  try {
+    existing = await db.get(
+      `
+        SELECT sc.id
+        FROM study_contexts sc
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        JOIN study_context_course_bindings sccb ON sccb.study_context_id = sc.id
+        WHERE sccb.course_id = ?
+          AND coh.legacy_admission_id = ?
+        ORDER BY sccb.is_primary DESC, sc.id ASC
+        LIMIT 1
+      `,
+      [normalizedCourseId, normalizedAdmissionId]
+    );
+    if (existing && existing.id) {
+      await ensureStudyContextSemesters(existing.id, normalizedCourseId);
+      return Number(existing.id);
+    }
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
+
+  const admissionRow = await db.get(
+    `
+      SELECT
+        a.id,
+        a.program_id,
+        a.admission_year,
+        a.label,
+        p.track_key,
+        p.code AS program_code,
+        p.name AS program_name,
+        c.id AS course_id,
+        c.name AS course_name,
+        COALESCE(c.location, 'kyiv') AS course_location
+      FROM program_admissions a
+      JOIN study_programs p ON p.id = a.program_id
+      JOIN courses c ON c.id = ?
+      WHERE a.id = ?
+      LIMIT 1
+    `,
+    [normalizedCourseId, normalizedAdmissionId]
+  );
+  if (!admissionRow) {
+    return null;
+  }
+
+  const resolvedProgramId = normalizedProgramId || Number(admissionRow.program_id || 0) || null;
+  const cohortId = await ensureAcademicSetupCohort(resolvedProgramId, admissionRow.admission_year, {
+    legacyAdmissionId: normalizedAdmissionId,
+    label: admissionRow.label,
+  });
+  if (!cohortId) {
+    return null;
+  }
+
+  const contextStage = normalizeStudyContextStage(
+    preferredStage,
+    inferLegacyCourseOrdinal(admissionRow.course_name) || 1
+  );
+  const campusKey = normalizeCourseCampus(preferredCampus || admissionRow.course_location);
+  const normalizedTrackKey = normalizeRegistrationTrack(trackKey || admissionRow.track_key, inferRegistrationTrackFromCourse(admissionRow));
+  const defaultLabel = buildStudyContextLabel({
+    program_code: admissionRow.program_code,
+    program_name: admissionRow.program_name,
+    admission_year: admissionRow.admission_year,
+    campus_key: campusKey,
+    stage: contextStage,
+    track_key: normalizedTrackKey,
+  });
+
+  try {
+    const inserted = await db.get(
+      `
+        INSERT INTO study_contexts
+          (cohort_id, stage_number, campus_key, label, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, true, NOW(), NOW())
+        ON CONFLICT (cohort_id, stage_number, campus_key)
+        DO UPDATE SET
+          label = COALESCE(NULLIF(study_contexts.label, ''), EXCLUDED.label),
+          is_active = true,
+          updated_at = NOW()
+        RETURNING id
+      `,
+      [
+        cohortId,
+        contextStage,
+        campusKey,
+        defaultLabel,
+      ]
+    );
+    const contextId = parsePositiveIntStrict(inserted && inserted.id);
+    if (contextId) {
+      await db.run(
+        `
+          INSERT INTO study_context_course_bindings
+            (study_context_id, course_id, is_primary, created_at, updated_at)
+          VALUES (?, ?, true, NOW(), NOW())
+          ON CONFLICT (study_context_id, course_id)
+          DO UPDATE SET
+            is_primary = true,
+            updated_at = NOW()
+        `,
+        [contextId, normalizedCourseId]
+      );
+      await ensureStudyContextSemesters(contextId, normalizedCourseId);
+    }
+    return contextId;
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+async function resolveRegistrationStudyContext({ admissionId, programId, trackKey, campus, stage = 1 } = {}) {
+  const normalizedAdmissionId = parsePositiveIntStrict(admissionId);
+  const normalizedProgramId = parsePositiveIntStrict(programId);
+  if (!normalizedAdmissionId) {
+    return { contextId: null, reason: 'missing_admission' };
+  }
+  const campusKey = parseCourseCampus(campus);
+  if (!campusKey) {
+    return { contextId: null, reason: 'missing_campus' };
+  }
+  const normalizedStage = normalizeStudyContextStage(stage, 1);
+  const normalizedTrackKey = trackKey ? normalizeRegistrationTrack(trackKey, 'bachelor') : '';
+  const params = [normalizedAdmissionId, campusKey, normalizedStage];
+  const where = [
+    'coh.legacy_admission_id = ?',
+    'sc.campus_key = ?',
+    'sc.stage_number = ?',
+    'sc.is_active = true',
+  ];
+  if (normalizedProgramId) {
+    where.push('coh.program_id = ?');
+    params.push(normalizedProgramId);
+  }
+  if (normalizedTrackKey) {
+    where.push('p.track_key = ?');
+    params.push(normalizedTrackKey);
+  }
+
+  try {
+    const row = await db.get(
+      `
+        SELECT sc.id, sccb.course_id
+        FROM study_contexts sc
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        JOIN study_programs p ON p.id = coh.program_id
+        JOIN study_context_course_bindings sccb ON sccb.study_context_id = sc.id
+        WHERE ${where.join('\n          AND ')}
+        ORDER BY sccb.is_primary DESC, sc.id ASC
+        LIMIT 1
+      `,
+      params
+    );
+    if (!row || !row.id) {
+      return { contextId: null, courseId: null, reason: 'context_not_found' };
+    }
+    return {
+      contextId: Number(row.id || 0) || null,
+      courseId: Number(row.course_id || 0) || null,
+      reason: null,
+    };
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return { contextId: null, courseId: null, reason: 'context_not_found' };
+    }
+    throw err;
+  }
+}
+
+async function resolveUserAcademicPlacement(userOrId, options = {}) {
+  const lang = options.lang === 'en' ? 'en' : 'uk';
+  const userRow = typeof userOrId === 'object' && userOrId
+    ? userOrId
+    : await db.get(
+      `
+        SELECT
+          id,
+          course_id,
+          admission_id,
+          study_program_id,
+          study_track,
+          study_context_id
+        FROM users
+        WHERE id = ?
+      `,
+      [parsePositiveIntStrict(userOrId)]
+    );
+  if (!userRow) {
+    return null;
+  }
+
+  const studyContextId = parsePositiveIntStrict(userRow.study_context_id);
+  const placement = {
+    user_id: Number(userRow.id || 0) || null,
+    study_context_id: studyContextId || null,
+    course_id: parsePositiveIntStrict(userRow.course_id) || null,
+    admission_id: parsePositiveIntStrict(userRow.admission_id) || null,
+    program_id: parsePositiveIntStrict(userRow.study_program_id) || null,
+    track_key: normalizeRegistrationTrack(userRow.study_track, 'bachelor'),
+    campus_key: '',
+    stage: 1,
+    course_name: '',
+    program_code: '',
+    program_name: '',
+    admission_year: null,
+    cohort_label: '',
+    context_label: '',
+  };
+
+  if (studyContextId) {
+    const context = await getStudyContextById(studyContextId);
+    if (context) {
+      return {
+        ...placement,
+        study_context_id: context.id,
+        course_id: context.course_id,
+        admission_id: context.admission_id || placement.admission_id,
+        program_id: context.program_id || placement.program_id,
+        track_key: context.track_key,
+        campus_key: context.campus_key,
+        stage: context.stage,
+        course_name: context.course_name,
+        program_code: context.program_code,
+        program_name: context.program_name,
+        admission_year: context.admission_year,
+        cohort_label: context.cohort_label,
+        context_label: buildStudyContextLabel(context, lang),
+        raw_context: context,
+      };
+    }
+  }
+
+  if (placement.course_id && placement.admission_id) {
+    const ensuredContextId = await ensureStudyContextForLegacyPlacement({
+      courseId: placement.course_id,
+      admissionId: placement.admission_id,
+      programId: placement.program_id,
+      trackKey: placement.track_key,
+    });
+    if (ensuredContextId) {
+      const context = await getStudyContextById(ensuredContextId);
+      if (context) {
+        return {
+          ...placement,
+          study_context_id: context.id,
+          course_id: context.course_id,
+          admission_id: context.admission_id || placement.admission_id,
+          program_id: context.program_id || placement.program_id,
+          track_key: context.track_key,
+          campus_key: context.campus_key,
+          stage: context.stage,
+          course_name: context.course_name,
+          program_code: context.program_code,
+          program_name: context.program_name,
+          admission_year: context.admission_year,
+          cohort_label: context.cohort_label,
+          context_label: buildStudyContextLabel(context, lang),
+          raw_context: context,
+        };
+      }
+    }
+  }
+
+  const course = placement.course_id ? await getCourseById(placement.course_id) : null;
+  placement.campus_key = normalizeCourseCampus((course && course.location) || '', 'kyiv');
+  placement.stage = normalizeStudyContextStage(inferLegacyCourseOrdinal((course && course.name) || ''), 1);
+  placement.course_name = sanitizeCompactText((course && course.name) || '', 140);
+  placement.context_label = buildStudyContextLabel({
+    program_code: placement.program_code,
+    program_name: placement.program_name || (placement.track_key === 'teacher' ? 'Teacher Track' : ''),
+    admission_year: placement.admission_year,
+    campus_key: placement.campus_key,
+    stage: placement.stage,
+    track_key: placement.track_key,
+  }, lang);
+  return placement;
+}
+
+async function assignUserStudyContext(userId, studyContextId, fallback = {}) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  if (!normalizedUserId) {
+    return null;
+  }
+  const normalizedStudyContextId = parsePositiveIntStrict(studyContextId);
+  const context = normalizedStudyContextId ? await getStudyContextById(normalizedStudyContextId) : null;
+  const nextCourseId = context
+    ? (context.course_id || null)
+    : (parsePositiveIntStrict(fallback.courseId) || null);
+  const nextTrackKey = context
+    ? context.track_key
+    : normalizeRegistrationTrack(fallback.trackKey, '');
+  const nextProgramId = context
+    ? (context.program_id || null)
+    : (parsePositiveIntStrict(fallback.programId) || null);
+  const nextAdmissionId = context
+    ? (context.admission_id || parsePositiveIntStrict(fallback.admissionId) || null)
+    : (parsePositiveIntStrict(fallback.admissionId) || null);
+
+  await db.run(
+    `
+      UPDATE users
+      SET
+        study_context_id = ?,
+        course_id = ?,
+        study_track = ?,
+        study_program_id = ?,
+        admission_id = ?
+      WHERE id = ?
+    `,
+    [
+      normalizedStudyContextId || null,
+      nextCourseId,
+      nextTrackKey || null,
+      nextProgramId,
+      nextAdmissionId,
+      normalizedUserId,
+    ]
+  );
+
+  if (!normalizedStudyContextId || !context) {
+    return null;
+  }
+  return context;
+}
+
+async function listStudyContextOptions(options = {}) {
+  const normalizedProgramId = parsePositiveIntStrict(options.programId);
+  const normalizedAdmissionId = parsePositiveIntStrict(options.admissionId);
+  const normalizedCourseId = parsePositiveIntStrict(options.courseId);
+  const normalizedTrackKey = options.trackKey ? normalizeRegistrationTrack(options.trackKey, 'bachelor') : '';
+  const params = [];
+  const where = ['sc.is_active = true'];
+  if (normalizedProgramId) {
+    where.push('coh.program_id = ?');
+    params.push(normalizedProgramId);
+  }
+  if (normalizedAdmissionId) {
+    where.push('coh.legacy_admission_id = ?');
+    params.push(normalizedAdmissionId);
+  }
+  if (normalizedCourseId) {
+    where.push('EXISTS (SELECT 1 FROM study_context_course_bindings sccb WHERE sccb.study_context_id = sc.id AND sccb.course_id = ?)');
+    params.push(normalizedCourseId);
+  }
+  if (normalizedTrackKey) {
+    where.push('p.track_key = ?');
+    params.push(normalizedTrackKey);
+  }
+
+  try {
+    const rows = await db.all(
+      `
+        SELECT
+          sc.id,
+          sc.cohort_id,
+          sc.campus_key,
+          sc.stage_number AS stage,
+          p.track_key,
+          coh.program_id,
+          coh.admission_year,
+          coh.legacy_admission_id AS admission_id,
+          p.code AS program_code,
+          p.name AS program_name,
+          primary_binding.course_id,
+          c.name AS course_name,
+          COALESCE(c.location, sc.campus_key, 'kyiv') AS course_location
+        FROM study_contexts sc
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        JOIN study_programs p ON p.id = coh.program_id
+        LEFT JOIN LATERAL (
+          SELECT sccb.course_id
+          FROM study_context_course_bindings sccb
+          WHERE sccb.study_context_id = sc.id
+          ORDER BY sccb.is_primary DESC, sccb.course_id ASC
+          LIMIT 1
+        ) primary_binding ON true
+        LEFT JOIN courses c ON c.id = primary_binding.course_id
+        WHERE ${where.join('\n          AND ')}
+        ORDER BY
+          CASE p.track_key
+            WHEN 'bachelor' THEN 0
+            WHEN 'master' THEN 1
+            WHEN 'teacher' THEN 2
+            ELSE 3
+          END,
+          p.name ASC,
+          coh.admission_year DESC,
+          sc.stage_number ASC,
+          CASE sc.campus_key
+            WHEN 'kyiv' THEN 0
+            WHEN 'munich' THEN 1
+            ELSE 2
+          END
+      `,
+      params
+    );
+    return (rows || []).map((row) => {
+      const context = {
+        ...row,
+        id: Number(row.id || 0),
+        cohort_id: Number(row.cohort_id || 0),
+        course_id: Number(row.course_id || 0) || null,
+        stage: normalizeStudyContextStage(row.stage, 1),
+        track_key: normalizeRegistrationTrack(row.track_key, 'bachelor'),
+        campus_key: normalizeCourseCampus(row.campus_key || row.course_location),
+        program_id: Number(row.program_id || 0) || null,
+        admission_id: Number(row.admission_id || 0) || null,
+        admission_year: Number(row.admission_year || 0) || null,
+        program_code: sanitizeCompactText(row.program_code || '', 40),
+        program_name: sanitizeCompactText(row.program_name || '', 140),
+        course_name: sanitizeCompactText(row.course_name || '', 140),
+        is_registration_open: true,
+      };
+      return {
+        ...context,
+        label: buildStudyContextLabel(context, 'uk'),
+        label_en: buildStudyContextLabel(context, 'en'),
+      };
+    });
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function syncStudyContextsForAdmission(admissionId) {
+  const normalizedAdmissionId = parsePositiveIntStrict(admissionId);
+  if (!normalizedAdmissionId) {
+    return { cohortId: null, contextIds: [] };
+  }
+  try {
+    const admission = await db.get(
+      `
+        SELECT
+          a.id,
+          a.program_id,
+          a.admission_year,
+          a.label,
+          p.track_key,
+          p.code AS program_code,
+          p.name AS program_name
+        FROM program_admissions a
+        JOIN study_programs p ON p.id = a.program_id
+        WHERE a.id = ?
+        LIMIT 1
+      `,
+      [normalizedAdmissionId]
+    );
+    if (!admission) {
+      return { cohortId: null, contextIds: [] };
+    }
+    const cohortId = await ensureAcademicSetupCohort(admission.program_id, admission.admission_year, {
+      legacyAdmissionId: normalizedAdmissionId,
+      label: admission.label,
+    });
+    if (!cohortId) {
+      return { cohortId: null, contextIds: [] };
+    }
+
+    const rows = await db.all(
+      `
+        SELECT
+          pac.course_id,
+          pac.is_visible,
+          c.name AS course_name,
+          COALESCE(c.location, 'kyiv') AS course_location
+        FROM program_admission_courses pac
+        JOIN courses c ON c.id = pac.course_id
+        WHERE pac.admission_id = ?
+      `,
+      [normalizedAdmissionId]
+    );
+    const activeContextIds = [];
+    for (const row of rows || []) {
+      const mappedCourseId = Number(row.course_id || 0);
+      if (!mappedCourseId) continue;
+      const campusKey = normalizeCourseCampus(row.course_location);
+      const stage = normalizeStudyContextStage(inferLegacyCourseOrdinal(row.course_name), 1);
+      const label = buildStudyContextLabel({
+        program_code: admission.program_code,
+        program_name: admission.program_name,
+        admission_year: admission.admission_year,
+        campus_key: campusKey,
+        stage,
+        track_key: admission.track_key,
+      });
+      const upserted = await db.get(
+        `
+          INSERT INTO study_contexts
+            (cohort_id, stage_number, campus_key, label, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+          ON CONFLICT (cohort_id, stage_number, campus_key)
+          DO UPDATE SET
+            is_active = EXCLUDED.is_active,
+            label = EXCLUDED.label,
+            updated_at = NOW()
+          RETURNING id
+        `,
+        [
+          cohortId,
+          stage,
+          campusKey,
+          label,
+          row.is_visible === true || Number(row.is_visible) === 1,
+        ]
+      );
+      const contextId = parsePositiveIntStrict(upserted && upserted.id);
+      if (contextId) {
+        activeContextIds.push(contextId);
+        await db.run(
+          `
+            INSERT INTO study_context_course_bindings
+              (study_context_id, course_id, is_primary, created_at, updated_at)
+            VALUES (?, ?, true, NOW(), NOW())
+            ON CONFLICT (study_context_id, course_id)
+            DO UPDATE SET
+              is_primary = true,
+              updated_at = NOW()
+          `,
+          [contextId, mappedCourseId]
+        );
+        await ensureStudyContextSemesters(contextId, mappedCourseId);
+      }
+    }
+
+    await db.run(
+      `
+        UPDATE study_contexts
+        SET is_active = CASE WHEN id = ANY(?::int[]) THEN true ELSE false END,
+            updated_at = NOW()
+        WHERE cohort_id = ?
+      `,
+      [activeContextIds.length ? activeContextIds : [0], cohortId]
+    );
+
+    return { cohortId, contextIds: activeContextIds };
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return { cohortId: null, contextIds: [] };
+    }
+    throw err;
+  }
+}
+
 function normalizeRegistrationTrack(rawTrack, fallback = 'bachelor') {
   return pathwayHelpers.normalizeRegistrationTrack(rawTrack, fallback);
 }
@@ -9194,7 +10000,7 @@ app.get('/register/course', async (req, res) => {
     const [courses, pendingUser, registrationPathways] = await Promise.all([
       getCoursesCached(),
       db.get(
-        'SELECT course_id, study_track, study_program_id, admission_id FROM users WHERE id = ?',
+        'SELECT course_id, study_track, study_program_id, admission_id, study_context_id FROM users WHERE id = ?',
         [req.session.pendingUserId]
       ),
       getRegistrationPathways(),
@@ -9204,18 +10010,21 @@ app.get('/register/course', async (req, res) => {
       req.session.rememberMe = null;
       return res.redirect('/register?error=Session%20expired');
     }
-    const selectedCourseId = pendingUser && pendingUser.course_id ? Number(pendingUser.course_id) : null;
+    const pendingPlacement = await resolveUserAcademicPlacement(pendingUser, { lang: getPreferredLang(req) });
+    const selectedCourseId = pendingPlacement && pendingPlacement.course_id ? Number(pendingPlacement.course_id) : null;
     const selectedCourse = (courses || []).find((course) => Number(course.id) === Number(selectedCourseId)) || null;
     const selectedTrack = normalizeRegistrationTrack(
-      pendingUser.study_track,
+      pendingPlacement && pendingPlacement.track_key ? pendingPlacement.track_key : pendingUser.study_track,
       inferRegistrationTrackFromCourse(selectedCourse)
     );
-    const selectedCampus = selectedCourse ? normalizeCourseCampus(selectedCourse.location) : '';
-    const selectedProgramId = Number.isFinite(Number(pendingUser.study_program_id))
-      ? Number(pendingUser.study_program_id)
+    const selectedCampus = pendingPlacement && pendingPlacement.campus_key
+      ? normalizeCourseCampus(pendingPlacement.campus_key)
+      : (selectedCourse ? normalizeCourseCampus(selectedCourse.location) : '');
+    const selectedProgramId = Number.isFinite(Number((pendingPlacement && pendingPlacement.program_id) || pendingUser.study_program_id))
+      ? Number((pendingPlacement && pendingPlacement.program_id) || pendingUser.study_program_id)
       : null;
-    const selectedAdmissionId = Number.isFinite(Number(pendingUser.admission_id))
-      ? Number(pendingUser.admission_id)
+    const selectedAdmissionId = Number.isFinite(Number((pendingPlacement && pendingPlacement.admission_id) || pendingUser.admission_id))
+      ? Number((pendingPlacement && pendingPlacement.admission_id) || pendingUser.admission_id)
       : null;
     return res.render('register-course', {
       courses,
@@ -9225,6 +10034,8 @@ app.get('/register/course', async (req, res) => {
       selectedProgramId,
       selectedAdmissionId,
       registrationPathways,
+      selectedStudyContextId: pendingPlacement && pendingPlacement.study_context_id ? Number(pendingPlacement.study_context_id) : null,
+      pendingStudyContext: pendingPlacement,
       error: req.query.error || '',
     });
   } catch (err) {
@@ -9253,6 +10064,7 @@ app.post('/register/course', registerLimiter, async (req, res) => {
   let selectedProgramId = Number.isFinite(requestedProgramId) && requestedProgramId > 0 ? requestedProgramId : null;
   let selectedAdmissionId = Number.isFinite(requestedAdmissionId) && requestedAdmissionId > 0 ? requestedAdmissionId : null;
   let courseId = parsePositiveIntStrict(req.body.course_id);
+  let studyContextId = parsePositiveIntStrict(req.body.study_context_id);
 
   try {
     await ensureDbReady();
@@ -9261,6 +10073,25 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       selectedAdmissionId = await resolveLatestRegistrationAdmissionId(selectedProgramId, {
         trackKey: 'teacher',
       });
+    }
+
+    if (!studyContextId && selectedAdmissionId && requestedCampus) {
+      const resolvedContext = await resolveRegistrationStudyContext({
+        admissionId: selectedAdmissionId,
+        programId: selectedProgramId,
+        trackKey: trackFromBody,
+        campus: requestedCampus,
+        stage: 1,
+      });
+      if (resolvedContext.contextId) {
+        studyContextId = resolvedContext.contextId;
+        courseId = resolvedContext.courseId || courseId;
+      } else if (resolvedContext.reason && resolvedContext.reason !== 'context_not_found') {
+        if (resolvedContext.reason === 'ambiguous_campus') {
+          return redirectRegistrationFlowIssue('ambiguous_campus');
+        }
+        return redirectRegistrationFlowIssue(resolvedContext.reason || 'campus_not_available');
+      }
     }
 
     if (!courseId && selectedAdmissionId && requestedCampus) {
@@ -9396,6 +10227,17 @@ app.post('/register/course', registerLimiter, async (req, res) => {
     if (selectedProgramId && !selectedAdmissionId) {
       return redirectRegistrationFlowIssue('missing_admission');
     }
+    if (!studyContextId && courseId && selectedAdmissionId) {
+      studyContextId = await ensureStudyContextForLegacyPlacement({
+        courseId,
+        admissionId: selectedAdmissionId,
+        programId: selectedProgramId,
+        trackKey: selectedTrack,
+        preferredCampus: requestedCampus,
+        preferredStage: 1,
+      });
+    }
+
     if (!teacherCourse && selectedAdmissionId) {
       const scopedSubjects = await getRegistrationSubjects(courseId, selectedAdmissionId);
       if (!(scopedSubjects || []).length) {
@@ -9403,10 +10245,12 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       }
     }
 
-    await db.run(
-      'UPDATE users SET course_id = ?, study_track = ?, study_program_id = ?, admission_id = ? WHERE id = ?',
-      [courseId, selectedTrack, selectedProgramId, selectedAdmissionId, userId]
-    );
+    await assignUserStudyContext(userId, studyContextId, {
+      courseId,
+      trackKey: selectedTrack,
+      programId: selectedProgramId,
+      admissionId: selectedAdmissionId,
+    });
     await db.run(
       'UPDATE user_registration_events SET course_id = COALESCE(course_id, ?) WHERE user_id = ?',
       [courseId, userId]
@@ -9429,22 +10273,23 @@ app.get('/register/subjects', async (req, res) => {
   try {
     await ensureDbReady();
     const user = await db.get(
-      'SELECT course_id, admission_id FROM users WHERE id = ?',
+      'SELECT course_id, admission_id, study_context_id, study_program_id, study_track FROM users WHERE id = ?',
       [req.session.pendingUserId]
     );
-    if (!user || !user.course_id) {
+    const placement = await resolveUserAcademicPlacement(user, { lang: getPreferredLang(req) });
+    if (!placement || !placement.course_id) {
       return res.redirect('/register/course');
     }
-    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [user.course_id]);
+    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [placement.course_id]);
     if (course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
       return res.redirect('/register/teacher-subjects');
     }
 
     const [subjects, allCourseSubjects, baseVisibleSubjects, admissionMappedCourses] = await Promise.all([
-      getRegistrationSubjects(user.course_id, user.admission_id),
-      getSubjectsCached(user.course_id, { visibleOnly: false }),
-      getSubjectsCached(user.course_id, { visibleOnly: true }),
-      getAdmissionRegistrationCourses(user.admission_id),
+      getRegistrationSubjects(placement.course_id, placement.admission_id),
+      getSubjectsCached(placement.course_id, { visibleOnly: false }),
+      getSubjectsCached(placement.course_id, { visibleOnly: true }),
+      getAdmissionRegistrationCourses(placement.admission_id),
     ]);
     const isRequired = (subject) =>
       subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
@@ -9531,6 +10376,7 @@ app.get('/register/subjects', async (req, res) => {
       subjects,
       optouts,
       selectedGroups,
+      studyContext: placement,
       pathwayRegistrationHint,
       registrationPathwayReadiness,
       registrationPathwayAlert,
@@ -9559,14 +10405,15 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
   try {
     await ensureDbReady();
     const userRow = await db.get(
-      'SELECT course_id, admission_id FROM users WHERE id = ?',
+      'SELECT course_id, admission_id, study_context_id, study_program_id, study_track FROM users WHERE id = ?',
       [userId]
     );
-    if (!userRow || !userRow.course_id) {
+    const placement = await resolveUserAcademicPlacement(userRow, { lang: getPreferredLang(req) });
+    if (!placement || !placement.course_id) {
       return res.redirect('/register/course');
     }
 
-    const subjects = await getRegistrationSubjects(userRow.course_id, userRow.admission_id);
+    const subjects = await getRegistrationSubjects(placement.course_id, placement.admission_id);
     const isRequired = (subject) =>
       subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
     let hasMissingRequired = false;
@@ -9673,31 +10520,39 @@ app.get('/register/teacher-subjects', (req, res) => {
   ensureDbReady().catch((err) => {
     console.error('DB init failed', err);
   });
-  db.get('SELECT id, course_id FROM users WHERE id = ?', [req.session.pendingUserId], (uErr, user) => {
-    if (uErr || !user || !user.course_id) {
-      return res.redirect('/register/course');
-    }
-    db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [user.course_id], async (cErr, course) => {
-      if (cErr || !course) {
+  db.get(
+    'SELECT id, course_id, admission_id, study_context_id, study_program_id, study_track FROM users WHERE id = ?',
+    [req.session.pendingUserId],
+    async (uErr, user) => {
+      if (uErr || !user) {
         return res.redirect('/register/course');
       }
-      if (!(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
-        return res.redirect('/register/subjects');
-      }
       try {
+        const placement = await resolveUserAcademicPlacement(user, { lang: getPreferredLang(req) });
+        if (!placement || !placement.course_id) {
+          return res.redirect('/register/course');
+        }
+        const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [placement.course_id]);
+        if (!course) {
+          return res.redirect('/register/course');
+        }
+        if (!(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+          return res.redirect('/register/subjects');
+        }
         const subjects = await getTeacherSubjectCatalog();
         const selections = await getTeacherSelections(user.id);
         return res.render('register-teacher-subjects', {
           subjects,
           selections,
+          studyContext: placement,
           error: req.query.error || '',
           isProfileEdit: false,
         });
       } catch (err) {
         return res.status(500).send('Database error');
       }
-    });
-  });
+    }
+  );
 });
 
 app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
@@ -9706,11 +10561,15 @@ app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
     return res.redirect('/register');
   }
   try {
-    const userRow = await db.get('SELECT id, full_name, role, schedule_group, course_id, language FROM users WHERE id = ?', [userId]);
-    if (!userRow || !userRow.course_id) {
+    const userRow = await db.get(
+      'SELECT id, full_name, role, schedule_group, course_id, language, study_context_id, admission_id, study_program_id, study_track FROM users WHERE id = ?',
+      [userId]
+    );
+    const placement = await resolveUserAcademicPlacement(userRow, { lang: getPreferredLang(req) });
+    if (!userRow || !placement || !placement.course_id) {
       return res.redirect('/register/course');
     }
-    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [userRow.course_id]);
+    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [placement.course_id]);
     if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
       return res.redirect('/register/subjects');
     }
@@ -10921,20 +11780,24 @@ app.get('/profile', requireLogin, async (req, res) => {
   }
   const { id, role, username } = req.session.user;
   try {
-    const user = await db.get('SELECT id, full_name, course_id, language FROM users WHERE id = ?', [id]);
+    const user = await db.get(
+      'SELECT id, full_name, course_id, language, admission_id, study_program_id, study_track, study_context_id FROM users WHERE id = ?',
+      [id]
+    );
     if (!user) {
       return res.status(500).send('Database error');
     }
+    const placement = await resolveUserAcademicPlacement(user, { lang: getPreferredLang(req) });
     let teacherStatus = null;
     let teacherCourse = false;
-    if (user.course_id) {
-      teacherCourse = await isTeacherCourse(user.course_id);
+    if (placement && placement.course_id) {
+      teacherCourse = await isTeacherCourse(placement.course_id);
       if (teacherCourse) {
         const tr = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [id]);
         teacherStatus = tr ? tr.status : null;
       }
     }
-    const activeSemester = await getActiveSemester(user.course_id || 1);
+    const activeSemester = await getActiveSemester((placement && placement.course_id) || user.course_id || 1);
     const pointsRow = await db.get(
       `
         SELECT COALESCE(SUM(${ACTIVITY_POINTS_CASE}), 0) AS points
@@ -10944,7 +11807,8 @@ app.get('/profile', requireLogin, async (req, res) => {
       activeSemester ? [id, activeSemester.id] : [id]
     );
     const activityPoints = pointsRow ? Number(pointsRow.points || 0) : 0;
-    const analyticsParams = activeSemester ? [id, user.course_id || 1, activeSemester.id] : [id, user.course_id || 1];
+    const analyticsCourseId = (placement && placement.course_id) || user.course_id || 1;
+    const analyticsParams = activeSemester ? [id, analyticsCourseId, activeSemester.id] : [id, analyticsCourseId];
     const [
       homeworkCreatedRow,
       teamworkCreatedRow,
@@ -10977,6 +11841,7 @@ app.get('/profile', requireLogin, async (req, res) => {
     };
     res.render('profile', {
       user,
+      studyContext: placement,
       activityPoints,
       profileStats,
       teacherStatus,
@@ -29712,6 +30577,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
     const admissionId = parsePositiveIntStrict(inserted && inserted.id);
     if (admissionId) {
       await cloneAdmissionConfigurationFromLatest(programId, admissionId);
+      await syncStudyContextsForAdmission(admissionId);
     }
     invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
@@ -29787,6 +30653,7 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
       `,
       [programId, admissionYear, label || null, isActive, admissionId]
     );
+    await syncStudyContextsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
@@ -29862,6 +30729,7 @@ app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAc
         [admissionId, course.id, mappedFlag]
       );
     }
+    await syncStudyContextsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
@@ -29979,6 +30847,7 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
       [admissionId, sourceAdmissionId, compatibleCourseIds]
     );
 
+    await syncStudyContextsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
@@ -30095,6 +30964,7 @@ app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSec
       );
     }
 
+    await syncStudyContextsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
@@ -30201,27 +31071,82 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
       }));
     }
 
-    const updatedRows = await db.all(
-      `
-        UPDATE users
-        SET
-          study_track = ?,
-          study_program_id = ?,
-          admission_id = ?
-        WHERE course_id = ANY(?::int[])
-          AND LOWER(COALESCE(role, '')) <> 'admin'
-        RETURNING id
-      `,
-      [admissionRow.track_key, resolvedProgramId, admissionId, validSourceCourseIds]
-    );
+    await syncStudyContextsForAdmission(admissionId);
+    let migratedCount = 0;
+    const missingContextCourseIds = [];
+    for (const sourceCourseId of validSourceCourseIds) {
+      const targetContextId = await ensureStudyContextForLegacyPlacement({
+        courseId: sourceCourseId,
+        admissionId,
+        programId: resolvedProgramId,
+        trackKey: admissionRow.track_key,
+      });
+      if (!targetContextId) {
+        missingContextCourseIds.push(sourceCourseId);
+        continue;
+      }
+      const updatedRows = await db.all(
+        `
+          UPDATE users
+          SET
+            study_context_id = ?,
+            course_id = ?,
+            study_track = ?,
+            study_program_id = ?,
+            admission_id = ?
+          WHERE course_id = ?
+            AND LOWER(COALESCE(role, '')) <> 'admin'
+          RETURNING id
+        `,
+        [targetContextId, sourceCourseId, admissionRow.track_key, resolvedProgramId, admissionId, sourceCourseId]
+      );
+      migratedCount += Array.isArray(updatedRows) ? updatedRows.length : 0;
+    }
 
-    const migratedCount = Array.isArray(updatedRows) ? updatedRows.length : 0;
+    if (missingContextCourseIds.length) {
+      try {
+        await db.run(
+          `
+            INSERT INTO academic_moderation_queue
+              (dedupe_key, source_kind, source_id, issue_code, severity, status, title, summary, payload_json, created_at, updated_at)
+            SELECT
+              CONCAT('course-migration::', ?, '::', source_course_id),
+              'course_migration',
+              source_course_id,
+              'missing_target_context',
+              'high',
+              'open',
+              'Missing target study context for migration',
+              'Could not resolve a study context for the selected course during cohort migration.',
+              payload::jsonb,
+              NOW(),
+              NOW()
+            FROM UNNEST(?::int[], ?::text[]) AS t(source_course_id, payload)
+          `,
+          [
+            admissionId,
+            missingContextCourseIds,
+            missingContextCourseIds.map((courseIdValue) => JSON.stringify({
+              admission_id: admissionId,
+              course_id: courseIdValue,
+              program_id: resolvedProgramId,
+              track_key: admissionRow.track_key,
+            })),
+          ]
+        );
+      } catch (queueErr) {
+        if (!isDbSchemaCompatibilityError(queueErr)) {
+          throw queueErr;
+        }
+      }
+    }
     logAction(db, req, 'pathways_user_migrate', {
       admission_id: admissionId,
       program_id: resolvedProgramId,
       study_track: admissionRow.track_key,
       source_course_ids: validSourceCourseIds,
       migrated_count: migratedCount,
+      missing_context_course_ids: missingContextCourseIds,
     });
     broadcast('users_updated');
 
@@ -30236,6 +31161,153 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.users.migrate');
+  }
+});
+
+app.post('/admin/pathways/admissions/:id/promote', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const admissionId = parsePositiveIntStrict(req.params.id);
+  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
+  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const programId = parsePositiveIntStrict(req.body.program_id);
+
+  if (!admissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId,
+      error: msg.invalidAdmissionYear,
+    }));
+  }
+
+  try {
+    const admissionRow = await db.get(
+      `
+        SELECT
+          a.id,
+          a.program_id,
+          a.admission_year,
+          p.track_key
+        FROM program_admissions a
+        JOIN study_programs p ON p.id = a.program_id
+        WHERE a.id = ?
+      `,
+      [admissionId]
+    );
+    if (!admissionRow) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId,
+        admissionId,
+        error: msg.admissionNotFound,
+      }));
+    }
+
+    await syncStudyContextsForAdmission(admissionId);
+    const cohortRow = await db.get(
+      `
+        SELECT id
+        FROM cohorts
+        WHERE legacy_admission_id = ?
+        LIMIT 1
+      `,
+      [admissionId]
+    ).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return null;
+      }
+      throw err;
+    });
+    const cohortId = parsePositiveIntStrict(cohortRow && cohortRow.id);
+    if (!cohortId) {
+      return res.redirect(buildAdminPathwaysUrl({
+        courseId,
+        track: trackFilter,
+        programId: Number(admissionRow.program_id || 0),
+        admissionId,
+        error: getPreferredLang(req) === 'uk'
+          ? 'Для цієї когорти ще не створено study contexts'
+          : 'No study contexts exist for this cohort yet',
+      }));
+    }
+
+    const contextRows = await db.all(
+      `
+        SELECT id, stage_number AS stage, campus_key
+        FROM study_contexts
+        WHERE cohort_id = ?
+          AND is_active = true
+        ORDER BY stage_number ASC, id ASC
+      `,
+      [cohortId]
+    );
+    const nextContextByKey = new Map();
+    (contextRows || []).forEach((row) => {
+      const stage = normalizeStudyContextStage(row.stage, 1);
+      const nextKey = `${stage - 1}|${normalizeCourseCampus(row.campus_key || 'kyiv')}`;
+      if (stage > 1 && !nextContextByKey.has(nextKey)) {
+        nextContextByKey.set(nextKey, Number(row.id || 0));
+      }
+    });
+
+    const users = await db.all(
+      `
+        SELECT
+          u.id,
+          u.course_id,
+          u.admission_id,
+          u.study_program_id,
+          u.study_track,
+          u.study_context_id,
+          u.role
+        FROM users u
+        LEFT JOIN study_contexts sc ON sc.id = u.study_context_id
+        WHERE (
+            sc.cohort_id = ?
+            OR (u.study_context_id IS NULL AND u.admission_id = ?)
+          )
+          AND LOWER(COALESCE(u.role, '')) <> 'admin'
+      `,
+      [cohortId, admissionId]
+    );
+    let promotedCount = 0;
+    let skippedCount = 0;
+    for (const user of users || []) {
+      const placement = await resolveUserAcademicPlacement(user);
+      if (!placement || !placement.study_context_id) {
+        skippedCount += 1;
+        continue;
+      }
+      const nextContextId = nextContextByKey.get(
+        `${normalizeStudyContextStage(placement.stage, 1)}|${normalizeCourseCampus(placement.campus_key || 'kyiv')}`
+      );
+      if (!nextContextId) {
+        skippedCount += 1;
+        continue;
+      }
+      await assignUserStudyContext(user.id, nextContextId);
+      promotedCount += 1;
+    }
+
+    logAction(db, req, 'pathways_users_promote', {
+      admission_id: admissionId,
+      program_id: Number(admissionRow.program_id || 0),
+      promoted_count: promotedCount,
+      skipped_count: skippedCount,
+    });
+    broadcast('users_updated');
+    return res.redirect(buildAdminPathwaysUrl({
+      courseId,
+      track: trackFilter,
+      programId: Number(admissionRow.program_id || 0),
+      admissionId,
+      ok: getPreferredLang(req) === 'uk'
+        ? `Підвищено ${promotedCount} користувачів, пропущено ${skippedCount}`
+        : `Promoted ${promotedCount} users, skipped ${skippedCount}`,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.admission.promote');
   }
 });
 
@@ -37666,6 +38738,10 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
           COALESCE(NULLIF(u.last_user_agent, ''), NULLIF(reg.user_agent, '')) AS last_user_agent,
           u.last_login_at,
           u.course_id,
+          u.admission_id,
+          u.study_program_id,
+          u.study_track,
+          u.study_context_id,
           COALESCE(usc.risk_level, 'normal') AS security_risk_level,
           COALESCE(usc.status, 'open') AS security_case_status,
           COALESCE(usc.risk_score, 0)::int AS security_risk_score,
@@ -37709,18 +38785,95 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
                     (async () => {
                       const userIds = (users || []).map((user) => Number(user.id)).filter((id) => Number.isFinite(id));
                       const assignment = await getUserRoleAssignmentsForUserIds(userIds);
+                      const placementRows = await db.all(
+                        `
+                          SELECT
+                            u.id AS user_id,
+                            sc.id AS study_context_id,
+                            sc.stage_number AS stage,
+                            sc.campus_key,
+                            coh.id AS cohort_id,
+                            coh.admission_year,
+                            coh.legacy_admission_id AS admission_id,
+                            p.id AS program_id,
+                            p.code AS program_code,
+                            p.name AS program_name,
+                            p.track_key,
+                            primary_binding.course_id,
+                            c.name AS course_name
+                          FROM users u
+                          LEFT JOIN study_contexts sc ON sc.id = u.study_context_id
+                          LEFT JOIN cohorts coh ON coh.id = sc.cohort_id
+                          LEFT JOIN study_programs p ON p.id = coh.program_id
+                          LEFT JOIN LATERAL (
+                            SELECT sccb.course_id
+                            FROM study_context_course_bindings sccb
+                            WHERE sccb.study_context_id = sc.id
+                            ORDER BY sccb.is_primary DESC, sccb.course_id ASC
+                            LIMIT 1
+                          ) primary_binding ON true
+                          LEFT JOIN courses c ON c.id = primary_binding.course_id
+                          WHERE u.id = ANY(?::int[])
+                        `,
+                        [userIds.length ? userIds : [0]]
+                      ).catch((err) => {
+                        if (isDbSchemaCompatibilityError(err)) {
+                          return [];
+                        }
+                        throw err;
+                      });
+                      const placementByUserId = new Map();
+                      (placementRows || []).forEach((row) => {
+                        const userId = Number(row.user_id || 0);
+                        if (!userId) return;
+                        const context = {
+                          id: Number(row.study_context_id || 0) || null,
+                          course_id: Number(row.course_id || 0) || null,
+                          stage: normalizeStudyContextStage(row.stage, 1),
+                          campus_key: normalizeCourseCampus(row.campus_key || 'kyiv'),
+                          cohort_id: Number(row.cohort_id || 0) || null,
+                          admission_id: Number(row.admission_id || 0) || null,
+                          admission_year: Number(row.admission_year || 0) || null,
+                          program_id: Number(row.program_id || 0) || null,
+                          program_code: sanitizeCompactText(row.program_code || '', 40),
+                          program_name: sanitizeCompactText(row.program_name || '', 140),
+                          track_key: normalizeRegistrationTrack(row.track_key, 'bachelor'),
+                          course_name: sanitizeCompactText(row.course_name || '', 140),
+                        };
+                        placementByUserId.set(userId, {
+                          ...context,
+                          label: context.id ? buildStudyContextLabel(context, 'en') : '',
+                          label_uk: context.id ? buildStudyContextLabel(context, 'uk') : '',
+                        });
+                      });
+                      const studyContexts = await listStudyContextOptions();
                       const usersWithRoles = (users || []).map((user) => {
                         const userId = Number(user.id);
                         const roleKeys = assignment.roleKeysByUser[userId] || [normalizeRoleKey(user.role || 'student')];
                         const primaryRole = assignment.primaryRoleByUser[userId]
                           || normalizeRoleKey(user.role || roleKeys[0] || 'student');
+                        const placement = placementByUserId.get(userId) || null;
                         return {
                           ...user,
                           role_keys: roleKeys,
                           primary_role: primaryRole,
+                          study_context: placement,
+                          study_context_id: placement && placement.id ? placement.id : null,
+                          study_context_label: placement && placement.label_uk ? placement.label_uk : '',
+                          study_context_name: placement && placement.label_uk ? placement.label_uk : '',
+                          study_context_course_id: placement && placement.course_id ? placement.course_id : null,
+                          study_context_options: studyContexts,
+                          context_options: studyContexts,
                         };
                       });
-                      res.json({ users: usersWithRoles, subjects, studentGroups, courses, selectedCourseId: courseId });
+                      res.json({
+                        users: usersWithRoles,
+                        subjects,
+                        studentGroups,
+                        courses,
+                        studyContexts,
+                        selectedCourseId: courseId,
+                      });
                     })().catch((roleErr) => {
                       console.error('Database error (admin.users.json.roles)', roleErr);
                       return res.status(500).json({ error: 'Database error' });
@@ -43523,7 +44676,44 @@ app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async 
   }
 });
 
-app.post('/admin/users/course', requireUsersSectionAccess, (req, res) => {
+app.post('/admin/users/study-context', requireUsersSectionAccess, async (req, res) => {
+  const userId = Number(req.body.user_id);
+  const studyContextId = Number(req.body.study_context_id);
+  const currentCourse = getAdminCourse(req);
+  if (!Number.isFinite(userId) || userId <= 0 || !Number.isFinite(studyContextId) || studyContextId <= 0) {
+    return res.redirect('/admin?err=Invalid%20study%20context');
+  }
+  try {
+    const [context, user] = await Promise.all([
+      getStudyContextById(studyContextId),
+      db.get(
+        'SELECT id, role, full_name, course_id FROM users WHERE id = ? AND course_id = ?',
+        [userId, currentCourse]
+      ),
+    ]);
+    if (!context) {
+      return res.redirect('/admin?err=Study%20context%20not%20found');
+    }
+    if (!user) {
+      return res.redirect('/admin?err=User%20not%20found');
+    }
+    if (normalizeRoleKey(user.role) === 'admin') {
+      return res.redirect('/admin?err=Cannot%20change%20admin%20context');
+    }
+    await assignUserStudyContext(userId, studyContextId);
+    logAction(db, req, 'user_study_context_change', {
+      user_id: userId,
+      study_context_id: studyContextId,
+      course_id: context.course_id,
+    });
+    broadcast('users_updated');
+    return res.redirect(`/admin?course=${currentCourse}&ok=Study%20context%20updated`);
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
+});
+
+app.post('/admin/users/course', requireUsersSectionAccess, async (req, res) => {
   const { user_id, course_id } = req.body;
   const userId = Number(user_id);
   const courseId = Number(course_id);
@@ -43531,27 +44721,94 @@ app.post('/admin/users/course', requireUsersSectionAccess, (req, res) => {
   if (Number.isNaN(userId) || Number.isNaN(courseId)) {
     return res.redirect('/admin?err=Invalid%20course');
   }
-  db.get('SELECT id FROM courses WHERE id = ?', [courseId], (courseErr, courseRow) => {
-    if (courseErr || !courseRow) {
+  try {
+    const [courseRow, user] = await Promise.all([
+      db.get('SELECT id, name, location FROM courses WHERE id = ?', [courseId]),
+      db.get(
+        `
+          SELECT
+            id,
+            role,
+            full_name,
+            course_id,
+            admission_id,
+            study_program_id,
+            study_track,
+            study_context_id
+          FROM users
+          WHERE id = ? AND course_id = ?
+        `,
+        [userId, currentCourse]
+      ),
+    ]);
+    if (!courseRow) {
       return res.redirect('/admin?err=Invalid%20course');
     }
-    db.get('SELECT role FROM users WHERE id = ? AND course_id = ?', [userId, currentCourse], (err, user) => {
-      if (err || !user) {
-        return res.redirect('/admin?err=User%20not%20found');
-      }
-      if (user.role === 'admin') {
-        return res.redirect('/admin?err=Cannot%20change%20admin%20course');
-      }
-      db.run('UPDATE users SET course_id = ? WHERE id = ?', [courseId, userId], (updErr) => {
-        if (updErr) {
-          return res.redirect('/admin?err=Database%20error');
+    if (!user) {
+      return res.redirect('/admin?err=User%20not%20found');
+    }
+    if (normalizeRoleKey(user.role) === 'admin') {
+      return res.redirect('/admin?err=Cannot%20change%20admin%20course');
+    }
+
+    const placement = await resolveUserAcademicPlacement(user);
+    let targetStudyContextId = null;
+    if (placement && placement.admission_id) {
+      const matchingContext = await db.get(
+        `
+          SELECT sc.id
+          FROM study_contexts sc
+          JOIN cohorts coh ON coh.id = sc.cohort_id
+          JOIN study_context_course_bindings sccb ON sccb.study_context_id = sc.id
+          WHERE sccb.course_id = ?
+            AND coh.legacy_admission_id = ?
+          ORDER BY
+            CASE WHEN sc.stage_number = ? THEN 0 ELSE 1 END,
+            CASE WHEN sc.campus_key = ? THEN 0 ELSE 1 END,
+            sc.id ASC
+          LIMIT 1
+        `,
+        [
+          courseId,
+          placement.admission_id,
+          normalizeStudyContextStage(placement.stage, inferLegacyCourseOrdinal(courseRow.name) || 1),
+          normalizeCourseCampus((courseRow && courseRow.location) || placement.campus_key || 'kyiv'),
+        ]
+      ).catch((err) => {
+        if (isDbSchemaCompatibilityError(err)) {
+          return null;
         }
-        logAction(db, req, 'user_course_change', { user_id: userId, course_id: courseId });
-        broadcast('users_updated');
-        return res.redirect(`/admin?course=${currentCourse}&ok=Course%20updated`);
+        throw err;
       });
-    });
-  });
+      targetStudyContextId = parsePositiveIntStrict(matchingContext && matchingContext.id);
+      if (!targetStudyContextId) {
+        targetStudyContextId = await ensureStudyContextForLegacyPlacement({
+          courseId,
+          admissionId: placement.admission_id,
+          programId: placement.program_id,
+          trackKey: placement.track_key,
+          preferredCampus: (courseRow && courseRow.location) || placement.campus_key,
+          preferredStage: placement.stage,
+        });
+      }
+    }
+
+    if (targetStudyContextId) {
+      await assignUserStudyContext(userId, targetStudyContextId, {
+        courseId,
+        trackKey: user.study_track,
+        programId: user.study_program_id,
+        admissionId: user.admission_id,
+      });
+    } else {
+      await db.run('UPDATE users SET course_id = ? WHERE id = ?', [courseId, userId]);
+    }
+    logAction(db, req, 'user_course_change', { user_id: userId, course_id: courseId, study_context_id: targetStudyContextId });
+    broadcast('users_updated');
+    return res.redirect(`/admin?course=${currentCourse}&ok=Course%20updated`);
+  } catch (err) {
+    return res.redirect('/admin?err=Database%20error');
+  }
 });
 
 app.post('/admin/users/reset-password', requireUsersSectionAccess, (req, res) => {

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.2.89",
+      "date": "2026-03-26",
+      "items": [
+        "feat(academic-setup-canonical-user-context): route registration, profile, admin user editing, and cohort migration flows through `study_context_id`, keeping legacy course/admission fields as compatibility shadows instead of the primary academic placement source",
+        "feat(academic-setup-sync-and-promotion): automatically sync study contexts whenever admissions or course mappings change, add cohort promotion through stage-aware study contexts, and surface the new `Promote stage +1` action inside the Academic Setup workspace",
+        "fix(academic-setup-admin-context-data): enrich admin user payloads with resolved study-context labels and course bindings so the context-first user moderation UI can move people between cohorts, stages, and campuses without losing canonical placement metadata"
+      ]
+    },
+    {
       "version": "1.2.88",
       "date": "2026-03-26",
       "items": [

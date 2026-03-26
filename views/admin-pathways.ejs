@@ -1756,6 +1756,24 @@
                     <div class="soft-panel muted mt-3"><%= ui.allMigrationCoursesAligned %></div>
                   <% } %>
                 </form>
+                <div class="soft-panel mt-3">
+                  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div>
+                      <strong><%= isUk ? 'Підвищення когорти' : 'Cohort promotion' %></strong>
+                      <div class="muted mt-1">
+                        <%= isUk
+                          ? 'Переводить користувачів у наступний study context цього ж року вступу, якщо для нього вже існує stage +1.'
+                          : 'Moves users into the next study context of the same admission year when a stage +1 context already exists.' %>
+                      </div>
+                    </div>
+                    <form method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/promote" class="d-flex flex-wrap align-items-center gap-2">
+                      <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                      <input type="hidden" name="track" value="<%= activeTrack %>" />
+                      <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                      <button class="btn btn-soft btn-pill" type="submit"><%= isUk ? 'Підвищити курс +1' : 'Promote stage +1' %></button>
+                    </form>
+                  </div>
+                </div>
               <% } else { %>
                 <div class="soft-panel muted mt-3">
                   <div><%= ui.selectProgramAndAdmissionFirst %></div>
