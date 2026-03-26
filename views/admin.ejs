@@ -4216,7 +4216,7 @@
             const supportThread = selectedSupportRequest || null;
             const supportMessages = supportThread && Array.isArray(supportThread.messages) ? supportThread.messages : [];
             const activeSupportId = supportThread ? Number(supportThread.id || 0) : 0;
-            const supportBaseHref = "<%= buildScopedHref('/admin', { tab: 'admin-support' }) %>";
+            const supportBaseHref = buildScopedHref('/admin', { tab: 'admin-support' });
             const supportStatusClass = (status) => (
               status === 'resolved'
                 ? 'bg-success'
