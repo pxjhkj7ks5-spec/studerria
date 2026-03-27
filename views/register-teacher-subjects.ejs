@@ -221,8 +221,24 @@
         <div class="alert alert-danger glass"><%= decodeURIComponent(error) %></div>
       <% } %>
 
+      <div class="glass p-3 p-md-4 mb-3">
+        <div class="small text-muted">
+          <%= isProfileEdit
+            ? 'Primary live teaching management now lives in Teacher workspace. Use this screen only if you specifically need the legacy compatibility picker.'
+            : 'Choose your teaching scope for approval. After approval, the primary place to manage live offerings, semesters, templates, and files is Teacher workspace.' %>
+        </div>
+        <% if (isProfileEdit) { %>
+          <div class="mt-3">
+            <a href="/teacher/workspace" class="btn btn-outline-secondary auth-action-btn">Open teacher workspace</a>
+          </div>
+        <% } %>
+      </div>
+
       <form method="POST" action="<%= isProfileEdit ? '/teacher/subjects' : '/register/teacher-subjects' %>">
         <input type="hidden" name="selection_mode" value="<%= teacherSelectionMode %>" />
+        <% if (isProfileEdit) { %>
+          <input type="hidden" name="legacy" value="1" />
+        <% } %>
         <div class="mb-3">
           <label class="form-label small" for="teacherSubjectSearch">Quick search</label>
           <input

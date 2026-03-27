@@ -14204,6 +14204,17 @@ app.get('/teacher/subjects', requireLogin, async (req, res) => {
     }
   };
   try {
+    const redirectState = await hydrateTeacherWorkspaceRedirectState(
+      getTeacherWorkspaceRedirectState(req.query, courseId)
+    );
+    const legacyMode = String(req.query.legacy || '').trim() === '1';
+    if (!legacyMode) {
+      return res.redirect(buildTeacherWorkspaceUrl({
+        ...redirectState,
+        ok: decodeMessage(req.query.ok),
+        error: decodeMessage(req.query.error),
+      }));
+    }
     const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [courseId]);
     if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
       return res.redirect('/schedule');
@@ -14223,6 +14234,8 @@ app.get('/teacher/subjects', requireLogin, async (req, res) => {
       subjects,
       selections,
       selectionMode,
+      workspaceHref: buildTeacherWorkspaceUrl(redirectState),
+      legacyRedirectState: redirectState,
       error: decodeMessage(req.query.error),
       success: decodeMessage(req.query.ok),
     });
@@ -14242,22 +14255,64 @@ app.post('/teacher/subjects', requireLogin, async (req, res) => {
   }
   const { id: userId, course_id: courseId } = req.session.user;
   try {
+    const redirectState = await hydrateTeacherWorkspaceRedirectState(
+      getTeacherWorkspaceRedirectState(req.body, courseId)
+    );
     const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [courseId]);
     if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
       return res.redirect('/schedule');
     }
     const result = await saveTeacherSubjects(userId, req.body);
     if (!result.ok) {
-      return res.redirect(`/teacher/subjects?error=${result.error || 'Select%20subject'}`);
+      return res.redirect(buildTeacherSubjectsLegacyUrl({
+        ...redirectState,
+        error: result.error || 'Select%20subject',
+      }));
     }
     logAction(db, req, 'teacher_subjects_update', { user_id: userId });
     broadcast('users_updated');
-    return res.redirect('/teacher/subjects?ok=Subjects%20updated');
+    return res.redirect(buildTeacherWorkspaceUrl({
+      ...redirectState,
+      ok: 'Subjects updated',
+    }));
   } catch (err) {
     console.error('Failed to save teacher subjects', err);
-    return res.redirect('/teacher/subjects?error=Database%20error');
+    return res.redirect(buildTeacherSubjectsLegacyUrl({
+      ...getTeacherWorkspaceRedirectState(req.body, courseId),
+      error: 'Database error',
+    }));
   }
 });
+
+function buildTeacherSubjectsLegacyUrl({
+  courseId = null,
+  studyContextId = null,
+  semesterId = null,
+  ok = '',
+  error = '',
+} = {}) {
+  const params = new URLSearchParams();
+  params.set('legacy', '1');
+  const normalizedCourseId = parsePositiveIntStrict(courseId);
+  const normalizedStudyContextId = parsePositiveIntStrict(studyContextId);
+  const normalizedSemesterId = parsePositiveIntStrict(semesterId);
+  if (normalizedCourseId) {
+    params.set('course', String(normalizedCourseId));
+  }
+  if (normalizedStudyContextId) {
+    params.set('study_context_id', String(normalizedStudyContextId));
+  }
+  if (normalizedSemesterId) {
+    params.set('semester_id', String(normalizedSemesterId));
+  }
+  if (ok) {
+    params.set('ok', String(ok));
+  }
+  if (error) {
+    params.set('error', String(error));
+  }
+  return `/teacher/subjects?${params.toString()}`;
+}
 
 function buildTeacherWorkspaceUrl({
   courseId = null,

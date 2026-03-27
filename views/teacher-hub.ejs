@@ -374,7 +374,7 @@
         <div class="hub-actions">
           <a class="btn btn-hub" href="<%= teacherScheduleHref %>"><%= t('teacherHub.action.schedule') %></a>
           <a class="btn btn-hub" href="/teacher/workspace"><%= t('teacherHub.action.workspace') %></a>
-          <a class="btn btn-hub" href="/teacher/subjects"><%= t('teacherHub.action.subjects') %></a>
+          <a class="btn btn-hub" href="/teacher/subjects?legacy=1"><%= lang === 'en' ? 'Legacy scope' : 'Сумісний режим' %></a>
           <a class="btn btn-hub" href="<%= teacherJournalHref %>"><%= t('teacherHub.action.journal') %></a>
         </div>
       </section>
@@ -531,9 +531,9 @@
                 <span class="quick-title"><%= t('teacherHub.quick.manageTemplates.title') %></span>
                 <span class="quick-desc"><%= t('teacherHub.quick.manageTemplates.desc') %></span>
               </a>
-              <a class="quick-card" href="/teacher/subjects">
-                <span class="quick-title"><%= t('teacherHub.quick.updateScope.title') %></span>
-                <span class="quick-desc"><%= t('teacherHub.quick.updateScope.desc') %></span>
+              <a class="quick-card" href="/teacher/subjects?legacy=1">
+                <span class="quick-title"><%= lang === 'en' ? 'Compatibility scope' : 'Режим сумісності' %></span>
+                <span class="quick-desc"><%= lang === 'en' ? 'Use only if you need the legacy subject picker. Primary live management now lives in Workspace.' : 'Використовуйте лише якщо потрібен старий пікер предметів. Основне керування тепер у Workspace.' %></span>
               </a>
               <a class="quick-card" href="<%= teacherScheduleHref %>">
                 <span class="quick-title"><%= t('teacherHub.quick.openSchedule.title') %></span>

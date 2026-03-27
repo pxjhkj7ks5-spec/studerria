@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.09",
+      "date": "2026-03-27",
+      "items": [
+        "feat(teacher-workspace-primary-path): turn `/teacher/subjects` into an explicit compatibility wrapper that redirects normal teacher traffic back into `/teacher/workspace`, preserves `course/study_context/semester` scope across the wrapper, and returns successful legacy saves to the workspace instead of keeping the old page as a normal-path editor",
+        "refactor(teacher-ux-compatibility-positioning): update `views/teacher-hub.ejs`, `views/teacher-subjects.ejs`, and `views/register-teacher-subjects.ejs` so Teacher workspace is the clear primary surface for live scope management while the legacy subject picker is labeled and presented as compatibility-only",
+        "test(teacher-compatibility-render-smoke): extend `test/admin-render-smoke.test.js` with coverage for the legacy teacher-subjects wrapper and the profile-edit teacher registration screen so the new compatibility copy and workspace escape-hatch paths stay EJS-safe"
+      ]
+    },
+    {
       "version": "1.3.08",
       "date": "2026-03-27",
       "items": [

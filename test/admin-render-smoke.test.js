@@ -208,6 +208,32 @@ test('teacher workspace renders context-first filter surface', async () => {
   assert.match(html, /Teacher workspace|study_context_id|Live teaching scope/i);
 });
 
+test('teacher subjects renders as compatibility wrapper with workspace escape hatch', async () => {
+  const html = await renderView('teacher-subjects.ejs', baseRenderLocals({
+    role: 'teacher',
+    subjects: [{ id: 11, name: 'Policy Lab', course_name: 'PL 2025', group_count: 2, is_general: 0, pathway_labels: 'Master / 2025' }],
+    selections: new Map([[11, 2]]),
+    selectionMode: 'offering',
+    workspaceHref: '/teacher/workspace?study_context_id=7',
+    legacyRedirectState: { courseId: 1, studyContextId: 7, semesterId: 3 },
+    error: '',
+    success: '',
+  }));
+  assert.match(html, /Legacy teacher subjects|Open teacher workspace|Compatibility teaching scope/i);
+});
+
+test('register teacher subjects renders workspace guidance for profile edit', async () => {
+  const html = await renderView('register-teacher-subjects.ejs', baseRenderLocals({
+    role: 'teacher',
+    subjects: [{ id: 11, name: 'Policy Lab', course_name: 'PL 2025', group_count: 2, is_general: 0, pathway_labels: 'Master / 2025' }],
+    selections: new Map([[11, 2]]),
+    selectionMode: 'offering',
+    error: '',
+    isProfileEdit: true,
+  }));
+  assert.match(html, /Teacher workspace|legacy compatibility picker|selection_mode/i);
+});
+
 test('register course renders academic context preview flow', async () => {
   const html = await renderView('register-course.ejs', baseRenderLocals({
     lang: 'en',

@@ -109,6 +109,12 @@
         border-color: rgba(15, 23, 42, 0.14);
         background: rgba(255, 255, 255, 0.9);
       }
+      .hero-actions {
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
       .section {
         padding: 20px;
       }
@@ -200,25 +206,39 @@
       <% } %>
 
       <section class="glass hero mb-3">
-        <h1 class="hero-title">Teacher subjects</h1>
+        <h1 class="hero-title">Legacy teacher subjects</h1>
         <p class="hero-subtitle">
-          Dedicated teacher flow: choose subjects and seminar groups for teaching scope without using admin panels.
+          Compatibility editor for the old subject picker. Primary live teaching scope, templates, files, and semester filters now live in Teacher workspace.
         </p>
         <div class="chip-row">
           <span class="chip">Catalog: <%= teacherSubjects.length %></span>
           <span class="chip">Selected: <%= selectedCount %></span>
           <span class="chip">Mode: <%= teacherSelectionMode === 'offering' ? 'live offerings' : 'legacy subjects' %></span>
         </div>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="<%= workspaceHref || '/teacher/workspace' %>">Open teacher workspace</a>
+          <a class="btn btn-outline-secondary" href="/teacher">Back to teacher hub</a>
+        </div>
       </section>
 
       <section class="glass section mb-3">
-        <h2 class="section-title">Teaching scope</h2>
+        <h2 class="section-title">Compatibility teaching scope</h2>
         <p class="section-subtitle">
-          Select every subject you teach. For non-general subjects, choose exactly one seminar group.
+          Use this screen only when you need the legacy subject-selection flow. Normal teaching setup should be managed from Teacher workspace.
         </p>
 
         <form id="teacherSubjectsForm" method="POST" action="/teacher/subjects" class="mt-3">
           <input type="hidden" name="selection_mode" value="<%= teacherSelectionMode %>" />
+          <input type="hidden" name="legacy" value="1" />
+          <% if (legacyRedirectState && legacyRedirectState.courseId) { %>
+            <input type="hidden" name="course" value="<%= legacyRedirectState.courseId %>" />
+          <% } %>
+          <% if (legacyRedirectState && legacyRedirectState.studyContextId) { %>
+            <input type="hidden" name="study_context_id" value="<%= legacyRedirectState.studyContextId %>" />
+          <% } %>
+          <% if (legacyRedirectState && legacyRedirectState.semesterId) { %>
+            <input type="hidden" name="semester_id" value="<%= legacyRedirectState.semesterId %>" />
+          <% } %>
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
             <span class="small text-muted">Bulk actions</span>
             <span
@@ -287,7 +307,7 @@
 
           <div class="d-flex flex-wrap gap-2">
             <button class="btn btn-primary" type="submit">Save teacher subjects</button>
-            <a class="btn btn-outline-secondary" href="/teacher">Back to teacher hub</a>
+            <a class="btn btn-outline-secondary" href="<%= workspaceHref || '/teacher/workspace' %>">Back to workspace</a>
           </div>
         </form>
       </section>
