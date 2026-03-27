@@ -4568,20 +4568,18 @@ async function cloneAdmissionConfigurationFromLatest(programId, targetAdmissionI
     return;
   }
 
-  await db.run(
-    `
-      INSERT INTO program_admission_courses
-        (admission_id, course_id, is_visible, created_at, updated_at)
-      SELECT ?, pac.course_id, pac.is_visible, NOW(), NOW()
-      FROM program_admission_courses pac
-      WHERE pac.admission_id = ?
-      ON CONFLICT (admission_id, course_id)
-      DO UPDATE SET
-        is_visible = EXCLUDED.is_visible,
-        updated_at = NOW()
-    `,
-    [normalizedTargetAdmissionId, sourceAdmissionId]
-  );
+  const sourceMappings = await academicSetupHelpers.listLegacyAdmissionCourseRows(getAcademicSetupStore(), {
+    admissionId: sourceAdmissionId,
+  });
+  await academicSetupHelpers.upsertLegacyAdmissionCourseMappings({
+    run: (sql, params) => db.run(sql, params),
+  }, {
+    admissionId: normalizedTargetAdmissionId,
+    mappings: (sourceMappings || []).map((row) => ({
+      course_id: row.course_id,
+      is_visible: row.is_visible,
+    })),
+  });
 
   await academicSetupHelpers.copyLegacySubjectVisibility({
     run: (sql, params) => db.run(sql, params),
@@ -5707,14 +5705,9 @@ async function syncSubjectOfferingsForSubjectIds(subjectIds = []) {
     return { admissionIds: [], contextIds: [], offeringIds: [] };
   }
   try {
-    const rows = await db.all(
-      `
-        SELECT DISTINCT pac.admission_id
-        FROM subject_course_bindings scb
-        JOIN program_admission_courses pac ON pac.course_id = scb.course_id
-        WHERE scb.subject_id = ANY(?::int[])
-      `,
-      [normalizedSubjectIds]
+    const rows = await academicSetupHelpers.listLegacyAdmissionIdsForSubjectIds(
+      getAcademicSetupStore(),
+      normalizedSubjectIds
     );
     const admissionIds = Array.from(new Set(
       (rows || [])
@@ -9435,6 +9428,13 @@ function buildAdminScopedPathUrl(req, basePath, overrides = {}, extraParams = {}
   return buildScopedAppUrl(basePath, getStoredAdminAcademicScope(req), overrides, extraParams);
 }
 
+function buildAdminTabUrl(req, tab, extraParams = {}, overrides = {}) {
+  return buildAdminScopedPathUrl(req, '/admin', overrides, {
+    tab: tab || '',
+    ...(extraParams || {}),
+  });
+}
+
 function buildAdminFixTargetUrl(req, { courseId = null, day = '', groupNumber = null } = {}) {
   return buildAdminScopedPathUrl(
     req,
@@ -10328,78 +10328,7 @@ async function isCourseDayActive(courseId, dayName) {
 }
 
 async function getTeacherSubjectCatalog() {
-  try {
-    return await db.all(
-      `
-        SELECT
-          s.id,
-          s.name,
-          s.group_count,
-          s.is_general,
-          s.course_id,
-          s.course_id AS owner_course_id,
-          COALESCE(binding_scope.course_labels, owner_course.name) AS course_name,
-          COALESCE(pathways.pathway_labels, '') AS pathway_labels
-        FROM subjects s
-        JOIN courses owner_course ON owner_course.id = s.course_id
-        LEFT JOIN LATERAL (
-          SELECT STRING_AGG(DISTINCT c.name, ', ' ORDER BY c.name) AS course_labels
-          FROM subject_course_bindings scb
-          JOIN courses c ON c.id = scb.course_id
-          WHERE scb.subject_id = s.id
-        ) binding_scope ON true
-        LEFT JOIN LATERAL (
-          SELECT STRING_AGG(
-            DISTINCT (
-              CASE
-                WHEN COALESCE(p.code, '') <> '' THEN p.code || ' '
-                ELSE ''
-              END
-              || p.name
-              || ' '
-              || a.admission_year::text
-            ),
-            ', '
-          ) AS pathway_labels
-          FROM subject_course_bindings scb
-          JOIN program_admission_courses pac ON pac.course_id = scb.course_id
-          JOIN program_admissions a ON a.id = pac.admission_id
-          JOIN study_programs p ON p.id = a.program_id
-          WHERE scb.subject_id = s.id
-            AND pac.is_visible = true
-            AND a.is_active = true
-            AND p.is_active = true
-        ) pathways ON true
-        WHERE s.visible = 1
-          AND EXISTS (
-            SELECT 1
-            FROM subject_course_bindings scb
-            JOIN semesters sem ON sem.course_id = scb.course_id
-            WHERE scb.subject_id = s.id
-              AND sem.is_active = 1
-          )
-        ORDER BY s.name ASC, s.id ASC
-      `
-    );
-  } catch (err) {
-    if (!(err && (err.code === '42P01' || err.code === '42703'))) {
-      throw err;
-    }
-    return db.all(
-      `
-        SELECT s.id, s.name, s.group_count, s.is_general, s.course_id, c.name AS course_name
-        FROM subjects s
-        JOIN courses c ON c.id = s.course_id
-        WHERE s.visible = 1
-          AND EXISTS (
-            SELECT 1
-            FROM semesters sem
-            WHERE sem.course_id = s.course_id AND sem.is_active = 1
-          )
-        ORDER BY c.id, s.name
-      `
-    );
-  }
+  return academicSetupHelpers.listLegacyTeacherCatalogRows(getAcademicSetupStore());
 }
 
 async function getTeacherSelections(userId) {
@@ -16662,29 +16591,41 @@ async function buildAdminDataQualityDiagnostics({
         `,
         [scopeSubjectIds, normalizedCourseId]
       ), []),
-      withCompatibilityFallback(db.all(
-        `
-          SELECT
-            ts.subject_id,
-            COALESCE(s.name, 'Предмет') AS subject_name,
-            COALESCE(s.group_count, 1)::int AS max_group,
-            ts.group_number::int AS group_number,
-            COUNT(*)::int AS rows_count,
-            COUNT(*) OVER()::int AS groups_total,
-            COALESCE(SUM(COUNT(*)) OVER(), 0)::int AS affected_rows_total
-          FROM teacher_subjects ts
-          JOIN subjects s ON s.id = ts.subject_id
-          JOIN users u ON u.id = ts.user_id
-          WHERE s.id = ANY(?::int[])
-            AND u.course_id = ?
-            AND ts.group_number IS NOT NULL
-            AND (ts.group_number < 1 OR ts.group_number > COALESCE(s.group_count, 1))
-          GROUP BY ts.subject_id, s.name, COALESCE(s.group_count, 1), ts.group_number
-          ORDER BY rows_count DESC, subject_name ASC
-          LIMIT 8
-        `,
-        [scopeSubjectIds, normalizedCourseId]
-      ), []),
+      withCompatibilityFallback((async () => {
+        const rows = await teacherTemplateHelpers.listTeacherAssignmentRows(getTeacherTemplateStore(), {
+          subjectIds: scopeSubjectIds,
+          teacherCourseId: normalizedCourseId,
+          includeHidden: true,
+        });
+        const grouped = new Map();
+        (rows || []).forEach((row) => {
+          if (row.group_number === null || typeof row.group_number === 'undefined') return;
+          const maxGroup = Math.max(1, Number(row.group_count || 1));
+          const groupNumber = Number(row.group_number);
+          if (!Number.isFinite(groupNumber) || (groupNumber >= 1 && groupNumber <= maxGroup)) return;
+          const key = `${Number(row.subject_id || 0)}|${groupNumber}`;
+          if (!grouped.has(key)) {
+            grouped.set(key, {
+              subject_id: Number(row.subject_id || 0) || null,
+              subject_name: String(row.subject_name || 'Предмет'),
+              max_group: maxGroup,
+              group_number: groupNumber,
+              rows_count: 0,
+            });
+          }
+          grouped.get(key).rows_count += 1;
+        });
+        const aggregated = Array.from(grouped.values())
+          .sort((a, b) => Number(b.rows_count || 0) - Number(a.rows_count || 0)
+            || String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk'))
+          .slice(0, 8);
+        const affectedRowsTotal = aggregated.reduce((sum, row) => sum + Number(row.rows_count || 0), 0);
+        return aggregated.map((row) => ({
+          ...row,
+          groups_total: aggregated.length,
+          affected_rows_total: affectedRowsTotal,
+        }));
+      })(), []),
       withCompatibilityFallback(db.all(
         `
           SELECT
@@ -16830,7 +16771,7 @@ async function buildAdminDataQualityDiagnostics({
       key: 'invalid_teacher_subject_groups',
       title: 'Некоректні групи у зв’язках викладач-предмет',
       severity: 'warning',
-      description: 'У teacher_subjects записано group_number поза межами предмета.',
+      description: 'У legacy teacher assignment mirror записано group_number поза межами предмета.',
       count: Number(invalidTeacherGroupRows && invalidTeacherGroupRows[0]
         ? invalidTeacherGroupRows[0].affected_rows_total
         : 0),
@@ -29941,23 +29882,9 @@ app.get('/teamwork', requireLogin, async (req, res) => {
           isTeacherMode,
         });
       }
-
-      const groupPlaceholders = studentSubjectGroups.map(() => '?').join(',');
-      taskFilters.push(
-        `
-          EXISTS (
-            SELECT 1
-            FROM teacher_subjects ts
-            WHERE ts.user_id = t.created_by
-              AND ts.subject_id = t.subject_id
-              AND (ts.group_number IS NULL OR ts.group_number IN (${groupPlaceholders}))
-          )
-        `
-      );
-      taskParams.push(...studentSubjectGroups);
     }
 
-    const tasks = await db.all(
+    const taskRows = await db.all(
       `
         SELECT t.*, s.name AS subject_name, COALESCE(u.full_name, '') AS created_by_name
         FROM teamwork_tasks t
@@ -29968,6 +29895,52 @@ app.get('/teamwork', requireLogin, async (req, res) => {
       `,
       taskParams
     );
+
+    if (!taskRows.length) {
+      return res.render('teamwork', {
+        subjects,
+        selectedSubjectId: selectedSubject.subject_id,
+        selectedSubject,
+        tasks: [],
+        freeStudents: {},
+        messages: res.locals.messages,
+        username,
+        role,
+        isTeacherMode,
+      });
+    }
+
+    const selectedSubjectGroupCount = Math.max(1, Number(selectedSubject.group_count || 1));
+    const taskCreatorIds = Array.from(new Set(
+      (taskRows || [])
+        .map((task) => Number(task.created_by || 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ));
+    const creatorAssignmentRows = taskCreatorIds.length
+      ? await teacherTemplateHelpers.listTeacherAssignmentRows(getTeacherTemplateStore(), {
+          userIds: taskCreatorIds,
+          subjectId: selectedSubject.subject_id,
+          includeHidden: true,
+        })
+      : [];
+    const creatorAssignmentsByUser = {};
+    (creatorAssignmentRows || []).forEach((row) => {
+      const teacherId = Number(row.user_id || 0);
+      if (!Number.isInteger(teacherId) || teacherId < 1) return;
+      if (!creatorAssignmentsByUser[teacherId]) creatorAssignmentsByUser[teacherId] = [];
+      creatorAssignmentsByUser[teacherId].push(row);
+    });
+    const audienceByTaskId = {};
+    const tasks = (taskRows || []).filter((task) => {
+      const teacherRows = creatorAssignmentsByUser[Number(task.created_by || 0)] || [];
+      const access = buildTeacherSubjectAccess(teacherRows, selectedSubjectGroupCount);
+      const audience = buildTeamworkTaskAudience(task, access, selectedSubjectGroupCount);
+      audienceByTaskId[task.id] = audience;
+      if (isTeacherMode) return true;
+      if (!teacherRows.length) return false;
+      if (audience.allowAll) return true;
+      return studentSubjectGroups.some((groupNum) => audience.groups.has(Number(groupNum)));
+    });
 
     if (!tasks.length) {
       return res.render('teamwork', {
@@ -29985,7 +29958,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
 
     const taskIds = tasks.map((task) => task.id);
     const placeholders = taskIds.map(() => '?').join(',');
-    const [groups, members, reactionRows, myReactionRows, students, visibilityRows] = await Promise.all([
+    const [groups, members, reactionRows, myReactionRows, students] = await Promise.all([
       db.all(
         `
           SELECT g.*, COALESCE(u.full_name, '') AS leader_name
@@ -30032,17 +30005,6 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         `,
         [selectedSubject.subject_id, selectedBoundCourseIds]
       ),
-      db.all(
-        `
-          SELECT t.id AS task_id, ts.group_number
-          FROM teamwork_tasks t
-          LEFT JOIN teacher_subjects ts
-            ON ts.user_id = t.created_by
-           AND ts.subject_id = t.subject_id
-          WHERE t.id IN (${placeholders})
-        `,
-        taskIds
-      ),
     ]);
 
     const groupsByTask = {};
@@ -30078,30 +30040,11 @@ app.get('/teamwork', requireLogin, async (req, res) => {
       reactedMap[row.task_id][row.emoji] = true;
     });
 
-    const selectedSubjectGroupCount = Math.max(1, Number(selectedSubject.group_count || 1));
-    const visibilityRowsByTask = {};
-    (visibilityRows || []).forEach((row) => {
-      if (!visibilityRowsByTask[row.task_id]) visibilityRowsByTask[row.task_id] = [];
-      visibilityRowsByTask[row.task_id].push(row);
-    });
-
-    const visibilityByTask = {};
-    taskIds.forEach((taskId) => {
-      visibilityByTask[taskId] = buildTeacherSubjectAccess(visibilityRowsByTask[taskId] || [], selectedSubjectGroupCount);
-    });
-
     const freeStudents = {};
     const taskData = tasks
       .map((task) => {
-        const access = visibilityByTask[task.id] || { hasRows: false, allowAll: true, groups: new Set() };
-        const audience = buildTeamworkTaskAudience(task, access, selectedSubjectGroupCount);
-        if (!isTeacherMode && !audience.allowAll) {
-          const canViewTask = studentSubjectGroups.some((groupNum) => audience.groups.has(Number(groupNum)));
-          if (!canViewTask) {
-            return null;
-          }
-        }
-
+        const audience = audienceByTaskId[task.id]
+          || buildTeamworkTaskAudience(task, { hasRows: false, allowAll: true, groups: new Set() }, selectedSubjectGroupCount);
         const used = membersByTask[task.id] || new Set();
         const allowedStudentsByAudience = (students || []).filter((student) => {
           if (audience.allowAll) return true;
@@ -31227,18 +31170,23 @@ app.post('/admin/support-requests/:id/update', requireSupportSectionAccess, writ
   const closeRequested = String(req.body.close_request || '') === '1';
   const status = closeRequested ? 'resolved' : normalizeSupportRequestStatus(req.body.status);
   const selectedCourseId = Number(getAdminCourse(req) || req.session.user.course_id || 0);
-  const redirectCourseQuery = selectedCourseId > 0 ? `&course=${selectedCourseId}` : '';
-  const redirectThreadQuery = Number.isInteger(requestId) && requestId > 0 ? `&support_request=${requestId}` : '';
-  const redirectBase = `/admin?tab=admin-support${redirectCourseQuery}${redirectThreadQuery}`;
+  const redirectBase = buildAdminTabUrl(req, 'admin-support', {
+    support_request: Number.isInteger(requestId) && requestId > 0 ? requestId : null,
+  });
+  const redirectWith = (kind, message) => appendQueryParamToUrl(
+    redirectBase,
+    kind,
+    String(message || '')
+  );
 
   if (Number.isNaN(requestId) || replyBody.length > 1000) {
-    return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketValidationMessage'))}`);
+    return res.redirect(redirectWith('err', translate(lang, 'admin.supportTicketValidationMessage')));
   }
 
   try {
     const supportRequestColumns = await getTableColumnSet('support_requests', { refresh: true });
     if (!supportRequestColumns.has('id')) {
-      return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
+      return res.redirect(redirectWith('err', translate(lang, 'admin.supportTicketSchemaMessage')));
     }
 
     const selectFields = ['id'];
@@ -31256,14 +31204,14 @@ app.post('/admin/support-requests/:id/update', requireSupportSectionAccess, writ
       [requestId]
     );
     if (!supportRequest) {
-      return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketMissingMessage'))}`);
+      return res.redirect(redirectWith('err', translate(lang, 'admin.supportTicketMissingMessage')));
     }
     if (
       supportRequestColumns.has('course_id')
       && selectedCourseId > 0
       && Number(supportRequest.course_id || 0) !== selectedCourseId
     ) {
-      return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketMissingMessage'))}`);
+      return res.redirect(redirectWith('err', translate(lang, 'admin.supportTicketMissingMessage')));
     }
     const resolvedAt = status === 'resolved' ? new Date().toISOString() : null;
     const resolvedBy = status === 'resolved' ? req.session.user.id : null;
@@ -31290,7 +31238,7 @@ app.post('/admin/support-requests/:id/update', requireSupportSectionAccess, writ
       updateParams.push(resolvedBy);
     }
     if (!updateAssignments.length) {
-      return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
+      return res.redirect(redirectWith('err', translate(lang, 'admin.supportTicketSchemaMessage')));
     }
     updateParams.push(requestId);
 
@@ -31312,10 +31260,10 @@ app.post('/admin/support-requests/:id/update', requireSupportSectionAccess, writ
       status,
       replied: Boolean(replyBody),
     });
-    return res.redirect(`${redirectBase}&ok=${encodeURIComponent(translate(lang, 'admin.supportTicketUpdatedMessage'))}`);
+    return res.redirect(redirectWith('ok', translate(lang, 'admin.supportTicketUpdatedMessage')));
   } catch (err) {
     if (isDbSchemaCompatibilityError(err)) {
-      return res.redirect(`${redirectBase}&err=${encodeURIComponent(translate(lang, 'admin.supportTicketSchemaMessage'))}`);
+      return res.redirect(redirectWith('err', translate(lang, 'admin.supportTicketSchemaMessage')));
     }
     return handleDbError(res, err, 'admin.supportRequests.update');
   }
@@ -35802,21 +35750,15 @@ app.post('/admin/pathways/admissions/:id/courses/save', requirePathwaysSectionAc
       }));
     }
     const { compatibleCourses } = await getAdmissionCourseScope(admissionId, admissionRow.track_key);
-    for (const course of compatibleCourses || []) {
-      const mappedFlag = parseBooleanFlag(req.body[`course_${course.id}`], false);
-      await db.run(
-        `
-          INSERT INTO program_admission_courses
-            (admission_id, course_id, is_visible, created_at, updated_at)
-          VALUES (?, ?, ?, NOW(), NOW())
-          ON CONFLICT (admission_id, course_id)
-          DO UPDATE SET
-            is_visible = EXCLUDED.is_visible,
-            updated_at = NOW()
-        `,
-        [admissionId, course.id, mappedFlag]
-      );
-    }
+    await academicSetupHelpers.upsertLegacyAdmissionCourseMappings({
+      run: (sql, params) => db.run(sql, params),
+    }, {
+      admissionId,
+      mappings: (compatibleCourses || []).map((course) => ({
+        course_id: course.id,
+        is_visible: parseBooleanFlag(req.body[`course_${course.id}`], false),
+      })),
+    });
     await syncStudyContextsForAdmission(admissionId);
     await syncSubjectOfferingsForAdmission(admissionId);
     invalidateRegistrationPathwaysCache();
@@ -35913,28 +35855,13 @@ app.post('/admin/pathways/admissions/:id/courses/copy', requirePathwaysSectionAc
       }));
     }
 
-    await db.run(
-      `
-        INSERT INTO program_admission_courses
-          (admission_id, course_id, is_visible, created_at, updated_at)
-        SELECT
-          ?,
-          c.id,
-          COALESCE(src.is_visible, false),
-          NOW(),
-          NOW()
-        FROM courses c
-        LEFT JOIN program_admission_courses src
-          ON src.course_id = c.id
-         AND src.admission_id = ?
-        WHERE c.id = ANY(?::int[])
-        ON CONFLICT (admission_id, course_id)
-        DO UPDATE SET
-          is_visible = EXCLUDED.is_visible,
-          updated_at = NOW()
-      `,
-      [admissionId, sourceAdmissionId, compatibleCourseIds]
-    );
+    await academicSetupHelpers.copyLegacyAdmissionCourseMappings({
+      run: (sql, params) => db.run(sql, params),
+    }, {
+      sourceAdmissionId,
+      targetAdmissionId: admissionId,
+      courseIds: compatibleCourseIds,
+    });
 
     await syncStudyContextsForAdmission(admissionId);
     await syncSubjectOfferingsForAdmission(admissionId);
@@ -36034,22 +35961,15 @@ app.post('/admin/pathways/admissions/:id/courses/legacy-map', requirePathwaysSec
     }
 
     const targetCourseSet = new Set(targetCourseIds);
-    for (const scopedCourse of compatibleCourses) {
-      const scopedCourseId = Number(scopedCourse.id || 0);
-      if (!scopedCourseId) continue;
-      await db.run(
-        `
-          INSERT INTO program_admission_courses
-            (admission_id, course_id, is_visible, created_at, updated_at)
-          VALUES (?, ?, ?, NOW(), NOW())
-          ON CONFLICT (admission_id, course_id)
-          DO UPDATE SET
-            is_visible = EXCLUDED.is_visible,
-            updated_at = NOW()
-        `,
-        [admissionId, scopedCourseId, targetCourseSet.has(scopedCourseId)]
-      );
-    }
+    await academicSetupHelpers.upsertLegacyAdmissionCourseMappings({
+      run: (sql, params) => db.run(sql, params),
+    }, {
+      admissionId,
+      mappings: compatibleCourses.map((scopedCourse) => ({
+        course_id: scopedCourse.id,
+        is_visible: targetCourseSet.has(Number(scopedCourse.id || 0)),
+      })),
+    });
 
     await syncStudyContextsForAdmission(admissionId);
     await syncSubjectOfferingsForAdmission(admissionId);
@@ -38051,19 +37971,10 @@ const getSessionSubjectTeacherMap = async (subjectIds = []) => {
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value) && value > 0)));
   if (!safeIds.length) return new Map();
-  const rows = await db.all(
-    `
-      SELECT
-        ts.subject_id,
-        ts.group_number,
-        ts.user_id,
-        COALESCE(NULLIF(TRIM(u.full_name), ''), ('ID ' || ts.user_id::TEXT)) AS teacher_name
-      FROM teacher_subjects ts
-      LEFT JOIN users u ON u.id = ts.user_id
-      WHERE ts.subject_id = ANY(?)
-    `,
-    [safeIds]
-  );
+  const rows = await teacherTemplateHelpers.listTeacherAssignmentRows(getTeacherTemplateStore(), {
+    subjectIds: safeIds,
+    includeHidden: true,
+  });
   const result = new Map();
   (rows || []).forEach((row) => {
     const subjectId = Number(row.subject_id);
@@ -38210,18 +38121,25 @@ const buildSessionExpandedAssignments = (assessments = [], subjectById = new Map
   });
 };
 
-const getSessionTeacherBusyMap = async (teacherIds = []) => {
+const getSessionTeacherBusyMap = async (teacherIds = [], teacherMapBySubject = new Map()) => {
   const safeTeacherIds = Array.from(new Set((teacherIds || [])
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value) && value > 0)));
   const busyMap = new Map();
   if (!safeTeacherIds.length) return busyMap;
+  const safeSubjectIds = Array.from(new Set(
+    Array.from((teacherMapBySubject && typeof teacherMapBySubject.keys === 'function')
+      ? teacherMapBySubject.keys()
+      : [])
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0)
+  ));
+  if (!safeSubjectIds.length) return busyMap;
+  const teacherIdSet = new Set(safeTeacherIds);
 
   const scheduleRows = await db.all(
     `
       SELECT DISTINCT
-        ts.user_id AS teacher_id,
-        COALESCE(NULLIF(TRIM(u.full_name), ''), ('ID ' || ts.user_id::TEXT)) AS teacher_name,
         se.id AS source_id,
         se.course_id,
         COALESCE(c.name, ('Курс ' || se.course_id::TEXT)) AS course_name,
@@ -38235,25 +38153,19 @@ const getSessionTeacherBusyMap = async (teacherIds = []) => {
       FROM schedule_entries se
       JOIN subjects s ON s.id = se.subject_id
       JOIN semesters sem ON sem.id = se.semester_id
-      JOIN teacher_subjects ts ON ts.subject_id = se.subject_id
-        AND (ts.group_number IS NULL OR ts.group_number = se.group_number)
-      LEFT JOIN users u ON u.id = ts.user_id
       LEFT JOIN courses c ON c.id = se.course_id
-      WHERE ts.user_id = ANY(?)
+      WHERE se.subject_id = ANY(?::int[])
         AND se.class_number BETWEEN 1 AND 7
     `,
-    [safeTeacherIds]
+    [safeSubjectIds]
   );
   (scheduleRows || []).forEach((row) => {
-    const teacherId = Number(row.teacher_id);
     const classNumber = Number(row.class_number);
     const weekNumber = Number(row.week_number);
     const dayName = normalizeWeekdayName(row.day_of_week);
     const startDate = row.start_date ? String(row.start_date) : null;
     if (
-      !Number.isFinite(teacherId)
-      || teacherId < 1
-      || !Number.isFinite(classNumber)
+      !Number.isFinite(classNumber)
       || classNumber < 1
       || classNumber > 7
       || !Number.isFinite(weekNumber)
@@ -38265,28 +38177,35 @@ const getSessionTeacherBusyMap = async (teacherIds = []) => {
     }
     const classDate = getDateForWeekDay(weekNumber, dayName, startDate);
     if (!classDate || !isValidDateString(classDate)) return;
-    const slotKey = `${teacherId}|${classDate}|${classNumber}`;
-    if (!busyMap.has(slotKey)) busyMap.set(slotKey, []);
-    busyMap.get(slotKey).push({
-      source_kind: 'schedule',
-      source_ref: `schedule:${row.source_id}`,
-      teacher_id: teacherId,
-      teacher_name: String(row.teacher_name || `ID ${teacherId}`),
-      date: classDate,
-      class_number: classNumber,
-      course_id: Number(row.course_id || 0) || null,
-      course_name: String(row.course_name || ''),
-      subject_id: Number(row.subject_id || 0) || null,
-      subject_name: String(row.subject_name || ''),
-      group_number: Number(row.group_number || 0) || null,
+    const teachers = resolveSessionTeachersForGroup(
+      teacherMapBySubject,
+      row.subject_id,
+      row.group_number
+    ).filter((teacher) => teacherIdSet.has(Number(teacher.id || 0)));
+    teachers.forEach((teacher) => {
+      const teacherId = Number(teacher.id || 0);
+      if (!Number.isFinite(teacherId) || teacherId < 1) return;
+      const slotKey = `${teacherId}|${classDate}|${classNumber}`;
+      if (!busyMap.has(slotKey)) busyMap.set(slotKey, []);
+      busyMap.get(slotKey).push({
+        source_kind: 'schedule',
+        source_ref: `schedule:${row.source_id}`,
+        teacher_id: teacherId,
+        teacher_name: String(teacher.name || `ID ${teacherId}`),
+        date: classDate,
+        class_number: classNumber,
+        course_id: Number(row.course_id || 0) || null,
+        course_name: String(row.course_name || ''),
+        subject_id: Number(row.subject_id || 0) || null,
+        subject_name: String(row.subject_name || ''),
+        group_number: Number(row.group_number || 0) || null,
+      });
     });
   });
 
   const homeworkRows = await db.all(
     `
       SELECT DISTINCT
-        ts.user_id AS teacher_id,
-        COALESCE(NULLIF(TRIM(u.full_name), ''), ('ID ' || ts.user_id::TEXT)) AS teacher_name,
         h.id AS source_id,
         h.course_id,
         COALESCE(c.name, ('Курс ' || h.course_id::TEXT)) AS course_name,
@@ -38296,12 +38215,9 @@ const getSessionTeacherBusyMap = async (teacherIds = []) => {
         h.class_number,
         h.class_date
       FROM homework h
-      JOIN teacher_subjects ts ON ts.subject_id = h.subject_id
-        AND (ts.group_number IS NULL OR ts.group_number = h.group_number)
-      LEFT JOIN users u ON u.id = ts.user_id
       LEFT JOIN subjects s ON s.id = h.subject_id
       LEFT JOIN courses c ON c.id = h.course_id
-      WHERE ts.user_id = ANY(?)
+      WHERE h.subject_id = ANY(?::int[])
         AND h.class_date IS NOT NULL
         AND h.class_number BETWEEN 1 AND 7
         AND COALESCE(h.status, 'published') IN ('draft', 'scheduled', 'published')
@@ -38311,36 +38227,42 @@ const getSessionTeacherBusyMap = async (teacherIds = []) => {
           OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE '[сесія]%'
         )
     `,
-    [safeTeacherIds]
+    [safeSubjectIds]
   );
   (homeworkRows || []).forEach((row) => {
-    const teacherId = Number(row.teacher_id);
     const classNumber = Number(row.class_number);
     const classDate = toDateOnly(row.class_date);
     if (
-      !Number.isFinite(teacherId)
-      || teacherId < 1
-      || !Number.isFinite(classNumber)
+      !Number.isFinite(classNumber)
       || classNumber < 1
       || classNumber > 7
       || !isValidDateString(classDate)
     ) {
       return;
     }
-    const slotKey = `${teacherId}|${classDate}|${classNumber}`;
-    if (!busyMap.has(slotKey)) busyMap.set(slotKey, []);
-    busyMap.get(slotKey).push({
-      source_kind: 'homework',
-      source_ref: `homework:${row.source_id}`,
-      teacher_id: teacherId,
-      teacher_name: String(row.teacher_name || `ID ${teacherId}`),
-      date: classDate,
-      class_number: classNumber,
-      course_id: Number(row.course_id || 0) || null,
-      course_name: String(row.course_name || ''),
-      subject_id: Number(row.subject_id || 0) || null,
-      subject_name: String(row.subject_name || ''),
-      group_number: Number(row.group_number || 0) || null,
+    const teachers = resolveSessionTeachersForGroup(
+      teacherMapBySubject,
+      row.subject_id,
+      row.group_number
+    ).filter((teacher) => teacherIdSet.has(Number(teacher.id || 0)));
+    teachers.forEach((teacher) => {
+      const teacherId = Number(teacher.id || 0);
+      if (!Number.isFinite(teacherId) || teacherId < 1) return;
+      const slotKey = `${teacherId}|${classDate}|${classNumber}`;
+      if (!busyMap.has(slotKey)) busyMap.set(slotKey, []);
+      busyMap.get(slotKey).push({
+        source_kind: 'homework',
+        source_ref: `homework:${row.source_id}`,
+        teacher_id: teacherId,
+        teacher_name: String(teacher.name || `ID ${teacherId}`),
+        date: classDate,
+        class_number: classNumber,
+        course_id: Number(row.course_id || 0) || null,
+        course_name: String(row.course_name || ''),
+        subject_id: Number(row.subject_id || 0) || null,
+        subject_name: String(row.subject_name || ''),
+        group_number: Number(row.group_number || 0) || null,
+      });
     });
   });
 
@@ -38369,7 +38291,7 @@ const buildSessionTeacherConflictReport = async ({
     });
   });
   const teacherIds = Array.from(new Set(enrichedRows.flatMap((row) => row.teachers.map((teacher) => teacher.id))));
-  const busyMap = await getSessionTeacherBusyMap(teacherIds);
+  const busyMap = await getSessionTeacherBusyMap(teacherIds, teacherMapBySubject);
   const draftMap = new Map();
   const conflicts = [];
   const conflictDedup = new Set();
@@ -40440,7 +40362,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
     }
 
     const unresolvedSuffix = combinedReport.unresolvedRows.length
-      ? ` Перевірка конфліктів неповна: для ${conflictReport.unresolvedRows.length} подій не знайдено привʼязаного викладача (teacher_subjects).`
+    ? ` Перевірка конфліктів неповна: для ${conflictReport.unresolvedRows.length} подій не знайдено привʼязаного викладача в compatibility mirror.`
       : '';
     const message = createdCount > 0
       ? `Опубліковано ${createdCount} подій сесії. Пропущено дублікатів: ${skippedCount}. Синхронізовано предметів у журналі: ${syncedSubjects}.${unresolvedSuffix}`
@@ -42591,8 +42513,12 @@ app.get('/admin/audit/role-studio.json', requireRoleAccessSectionAccess, async (
 
 app.post('/admin/settings/rollback', requireSettingsSectionAccess, async (req, res) => {
   const auditId = Number(req.body.audit_id);
+  const redirectWith = (kind, message, extraParams = {}) => buildAdminTabUrl(req, 'admin-settings', {
+    ...extraParams,
+    [kind]: String(message || ''),
+  });
   if (!Number.isFinite(auditId) || auditId < 1) {
-    return res.redirect('/admin?tab=admin-settings&err=Invalid%20audit%20entry');
+    return res.redirect(redirectWith('err', 'Invalid audit entry'));
   }
   try {
     await ensureDbReady();
@@ -42606,18 +42532,18 @@ app.post('/admin/settings/rollback', requireSettingsSectionAccess, async (req, r
           AND (course_id = ? OR course_id IS NULL)
         LIMIT 1
       `,
-      [auditId, ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS, courseId]
-    );
-    if (!auditRow) {
-      return res.redirect('/admin?tab=admin-settings&err=Audit%20entry%20not%20found');
-    }
-    if (String(auditRow.target_type || '') !== 'system_settings') {
-      return res.redirect('/admin?tab=admin-settings&err=Unsupported%20audit%20target');
-    }
-    const rollbackStateRaw = parseAuditState(auditRow.before_state);
-    if (!rollbackStateRaw || typeof rollbackStateRaw !== 'object') {
-      return res.redirect('/admin?tab=admin-settings&err=Rollback%20snapshot%20is%20invalid');
-    }
+        [auditId, ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS, courseId]
+      );
+      if (!auditRow) {
+      return res.redirect(redirectWith('err', 'Audit entry not found'));
+      }
+      if (String(auditRow.target_type || '') !== 'system_settings') {
+      return res.redirect(redirectWith('err', 'Unsupported audit target'));
+      }
+      const rollbackStateRaw = parseAuditState(auditRow.before_state);
+      if (!rollbackStateRaw || typeof rollbackStateRaw !== 'object') {
+      return res.redirect(redirectWith('err', 'Rollback snapshot is invalid'));
+      }
 
     const beforeRollbackState = buildSystemSettingsAuditState(settingsCache);
     const rollbackState = buildSystemSettingsAuditState(rollbackStateRaw);
@@ -42637,16 +42563,20 @@ app.post('/admin/settings/rollback', requireSettingsSectionAccess, async (req, r
       operation_id: operationId,
       audit_id: auditId,
     });
-    return res.redirect(`/admin?tab=admin-settings&ok=Settings%20rollback%20applied&op=${operationId}`);
+    return res.redirect(redirectWith('ok', 'Settings rollback applied', { op: operationId }));
   } catch (err) {
-    return res.redirect('/admin?tab=admin-settings&err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
 app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (req, res) => {
   const auditId = Number(req.body.audit_id);
+  const redirectWith = (kind, message, extraParams = {}) => buildAdminTabUrl(req, 'admin-role-studio', {
+    ...extraParams,
+    [kind]: String(message || ''),
+  });
   if (!Number.isFinite(auditId) || auditId < 1) {
-    return res.redirect('/admin?tab=admin-role-studio&err=Invalid%20audit%20entry');
+    return res.redirect(redirectWith('err', 'Invalid audit entry'));
   }
   try {
     await ensureDbReady();
@@ -42660,11 +42590,11 @@ app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (r
           AND (course_id = ? OR course_id IS NULL)
         LIMIT 1
       `,
-      [auditId, ADMIN_AUDIT_SCOPE_ROLE_STUDIO, courseId]
-    );
-    if (!auditRow) {
-      return res.redirect('/admin?tab=admin-role-studio&err=Audit%20entry%20not%20found');
-    }
+        [auditId, ADMIN_AUDIT_SCOPE_ROLE_STUDIO, courseId]
+      );
+      if (!auditRow) {
+      return res.redirect(redirectWith('err', 'Audit entry not found'));
+      }
     const targetType = String(auditRow.target_type || '');
     const targetKey = String(auditRow.target_key || '').trim().toLowerCase();
     const rollbackState = parseAuditState(auditRow.before_state);
@@ -42673,7 +42603,7 @@ app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (r
 
     if (targetType === 'role_permissions') {
       if (!rollbackState || typeof rollbackState !== 'object') {
-        return res.redirect('/admin?tab=admin-role-studio&err=Rollback%20snapshot%20is%20invalid');
+        return res.redirect(redirectWith('err', 'Rollback snapshot is invalid'));
       }
       const beforeRollbackState = sanitizeLegacyRolePermissions(settingsCache.role_permissions || {});
       const appliedState = await persistLegacyRolePermissions(rollbackState);
@@ -42693,16 +42623,16 @@ app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (r
         audit_id: auditId,
       });
       broadcast('users_updated');
-      return res.redirect(`/admin?tab=admin-role-studio&ok=Role%20Studio%20rollback%20applied&op=${operationId}`);
+      return res.redirect(redirectWith('ok', 'Role Studio rollback applied', { op: operationId }));
     }
 
     if (targetType === 'rbac_role') {
       if (!targetKey) {
-        return res.redirect('/admin?tab=admin-role-studio&err=Invalid%20audit%20target%20key');
+        return res.redirect(redirectWith('err', 'Invalid audit target key'));
       }
       const beforeRollbackState = await getRbacRoleStateByKey(targetKey);
       if (!rollbackState && !afterState) {
-        return res.redirect('/admin?tab=admin-role-studio&err=Rollback%20snapshot%20is%20empty');
+        return res.redirect(redirectWith('err', 'Rollback snapshot is empty'));
       }
       await withTransaction(async (client) => {
         if (!rollbackState && afterState) {
@@ -42729,19 +42659,19 @@ app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (r
         role_key: targetKey,
       });
       broadcast('users_updated');
-      return res.redirect(`/admin?tab=admin-role-studio&ok=Role%20Studio%20rollback%20applied&op=${operationId}`);
+      return res.redirect(redirectWith('ok', 'Role Studio rollback applied', { op: operationId }));
     }
 
-    return res.redirect('/admin?tab=admin-role-studio&err=Unsupported%20rollback%20target');
+    return res.redirect(redirectWith('err', 'Unsupported rollback target'));
   } catch (err) {
     const message = String(err && err.message ? err.message : '');
     if (message.includes('Role is assigned to users')) {
-      return res.redirect('/admin?tab=admin-role-studio&err=Cannot%20rollback:%20role%20is%20assigned%20to%20users');
+      return res.redirect(redirectWith('err', 'Cannot rollback: role is assigned to users'));
     }
     if (message.includes('Cannot delete system role')) {
-      return res.redirect('/admin?tab=admin-role-studio&err=Cannot%20rollback:%20system%20role%20delete%20blocked');
+      return res.redirect(redirectWith('err', 'Cannot rollback: system role delete blocked'));
     }
-    return res.redirect('/admin?tab=admin-role-studio&err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
@@ -49291,20 +49221,23 @@ app.post('/admin/student-groups/set', requireUsersSectionAccess, (req, res) => {
 
 app.post('/admin/group/remove', requireUsersSectionAccess, (req, res) => {
   const { student_id, subject_id } = req.body;
+  const redirectWith = (kind, message) => buildAdminTabUrl(req, 'admin-students', {
+    [kind]: String(message || ''),
+  });
   if (!student_id || !subject_id) {
-    return res.redirect('/admin?err=Invalid%20remove%20request');
+    return res.redirect(redirectWith('err', 'Invalid remove request'));
   }
   db.run(
     'DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?',
     [student_id, subject_id],
     (err) => {
     if (err) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(redirectWith('err', 'Database error'));
     }
     logAction(db, req, 'student_group_remove', { student_id, subject_id });
     logActivity(db, req, 'group_remove', 'student_group', null, { student_id, subject_id }, getAdminCourse(req));
     broadcast('users_updated');
-    return res.redirect('/admin?ok=Subject%20removed');
+    return res.redirect(redirectWith('ok', 'Subject removed'));
   }
   );
 });
@@ -49313,25 +49246,28 @@ app.post('/admin/students/groups/set', requireUsersOrStudentsSectionAccess, (req
   const { student_id, subject_id, group_number } = req.body;
   const groupNum = Number(group_number);
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminTabUrl(req, 'admin-students', {
+    [kind]: String(message || ''),
+  });
   if (!student_id || !subject_id || Number.isNaN(groupNum)) {
-    return res.redirect('/admin?tab=admin-students&err=Invalid%20group%20assignment');
+    return res.redirect(redirectWith('err', 'Invalid group assignment'));
   }
   db.get(
     'SELECT id, role FROM users WHERE id = ? AND course_id = ?',
     [student_id, courseId],
     (userErr, user) => {
       if (userErr || !user) {
-        return res.redirect('/admin?tab=admin-students&err=User%20not%20found');
+        return res.redirect(redirectWith('err', 'User not found'));
       }
       if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
-        return res.redirect('/admin?tab=admin-students&err=Forbidden%20student%20scope');
+        return res.redirect(redirectWith('err', 'Forbidden student scope'));
       }
       getSubjectForCourse(subject_id, courseId, { includeHidden: true }).then((subject) => {
         if (!subject) {
-          return res.redirect('/admin?tab=admin-students&err=Database%20error');
+          return res.redirect(redirectWith('err', 'Database error'));
         }
         if (groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
-          return res.redirect('/admin?tab=admin-students&err=Group%20out%20of%20range');
+          return res.redirect(redirectWith('err', 'Group out of range'));
         }
         db.run(
           `
@@ -49343,7 +49279,7 @@ app.post('/admin/students/groups/set', requireUsersOrStudentsSectionAccess, (req
           [student_id, subject_id, groupNum],
           (setErr) => {
             if (setErr) {
-              return res.redirect('/admin?tab=admin-students&err=Database%20error');
+              return res.redirect(redirectWith('err', 'Database error'));
             }
             logAction(db, req, 'student_group_set', { student_id, subject_id, group_number: groupNum });
             logActivity(
@@ -49356,11 +49292,11 @@ app.post('/admin/students/groups/set', requireUsersOrStudentsSectionAccess, (req
               courseId
             );
             broadcast('users_updated');
-            return res.redirect('/admin?tab=admin-students&ok=Group%20updated');
+            return res.redirect(redirectWith('ok', 'Group updated'));
           }
         );
       }).catch(() => {
-        return res.redirect('/admin?tab=admin-students&err=Database%20error');
+        return res.redirect(redirectWith('err', 'Database error'));
       });
     }
   );
@@ -49369,25 +49305,28 @@ app.post('/admin/students/groups/set', requireUsersOrStudentsSectionAccess, (req
 app.post('/admin/students/group/remove', requireUsersOrStudentsSectionAccess, (req, res) => {
   const { student_id, subject_id } = req.body;
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminTabUrl(req, 'admin-students', {
+    [kind]: String(message || ''),
+  });
   if (!student_id || !subject_id) {
-    return res.redirect('/admin?tab=admin-students&err=Invalid%20remove%20request');
+    return res.redirect(redirectWith('err', 'Invalid remove request'));
   }
   db.get(
     'SELECT id, role FROM users WHERE id = ? AND course_id = ?',
     [student_id, courseId],
     (userErr, user) => {
       if (userErr || !user) {
-        return res.redirect('/admin?tab=admin-students&err=User%20not%20found');
+        return res.redirect(redirectWith('err', 'User not found'));
       }
       if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
-        return res.redirect('/admin?tab=admin-students&err=Forbidden%20student%20scope');
+        return res.redirect(redirectWith('err', 'Forbidden student scope'));
       }
       db.run(
         'DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?',
         [student_id, subject_id],
         (err) => {
           if (err) {
-            return res.redirect('/admin?tab=admin-students&err=Database%20error');
+            return res.redirect(redirectWith('err', 'Database error'));
           }
           logAction(db, req, 'student_group_remove', { student_id, subject_id });
           logActivity(
@@ -49400,7 +49339,7 @@ app.post('/admin/students/group/remove', requireUsersOrStudentsSectionAccess, (r
             courseId
           );
           broadcast('users_updated');
-          return res.redirect('/admin?tab=admin-students&ok=Subject%20removed');
+          return res.redirect(redirectWith('ok', 'Subject removed'));
         }
       );
     }
@@ -49411,29 +49350,32 @@ app.post('/admin/students/deactivate', requireUsersOrStudentsSectionAccess, (req
   const { user_id } = req.body;
   const courseId = getAdminCourse(req);
   const userId = Number(user_id);
+  const redirectWith = (kind, message) => buildAdminTabUrl(req, 'admin-students', {
+    [kind]: String(message || ''),
+  });
   if (!Number.isFinite(userId)) {
-    return res.redirect('/admin?tab=admin-students&err=Invalid%20user');
+    return res.redirect(redirectWith('err', 'Invalid user'));
   }
   db.get(
     'SELECT id, role, full_name FROM users WHERE id = ? AND course_id = ?',
     [userId, courseId],
     (err, user) => {
       if (err || !user) {
-        return res.redirect('/admin?tab=admin-students&err=User%20not%20found');
+        return res.redirect(redirectWith('err', 'User not found'));
       }
       if (normalizeRoleKey(user.role) === 'admin') {
-        return res.redirect('/admin?tab=admin-students&err=Cannot%20deactivate%20admin');
+        return res.redirect(redirectWith('err', 'Cannot deactivate admin'));
       }
       if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
-        return res.redirect('/admin?tab=admin-students&err=Forbidden%20student%20scope');
+        return res.redirect(redirectWith('err', 'Forbidden student scope'));
       }
       db.run('UPDATE users SET is_active = 0 WHERE id = ?', [userId], (updErr) => {
         if (updErr) {
-          return res.redirect('/admin?tab=admin-students&err=Database%20error');
+          return res.redirect(redirectWith('err', 'Database error'));
         }
         logAction(db, req, 'student_deactivate', { user_id: userId, full_name: user.full_name });
         broadcast('users_updated');
-        return res.redirect('/admin?tab=admin-students&ok=Student%20deactivated');
+        return res.redirect(redirectWith('ok', 'Student deactivated'));
       });
     }
   );
@@ -49443,26 +49385,29 @@ app.post('/admin/students/activate', requireUsersOrStudentsSectionAccess, (req, 
   const { user_id } = req.body;
   const courseId = getAdminCourse(req);
   const userId = Number(user_id);
+  const redirectWith = (kind, message) => buildAdminTabUrl(req, 'admin-students', {
+    [kind]: String(message || ''),
+  });
   if (!Number.isFinite(userId)) {
-    return res.redirect('/admin?tab=admin-students&err=Invalid%20user');
+    return res.redirect(redirectWith('err', 'Invalid user'));
   }
   db.get(
     'SELECT id, role FROM users WHERE id = ? AND course_id = ?',
     [userId, courseId],
     (err, user) => {
       if (err || !user) {
-        return res.redirect('/admin?tab=admin-students&err=User%20not%20found');
+        return res.redirect(redirectWith('err', 'User not found'));
       }
       if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
-        return res.redirect('/admin?tab=admin-students&err=Forbidden%20student%20scope');
+        return res.redirect(redirectWith('err', 'Forbidden student scope'));
       }
       db.run('UPDATE users SET is_active = 1 WHERE id = ?', [userId], (updErr) => {
         if (updErr) {
-          return res.redirect('/admin?tab=admin-students&err=Database%20error');
+          return res.redirect(redirectWith('err', 'Database error'));
         }
         logAction(db, req, 'student_activate', { user_id: userId });
         broadcast('users_updated');
-        return res.redirect('/admin?tab=admin-students&ok=Student%20restored');
+        return res.redirect(redirectWith('ok', 'Student restored'));
       });
     }
   );
@@ -49615,8 +49560,12 @@ app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, async (req,
   const label = String(req.body.label || '').trim();
   const description = String(req.body.description || '').trim();
   const cloneFrom = String(req.body.clone_from || '').trim().toLowerCase();
+  const redirectWith = (kind, message, extraParams = {}) => buildAdminTabUrl(req, 'admin-role-studio', {
+    ...extraParams,
+    [kind]: String(message || ''),
+  });
   if (!/^[a-z][a-z0-9_-]{1,31}$/.test(key) || !label) {
-    return res.redirect('/admin?err=Invalid%20role%20data');
+    return res.redirect(redirectWith('err', 'Invalid role data'));
   }
   try {
     await ensureDbReady();
@@ -49681,7 +49630,7 @@ app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, async (req,
       });
       logAction(db, req, 'rbac_role_create', { key, label, clone_from: cloneFrom || null });
       broadcast('users_updated');
-      return res.redirect(`/admin?tab=admin-role-studio&ok=Role%20created&op=${operationId}`);
+      return res.redirect(redirectWith('ok', 'Role created', { op: operationId }));
     } catch (err) {
       try {
         await client.query('ROLLBACK');
@@ -49689,21 +49638,25 @@ app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, async (req,
         // ignore rollback error when transaction is already committed
       }
       if (err && err.code === '23505') {
-        return res.redirect('/admin?err=Role%20key%20already%20exists');
+        return res.redirect(redirectWith('err', 'Role key already exists'));
       }
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(redirectWith('err', 'Database error'));
     } finally {
       client.release();
     }
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
 app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (req, res) => {
   const roleKey = String(req.params.key || '').trim().toLowerCase();
+  const redirectWith = (kind, message, extraParams = {}) => buildAdminTabUrl(req, 'admin-role-studio', {
+    ...extraParams,
+    [kind]: String(message || ''),
+  });
   if (!roleKey) {
-    return res.redirect('/admin?err=Invalid%20role');
+    return res.redirect(redirectWith('err', 'Invalid role'));
   }
   const label = String(req.body.label || '').trim();
   const description = String(req.body.description || '').trim();
@@ -49720,7 +49673,7 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
     )
   );
   if (!label) {
-    return res.redirect('/admin?err=Role%20label%20required');
+    return res.redirect(redirectWith('err', 'Role label required'));
   }
   try {
     await ensureDbReady();
@@ -49728,7 +49681,7 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
     const beforeState = await getRbacRoleStateByKey(roleKey);
     const roleRow = await db.get('SELECT id, key, is_system FROM access_roles WHERE key = ?', [roleKey]);
     if (!roleRow) {
-      return res.redirect('/admin?err=Role%20not%20found');
+      return res.redirect(redirectWith('err', 'Role not found'));
     }
     const requestedActive = String(req.body.is_active || '').toLowerCase();
     let isActive = requestedActive === '1' || requestedActive === 'true' || requestedActive === 'on';
@@ -49799,26 +49752,30 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
         course_kinds: courseKinds,
       });
       broadcast('users_updated');
-      return res.redirect(`/admin?tab=admin-role-studio&ok=Role%20updated&op=${operationId}`);
+      return res.redirect(redirectWith('ok', 'Role updated', { op: operationId }));
     } catch (err) {
       try {
         await client.query('ROLLBACK');
       } catch (_) {
         // ignore rollback error when transaction is already committed
       }
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(redirectWith('err', 'Database error'));
     } finally {
       client.release();
     }
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
 app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async (req, res) => {
   const roleKey = String(req.params.key || '').trim().toLowerCase();
+  const redirectWith = (kind, message, extraParams = {}) => buildAdminTabUrl(req, 'admin-role-studio', {
+    ...extraParams,
+    [kind]: String(message || ''),
+  });
   if (!roleKey) {
-    return res.redirect('/admin?err=Invalid%20role');
+    return res.redirect(redirectWith('err', 'Invalid role'));
   }
   try {
     await ensureDbReady();
@@ -49826,14 +49783,14 @@ app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async 
     const beforeState = await getRbacRoleStateByKey(roleKey);
     const roleRow = await db.get('SELECT id, key, is_system FROM access_roles WHERE key = ?', [roleKey]);
     if (!roleRow) {
-      return res.redirect('/admin?err=Role%20not%20found');
+      return res.redirect(redirectWith('err', 'Role not found'));
     }
     if (roleRow.is_system === true || Number(roleRow.is_system) === 1) {
-      return res.redirect('/admin?err=Cannot%20delete%20system%20role');
+      return res.redirect(redirectWith('err', 'Cannot delete system role'));
     }
     const usageRow = await db.get('SELECT COUNT(*) AS count FROM user_roles WHERE role_id = ?', [roleRow.id]);
     if (Number(usageRow?.count || 0) > 0) {
-      return res.redirect('/admin?err=Role%20is%20assigned%20to%20users');
+      return res.redirect(redirectWith('err', 'Role is assigned to users'));
     }
     await db.run('DELETE FROM access_roles WHERE id = ?', [roleRow.id]);
     const operationId = randomUUID();
@@ -49849,9 +49806,9 @@ app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async 
     });
     logAction(db, req, 'rbac_role_delete', { key: roleRow.key });
     broadcast('users_updated');
-    return res.redirect(`/admin?tab=admin-role-studio&ok=Role%20deleted&op=${operationId}`);
+    return res.redirect(redirectWith('ok', 'Role deleted', { op: operationId }));
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 

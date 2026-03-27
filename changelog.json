@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.04",
+      "date": "2026-03-27",
+      "items": [
+        "refactor(teacher-assignment-runtime-facade): add a generic `listTeacherAssignmentRows(...)` service helper in `lib/teacherTemplates.js` and move teamwork task visibility, session teacher conflict resolution, and teacher-group data-quality diagnostics in `app.js` off direct `teacher_subjects` joins",
+        "refactor(pathways-legacy-course-bridge): add Academic Setup helpers for legacy subject-to-admission lookups, teacher subject catalog labels, and `program_admission_courses` upsert/copy operations, then switch subject offering sync, teacher catalog loading, admission cloning, and pathways course mapping writes to those service-layer bridges",
+        "feat(canonical-scope-admin-redirects): add `buildAdminTabUrl(...)` and preserve canonical academic scope through support ticket updates, settings rollback, role studio rollback/create/update/delete, and student group/activation admin mutations instead of hand-built `/admin?tab=...` redirects"
+      ]
+    },
+    {
       "version": "1.3.03",
       "date": "2026-03-27",
       "items": [

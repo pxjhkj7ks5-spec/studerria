@@ -14,9 +14,11 @@ const {
 const {
   buildFailedPromotionTargetIssue,
   buildRegistrationCourseFallbackIssue,
+  listLegacyAdmissionIdsForSubjectIds,
   listLegacyAdmissionCourseRows,
   listLegacyAdmissionSubjectVisibilityRows,
   resolveAdminAcademicScopeState,
+  upsertLegacyAdmissionCourseMappings,
 } = require('../lib/academicSetup');
 
 test('pathway readiness becomes blocked without mapped courses', () => {
@@ -251,4 +253,43 @@ test('legacy admission subject visibility helper supports scoped admission array
   assert.match(calls[0].sql, /scb\.course_id = \?/i);
   assert.match(calls[0].sql, /sva\.subject_id = \?/i);
   assert.deepEqual(calls[0].params, [[11, 12], 5, 22]);
+});
+
+test('legacy admission id helper resolves subject bindings through service layer', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ admission_id: 14 }];
+    },
+  };
+
+  const rows = await listLegacyAdmissionIdsForSubjectIds(store, [4, '5', 4]);
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /JOIN program_admission_courses pac/i);
+  assert.deepEqual(calls[0].params, [[4, 5]]);
+});
+
+test('legacy admission course upsert helper normalizes mapping writes', async () => {
+  const calls = [];
+  const store = {
+    async run(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return { rowCount: 1 };
+    },
+  };
+
+  const writes = await upsertLegacyAdmissionCourseMappings(store, {
+    admissionId: 9,
+    mappings: [
+      { course_id: '11', is_visible: 'true' },
+      { course_id: 12, is_visible: 0 },
+      { course_id: null, is_visible: true },
+    ],
+  });
+
+  assert.equal(writes, 2);
+  assert.match(calls[0].sql, /INSERT INTO program_admission_courses/i);
+  assert.deepEqual(calls[0].params, [9, 11, true]);
+  assert.deepEqual(calls[1].params, [9, 12, false]);
 });

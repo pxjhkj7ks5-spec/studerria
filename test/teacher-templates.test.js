@@ -6,6 +6,7 @@ const {
   normalizeHomeworkTemplateTitleInput,
   normalizeTemplateAssetIds,
   buildAppliedHomeworkAssetIds,
+  listTeacherAssignmentRows,
   listTeacherSubjectSelections,
   normalizeTeacherSubjectSelections,
   replaceTeacherSubjectsMirror,
@@ -103,4 +104,29 @@ test('teacher subject selections helper reads compatibility rows', async () => {
 
   const rows = await listTeacherSubjectSelections(store, 21);
   assert.deepEqual(rows, [{ subject_id: 5, group_number: 2 }]);
+});
+
+test('teacher assignment helper applies canonical read filters through facade', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ user_id: 7, subject_id: 5, group_number: null }];
+    },
+  };
+
+  const rows = await listTeacherAssignmentRows(store, {
+    userIds: [7, 8],
+    subjectId: 5,
+    courseId: 3,
+    teacherCourseId: 11,
+    includeHidden: true,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /ts\.user_id = ANY/i);
+  assert.match(calls[0].sql, /ts\.subject_id = \?/i);
+  assert.match(calls[0].sql, /u\.course_id = \?/i);
+  assert.match(calls[0].sql, /subject_course_bindings scoped_bindings/i);
+  assert.deepEqual(calls[0].params, [[7, 8], 5, 11, 3, 3]);
 });
