@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.07",
+      "date": "2026-03-27",
+      "items": [
+        "refactor(course-wide-student-group-facades): add `listLegacyCourseStudentGroupAssignments(...)`, `countLegacySubjectStudents(...)`, and `countLegacyMessageRecipients(...)` to `lib/academicSetup.js`, with binding-first reads and compatibility fallback for legacy schemas so repeated course-scoped student-group aggregates no longer need route-level SQL",
+        "refactor(runtime-course-aggregate-cleanup): move admin/users placement reads, admin and starosta message target counts, deanery subject monitoring counts, and users CSV semester-scoped placement filtering in `app.js` onto Academic Setup service-layer facades while keeping `courseId` as a derived runtime key",
+        "test(academic-setup-course-group-aggregates): extend `test/pathways.test.js` with contract coverage for the new course-wide assignment, subject-student count, and batched message-recipient helpers to lock their normalized runtime wire format"
+      ]
+    },
+    {
       "version": "1.3.06",
       "date": "2026-03-27",
       "items": [

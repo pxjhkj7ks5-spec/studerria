@@ -12684,6 +12684,163 @@ async function listVisibleMessagesForUser({
   };
 }
 
+async function attachScopedMessageTargetCounts(rows, { fallbackCourseId = null } = {}) {
+  const items = Array.isArray(rows) ? rows : [];
+  const normalizedFallbackCourseId = Number(fallbackCourseId || 0) || null;
+  const activeUserWhere = "COALESCE(LOWER(TRIM(CAST(is_active AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')";
+  const activeUserJoin = "COALESCE(LOWER(TRIM(CAST(u.is_active AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')";
+  if (!items.length) {
+    return items;
+  }
+
+  const broadcastCourseIds = new Set();
+  const subjectOnlyTargetsByCourse = new Map();
+  const subjectGroupTargetsByCourse = new Map();
+  const directMessageIdsByCourse = new Map();
+  let needsGlobalStudentCount = false;
+
+  for (const row of items) {
+    const messageId = Number(row.id || 0);
+    const courseId = Number(row.course_id || normalizedFallbackCourseId || 0) || null;
+    const subjectId = Number(row.subject_id || 0) || null;
+    const groupNumber = Number(row.group_number || 0) || null;
+    const isBroadcast = Number(row.target_all || 0) === 1;
+
+    if (isBroadcast) {
+      if (!courseId && !subjectId && !groupNumber) {
+        needsGlobalStudentCount = true;
+      } else if (courseId) {
+        broadcastCourseIds.add(courseId);
+      }
+      continue;
+    }
+
+    if (courseId && subjectId && groupNumber) {
+      if (!subjectGroupTargetsByCourse.has(courseId)) {
+        subjectGroupTargetsByCourse.set(courseId, []);
+      }
+      subjectGroupTargetsByCourse.get(courseId).push({
+        subject_id: subjectId,
+        group_number: groupNumber,
+      });
+      continue;
+    }
+
+    if (courseId && subjectId) {
+      if (!subjectOnlyTargetsByCourse.has(courseId)) {
+        subjectOnlyTargetsByCourse.set(courseId, new Set());
+      }
+      subjectOnlyTargetsByCourse.get(courseId).add(subjectId);
+      continue;
+    }
+
+    if (courseId && messageId) {
+      if (!directMessageIdsByCourse.has(courseId)) {
+        directMessageIdsByCourse.set(courseId, new Set());
+      }
+      directMessageIdsByCourse.get(courseId).add(messageId);
+    }
+  }
+
+  const courseStudentCountMap = new Map();
+  await Promise.all(Array.from(broadcastCourseIds).map(async (courseId) => {
+    const rows = await academicSetupHelpers.listLegacyCourseUsers(getAcademicSetupStore(), {
+      courseId,
+      activeOnly: true,
+    });
+    const count = (rows || []).filter((row) => normalizeRoleKey(row.role || 'student') === 'student').length;
+    courseStudentCountMap.set(courseId, count);
+  }));
+
+  let globalStudentCount = 0;
+  if (needsGlobalStudentCount) {
+    const globalStudentRow = await db.get(
+      `
+        SELECT COUNT(*)::int AS count
+        FROM users
+        WHERE LOWER(TRIM(COALESCE(role, ''))) = 'student'
+          ${usersHasIsActive ? `AND ${activeUserWhere}` : ''}
+      `
+    );
+    globalStudentCount = Number(globalStudentRow && (globalStudentRow.count ?? globalStudentRow.cnt) || 0);
+  }
+
+  const subjectOnlyCountMap = new Map();
+  await Promise.all(Array.from(subjectOnlyTargetsByCourse.entries()).map(async ([courseId, subjectIds]) => {
+    const rows = await academicSetupHelpers.countLegacySubjectStudents(getAcademicSetupStore(), {
+      courseId,
+      subjectIds: Array.from(subjectIds),
+      activeOnly: true,
+    });
+    subjectOnlyCountMap.set(
+      courseId,
+      new Map((rows || []).map((row) => [Number(row.subject_id || 0), Number(row.students_total || 0)]))
+    );
+  }));
+
+  const subjectGroupCountMap = new Map();
+  await Promise.all(Array.from(subjectGroupTargetsByCourse.entries()).map(async ([courseId, targets]) => {
+    const rows = await academicSetupHelpers.countLegacyMessageRecipients(getAcademicSetupStore(), {
+      courseId,
+      targets,
+      activeOnly: true,
+    });
+    subjectGroupCountMap.set(
+      courseId,
+      new Map((rows || []).map((row) => [`${Number(row.subject_id || 0)}|${Number(row.group_number || 0)}`, Number(row.students_total || 0)]))
+    );
+  }));
+
+  const directCountMap = new Map();
+  await Promise.all(Array.from(directMessageIdsByCourse.entries()).map(async ([courseId, messageIdsSet]) => {
+    const messageIds = Array.from(messageIdsSet);
+    if (!messageIds.length) {
+      directCountMap.set(courseId, new Map());
+      return;
+    }
+    const rows = await db.all(
+      `
+        SELECT mt.message_id, COUNT(DISTINCT u.id)::int AS target_count
+        FROM message_targets mt
+        JOIN users u ON u.id = mt.user_id
+        WHERE mt.message_id = ANY(?::int[])
+          AND u.course_id = ?
+          ${usersHasIsActive ? `AND ${activeUserJoin}` : ''}
+        GROUP BY mt.message_id
+      `,
+      [messageIds, courseId]
+    );
+    directCountMap.set(
+      courseId,
+      new Map((rows || []).map((row) => [Number(row.message_id || 0), Number(row.target_count || 0)]))
+    );
+  }));
+
+  return items.map((row) => {
+    const messageId = Number(row.id || 0);
+    const courseId = Number(row.course_id || normalizedFallbackCourseId || 0) || null;
+    const subjectId = Number(row.subject_id || 0) || null;
+    const groupNumber = Number(row.group_number || 0) || null;
+    const isBroadcast = Number(row.target_all || 0) === 1;
+
+    let targetCount = 0;
+    if (isBroadcast) {
+      targetCount = courseId ? Number(courseStudentCountMap.get(courseId) || 0) : globalStudentCount;
+    } else if (courseId && subjectId && groupNumber) {
+      targetCount = Number((subjectGroupCountMap.get(courseId) || new Map()).get(`${subjectId}|${groupNumber}`) || 0);
+    } else if (courseId && subjectId) {
+      targetCount = Number((subjectOnlyCountMap.get(courseId) || new Map()).get(subjectId) || 0);
+    } else if (courseId && messageId) {
+      targetCount = Number((directCountMap.get(courseId) || new Map()).get(messageId) || 0);
+    }
+
+    return {
+      ...row,
+      target_count: targetCount,
+    };
+  });
+}
+
 app.get('/', (req, res) => {
   if (req.session && req.session.user) {
     return res.redirect('/home');
@@ -31879,23 +32036,19 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
               return;
             }
             getSubjectsCached(courseId)
-              .then((subjects) => {
-	                db.all(
-	                  `
-	                    SELECT sg.student_id, sg.subject_id, sg.group_number, s.name AS subject_name
-	                    FROM student_groups sg
-	                    JOIN subjects s ON s.id = sg.subject_id
-	                    JOIN subject_course_bindings scb ON scb.subject_id = s.id
-	                    WHERE scb.course_id = ?
-	                  `,
-	                  [courseId],
-                  (sgErr, studentGroups) => {
-                    if (sgErr) {
-                      return handleDbError(res, sgErr, 'admin.studentGroups');
-                    }
-                    if (res.headersSent) {
-                      return;
-                    }
+              .then(async (subjects) => {
+                let studentGroups = [];
+                try {
+                  studentGroups = await academicSetupHelpers.listLegacyCourseStudentGroupAssignments(getAcademicSetupStore(), {
+                    courseId,
+                    includeSubjectNames: true,
+                  });
+                } catch (sgErr) {
+                  return handleDbError(res, sgErr, 'admin.studentGroups');
+                }
+                if (res.headersSent) {
+                  return;
+                }
                   const historyFilters = [];
                   const historyParams = [];
                   historyFilters.push('course_id = ?');
@@ -32057,8 +32210,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                           db.all(
                             `
                               SELECT m.*, s.name AS subject_name, u.full_name AS created_by,
-                                     COALESCE(reads.read_count, 0) AS read_count,
-                                     COALESCE(targets.target_count, 0) AS target_count
+                                     COALESCE(reads.read_count, 0) AS read_count
                               FROM messages m
                               LEFT JOIN subjects s ON s.id = m.subject_id
                               LEFT JOIN users u ON u.id = m.created_by_id
@@ -32067,32 +32219,6 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                 FROM message_reads mr
                                 WHERE mr.message_id = m.id
                               ) reads ON true
-                              LEFT JOIN LATERAL (
-                                SELECT CASE
-                                  WHEN m.target_all = 1 THEN (
-                                    SELECT COUNT(*)
-                                    FROM users u2
-                                    WHERE u2.role = 'student' AND u2.is_active = 1
-                                      AND (
-                                        (m.course_id IS NULL AND m.subject_id IS NULL AND m.group_number IS NULL)
-                                        OR u2.course_id = m.course_id
-                                      )
-                                  )
-                                  WHEN m.subject_id IS NOT NULL THEN (
-                                    SELECT COUNT(DISTINCT sg.student_id)
-                                    FROM student_groups sg
-                                    JOIN users u3 ON u3.id = sg.student_id
-                                    WHERE sg.subject_id = m.subject_id AND sg.group_number = m.group_number
-                                      AND u3.course_id = m.course_id AND u3.is_active = 1
-                                  )
-                                  ELSE (
-                                    SELECT COUNT(*)
-                                    FROM message_targets mt
-                                    JOIN users u4 ON u4.id = mt.user_id
-                                    WHERE mt.message_id = m.id AND u4.course_id = m.course_id AND u4.is_active = 1
-                                  )
-                                END AS target_count
-                              ) targets ON true
                               WHERE (
                                 m.course_id = ?
                                 OR (m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL AND m.course_id IS NULL)
@@ -32115,6 +32241,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                               }
                               (async () => {
                                 try {
+                                  const adminMessages = await attachScopedMessageTargetCounts(messages, { fallbackCourseId: courseId });
                                   const [
                                     dashboardStats,
                                     allSemestersRows,
@@ -32288,7 +32415,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       activityTop,
                                       dashboardStats,
                                       teamworkTasks,
-                                      adminMessages: messages,
+                                      adminMessages,
                                       supportRequests,
                                       selectedSupportRequest,
                                       supportSectionVisible: isAdminPanelOwner,
@@ -42039,7 +42166,6 @@ app.post('/admin/api/scheduler/run', requireScheduleGeneratorSectionAccess, asyn
     );
   });
 });
-});
 
 app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   const redirectWith = (kind, message, extraParams = {}) => buildAdminScopedNoticeUrl(req, kind, message, {
@@ -43674,16 +43800,10 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
     const [subjects, courses, studentGroups] = await Promise.all([
       getSubjectsCached(courseId),
       getCoursesCached(),
-      db.all(
-        `
-          SELECT sg.student_id, sg.subject_id, sg.group_number
-          FROM student_groups sg
-          JOIN subjects s ON s.id = sg.subject_id
-          JOIN subject_course_bindings scb ON scb.subject_id = s.id
-          WHERE scb.course_id = ?
-        `,
-        [courseId]
-      ),
+      academicSetupHelpers.listLegacyCourseStudentGroupAssignments(getAcademicSetupStore(), {
+        courseId,
+        includeSubjectNames: false,
+      }),
     ]);
     const userIds = (users || []).map((user) => Number(user.id)).filter((id) => Number.isFinite(id));
     const assignment = await getUserRoleAssignmentsForUserIds(userIds);
@@ -44194,7 +44314,7 @@ app.post('/admin/import/schedule.csv', requireImportExportSectionAccess, writeLi
   return res.redirect(redirectWith('ok', `Schedule imported (${inserted}/${updated}/${skipped})`, { op: operationId }));
 });
 
-app.get('/admin/export/users.csv', requireImportExportSectionAccess, (req, res) => {
+app.get('/admin/export/users.csv', requireImportExportSectionAccess, async (req, res) => {
   const courseId = Number(req.query.course || getAdminCourse(req));
   const semesterId = req.query.semester_id ? Number(req.query.semester_id) : null;
   const group = req.query.group;
@@ -44204,41 +44324,57 @@ app.get('/admin/export/users.csv', requireImportExportSectionAccess, (req, res) 
     filters.push('u.schedule_group = ?');
     params.push(group);
   }
-  if (semesterId) {
-    filters.push(
-      `EXISTS (
-        SELECT 1
-        FROM student_groups sg
-        JOIN schedule_entries se
-          ON se.subject_id = sg.subject_id
-         AND se.group_number = sg.group_number
-         AND se.semester_id = ?
-        WHERE sg.student_id = u.id
-      )`
-    );
-    params.push(semesterId);
-  }
   const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
-  db.all(
-    `SELECT u.id, u.full_name, u.role, u.schedule_group, u.is_active, u.course_id
-     FROM users u
-     ${where}
-     ORDER BY u.full_name`,
-    params,
-    (err, rows) => {
-    if (err) {
-      return res.status(500).send('Database error');
+  try {
+    let rows = await db.all(
+      `SELECT u.id, u.full_name, u.role, u.schedule_group, u.is_active, u.course_id
+       FROM users u
+       ${where}
+       ORDER BY u.full_name`,
+      params
+    );
+    if (semesterId) {
+      const [scheduleTargets, assignments] = await Promise.all([
+        db.all(
+          `
+            SELECT DISTINCT subject_id, group_number
+            FROM schedule_entries
+            WHERE semester_id = ?
+              AND subject_id IS NOT NULL
+              AND group_number IS NOT NULL
+          `,
+          [semesterId]
+        ),
+        academicSetupHelpers.listLegacyCourseStudentGroupAssignments(getAcademicSetupStore(), {
+          courseId,
+          studentIds: (rows || []).map((row) => Number(row.id || 0)).filter((value) => Number.isFinite(value) && value > 0),
+          includeSubjectNames: false,
+          activeOnly: false,
+        }),
+      ]);
+      const scheduleTargetKeys = new Set(
+        (scheduleTargets || []).map((row) => `${Number(row.subject_id || 0)}|${Number(row.group_number || 0)}`)
+      );
+      const allowedUserIds = new Set(
+        (assignments || [])
+          .filter((row) => scheduleTargetKeys.has(`${Number(row.subject_id || 0)}|${Number(row.group_number || 0)}`))
+          .map((row) => Number(row.student_id || 0))
+          .filter((value) => Number.isFinite(value) && value > 0)
+      );
+      rows = (rows || []).filter((row) => allowedUserIds.has(Number(row.id || 0)));
     }
     const header = 'id,full_name,role,schedule_group,is_active,course_id';
-    const lines = rows.map((r) =>
-      [r.id, r.full_name, r.role, r.schedule_group, r.is_active, r.course_id]
-        .map((v) => escapeCsvValue(v))
+    const lines = (rows || []).map((row) =>
+      [row.id, row.full_name, row.role, row.schedule_group, row.is_active, row.course_id]
+        .map((value) => escapeCsvValue(value))
         .join(',')
     );
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="users.csv"');
-    res.send([header, ...lines].join('\n'));
-  });
+    return res.send([header, ...lines].join('\n'));
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
 
 app.post('/admin/import/users.csv', requireImportExportSectionAccess, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
@@ -46326,11 +46462,10 @@ app.get('/starosta', requireStaff, async (req, res) => {
 
   let adminMessages = [];
   try {
-    adminMessages = await db.all(
+    const adminMessageRows = await db.all(
       `
         SELECT m.*, s.name AS subject_name, u.full_name AS created_by,
-               COALESCE(reads.read_count, 0) AS read_count,
-               COALESCE(targets.target_count, 0) AS target_count
+               COALESCE(reads.read_count, 0) AS read_count
         FROM messages m
         LEFT JOIN subjects s ON s.id = m.subject_id
         LEFT JOIN users u ON u.id = m.created_by_id
@@ -46339,32 +46474,6 @@ app.get('/starosta', requireStaff, async (req, res) => {
           FROM message_reads mr
           WHERE mr.message_id = m.id
         ) reads ON true
-        LEFT JOIN LATERAL (
-          SELECT CASE
-            WHEN m.target_all = 1 THEN (
-              SELECT COUNT(*)
-              FROM users u2
-              WHERE u2.role = 'student' AND u2.is_active = 1
-                AND (
-                  (m.course_id IS NULL AND m.subject_id IS NULL AND m.group_number IS NULL)
-                  OR u2.course_id = m.course_id
-                )
-            )
-            WHEN m.subject_id IS NOT NULL THEN (
-              SELECT COUNT(DISTINCT sg.student_id)
-              FROM student_groups sg
-              JOIN users u3 ON u3.id = sg.student_id
-              WHERE sg.subject_id = m.subject_id AND sg.group_number = m.group_number
-                AND u3.course_id = m.course_id AND u3.is_active = 1
-            )
-            ELSE (
-              SELECT COUNT(*)
-              FROM message_targets mt
-              JOIN users u4 ON u4.id = mt.user_id
-              WHERE mt.message_id = m.id AND u4.course_id = m.course_id AND u4.is_active = 1
-            )
-          END AS target_count
-        ) targets ON true
         WHERE (
           m.course_id = ?
           OR (m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL AND m.course_id IS NULL)
@@ -46379,6 +46488,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
       `,
       activeSemester ? [courseId, activeSemester.id] : [courseId]
     );
+    adminMessages = await attachScopedMessageTargetCounts(adminMessageRows, { fallbackCourseId: courseId });
   } catch (err) {
     return handleDbError(res, err, 'starosta.messages');
   }
@@ -46595,18 +46705,11 @@ async function buildDeanerySubjectMonitoringRows(courseId, semesterId) {
       [scopeSubjectIds, scopeOwnerCourseIds, ...(scopeSemesterIds.length ? [scopeSemesterIds] : [])],
       []
     ),
-    safeAll(
-      `
-        SELECT sg.subject_id, COUNT(DISTINCT sg.student_id) AS students_total
-        FROM student_groups sg
-        JOIN users u ON u.id = sg.student_id
-        WHERE sg.subject_id = ANY(?::int[])
-          AND u.course_id = ?
-        GROUP BY sg.subject_id
-      `,
-      [scopeSubjectIds, safeCourseId],
-      []
-    ),
+    academicSetupHelpers.countLegacySubjectStudents(getAcademicSetupStore(), {
+      courseId: safeCourseId,
+      subjectIds: scopeSubjectIds,
+      activeOnly: false,
+    }),
     safeAll(
       `
         SELECT h.subject_id, COUNT(*) AS homework_total

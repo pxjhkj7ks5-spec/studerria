@@ -14,10 +14,13 @@ const {
 const {
   buildFailedPromotionTargetIssue,
   buildRegistrationCourseFallbackIssue,
+  countLegacyMessageRecipients,
+  countLegacySubjectStudents,
   getLegacyCourseActiveSemester,
   getLegacyCourseDependencyCounts,
   getLegacyCourseSubject,
   getLegacyStudentSubjectGroup,
+  listLegacyCourseStudentGroupAssignments,
   listLegacyStudentGroupRows,
   listLegacySubjectStudentRows,
   listLegacyCourseUsers,
@@ -352,6 +355,110 @@ test('legacy student subject group helper supports active-user filter through fa
   assert.equal(row.group_number, 4);
   assert.match(calls[0].sql, /u\.is_active/i);
   assert.deepEqual(calls[0].params, [15, 19]);
+});
+
+test('legacy course student group assignments use bindings when available', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ student_id: 4, subject_id: 9, group_number: 2 }];
+    },
+  };
+
+  const rows = await listLegacyCourseStudentGroupAssignments(store, {
+    courseId: 7,
+    studentIds: [4, 5],
+    subjectIds: [9],
+    includeSubjectNames: true,
+    activeOnly: true,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /JOIN subject_course_bindings scb/i);
+  assert.match(calls[0].sql, /scb\.course_id = \?/i);
+  assert.match(calls[0].sql, /sg\.student_id = ANY/i);
+  assert.match(calls[0].sql, /sg\.subject_id = ANY/i);
+  assert.match(calls[0].sql, /u\.is_active/i);
+  assert.deepEqual(calls[0].params, [7, [4, 5], [9]]);
+});
+
+test('legacy course student group assignments fall back to subject owner course on compatibility error', async () => {
+  const calls = [];
+  let attempt = 0;
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      attempt += 1;
+      if (attempt === 1) {
+        const err = new Error('missing bindings');
+        err.code = '42703';
+        throw err;
+      }
+      return [{ student_id: 8, subject_id: 13, group_number: 1 }];
+    },
+  };
+
+  const rows = await listLegacyCourseStudentGroupAssignments(store, {
+    courseId: 11,
+    includeSubjectNames: false,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].sql, /s\.course_id = \?/i);
+  assert.match(calls[1].sql, /NULL AS subject_name/i);
+  assert.deepEqual(calls[1].params, [11]);
+});
+
+test('legacy subject student counts aggregate distinct students through service layer', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ subject_id: 12, students_total: 18 }];
+    },
+  };
+
+  const rows = await countLegacySubjectStudents(store, {
+    courseId: 5,
+    subjectIds: [12, 13],
+    groupNumber: 2,
+    activeOnly: true,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /COUNT\(DISTINCT sg\.student_id\)/i);
+  assert.match(calls[0].sql, /scb\.course_id = \?/i);
+  assert.match(calls[0].sql, /sg\.subject_id = ANY/i);
+  assert.match(calls[0].sql, /sg\.group_number = \?/i);
+  assert.deepEqual(calls[0].params, [5, [12, 13], 5, 2]);
+});
+
+test('legacy message recipient counts batch subject-group targets', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ subject_id: 7, group_number: 1, students_total: 6 }];
+    },
+  };
+
+  const rows = await countLegacyMessageRecipients(store, {
+    courseId: 3,
+    targets: [
+      { subject_id: 7, group_number: 1 },
+      { subject_id: 7, group_number: 1 },
+      { subject_id: 8, group_number: 2 },
+    ],
+    activeOnly: true,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /WITH target_scope/i);
+  assert.match(calls[0].sql, /VALUES \(\?, \?\), \(\?, \?\)/i);
+  assert.match(calls[0].sql, /COUNT\(DISTINCT u\.id\)/i);
+  assert.deepEqual(calls[0].params, [7, 1, 8, 2, 3]);
 });
 
 test('legacy admission id helper resolves subject bindings through service layer', async () => {
