@@ -14,6 +14,8 @@ const {
 const {
   buildFailedPromotionTargetIssue,
   buildRegistrationCourseFallbackIssue,
+  listLegacyAdmissionCourseRows,
+  listLegacyAdmissionSubjectVisibilityRows,
   resolveAdminAcademicScopeState,
 } = require('../lib/academicSetup');
 
@@ -202,4 +204,51 @@ test('failed promotion moderation issue distinguishes missing placement case', (
   assert.equal(issue.payload.user_id, 8);
   assert.equal(issue.payload.admission_id, 31);
   assert.equal(issue.payload.program_id, 6);
+});
+
+test('legacy admission course rows helper applies scope filters through service layer', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ admission_id: 8, course_id: 14, is_visible: true }];
+    },
+  };
+
+  const rows = await listLegacyAdmissionCourseRows(store, {
+    admissionId: 8,
+    courseId: 14,
+    programId: 3,
+    trackKey: 'master',
+    visibleOnly: true,
+    activeOnly: true,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /pac\.admission_id = \?/i);
+  assert.match(calls[0].sql, /pac\.course_id = \?/i);
+  assert.match(calls[0].sql, /pac\.is_visible = true/i);
+  assert.deepEqual(calls[0].params, [8, 3, 14, 'master']);
+});
+
+test('legacy admission subject visibility helper supports scoped admission arrays', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ admission_id: 11, subject_id: 22, is_visible: true }];
+    },
+  };
+
+  const rows = await listLegacyAdmissionSubjectVisibilityRows(store, {
+    admissionIds: [11, 12],
+    courseId: 5,
+    subjectId: 22,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /sva\.admission_id = ANY/i);
+  assert.match(calls[0].sql, /scb\.course_id = \?/i);
+  assert.match(calls[0].sql, /sva\.subject_id = \?/i);
+  assert.deepEqual(calls[0].params, [[11, 12], 5, 22]);
 });

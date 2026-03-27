@@ -2,9 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  getTeacherRequestStatus,
   normalizeHomeworkTemplateTitleInput,
   normalizeTemplateAssetIds,
   buildAppliedHomeworkAssetIds,
+  listTeacherSubjectSelections,
   normalizeTeacherSubjectSelections,
   replaceTeacherSubjectsMirror,
   upsertTeacherRequestStatus,
@@ -77,4 +79,28 @@ test('teacher request status falls back from rejected to pending by default', as
 
   const status = await upsertTeacherRequestStatus(store, 14);
   assert.equal(status, 'pending');
+});
+
+test('teacher request status helper normalizes stored status', async () => {
+  const store = {
+    async get() {
+      return { status: 'Approved ' };
+    },
+  };
+
+  const status = await getTeacherRequestStatus(store, 9);
+  assert.equal(status, 'approved');
+});
+
+test('teacher subject selections helper reads compatibility rows', async () => {
+  const store = {
+    async all(sql, params) {
+      assert.match(String(sql), /FROM teacher_subjects/i);
+      assert.deepEqual(params, [21]);
+      return [{ subject_id: 5, group_number: 2 }];
+    },
+  };
+
+  const rows = await listTeacherSubjectSelections(store, 21);
+  assert.deepEqual(rows, [{ subject_id: 5, group_number: 2 }]);
 });

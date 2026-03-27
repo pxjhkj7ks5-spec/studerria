@@ -8376,9 +8376,15 @@
           modal.show();
           try {
             const params = new URLSearchParams(window.location.search);
-            const courseParam = params.get('course');
-            const url = courseParam
-              ? `/admin/api/messages/${encodeURIComponent(messageId)}/reads?course=${encodeURIComponent(courseParam)}`
+            const scopedParams = new URLSearchParams();
+            ['course', 'track', 'program_id', 'admission_id', 'stage', 'campus', 'study_context_id'].forEach(function(key) {
+              if (params.has(key)) {
+                scopedParams.set(key, params.get(key));
+              }
+            });
+            const scopedQuery = scopedParams.toString();
+            const url = scopedQuery
+              ? `/admin/api/messages/${encodeURIComponent(messageId)}/reads?${scopedQuery}`
               : `/admin/api/messages/${encodeURIComponent(messageId)}/reads`;
             const res = await fetch(url);
             if (!res.ok) throw new Error('bad');

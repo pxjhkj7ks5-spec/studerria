@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.03",
+      "date": "2026-03-27",
+      "items": [
+        "feat(canonical-scope-secondary-cleanup): remove the last explicit `?course=` tails from secondary admin flows by preserving canonical academic scope in schedule-health fix links, schedule-generator preview redirects, message read lookups, and admin overview return navigation",
+        "refactor(teacher-compatibility-facades): add service-layer read helpers in `lib/teacherTemplates.js` for teacher request status, teacher request summaries, teacher subject mirror rows, teacher selection rows, course-access checks, and template target resolution, then switch mainline teacher/profile/journal/teamwork/material access flows in `app.js` to those helpers instead of direct route-level SQL",
+        "refactor(pathways-legacy-read-bridges): add `lib/academicSetup.js` facade helpers for legacy registration-pathway rows, admission-course mappings, admission visibility rows, and aggregate stats, and move registration/pathways/context-sync flows in `app.js` onto those helpers so `program_admission_courses` and `subject_visibility_by_admission` are no longer read directly in the primary Academic Setup flow"
+      ]
+    },
+    {
       "version": "1.3.02",
       "date": "2026-03-27",
       "items": [

@@ -2223,11 +2223,14 @@ app.use(async (req, res, next) => {
     if (!isTeacher) {
       return next();
     }
-    const request = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [req.session.user.id]);
-    if (!request) {
+    const requestStatus = await teacherTemplateHelpers.getTeacherRequestStatus(
+      getTeacherTemplateStore(),
+      req.session.user.id
+    );
+    if (!requestStatus) {
       return next();
     }
-    if (request.status === 'approved') {
+    if (requestStatus === 'approved') {
       if (!hasSessionRole(req, 'teacher')) {
         req.session.roles = normalizeRoleList([...getSessionRoleList(req), 'teacher']);
       }
@@ -3200,19 +3203,9 @@ async function syncStudyContextsForAdmission(admissionId) {
       return { cohortId: null, contextIds: [] };
     }
 
-    const rows = await db.all(
-      `
-        SELECT
-          pac.course_id,
-          pac.is_visible,
-          c.name AS course_name,
-          COALESCE(c.location, 'kyiv') AS course_location
-        FROM program_admission_courses pac
-        JOIN courses c ON c.id = pac.course_id
-        WHERE pac.admission_id = ?
-      `,
-      [normalizedAdmissionId]
-    );
+    const rows = await academicSetupHelpers.listLegacyAdmissionCourseRows(getAcademicSetupStore(), {
+      admissionId: normalizedAdmissionId,
+    });
     const activeContextIds = [];
     for (const row of rows || []) {
       const mappedCourseId = Number(row.course_id || 0);
@@ -4338,32 +4331,7 @@ async function getRegistrationPathways() {
   const links = [];
 
   try {
-    const rows = await db.all(
-      `
-        SELECT
-          p.id AS program_id,
-          p.track_key,
-          p.code AS program_code,
-          p.name AS program_name,
-          p.sort_order,
-          a.id AS admission_id,
-          a.admission_year,
-          a.label AS admission_label,
-          pac.course_id
-        FROM study_programs p
-        JOIN program_admissions a ON a.program_id = p.id
-        JOIN program_admission_courses pac ON pac.admission_id = a.id
-        WHERE p.is_active = true
-          AND a.is_active = true
-          AND pac.is_visible = true
-        ORDER BY
-          p.track_key ASC,
-          COALESCE(p.sort_order, 100) ASC,
-          p.name ASC,
-          a.admission_year DESC,
-          pac.course_id ASC
-      `
-    );
+    const rows = await academicSetupHelpers.listLegacyRegistrationPathwayRows(getAcademicSetupStore());
 
     const programById = new Map();
     const admissionById = new Map();
@@ -4483,45 +4451,13 @@ async function getAdmissionRegistrationCourses(admissionId, options = {}) {
 
   const normalizedProgramId = parsePositiveIntStrict(options.programId);
   const trackKey = options.trackKey ? normalizeRegistrationTrack(options.trackKey, '') : '';
-  const params = [normalizedAdmissionId];
-  const where = [
-    'pac.admission_id = ?',
-    'pac.is_visible = true',
-    'a.is_active = true',
-    'p.is_active = true',
-  ];
-
-  if (normalizedProgramId) {
-    where.push('p.id = ?');
-    params.push(normalizedProgramId);
-  }
-  if (trackKey) {
-    where.push('p.track_key = ?');
-    params.push(trackKey);
-  }
-
-  const rows = await db.all(
-    `
-      SELECT
-        c.id AS course_id,
-        c.name AS course_name,
-        COALESCE(c.location, 'kyiv') AS course_location,
-        c.is_teacher_course
-      FROM program_admission_courses pac
-      JOIN program_admissions a ON a.id = pac.admission_id
-      JOIN study_programs p ON p.id = a.program_id
-      JOIN courses c ON c.id = pac.course_id
-      WHERE ${where.join('\n        AND ')}
-      ORDER BY
-        CASE COALESCE(c.location, 'kyiv')
-          WHEN 'kyiv' THEN 0
-          WHEN 'munich' THEN 1
-          ELSE 2
-        END,
-        c.id ASC
-    `,
-    params
-  );
+  const rows = await academicSetupHelpers.listLegacyAdmissionCourseRows(getAcademicSetupStore(), {
+    admissionId: normalizedAdmissionId,
+    programId: normalizedProgramId,
+    trackKey,
+    visibleOnly: true,
+    activeOnly: true,
+  });
 
   const mappedRows = (rows || [])
     .map((row) => ({
@@ -4598,37 +4534,15 @@ async function resolveLatestRegistrationAdmissionId(programId, options = {}) {
 
   const trackKey = options.trackKey ? normalizeRegistrationTrack(options.trackKey, '') : '';
   const courseId = parsePositiveIntStrict(options.courseId);
-  const params = [normalizedProgramId];
-  const where = [
-    'a.program_id = ?',
-    'a.is_active = true',
-    'p.is_active = true',
-  ];
-
-  if (trackKey) {
-    where.push('p.track_key = ?');
-    params.push(trackKey);
-  }
-  if (courseId) {
-    where.push('pac.course_id = ?');
-    where.push('pac.is_visible = true');
-    params.push(courseId);
-  }
-
-  const row = await db.get(
-    `
-      SELECT a.id
-      FROM program_admissions a
-      JOIN study_programs p ON p.id = a.program_id
-      ${courseId ? 'JOIN program_admission_courses pac ON pac.admission_id = a.id' : ''}
-      WHERE ${where.join('\n        AND ')}
-      ORDER BY a.admission_year DESC, a.id DESC
-      LIMIT 1
-    `,
-    params
-  );
-
-  return parsePositiveIntStrict(row && row.id);
+  const rows = await academicSetupHelpers.listLegacyAdmissionCourseRows(getAcademicSetupStore(), {
+    programId: normalizedProgramId,
+    trackKey,
+    courseId,
+    visibleOnly: Boolean(courseId),
+    activeOnly: true,
+  });
+  const latest = (rows || [])[0] || null;
+  return parsePositiveIntStrict(latest && latest.admission_id);
 }
 
 async function cloneAdmissionConfigurationFromLatest(programId, targetAdmissionId) {
@@ -4740,14 +4654,9 @@ async function getLegacyRegistrationSubjects(courseId, admissionId) {
   }
 
   try {
-    const overrideRows = await db.all(
-      `
-        SELECT subject_id, is_visible
-        FROM subject_visibility_by_admission
-        WHERE admission_id = ?
-      `,
-      [normalizedAdmissionId]
-    );
+    const overrideRows = await academicSetupHelpers.listLegacyAdmissionSubjectVisibilityRows(getAcademicSetupStore(), {
+      admissionId: normalizedAdmissionId,
+    });
     if (!overrideRows || !overrideRows.length) {
       return visibleSubjects || [];
     }
@@ -6617,15 +6526,11 @@ async function syncSubjectAdmissionVisibility(client, sourceSubjectId, targetSub
   if (!normalizedSourceSubjectId || !normalizedTargetSubjectId || !normalizedTargetCourseId) {
     return;
   }
-  const admissionRows = await txAll(
-    client,
-    `
-      SELECT admission_id
-      FROM program_admission_courses
-      WHERE course_id = ?
-    `,
-    [normalizedTargetCourseId]
-  );
+  const admissionRows = await academicSetupHelpers.listLegacyAdmissionCourseRows({
+    all: (sql, params) => txAll(client, sql, params),
+  }, {
+    courseId: normalizedTargetCourseId,
+  });
   const admissionIds = Array.from(new Set(
     (admissionRows || [])
       .map((row) => Number(row.admission_id || 0))
@@ -9483,33 +9388,77 @@ function buildAdminScopeStatePayload(scopeState = {}, overrides = {}) {
   };
 }
 
-function buildStaffPanelScopeUrl(req, scopeState = {}, overrides = {}) {
+function buildScopedAppUrl(basePath, scopeState = {}, overrides = {}, extraParams = {}) {
   const state = buildAdminScopeStatePayload(scopeState, overrides);
   const params = new URLSearchParams();
-  if (state.courseId) {
-    params.set('course', String(state.courseId));
-  }
-  if (state.track) {
-    params.set('track', state.track);
-  }
-  if (state.programId) {
-    params.set('program_id', String(state.programId));
-  }
-  if (state.admissionId) {
-    params.set('admission_id', String(state.admissionId));
-  }
-  if (state.stage) {
-    params.set('stage', String(state.stage));
-  }
-  if (state.campus) {
-    params.set('campus', state.campus);
-  }
-  if (state.studyContextId) {
-    params.set('study_context_id', String(state.studyContextId));
-  }
-  const basePath = buildAdminScopeBasePath(req);
+  const push = (key, value) => {
+    if (value === null || typeof value === 'undefined' || value === '') {
+      return;
+    }
+    params.set(key, String(value));
+  };
+  push('course', state.courseId);
+  push('track', state.track);
+  push('program_id', state.programId);
+  push('admission_id', state.admissionId);
+  push('stage', state.stage);
+  push('campus', state.campus);
+  push('study_context_id', state.studyContextId);
+  Object.entries(extraParams || {}).forEach(([key, value]) => {
+    push(key, value);
+  });
   const query = params.toString();
   return query ? `${basePath}?${query}` : basePath;
+}
+
+function buildStaffPanelScopeUrl(req, scopeState = {}, overrides = {}, extraParams = {}) {
+  return buildScopedAppUrl(buildAdminScopeBasePath(req), scopeState, overrides, extraParams);
+}
+
+function getAcademicSetupStore() {
+  return {
+    get: (sql, params) => db.get(sql, params),
+    all: (sql, params) => db.all(sql, params),
+    run: (sql, params) => db.run(sql, params),
+  };
+}
+
+function getTeacherTemplateStore() {
+  return {
+    get: (sql, params) => db.get(sql, params),
+    all: (sql, params) => db.all(sql, params),
+    run: (sql, params) => db.run(sql, params),
+  };
+}
+
+function buildAdminScopedPathUrl(req, basePath, overrides = {}, extraParams = {}) {
+  return buildScopedAppUrl(basePath, getStoredAdminAcademicScope(req), overrides, extraParams);
+}
+
+function buildAdminFixTargetUrl(req, { courseId = null, day = '', groupNumber = null } = {}) {
+  return buildAdminScopedPathUrl(
+    req,
+    buildAdminScopeBasePath(req),
+    { courseId: parsePositiveIntStrict(courseId) || parsePositiveIntStrict(getAdminCourse(req)) || null },
+    {
+      day: day ? String(day) : '',
+      group_number: parsePositiveIntStrict(groupNumber),
+    }
+  );
+}
+
+function buildScheduleGeneratorPreviewUrl(req, runId, options = {}) {
+  return buildAdminScopedPathUrl(
+    req,
+    `/admin/schedule-generator/${runId}/preview`,
+    { courseId: parsePositiveIntStrict(options.courseId) || null },
+    {
+      week: parsePositiveIntStrict(options.week) || null,
+      run: parsePositiveIntStrict(options.runId) || null,
+      err: options.err || '',
+      ok: options.ok || '',
+    }
+  );
 }
 
 function appendQueryParamToUrl(url, key, value) {
@@ -10454,10 +10403,7 @@ async function getTeacherSubjectCatalog() {
 }
 
 async function getTeacherSelections(userId) {
-  const rows = await db.all(
-    'SELECT subject_id, group_number FROM teacher_subjects WHERE user_id = ?',
-    [userId]
-  );
+  const rows = await teacherTemplateHelpers.listTeacherSubjectSelections(getTeacherTemplateStore(), userId);
   const map = new Map();
   (rows || []).forEach((row) => {
     map.set(Number(row.subject_id), row.group_number === null ? null : Number(row.group_number));
@@ -11263,53 +11209,7 @@ async function getTeacherAssignedSubjects(userId) {
       }];
     });
   }
-  try {
-    return await db.all(
-      `
-        SELECT
-          ts.subject_id,
-          COALESCE(toa.subject_offering_id, so.id) AS subject_offering_id,
-          ts.group_number,
-          s.name AS subject_name,
-          s.group_count,
-          s.is_general,
-          s.show_in_teamwork,
-          scb.course_id,
-          s.course_id AS owner_course_id,
-          c.name AS course_name,
-          s.is_shared
-        FROM teacher_subjects ts
-        JOIN subjects s ON s.id = ts.subject_id
-        JOIN subject_course_bindings scb ON scb.subject_id = s.id
-        JOIN courses c ON c.id = scb.course_id
-        LEFT JOIN subject_offerings so ON so.dedupe_key = CONCAT('legacy-subject:', s.id::text)
-        LEFT JOIN teacher_offering_assignments toa
-          ON toa.teacher_id = ts.user_id
-         AND toa.subject_offering_id = so.id
-        WHERE ts.user_id = ?
-          AND s.visible = 1
-        ORDER BY scb.course_id ASC, s.name ASC, ts.group_number NULLS FIRST
-      `,
-      [userId]
-    );
-  } catch (err) {
-    if (!isDbSchemaCompatibilityError(err)) {
-      throw err;
-    }
-    return db.all(
-      `
-        SELECT ts.subject_id, NULL AS subject_offering_id, ts.group_number, s.name AS subject_name, s.group_count, s.is_general,
-               s.show_in_teamwork,
-               s.course_id, s.course_id AS owner_course_id, c.name AS course_name, false AS is_shared
-        FROM teacher_subjects ts
-        JOIN subjects s ON s.id = ts.subject_id
-        JOIN courses c ON c.id = s.course_id
-        WHERE ts.user_id = ? AND s.visible = 1
-        ORDER BY c.id, s.name, ts.group_number NULLS FIRST
-      `,
-      [userId]
-    );
-  }
+  return teacherTemplateHelpers.listTeacherAssignedSubjectRows(getTeacherTemplateStore(), userId);
 }
 
 async function listTeacherOfferingCatalog() {
@@ -12200,16 +12100,16 @@ async function resolveTeacherTemplateScope(userId, requestedCourseIdRaw, request
   const requestedSubjectId = Number(requestedSubjectIdRaw);
   let resolvedSubject = null;
   if (Number.isInteger(requestedSubjectId) && requestedSubjectId > 0) {
-    resolvedSubject = await db.get(
-      `
-        SELECT s.id, s.course_id AS owner_course_id
-        FROM teacher_subjects ts
-        JOIN subjects s ON s.id = ts.subject_id
-        WHERE ts.user_id = ? AND ts.subject_id = ?
-        LIMIT 1
-      `,
-      [userId, requestedSubjectId]
-    );
+    const subjectRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(getTeacherTemplateStore(), userId, {
+      subjectId: requestedSubjectId,
+      includeHidden: true,
+    });
+    resolvedSubject = subjectRows.length
+      ? {
+          id: Number(subjectRows[0].subject_id || 0) || null,
+          owner_course_id: Number(subjectRows[0].owner_course_id || subjectRows[0].course_id || 0) || null,
+        }
+      : null;
     if (!resolvedSubject) {
       return { ok: false, error: 'Invalid%20subject' };
     }
@@ -12217,33 +12117,11 @@ async function resolveTeacherTemplateScope(userId, requestedCourseIdRaw, request
 
   let validatedCourseId = null;
   if (Number.isInteger(requestedCourseId) && requestedCourseId > 0) {
-    let hasCourseAccess = null;
-    try {
-      hasCourseAccess = await db.get(
-        `
-          SELECT 1
-          FROM teacher_subjects ts
-          JOIN subject_course_bindings scb ON scb.subject_id = ts.subject_id
-          WHERE ts.user_id = ? AND scb.course_id = ?
-          LIMIT 1
-        `,
-        [userId, requestedCourseId]
-      );
-    } catch (err) {
-      if (!isDbSchemaCompatibilityError(err)) {
-        throw err;
-      }
-      hasCourseAccess = await db.get(
-        `
-          SELECT 1
-          FROM teacher_subjects ts
-          JOIN subjects s ON s.id = ts.subject_id
-          WHERE ts.user_id = ? AND s.course_id = ?
-          LIMIT 1
-        `,
-        [userId, requestedCourseId]
-      );
-    }
+    const hasCourseAccess = await teacherTemplateHelpers.userHasTeacherMirrorCourseAccess(
+      getTeacherTemplateStore(),
+      userId,
+      requestedCourseId
+    );
     if (!hasCourseAccess) {
       return { ok: false, error: 'Invalid%20course' };
     }
@@ -12381,10 +12259,11 @@ async function upsertTeacherRequestStatus(userId, options = {}) {
   if (!normalizedUserId) {
     return 'pending';
   }
-  return teacherTemplateHelpers.upsertTeacherRequestStatus({
-    get: (sql, params) => db.get(sql, params),
-    run: (sql, params) => db.run(sql, params),
-  }, normalizedUserId, options);
+  return teacherTemplateHelpers.upsertTeacherRequestStatus(
+    getTeacherTemplateStore(),
+    normalizedUserId,
+    options
+  );
 }
 
 function extractTeacherOfferingSelectionIds(body = {}) {
@@ -13675,21 +13554,16 @@ app.post('/register/course', registerLimiter, async (req, res) => {
     }
 
     if (selectedProgramId && selectedAdmissionId) {
-      const explicitPath = await db.get(
-        `
-          SELECT p.track_key
-          FROM study_programs p
-          JOIN program_admissions a ON a.program_id = p.id
-          JOIN program_admission_courses pac ON pac.admission_id = a.id
-          WHERE p.id = ?
-            AND a.id = ?
-            AND pac.course_id = ?
-            AND p.is_active = true
-            AND a.is_active = true
-            AND pac.is_visible = true
-        `,
-        [selectedProgramId, selectedAdmissionId, courseId]
-      );
+      const explicitPathRows = await academicSetupHelpers.listLegacyAdmissionCourseRows(getAcademicSetupStore(), {
+        admissionId: selectedAdmissionId,
+        programId: selectedProgramId,
+        courseId,
+        visibleOnly: true,
+        activeOnly: true,
+      });
+      const explicitPath = explicitPathRows.length
+        ? { track_key: explicitPathRows[0].track_key }
+        : null;
       if (explicitPath) {
         const explicitTrack = normalizeRegistrationTrack(explicitPath.track_key, selectedTrack);
         if (trackFromBody && explicitTrack !== selectedTrack) {
@@ -13720,33 +13594,19 @@ app.post('/register/course', registerLimiter, async (req, res) => {
 
     if (!selectedProgramId || !selectedAdmissionId) {
       const hasTrackFilter = REGISTRATION_TRACK_KEYS.has(selectedTrack);
-      const fallbackPath = await db.get(
-        `
-          SELECT
-            p.id AS program_id,
-            a.id AS admission_id,
-            p.track_key
-          FROM study_programs p
-          JOIN program_admissions a ON a.program_id = p.id
-          JOIN program_admission_courses pac ON pac.admission_id = a.id
-          WHERE pac.course_id = ?
-            AND p.is_active = true
-            AND a.is_active = true
-            AND pac.is_visible = true
-            ${hasTrackFilter ? 'AND p.track_key = ?' : ''}
-          ORDER BY
-            CASE p.track_key
-              WHEN 'teacher' THEN 0
-              WHEN 'master' THEN 1
-              WHEN 'bachelor' THEN 2
-              ELSE 3
-            END,
-            a.admission_year DESC,
-            a.id DESC
-          LIMIT 1
-        `,
-        hasTrackFilter ? [courseId, selectedTrack] : [courseId]
-      );
+      const fallbackRows = await academicSetupHelpers.listLegacyAdmissionCourseRows(getAcademicSetupStore(), {
+        courseId,
+        trackKey: hasTrackFilter ? selectedTrack : '',
+        visibleOnly: true,
+        activeOnly: true,
+      });
+      const fallbackPath = (fallbackRows || []).length
+        ? {
+            program_id: fallbackRows[0].program_id,
+            admission_id: fallbackRows[0].admission_id,
+            track_key: fallbackRows[0].track_key,
+          }
+        : null;
       if (fallbackPath) {
         selectedProgramId = Number(fallbackPath.program_id || 0) || null;
         selectedAdmissionId = Number(fallbackPath.admission_id || 0) || null;
@@ -15258,20 +15118,10 @@ app.post('/teacher/workspace/templates/:id/clone', requireLogin, async (req, res
     }
 
     const placeholders = targetSubjectIds.map(() => '?').join(', ');
-    const rows = await db.all(
-      `
-        SELECT DISTINCT
-          s.id AS subject_id,
-          s.course_id,
-          s.name AS subject_name,
-          c.name AS course_name
-        FROM teacher_subjects ts
-        JOIN subjects s ON s.id = ts.subject_id
-        LEFT JOIN courses c ON c.id = s.course_id
-        WHERE ts.user_id = ?
-          AND ts.subject_id IN (${placeholders})
-      `,
-      [userId, ...targetSubjectIds]
+    const rows = await teacherTemplateHelpers.listTeacherTemplateTargetSubjects(
+      getTeacherTemplateStore(),
+      userId,
+      targetSubjectIds
     );
     const targetMap = new Map();
     (rows || []).forEach((row) => {
@@ -15471,21 +15321,10 @@ app.post('/teacher/workspace/templates/bulk-clone', requireLogin, async (req, re
       }));
     }
 
-    const targetPlaceholders = targetSubjectIds.map(() => '?').join(', ');
-    const targetRows = await db.all(
-      `
-        SELECT DISTINCT
-          s.id AS subject_id,
-          s.course_id,
-          s.name AS subject_name,
-          c.name AS course_name
-        FROM teacher_subjects ts
-        JOIN subjects s ON s.id = ts.subject_id
-        LEFT JOIN courses c ON c.id = s.course_id
-        WHERE ts.user_id = ?
-          AND ts.subject_id IN (${targetPlaceholders})
-      `,
-      [userId, ...targetSubjectIds]
+    const targetRows = await teacherTemplateHelpers.listTeacherTemplateTargetSubjects(
+      getTeacherTemplateStore(),
+      userId,
+      targetSubjectIds
     );
     const targetMap = new Map();
     (targetRows || []).forEach((row) => {
@@ -15788,8 +15627,8 @@ app.get('/teacher/pending', requireLogin, async (req, res) => {
     if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
       return res.redirect('/schedule');
     }
-    const request = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [userId]);
-    if (request && request.status === 'approved') {
+    const requestStatus = await teacherTemplateHelpers.getTeacherRequestStatus(getTeacherTemplateStore(), userId);
+    if (requestStatus === 'approved') {
       await establishAuthenticatedSession(req, {
         user: {
           ...req.session.user,
@@ -15807,7 +15646,7 @@ app.get('/teacher/pending', requireLogin, async (req, res) => {
       return res.redirect('/schedule');
     }
     return res.render('teacher-pending', {
-      status: request ? request.status : 'pending',
+      status: requestStatus || 'pending',
     });
   } catch (err) {
     return handleDbError(res, err, 'teacher.pending');
@@ -15835,8 +15674,7 @@ app.get('/profile', requireLogin, async (req, res) => {
     if (placement && placement.course_id) {
       teacherCourse = await isTeacherCourse(placement.course_id);
       if (teacherCourse) {
-        const tr = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [id]);
-        teacherStatus = tr ? tr.status : null;
+        teacherStatus = await teacherTemplateHelpers.getTeacherRequestStatus(getTeacherTemplateStore(), id);
       }
     }
     const activeSemester = await getActiveSemester((placement && placement.course_id) || user.course_id || 1);
@@ -17541,32 +17379,11 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   }));
 
   if (!workloadTargets.length && isStaffRole) {
-    let teacherTargets = [];
-    try {
-      teacherTargets = await db.all(
-        `
-          SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.course_id AS owner_course_id
-          FROM teacher_subjects ts
-          JOIN subjects s ON s.id = ts.subject_id
-          JOIN subject_course_bindings scb ON scb.subject_id = s.id
-          WHERE ts.user_id = ? AND scb.course_id = ? AND s.visible = 1
-        `,
-        [user.id, courseId]
-      );
-    } catch (err) {
-      if (!isDbSchemaCompatibilityError(err)) {
-        throw err;
-      }
-      teacherTargets = await db.all(
-        `
-          SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.course_id AS owner_course_id
-          FROM teacher_subjects ts
-          JOIN subjects s ON s.id = ts.subject_id
-          WHERE ts.user_id = ? AND s.course_id = ? AND s.visible = 1
-        `,
-        [user.id, courseId]
-      );
-    }
+    const teacherTargets = (await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+      getTeacherTemplateStore(),
+      user.id,
+      { includeHidden: false }
+    )).filter((row) => Number(row.course_id || 0) === Number(courseId || 0));
     workloadTargets = (teacherTargets || []).map((row) => ({
       subject_id: Number(row.subject_id),
       group_number: row.group_number === null ? null : Number(row.group_number),
@@ -19446,14 +19263,13 @@ async function getHomeworkReactionAccess(req, homeworkId) {
   const isAdminViewAsStudent = hasSessionRole(req, 'admin') && String(req?.session?.viewAs || '') === 'student';
   const isTeacherMode = hasSessionRole(req, 'teacher') && !isAdminViewAsStudent;
   if (isTeacherMode) {
-    const teacherRows = await db.all(
-      `
-        SELECT ts.group_number, s.group_count
-        FROM teacher_subjects ts
-        JOIN subjects s ON s.id = ts.subject_id
-        WHERE ts.user_id = ? AND ts.subject_id = ?
-      `,
-      [userId, homework.subject_id]
+    const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+      getTeacherTemplateStore(),
+      userId,
+      {
+        subjectId: homework.subject_id,
+        includeHidden: true,
+      }
     );
     if (!teacherRows || !teacherRows.length) {
       return { status: 'forbidden', homework: null };
@@ -23370,15 +23186,10 @@ async function trySyncJournalColumnsAfterHomeworkCreate({
 }
 
 async function getTeacherJournalSubjectAccess(userId, subjectId) {
-  const rows = await db.all(
-    `
-      SELECT ts.group_number, s.group_count
-      FROM teacher_subjects ts
-      JOIN subjects s ON s.id = ts.subject_id
-      WHERE ts.user_id = ? AND ts.subject_id = ?
-    `,
-    [userId, subjectId]
-  );
+  const rows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(getTeacherTemplateStore(), userId, {
+    subjectId,
+    includeHidden: true,
+  });
   if (!rows || !rows.length) {
     return { hasRows: false, allowAll: false, groups: new Set() };
   }
@@ -23435,18 +23246,9 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
   }
 
   if (teacherJournalMode) {
-    const rows = await db.all(
-      `
-        SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count, s.course_id, c.name AS course_name
-        FROM teacher_subjects ts
-        JOIN subjects s ON s.id = ts.subject_id
-        JOIN courses c ON c.id = s.course_id
-        WHERE ts.user_id = ?
-          AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
-        ORDER BY c.id ASC, s.name ASC
-      `,
-      [userId]
-    );
+    const rows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(getTeacherTemplateStore(), userId, {
+      includeHidden: false,
+    });
     if (!rows || !rows.length) {
       return getStudentJournalSubjectOptions(userId);
     }
@@ -29594,17 +29396,10 @@ app.get('/subjects', requireLogin, async (req, res) => {
 
   try {
     const subjectRows = isTeacherMode
-      ? await db.all(
-          `
-            SELECT ts.subject_id, ts.group_number, s.name AS subject_name, s.group_count,
-                   s.course_id, c.name AS course_name
-            FROM teacher_subjects ts
-            JOIN subjects s ON s.id = ts.subject_id
-            JOIN courses c ON c.id = s.course_id
-            WHERE ts.user_id = ? AND s.visible = 1
-            ORDER BY c.id, s.name
-          `,
-          [userId]
+      ? await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+          getTeacherTemplateStore(),
+          userId,
+          { includeHidden: false }
         )
       : await db.all(
           `
@@ -29822,9 +29617,10 @@ app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('atta
     }
 
     const selectedCourseId = Number(subjectRow.course_id || req.session.user.course_id || 1);
-    const teacherRows = await db.all(
-      'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
-      [userId, subjectId]
+    const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+      getTeacherTemplateStore(),
+      userId,
+      { subjectId, includeHidden: true }
     );
     const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], Number(subjectRow.group_count || 1));
     if (!teacherAccess.hasRows) {
@@ -29961,9 +29757,10 @@ app.post('/subjects/materials/:id/delete', requireLogin, writeLimiter, async (re
       return res.redirect(`/subjects?subject_id=${material.subject_id}&err=You%20can%20delete%20only%20your%20materials`);
     }
     if (!isAdmin) {
-      const teacherAccess = await db.get(
-        'SELECT 1 FROM teacher_subjects WHERE user_id = ? AND subject_id = ? LIMIT 1',
-        [userId, material.subject_id]
+      const teacherAccess = await teacherTemplateHelpers.hasTeacherSubjectMirrorAssignment(
+        getTeacherTemplateStore(),
+        userId,
+        material.subject_id
       );
       if (!teacherAccess) {
         return res.redirect(`/subjects?subject_id=${material.subject_id}&err=No%20access%20to%20subject`);
@@ -30429,9 +30226,10 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
       return res.redirect('/teamwork?err=Subject%20not%20available');
     }
 
-    const teacherRows = await db.all(
-      'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
-      [userId, subjectId]
+    const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+      getTeacherTemplateStore(),
+      userId,
+      { subjectId, includeHidden: true }
     );
     if (!teacherRows || !teacherRows.length) {
       return res.redirect('/teamwork?err=Subject%20access%20denied');
@@ -30737,9 +30535,13 @@ app.post('/teamwork/group/create', requireLogin, writeLimiter, async (req, res) 
     let seminarGroupNumberForNew = null;
     let seminarGroupLocalIndex = nextIndex;
     if (lessonScope === 'seminar') {
-      const teacherRows = await db.all(
-        'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
-        [taskRow.created_by, taskRow.subject_id]
+      const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+        getTeacherTemplateStore(),
+        taskRow.created_by,
+        {
+          subjectId: taskRow.subject_id,
+          includeHidden: true,
+        }
       );
       const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], taskRow.subject_group_count || 1);
       const audience = buildTeamworkTaskAudience(taskRow, teacherAccess, taskRow.subject_group_count || 1);
@@ -30855,9 +30657,13 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
       return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
     }
 
-    const teacherRows = await db.all(
-      'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
-      [grpRow.created_by, grpRow.subject_id]
+    const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+      getTeacherTemplateStore(),
+      grpRow.created_by,
+      {
+        subjectId: grpRow.subject_id,
+        includeHidden: true,
+      }
     );
     if (!teacherRows || !teacherRows.length) {
       return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
@@ -31704,9 +31510,13 @@ async function getTeamworkReactionAccess(req, taskId) {
     if (Number(task.created_by || 0) !== userId) {
       return { status: 'forbidden', task: null };
     }
-    const teacherRows = await db.all(
-      'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
-      [userId, task.subject_id]
+    const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+      getTeacherTemplateStore(),
+      userId,
+      {
+        subjectId: task.subject_id,
+        includeHidden: true,
+      }
     );
     return teacherRows && teacherRows.length
       ? { status: 'ok', task }
@@ -31737,9 +31547,13 @@ async function getTeamworkReactionAccess(req, taskId) {
   if (!studentGroups.length) {
     return { status: 'forbidden', task: null };
   }
-  const teacherRows = await db.all(
-    'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
-    [task.created_by, task.subject_id]
+  const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+    getTeacherTemplateStore(),
+    task.created_by,
+    {
+      subjectId: task.subject_id,
+      includeHidden: true,
+    }
   );
   if (!teacherRows || !teacherRows.length) {
     return { status: 'forbidden', task: null };
@@ -32107,24 +31921,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
   try {
     courses = await getCoursesCached();
     semesters = await getSemestersCached(courseId);
-    teacherRequests = await db.all(
-      `
-        SELECT tr.user_id, tr.status, tr.created_at,
-               u.full_name,
-               COALESCE(
-                 array_agg(DISTINCT (s.name || ' (' || c.name || ')'))
-                   FILTER (WHERE s.id IS NOT NULL),
-                 ARRAY[]::text[]
-               ) AS subjects
-        FROM teacher_requests tr
-        JOIN users u ON u.id = tr.user_id
-        LEFT JOIN teacher_subjects ts ON ts.user_id = tr.user_id
-        LEFT JOIN subjects s ON s.id = ts.subject_id
-        LEFT JOIN courses c ON c.id = s.course_id
-        GROUP BY tr.user_id, tr.status, tr.created_at, u.full_name
-        ORDER BY tr.created_at DESC
-      `
-    );
+    teacherRequests = await teacherTemplateHelpers.listTeacherRequestSummaries(getTeacherTemplateStore());
   } catch (err) {
     return handleDbError(res, err, 'admin.reference');
   }
@@ -33046,16 +32843,10 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     const allCourseSubjects = await getSubjectsCached(selectedCourseId, { visibleOnly: false });
     let visibilityRows = [];
     if (selectedAdmissionId) {
-      visibilityRows = await db.all(
-        `
-          SELECT sva.subject_id, sva.is_visible
-          FROM subject_visibility_by_admission sva
-          JOIN subject_course_bindings scb ON scb.subject_id = sva.subject_id
-          WHERE sva.admission_id = ?
-            AND scb.course_id = ?
-        `,
-        [selectedAdmissionId, selectedCourseId]
-      );
+      visibilityRows = await academicSetupHelpers.listLegacyAdmissionSubjectVisibilityRows(getAcademicSetupStore(), {
+        admissionId: selectedAdmissionId,
+        courseId: selectedCourseId,
+      });
     }
     const visibilityBySubject = new Map();
     (visibilityRows || []).forEach((row) => {
@@ -33081,7 +32872,6 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     const configurableSubjectVisibility = subjectVisibilityItems.filter((item) => item.base_visible);
     const hiddenSubjectCount = subjectVisibilityItems.length - configurableSubjectVisibility.length;
 
-    const truthySqlValues = "('1', 'true', 't', 'yes', 'on', '')";
     const courseMappingStatsByAdmission = new Map();
     const subjectVisibilityStatsByAdmission = new Map();
     const campusStatsByAdmission = new Map();
@@ -33089,19 +32879,9 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
 
     try {
       if (selectedProgramAdmissionIds.length) {
-        const mappingStatRows = await db.all(
-          `
-            SELECT
-              pac.admission_id,
-              COUNT(*) FILTER (
-                WHERE COALESCE(LOWER(TRIM(CAST(pac.is_visible AS TEXT))), '1') IN ${truthySqlValues}
-              )::int AS visible_count,
-              COUNT(*)::int AS total_count
-            FROM program_admission_courses pac
-            WHERE pac.admission_id = ANY(?::int[])
-            GROUP BY pac.admission_id
-          `,
-          [selectedProgramAdmissionIds]
+        const mappingStatRows = await academicSetupHelpers.listLegacyAdmissionCourseStats(
+          getAcademicSetupStore(),
+          selectedProgramAdmissionIds
         );
         (mappingStatRows || []).forEach((row) => {
           const admissionId = Number(row.admission_id || 0);
@@ -33114,31 +32894,12 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       }
 
       if (selectedProgramAdmissionIds.length && selectedCourseId) {
-        const subjectStatRows = await db.all(
-          `
-            SELECT
-              a.id AS admission_id,
-              COUNT(*) FILTER (
-                WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ${truthySqlValues}
-              )::int AS total_count,
-              COUNT(*) FILTER (
-                WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ${truthySqlValues}
-                  AND COALESCE(LOWER(TRIM(CAST(sva.is_visible AS TEXT))), '1') IN ${truthySqlValues}
-              )::int AS visible_count,
-              COUNT(*) FILTER (
-                WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ${truthySqlValues}
-                  AND sva.subject_id IS NOT NULL
-              )::int AS override_count
-            FROM program_admissions a
-            LEFT JOIN subject_course_bindings scb ON scb.course_id = ?
-            LEFT JOIN subjects s ON s.id = scb.subject_id
-            LEFT JOIN subject_visibility_by_admission sva
-              ON sva.admission_id = a.id
-             AND sva.subject_id = s.id
-            WHERE a.id = ANY(?::int[])
-            GROUP BY a.id
-          `,
-          [selectedCourseId, selectedProgramAdmissionIds]
+        const subjectStatRows = await academicSetupHelpers.listLegacyAdmissionSubjectVisibilityStats(
+          getAcademicSetupStore(),
+          {
+            admissionIds: selectedProgramAdmissionIds,
+            courseId: selectedCourseId,
+          }
         );
         (subjectStatRows || []).forEach((row) => {
           const admissionId = Number(row.admission_id || 0);
@@ -33216,22 +32977,10 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
 
     try {
       if (selectedProgramAdmissionIds.length) {
-        const campusRows = await db.all(
-          `
-            SELECT
-              pac.admission_id,
-              c.id AS course_id,
-              c.name AS course_name,
-              COALESCE(c.location, 'kyiv') AS course_location,
-              c.is_teacher_course
-            FROM program_admission_courses pac
-            JOIN courses c ON c.id = pac.course_id
-            WHERE pac.admission_id = ANY(?::int[])
-              AND COALESCE(LOWER(TRIM(CAST(pac.is_visible AS TEXT))), '1') IN ${truthySqlValues}
-            ORDER BY pac.admission_id ASC, c.id ASC
-          `,
-          [selectedProgramAdmissionIds]
-        );
+        const campusRows = await academicSetupHelpers.listLegacyAdmissionCourseRows(getAcademicSetupStore(), {
+          admissionIds: selectedProgramAdmissionIds,
+          visibleOnly: true,
+        });
         const campusRowsByAdmission = new Map();
         (campusRows || []).forEach((row) => {
           const admissionId = Number(row.admission_id || 0);
@@ -34259,14 +34008,9 @@ async function getAdmissionPathwayContext(admissionId) {
 async function getAdmissionCourseScope(admissionId, trackKey) {
   const [courses, mappingRows] = await Promise.all([
     getCoursesCached(),
-    db.all(
-      `
-        SELECT course_id, is_visible
-        FROM program_admission_courses
-        WHERE admission_id = ?
-      `,
-      [admissionId]
-    ),
+    academicSetupHelpers.listLegacyAdmissionCourseRows(getAcademicSetupStore(), {
+      admissionId,
+    }),
   ]);
   const compatibleCourses = pathwayHelpers.filterCourseRowsForTrack(courses || [], trackKey);
   const compatibleCourseIds = compatibleCourses
@@ -42146,7 +41890,10 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
     });
 
     const firstCourse = courseOnly || (normalizedItems[0] ? normalizedItems[0].course_id : courseIds[0]);
-    return res.redirect(`/admin/schedule-generator/${runId}/preview?course=${firstCourse}&week=1`);
+    return res.redirect(buildScheduleGeneratorPreviewUrl(req, runId, {
+      courseId: firstCourse,
+      week: 1,
+    }));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.run');
   }
@@ -46005,9 +45752,10 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
     const maxGroups = Number(subjectRow.group_count || 1);
     let targetGroups = [];
     if (isTeacher) {
-      const teacherRows = await db.all(
-        'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
-        [userId, subjectId]
+      const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+        getTeacherTemplateStore(),
+        userId,
+        { subjectId, includeHidden: true }
       );
       const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], maxGroups);
       if (!teacherAccess.hasRows) {
@@ -46326,9 +46074,10 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
     }
     let targetGroups = [];
     if (isTeacher) {
-      const teacherRows = await db.all(
-        'SELECT group_number FROM teacher_subjects WHERE user_id = ? AND subject_id = ?',
-        [userId, subjectId]
+      const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+        getTeacherTemplateStore(),
+        userId,
+        { subjectId, includeHidden: true }
       );
       const maxGroups = Number(subjectRow.group_count || 1);
       const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], maxGroups);
@@ -47953,14 +47702,9 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
     const admissionsByCourse = new Map();
     const sourceVisibilityByAdmission = new Map();
     if (syncPathways && validTargetCourseIds.length) {
-      const admissionRows = await db.all(
-        `
-          SELECT course_id, admission_id
-          FROM program_admission_courses
-          WHERE course_id = ANY(?::int[])
-        `,
-        [validTargetCourseIds]
-      );
+      const admissionRows = await academicSetupHelpers.listLegacyAdmissionCourseRows(getAcademicSetupStore(), {
+        courseIds: validTargetCourseIds,
+      });
       const admissionSet = new Set();
       (admissionRows || []).forEach((row) => {
         const courseId = Number(row.course_id || 0);
@@ -47975,14 +47719,12 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
       });
       const admissionIds = Array.from(admissionSet.values());
       if (admissionIds.length) {
-        const sourceVisibilityRows = await db.all(
-          `
-            SELECT admission_id, is_visible
-            FROM subject_visibility_by_admission
-            WHERE subject_id = ?
-              AND admission_id = ANY(?::int[])
-          `,
-          [sourceSubjectId, admissionIds]
+        const sourceVisibilityRows = await academicSetupHelpers.listLegacyAdmissionSubjectVisibilityRows(
+          getAcademicSetupStore(),
+          {
+            subjectId: sourceSubjectId,
+            admissionIds,
+          }
         );
         (sourceVisibilityRows || []).forEach((row) => {
           const admissionId = Number(row.admission_id || 0);
@@ -48665,16 +48407,17 @@ app.post('/admin/teacher-requests/:userId/approve', requireTeachersSectionAccess
     if (!targetUser) {
       return res.redirect('/admin?err=User%20not%20found');
     }
-    const requestRow = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [userId]);
-    if (!requestRow) {
+    const requestStatus = await teacherTemplateHelpers.getTeacherRequestStatus(getTeacherTemplateStore(), userId);
+    if (!requestStatus) {
       return res.redirect('/admin?err=Teacher%20request%20not%20found');
     }
     const targetCourseId = Number(targetUser.course_id || courseId || 1);
     const beforeSnapshot = await getUserRoleSnapshot(userId, targetUser.role || 'student');
-    await teacherTemplateHelpers.upsertTeacherRequestStatus({
-      get: (sql, params) => db.get(sql, params),
-      run: (sql, params) => db.run(sql, params),
-    }, userId, { status: 'approved', allowPendingReset: true });
+    await teacherTemplateHelpers.upsertTeacherRequestStatus(
+      getTeacherTemplateStore(),
+      userId,
+      { status: 'approved', allowPendingReset: true }
+    );
     await assignUserRoles(userId, ['teacher'], { preferredPrimary: 'teacher' });
     await recordUserRoleChangeEvent({
       userId,
@@ -48711,16 +48454,17 @@ app.post('/admin/teacher-requests/:userId/reject', requireTeachersSectionAccess,
     if (!targetUser) {
       return res.redirect('/admin?err=User%20not%20found');
     }
-    const requestRow = await db.get('SELECT status FROM teacher_requests WHERE user_id = ?', [userId]);
-    if (!requestRow) {
+    const requestStatus = await teacherTemplateHelpers.getTeacherRequestStatus(getTeacherTemplateStore(), userId);
+    if (!requestStatus) {
       return res.redirect('/admin?err=Teacher%20request%20not%20found');
     }
     const targetCourseId = Number(targetUser.course_id || courseId || 1);
     const beforeSnapshot = await getUserRoleSnapshot(userId, targetUser.role || 'student');
-    await teacherTemplateHelpers.upsertTeacherRequestStatus({
-      get: (sql, params) => db.get(sql, params),
-      run: (sql, params) => db.run(sql, params),
-    }, userId, { status: 'rejected', allowPendingReset: true });
+    await teacherTemplateHelpers.upsertTeacherRequestStatus(
+      getTeacherTemplateStore(),
+      userId,
+      { status: 'rejected', allowPendingReset: true }
+    );
     await assignUserRoles(userId, ['student'], { preferredPrimary: 'student' });
     await recordUserRoleChangeEvent({
       userId,
@@ -49135,7 +48879,11 @@ app.get('/admin/api/schedule/validate', requireScheduleSectionAccess, async (req
             group: row.group_number,
             schedule_ids: [row.id],
           },
-          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
+          fix_url: buildAdminFixTargetUrl(req, {
+            courseId,
+            day: row.day_of_week,
+            groupNumber: row.group_number,
+          }),
         });
       }
 
@@ -49151,7 +48899,11 @@ app.get('/admin/api/schedule/validate', requireScheduleSectionAccess, async (req
             group: row.group_number,
             schedule_ids: [row.id],
           },
-          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
+          fix_url: buildAdminFixTargetUrl(req, {
+            courseId,
+            day: row.day_of_week,
+            groupNumber: row.group_number,
+          }),
         });
       }
 
@@ -49168,7 +48920,11 @@ app.get('/admin/api/schedule/validate', requireScheduleSectionAccess, async (req
             group: row.group_number,
             schedule_ids: [row.id],
           },
-          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(row.day_of_week)}&group_number=${row.group_number}`,
+          fix_url: buildAdminFixTargetUrl(req, {
+            courseId,
+            day: row.day_of_week,
+            groupNumber: row.group_number,
+          }),
         });
       }
     });
@@ -49187,7 +48943,11 @@ app.get('/admin/api/schedule/validate', requireScheduleSectionAccess, async (req
             group: sample.group_number,
             schedule_ids: list.map((r) => r.id),
           },
-          fix_url: `/admin?course=${courseId}&day=${encodeURIComponent(sample.day_of_week)}&group_number=${sample.group_number}`,
+          fix_url: buildAdminFixTargetUrl(req, {
+            courseId,
+            day: sample.day_of_week,
+            groupNumber: sample.group_number,
+          }),
         });
       }
     });
