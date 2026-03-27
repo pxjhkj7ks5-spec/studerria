@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.08",
+      "date": "2026-03-27",
+      "items": [
+        "feat(academic-setup-primary-flow-strip): add an explicit August setup flow strip to `views/admin-pathways.ejs` so admins can move through programs, intake, cohorts, live contexts, and teacher scope from one primary workspace instead of mentally stitching the order together",
+        "refactor(pathways-compatibility-shell): collapse legacy course mapping, legacy subject visibility, campus routing, and migration into a single advanced `Compatibility tools` details shell with summary metrics, keeping these bridge/debug surfaces accessible without letting them dominate the primary Academic Setup flow",
+        "tune(pathways-hero-and-context-ux): shift the hero metrics away from legacy mapping/visibility counts toward live contexts and moderation, and update empty-context guidance so missing stage cards send admins back into intake/cohort setup instead of back into legacy mapping by default"
+      ]
+    },
+    {
       "version": "1.3.07",
       "date": "2026-03-27",
       "items": [

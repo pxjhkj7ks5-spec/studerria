@@ -126,6 +126,24 @@
     already_assigned: 0,
     pending_users: 0,
   };
+  const compatibilityMetrics = [
+    {
+      label: isUk ? 'Mapping' : 'Mapping',
+      value: `${Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0)}/${Number(mappingSummary && mappingSummary.total ? mappingSummary.total : 0)}`,
+    },
+    {
+      label: isUk ? 'Subjects' : 'Subjects',
+      value: `${Number(visibilitySummary && visibilitySummary.visible ? visibilitySummary.visible : 0)}/${Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0)}`,
+    },
+    {
+      label: isUk ? 'Pending users' : 'Pending users',
+      value: Number(migrationSummaryValue.pending_users || 0),
+    },
+    {
+      label: isUk ? 'Campus issues' : 'Campus issues',
+      value: Number((ambiguousCampusList || []).length || 0),
+    },
+  ];
   const catalogTargetReadyLabel = isUk ? 'Готово до призначення' : 'Ready for assignment';
   const catalogTargetBlockedLabel = isUk ? 'Спершу додайте в mapping' : 'Map into the cohort first';
   const catalogTargetList = selectedAdmissionValue > 0
@@ -166,11 +184,11 @@
     pageTitle: 'Адмін · академічне налаштування',
     heroKicker: 'Центр академічного налаштування',
     heroTitle: 'Робочий простір академічних контекстів',
-    heroSubtitle: 'Керуйте треками, програмами, роками вступу, курсами, кампусами та видимістю предметів для кожної когорти. Сторінка одразу показує, чи готовий обраний контекст до реєстрації, чи ще завис на мапінгу, кампусах або міграції користувачів.',
+    heroSubtitle: 'Керуйте треками, програмами, роками вступу, stage-контекстами, кампусами, live semesters та offerings для кожної когорти. Сторінка одразу показує, чи готовий обраний контекст до реєстрації, чи ще завис на setup, campuses або міграції користувачів.',
     programsChip: 'Програми',
     admissionsChip: 'Роки вступу',
-    mappedCoursesChip: 'Замаплені курси',
-    visibleSubjectsChip: 'Видимі предмети',
+    mappedCoursesChip: 'Контексти',
+    visibleSubjectsChip: 'Модерація',
     courseScope: 'Контекст навчання',
     trackFilter: 'Фільтр треку',
     focusedCohort: 'Контекст у фокусі',
@@ -380,11 +398,11 @@
     pageTitle: 'Admin academic setup',
     heroKicker: 'Academic setup center',
     heroTitle: 'Academic setup workspace',
-    heroSubtitle: 'Manage tracks, programs, admission years, courses, campuses, and subject visibility for each cohort. The page now shows immediately whether the selected context is ready for registration or still blocked by mapping, campuses, or user migration.',
+    heroSubtitle: 'Manage tracks, programs, admission years, stage contexts, campuses, live semesters, and offerings for each cohort. The page shows immediately whether the selected context is ready for registration or still blocked by setup, campus routing, or user migration.',
     programsChip: 'Programs',
     admissionsChip: 'Admissions',
-    mappedCoursesChip: 'Mapped courses',
-    visibleSubjectsChip: 'Visible subjects',
+    mappedCoursesChip: 'Contexts',
+    visibleSubjectsChip: 'Moderation',
     courseScope: 'Study context',
     trackFilter: 'Track filter',
     focusedCohort: 'Focused context',
@@ -701,9 +719,6 @@
     { href: '#pathways-admissions', label: ui.navAdmissions },
     { href: '#pathways-presets', label: setupUi.navPresets },
     { href: '#pathways-contexts', label: ui.navContexts },
-    { href: '#pathways-compatibility', label: isUk ? 'Compatibility tools' : 'Compatibility tools' },
-    { href: '#pathways-campuses', label: ui.navCampuses },
-    { href: '#pathways-migration', label: ui.navMigration },
     { href: '#pathways-moderation', label: setupUi.navModeration },
     { href: '#pathways-catalog', label: ui.navCatalog },
   ];
@@ -1220,6 +1235,134 @@
           grid-template-columns: 1fr;
         }
       }
+      .setup-flow-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+      }
+      .setup-flow-card {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 16px 18px;
+        border-radius: 18px;
+        text-decoration: none;
+        transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.14);
+        color: inherit;
+      }
+      .setup-flow-card:hover {
+        transform: translateY(-1px);
+        border-color: rgba(96, 165, 250, 0.38);
+        background: rgba(30, 41, 59, 0.28);
+      }
+      body.theme-light .setup-flow-card {
+        border-color: rgba(15, 23, 42, 0.1);
+        background: rgba(255, 255, 255, 0.8);
+      }
+      body.theme-light .setup-flow-card:hover {
+        border-color: rgba(59, 130, 246, 0.28);
+        background: rgba(255, 255, 255, 0.96);
+      }
+      .setup-flow-card__step {
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(148, 163, 184, 0.78);
+      }
+      body.theme-light .setup-flow-card__step {
+        color: rgba(15, 23, 42, 0.5);
+      }
+      .setup-flow-card__title {
+        font-weight: 700;
+      }
+      .setup-flow-card__meta {
+        font-size: 0.84rem;
+        color: rgba(226, 232, 240, 0.74);
+      }
+      body.theme-light .setup-flow-card__meta {
+        color: rgba(15, 23, 42, 0.64);
+      }
+      .compatibility-shell {
+        overflow: hidden;
+      }
+      .compatibility-shell__summary {
+        list-style: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        cursor: pointer;
+      }
+      .compatibility-shell__summary::-webkit-details-marker {
+        display: none;
+      }
+      .compatibility-shell__summary::marker {
+        display: none;
+      }
+      .compatibility-shell__headline {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .compatibility-shell__caption {
+        font-size: 0.84rem;
+        color: rgba(203, 213, 225, 0.74);
+      }
+      body.theme-light .compatibility-shell__caption {
+        color: rgba(15, 23, 42, 0.62);
+      }
+      .compatibility-shell__metrics {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .compatibility-shell__metric {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.12);
+        font-size: 0.78rem;
+      }
+      body.theme-light .compatibility-shell__metric {
+        border-color: rgba(15, 23, 42, 0.08);
+        background: rgba(255, 255, 255, 0.76);
+      }
+      .compatibility-shell__caret {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.16);
+        font-size: 1rem;
+        transition: transform 180ms ease;
+      }
+      body.theme-light .compatibility-shell__caret {
+        border-color: rgba(15, 23, 42, 0.08);
+        background: rgba(255, 255, 255, 0.82);
+      }
+      .compatibility-shell[open] .compatibility-shell__caret {
+        transform: rotate(180deg);
+      }
+      .compatibility-shell__body {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid rgba(148, 163, 184, 0.12);
+      }
+      .compatibility-shell__panel {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
     </style>
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/pages/admin-pathways.css" />
@@ -1264,8 +1407,8 @@
             <div class="chip-row">
               <span class="chip"><%= ui.programsChip %>: <%= (programs || []).length %></span>
               <span class="chip"><%= ui.admissionsChip %>: <%= (admissions || []).length %></span>
-              <span class="chip"><%= ui.mappedCoursesChip %>: <%= Number(mappingSummary && mappingSummary.visible ? mappingSummary.visible : 0) %> / <%= Number(mappingSummary && mappingSummary.total ? mappingSummary.total : 0) %></span>
-              <span class="chip"><%= ui.visibleSubjectsChip %>: <%= Number(visibilitySummary && visibilitySummary.visible ? visibilitySummary.visible : 0) %> / <%= Number(visibilitySummary && visibilitySummary.total ? visibilitySummary.total : 0) %></span>
+              <span class="chip"><%= ui.mappedCoursesChip %>: <%= studyContextList.length %></span>
+              <span class="chip"><%= ui.visibleSubjectsChip %>: <%= moderationQueueList.length %></span>
             </div>
             <div class="hero-focus-strip">
               <div class="hero-focus-item">
@@ -1332,6 +1475,43 @@
           <strong class="focus-nav__meta-value"><%= cohortFocusLabel %></strong>
         </div>
       </nav>
+
+      <section class="glass section mb-3" id="pathways-flow">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><%= isUk ? 'Серпневий setup flow' : 'August setup flow' %></h2>
+            <p class="section-subtitle"><%= isUk ? 'Primary path без legacy-мепінгу: спочатку програми і пресети, далі intake year, потім live contexts, semesters, offerings, а вже після цього teachers та users.' : 'Primary path without legacy mapping: start with programs and presets, create the intake year, then prepare live contexts, semesters, offerings, and only then align teachers and users.' %></p>
+          </div>
+          <span class="chip"><%= selectedStudyContextItem ? (isUk ? 'Context у фокусі' : 'Context focused') : (isUk ? 'Оберіть context' : 'Pick a context') %></span>
+        </div>
+        <div class="setup-flow-grid">
+          <a class="setup-flow-card" href="#pathways-programs">
+            <span class="setup-flow-card__step">01</span>
+            <strong class="setup-flow-card__title"><%= isUk ? 'Програми і пресети' : 'Programs and presets' %></strong>
+            <span class="setup-flow-card__meta"><%= isUk ? `${(filteredPrograms || programs || []).length} програм у фокусі` : `${(filteredPrograms || programs || []).length} programs in scope` %></span>
+          </a>
+          <a class="setup-flow-card" href="#pathways-intake">
+            <span class="setup-flow-card__step">02</span>
+            <strong class="setup-flow-card__title"><%= isUk ? 'Створити intake year' : 'Create intake year' %></strong>
+            <span class="setup-flow-card__meta"><%= isUk ? 'Один admission year для кількох програм з авто-stage-1 contexts' : 'One admission year for multiple programs with auto-created stage 1 contexts' %></span>
+          </a>
+          <a class="setup-flow-card" href="#pathways-admissions">
+            <span class="setup-flow-card__step">03</span>
+            <strong class="setup-flow-card__title"><%= isUk ? 'Когорта і promote' : 'Cohort and promote' %></strong>
+            <span class="setup-flow-card__meta"><%= isUk ? `Років вступу: ${(admissions || []).length}` : `Admission years: ${(admissions || []).length}` %></span>
+          </a>
+          <a class="setup-flow-card" href="#pathways-contexts">
+            <span class="setup-flow-card__step">04</span>
+            <strong class="setup-flow-card__title"><%= isUk ? 'Контексти, семестри, offerings' : 'Contexts, semesters, offerings' %></strong>
+            <span class="setup-flow-card__meta"><%= selectedStudyContextItem ? `${selectedStudyContextSemestersList.length} / ${selectedStudyContextOfferingsList.length}` : `${studyContextList.length}` %> <%= isUk ? (selectedStudyContextItem ? 'семестрів / offerings' : 'context cards') : (selectedStudyContextItem ? 'semesters / offerings' : 'context cards') %></span>
+          </a>
+          <a class="setup-flow-card" href="<%= selectedStudyContextItem ? buildAdminScopeUrl(selectedStudyContextItem, 'admin-teachers') : '/teacher/workspace' %>">
+            <span class="setup-flow-card__step">05</span>
+            <strong class="setup-flow-card__title"><%= isUk ? 'Teachers і users' : 'Teachers and users' %></strong>
+            <span class="setup-flow-card__meta"><%= selectedStudyContextItem ? (isUk ? `Юзерів у context: ${Number(selectedStudyContextItem.user_count || 0)}` : `Context users: ${Number(selectedStudyContextItem.user_count || 0)}`) : (isUk ? 'Після setup відкрийте teacher scope' : 'Open teacher scope after setup') %></span>
+          </a>
+        </div>
+      </section>
 
       <% if (cohortAlertsList.length) { %>
         <section class="pathways-alert-stack mb-3">
@@ -2339,7 +2519,7 @@
             <div class="soft-panel muted">
               <div><%= ui.contextsEmpty %></div>
               <div class="mt-2">
-                <a class="btn btn-soft btn-pill" href="#pathways-compatibility"><%= ui.reviewMapping %></a>
+                <a class="btn btn-soft btn-pill" href="<%= selectedAdmissionValue > 0 ? '#pathways-admissions' : (selectedProgramValue > 0 ? '#pathways-intake' : '#pathways-programs') %>"><%= isUk ? 'Відкрити cohort setup' : 'Open cohort setup' %></a>
               </div>
             </div>
           <% } %>
@@ -2353,6 +2533,23 @@
         <% } %>
       </section>
 
+      <details class="glass section mb-3 compatibility-shell" id="pathways-compatibility">
+        <summary class="compatibility-shell__summary">
+          <div class="compatibility-shell__headline">
+            <strong><%= isUk ? 'Compatibility tools' : 'Compatibility tools' %></strong>
+            <span class="compatibility-shell__caption"><%= isUk ? 'Legacy mapping, subject visibility, campus routing і migration лишаються тут тільки як advanced bridge/debug layer. Primary setup flow іде через presets, contexts, semesters і live offerings.' : 'Legacy mapping, subject visibility, campus routing, and migration stay here only as an advanced bridge/debug layer. The primary setup flow goes through presets, contexts, semesters, and live offerings.' %></span>
+          </div>
+          <div class="compatibility-shell__metrics">
+            <% compatibilityMetrics.forEach((metric) => { %>
+              <span class="compatibility-shell__metric">
+                <span><%= metric.label %></span>
+                <strong><%= metric.value %></strong>
+              </span>
+            <% }) %>
+            <span class="compatibility-shell__caret" aria-hidden="true">⌄</span>
+          </div>
+        </summary>
+        <div class="compatibility-shell__body">
       <section class="row g-3">
         <div class="col-12 col-xl-5">
           <article class="glass section h-100" id="pathways-mapping">
@@ -2560,11 +2757,11 @@
         </div>
       </section>
 
-      <section class="glass section mb-3" id="pathways-compatibility">
+      <section class="compatibility-shell__panel mb-3">
         <div class="section-header mb-3">
           <div>
-            <h2 class="section-title"><%= isUk ? 'Compatibility tools' : 'Compatibility tools' %></h2>
-            <p class="section-subtitle"><%= isUk ? 'Legacy mapping і subject visibility лишаються тут тільки як compatibility/debug layer. Primary setup flow іде через presets, contexts, semesters і live offerings.' : 'Legacy mapping and subject visibility stay here only as a compatibility/debug layer. The primary setup flow now goes through presets, contexts, semesters, and live offerings.' %></p>
+            <h2 class="section-title"><%= isUk ? 'Bridge operations' : 'Bridge operations' %></h2>
+            <p class="section-subtitle"><%= isUk ? 'Сюди винесені тільки campus routing, migration backlog і legacy bridge-операції, які ще не варто тримати у primary setup flow.' : 'Only campus routing, migration backlog, and remaining legacy bridge operations live here now so they do not dominate the primary setup flow.' %></p>
           </div>
           <span class="chip"><%= isUk ? 'Legacy' : 'Legacy' %></span>
         </div>
@@ -2743,6 +2940,8 @@
           </div>
         </div>
       </section>
+        </div>
+      </details>
 
       <section class="glass section mb-3" id="pathways-moderation">
         <div class="section-header">
@@ -3142,6 +3341,25 @@
     <%- include('partials/desktop-menu-drawer-script') %>
     <script src="/js/design-system.js" defer></script>
     <script>
+      (function initCompatibilityShell() {
+        const shell = document.getElementById('pathways-compatibility');
+        if (!shell || shell.tagName !== 'DETAILS') return;
+        const compatibilityHashes = new Set([
+          '#pathways-compatibility',
+          '#pathways-mapping',
+          '#pathways-subjects',
+          '#pathways-campuses',
+          '#pathways-migration',
+        ]);
+        function syncCompatibilityShell() {
+          if (compatibilityHashes.has(window.location.hash)) {
+            shell.open = true;
+          }
+        }
+        syncCompatibilityShell();
+        window.addEventListener('hashchange', syncCompatibilityShell);
+      })();
+
       (function initThemeToggles() {
         function applyStandaloneTheme(rawTheme) {
           const theme = rawTheme === 'theme-light' || rawTheme === 'light' ? 'light' : 'dark';
