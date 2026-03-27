@@ -570,6 +570,10 @@ body.theme-light .admin-course-chip {
 .admin-course-label {
   font-weight: 600;
   letter-spacing: -0.02em;
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-campus-badge {
@@ -586,10 +590,14 @@ body.theme-light .admin-campus-badge {
 }
 
 .admin-course-form select {
-  min-width: 160px;
+  min-width: 144px;
   min-height: 38px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.08);
+}
+
+.admin-course-form select[name="course"] {
+  min-width: 176px;
 }
 
 .admin-scope-form {
@@ -604,7 +612,7 @@ body.theme-light .admin-campus-badge {
 }
 
 .admin-scope-fields select {
-  min-width: 138px;
+  min-width: 132px;
 }
 
 body.theme-light .admin-course-form select {
@@ -1213,6 +1221,8 @@ body.theme-light .admin-toast.is-error {
 
   .admin-course-label {
     width: 100%;
+    max-width: none;
+    white-space: normal;
   }
 
   .admin-course-form {
@@ -1226,6 +1236,10 @@ body.theme-light .admin-toast.is-error {
 
   .admin-course-form select {
     width: 100%;
+    min-width: 0;
+  }
+
+  .admin-course-form select[name="course"] {
     min-width: 0;
   }
 

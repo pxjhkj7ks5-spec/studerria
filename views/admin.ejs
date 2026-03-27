@@ -906,7 +906,7 @@
     <% const selectedCourse = (courses || []).find(function(c) { return Number(c.id) === Number(selectedCourseId); }) || {}; %>
     <% const selectedCourseLabel = selectedCourse.name || (courseMap[selectedCourseId] || ('Course ' + selectedCourseId)); %>
     <% const selectedCourseCampus = selectedCourse.is_teacher_course ? 'Teachers' : (String(selectedCourse.location || 'kyiv').toLowerCase() === 'munich' ? 'Munich' : 'Kyiv'); %>
-    <% const selectedScopeLabel = scopeState.label || selectedCourseLabel; %>
+    <% const selectedScopeLabel = selectedCourseLabel; %>
     <% const selectedScopeCampus = scopeState.selectedCampusLabel || selectedCourseCampus; %>
     <% const canSwitchAcademicScope = (typeof allowCourseSelect !== 'undefined' ? allowCourseSelect : !isLimitedView) && Boolean(scopeTrackOptions.length || scopeProgramOptions.length || scopeAdmissionOptions.length || scopeStageOptions.length || scopeCampusOptions.length); %>
     <% const scopeFormAction = role === 'deanery' ? '/deanery' : (role === 'starosta' ? '/starosta' : '/admin'); %>
@@ -946,6 +946,11 @@
                   <input type="hidden" name="tab" value="<%= activeAdminTab %>" />
                 <% } %>
                 <div class="admin-scope-fields">
+                  <select name="course" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <% (courses || []).forEach(function(course) { %>
+                      <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
+                    <% }); %>
+                  </select>
                   <select name="track" class="form-select form-select-sm" onchange="this.form.submit()">
                     <% scopeTrackOptions.forEach(function(option) { %>
                       <option value="<%= option.value %>" <%= String(scopeState.track || '') === String(option.value || '') ? 'selected' : '' %>><%= option.label %></option>

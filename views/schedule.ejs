@@ -3731,6 +3731,8 @@
         const offsets = getWeekCarouselOffsets();
         weekCarousel.style.setProperty('--week-carousel-columns', String(offsets.length));
         weekCarousel.dataset.compact = offsets.length <= 3 ? 'true' : 'false';
+        weekCarousel.dataset.viewport = window.innerWidth <= 560 ? 'mobile' : 'desktop';
+        let activeChip = null;
 
         offsets.forEach((offset) => {
           const week = activeWeek + offset;
@@ -3755,6 +3757,7 @@
           if (week === activeWeek) {
             chip.classList.add('is-active');
             chip.setAttribute('aria-current', 'page');
+            activeChip = chip;
           }
           chip.innerHTML = `
             <span class="week-carousel-card__shine" aria-hidden="true"></span>
@@ -3767,6 +3770,11 @@
         });
 
         weekCarousel.appendChild(fragment);
+        if (weekCarousel.dataset.viewport === 'mobile' && activeChip && typeof activeChip.scrollIntoView === 'function') {
+          window.requestAnimationFrame(() => {
+            activeChip.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'auto' });
+          });
+        }
       }
 
       function getKyivAcademicWeek() {

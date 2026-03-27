@@ -2121,17 +2121,17 @@ body.page-schedule .app-footer {
   body.page-schedule .week-rail {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
-    padding: 7px;
+    padding: 6px;
   }
 
   body.page-schedule .week-pager {
-    padding: 7px;
-    border-radius: 22px;
+    padding: 6px;
+    border-radius: 20px;
   }
 
   body.page-schedule .week-pager .week-pill {
-    min-height: 114px;
-    padding: 10px 11px;
+    min-height: 106px;
+    padding: 9px 10px;
     gap: 6px;
   }
 
@@ -2152,18 +2152,28 @@ body.page-schedule .app-footer {
   }
 
   body.page-schedule .week-pager .week-carousel {
-    min-height: 56px;
-    gap: 6px;
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    min-height: 60px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding: 2px 2px 1px;
   }
 
   body.page-schedule .week-pager .week-carousel-card {
-    min-height: 46px;
-    padding: 7px 8px 8px;
+    flex: 0 0 clamp(92px, 31vw, 122px);
+    min-height: 52px;
+    padding: 8px 8px 9px;
     border-radius: 14px;
+    scroll-snap-align: center;
   }
 
   body.page-schedule .week-pager .week-carousel-card.is-active {
-    min-height: 58px;
+    min-height: 62px;
   }
 
   body.page-schedule .week-pager .week-carousel-card__label {
@@ -2172,6 +2182,10 @@ body.page-schedule .app-footer {
 
   body.page-schedule .week-pager .week-carousel-card__range {
     font-size: 8.5px;
+  }
+
+  body.page-schedule .week-pager .week-carousel::-webkit-scrollbar {
+    display: none;
   }
 }
 
@@ -2201,6 +2215,10 @@ body.page-schedule .app-footer {
     padding: 8px;
     bottom: calc(10px + env(safe-area-inset-bottom) + var(--studerria-vv-offset-bottom, 0px));
     transform: none;
+  }
+
+  body.page-schedule .week-pager .week-carousel {
+    padding-inline: 1px;
   }
 }
 

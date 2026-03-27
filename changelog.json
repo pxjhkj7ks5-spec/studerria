@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.11",
+      "date": "2026-03-27",
+      "items": [
+        "fix(admin-scope-topbar): add an explicit course selector to the admin scope chip, keep the current course summary compact, and preserve the selected academic scope while switching courses from the topbar",
+        "fix(schedule-mobile-carousel): turn the schedule week carousel into a mobile scroll-snap strip with a centered active week so the dock no longer collapses into a clipped sliver on small screens",
+        "style(admin-scope-chip-compactness): tighten the admin topbar chip and scope select widths so the active course is readable without flooding the header with the full scope path"
+      ]
+    },
+    {
       "version": "1.3.10",
       "date": "2026-03-27",
       "items": [
