@@ -1,9 +1,39 @@
 <%
-  const selectedCourseValue = Number(selectedCourseId || 0);
-  const activeTrack = trackFilter || 'all';
-  const selectedProgramValue = Number(selectedProgramId || 0);
-  const selectedAdmissionValue = Number(selectedAdmissionId || 0);
-  const requestedStudyContextValue = Number(selectedStudyContextId || 0);
+  const canonicalPathwaysFocus = pathwaysFocus && typeof pathwaysFocus === 'object' ? pathwaysFocus : {};
+  const normalizeFocusPositiveInt = (value) => {
+    const normalized = Number(value || 0);
+    return Number.isInteger(normalized) && normalized > 0 ? normalized : 0;
+  };
+  const normalizePathwaysFocusState = (state, overrides) => {
+    const next = Object.assign({}, state || {}, overrides || {});
+    const normalizedTrack = String(next.track || next.mode || 'all').trim().toLowerCase();
+    const normalizedModerationStatus = String(next.moderationStatus || next.moderation_status || 'open').trim().toLowerCase();
+    return {
+      courseId: normalizeFocusPositiveInt(next.courseId || next.course_id || next.course),
+      track: ['all', 'bachelor', 'master', 'teacher'].includes(normalizedTrack) ? normalizedTrack : 'all',
+      programId: normalizeFocusPositiveInt(next.programId || next.program_id),
+      admissionId: normalizeFocusPositiveInt(next.admissionId || next.admission_id),
+      studyContextId: normalizeFocusPositiveInt(next.studyContextId || next.study_context_id),
+      presetId: normalizeFocusPositiveInt(next.presetId || next.preset_id),
+      moderationStatus: ['open', 'reviewing', 'resolved', 'ignored'].includes(normalizedModerationStatus)
+        ? normalizedModerationStatus
+        : 'open',
+    };
+  };
+  const pathwaysFocusState = normalizePathwaysFocusState(canonicalPathwaysFocus, {
+    courseId: canonicalPathwaysFocus.courseId || selectedCourseId,
+    track: canonicalPathwaysFocus.track || trackFilter || 'all',
+    programId: canonicalPathwaysFocus.programId || selectedProgramId,
+    admissionId: canonicalPathwaysFocus.admissionId || selectedAdmissionId,
+    studyContextId: canonicalPathwaysFocus.studyContextId || selectedStudyContextId,
+    presetId: canonicalPathwaysFocus.presetId || selectedProgramPresetId,
+    moderationStatus: canonicalPathwaysFocus.moderationStatus || moderationStatus || 'open',
+  });
+  const selectedCourseValue = Number(pathwaysFocusState.courseId || 0);
+  const activeTrack = pathwaysFocusState.track || 'all';
+  const selectedProgramValue = Number(pathwaysFocusState.programId || 0);
+  const selectedAdmissionValue = Number(pathwaysFocusState.admissionId || 0);
+  const requestedStudyContextValue = Number(pathwaysFocusState.studyContextId || 0);
   const selectedProgram = (programs || []).find((item) => Number(item.id) === selectedProgramValue) || null;
   const selectedAdmission = (admissions || []).find((item) => Number(item.id) === selectedAdmissionValue) || null;
   const studyContextList = Array.isArray(studyContexts) ? studyContexts : [];
@@ -14,7 +44,7 @@
   const selectedStudyContextSemestersList = Array.isArray(selectedStudyContextSemesters) ? selectedStudyContextSemesters : [];
   const selectedStudyContextOfferingsList = Array.isArray(selectedStudyContextOfferings) ? selectedStudyContextOfferings : [];
   const programPresetList = Array.isArray(programPresets) ? programPresets : [];
-  const requestedProgramPresetValue = Number(selectedProgramPresetId || 0);
+  const requestedProgramPresetValue = Number(pathwaysFocusState.presetId || selectedProgramPresetId || 0);
   const selectedProgramPresetItem = (selectedProgramPreset && Number(selectedProgramPreset.id || 0) > 0)
     ? selectedProgramPreset
     : (programPresetList.find((item) => Number(item.id) === requestedProgramPresetValue) || null);
@@ -26,9 +56,7 @@
   const selectedContextPresetPreviewValue = selectedContextPresetPreview || null;
   const selectedAdmissionPresetPreviewValue = selectedAdmissionPresetPreview || null;
   const moderationQueueList = Array.isArray(moderationQueue) ? moderationQueue : [];
-  const moderationStatusValue = ['open', 'reviewing', 'resolved', 'ignored'].includes(String(moderationStatus || '').trim().toLowerCase())
-    ? String(moderationStatus || '').trim().toLowerCase()
-    : 'open';
+  const moderationStatusValue = pathwaysFocusState.moderationStatus || 'open';
   const contextOfferingUi = String(lang || '').toLowerCase() === 'uk' ? {
     title: 'Live offerings',
     subtitle: 'Primary editor for live context offerings. New writes land in subject_offerings first and legacy subject visibility stays a compatibility mirror.',
@@ -782,43 +810,84 @@
     return isUk ? `${normalizedStage} курс` : `Year ${normalizedStage}`;
   };
 
+  const escapeFocusAttr = (value) => String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/'/g, '&#39;');
+  const buildPathwaysFocusState = (overrides) => normalizePathwaysFocusState({
+    courseId: selectedCourseValue,
+    track: activeTrack,
+    programId: selectedProgramValue,
+    admissionId: selectedAdmissionValue,
+    studyContextId: selectedStudyContextValue,
+    presetId: selectedProgramPresetValue,
+    moderationStatus: moderationStatusValue,
+  }, overrides || {});
+  const renderPathwaysFocusFields = (overrides, options) => {
+    const state = buildPathwaysFocusState(overrides || {});
+    const opts = options || {};
+    const exclude = new Set(Array.isArray(opts.exclude) ? opts.exclude : []);
+    const names = Object.assign({
+      courseId: 'course_id',
+      track: 'track',
+      programId: 'program_id',
+      admissionId: 'admission_id',
+      studyContextId: 'study_context_id',
+      presetId: 'preset_id',
+      moderationStatus: 'moderation_status',
+    }, opts.names || {});
+    const fields = [];
+    const pushField = (key, value, skipDefault = false) => {
+      if (exclude.has(key)) return;
+      if (value === null || typeof value === 'undefined' || value === '') return;
+      if (skipDefault && (!value || value === 'all' || value === 'open')) return;
+      fields.push(`<input type="hidden" name="${escapeFocusAttr(names[key])}" value="${escapeFocusAttr(value)}" />`);
+    };
+    pushField('courseId', state.courseId);
+    pushField('track', state.track, true);
+    pushField('programId', state.programId);
+    pushField('admissionId', state.admissionId);
+    pushField('studyContextId', state.studyContextId);
+    pushField('presetId', state.presetId);
+    pushField('moderationStatus', state.moderationStatus, true);
+    return fields.join('\n');
+  };
+
   const buildPathwaysUrl = (overrides) => {
     const params = new URLSearchParams();
-    const next = Object.assign({}, {
-      course: selectedCourseValue,
-      track: activeTrack,
-      program_id: selectedProgramValue,
-      admission_id: selectedAdmissionValue,
-      study_context_id: selectedStudyContextValue,
-      preset_id: selectedProgramPresetValue,
-      moderation_status: moderationStatusValue,
-    }, overrides || {});
-    const hasStudyContextOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'study_context_id');
-    const hasProgramOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'program_id');
-    const hasAdmissionOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'admission_id');
-    const hasPresetOverride = Object.prototype.hasOwnProperty.call(overrides || {}, 'preset_id');
+    const rawOverrides = overrides || {};
+    const next = buildPathwaysFocusState(rawOverrides);
+    const hasStudyContextOverride = Object.prototype.hasOwnProperty.call(rawOverrides, 'studyContextId')
+      || Object.prototype.hasOwnProperty.call(rawOverrides, 'study_context_id');
+    const hasProgramOverride = Object.prototype.hasOwnProperty.call(rawOverrides, 'programId')
+      || Object.prototype.hasOwnProperty.call(rawOverrides, 'program_id');
+    const hasAdmissionOverride = Object.prototype.hasOwnProperty.call(rawOverrides, 'admissionId')
+      || Object.prototype.hasOwnProperty.call(rawOverrides, 'admission_id');
+    const hasPresetOverride = Object.prototype.hasOwnProperty.call(rawOverrides, 'presetId')
+      || Object.prototype.hasOwnProperty.call(rawOverrides, 'preset_id');
     if (!hasStudyContextOverride) {
-      const programChanged = hasProgramOverride && Number(next.program_id || 0) !== Number(selectedProgramValue || 0);
-      const admissionChanged = hasAdmissionOverride && Number(next.admission_id || 0) !== Number(selectedAdmissionValue || 0);
-      if (programChanged || admissionChanged || !next.program_id || !next.admission_id) {
-        next.study_context_id = null;
+      const programChanged = hasProgramOverride && Number(next.programId || 0) !== Number(selectedProgramValue || 0);
+      const admissionChanged = hasAdmissionOverride && Number(next.admissionId || 0) !== Number(selectedAdmissionValue || 0);
+      if (programChanged || admissionChanged || !next.programId || !next.admissionId) {
+        next.studyContextId = null;
       }
     }
     if (!hasPresetOverride) {
-      const programChanged = hasProgramOverride && Number(next.program_id || 0) !== Number(selectedProgramValue || 0);
-      if (programChanged || !next.program_id) {
-        next.preset_id = null;
+      const programChanged = hasProgramOverride && Number(next.programId || 0) !== Number(selectedProgramValue || 0);
+      if (programChanged || !next.programId) {
+        next.presetId = null;
       }
     }
 
-    Object.keys(next).forEach((key) => {
-      const value = next[key];
-      if (value === null || typeof value === 'undefined') return;
-      if (String(value) === '' || String(value) === '0') return;
-      if (key === 'track' && String(value) === 'all') return;
-      if (key === 'moderation_status' && String(value) === 'open') return;
-      params.set(key, String(value));
-    });
+    if (next.courseId) params.set('course', String(next.courseId));
+    if (next.track && next.track !== 'all') params.set('track', String(next.track));
+    if (next.programId) params.set('program_id', String(next.programId));
+    if (next.admissionId) params.set('admission_id', String(next.admissionId));
+    if (next.studyContextId) params.set('study_context_id', String(next.studyContextId));
+    if (next.presetId) params.set('preset_id', String(next.presetId));
+    if (next.moderationStatus && next.moderationStatus !== 'open') params.set('moderation_status', String(next.moderationStatus));
 
     const query = params.toString();
     return `/admin/pathways${query ? `?${query}` : ''}`;
@@ -1597,21 +1666,7 @@
           <div class="col-12 col-xl-2 align-self-end d-grid">
             <button type="submit" class="btn btn-primary btn-pill"><%= ui.applyScope %></button>
           </div>
-          <% if (selectedProgramValue > 0) { %>
-            <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-          <% } %>
-          <% if (selectedAdmissionValue > 0) { %>
-            <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-          <% } %>
-          <% if (selectedStudyContextValue > 0) { %>
-            <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-          <% } %>
-          <% if (selectedProgramPresetValue > 0) { %>
-            <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
-          <% } %>
-          <% if (moderationStatusValue !== 'open') { %>
-            <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
-          <% } %>
+          <%- renderPathwaysFocusFields({}, { exclude: ['courseId', 'track'] }) %>
         </form>
         <div class="scope-summary-grid">
           <div class="scope-summary-card">
@@ -1938,12 +1993,7 @@
             </div>
           <% } %>
           <form method="POST" action="/admin/pathways/presets/save" class="soft-panel mb-3">
-            <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-            <input type="hidden" name="track" value="<%= activeTrack %>" />
-            <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-            <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-            <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-            <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+            <%- renderPathwaysFocusFields() %>
             <div class="row g-2">
               <div class="col-12 col-lg-6">
                 <label class="form-label small"><%= setupUi.presetName %></label>
@@ -1990,12 +2040,7 @@
                       <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewTeachers %></span><strong><%= Number(selectedContextPresetPreviewValue.teacher_assignments || 0) %></strong></div>
                     </div>
                     <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/apply-preset" class="mt-3">
-                      <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                      <input type="hidden" name="track" value="<%= activeTrack %>" />
-                      <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                      <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                      <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-                      <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                      <%- renderPathwaysFocusFields({ studyContextId: selectedStudyContextValue }) %>
                       <button class="btn btn-primary btn-pill" type="submit"><%= setupUi.applyPresetContext %></button>
                     </form>
                   <% } else { %>
@@ -2021,12 +2066,7 @@
                       <div class="scope-summary-card"><span class="scope-summary-card__label"><%= setupUi.previewTeachers %></span><strong><%= Number(selectedAdmissionPresetPreviewValue.teacher_assignments || 0) %></strong></div>
                     </div>
                     <form method="POST" action="/admin/pathways/admissions/<%= selectedAdmissionValue %>/apply-preset" class="mt-3">
-                      <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                      <input type="hidden" name="track" value="<%= activeTrack %>" />
-                      <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                      <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                      <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-                      <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                      <%- renderPathwaysFocusFields() %>
                       <button class="btn btn-primary btn-pill" type="submit"><%= setupUi.applyPresetAdmission %></button>
                     </form>
                   <% } else { %>
@@ -2059,24 +2099,14 @@
                               <div class="catalog-subject-meta">#<%= semester.semester_number %> / <%= semester.start_date || '—' %> / <%= Number(semester.weeks_count || 0) || 16 %>w</div>
                             </div>
                             <form method="POST" action="/admin/pathways/presets/semesters/<%= semester.id %>/delete">
-                              <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                              <input type="hidden" name="track" value="<%= activeTrack %>" />
-                              <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                              <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                              <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-                              <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                              <%- renderPathwaysFocusFields() %>
                               <button class="btn btn-soft btn-pill" type="submit"><%= ui.deleteSemester %></button>
                             </form>
                           </div>
                         <% }) %>
                       </div>
                       <form method="POST" action="/admin/pathways/presets/<%= selectedProgramPresetValue %>/stages/<%= stage.stage_number %>/semesters/save" class="row g-2">
-                        <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                        <input type="hidden" name="track" value="<%= activeTrack %>" />
-                        <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                        <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                        <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-                        <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                        <%- renderPathwaysFocusFields() %>
                         <div class="col-4"><input class="form-control compact-input" type="number" name="semester_number" min="1" max="12" value="<%= Math.max(1, (stage.semesters || []).length + 1) %>" required /></div>
                         <div class="col-8"><input class="form-control compact-input" type="text" name="title" maxlength="120" placeholder="<%= ui.semesterTitle %>" required /></div>
                         <div class="col-6"><input class="form-control compact-input" type="date" name="start_date" /></div>
@@ -2103,24 +2133,14 @@
                               </div>
                             </div>
                             <form method="POST" action="/admin/pathways/presets/subjects/<%= subject.id %>/delete">
-                              <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                              <input type="hidden" name="track" value="<%= activeTrack %>" />
-                              <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                              <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                              <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-                              <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                              <%- renderPathwaysFocusFields() %>
                               <button class="btn btn-soft btn-pill" type="submit"><%= ui.catalogCourseRemove %></button>
                             </form>
                           </div>
                         <% }) %>
                       </div>
                       <form method="POST" action="/admin/pathways/presets/<%= selectedProgramPresetValue %>/stages/<%= stage.stage_number %>/subjects/save" class="row g-2">
-                        <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                        <input type="hidden" name="track" value="<%= activeTrack %>" />
-                        <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                        <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                        <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-                        <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                        <%- renderPathwaysFocusFields() %>
                         <div class="col-12 col-lg-4">
                           <select class="form-select compact-select" name="subject_catalog_id" required>
                             <option value=""><%= isUk ? 'Оберіть предмет' : 'Select subject' %></option>
@@ -2221,12 +2241,7 @@
               <div class="row g-3">
                 <div class="col-12 col-xl-4">
                   <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/semesters/add" class="soft-panel h-100">
-                    <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                    <input type="hidden" name="track" value="<%= activeTrack %>" />
-                    <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                    <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                    <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
-                    <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                    <%- renderPathwaysFocusFields({ studyContextId: selectedStudyContextItem.id }) %>
                     <div class="section-header mb-2">
                       <div>
                         <h3 class="section-title h5 mb-1"><%= ui.addSemesterTitle %></h3>
@@ -2277,12 +2292,7 @@
                       <% selectedStudyContextSemestersList.forEach((semester) => { %>
                         <div class="soft-panel">
                           <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/semesters/<%= semester.id %>/update" class="row g-2">
-                            <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                            <input type="hidden" name="track" value="<%= activeTrack %>" />
-                            <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                            <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                            <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
-                            <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                            <%- renderPathwaysFocusFields({ studyContextId: selectedStudyContextItem.id }) %>
                             <div class="col-12 col-md-2">
                               <label class="form-label small"><%= ui.semesterNumber %></label>
                               <input class="form-control compact-input" type="number" name="semester_number" min="1" max="12" value="<%= Number(semester.semester_number || 1) %>" required />
@@ -2323,12 +2333,7 @@
                               <% } %>
                             </span>
                             <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/semesters/<%= semester.id %>/delete">
-                              <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                              <input type="hidden" name="track" value="<%= activeTrack %>" />
-                              <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                              <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                              <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
-                              <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                              <%- renderPathwaysFocusFields({ studyContextId: selectedStudyContextItem.id }) %>
                               <button class="btn btn-soft btn-pill" type="submit"><%= ui.deleteSemester %></button>
                             </form>
                           </div>
@@ -2351,12 +2356,7 @@
                   <div class="row g-3">
                     <div class="col-12 col-xl-4">
                       <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/offerings/save" class="soft-panel h-100">
-                        <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                        <input type="hidden" name="track" value="<%= activeTrack %>" />
-                        <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                        <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                        <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
-                        <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                        <%- renderPathwaysFocusFields({ studyContextId: selectedStudyContextItem.id }) %>
                         <div class="section-header mb-2">
                           <div>
                             <h4 class="section-title h6 mb-1"><%= contextOfferingUi.createTitle %></h4>
@@ -2430,12 +2430,7 @@
                             <div class="soft-panel">
                               <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/offerings/save" class="row g-2">
                                 <input type="hidden" name="subject_offering_id" value="<%= offering.id %>" />
-                                <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                                <input type="hidden" name="track" value="<%= activeTrack %>" />
-                                <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                                <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                                <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
-                                <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                                <%- renderPathwaysFocusFields({ studyContextId: selectedStudyContextItem.id }) %>
                                 <div class="col-12 col-lg-4">
                                   <label class="form-label small"><%= contextOfferingUi.catalogLabel %></label>
                                   <select class="form-select compact-select" name="subject_catalog_id" required>
@@ -2495,12 +2490,7 @@
                               <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2">
                                 <span class="catalog-subject-meta">#<%= offering.id %><% if (offering.is_shared) { %> / shared<% } %><% if (!offering.is_active) { %> / inactive<% } %></span>
                                 <form method="POST" action="/admin/pathways/contexts/<%= selectedStudyContextItem.id %>/offerings/<%= offering.id %>/delete">
-                                  <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                                  <input type="hidden" name="track" value="<%= activeTrack %>" />
-                                  <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                                  <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                                  <input type="hidden" name="study_context_id" value="<%= selectedStudyContextItem.id %>" />
-                                  <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                                  <%- renderPathwaysFocusFields({ studyContextId: selectedStudyContextItem.id }) %>
                                   <button class="btn btn-soft btn-pill" type="submit"><%= contextOfferingUi.delete %></button>
                                 </form>
                               </div>
@@ -2984,12 +2974,7 @@
                     <a class="btn btn-soft btn-pill" href="<%= buildPathwaysUrl({ study_context_id: item.payload.study_context_id }) %>"><%= isUk ? 'Відкрити context' : 'Open context' %></a>
                   <% } %>
                   <form method="POST" action="/admin/pathways/moderation/<%= item.id %>/resolve" class="d-flex flex-wrap gap-2 align-items-center">
-                    <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                    <input type="hidden" name="track" value="<%= activeTrack %>" />
-                    <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                    <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                    <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
-                    <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
+                    <%- renderPathwaysFocusFields({}, { exclude: ['studyContextId'] }) %>
                     <select class="form-select compact-select" name="study_context_id">
                       <option value=""><%= setupUi.moderationAssignContext %></option>
                       <% studyContextList.forEach((context) => { %>
@@ -3000,48 +2985,24 @@
                     <button class="btn btn-primary btn-pill" type="submit"><%= setupUi.moderationAssignContext %></button>
                   </form>
                   <form method="POST" action="/admin/pathways/moderation/<%= item.id %>/resolve">
-                    <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                    <input type="hidden" name="track" value="<%= activeTrack %>" />
-                    <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                    <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                    <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-                    <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
-                    <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
+                    <%- renderPathwaysFocusFields() %>
                     <input type="hidden" name="action" value="mark_resolved" />
                     <button class="btn btn-soft btn-pill" type="submit"><%= setupUi.moderationResolve %></button>
                   </form>
                   <form method="POST" action="/admin/pathways/moderation/<%= item.id %>/resolve">
-                    <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                    <input type="hidden" name="track" value="<%= activeTrack %>" />
-                    <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                    <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                    <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-                    <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
-                    <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
+                    <%- renderPathwaysFocusFields() %>
                     <input type="hidden" name="action" value="ignore" />
                     <button class="btn btn-soft btn-pill" type="submit"><%= setupUi.moderationIgnore %></button>
                   </form>
                   <% if ((item.status || moderationStatusValue) === 'resolved' || (item.status || moderationStatusValue) === 'ignored') { %>
                     <form method="POST" action="/admin/pathways/moderation/<%= item.id %>/resolve">
-                      <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                      <input type="hidden" name="track" value="<%= activeTrack %>" />
-                      <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                      <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                      <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-                      <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
-                      <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
+                      <%- renderPathwaysFocusFields() %>
                       <input type="hidden" name="action" value="reopen" />
                       <button class="btn btn-soft btn-pill" type="submit"><%= isUk ? 'Відкрити знову' : 'Reopen' %></button>
                     </form>
                   <% } else { %>
                     <form method="POST" action="/admin/pathways/moderation/<%= item.id %>/resolve">
-                      <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-                      <input type="hidden" name="track" value="<%= activeTrack %>" />
-                      <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
-                      <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
-                      <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
-                      <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
-                      <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
+                      <%- renderPathwaysFocusFields() %>
                       <input type="hidden" name="action" value="mark_reviewing" />
                       <button class="btn btn-soft btn-pill" type="submit"><%= isUk ? 'Позначити reviewing' : 'Mark reviewing' %></button>
                     </form>

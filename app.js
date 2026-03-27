@@ -9604,21 +9604,38 @@ function normalizePathwayTrackFilter(rawFilter, fallback = 'all') {
   return PATHWAY_TRACK_FILTER_KEYS.has(fallback) ? fallback : 'all';
 }
 
+function buildPathwaysFocusStatePayload(state = {}, overrides = {}) {
+  const next = Object.assign({}, state || {}, overrides || {});
+  const moderationStatus = String(next.moderationStatus || next.moderation_status || 'open').trim().toLowerCase();
+  return {
+    courseId: parsePositiveIntStrict(next.courseId || next.course_id || next.course),
+    track: normalizePathwayTrackFilter(next.track || next.mode, 'all'),
+    programId: parsePositiveIntStrict(next.programId || next.program_id),
+    admissionId: parsePositiveIntStrict(next.admissionId || next.admission_id),
+    studyContextId: parsePositiveIntStrict(next.studyContextId || next.study_context_id),
+    presetId: parsePositiveIntStrict(next.presetId || next.preset_id),
+    moderationStatus: ['open', 'reviewing', 'resolved', 'ignored'].includes(moderationStatus)
+      ? moderationStatus
+      : 'open',
+  };
+}
+
 function buildAdminPathwaysUrl(params = {}) {
+  const focus = buildPathwaysFocusStatePayload(params);
   const query = new URLSearchParams();
-  const courseId = parsePositiveIntStrict(params.courseId);
+  const courseId = parsePositiveIntStrict(focus.courseId);
   if (courseId) query.set('course', String(courseId));
-  const track = normalizePathwayTrackFilter(params.track || 'all');
+  const track = normalizePathwayTrackFilter(focus.track || 'all');
   if (track && track !== 'all') query.set('track', track);
-  const programId = parsePositiveIntStrict(params.programId);
+  const programId = parsePositiveIntStrict(focus.programId);
   if (programId) query.set('program_id', String(programId));
-  const admissionId = parsePositiveIntStrict(params.admissionId);
+  const admissionId = parsePositiveIntStrict(focus.admissionId);
   if (admissionId) query.set('admission_id', String(admissionId));
-  const studyContextId = parsePositiveIntStrict(params.studyContextId);
+  const studyContextId = parsePositiveIntStrict(focus.studyContextId);
   if (studyContextId) query.set('study_context_id', String(studyContextId));
-  const presetId = parsePositiveIntStrict(params.presetId);
+  const presetId = parsePositiveIntStrict(focus.presetId);
   if (presetId) query.set('preset_id', String(presetId));
-  const moderationStatus = String(params.moderationStatus || '').trim().toLowerCase();
+  const moderationStatus = String(focus.moderationStatus || '').trim().toLowerCase();
   if (moderationStatus && moderationStatus !== 'open') query.set('moderation_status', moderationStatus);
   if (params.error) query.set('error', String(params.error));
   if (params.ok) query.set('ok', String(params.ok));
@@ -32583,7 +32600,22 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     const courseById = new Map((courses || []).map((course) => [Number(course.id || 0), course]));
 
     const rememberedCourseId = getAdminCourse(req);
-    let selectedCourseId = parsePositiveIntStrict(req.query.course, rememberedCourseId);
+    const requestedStudyContextId = parsePositiveIntStrict(req.query.study_context_id);
+    const requestedStudyContextSeed = requestedStudyContextId
+      ? await getStudyContextById(requestedStudyContextId).catch((err) => {
+        if (isDbSchemaCompatibilityError(err)) {
+          return null;
+        }
+        throw err;
+      })
+      : null;
+    let selectedCourseId = parsePositiveIntStrict(
+      req.query.course,
+      parsePositiveIntStrict(requestedStudyContextSeed && requestedStudyContextSeed.course_id, rememberedCourseId)
+    );
+    if (!(courses || []).some((course) => Number(course.id) === Number(selectedCourseId))) {
+      selectedCourseId = parsePositiveIntStrict(requestedStudyContextSeed && requestedStudyContextSeed.course_id);
+    }
     if (!(courses || []).some((course) => Number(course.id) === Number(selectedCourseId))) {
       selectedCourseId = Number(courses[0].id);
     }
@@ -32745,8 +32777,14 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       trackFilter === 'all' ? true : program.track_key === trackFilter
     );
 
-    const requestedProgramId = parsePositiveIntStrict(req.query.program_id);
-    const requestedAdmissionId = parsePositiveIntStrict(req.query.admission_id);
+    const requestedProgramId = parsePositiveIntStrict(
+      req.query.program_id,
+      parsePositiveIntStrict(requestedStudyContextSeed && requestedStudyContextSeed.program_id)
+    );
+    const requestedAdmissionId = parsePositiveIntStrict(
+      req.query.admission_id,
+      parsePositiveIntStrict(requestedStudyContextSeed && requestedStudyContextSeed.admission_id)
+    );
     let selectedProgramId = filteredPrograms.some((item) => Number(item.id) === Number(requestedProgramId))
       ? requestedProgramId
       : 0;
@@ -33124,7 +33162,6 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     let selectedStudyContextSemesters = [];
     let selectedStudyContextOfferings = [];
     if (selectedAdmissionId && selectedProgramId && selectedTrackKey) {
-      const requestedStudyContextId = parsePositiveIntStrict(req.query.study_context_id);
       const contextOptions = await listStudyContextOptions({
         programId: selectedProgramId,
         admissionId: selectedAdmissionId,
@@ -33313,6 +33350,19 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     const selectedCourseLabel = selectedCourse
       ? `${sanitizeCompactText(selectedCourse.name || '', 120)} / ${formatPathwaysCampusLabel(selectedCourse.location)}${isTeacherCourseRecord(selectedCourse) ? ` / ${pathwaysText.teacherBadge}` : ''}`
       : '';
+    const pathwaysFocus = buildPathwaysFocusStatePayload({
+      courseId: selectedCourseId,
+      track: trackFilter,
+      programId: selectedStudyContext
+        ? Number(selectedStudyContext.program_id || selectedProgramId || 0)
+        : selectedProgramId,
+      admissionId: selectedStudyContext
+        ? Number(selectedStudyContext.admission_id || selectedAdmissionId || 0)
+        : selectedAdmissionId,
+      studyContextId: selectedStudyContextId,
+      presetId: selectedProgramPresetId,
+      moderationStatus,
+    });
 
     let admissionHealthCards = [];
     let selectedCohortHealth = null;
@@ -33771,6 +33821,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       success: String(req.query.ok || ''),
       courses,
       selectedCourseId,
+      pathwaysFocus,
       trackFilter,
       trackFilterOptions: PATHWAY_TRACK_FILTER_OPTIONS,
       programs,
@@ -34030,26 +34081,23 @@ async function getAdmissionCourseScope(admissionId, trackKey) {
 }
 
 function getPathwaysRedirectState(req, overrides = {}) {
-  const moderationStatusValue = String(
-    (req.body && req.body.moderation_status)
-    || (req.query && req.query.moderation_status)
-    || 'open'
-  ).trim().toLowerCase();
-  return Object.assign({
+  return buildPathwaysFocusStatePayload({
+    courseId: (req.body && req.body.course_id) || (req.query && req.query.course),
+    track: (req.body && req.body.track) || (req.query && req.query.track),
+    programId: (req.body && req.body.program_id) || (req.query && req.query.program_id),
+    admissionId: (req.body && req.body.admission_id) || (req.query && req.query.admission_id),
+    studyContextId: (req.body && req.body.study_context_id) || (req.query && req.query.study_context_id),
+    presetId: (req.body && req.body.preset_id) || (req.query && req.query.preset_id),
+    moderationStatus: (req.body && req.body.moderation_status) || (req.query && req.query.moderation_status),
+  }, {
     courseId: parsePositiveIntStrict(
-      (req.body && req.body.course_id) || (req.query && req.query.course),
+      (overrides && (overrides.courseId || overrides.course_id))
+      || (req.body && req.body.course_id)
+      || (req.query && req.query.course),
       getAdminCourse(req)
     ),
-    track: normalizePathwayTrackFilter(
-      (req.body && req.body.track) || (req.query && req.query.track),
-      'all'
-    ),
-    programId: parsePositiveIntStrict((req.body && req.body.program_id) || (req.query && req.query.program_id)),
-    admissionId: parsePositiveIntStrict((req.body && req.body.admission_id) || (req.query && req.query.admission_id)),
-    studyContextId: parsePositiveIntStrict((req.body && req.body.study_context_id) || (req.query && req.query.study_context_id)),
-    presetId: parsePositiveIntStrict((req.body && req.body.preset_id) || (req.query && req.query.preset_id)),
-    moderationStatus: ['open', 'reviewing', 'resolved', 'ignored'].includes(moderationStatusValue) ? moderationStatusValue : 'open',
-  }, overrides || {});
+    ...overrides,
+  });
 }
 
 app.post('/admin/pathways/presets/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
@@ -35480,24 +35528,23 @@ app.post('/admin/pathways/subjects/:subjectId/course/:courseId/remove', requireP
 
 app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);
-  const focusProgramId = parsePositiveIntStrict(req.body.focus_program_id);
-  const focusAdmissionId = parsePositiveIntStrict(req.body.focus_admission_id);
+  const redirectState = getPathwaysRedirectState(req, {
+    programId: parsePositiveIntStrict(req.body.focus_program_id) || parsePositiveIntStrict(req.body.program_id),
+    admissionId: parsePositiveIntStrict(req.body.focus_admission_id) || parsePositiveIntStrict(req.body.admission_id),
+  });
   try {
     await ensureDbReady();
   } catch (err) {
     return res.redirect(
       buildAdminPathwaysUrl({
-        courseId: parsePositiveIntStrict(req.body.course_id, getAdminCourse(req)),
-        track: normalizePathwayTrackFilter(req.body.track, 'all'),
-        programId: focusProgramId,
-        admissionId: focusAdmissionId,
+        ...redirectState,
         error: msg.databaseError,
       })
     );
   }
 
-  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
-  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const courseId = redirectState.courseId;
+  const trackFilter = redirectState.track;
   const trackKey = normalizeRegistrationTrack(req.body.track_key, 'bachelor');
   const name = sanitizeCompactText(req.body.name, 140);
   const code = sanitizeCompactText(req.body.code, 40);
@@ -35508,8 +35555,8 @@ app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimi
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId: focusProgramId,
-      admissionId: focusAdmissionId,
+      programId: redirectState.programId,
+      admissionId: redirectState.admissionId,
       error: msg.programNameRequired,
     }));
   }
@@ -35536,8 +35583,8 @@ app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimi
       return res.redirect(buildAdminPathwaysUrl({
         courseId,
         track: trackFilter,
-        programId: focusProgramId,
-        admissionId: focusAdmissionId,
+        programId: redirectState.programId,
+        admissionId: redirectState.admissionId,
         error: msg.programExistsForTrack,
       }));
     }
@@ -35548,18 +35595,20 @@ app.post('/admin/pathways/programs/add', requirePathwaysSectionAccess, writeLimi
 app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);
   const programId = parsePositiveIntStrict(req.params.id);
-  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
-  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
-  const focusProgramId = parsePositiveIntStrict(req.body.focus_program_id);
-  const focusAdmissionId = parsePositiveIntStrict(req.body.focus_admission_id);
-  const redirectProgramId = focusProgramId || programId;
-  const redirectAdmissionId = focusProgramId ? focusAdmissionId : null;
+  const redirectState = getPathwaysRedirectState(req, {
+    programId: parsePositiveIntStrict(req.body.focus_program_id) || programId,
+    admissionId: parsePositiveIntStrict(req.body.focus_admission_id) || parsePositiveIntStrict(req.body.admission_id),
+  });
+  const courseId = redirectState.courseId;
+  const trackFilter = redirectState.track;
+  const redirectProgramId = redirectState.programId || programId;
+  const redirectAdmissionId = redirectState.admissionId || null;
   if (!programId) {
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId: focusProgramId,
-      admissionId: focusAdmissionId,
+      programId: redirectState.programId,
+      admissionId: redirectState.admissionId,
       error: msg.invalidProgram,
     }));
   }
@@ -35614,10 +35663,11 @@ app.post('/admin/pathways/programs/:id/update', requirePathwaysSectionAccess, wr
 
 app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);
-  const redirectState = getPathwaysRedirectState(req);
+  const redirectState = getPathwaysRedirectState(req, {
+    programId: parsePositiveIntStrict(req.body.focus_program_id) || parsePositiveIntStrict(req.body.program_id),
+    admissionId: parsePositiveIntStrict(req.body.focus_admission_id) || parsePositiveIntStrict(req.body.admission_id),
+  });
   const programId = parsePositiveIntStrict(req.body.program_id);
-  const focusProgramId = parsePositiveIntStrict(req.body.focus_program_id);
-  const focusAdmissionId = parsePositiveIntStrict(req.body.focus_admission_id);
   const yearRaw = Number(req.body.admission_year);
   const admissionYear = Number.isFinite(yearRaw) ? Math.max(2000, Math.min(2100, Math.round(yearRaw))) : null;
   const label = sanitizeCompactText(req.body.label, 120);
@@ -35625,8 +35675,8 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
   if (!programId) {
     return res.redirect(buildAdminPathwaysUrl({
       ...redirectState,
-      programId: focusProgramId,
-      admissionId: focusAdmissionId,
+      programId: redirectState.programId,
+      admissionId: redirectState.admissionId,
       error: msg.selectProgram,
     }));
   }
@@ -35634,7 +35684,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
     return res.redirect(buildAdminPathwaysUrl({
       ...redirectState,
       programId,
-      admissionId: focusProgramId ? focusAdmissionId : null,
+      admissionId: redirectState.programId === programId ? redirectState.admissionId : null,
       error: msg.admissionYearRequired,
     }));
   }
@@ -35669,7 +35719,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
     return res.redirect(buildAdminPathwaysUrl({
       ...redirectState,
       programId,
-      admissionId: focusProgramId === programId ? focusAdmissionId : null,
+      admissionId: redirectState.programId === programId ? redirectState.admissionId : null,
       error: msg.databaseError,
     }));
   } catch (err) {
@@ -35677,7 +35727,7 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
       return res.redirect(buildAdminPathwaysUrl({
         ...redirectState,
         programId,
-        admissionId: focusProgramId === programId ? focusAdmissionId : null,
+        admissionId: redirectState.programId === programId ? redirectState.admissionId : null,
         error: msg.admissionExistsForProgram,
       }));
     }
@@ -35688,13 +35738,15 @@ app.post('/admin/pathways/admissions/add', requirePathwaysSectionAccess, writeLi
 app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);
   const admissionId = parsePositiveIntStrict(req.params.id);
-  const courseId = parsePositiveIntStrict(req.body.course_id, getAdminCourse(req));
-  const trackFilter = normalizePathwayTrackFilter(req.body.track, 'all');
+  const redirectState = getPathwaysRedirectState(req, {
+    programId: parsePositiveIntStrict(req.body.focus_program_id) || parsePositiveIntStrict(req.body.program_id),
+    admissionId: parsePositiveIntStrict(req.body.focus_admission_id) || admissionId,
+  });
+  const courseId = redirectState.courseId;
+  const trackFilter = redirectState.track;
   const programId = parsePositiveIntStrict(req.body.program_id);
-  const focusProgramId = parsePositiveIntStrict(req.body.focus_program_id);
-  const focusAdmissionId = parsePositiveIntStrict(req.body.focus_admission_id);
-  const redirectProgramId = focusProgramId || programId;
-  const redirectAdmissionId = focusProgramId ? focusAdmissionId : admissionId;
+  const redirectProgramId = redirectState.programId || programId;
+  const redirectAdmissionId = redirectState.admissionId || admissionId;
   const yearRaw = Number(req.body.admission_year);
   const admissionYear = Number.isFinite(yearRaw) ? Math.max(2000, Math.min(2100, Math.round(yearRaw))) : null;
   const label = sanitizeCompactText(req.body.label, 120);
@@ -35704,8 +35756,8 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
     return res.redirect(buildAdminPathwaysUrl({
       courseId,
       track: trackFilter,
-      programId: focusProgramId,
-      admissionId: focusAdmissionId,
+      programId: redirectState.programId,
+      admissionId: redirectState.admissionId,
       error: msg.invalidAdmissionYear,
     }));
   }

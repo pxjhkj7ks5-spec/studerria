@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.12",
+      "date": "2026-03-27",
+      "items": [
+        "feat(pathways-unified-focus-state): add a canonical `pathwaysFocus` payload to `/admin/pathways`, seed it from `study_context_id` when available, and use the same normalized focus contract for GET render state, redirect URLs, and Academic Setup scope recovery instead of rebuilding program/admission/context/preset state piecemeal",
+        "refactor(admin-pathways-focus-fields): rework `views/admin-pathways.ejs` so the page derives its selected scope from one normalized focus object, `buildPathwaysUrl(...)` now uses that shared state, and repeated hidden focus inputs in preset/context/offering/moderation forms are generated through a single `renderPathwaysFocusFields(...)` helper",
+        "refactor(pathways-post-redirect-continuity): switch program and admission add/update actions in `app.js` onto the same canonical pathways redirect state, reducing dependence on separate `focus_program_id` / `focus_admission_id` flows and keeping Academic Setup focused on one shared context across GET and POST transitions"
+      ]
+    },
+    {
       "version": "1.3.11",
       "date": "2026-03-27",
       "items": [
