@@ -274,6 +274,11 @@
     usersShort: 'Користувачі',
     year: 'Рік',
     focusCohort: 'Обрати контекст',
+    statusWhyTitle: 'Чому такий статус',
+    deleteCohort: 'Видалити когорту',
+    deleteImpactTitle: 'Що видалиться',
+    deleteBlockedTitle: 'Чому видалення заблоковано',
+    deleteConfirm: 'Видалити цю когорту? Live-контексти, semesters, offerings і legacy-прив’язки будуть прибрані без відновлення.',
     manageProgramAdmissions: 'Оберіть програму, щоб керувати її роками вступу.',
     noAdmissionsForProgram: 'У цієї програми ще немає жодного року вступу. Додайте першу когорту у форму вище.',
     openPrograms: 'До програм',
@@ -488,6 +493,11 @@
     usersShort: 'Users',
     year: 'Year',
     focusCohort: 'Focus context',
+    statusWhyTitle: 'Why this status',
+    deleteCohort: 'Delete cohort',
+    deleteImpactTitle: 'What will be removed',
+    deleteBlockedTitle: 'Why delete is blocked',
+    deleteConfirm: 'Delete this cohort? Live contexts, semesters, offerings, and legacy links will be removed permanently.',
     manageProgramAdmissions: 'Select a program to manage its admission years.',
     noAdmissionsForProgram: 'This program does not have any admission years yet. Add the first cohort in the form above.',
     openPrograms: 'Go to programs',
@@ -1874,20 +1884,28 @@
         <div class="admission-grid">
           <% admissionCards.forEach((admission) => { %>
             <form class="soft-panel admission-card <%= admission.is_selected ? 'is-selected' : '' %>" method="POST" action="/admin/pathways/admissions/<%= admission.id %>/update">
-              <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
-              <input type="hidden" name="track" value="<%= activeTrack %>" />
-              <input type="hidden" name="program_id" value="<%= admission.program_id %>" />
-              <input type="hidden" name="focus_program_id" value="<%= selectedProgramValue %>" />
-              <input type="hidden" name="focus_admission_id" value="<%= selectedAdmissionValue %>" />
+              <%- renderPathwaysFocusFields({ programId: admission.program_id, admissionId: admission.id, studyContextId: admission.is_selected ? selectedStudyContextValue : 0 }) %>
               <div class="admission-card__head">
                 <div>
                   <div class="admission-card__eyebrow"><%= ui.admissionEyebrow %></div>
                   <div class="admission-card__title"><%= admission.admission_year %><%= admission.label ? ` · ${admission.label}` : '' %></div>
                 </div>
-                <div class="admission-card__status">
-                  <span class="status-pill status-pill--<%= admission.status_tone %>"><%= admission.status_label %></span>
-                  <% if (admission.is_selected) { %>
-                    <span class="status-pill status-pill--focus"><%= ui.focusedPill %></span>
+                <div class="admission-card__status-stack">
+                  <div class="admission-card__status">
+                    <span class="status-pill status-pill--<%= admission.status_tone %>"><%= admission.status_label %></span>
+                    <% if (admission.is_selected) { %>
+                      <span class="status-pill status-pill--focus"><%= ui.focusedPill %></span>
+                    <% } %>
+                  </div>
+                  <% if ((admission.status_detail_lines || []).length) { %>
+                    <div class="admission-card__popover" role="note">
+                      <strong class="admission-card__popover-title"><%= ui.statusWhyTitle %></strong>
+                      <ul class="admission-card__popover-list">
+                        <% (admission.status_detail_lines || []).forEach((line) => { %>
+                          <li><%= line %></li>
+                        <% }) %>
+                      </ul>
+                    </div>
                   <% } %>
                 </div>
               </div>
@@ -1934,7 +1952,32 @@
               </div>
               <div class="admission-card__footer">
                 <a class="btn btn-soft btn-pill" href="<%= buildPathwaysUrl({ program_id: admission.program_id, admission_id: admission.id }) %>"><%= ui.focusCohort %></a>
-                <button class="btn btn-primary btn-pill" type="submit"><%= ui.save %></button>
+                <div class="admission-card__footer-actions">
+                  <div class="admission-card__action-stack">
+                    <% if (admission.can_delete) { %>
+                      <button
+                        class="btn btn-soft btn-pill admission-card__delete-btn"
+                        type="submit"
+                        formaction="/admin/pathways/admissions/<%= admission.id %>/delete"
+                        formmethod="POST"
+                        onclick='return window.confirm(<%- JSON.stringify(ui.deleteConfirm) %>);'
+                      ><%= ui.deleteCohort %></button>
+                    <% } else { %>
+                      <button class="btn btn-soft btn-pill admission-card__delete-btn is-disabled" type="button" disabled aria-disabled="true"><%= ui.deleteCohort %></button>
+                    <% } %>
+                    <% if ((admission.delete_detail_lines || []).length) { %>
+                      <div class="admission-card__popover" role="note">
+                        <strong class="admission-card__popover-title"><%= admission.can_delete ? ui.deleteImpactTitle : ui.deleteBlockedTitle %></strong>
+                        <ul class="admission-card__popover-list">
+                          <% (admission.delete_detail_lines || []).forEach((line) => { %>
+                            <li><%= line %></li>
+                          <% }) %>
+                        </ul>
+                      </div>
+                    <% } %>
+                  </div>
+                  <button class="btn btn-primary btn-pill" type="submit"><%= ui.save %></button>
+                </div>
               </div>
             </form>
           <% }) %>

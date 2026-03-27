@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.13",
+      "date": "2026-03-28",
+      "items": [
+        "feat(pathways-cohort-status-explainers): enrich cohort cards in `views/admin-pathways.ejs` with hover detail popovers that explain the current readiness state in plain language, including mapping, subject, campus, override, and user-assignment reasons instead of only showing a short status pill",
+        "feat(pathways-cohort-delete-flow): add a guarded `POST /admin/pathways/admissions/:id/delete` flow in `app.js` that removes the cohort's live contexts and the underlying admission year, blocks deletion while users are still attached, and cleans up orphan subject offerings after cascade deletes",
+        "style(pathways-cohort-action-popovers): add dedicated cohort status/delete hover-card styling in `public/css/pages/admin-pathways.css`, and switch admission card forms onto unified hidden focus fields so edit and delete actions preserve the shared Academic Setup context"
+      ]
+    },
+    {
       "version": "1.3.12",
       "date": "2026-03-27",
       "items": [

@@ -32675,6 +32675,31 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       hiddenInBaseCourse: (count) => `${count} приховано в базовому курсі`,
       campusKyiv: 'Київ',
       campusMunich: 'Мюнхен',
+      statusDetailReady: 'Когорта готова: маршрути курсів, предмети й кампуси вирівняні.',
+      statusDetailInactive: 'Когорта вимкнена, тому нова реєстрація для неї не повинна використовуватись.',
+      statusDetailNoMappedCourses: (visible, total) => `Курси реєстрації: ${visible}/${total}. Потрібен хоча б один видимий маршрут.`,
+      statusDetailPartialMapping: (visible, total) => `Курси реєстрації: ${visible}/${total}. Частина маршрутів ще не завершена.`,
+      statusDetailNoVisibleSubjects: (visible, total) => `Предмети: ${visible}/${total}. Студент побачить порожній список, доки не з'явиться хоча б один видимий предмет.`,
+      statusDetailPartialSubjects: (visible, total) => `Предмети: ${visible}/${total}. Частина набору ще відфільтрована або прихована.`,
+      statusDetailCampusConflict: (ambiguous, ready, total) => `Кампуси: ${ready} готово з ${total}, конфліктів ${ambiguous}. Потрібно лишити по одному маршруту на кампус.`,
+      statusDetailCampusReady: (ready, total) => `Кампуси: ${ready} готово з ${total}.`,
+      statusDetailNoUsers: "До цієї когорти ще не прив'язано жодного користувача.",
+      statusDetailUsers: (count) => `Користувачів у когорті: ${count}.`,
+      statusDetailOverrides: (count) => count === 1
+        ? '1 override видимості предметів уже застосовано.'
+        : `${count} overrides видимості предметів уже застосовано.`,
+      deleteBlockedUsers: (count) => count === 1
+        ? 'Не можна видалити: 1 користувач усе ще прив’язаний до цієї когорти або її контекстів.'
+        : `Не можна видалити: ${count} користувачів усе ще прив’язані до цієї когорти або її контекстів.`,
+      deleteImpactContexts: (count) => count === 1 ? 'Буде видалено 1 live-контекст.' : `Буде видалено ${count} live-контекстів.`,
+      deleteImpactSemesters: (count) => count === 1 ? 'Буде видалено 1 live-semester.' : `Буде видалено ${count} live-semesters.`,
+      deleteImpactOfferings: (count) => count === 1 ? 'Буде видалено 1 offering без інших прив’язок.' : `Буде видалено ${count} offerings без інших прив’язок.`,
+      deleteImpactTeacherAssignments: (count) => count === 1
+        ? 'Буде прибрано 1 teacher assignment.'
+        : `Буде прибрано ${count} teacher assignments.`,
+      deleteImpactMappings: (visible, total) => `Legacy-мапінг курсів: ${visible}/${total} видимих маршрутів.`,
+      deleteImpactVisibility: (visible, total) => `Legacy-видимість предметів: ${visible}/${total} видимих правил.`,
+      deleteImpactNothing: 'Когорта ще не встигла створити live-даних, тому видалення буде майже порожнім.',
       teacherBadge: 'Викладацький',
     } : {
       ready: 'Ready',
@@ -32727,6 +32752,25 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
       hiddenInBaseCourse: (count) => `${count} hidden in base course`,
       campusKyiv: 'Kyiv',
       campusMunich: 'Munich',
+      statusDetailReady: 'This cohort is ready: course routes, subjects, and campus routing are aligned.',
+      statusDetailInactive: 'This cohort is disabled, so new registration should not target it.',
+      statusDetailNoMappedCourses: (visible, total) => `Registration courses: ${visible}/${total}. At least one visible route is required.`,
+      statusDetailPartialMapping: (visible, total) => `Registration courses: ${visible}/${total}. Some routes are still incomplete.`,
+      statusDetailNoVisibleSubjects: (visible, total) => `Subjects: ${visible}/${total}. Students would see an empty list until at least one subject is visible.`,
+      statusDetailPartialSubjects: (visible, total) => `Subjects: ${visible}/${total}. Part of the subject scope is still filtered or hidden.`,
+      statusDetailCampusConflict: (ambiguous, ready, total) => `Campuses: ${ready} ready of ${total}, ${ambiguous} conflicts. Keep one route per campus.`,
+      statusDetailCampusReady: (ready, total) => `Campuses: ${ready} ready of ${total}.`,
+      statusDetailNoUsers: 'No users are assigned to this cohort yet.',
+      statusDetailUsers: (count) => `Users in cohort: ${count}.`,
+      statusDetailOverrides: (count) => `${count} subject visibility override${count === 1 ? '' : 's'} already applied.`,
+      deleteBlockedUsers: (count) => `Cannot delete: ${count} user${count === 1 ? ' is' : 's are'} still linked to this cohort or its live contexts.`,
+      deleteImpactContexts: (count) => `Will remove ${count} live context${count === 1 ? '' : 's'}.`,
+      deleteImpactSemesters: (count) => `Will remove ${count} live semester${count === 1 ? '' : 's'}.`,
+      deleteImpactOfferings: (count) => `Will remove ${count} offering${count === 1 ? '' : 's'} with no remaining context links.`,
+      deleteImpactTeacherAssignments: (count) => `Will remove ${count} teacher assignment${count === 1 ? '' : 's'}.`,
+      deleteImpactMappings: (visible, total) => `Legacy course mapping: ${visible}/${total} visible routes.`,
+      deleteImpactVisibility: (visible, total) => `Legacy subject visibility: ${visible}/${total} visible rules.`,
+      deleteImpactNothing: 'This cohort has almost no live data yet, so the delete will be nearly empty.',
       teacherBadge: 'Teacher',
     };
     const formatPathwaysCampusLabel = (location) =>
@@ -32908,6 +32952,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     const subjectVisibilityStatsByAdmission = new Map();
     const campusStatsByAdmission = new Map();
     const userAssignmentStatsByAdmission = new Map();
+    const deletionStatsByAdmission = new Map();
 
     try {
       if (selectedProgramAdmissionIds.length) {
@@ -33064,6 +33109,42 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
           if (!Number.isInteger(admissionId) || admissionId < 1) return;
           userAssignmentStatsByAdmission.set(admissionId, {
             users_count: Number(row.users_count || 0),
+          });
+        });
+      }
+
+      if (selectedProgramAdmissionIds.length) {
+        const deletionRows = await db.all(
+          `
+            SELECT
+              coh.legacy_admission_id AS admission_id,
+              COUNT(DISTINCT coh.id)::int AS cohort_count,
+              COUNT(DISTINCT sc.id)::int AS context_count,
+              COUNT(DISTINCT scs.id)::int AS semester_count,
+              COUNT(DISTINCT soc.subject_offering_id)::int AS offering_count,
+              COUNT(DISTINCT toa.id)::int AS teacher_assignment_count,
+              COUNT(DISTINCT CASE WHEN LOWER(COALESCE(u.role, '')) <> 'admin' THEN u.id END)::int AS context_user_count
+            FROM cohorts coh
+            LEFT JOIN study_contexts sc ON sc.cohort_id = coh.id
+            LEFT JOIN study_context_semesters scs ON scs.study_context_id = sc.id
+            LEFT JOIN subject_offering_contexts soc ON soc.study_context_id = sc.id
+            LEFT JOIN teacher_offering_assignments toa ON toa.subject_offering_id = soc.subject_offering_id
+            LEFT JOIN users u ON u.study_context_id = sc.id
+            WHERE coh.legacy_admission_id = ANY(?::int[])
+            GROUP BY coh.legacy_admission_id
+          `,
+          [selectedProgramAdmissionIds]
+        );
+        (deletionRows || []).forEach((row) => {
+          const admissionId = Number(row.admission_id || 0);
+          if (!Number.isInteger(admissionId) || admissionId < 1) return;
+          deletionStatsByAdmission.set(admissionId, {
+            cohort_count: Number(row.cohort_count || 0),
+            context_count: Number(row.context_count || 0),
+            semester_count: Number(row.semester_count || 0),
+            offering_count: Number(row.offering_count || 0),
+            teacher_assignment_count: Number(row.teacher_assignment_count || 0),
+            context_user_count: Number(row.context_user_count || 0),
           });
         });
       }
@@ -33376,7 +33457,30 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
         const subjectStats = subjectVisibilityStatsByAdmission.get(admissionId) || { visible_count: 0, total_count: 0, override_count: 0 };
         const campusStats = campusStatsByAdmission.get(admissionId) || { total_bindings: 0, ready_bindings: 0, ambiguous_count: 0, bindings: [] };
         const userStats = userAssignmentStatsByAdmission.get(admissionId) || { users_count: 0 };
+        const deletionStats = deletionStatsByAdmission.get(admissionId) || {
+          cohort_count: 0,
+          context_count: 0,
+          semester_count: 0,
+          offering_count: 0,
+          teacher_assignment_count: 0,
+          context_user_count: 0,
+        };
+        const mappingVisibleCount = Number(mappingStats.visible_count || 0);
+        const mappingTotalCount = Number(mappingStats.total_count || 0);
+        const subjectVisibleCount = Number(subjectStats.visible_count || 0);
+        const subjectTotalCount = Number(subjectStats.total_count || 0);
+        const subjectOverrideCount = Number(subjectStats.override_count || 0);
+        const campusReadyCount = Number(campusStats.ready_bindings || 0);
+        const campusTotalCount = Number(campusStats.total_bindings || 0);
+        const campusAmbiguousCount = Number(campusStats.ambiguous_count || 0);
+        const usersCount = Number(userStats.users_count || 0);
+        const contextCount = Number(deletionStats.context_count || 0);
+        const semesterCount = Number(deletionStats.semester_count || 0);
+        const offeringCount = Number(deletionStats.offering_count || 0);
+        const teacherAssignmentCount = Number(deletionStats.teacher_assignment_count || 0);
+        const deleteLinkedUsersCount = Math.max(usersCount, Number(deletionStats.context_user_count || 0));
         const statusNotes = [];
+        const statusReasonLines = [];
         let statusKey = 'ready';
         let statusTone = 'success';
         let statusLabel = pathwaysText.ready;
@@ -33386,42 +33490,95 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
           statusTone = 'muted';
           statusLabel = pathwaysText.inactive;
           statusNotes.push(pathwaysText.cohortDisabled);
+          statusReasonLines.push(pathwaysText.statusDetailInactive);
         }
 
-        if (Number(mappingStats.visible_count || 0) < 1) {
+        if (mappingVisibleCount < 1) {
           statusKey = 'blocked';
           statusTone = 'danger';
           statusLabel = pathwaysText.blocked;
           statusNotes.push(pathwaysText.noMappedCourses);
+          statusReasonLines.push(pathwaysText.statusDetailNoMappedCourses(mappingVisibleCount, mappingTotalCount));
         }
 
-        if (Number(subjectStats.total_count || 0) > 0 && Number(subjectStats.visible_count || 0) < 1) {
+        if (subjectTotalCount > 0 && subjectVisibleCount < 1) {
           statusKey = 'blocked';
           statusTone = 'danger';
           statusLabel = pathwaysText.blocked;
           statusNotes.push(pathwaysText.noVisibleSubjects);
+          statusReasonLines.push(pathwaysText.statusDetailNoVisibleSubjects(subjectVisibleCount, subjectTotalCount));
         }
 
-        if (Number(campusStats.ambiguous_count || 0) > 0) {
+        if (campusAmbiguousCount > 0) {
           statusKey = 'blocked';
           statusTone = 'danger';
           statusLabel = pathwaysText.blocked;
           statusNotes.push(pathwaysText.campusConflict);
+          statusReasonLines.push(pathwaysText.statusDetailCampusConflict(campusAmbiguousCount, campusReadyCount, campusTotalCount));
         }
 
         if (statusKey === 'ready') {
-          const hasPartialMapping = Number(mappingStats.visible_count || 0) > 0
-            && Number(mappingStats.visible_count || 0) < Number(mappingStats.total_count || 0);
-          const hasPartialSubjects = Number(subjectStats.visible_count || 0) > 0
-            && Number(subjectStats.visible_count || 0) < Number(subjectStats.total_count || 0);
-          if (hasPartialMapping || hasPartialSubjects || Number(userStats.users_count || 0) < 1) {
+          const hasPartialMapping = mappingVisibleCount > 0 && mappingVisibleCount < mappingTotalCount;
+          const hasPartialSubjects = subjectVisibleCount > 0 && subjectVisibleCount < subjectTotalCount;
+          if (hasPartialMapping || hasPartialSubjects || usersCount < 1) {
             statusKey = 'attention';
             statusTone = 'warning';
             statusLabel = pathwaysText.needsAttention;
           }
-          if (hasPartialMapping) statusNotes.push(pathwaysText.partialMapping);
-          if (hasPartialSubjects) statusNotes.push(pathwaysText.filteredSubjects);
-          if (Number(userStats.users_count || 0) < 1) statusNotes.push(pathwaysText.noUsersAssigned);
+          if (hasPartialMapping) {
+            statusNotes.push(pathwaysText.partialMapping);
+            statusReasonLines.push(pathwaysText.statusDetailPartialMapping(mappingVisibleCount, mappingTotalCount));
+          }
+          if (hasPartialSubjects) {
+            statusNotes.push(pathwaysText.filteredSubjects);
+            statusReasonLines.push(pathwaysText.statusDetailPartialSubjects(subjectVisibleCount, subjectTotalCount));
+          }
+          if (usersCount < 1) {
+            statusNotes.push(pathwaysText.noUsersAssigned);
+            statusReasonLines.push(pathwaysText.statusDetailNoUsers);
+          }
+        }
+
+        if (!statusReasonLines.length) {
+          statusReasonLines.push(pathwaysText.statusDetailReady);
+        }
+        if (campusTotalCount > 0 && campusAmbiguousCount < 1) {
+          statusReasonLines.push(pathwaysText.statusDetailCampusReady(campusReadyCount, campusTotalCount));
+        }
+        statusReasonLines.push(usersCount > 0 ? pathwaysText.statusDetailUsers(usersCount) : pathwaysText.statusDetailNoUsers);
+        if (subjectOverrideCount > 0) {
+          statusReasonLines.push(pathwaysText.statusDetailOverrides(subjectOverrideCount));
+        }
+        const deleteBlockers = [];
+        if (deleteLinkedUsersCount > 0) {
+          deleteBlockers.push(pathwaysText.deleteBlockedUsers(deleteLinkedUsersCount));
+        }
+        const deleteDetailLines = [...deleteBlockers];
+        if (contextCount > 0) {
+          deleteDetailLines.push(pathwaysText.deleteImpactContexts(contextCount));
+        }
+        if (semesterCount > 0) {
+          deleteDetailLines.push(pathwaysText.deleteImpactSemesters(semesterCount));
+        }
+        if (offeringCount > 0) {
+          deleteDetailLines.push(pathwaysText.deleteImpactOfferings(offeringCount));
+        }
+        if (teacherAssignmentCount > 0) {
+          deleteDetailLines.push(pathwaysText.deleteImpactTeacherAssignments(teacherAssignmentCount));
+        }
+        deleteDetailLines.push(pathwaysText.deleteImpactMappings(mappingVisibleCount, mappingTotalCount));
+        if (subjectTotalCount > 0 || subjectOverrideCount > 0) {
+          deleteDetailLines.push(pathwaysText.deleteImpactVisibility(subjectVisibleCount, subjectTotalCount));
+        }
+        if (
+          !contextCount
+          && !semesterCount
+          && !offeringCount
+          && !teacherAssignmentCount
+          && !mappingTotalCount
+          && !subjectTotalCount
+        ) {
+          deleteDetailLines.push(pathwaysText.deleteImpactNothing);
         }
 
         return {
@@ -33435,15 +33592,19 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
           status_tone: statusTone,
           status_label: statusLabel,
           status_notes: Array.from(new Set(statusNotes)),
-          mapping_visible_count: Number(mappingStats.visible_count || 0),
-          mapping_total_count: Number(mappingStats.total_count || 0),
-          subject_visible_count: Number(subjectStats.visible_count || 0),
-          subject_total_count: Number(subjectStats.total_count || 0),
-          subject_override_count: Number(subjectStats.override_count || 0),
-          campus_ready_count: Number(campusStats.ready_bindings || 0),
-          campus_total_count: Number(campusStats.total_bindings || 0),
-          campus_ambiguous_count: Number(campusStats.ambiguous_count || 0),
-          users_count: Number(userStats.users_count || 0),
+          status_detail_lines: Array.from(new Set(statusReasonLines.filter(Boolean))),
+          mapping_visible_count: mappingVisibleCount,
+          mapping_total_count: mappingTotalCount,
+          subject_visible_count: subjectVisibleCount,
+          subject_total_count: subjectTotalCount,
+          subject_override_count: subjectOverrideCount,
+          campus_ready_count: campusReadyCount,
+          campus_total_count: campusTotalCount,
+          campus_ambiguous_count: campusAmbiguousCount,
+          users_count: usersCount,
+          can_delete: deleteLinkedUsersCount < 1,
+          delete_blockers: deleteBlockers,
+          delete_detail_lines: Array.from(new Set(deleteDetailLines.filter(Boolean))),
         };
       });
 
@@ -33609,6 +33770,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
         status_tone: admission.is_active ? 'warning' : 'muted',
         status_label: admission.is_active ? pathwaysText.needsAttention : pathwaysText.inactive,
         status_notes: [],
+        status_detail_lines: [],
         mapping_visible_count: 0,
         mapping_total_count: 0,
         subject_visible_count: 0,
@@ -33618,6 +33780,9 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
         campus_total_count: 0,
         campus_ambiguous_count: 0,
         users_count: 0,
+        can_delete: false,
+        delete_blockers: [],
+        delete_detail_lines: [],
       }));
       selectedCohortHealth = null;
       selectedRegistrationExperience = null;
@@ -33932,6 +34097,10 @@ function getPathwaysRouteMessages(req) {
     studyContextSemesterAdded: 'Семестр context додано',
     studyContextSemesterUpdated: 'Семестр context оновлено',
     studyContextSemesterDeleted: 'Семестр context видалено',
+    admissionDeleted: 'Когорту видалено',
+    admissionDeleteBlockedUsers: (count) => count === 1
+      ? 'Когорту не можна видалити, доки 1 користувач ще прив’язаний до неї або її context.'
+      : `Когорту не можна видалити, доки ${count} користувачів ще прив’язані до неї або її contexts.`,
   } : {
     databaseError: 'Database error',
     programNameRequired: 'Program name is required',
@@ -33990,6 +34159,8 @@ function getPathwaysRouteMessages(req) {
     studyContextSemesterAdded: 'Context semester added',
     studyContextSemesterUpdated: 'Context semester updated',
     studyContextSemesterDeleted: 'Context semester deleted',
+    admissionDeleted: 'Cohort deleted',
+    admissionDeleteBlockedUsers: (count) => `Cannot delete the cohort while ${count} user${count === 1 ? ' is' : 's are'} still linked to it or its live contexts.`,
   };
   return Object.assign(messages, isUk ? {
     presetNameRequired: 'Назва шаблону обов’язкова',
@@ -34048,6 +34219,140 @@ async function getAdmissionPathwayContext(admissionId) {
     `,
     [admissionId]
   );
+}
+
+async function getAdmissionDeletionSummary(admissionId) {
+  const normalizedAdmissionId = parsePositiveIntStrict(admissionId);
+  if (!normalizedAdmissionId) {
+    return null;
+  }
+  const [mappingRow, visibilityRow, cohortStatsRow, assignedUsersRow] = await Promise.all([
+    db.get(
+      `
+        SELECT
+          COUNT(*)::int AS mapping_count,
+          COUNT(*) FILTER (WHERE is_visible = TRUE)::int AS visible_mapping_count
+        FROM program_admission_courses
+        WHERE admission_id = ?
+      `,
+      [normalizedAdmissionId]
+    ).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return { mapping_count: 0, visible_mapping_count: 0 };
+      }
+      throw err;
+    }),
+    db.get(
+      `
+        SELECT
+          COUNT(*)::int AS visibility_count,
+          COUNT(*) FILTER (WHERE is_visible = TRUE)::int AS visible_subject_count
+        FROM subject_visibility_by_admission
+        WHERE admission_id = ?
+      `,
+      [normalizedAdmissionId]
+    ).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return { visibility_count: 0, visible_subject_count: 0 };
+      }
+      throw err;
+    }),
+    db.get(
+      `
+        SELECT
+          COUNT(DISTINCT coh.id)::int AS cohort_count,
+          COUNT(DISTINCT sc.id)::int AS context_count,
+          COUNT(DISTINCT scs.id)::int AS semester_count,
+          COUNT(DISTINCT soc.subject_offering_id)::int AS offering_count,
+          COUNT(DISTINCT toa.id)::int AS teacher_assignment_count,
+          COUNT(DISTINCT CASE WHEN LOWER(COALESCE(u.role, '')) <> 'admin' THEN u.id END)::int AS context_user_count
+        FROM cohorts coh
+        LEFT JOIN study_contexts sc ON sc.cohort_id = coh.id
+        LEFT JOIN study_context_semesters scs ON scs.study_context_id = sc.id
+        LEFT JOIN subject_offering_contexts soc ON soc.study_context_id = sc.id
+        LEFT JOIN teacher_offering_assignments toa ON toa.subject_offering_id = soc.subject_offering_id
+        LEFT JOIN users u ON u.study_context_id = sc.id
+        WHERE coh.legacy_admission_id = ?
+      `,
+      [normalizedAdmissionId]
+    ).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return {
+          cohort_count: 0,
+          context_count: 0,
+          semester_count: 0,
+          offering_count: 0,
+          teacher_assignment_count: 0,
+          context_user_count: 0,
+        };
+      }
+      throw err;
+    }),
+    db.get(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE LOWER(COALESCE(role, '')) <> 'admin')::int AS users_count
+        FROM users
+        WHERE admission_id = ?
+      `,
+      [normalizedAdmissionId]
+    ),
+  ]);
+
+  return {
+    admission_id: normalizedAdmissionId,
+    mapping_count: Number(mappingRow && mappingRow.mapping_count || 0),
+    visible_mapping_count: Number(mappingRow && mappingRow.visible_mapping_count || 0),
+    visibility_count: Number(visibilityRow && visibilityRow.visibility_count || 0),
+    visible_subject_count: Number(visibilityRow && visibilityRow.visible_subject_count || 0),
+    cohort_count: Number(cohortStatsRow && cohortStatsRow.cohort_count || 0),
+    context_count: Number(cohortStatsRow && cohortStatsRow.context_count || 0),
+    semester_count: Number(cohortStatsRow && cohortStatsRow.semester_count || 0),
+    offering_count: Number(cohortStatsRow && cohortStatsRow.offering_count || 0),
+    teacher_assignment_count: Number(cohortStatsRow && cohortStatsRow.teacher_assignment_count || 0),
+    context_user_count: Number(cohortStatsRow && cohortStatsRow.context_user_count || 0),
+    users_count: Number(assignedUsersRow && assignedUsersRow.users_count || 0),
+  };
+}
+
+async function deleteOrphanSubjectOfferingsInTransaction(client, candidateOfferingIds = []) {
+  const normalizedOfferingIds = Array.from(
+    new Set(
+      (Array.isArray(candidateOfferingIds) ? candidateOfferingIds : [candidateOfferingIds])
+        .map((value) => parsePositiveIntStrict(value))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    )
+  );
+  if (!normalizedOfferingIds.length) {
+    return [];
+  }
+  const orphanRows = await txAll(
+    client,
+    `
+      SELECT so.id
+      FROM subject_offerings so
+      LEFT JOIN subject_offering_contexts soc ON soc.subject_offering_id = so.id
+      WHERE so.id = ANY(?::int[])
+      GROUP BY so.id
+      HAVING COUNT(soc.study_context_id) = 0
+    `,
+    [normalizedOfferingIds]
+  );
+  const orphanIds = (orphanRows || [])
+    .map((row) => parsePositiveIntStrict(row.id))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  if (!orphanIds.length) {
+    return [];
+  }
+  await client.query(
+    convertPlaceholders('DELETE FROM teacher_offering_assignments WHERE subject_offering_id = ANY(?::int[])'),
+    [orphanIds]
+  );
+  await client.query(
+    convertPlaceholders('DELETE FROM subject_offerings WHERE id = ANY(?::int[])'),
+    [orphanIds]
+  );
+  return orphanIds;
 }
 
 async function getAdmissionCourseScope(admissionId, trackKey) {
@@ -35810,6 +36115,82 @@ app.post('/admin/pathways/admissions/:id/update', requirePathwaysSectionAccess, 
       }));
     }
     return handleDbError(res, err, 'admin.pathways.admission.update');
+  }
+});
+
+app.post('/admin/pathways/admissions/:id/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const msg = getPathwaysRouteMessages(req);
+  const admissionId = parsePositiveIntStrict(req.params.id);
+  const redirectState = getPathwaysRedirectState(req, {
+    programId: parsePositiveIntStrict(req.body.program_id),
+    admissionId,
+  });
+  if (!admissionId) {
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      error: msg.invalidAdmissionYear,
+    }));
+  }
+
+  try {
+    const admissionRow = await getAdmissionPathwayContext(admissionId);
+    if (!admissionRow) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        error: msg.admissionNotFound,
+      }));
+    }
+    const redirectProgramId = Number(admissionRow.program_id || redirectState.programId || 0);
+    const deletionSummary = await getAdmissionDeletionSummary(admissionId);
+    const linkedUsersCount = Math.max(
+      Number(deletionSummary && deletionSummary.users_count || 0),
+      Number(deletionSummary && deletionSummary.context_user_count || 0)
+    );
+    if (linkedUsersCount > 0) {
+      return res.redirect(buildAdminPathwaysUrl({
+        ...redirectState,
+        programId: redirectProgramId,
+        admissionId,
+        error: msg.admissionDeleteBlockedUsers(linkedUsersCount),
+      }));
+    }
+
+    await withTransaction(async (client) => {
+      const offeringRows = await txAll(
+        client,
+        `
+          SELECT DISTINCT soc.subject_offering_id
+          FROM cohorts coh
+          JOIN study_contexts sc ON sc.cohort_id = coh.id
+          JOIN subject_offering_contexts soc ON soc.study_context_id = sc.id
+          WHERE coh.legacy_admission_id = ?
+        `,
+        [admissionId]
+      );
+      const candidateOfferingIds = (offeringRows || [])
+        .map((row) => parsePositiveIntStrict(row.subject_offering_id))
+        .filter((value) => Number.isInteger(value) && value > 0);
+      await client.query(
+        convertPlaceholders('DELETE FROM cohorts WHERE legacy_admission_id = ?'),
+        [admissionId]
+      );
+      await client.query(
+        convertPlaceholders('DELETE FROM program_admissions WHERE id = ?'),
+        [admissionId]
+      );
+      await deleteOrphanSubjectOfferingsInTransaction(client, candidateOfferingIds);
+    });
+
+    invalidateRegistrationPathwaysCache();
+    return res.redirect(buildAdminPathwaysUrl({
+      ...redirectState,
+      programId: redirectProgramId,
+      admissionId: null,
+      studyContextId: null,
+      ok: msg.admissionDeleted,
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.admission.delete');
   }
 });
 

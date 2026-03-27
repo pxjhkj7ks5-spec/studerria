@@ -471,6 +471,80 @@
   justify-content: space-between;
 }
 
+.page-admin-pathways .admission-card__status-stack,
+.page-admin-pathways .admission-card__action-stack {
+  position: relative;
+}
+
+.page-admin-pathways .admission-card__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.page-admin-pathways .admission-card__popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  min-width: min(320px, 72vw);
+  max-width: 360px;
+  padding: 14px 15px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--studerria-panel-border) 84%, rgba(255, 255, 255, 0.14));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08)),
+    color-mix(in srgb, var(--studerria-panel-bg) 94%, rgba(255, 255, 255, 0.08));
+  box-shadow:
+    0 20px 46px rgba(15, 23, 42, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  color: var(--studerria-text-primary);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 160ms ease, transform 160ms ease;
+  backdrop-filter: blur(26px) saturate(145%);
+}
+
+.page-admin-pathways .admission-card__status-stack:hover .admission-card__popover,
+.page-admin-pathways .admission-card__status-stack:focus-within .admission-card__popover,
+.page-admin-pathways .admission-card__action-stack:hover .admission-card__popover,
+.page-admin-pathways .admission-card__action-stack:focus-within .admission-card__popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.page-admin-pathways .admission-card__popover-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.page-admin-pathways .admission-card__popover-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: var(--studerria-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.page-admin-pathways .admission-card__delete-btn {
+  border-color: color-mix(in srgb, #fb7185 24%, var(--studerria-panel-border));
+  color: color-mix(in srgb, #fecdd3 76%, var(--studerria-text-primary));
+}
+
+.page-admin-pathways .admission-card__delete-btn.is-disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
 .page-admin-pathways .status-pill {
   display: inline-flex;
   align-items: center;
@@ -645,6 +719,16 @@ body.theme-light.page-admin-pathways .admission-row {
 
   .page-admin-pathways .admission-card__footer {
     justify-content: flex-start;
+  }
+
+  .page-admin-pathways .admission-card__footer-actions {
+    justify-content: flex-start;
+  }
+
+  .page-admin-pathways .admission-card__popover {
+    left: 0;
+    right: auto;
+    min-width: min(300px, calc(100vw - 48px));
   }
 }
 
