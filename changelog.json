@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.05",
+      "date": "2026-03-27",
+      "items": [
+        "feat(canonical-scope-admin-redirect-hardening): replace the remaining hand-built `/admin?ok|err` redirects in messages, homework, settings, import/export, subjects, courses, semesters, activity resets, teacher request moderation, and schedule/session generator flows with scope-aware redirect builders so canonical academic scope survives admin mutations and secondary generator paths",
+        "refactor(course-derived-academic-facades): add service-layer helpers in `lib/academicSetup.js` for legacy course semesters, subjects, users, support threads, and dependency counts, then switch `app.js` wrappers and critical users/students/roles/course-delete flows onto those facades instead of route-level SQL",
+        "test(academic-setup-course-facades): extend `test/pathways.test.js` with narrow contract coverage for the new legacy course facade helpers, including active semester lookup, schema-compat subject fallback, filtered course-user reads, and normalized dependency counts"
+      ]
+    },
+    {
       "version": "1.3.04",
       "date": "2026-03-27",
       "items": [

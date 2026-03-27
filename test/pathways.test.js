@@ -14,6 +14,10 @@ const {
 const {
   buildFailedPromotionTargetIssue,
   buildRegistrationCourseFallbackIssue,
+  getLegacyCourseActiveSemester,
+  getLegacyCourseDependencyCounts,
+  getLegacyCourseSubject,
+  listLegacyCourseUsers,
   listLegacyAdmissionIdsForSubjectIds,
   listLegacyAdmissionCourseRows,
   listLegacyAdmissionSubjectVisibilityRows,
@@ -292,4 +296,86 @@ test('legacy admission course upsert helper normalizes mapping writes', async ()
   assert.match(calls[0].sql, /INSERT INTO program_admission_courses/i);
   assert.deepEqual(calls[0].params, [9, 11, true]);
   assert.deepEqual(calls[1].params, [9, 12, false]);
+});
+
+test('legacy course active semester helper applies active-semester filter', async () => {
+  const calls = [];
+  const store = {
+    async get(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return { id: 12, title: 'Spring' };
+    },
+  };
+
+  const row = await getLegacyCourseActiveSemester(store, 9);
+  assert.equal(row.id, 12);
+  assert.match(calls[0].sql, /FROM semesters/i);
+  assert.match(calls[0].sql, /is_active/i);
+  assert.deepEqual(calls[0].params, [9]);
+});
+
+test('legacy course subject helper falls back to direct subjects table on schema-compat mode', async () => {
+  const calls = [];
+  const store = {
+    async get(sql, params) {
+      calls.push({ sql: String(sql), params });
+      if (calls.length === 1) {
+        const err = new Error('missing bindings');
+        err.code = '42P01';
+        throw err;
+      }
+      return { id: 5, course_id: 2, owner_course_id: 2 };
+    },
+  };
+
+  const row = await getLegacyCourseSubject(store, {
+    subjectId: 5,
+    courseId: 2,
+    includeHidden: true,
+  });
+
+  assert.equal(row.id, 5);
+  assert.match(calls[0].sql, /subject_course_bindings/i);
+  assert.match(calls[1].sql, /FROM subjects/i);
+  assert.deepEqual(calls[1].params, [5, 2]);
+});
+
+test('legacy course users helper normalizes filters through service layer facade', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ id: 7, role: 'student' }];
+    },
+  };
+
+  const rows = await listLegacyCourseUsers(store, {
+    courseId: 4,
+    userIds: [7, '8', 7],
+    excludeRoles: ['admin', 'teacher'],
+    activeOnly: true,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /u\.course_id = \?/i);
+  assert.match(calls[0].sql, /u\.id = ANY/i);
+  assert.match(calls[0].sql, /ANY\(\?::text\[\]\)/i);
+  assert.match(calls[0].sql, /is_active/i);
+  assert.deepEqual(calls[0].params, [4, [7, 8], ['admin', 'teacher']]);
+});
+
+test('legacy course dependency counts normalize count aliases', async () => {
+  const calls = [];
+  const counts = [{ cnt: 3 }, { count: 5 }, { count: 1 }];
+  const store = {
+    async get(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return counts.shift();
+    },
+  };
+
+  const result = await getLegacyCourseDependencyCounts(store, 15);
+  assert.deepEqual(result, { users: 3, subjects: 5, semesters: 1 });
+  assert.equal(calls.length, 3);
+  calls.forEach((call) => assert.deepEqual(call.params, [15]));
 });

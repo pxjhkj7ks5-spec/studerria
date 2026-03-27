@@ -5890,53 +5890,11 @@ async function invalidateSubjectCachesForSubjectIds(subjectIds = []) {
 }
 
 async function getSubjectForCourse(subjectId, courseId, options = {}) {
-  const normalizedSubjectId = Number(subjectId || 0);
-  const normalizedCourseId = Number(courseId || 0);
-  if (!Number.isInteger(normalizedSubjectId) || normalizedSubjectId < 1) {
-    return null;
-  }
-  if (!Number.isInteger(normalizedCourseId) || normalizedCourseId < 1) {
-    return null;
-  }
-  const includeHidden = options.includeHidden === true;
-  try {
-    return await db.get(
-      `
-        SELECT
-          s.*,
-          s.course_id AS owner_course_id,
-          scb.course_id AS bound_course_id,
-          COALESCE(cat.name, s.name) AS catalog_name
-        FROM subject_course_bindings scb
-        JOIN subjects s ON s.id = scb.subject_id
-        LEFT JOIN subject_catalog cat ON cat.id = s.catalog_id
-        WHERE s.id = ?
-          AND scb.course_id = ?
-          ${includeHidden ? '' : "AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')"}
-        LIMIT 1
-      `,
-      [normalizedSubjectId, normalizedCourseId]
-    );
-  } catch (err) {
-    if (!isDbSchemaCompatibilityError(err)) {
-      throw err;
-    }
-    return db.get(
-      `
-        SELECT
-          *,
-          course_id AS owner_course_id,
-          course_id AS bound_course_id,
-          name AS catalog_name
-        FROM subjects
-        WHERE id = ?
-          AND course_id = ?
-          ${includeHidden ? '' : "AND COALESCE(LOWER(TRIM(CAST(visible AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')"}
-        LIMIT 1
-      `,
-      [normalizedSubjectId, normalizedCourseId]
-    );
-  }
+  return academicSetupHelpers.getLegacyCourseSubject(getAcademicSetupStore(), {
+    subjectId,
+    courseId,
+    includeHidden: options.includeHidden === true,
+  });
 }
 
 async function resolveSubjectCourseContext(subjectId, courseId, options = {}) {
@@ -9435,6 +9393,45 @@ function buildAdminTabUrl(req, tab, extraParams = {}, overrides = {}) {
   });
 }
 
+function buildAdminScopedNoticeUrl(req, kind, message, options = {}) {
+  const normalizedKind = String(kind || '').trim().toLowerCase() === 'ok' ? 'ok' : 'err';
+  const extraParams = options && options.extraParams ? options.extraParams : {};
+  const overrides = options && options.overrides ? options.overrides : {};
+  let baseUrl = '';
+  if (options && options.tab) {
+    baseUrl = buildScopedAppUrl(buildAdminScopeBasePath(req), getStoredAdminAcademicScope(req), overrides, {
+      tab: options.tab || '',
+      ...(extraParams || {}),
+    });
+  } else if (options && options.basePath) {
+    baseUrl = buildAdminScopedPathUrl(req, options.basePath, overrides, extraParams);
+  } else {
+    baseUrl = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req), overrides, extraParams);
+  }
+  return appendQueryParamToUrl(baseUrl, normalizedKind, String(message || ''));
+}
+
+function buildScheduleGeneratorUrl(req, runId = null, extraParams = {}) {
+  return buildAdminScopedPathUrl(req, '/admin/schedule-generator', {}, {
+    run: parsePositiveIntStrict(runId) || null,
+    ...(extraParams || {}),
+  });
+}
+
+function buildScheduleGeneratorNoticeUrl(req, kind, message, runId = null, extraParams = {}) {
+  return buildAdminScopedNoticeUrl(req, kind, message, {
+    basePath: '/admin/schedule-generator',
+    extraParams: {
+      run: parsePositiveIntStrict(runId) || null,
+      ...(extraParams || {}),
+    },
+  });
+}
+
+function buildSessionGeneratorUrl(req, extraParams = {}) {
+  return buildAdminScopedPathUrl(req, '/admin/session-generator', {}, extraParams || {});
+}
+
 function buildAdminFixTargetUrl(req, { courseId = null, day = '', groupNumber = null } = {}) {
   return buildAdminScopedPathUrl(
     req,
@@ -9457,6 +9454,7 @@ function buildScheduleGeneratorPreviewUrl(req, runId, options = {}) {
       run: parsePositiveIntStrict(options.runId) || null,
       err: options.err || '',
       ok: options.ok || '',
+      ...((options && options.extraParams) || {}),
     }
   );
 }
@@ -10230,17 +10228,7 @@ app.use((req, _res, next) => {
 async function getActiveSemester(courseId) {
   const cached = cacheGet(referenceCache.activeSemester, courseId);
   if (cached) return cached;
-  const row = await db.get(
-    `
-      SELECT id, title, start_date, weeks_count, is_active, is_archived
-      FROM semesters
-      WHERE course_id = ?
-        AND COALESCE(LOWER(TRIM(CAST(is_active AS TEXT))), '0') IN ('1', 'true', 't')
-      ORDER BY id DESC
-      LIMIT 1
-    `,
-    [courseId]
-  );
+  const row = await academicSetupHelpers.getLegacyCourseActiveSemester(getAcademicSetupStore(), courseId);
   return cacheSet(referenceCache.activeSemester, courseId, row || null);
 }
 
@@ -12466,21 +12454,10 @@ async function listSupportRequestsForUser(userId, limit = 12) {
 }
 
 async function listSupportRequestsForCourse(courseId, limit = 40) {
-  if (!Number.isFinite(Number(courseId))) {
-    return [];
-  }
-  const safeLimit = Math.min(Math.max(Number(limit) || 40, 1), 120);
-  return db.all(
-    `
-      SELECT sr.*, u.full_name AS user_name
-      FROM support_requests sr
-      JOIN users u ON u.id = sr.user_id
-      WHERE sr.course_id = ?
-      ORDER BY sr.updated_at DESC, sr.created_at DESC
-      LIMIT ${safeLimit}
-    `,
-    [courseId]
-  );
+  return academicSetupHelpers.listLegacyCourseSupportRequests(getAcademicSetupStore(), {
+    courseId,
+    limit,
+  });
 }
 
 async function getSupportRequestForUser(requestId, userId) {
@@ -12506,27 +12483,13 @@ async function getSupportRequestForUser(requestId, userId) {
 
 async function getSupportRequestThreadForCourse(requestId, courseId) {
   const normalizedRequestId = Number(requestId || 0);
-  const normalizedCourseId = Number(courseId || 0);
   if (!Number.isInteger(normalizedRequestId) || normalizedRequestId < 1) {
     return null;
   }
-  const row = await db.get(
-    `
-      SELECT
-        sr.*,
-        u.full_name AS user_name,
-        resolver.full_name AS resolved_by_name
-      FROM support_requests sr
-      JOIN users u ON u.id = sr.user_id
-      LEFT JOIN users resolver ON resolver.id = sr.resolved_by
-      WHERE sr.id = ?
-        ${Number.isInteger(normalizedCourseId) && normalizedCourseId > 0 ? 'AND sr.course_id = ?' : ''}
-      LIMIT 1
-    `,
-    Number.isInteger(normalizedCourseId) && normalizedCourseId > 0
-      ? [normalizedRequestId, normalizedCourseId]
-      : [normalizedRequestId]
-  );
+  const row = await academicSetupHelpers.getLegacyCourseSupportRequestThread(getAcademicSetupStore(), {
+    requestId,
+    courseId,
+  });
   if (!row) {
     return null;
   }
@@ -30836,26 +30799,32 @@ app.post('/teamwork/group/update', requireLogin, writeLimiter, (req, res) => {
 
 app.post('/admin/teamwork/delete/:id', requireTeamworkSectionAccess, (req, res) => {
   const taskId = Number(req.params.id);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-teamwork',
+  });
   if (Number.isNaN(taskId)) {
-    return res.redirect('/admin?err=Invalid%20task');
+    return res.redirect(redirectWith('err', 'Invalid task'));
   }
   db.run('DELETE FROM teamwork_members WHERE task_id = ?', [taskId], () => {
     db.run('DELETE FROM teamwork_groups WHERE task_id = ?', [taskId], () => {
       db.run('DELETE FROM teamwork_tasks WHERE id = ?', [taskId], () => {
         logAction(db, req, 'teamwork_task_delete', { id: taskId });
-        res.redirect('/admin?ok=Task%20deleted');
+        res.redirect(redirectWith('ok', 'Task deleted'));
       });
     });
   });
 });
 
 app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, async (req, res) => {
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-messages',
+  });
   if (!settingsCache.allow_messages) {
-    return res.redirect('/admin?err=Messages%20disabled');
+    return res.redirect(redirectWith('err', 'Messages disabled'));
   }
   const { target_type, target_all, subject_id, group_number, body, user_ids, status, scheduled_at } = req.body;
   if (!body || !body.trim()) {
-    return res.redirect('/admin?err=Message%20is%20empty');
+    return res.redirect(redirectWith('err', 'Message is empty'));
   }
   const createdAt = new Date().toISOString();
   const createdBy = req.session.user.id;
@@ -30874,7 +30843,7 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
   if (messageStatus === 'scheduled') {
     const parsed = scheduled_at ? new Date(scheduled_at) : null;
     if (!parsed || Number.isNaN(parsed.getTime())) {
-      return res.redirect('/admin?err=Schedule%20date%20required');
+      return res.redirect(redirectWith('err', 'Schedule date required'));
     }
     scheduledAt = parsed.toISOString();
     publishedAt = null;
@@ -30886,13 +30855,13 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
   const groupNum = group_number ? Number(group_number) : null;
   const users = Array.isArray(user_ids) ? user_ids : user_ids ? [user_ids] : [];
   if (target === 'subject' && (Number.isNaN(subjectId) || Number.isNaN(groupNum))) {
-    return res.redirect('/admin?err=Select%20subject%20and%20group');
+    return res.redirect(redirectWith('err', 'Select subject and group'));
   }
   if (target === 'users' && !users.length) {
-    return res.redirect('/admin?err=Select%20users');
+    return res.redirect(redirectWith('err', 'Select users'));
   }
   if (isAllCourses && !isAdmin) {
-    return res.redirect('/admin?err=Not%20allowed');
+    return res.redirect(redirectWith('err', 'Not allowed'));
   }
   try {
     if (isAllCourses) {
@@ -30916,7 +30885,7 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
         ]
       );
       if (!row || !row.id) {
-        return res.redirect('/admin?err=Database%20error');
+        return res.redirect(redirectWith('err', 'Database error'));
       }
       logAction(db, req, 'message_send', {
         target_type: target,
@@ -30925,7 +30894,7 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
         course_id: null,
       });
       broadcast('messages_updated');
-      return res.redirect('/admin?ok=Message%20sent');
+      return res.redirect(redirectWith('ok', 'Message sent'));
     }
 
     const row = await db.get(
@@ -30948,7 +30917,7 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
       ]
     );
     if (!row || !row.id) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(redirectWith('err', 'Database error'));
     }
     const messageId = row.id;
     if (target === 'users' && users.length) {
@@ -30964,7 +30933,7 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
         user_ids: users,
       });
       broadcast('messages_updated');
-      return res.redirect('/admin?ok=Message%20sent');
+      return res.redirect(redirectWith('ok', 'Message sent'));
     }
     logAction(db, req, 'message_send', {
       target_type: target,
@@ -30973,9 +30942,9 @@ app.post('/admin/messages/send', requireMessagesSectionAccess, writeLimiter, asy
       group_number: groupNum,
     });
     broadcast('messages_updated');
-    return res.redirect('/admin?ok=Message%20sent');
+    return res.redirect(redirectWith('ok', 'Message sent'));
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
@@ -30995,12 +30964,15 @@ async function deleteMessageRecordsByIds(ids) {
 }
 
 app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimiter, (req, res) => {
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-messages',
+  });
   if (!settingsCache.allow_messages) {
-    return res.redirect('/admin?err=Messages%20disabled');
+    return res.redirect(redirectWith('err', 'Messages disabled'));
   }
   const id = Number(req.params.id);
   if (Number.isNaN(id)) {
-    return res.redirect('/admin?err=Invalid%20message');
+    return res.redirect(redirectWith('err', 'Invalid message'));
   }
   db.get(
     `
@@ -31011,7 +30983,7 @@ app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimite
     [id],
     (findErr, message) => {
       if (findErr || !message) {
-        return res.redirect('/admin?err=Message%20not%20found');
+        return res.redirect(redirectWith('err', 'Message not found'));
       }
       const deleteIds = [id];
       const isBroadcast =
@@ -31024,9 +30996,9 @@ app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimite
             .then((deletedCount) => {
               logAction(db, req, 'message_delete', { id, deleted_count: deletedCount });
               broadcast('messages_updated');
-              return res.redirect('/admin?ok=Message%20deleted');
+              return res.redirect(redirectWith('ok', 'Message deleted'));
             })
-            .catch(() => res.redirect('/admin?err=Database%20error'));
+            .catch(() => res.redirect(redirectWith('err', 'Database error')));
         };
         return remove();
       }
@@ -31066,9 +31038,9 @@ app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimite
                 broadcast: true,
               });
               broadcast('messages_updated');
-              return res.redirect('/admin?ok=Message%20deleted');
+              return res.redirect(redirectWith('ok', 'Message deleted'));
             })
-            .catch(() => res.redirect('/admin?err=Database%20error'));
+            .catch(() => res.redirect(redirectWith('err', 'Database error')));
         }
       );
     }
@@ -31077,9 +31049,12 @@ app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimite
 
 app.post('/admin/messages/clear', requireMessagesSectionAccess, writeLimiter, async (req, res) => {
   const courseId = getStaffCourse(req);
-  const panelBase = getStaffPanelBase(req, courseId);
-  const redirectBase = `${panelBase}${panelBase.includes('?') ? '&' : '?'}tab=admin-messages`;
-  const redirectWith = (kind, message) => `${redirectBase}&${kind}=${encodeURIComponent(String(message || ''))}`;
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-messages',
+    overrides: {
+      courseId: parsePositiveIntStrict(courseId) || null,
+    },
+  });
 
   if (!settingsCache.allow_messages) {
     return res.redirect(redirectWith('err', 'Messages disabled'));
@@ -31124,9 +31099,12 @@ app.post('/admin/messages/clear', requireMessagesSectionAccess, writeLimiter, as
 
 app.post('/admin/messages/clear-all', requireMessagesSectionAccess, writeLimiter, async (req, res) => {
   const courseId = getStaffCourse(req);
-  const panelBase = getStaffPanelBase(req, courseId);
-  const redirectBase = `${panelBase}${panelBase.includes('?') ? '&' : '?'}tab=admin-messages`;
-  const redirectWith = (kind, message) => `${redirectBase}&${kind}=${encodeURIComponent(String(message || ''))}`;
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-messages',
+    overrides: {
+      courseId: parsePositiveIntStrict(courseId) || null,
+    },
+  });
 
   if (!hasSessionRole(req, 'admin')) {
     return res.redirect(redirectWith('err', 'Only admins can clear all messages'));
@@ -32532,7 +32510,9 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
   try {
     const courses = await getCoursesCached();
     if (!Array.isArray(courses) || !courses.length) {
-      return res.redirect('/admin?err=No%20courses%20configured');
+      return res.redirect(buildAdminScopedNoticeUrl(req, 'err', 'No courses configured', {
+        tab: 'admin-overview',
+      }));
     }
     const courseById = new Map((courses || []).map((course) => [Number(course.id || 0), course]));
 
@@ -36519,10 +36499,13 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
 });
 
 app.post('/admin/activity/reset-points', requireActivitySectionAccess, writeLimiter, async (req, res) => {
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-overview',
+  });
   try {
     await ensureDbReady();
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
   const courseId = hasSessionRole(req, 'admin')
     ? getAdminCourse(req)
@@ -36531,7 +36514,7 @@ app.post('/admin/activity/reset-points', requireActivitySectionAccess, writeLimi
   try {
     activeSemester = await getActiveSemester(courseId);
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
   const semesterId = activeSemester ? Number(activeSemester.id) : null;
   const actorId = Number(req.session.user.id);
@@ -36618,15 +36601,15 @@ app.post('/admin/activity/reset-points', requireActivitySectionAccess, writeLimi
         total_points_reset: Math.round(totalResetPoints * 100) / 100,
       });
       if (affectedUsers < 1) {
-        return res.redirect('/admin?ok=No%20activity%20points%20to%20reset%20for%20this%20course');
+        return res.redirect(redirectWith('ok', 'No activity points to reset for this course'));
       }
-      return res.redirect(`/admin?ok=${encodeURIComponent(`Activity points reset for ${affectedUsers} users`)}`);
+      return res.redirect(redirectWith('ok', `Activity points reset for ${affectedUsers} users`));
     }
 
     if (resetScope === 'user') {
       const targetUserId = Number(req.body.user_id);
       if (!Number.isFinite(targetUserId) || targetUserId < 1) {
-        return res.redirect('/admin?err=Select%20a%20user');
+        return res.redirect(redirectWith('err', 'Select a user'));
       }
       const targetUser = await db.get(
         `
@@ -36638,7 +36621,7 @@ app.post('/admin/activity/reset-points', requireActivitySectionAccess, writeLimi
         [targetUserId, courseId]
       );
       if (!targetUser) {
-        return res.redirect('/admin?err=User%20not%20found%20in%20current%20course');
+        return res.redirect(redirectWith('err', 'User not found in current course'));
       }
       const currentPoints = await resolveUserPoints(targetUserId);
       const details = await createPointsResetEntry(
@@ -36655,15 +36638,15 @@ app.post('/admin/activity/reset-points', requireActivitySectionAccess, writeLimi
         previous_points: Math.round(currentPoints * 100) / 100,
       });
       if (!details) {
-        return res.redirect('/admin?ok=User%20already%20has%200%20activity%20points');
+        return res.redirect(redirectWith('ok', 'User already has 0 activity points'));
       }
       const targetUserName = targetUser.full_name || `User ${targetUserId}`;
-      return res.redirect(`/admin?ok=${encodeURIComponent(`Activity points reset for ${targetUserName}`)}`);
+      return res.redirect(redirectWith('ok', `Activity points reset for ${targetUserName}`));
     }
 
-    return res.redirect('/admin?err=Invalid%20reset%20scope');
+    return res.redirect(redirectWith('err', 'Invalid reset scope'));
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
@@ -39891,15 +39874,11 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
 });
 
 app.get('/admin/session-generator/', requireScheduleGeneratorSectionAccess, (req, res) => {
-  const params = new URLSearchParams(req.query || {});
-  const query = params.toString();
-  return res.redirect(`/admin/session-generator${query ? `?${query}` : ''}`);
+  return res.redirect(buildSessionGeneratorUrl(req, req.query || {}));
 });
 
 app.get('/admin/session-generator/index', requireScheduleGeneratorSectionAccess, (req, res) => {
-  const params = new URLSearchParams(req.query || {});
-  const query = params.toString();
-  return res.redirect(`/admin/session-generator${query ? `?${query}` : ''}`);
+  return res.redirect(buildSessionGeneratorUrl(req, req.query || {}));
 });
 
 app.post('/admin/session-generator/draft/save', requireScheduleGeneratorSectionAccess, async (req, res) => {
@@ -40603,7 +40582,7 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
         ['draft', userId, serializeGeneratorConfig(DEFAULT_GENERATOR_CONFIG)]
       );
       const newId = insert.lastID;
-      return res.redirect(`/admin/schedule-generator?run=${newId}`);
+      return res.redirect(buildScheduleGeneratorUrl(req, newId));
     }
 
     const parsedConfig = parseGeneratorConfig(run.config);
@@ -40936,7 +40915,7 @@ app.post('/admin/schedule-generator/new', requireScheduleGeneratorSectionAccess,
       ['draft', userId, serializeGeneratorConfig(DEFAULT_GENERATOR_CONFIG)]
     );
     const runId = insert.lastID;
-    return res.redirect(`/admin/schedule-generator?run=${runId}`);
+    return res.redirect(buildScheduleGeneratorUrl(req, runId));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.create');
   }
@@ -40950,11 +40929,11 @@ app.post('/admin/schedule-generator/config', requireScheduleGeneratorSectionAcce
   }
   const runId = Number(req.body.run_id);
   if (!Number.isFinite(runId) || runId <= 0) {
-    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid run'));
   }
   try {
     const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
-    if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    if (!run) return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Run not found'));
     const existing = parseGeneratorConfig(run.config);
     const maxDailyRaw = Number(req.body.max_daily_pairs);
     const targetDailyRaw = Number(req.body.target_daily_pairs);
@@ -41023,7 +41002,7 @@ app.post('/admin/schedule-generator/config', requireScheduleGeneratorSectionAcce
         [Number(semesterId), runId, Number(courseId)]
       );
     }
-    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Settings%20saved`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'ok', 'Settings saved', runId));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.config.save');
   }
@@ -41037,11 +41016,11 @@ app.post('/admin/schedule-generator/config/autotune', requireScheduleGeneratorSe
   }
   const runId = Number(req.body.run_id);
   if (!Number.isFinite(runId) || runId <= 0) {
-    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid run'));
   }
   try {
     const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
-    if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    if (!run) return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Run not found'));
     const existing = parseGeneratorConfig(run.config);
     const activeLocation = String(req.body.active_location || existing.active_location || 'kyiv').toLowerCase() === 'munich'
       ? 'munich'
@@ -41172,7 +41151,7 @@ app.post('/admin/schedule-generator/config/autotune', requireScheduleGeneratorSe
       'UPDATE schedule_generator_runs SET config = ?, updated_at = NOW() WHERE id = ?',
       [serializeGeneratorConfig(nextConfig), runId]
     );
-    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Safe%20auto-tune%20applied`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'ok', 'Safe auto-tune applied', runId));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.config.autotune.save');
   }
@@ -41200,30 +41179,30 @@ app.post('/admin/schedule-generator/items/add', requireScheduleGeneratorSectionA
   const mirrorKey = mirrorKeyRaw || null;
 
   if (!Number.isFinite(runId) || runId <= 0 || !Number.isFinite(courseId) || !Number.isFinite(subjectId)) {
-    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20data`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid data', runId));
   }
   if (!Number.isFinite(pairsCount) || pairsCount <= 0) {
-    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20pairs`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid pairs', runId));
   }
   if (groupNumber && (Number.isNaN(groupNumber) || groupNumber < 1)) {
-    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid group', runId));
   }
   if (fixedClass && (fixedClass < 1 || fixedClass > 7)) {
-    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20slot`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid slot', runId));
   }
 
   try {
     const subjectRow = await resolveSubjectCourseContext(subjectId, courseId, { includeHidden: true });
     if (!subjectRow) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Subject%20not%20found`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Subject not found', runId));
     }
     const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || courseId || 1);
     if (groupNumber && Number(groupNumber) > Number(subjectRow.group_count || 1)) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid group', runId));
     }
     const run = await db.get('SELECT config FROM schedule_generator_runs WHERE id = ?', [runId]);
     if (!run) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Run%20not%20found`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Run not found', runId));
     }
     const runConfig = parseGeneratorConfig(run.config);
     const courseRow = await db.get('SELECT location FROM courses WHERE id = ?', [storageCourseId]);
@@ -41240,7 +41219,7 @@ app.post('/admin/schedule-generator/items/add', requireScheduleGeneratorSectionA
       semester = await getActiveSemester(storageCourseId);
     }
     if (!semester) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Semester%20not%20found`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Semester not found', runId));
     }
     const lessonTypeLower = String(lessonType || '').toLowerCase();
     const isSeminar = lessonTypeLower.includes('seminar') || lessonTypeLower.includes('сем');
@@ -41294,7 +41273,7 @@ app.post('/admin/schedule-generator/items/add', requireScheduleGeneratorSectionA
         ]
       );
     }
-    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Item%20added`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'ok', 'Item added', runId));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.item.add');
   }
@@ -41308,16 +41287,16 @@ app.post('/admin/schedule-generator/mirror-auto', requireScheduleGeneratorSectio
   }
   const runId = Number(req.body.run_id);
   if (!Number.isFinite(runId) || runId <= 0) {
-    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid run'));
   }
   const pairsRaw = req.body.mirror_pairs || [];
   const pairs = Array.isArray(pairsRaw) ? pairsRaw : pairsRaw ? [pairsRaw] : [];
   if (!pairs.length) {
-    return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20pairs%20selected`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'No pairs selected', runId));
   }
   const run = await db.get('SELECT id FROM schedule_generator_runs WHERE id = ?', [runId]);
   if (!run) {
-    return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Run not found'));
   }
   let updated = 0;
   for (const pair of pairs) {
@@ -41357,9 +41336,9 @@ app.post('/admin/schedule-generator/mirror-auto', requireScheduleGeneratorSectio
     updated += 1;
   }
   if (!updated) {
-    return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20pairs%20updated`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'No pairs updated', runId));
   }
-  return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Auto%20mirror%20pairs%20applied`);
+  return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'ok', 'Auto mirror pairs applied', runId));
 });
 
 app.post('/admin/schedule-generator/items/edit/:id', requireScheduleGeneratorSectionAccess, async (req, res) => {
@@ -41385,30 +41364,30 @@ app.post('/admin/schedule-generator/items/edit/:id', requireScheduleGeneratorSec
   const mirrorKey = mirrorKeyRaw || null;
 
   if (!Number.isFinite(itemId) || !Number.isFinite(runId) || runId <= 0) {
-    return res.redirect('/admin/schedule-generator?err=Invalid%20item');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid item'));
   }
   if (!Number.isFinite(pairsCount) || pairsCount <= 0) {
-    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20pairs`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid pairs', runId));
   }
   if (groupNumber && (Number.isNaN(groupNumber) || groupNumber < 1)) {
-    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid group', runId));
   }
   if (fixedClass && (fixedClass < 1 || fixedClass > 7)) {
-    return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20slot`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid slot', runId));
   }
 
   try {
     const subjectRow = await resolveSubjectCourseContext(subjectId, courseId, { includeHidden: true });
     if (!subjectRow) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Subject%20not%20found`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Subject not found', runId));
     }
     const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || courseId || 1);
     if (groupNumber && Number(groupNumber) > Number(subjectRow.group_count || 1)) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Invalid%20group`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid group', runId));
     }
     const run = await db.get('SELECT config FROM schedule_generator_runs WHERE id = ?', [runId]);
     if (!run) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Run%20not%20found`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Run not found', runId));
     }
     const runConfig = parseGeneratorConfig(run.config);
     const courseRow = await db.get('SELECT location FROM courses WHERE id = ?', [storageCourseId]);
@@ -41425,7 +41404,7 @@ app.post('/admin/schedule-generator/items/edit/:id', requireScheduleGeneratorSec
       semester = await getActiveSemester(storageCourseId);
     }
     if (!semester) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Semester%20not%20found`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Semester not found', runId));
     }
     await db.run(
       `
@@ -41449,7 +41428,7 @@ app.post('/admin/schedule-generator/items/edit/:id', requireScheduleGeneratorSec
         runId,
       ]
     );
-    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Item%20saved`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'ok', 'Item saved', runId));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.item.edit');
   }
@@ -41464,11 +41443,11 @@ app.post('/admin/schedule-generator/items/delete/:id', requireScheduleGeneratorS
   const itemId = Number(req.params.id);
   const runId = Number(req.body.run_id);
   if (!Number.isFinite(itemId) || !Number.isFinite(runId) || runId <= 0) {
-    return res.redirect('/admin/schedule-generator?err=Invalid%20item');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid item'));
   }
   try {
     await db.run('DELETE FROM schedule_generator_items WHERE id = ? AND run_id = ?', [itemId, runId]);
-    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Item%20deleted`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'ok', 'Item deleted', runId));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.item.delete');
   }
@@ -41483,7 +41462,7 @@ app.post('/admin/schedule-generator/items/freeze/:id', requireScheduleGeneratorS
   const itemId = Number(req.params.id);
   const runId = Number(req.body.run_id);
   if (!Number.isFinite(itemId) || !Number.isFinite(runId) || runId <= 0) {
-    return res.redirect('/admin/schedule-generator?err=Invalid%20item');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid item'));
   }
   try {
     const item = await db.get(
@@ -41491,7 +41470,7 @@ app.post('/admin/schedule-generator/items/freeze/:id', requireScheduleGeneratorS
       [itemId, runId]
     );
     if (!item) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Item%20not%20found`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Item not found', runId));
     }
     let slot = await db.get(
       `
@@ -41524,13 +41503,13 @@ app.post('/admin/schedule-generator/items/freeze/:id', requireScheduleGeneratorS
       );
     }
     if (!slot) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20generated%20slot`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'No generated slot', runId));
     }
     await db.run(
       'UPDATE schedule_generator_items SET fixed_day = ?, fixed_class_number = ? WHERE id = ? AND run_id = ?',
       [slot.day_of_week, slot.class_number, itemId, runId]
     );
-    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Slot%20fixed`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'ok', 'Slot fixed', runId));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.item.freeze');
   }
@@ -41545,14 +41524,14 @@ app.post('/admin/schedule-generator/items/unfreeze/:id', requireScheduleGenerato
   const itemId = Number(req.params.id);
   const runId = Number(req.body.run_id);
   if (!Number.isFinite(itemId) || !Number.isFinite(runId) || runId <= 0) {
-    return res.redirect('/admin/schedule-generator?err=Invalid%20item');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid item'));
   }
   try {
     await db.run(
       'UPDATE schedule_generator_items SET fixed_day = NULL, fixed_class_number = NULL WHERE id = ? AND run_id = ?',
       [itemId, runId]
     );
-    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Slot%20unfixed`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'ok', 'Slot unfixed', runId));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.item.unfreeze');
   }
@@ -41567,7 +41546,7 @@ app.post('/admin/schedule-generator/teachers/save', requireScheduleGeneratorSect
   const runId = Number(req.body.run_id);
   const teacherId = Number(req.body.teacher_id);
   if (!Number.isFinite(runId) || runId <= 0 || !Number.isFinite(teacherId)) {
-    return res.redirect('/admin/schedule-generator?err=Invalid%20teacher');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid teacher'));
   }
   const allowedDaysRaw = normalizeGeneratorDays(req.body.allowed_days);
   const allowedDays = allowedDaysRaw
@@ -41586,7 +41565,7 @@ app.post('/admin/schedule-generator/teachers/save', requireScheduleGeneratorSect
       `,
       [runId, teacherId, allowedDays.join(','), maxPairs]
     );
-    return res.redirect(`/admin/schedule-generator?run=${runId}&ok=Teacher%20saved`);
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'ok', 'Teacher saved', runId));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.teacher.save');
   }
@@ -41628,11 +41607,11 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
   const scopeSemesterRaw = Number(req.body.scope_semester_id);
   const scopeSemesterId = Number.isFinite(scopeSemesterRaw) && scopeSemesterRaw > 0 ? scopeSemesterRaw : null;
   if (!Number.isFinite(runId) || runId <= 0) {
-    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid run'));
   }
   try {
     const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
-    if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    if (!run) return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Run not found'));
     const config = parseGeneratorConfig(run.config);
     const requestedLocation = String(req.body.active_location || config.active_location || 'kyiv').toLowerCase();
     const activeLocation = requestedLocation === 'munich' ? 'munich' : 'kyiv';
@@ -41642,7 +41621,7 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
     const locationCourses = await getCoursesByLocation(activeLocation);
     const locationCourseIds = new Set((locationCourses || []).map((c) => Number(c.id)));
     if (courseOnly && !locationCourseIds.has(courseOnly)) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=Course%20not%20in%20location`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Course not in location', runId));
     }
     const itemsAll = await db.all(
       `
@@ -41658,7 +41637,7 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
       (!courseOnly || Number(item.course_id) === courseOnly)
     );
     if (!items.length) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20items%20for%20location`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'No items for location', runId));
     }
 
     const courseContexts = new Map();
@@ -41738,7 +41717,7 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
       return true;
     });
     if (!filteredEntries.length) {
-      return res.redirect(`/admin/schedule-generator?run=${runId}&err=No%20entries%20for%20scope`);
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'No entries for scope', runId));
     }
     const operationId = randomUUID();
     const diffResult = await buildScheduleDiff(filteredEntries);
@@ -41830,11 +41809,11 @@ app.get('/admin/schedule-generator/:runId/preview', requireScheduleGeneratorSect
   const runId = Number(req.params.runId);
   const courseId = Number(req.query.course);
   if (!Number.isFinite(runId) || runId <= 0) {
-    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid run'));
   }
   try {
     const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
-    if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    if (!run) return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Run not found'));
     const config = parseGeneratorConfig(run.config);
     const activeLocation = config.active_location === 'munich' ? 'munich' : 'kyiv';
     const coursesByLocation = {
@@ -41847,7 +41826,7 @@ app.get('/admin/schedule-generator/:runId/preview', requireScheduleGeneratorSect
     const fallbackCourseId = preferredList.length ? Number(preferredList[0].id) : availableCourseIds[0];
     const selectedCourseId = availableCourseIds.includes(courseId) ? courseId : fallbackCourseId;
     if (!selectedCourseId) {
-      return res.redirect('/admin/schedule-generator?run=' + runId);
+      return res.redirect(buildScheduleGeneratorUrl(req, runId));
     }
     const selectedCourse = allCourses.find((course) => Number(course.id) === Number(selectedCourseId));
     const selectedLocation = normalizeGeneratorLocation(selectedCourse?.location || activeLocation);
@@ -41982,28 +41961,21 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
   }
   const runId = Number(req.params.runId);
   const buildPreviewRedirect = (message) => {
-    const params = new URLSearchParams();
     const courseId = Number(req.body.course_id);
     const week = Number(req.body.week);
-    if (Number.isFinite(courseId) && courseId > 0) {
-      params.set('course', String(courseId));
-    }
-    if (Number.isFinite(week) && week > 0) {
-      params.set('week', String(week));
-    }
-    if (message) {
-      params.set('err', String(message));
-    }
-    const query = params.toString();
-    return `/admin/schedule-generator/${runId}/preview${query ? `?${query}` : ''}`;
+    return buildScheduleGeneratorPreviewUrl(req, runId, {
+      courseId,
+      week,
+      err: message || '',
+    });
   };
   if (!Number.isFinite(runId) || runId <= 0) {
-    return res.redirect('/admin/schedule-generator?err=Invalid%20run');
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid run'));
   }
   const replace = String(req.body.replace || '') === '1' || String(req.body.replace || '') === 'on';
   try {
     const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
-    if (!run) return res.redirect('/admin/schedule-generator?err=Run%20not%20found');
+    if (!run) return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Run not found'));
     const config = parseGeneratorConfig(run.config);
     const lastOperationId = config && config.last_stats ? config.last_stats.operation_id : null;
     const requestedOperationId = String(req.body.operation_id || '').trim();
@@ -42094,18 +42066,19 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
     });
     const courseId = Number(req.body.course_id) || Number(entries[0].course_id);
     const week = Number(req.body.week) || 1;
-    const query = new URLSearchParams({
-      course: String(courseId),
-      week: String(week),
-      published: '1',
-      op: operationId,
-      added: String(diffResult.diff.added),
-      updated: String(diffResult.diff.updated),
-      removed: String(diffResult.diff.removed),
-      overwrite: String(diffResult.diff.overwrite),
-      backup: backupInfo ? operationId : '',
-    });
-    return res.redirect(`/admin/schedule-generator/${runId}/preview?${query.toString()}`);
+    return res.redirect(buildScheduleGeneratorPreviewUrl(req, runId, {
+      courseId,
+      week,
+      extraParams: {
+        published: '1',
+        op: operationId,
+        added: String(diffResult.diff.added),
+        updated: String(diffResult.diff.updated),
+        removed: String(diffResult.diff.removed),
+        overwrite: String(diffResult.diff.overwrite),
+        backup: backupInfo ? operationId : '',
+      },
+    }));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.publish');
   }
@@ -42188,6 +42161,10 @@ app.post('/admin/api/scheduler/run', requireScheduleGeneratorSectionAccess, asyn
 });
 
 app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
+  const redirectWith = (kind, message, extraParams = {}) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-settings',
+    extraParams,
+  });
   try {
     await ensureDbReady();
   } catch (err) {
@@ -42257,7 +42234,7 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     if (wantsJson) {
       return res.status(400).json({ error: 'Invalid settings' });
     }
-    return res.redirect('/admin?err=Invalid%20settings');
+    return res.redirect(redirectWith('err', 'Invalid settings'));
   }
   if (
     scheduleRefreshMinutes > 120 ||
@@ -42283,7 +42260,7 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     if (wantsJson) {
       return res.status(400).json({ error: 'Invalid settings' });
     }
-    return res.redirect('/admin?err=Invalid%20settings');
+    return res.redirect(redirectWith('err', 'Invalid settings'));
   }
   try {
     const courseId = getAdminCourse(req);
@@ -42349,13 +42326,17 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
         changes,
       });
     }
-    return res.redirect(`/admin?ok=Settings%20saved&op=${operationId}`);
+    return res.redirect(redirectWith('ok', 'Settings saved', { op: operationId }));
   } catch (err) {
     return handleDbError(res, err, 'admin.settings.save');
   }
 });
 
 app.post('/admin/role-access', requireRoleAccessSectionAccess, async (req, res) => {
+  const redirectWith = (kind, message, extraParams = {}) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-role-studio',
+    extraParams,
+  });
   try {
     await ensureDbReady();
   } catch (err) {
@@ -42394,7 +42375,7 @@ app.post('/admin/role-access', requireRoleAccessSectionAccess, async (req, res) 
       operation_id: operationId,
       changes,
     });
-    return res.redirect(`/admin?ok=Role%20access%20saved&op=${operationId}`);
+    return res.redirect(redirectWith('ok', 'Role access saved', { op: operationId }));
   } catch (err) {
     return handleDbError(res, err, 'admin.roleAccess.save');
   }
@@ -44225,22 +44206,26 @@ app.get('/admin/export/schedule.csv', requireImportExportSectionAccess, async (r
 });
 
 app.post('/admin/import/schedule.csv', requireImportExportSectionAccess, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
+  const redirectWith = (kind, message, extraParams = {}) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-import-export',
+    extraParams,
+  });
   if (!req.file || !req.file.buffer) {
-    return res.redirect('/admin?err=Missing%20CSV');
+    return res.redirect(redirectWith('err', 'Missing CSV'));
   }
   const confirmRequired = String(req.body.confirm_required || '') === '1';
   const confirmPhrase = String(req.body.confirm_phrase || '').trim().toUpperCase();
   if (confirmRequired && confirmPhrase !== 'IMPORT') {
-    return res.redirect('/admin?err=Type%20IMPORT%20to%20confirm');
+    return res.redirect(redirectWith('err', 'Type IMPORT to confirm'));
   }
   let scope = null;
   try {
     scope = await resolveImportScope(req, 'schedule');
   } catch (err) {
-    return res.redirect('/admin?err=Semester%20error');
+    return res.redirect(redirectWith('err', 'Semester error'));
   }
   if (!scope || scope.error || !scope.semester) {
-    return res.redirect('/admin?err=No%20active%20semester');
+    return res.redirect(redirectWith('err', 'No active semester'));
   }
   const courseId = scope.course.id;
   const activeSemester = scope.semester;
@@ -44248,7 +44233,7 @@ app.post('/admin/import/schedule.csv', requireImportExportSectionAccess, writeLi
   try {
     subjects = await getSubjectsCached(courseId);
   } catch (err) {
-    return res.redirect('/admin?err=Subjects%20error');
+    return res.redirect(redirectWith('err', 'Subjects error'));
   }
   const subjectMap = new Map(
     (subjects || []).map((s) => [String(s.name || '').trim().toLowerCase(), s])
@@ -44258,10 +44243,10 @@ app.post('/admin/import/schedule.csv', requireImportExportSectionAccess, writeLi
     const text = req.file.buffer.toString('utf8');
     rows = parseCsvText(text);
   } catch (err) {
-    return res.redirect('/admin?err=Invalid%20CSV');
+    return res.redirect(redirectWith('err', 'Invalid CSV'));
   }
   if (!rows.length) {
-    return res.redirect('/admin?err=Empty%20CSV');
+    return res.redirect(redirectWith('err', 'Empty CSV'));
   }
   let inserted = 0;
   let updated = 0;
@@ -44325,7 +44310,7 @@ app.post('/admin/import/schedule.csv', requireImportExportSectionAccess, writeLi
     semester_id: activeSemester.id,
     operation_id: operationId,
   });
-  return res.redirect(`/admin?ok=Schedule%20imported%20(${inserted}%2F${updated}%2F${skipped})&op=${operationId}`);
+  return res.redirect(redirectWith('ok', `Schedule imported (${inserted}/${updated}/${skipped})`, { op: operationId }));
 });
 
 app.get('/admin/export/users.csv', requireImportExportSectionAccess, (req, res) => {
@@ -44376,22 +44361,26 @@ app.get('/admin/export/users.csv', requireImportExportSectionAccess, (req, res) 
 });
 
 app.post('/admin/import/users.csv', requireImportExportSectionAccess, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
+  const redirectWith = (kind, message, extraParams = {}) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-import-export',
+    extraParams,
+  });
   if (!req.file || !req.file.buffer) {
-    return res.redirect('/admin?err=Missing%20CSV');
+    return res.redirect(redirectWith('err', 'Missing CSV'));
   }
   const confirmRequired = String(req.body.confirm_required || '') === '1';
   const confirmPhrase = String(req.body.confirm_phrase || '').trim().toUpperCase();
   if (confirmRequired && confirmPhrase !== 'IMPORT') {
-    return res.redirect('/admin?err=Type%20IMPORT%20to%20confirm');
+    return res.redirect(redirectWith('err', 'Type IMPORT to confirm'));
   }
   let scope = null;
   try {
     scope = await resolveImportScope(req, 'users');
   } catch (err) {
-    return res.redirect('/admin?err=Invalid%20scope');
+    return res.redirect(redirectWith('err', 'Invalid scope'));
   }
   if (!scope || scope.error) {
-    return res.redirect('/admin?err=Invalid%20scope');
+    return res.redirect(redirectWith('err', 'Invalid scope'));
   }
   const courseId = scope.course.id;
   let rows = [];
@@ -44401,10 +44390,10 @@ app.post('/admin/import/users.csv', requireImportExportSectionAccess, writeLimit
     rows = parseCsvText(text);
     courses = await getCoursesCached();
   } catch (err) {
-    return res.redirect('/admin?err=Invalid%20CSV');
+    return res.redirect(redirectWith('err', 'Invalid CSV'));
   }
   if (!rows.length) {
-    return res.redirect('/admin?err=Empty%20CSV');
+    return res.redirect(redirectWith('err', 'Empty CSV'));
   }
   const courseSet = new Set((courses || []).map((c) => Number(c.id)));
   let inserted = 0;
@@ -44452,7 +44441,7 @@ app.post('/admin/import/users.csv', requireImportExportSectionAccess, writeLimit
     operation_id: operationId,
   });
   broadcast('users_updated');
-  return res.redirect(`/admin?ok=Users%20imported%20(${inserted}%2F${updated}%2F${skipped})&op=${operationId}`);
+  return res.redirect(redirectWith('ok', `Users imported (${inserted}/${updated}/${skipped})`, { op: operationId }));
 });
 
 app.get('/admin/export/subjects.csv', requireImportExportSectionAccess, (req, res) => {
@@ -44477,22 +44466,26 @@ app.get('/admin/export/subjects.csv', requireImportExportSectionAccess, (req, re
 });
 
 app.post('/admin/import/subjects.csv', requireImportExportSectionAccess, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
+  const redirectWith = (kind, message, extraParams = {}) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-import-export',
+    extraParams,
+  });
   if (!req.file || !req.file.buffer) {
-    return res.redirect('/admin?err=Missing%20CSV');
+    return res.redirect(redirectWith('err', 'Missing CSV'));
   }
   const confirmRequired = String(req.body.confirm_required || '') === '1';
   const confirmPhrase = String(req.body.confirm_phrase || '').trim().toUpperCase();
   if (confirmRequired && confirmPhrase !== 'IMPORT') {
-    return res.redirect('/admin?err=Type%20IMPORT%20to%20confirm');
+    return res.redirect(redirectWith('err', 'Type IMPORT to confirm'));
   }
   let scope = null;
   try {
     scope = await resolveImportScope(req, 'subjects');
   } catch (err) {
-    return res.redirect('/admin?err=Invalid%20scope');
+    return res.redirect(redirectWith('err', 'Invalid scope'));
   }
   if (!scope || scope.error) {
-    return res.redirect('/admin?err=Invalid%20scope');
+    return res.redirect(redirectWith('err', 'Invalid scope'));
   }
   const courseId = scope.course.id;
   let rows = [];
@@ -44500,10 +44493,10 @@ app.post('/admin/import/subjects.csv', requireImportExportSectionAccess, writeLi
     const text = req.file.buffer.toString('utf8');
     rows = parseCsvText(text);
   } catch (err) {
-    return res.redirect('/admin?err=Invalid%20CSV');
+    return res.redirect(redirectWith('err', 'Invalid CSV'));
   }
   if (!rows.length) {
-    return res.redirect('/admin?err=Empty%20CSV');
+    return res.redirect(redirectWith('err', 'Empty CSV'));
   }
   let inserted = 0;
   let updated = 0;
@@ -44548,7 +44541,7 @@ app.post('/admin/import/subjects.csv', requireImportExportSectionAccess, writeLi
     course_id: courseId,
     operation_id: operationId,
   });
-  return res.redirect(`/admin?ok=Subjects%20imported%20(${inserted}%2F${updated}%2F${skipped})&op=${operationId}`);
+  return res.redirect(redirectWith('ok', `Subjects imported (${inserted}/${updated}/${skipped})`, { op: operationId }));
 });
 
 app.get('/admin/history.csv', requireHistorySectionAccess, (req, res) => {
@@ -47397,15 +47390,18 @@ app.post('/admin/schedule/clear-all', requireScheduleSectionAccess, async (req, 
 app.post('/admin/homework/delete/:id', requireHomeworkSectionAccess, async (req, res) => {
   const homeworkId = Number(req.params.id);
   const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-homework',
+  });
   if (!Number.isFinite(homeworkId) || homeworkId < 1) {
-    return res.redirect('/admin?err=Invalid%20homework');
+    return res.redirect(redirectWith('err', 'Invalid homework'));
   }
   try {
     const row = await getHomeworkForCourse(homeworkId, courseId, {
       selectClause: 'h.id, h.file_path',
     });
     if (!row) {
-      return res.redirect('/admin?err=Homework%20not%20found');
+      return res.redirect(redirectWith('err', 'Homework not found'));
     }
     const subgroups = await db.all('SELECT id FROM subgroups WHERE homework_id = ?', [homeworkId]);
     const subgroupIds = (subgroups || []).map((sg) => Number(sg.id || 0)).filter((value) => value > 0);
@@ -47422,17 +47418,20 @@ app.post('/admin/homework/delete/:id', requireHomeworkSectionAccess, async (req,
     }
     logActivity(db, req, 'homework_delete', 'homework', homeworkId, null, courseId);
     logAction(db, req, 'homework_delete', { id: homeworkId });
-    return res.redirect('/admin?ok=Homework%20deleted');
+    return res.redirect(redirectWith('ok', 'Homework deleted'));
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
 app.post('/admin/homework/delete-multiple', requireHomeworkSectionAccess, writeLimiter, async (req, res) => {
   const rawIds = Array.isArray(req.body.ids) ? req.body.ids : (req.body.ids ? [req.body.ids] : []);
   const ids = rawIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-homework',
+  });
   if (!ids.length) {
-    return res.redirect('/admin?err=No%20homework%20selected');
+    return res.redirect(redirectWith('err', 'No homework selected'));
   }
   const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : (req.session.user.course_id || 1);
   try {
@@ -47440,7 +47439,7 @@ app.post('/admin/homework/delete-multiple', requireHomeworkSectionAccess, writeL
       selectClause: 'h.id, h.file_path',
     });
     if (!scoped.length) {
-      return res.redirect('/admin?err=No%20homework%20found');
+      return res.redirect(redirectWith('err', 'No homework found'));
     }
     const scopedIds = scoped.map((row) => row.id);
     const scopedPlaceholders = scopedIds.map(() => '?').join(',');
@@ -47462,9 +47461,9 @@ app.post('/admin/homework/delete-multiple', requireHomeworkSectionAccess, writeL
 
     logActivity(db, req, 'homework_delete_multiple', 'homework', null, { ids: scopedIds, count: scopedIds.length }, courseId);
     logAction(db, req, 'homework_delete_multiple', { ids: scopedIds, count: scopedIds.length });
-    return res.redirect(`/admin?ok=Deleted%20${scopedIds.length}%20homework%20items`);
+    return res.redirect(redirectWith('ok', `Deleted ${scopedIds.length} homework items`));
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
@@ -47473,11 +47472,14 @@ app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
   const count = Number(req.body.group_count);
   const def = Number(req.body.default_group);
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-subjects',
+  });
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
-    return res.redirect('/admin?err=Invalid%20subject%20data');
+    return res.redirect(redirectWith('err', 'Invalid subject data'));
   }
   if (Number.isNaN(def) || def < 1 || def > count) {
-    return res.redirect('/admin?err=Invalid%20default%20group');
+    return res.redirect(redirectWith('err', 'Invalid default group'));
   }
   const settings = buildSubjectSettingsDraft(req.body);
   withTransaction(async (client) => {
@@ -47499,7 +47501,7 @@ app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
     );
     if (existing && existing.id) {
       const conflict = new Error('Subject already exists');
-      conflict.redirectPath = '/admin?err=Subject%20already%20exists%20in%20this%20course';
+      conflict.redirectUrl = redirectWith('err', 'Subject already exists in this course');
       throw conflict;
     }
     const inserted = await createSubjectInstanceWithBinding(client, {
@@ -47540,10 +47542,10 @@ app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
     await syncSubjectOfferingsForSubjectIds([subjectId]);
     invalidateSubjectsCache(courseId);
     invalidateRegistrationPathwaysCache();
-    return res.redirect('/admin?ok=Subject%20added');
+    return res.redirect(redirectWith('ok', 'Subject added'));
   }).catch((err) => {
-    if (err && err.redirectPath) {
-      return res.redirect(err.redirectPath);
+    if (err && err.redirectUrl) {
+      return res.redirect(err.redirectUrl);
     }
     if (isDbSchemaCompatibilityError(err)) {
       db.run(
@@ -47560,21 +47562,24 @@ app.post('/admin/subjects/add', requireSubjectsSectionAccess, (req, res) => {
         ],
         (fallbackErr) => {
           if (fallbackErr) {
-            return res.redirect('/admin?err=Database%20error');
+            return res.redirect(redirectWith('err', 'Database error'));
           }
           invalidateSubjectsCache(courseId);
           invalidateRegistrationPathwaysCache();
-          return res.redirect('/admin?ok=Subject%20added');
+          return res.redirect(redirectWith('ok', 'Subject added'));
         }
       );
       return;
     }
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   });
 });
 
 app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimiter, async (req, res) => {
   const sourceCourseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-subjects',
+  });
   const sourceSubjectId = parsePositiveIntStrict(req.body.source_subject_id);
   const rawTargetCourseIds = Array.isArray(req.body.target_course_ids)
     ? req.body.target_course_ids
@@ -47591,23 +47596,23 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
   const syncPathways = parseBooleanFlag(req.body.sync_pathways, true);
 
   if (!sourceSubjectId) {
-    return res.redirect('/admin?err=Select%20source%20subject');
+    return res.redirect(redirectWith('err', 'Select source subject'));
   }
   if (!targetCourseIds.length) {
-    return res.redirect('/admin?err=Select%20target%20courses');
+    return res.redirect(redirectWith('err', 'Select target courses'));
   }
 
   try {
     const sourceSubject = await getSubjectForCourse(sourceSubjectId, sourceCourseId, { includeHidden: true });
     if (!sourceSubject) {
-      return res.redirect('/admin?err=Source%20subject%20not%20found');
+      return res.redirect(redirectWith('err', 'Source subject not found'));
     }
 
     const requestedName = sanitizeCompactText(req.body.target_name || '', 140);
     const sourceName = sanitizeCompactText(sourceSubject.name || '', 140);
     const targetName = requestedName || sourceName;
     if (!targetName) {
-      return res.redirect('/admin?err=Target%20name%20is%20required');
+      return res.redirect(redirectWith('err', 'Target name is required'));
     }
 
     const targetRows = await db.all(
@@ -47852,9 +47857,9 @@ app.post('/admin/subjects/bulk-assign', requireSubjectsSectionAccess, writeLimit
     );
 
     const summary = `Bulk assign complete: created ${createdCount}, updated ${updatedCount}, skipped existing ${skippedExistingCount}, invalid courses ${skippedMissingCourses}`;
-    return res.redirect(`/admin?ok=${encodeURIComponent(summary)}`);
+    return res.redirect(redirectWith('ok', summary));
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
@@ -47864,11 +47869,14 @@ app.post('/admin/subjects/edit/:id', requireSubjectsSectionAccess, (req, res) =>
   const count = Number(req.body.group_count);
   const def = Number(req.body.default_group);
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-subjects',
+  });
   if (!name || Number.isNaN(count) || count < 1 || count > 3) {
-    return res.redirect('/admin?err=Invalid%20subject%20data');
+    return res.redirect(redirectWith('err', 'Invalid subject data'));
   }
   if (Number.isNaN(def) || def < 1 || def > count) {
-    return res.redirect('/admin?err=Invalid%20default%20group');
+    return res.redirect(redirectWith('err', 'Invalid default group'));
   }
   const settings = buildSubjectSettingsDraft(req.body);
   withTransaction(async (client) => {
@@ -47885,7 +47893,7 @@ app.post('/admin/subjects/edit/:id', requireSubjectsSectionAccess, (req, res) =>
     );
     if (!scopedSubject) {
       const notFound = new Error('Subject not found');
-      notFound.redirectPath = '/admin?err=Subject%20not%20found';
+      notFound.redirectUrl = redirectWith('err', 'Subject not found');
       throw notFound;
     }
     const catalog = await upsertSubjectCatalogEntry(client, name);
@@ -47946,12 +47954,12 @@ app.post('/admin/subjects/edit/:id', requireSubjectsSectionAccess, (req, res) =>
     await invalidateSubjectCachesForSubjectIds([id]);
     await syncSubjectOfferingsForSubjectIds([id]);
     invalidateRegistrationPathwaysCache();
-    return res.redirect('/admin?ok=Subject%20updated');
+    return res.redirect(redirectWith('ok', 'Subject updated'));
   }).catch((err) => {
-    if (err && err.redirectPath) {
-      return res.redirect(err.redirectPath);
+    if (err && err.redirectUrl) {
+      return res.redirect(err.redirectUrl);
     }
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   });
 });
 
@@ -48128,6 +48136,9 @@ app.post('/admin/api/homework/:homeworkId/clone', requireHomeworkSectionAccess, 
 app.post('/admin/subjects/delete/:id', requireSubjectsSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-subjects',
+  });
   withTransaction(async (client) => {
     const scopedSubject = await txGet(
       client,
@@ -48142,7 +48153,7 @@ app.post('/admin/subjects/delete/:id', requireSubjectsSectionAccess, (req, res) 
     );
     if (!scopedSubject) {
       const notFound = new Error('Subject not found');
-      notFound.redirectPath = '/admin?err=Subject%20not%20found';
+      notFound.redirectUrl = redirectWith('err', 'Subject not found');
       throw notFound;
     }
     return removeSubjectBindingFromCourse(client, id, courseId);
@@ -48153,12 +48164,12 @@ app.post('/admin/subjects/delete/:id', requireSubjectsSectionAccess, (req, res) 
     await syncSubjectOfferingsForSubjectIds([id]);
     invalidateSubjectsCache(courseId);
     invalidateRegistrationPathwaysCache();
-    return res.redirect('/admin?ok=Subject%20removed%20from%20course');
+    return res.redirect(redirectWith('ok', 'Subject removed from course'));
   }).catch((err) => {
-    if (err && err.redirectPath) {
-      return res.redirect(err.redirectPath);
+    if (err && err.redirectUrl) {
+      return res.redirect(err.redirectUrl);
     }
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   });
 });
 
@@ -48167,15 +48178,18 @@ app.post('/admin/courses/add', requireCoursesSectionAccess, (req, res) => {
   const courseId = Number(id);
   const teacherFlag = String(is_teacher_course) === '1' ? 1 : 0;
   const normalizedCourse = normalizeCourseDraft(name, location);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-courses',
+  });
   if (Number.isNaN(courseId) || courseId < 1 || !normalizedCourse.name) {
-    return res.redirect('/admin?err=Invalid%20course');
+    return res.redirect(redirectWith('err', 'Invalid course'));
   }
   db.run(
     'INSERT INTO courses (id, name, is_teacher_course, location) VALUES (?, ?, ?, ?)',
     [courseId, normalizedCourse.name, teacherFlag, normalizedCourse.location],
     (err) => {
     if (err) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(redirectWith('err', 'Database error'));
     }
     logAction(db, req, 'course_add', {
       id: courseId,
@@ -48185,7 +48199,7 @@ app.post('/admin/courses/add', requireCoursesSectionAccess, (req, res) => {
     });
     invalidateCoursesCache();
     invalidateRegistrationPathwaysCache();
-    return res.redirect('/admin?ok=Course%20created');
+    return res.redirect(redirectWith('ok', 'Course created'));
     }
   );
 });
@@ -48196,15 +48210,18 @@ app.post('/admin/courses/edit/:id', requireCoursesSectionAccess, (req, res) => {
   const courseId = Number(id);
   const teacherFlag = String(is_teacher_course) === '1' ? 1 : 0;
   const normalizedCourse = normalizeCourseDraft(name, location);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-courses',
+  });
   if (Number.isNaN(courseId) || !normalizedCourse.name) {
-    return res.redirect('/admin?err=Invalid%20course');
+    return res.redirect(redirectWith('err', 'Invalid course'));
   }
   db.run(
     'UPDATE courses SET name = ?, is_teacher_course = ?, location = ? WHERE id = ?',
     [normalizedCourse.name, teacherFlag, normalizedCourse.location, courseId],
     (err) => {
     if (err) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(redirectWith('err', 'Database error'));
     }
     logAction(db, req, 'course_edit', {
       id: courseId,
@@ -48214,15 +48231,18 @@ app.post('/admin/courses/edit/:id', requireCoursesSectionAccess, (req, res) => {
     });
     invalidateCoursesCache();
     invalidateRegistrationPathwaysCache();
-    return res.redirect('/admin?ok=Course%20updated');
+    return res.redirect(redirectWith('ok', 'Course updated'));
   });
 });
 
 app.post('/admin/courses/normalize-legacy', requireCoursesSectionAccess, writeLimiter, async (req, res) => {
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-courses',
+  });
   try {
     await ensureDbReady();
   } catch (err) {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 
   let transactionOpen = false;
@@ -48267,7 +48287,7 @@ app.post('/admin/courses/normalize-legacy', requireCoursesSectionAccess, writeLi
     const message = changes.length
       ? `Normalized ${changes.length} legacy course${changes.length === 1 ? '' : 's'}`
       : 'Courses already normalized';
-    return res.redirect(`/admin?ok=${encodeURIComponent(message)}`);
+    return res.redirect(redirectWith('ok', message));
   } catch (err) {
     if (transactionOpen) {
       try {
@@ -48277,69 +48297,64 @@ app.post('/admin/courses/normalize-legacy', requireCoursesSectionAccess, writeLi
       }
     }
     console.error('Legacy course normalization failed', err);
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
 app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = Number(id);
-  if (Number.isNaN(courseId)) {
-    return res.redirect('/admin?err=Invalid%20course');
-  }
-  db.get('SELECT COUNT(*) AS cnt FROM users WHERE course_id = ?', [courseId], (userErr, userRow) => {
-    if (userErr) {
-      return res.redirect('/admin?err=Database%20error');
-    }
-    if (Number(userRow.cnt) > 0) {
-      return res.redirect('/admin?err=Course%20has%20users');
-    }
-    db.get('SELECT COUNT(*) AS cnt FROM subjects WHERE course_id = ?', [courseId], (subErr, subRow) => {
-      if (subErr) {
-        return res.redirect('/admin?err=Database%20error');
-      }
-      if (Number(subRow.cnt) > 0) {
-        return res.redirect('/admin?err=Course%20has%20subjects');
-      }
-      db.get('SELECT COUNT(*) AS cnt FROM semesters WHERE course_id = ?', [courseId], (semErr, semRow) => {
-        if (semErr) {
-          return res.redirect('/admin?err=Database%20error');
-        }
-        if (Number(semRow.cnt) > 0) {
-          return res.redirect('/admin?err=Course%20has%20semesters');
-        }
-        db.run('DELETE FROM courses WHERE id = ?', [courseId], (err) => {
-          if (err) {
-            return res.redirect('/admin?err=Database%20error');
-          }
-          logAction(db, req, 'course_delete', { id: courseId });
-          invalidateCoursesCache();
-          invalidateRegistrationPathwaysCache();
-          invalidateSubjectsCache(courseId);
-          invalidateSemestersCache(courseId);
-          invalidateStudyDaysCache(courseId);
-          return res.redirect('/admin?ok=Course%20deleted');
-        });
-      });
-    });
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-courses',
   });
+  if (Number.isNaN(courseId)) {
+    return res.redirect(redirectWith('err', 'Invalid course'));
+  }
+  academicSetupHelpers.getLegacyCourseDependencyCounts(getAcademicSetupStore(), courseId)
+    .then((counts) => {
+      if (Number(counts.users || 0) > 0) {
+        return res.redirect(redirectWith('err', 'Course has users'));
+      }
+      if (Number(counts.subjects || 0) > 0) {
+        return res.redirect(redirectWith('err', 'Course has subjects'));
+      }
+      if (Number(counts.semesters || 0) > 0) {
+        return res.redirect(redirectWith('err', 'Course has semesters'));
+      }
+      db.run('DELETE FROM courses WHERE id = ?', [courseId], (err) => {
+        if (err) {
+          return res.redirect(redirectWith('err', 'Database error'));
+        }
+        logAction(db, req, 'course_delete', { id: courseId });
+        invalidateCoursesCache();
+        invalidateRegistrationPathwaysCache();
+        invalidateSubjectsCache(courseId);
+        invalidateSemestersCache(courseId);
+        invalidateStudyDaysCache(courseId);
+        return res.redirect(redirectWith('ok', 'Course deleted'));
+      });
+    })
+    .catch(() => res.redirect(redirectWith('err', 'Database error')));
 });
 
 app.post('/admin/teacher-requests/:userId/approve', requireTeachersSectionAccess, async (req, res) => {
   const userId = Number(req.params.userId);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-students',
+  });
   if (Number.isNaN(userId)) {
-    return res.redirect('/admin?err=Invalid%20user');
+    return res.redirect(redirectWith('err', 'Invalid user'));
   }
   try {
     await ensureDbReady();
     const courseId = getAdminCourse(req);
     const targetUser = await db.get('SELECT id, full_name, role, course_id FROM users WHERE id = ?', [userId]);
     if (!targetUser) {
-      return res.redirect('/admin?err=User%20not%20found');
+      return res.redirect(redirectWith('err', 'User not found'));
     }
     const requestStatus = await teacherTemplateHelpers.getTeacherRequestStatus(getTeacherTemplateStore(), userId);
     if (!requestStatus) {
-      return res.redirect('/admin?err=Teacher%20request%20not%20found');
+      return res.redirect(redirectWith('err', 'Teacher request not found'));
     }
     const targetCourseId = Number(targetUser.course_id || courseId || 1);
     const beforeSnapshot = await getUserRoleSnapshot(userId, targetUser.role || 'student');
@@ -48365,28 +48380,31 @@ app.post('/admin/teacher-requests/:userId/approve', requireTeachersSectionAccess
     await recomputeUserSecurityCase(userId, { courseId: targetCourseId, allowAutoQuarantine: false });
     logAction(db, req, 'teacher_request_approve', { user_id: userId });
     broadcast('users_updated');
-    return res.redirect('/admin?ok=Teacher%20approved');
+    return res.redirect(redirectWith('ok', 'Teacher approved'));
   } catch (err) {
     console.error('Approve teacher failed', err);
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
 app.post('/admin/teacher-requests/:userId/reject', requireTeachersSectionAccess, async (req, res) => {
   const userId = Number(req.params.userId);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-students',
+  });
   if (Number.isNaN(userId)) {
-    return res.redirect('/admin?err=Invalid%20user');
+    return res.redirect(redirectWith('err', 'Invalid user'));
   }
   try {
     await ensureDbReady();
     const courseId = getAdminCourse(req);
     const targetUser = await db.get('SELECT id, full_name, role, course_id FROM users WHERE id = ?', [userId]);
     if (!targetUser) {
-      return res.redirect('/admin?err=User%20not%20found');
+      return res.redirect(redirectWith('err', 'User not found'));
     }
     const requestStatus = await teacherTemplateHelpers.getTeacherRequestStatus(getTeacherTemplateStore(), userId);
     if (!requestStatus) {
-      return res.redirect('/admin?err=Teacher%20request%20not%20found');
+      return res.redirect(redirectWith('err', 'Teacher request not found'));
     }
     const targetCourseId = Number(targetUser.course_id || courseId || 1);
     const beforeSnapshot = await getUserRoleSnapshot(userId, targetUser.role || 'student');
@@ -48412,10 +48430,10 @@ app.post('/admin/teacher-requests/:userId/reject', requireTeachersSectionAccess,
     await recomputeUserSecurityCase(userId, { courseId: targetCourseId, allowAutoQuarantine: false });
     logAction(db, req, 'teacher_request_reject', { user_id: userId });
     broadcast('users_updated');
-    return res.redirect('/admin?ok=Teacher%20rejected');
+    return res.redirect(redirectWith('ok', 'Teacher rejected'));
   } catch (err) {
     console.error('Reject teacher failed', err);
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
@@ -48897,8 +48915,11 @@ app.post('/admin/semesters/add', requireSemestersSectionAccess, (req, res) => {
   const courseId = getAdminCourse(req);
   const weeks = Number(weeks_count);
   const active = String(is_active) === '1' ? 1 : 0;
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-semesters',
+  });
   if (!title || !start_date || Number.isNaN(weeks) || weeks < 1 || weeks > 30) {
-    return res.redirect('/admin?err=Invalid%20semester');
+    return res.redirect(redirectWith('err', 'Invalid semester'));
   }
   const create = () => {
     db.run(
@@ -48906,18 +48927,18 @@ app.post('/admin/semesters/add', requireSemestersSectionAccess, (req, res) => {
       [courseId, title.trim(), start_date, weeks, active],
       (err) => {
         if (err) {
-          return res.redirect('/admin?err=Database%20error');
+          return res.redirect(redirectWith('err', 'Database error'));
         }
         logAction(db, req, 'semester_add', { title, start_date, weeks_count: weeks, is_active: active });
         invalidateSemestersCache(courseId);
-        return res.redirect('/admin?ok=Semester%20created');
+        return res.redirect(redirectWith('ok', 'Semester created'));
       }
     );
   };
   if (active) {
     db.run('UPDATE semesters SET is_active = 0 WHERE course_id = ?', [courseId], (err) => {
       if (err) {
-        return res.redirect('/admin?err=Database%20error');
+        return res.redirect(redirectWith('err', 'Database error'));
       }
       create();
     });
@@ -48931,19 +48952,22 @@ app.post('/admin/semesters/edit/:id', requireSemestersSectionAccess, (req, res) 
   const { title, start_date, weeks_count } = req.body;
   const courseId = getAdminCourse(req);
   const weeks = Number(weeks_count);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-semesters',
+  });
   if (!title || !start_date || Number.isNaN(weeks) || weeks < 1 || weeks > 30) {
-    return res.redirect('/admin?err=Invalid%20semester');
+    return res.redirect(redirectWith('err', 'Invalid semester'));
   }
   db.run(
     'UPDATE semesters SET title = ?, start_date = ?, weeks_count = ? WHERE id = ? AND course_id = ?',
     [title.trim(), start_date, weeks, id, courseId],
     (err) => {
     if (err) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(redirectWith('err', 'Database error'));
     }
     logAction(db, req, 'semester_edit', { id, title, start_date, weeks_count: weeks });
     invalidateSemestersCache(courseId);
-    return res.redirect('/admin?ok=Semester%20updated');
+    return res.redirect(redirectWith('ok', 'Semester updated'));
   }
 );
 });
@@ -48951,17 +48975,20 @@ app.post('/admin/semesters/edit/:id', requireSemestersSectionAccess, (req, res) 
 app.post('/admin/semesters/set-active/:id', requireSemestersSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-semesters',
+  });
   db.run('UPDATE semesters SET is_active = 0 WHERE course_id = ?', [courseId], (err) => {
     if (err) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(redirectWith('err', 'Database error'));
     }
     db.run('UPDATE semesters SET is_active = 1, is_archived = 0 WHERE id = ? AND course_id = ?', [id, courseId], (err2) => {
       if (err2) {
-        return res.redirect('/admin?err=Database%20error');
+        return res.redirect(redirectWith('err', 'Database error'));
       }
       logAction(db, req, 'semester_set_active', { id });
       invalidateSemestersCache(courseId);
-      return res.redirect('/admin?ok=Semester%20activated');
+      return res.redirect(redirectWith('ok', 'Semester activated'));
     });
   });
 });
@@ -48969,24 +48996,30 @@ app.post('/admin/semesters/set-active/:id', requireSemestersSectionAccess, (req,
 app.post('/admin/semesters/archive/:id', requireSemestersSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-semesters',
+  });
   db.run('UPDATE semesters SET is_archived = 1, is_active = 0 WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
     if (err) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(redirectWith('err', 'Database error'));
     }
     logAction(db, req, 'semester_archive', { id });
     invalidateSemestersCache(courseId);
-    return res.redirect('/admin?ok=Semester%20archived');
+    return res.redirect(redirectWith('ok', 'Semester archived'));
   });
 });
 
 app.post('/admin/semesters/finalize/:id', requireSemestersSectionAccess, async (req, res) => {
   const semesterId = Number(req.params.id);
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-semesters',
+  });
   if (!Number.isFinite(semesterId) || semesterId < 1) {
-    return res.redirect('/admin?err=Invalid%20semester');
+    return res.redirect(redirectWith('err', 'Invalid semester'));
   }
   if (!isStepUpPhraseValid(req.body.confirm_phrase || req.body.stepup_code, STEPUP_CODE_FINALIZE)) {
-    return res.redirect('/admin?err=Type%20FINALIZE%20to%20confirm');
+    return res.redirect(redirectWith('err', 'Type FINALIZE to confirm'));
   }
 
   try {
@@ -49000,7 +49033,7 @@ app.post('/admin/semesters/finalize/:id', requireSemestersSectionAccess, async (
       [semesterId, courseId]
     );
     if (!semester) {
-      return res.redirect('/admin?err=Semester%20not%20found');
+      return res.redirect(redirectWith('err', 'Semester not found'));
     }
 
     const archiveSnapshot = await buildSemesterJournalArchiveSnapshot({
@@ -49060,9 +49093,10 @@ app.post('/admin/semesters/finalize/:id', requireSemestersSectionAccess, async (
       semesterId
     );
     invalidateSemestersCache(courseId);
-    return res.redirect(
-      `/admin?ok=${encodeURIComponent(`Semester finalized: archived + journals locked + backup generated (${Number(archiveSnapshot.subjects_count || 0)} subjects)`)}`
-    );
+    return res.redirect(redirectWith(
+      'ok',
+      `Semester finalized: archived + journals locked + backup generated (${Number(archiveSnapshot.subjects_count || 0)} subjects)`
+    ));
   } catch (err) {
     return handleDbError(res, err, 'admin.semesters.finalize');
   }
@@ -49071,8 +49105,11 @@ app.post('/admin/semesters/finalize/:id', requireSemestersSectionAccess, async (
 app.get('/admin/semesters/archive-export/:id', requireSemestersSectionAccess, async (req, res) => {
   const semesterId = Number(req.params.id);
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-semesters',
+  });
   if (!Number.isFinite(semesterId) || semesterId < 1) {
-    return res.redirect('/admin?err=Invalid%20semester');
+    return res.redirect(redirectWith('err', 'Invalid semester'));
   }
 
   try {
@@ -49086,7 +49123,7 @@ app.get('/admin/semesters/archive-export/:id', requireSemestersSectionAccess, as
       [semesterId, courseId]
     );
     if (!semester) {
-      return res.redirect('/admin?err=Semester%20not%20found');
+      return res.redirect(redirectWith('err', 'Semester not found'));
     }
 
     const archiveDir = path.join(
@@ -49098,7 +49135,7 @@ app.get('/admin/semesters/archive-export/:id', requireSemestersSectionAccess, as
     const latestSummaryFileName = `semester-${semesterId}-archive-summary-latest.csv`;
     const absolutePath = path.join(archiveDir, latestSummaryFileName);
     if (!fs.existsSync(absolutePath)) {
-      return res.redirect('/admin?err=Archive%20summary%20not%20found');
+      return res.redirect(redirectWith('err', 'Archive summary not found'));
     }
     return res.download(absolutePath, latestSummaryFileName);
   } catch (err) {
@@ -49109,40 +49146,46 @@ app.get('/admin/semesters/archive-export/:id', requireSemestersSectionAccess, as
 app.post('/admin/semesters/restore/:id', requireSemestersSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-semesters',
+  });
   db.run('UPDATE semesters SET is_archived = 0 WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
     if (err) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(redirectWith('err', 'Database error'));
     }
     logAction(db, req, 'semester_restore', { id });
     invalidateSemestersCache(courseId);
-    return res.redirect('/admin?ok=Semester%20restored');
+    return res.redirect(redirectWith('ok', 'Semester restored'));
   });
 });
 
 app.post('/admin/semesters/delete/:id', requireSemestersSectionAccess, (req, res) => {
   const { id } = req.params;
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-semesters',
+  });
   db.get('SELECT is_active FROM semesters WHERE id = ? AND course_id = ?', [id, courseId], (semErr, semRow) => {
     if (semErr || !semRow) {
-      return res.redirect('/admin?err=Semester%20not%20found');
+      return res.redirect(redirectWith('err', 'Semester not found'));
     }
     if (semRow.is_active === 1) {
-      return res.redirect('/admin?err=Cannot%20delete%20active%20semester');
+      return res.redirect(redirectWith('err', 'Cannot delete active semester'));
     }
     db.get('SELECT COUNT(*) AS cnt FROM schedule_entries WHERE semester_id = ?', [id], (cntErr, cntRow) => {
       if (cntErr) {
-        return res.redirect('/admin?err=Database%20error');
+        return res.redirect(redirectWith('err', 'Database error'));
       }
       if (Number(cntRow.cnt) > 0) {
-        return res.redirect('/admin?err=Semester%20in%20use');
+        return res.redirect(redirectWith('err', 'Semester in use'));
       }
       db.run('DELETE FROM semesters WHERE id = ? AND course_id = ?', [id, courseId], (err) => {
         if (err) {
-          return res.redirect('/admin?err=Database%20error');
+          return res.redirect(redirectWith('err', 'Database error'));
         }
         logAction(db, req, 'semester_delete', { id });
         invalidateSemestersCache(courseId);
-        return res.redirect('/admin?ok=Semester%20deleted');
+        return res.redirect(redirectWith('ok', 'Semester deleted'));
       });
     });
   });
@@ -49151,13 +49194,16 @@ app.post('/admin/semesters/delete/:id', requireSemestersSectionAccess, (req, res
 app.post('/admin/semesters/hard-delete/:id', requireSemestersSectionAccess, async (req, res) => {
   const semesterId = Number(req.params.id);
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-semesters',
+  });
   if (!Number.isFinite(semesterId) || semesterId <= 0) {
-    return res.redirect('/admin?err=Invalid%20semester');
+    return res.redirect(redirectWith('err', 'Invalid semester'));
   }
   try {
     const semRow = await db.get('SELECT id, is_active FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
     if (!semRow) {
-      return res.redirect('/admin?err=Semester%20not%20found');
+      return res.redirect(redirectWith('err', 'Semester not found'));
     }
     if (Number(semRow.is_active) === 1) {
       await db.run('UPDATE semesters SET is_active = 0 WHERE id = ? AND course_id = ?', [semesterId, courseId]);
@@ -49176,7 +49222,7 @@ app.post('/admin/semesters/hard-delete/:id', requireSemestersSectionAccess, asyn
     await db.run('DELETE FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
     logAction(db, req, 'semester_hard_delete', { id: semesterId });
     invalidateSemestersCache(courseId);
-    return res.redirect('/admin?ok=Semester%20hard%20deleted');
+    return res.redirect(redirectWith('ok', 'Semester hard deleted'));
   } catch (err) {
     return handleDbError(res, err, 'admin.semesters.hardDelete');
   }
@@ -49186,15 +49232,18 @@ app.post('/admin/student-groups/set', requireUsersSectionAccess, (req, res) => {
   const { student_id, subject_id, group_number } = req.body;
   const groupNum = Number(group_number);
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-students',
+  });
   if (!student_id || !subject_id || Number.isNaN(groupNum)) {
-    return res.redirect('/admin?err=Invalid%20group%20assignment');
+    return res.redirect(redirectWith('err', 'Invalid group assignment'));
   }
   getSubjectForCourse(subject_id, courseId, { includeHidden: true }).then((subject) => {
     if (!subject) {
-      return res.redirect('/admin?err=Database%20error');
+      return res.redirect(redirectWith('err', 'Database error'));
     }
     if (groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
-      return res.redirect('/admin?err=Group%20out%20of%20range');
+      return res.redirect(redirectWith('err', 'Group out of range'));
     }
     db.run(
       `
@@ -49206,16 +49255,16 @@ app.post('/admin/student-groups/set', requireUsersSectionAccess, (req, res) => {
       [student_id, subject_id, groupNum],
       (setErr) => {
         if (setErr) {
-          return res.redirect('/admin?err=Database%20error');
+          return res.redirect(redirectWith('err', 'Database error'));
         }
         logAction(db, req, 'student_group_set', { student_id, subject_id, group_number: groupNum });
         logActivity(db, req, 'group_set', 'student_group', null, { student_id, subject_id, group_number: groupNum }, courseId);
         broadcast('users_updated');
-        return res.redirect('/admin?ok=Group%20updated');
+        return res.redirect(redirectWith('ok', 'Group updated'));
       }
     );
   }).catch(() => {
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   });
 });
 
@@ -49252,54 +49301,53 @@ app.post('/admin/students/groups/set', requireUsersOrStudentsSectionAccess, (req
   if (!student_id || !subject_id || Number.isNaN(groupNum)) {
     return res.redirect(redirectWith('err', 'Invalid group assignment'));
   }
-  db.get(
-    'SELECT id, role FROM users WHERE id = ? AND course_id = ?',
-    [student_id, courseId],
-    (userErr, user) => {
-      if (userErr || !user) {
-        return res.redirect(redirectWith('err', 'User not found'));
-      }
-      if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
-        return res.redirect(redirectWith('err', 'Forbidden student scope'));
-      }
-      getSubjectForCourse(subject_id, courseId, { includeHidden: true }).then((subject) => {
-        if (!subject) {
-          return res.redirect(redirectWith('err', 'Database error'));
-        }
-        if (groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
-          return res.redirect(redirectWith('err', 'Group out of range'));
-        }
-        db.run(
-          `
-            INSERT INTO student_groups (student_id, subject_id, group_number)
-            VALUES (?, ?, ?)
-            ON CONFLICT(student_id, subject_id)
-            DO UPDATE SET group_number = excluded.group_number
-          `,
-          [student_id, subject_id, groupNum],
-          (setErr) => {
-            if (setErr) {
-              return res.redirect(redirectWith('err', 'Database error'));
-            }
-            logAction(db, req, 'student_group_set', { student_id, subject_id, group_number: groupNum });
-            logActivity(
-              db,
-              req,
-              'group_set',
-              'student_group',
-              null,
-              { student_id, subject_id, group_number: groupNum, scope: 'students' },
-              courseId
-            );
-            broadcast('users_updated');
-            return res.redirect(redirectWith('ok', 'Group updated'));
-          }
-        );
-      }).catch(() => {
-        return res.redirect(redirectWith('err', 'Database error'));
-      });
+  academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+    userId: student_id,
+    courseId,
+  }).then((user) => {
+    if (!user) {
+      return res.redirect(redirectWith('err', 'User not found'));
     }
-  );
+    if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
+      return res.redirect(redirectWith('err', 'Forbidden student scope'));
+    }
+    getSubjectForCourse(subject_id, courseId, { includeHidden: true }).then((subject) => {
+      if (!subject) {
+        return res.redirect(redirectWith('err', 'Database error'));
+      }
+      if (groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
+        return res.redirect(redirectWith('err', 'Group out of range'));
+      }
+      db.run(
+        `
+          INSERT INTO student_groups (student_id, subject_id, group_number)
+          VALUES (?, ?, ?)
+          ON CONFLICT(student_id, subject_id)
+          DO UPDATE SET group_number = excluded.group_number
+        `,
+        [student_id, subject_id, groupNum],
+        (setErr) => {
+          if (setErr) {
+            return res.redirect(redirectWith('err', 'Database error'));
+          }
+          logAction(db, req, 'student_group_set', { student_id, subject_id, group_number: groupNum });
+          logActivity(
+            db,
+            req,
+            'group_set',
+            'student_group',
+            null,
+            { student_id, subject_id, group_number: groupNum, scope: 'students' },
+            courseId
+          );
+          broadcast('users_updated');
+          return res.redirect(redirectWith('ok', 'Group updated'));
+        }
+      );
+    }).catch(() => {
+      return res.redirect(redirectWith('err', 'Database error'));
+    });
+  }).catch(() => res.redirect(redirectWith('err', 'Database error')));
 });
 
 app.post('/admin/students/group/remove', requireUsersOrStudentsSectionAccess, (req, res) => {
@@ -49311,39 +49359,38 @@ app.post('/admin/students/group/remove', requireUsersOrStudentsSectionAccess, (r
   if (!student_id || !subject_id) {
     return res.redirect(redirectWith('err', 'Invalid remove request'));
   }
-  db.get(
-    'SELECT id, role FROM users WHERE id = ? AND course_id = ?',
-    [student_id, courseId],
-    (userErr, user) => {
-      if (userErr || !user) {
-        return res.redirect(redirectWith('err', 'User not found'));
-      }
-      if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
-        return res.redirect(redirectWith('err', 'Forbidden student scope'));
-      }
-      db.run(
-        'DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?',
-        [student_id, subject_id],
-        (err) => {
-          if (err) {
-            return res.redirect(redirectWith('err', 'Database error'));
-          }
-          logAction(db, req, 'student_group_remove', { student_id, subject_id });
-          logActivity(
-            db,
-            req,
-            'group_remove',
-            'student_group',
-            null,
-            { student_id, subject_id, scope: 'students' },
-            courseId
-          );
-          broadcast('users_updated');
-          return res.redirect(redirectWith('ok', 'Subject removed'));
-        }
-      );
+  academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+    userId: student_id,
+    courseId,
+  }).then((user) => {
+    if (!user) {
+      return res.redirect(redirectWith('err', 'User not found'));
     }
-  );
+    if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
+      return res.redirect(redirectWith('err', 'Forbidden student scope'));
+    }
+    db.run(
+      'DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?',
+      [student_id, subject_id],
+      (err) => {
+        if (err) {
+          return res.redirect(redirectWith('err', 'Database error'));
+        }
+        logAction(db, req, 'student_group_remove', { student_id, subject_id });
+        logActivity(
+          db,
+          req,
+          'group_remove',
+          'student_group',
+          null,
+          { student_id, subject_id, scope: 'students' },
+          courseId
+        );
+        broadcast('users_updated');
+        return res.redirect(redirectWith('ok', 'Subject removed'));
+      }
+    );
+  }).catch(() => res.redirect(redirectWith('err', 'Database error')));
 });
 
 app.post('/admin/students/deactivate', requireUsersOrStudentsSectionAccess, (req, res) => {
@@ -49356,29 +49403,28 @@ app.post('/admin/students/deactivate', requireUsersOrStudentsSectionAccess, (req
   if (!Number.isFinite(userId)) {
     return res.redirect(redirectWith('err', 'Invalid user'));
   }
-  db.get(
-    'SELECT id, role, full_name FROM users WHERE id = ? AND course_id = ?',
-    [userId, courseId],
-    (err, user) => {
-      if (err || !user) {
-        return res.redirect(redirectWith('err', 'User not found'));
-      }
-      if (normalizeRoleKey(user.role) === 'admin') {
-        return res.redirect(redirectWith('err', 'Cannot deactivate admin'));
-      }
-      if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
-        return res.redirect(redirectWith('err', 'Forbidden student scope'));
-      }
-      db.run('UPDATE users SET is_active = 0 WHERE id = ?', [userId], (updErr) => {
-        if (updErr) {
-          return res.redirect(redirectWith('err', 'Database error'));
-        }
-        logAction(db, req, 'student_deactivate', { user_id: userId, full_name: user.full_name });
-        broadcast('users_updated');
-        return res.redirect(redirectWith('ok', 'Student deactivated'));
-      });
+  academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+    userId,
+    courseId,
+  }).then((user) => {
+    if (!user) {
+      return res.redirect(redirectWith('err', 'User not found'));
     }
-  );
+    if (normalizeRoleKey(user.role) === 'admin') {
+      return res.redirect(redirectWith('err', 'Cannot deactivate admin'));
+    }
+    if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
+      return res.redirect(redirectWith('err', 'Forbidden student scope'));
+    }
+    db.run('UPDATE users SET is_active = 0 WHERE id = ?', [userId], (updErr) => {
+      if (updErr) {
+        return res.redirect(redirectWith('err', 'Database error'));
+      }
+      logAction(db, req, 'student_deactivate', { user_id: userId, full_name: user.full_name });
+      broadcast('users_updated');
+      return res.redirect(redirectWith('ok', 'Student deactivated'));
+    });
+  }).catch(() => res.redirect(redirectWith('err', 'Database error')));
 });
 
 app.post('/admin/students/activate', requireUsersOrStudentsSectionAccess, (req, res) => {
@@ -49391,26 +49437,25 @@ app.post('/admin/students/activate', requireUsersOrStudentsSectionAccess, (req, 
   if (!Number.isFinite(userId)) {
     return res.redirect(redirectWith('err', 'Invalid user'));
   }
-  db.get(
-    'SELECT id, role FROM users WHERE id = ? AND course_id = ?',
-    [userId, courseId],
-    (err, user) => {
-      if (err || !user) {
-        return res.redirect(redirectWith('err', 'User not found'));
-      }
-      if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
-        return res.redirect(redirectWith('err', 'Forbidden student scope'));
-      }
-      db.run('UPDATE users SET is_active = 1 WHERE id = ?', [userId], (updErr) => {
-        if (updErr) {
-          return res.redirect(redirectWith('err', 'Database error'));
-        }
-        logAction(db, req, 'student_activate', { user_id: userId });
-        broadcast('users_updated');
-        return res.redirect(redirectWith('ok', 'Student restored'));
-      });
+  academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+    userId,
+    courseId,
+  }).then((user) => {
+    if (!user) {
+      return res.redirect(redirectWith('err', 'User not found'));
     }
-  );
+    if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
+      return res.redirect(redirectWith('err', 'Forbidden student scope'));
+    }
+    db.run('UPDATE users SET is_active = 1 WHERE id = ?', [userId], (updErr) => {
+      if (updErr) {
+        return res.redirect(redirectWith('err', 'Database error'));
+      }
+      logAction(db, req, 'student_activate', { user_id: userId });
+      broadcast('users_updated');
+      return res.redirect(redirectWith('ok', 'Student restored'));
+    });
+  }).catch(() => res.redirect(redirectWith('err', 'Database error')));
 });
 
 app.get('/admin/users/:id/roles.json', requireRoleAccessSectionAccess, async (req, res) => {
@@ -49425,7 +49470,10 @@ app.get('/admin/users/:id/roles.json', requireRoleAccessSectionAccess, async (re
   }
   const courseId = getAdminCourse(req);
   try {
-    const userRow = await db.get('SELECT id, role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    const userRow = await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+      userId,
+      courseId,
+    });
     if (!userRow) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -49449,23 +49497,29 @@ app.get('/admin/users/:id/roles.json', requireRoleAccessSectionAccess, async (re
 app.post('/admin/users/roles', requireRoleAccessSectionAccess, async (req, res) => {
   const userId = Number(req.body.user_id);
   const courseId = getAdminCourse(req);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-role-studio',
+  });
   const selectedRoles = normalizeRoleList(
     Array.isArray(req.body.role_keys) ? req.body.role_keys : (req.body.role_keys ? [req.body.role_keys] : [])
   );
   if (!Number.isFinite(userId) || userId < 1 || !selectedRoles.length) {
-    return res.redirect('/admin?err=Invalid%20role%20selection');
+    return res.redirect(redirectWith('err', 'Invalid role selection'));
   }
   if (!isStepUpPhraseValid(req.body.stepup_code, STEPUP_CODE_ROLE)) {
-    return res.redirect('/admin?err=Type%20ROLE%20to%20confirm');
+    return res.redirect(redirectWith('err', 'Type ROLE to confirm'));
   }
   try {
     await ensureDbReady();
-    const user = await db.get('SELECT id, role, full_name FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    const user = await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+      userId,
+      courseId,
+    });
     if (!user) {
-      return res.redirect('/admin?err=User%20not%20found');
+      return res.redirect(redirectWith('err', 'User not found'));
     }
     if (Number(userId) === Number(req.session.user.id) && !selectedRoles.includes('admin')) {
-      return res.redirect('/admin?err=Cannot%20remove%20your%20own%20admin%20role');
+      return res.redirect(redirectWith('err', 'Cannot remove your own admin role'));
     }
     const beforeSnapshot = await getUserRoleSnapshot(userId, user.role || 'student');
     const requestedPrimary = normalizeRoleKey(req.body.primary_role || '');
@@ -49493,40 +49547,46 @@ app.post('/admin/users/roles', requireRoleAccessSectionAccess, async (req, res) 
     await recomputeUserSecurityCase(userId, { courseId, allowAutoQuarantine: false });
     logAction(db, req, 'user_roles_change', { user_id: userId, role_keys: result.roleKeys, primary_role: result.primaryRoleKey });
     broadcast('users_updated');
-    return res.redirect('/admin?ok=Roles%20updated');
+    return res.redirect(redirectWith('ok', 'Roles updated'));
   } catch (err) {
     if (String(err.message || '').includes('At least one admin required')) {
-      return res.redirect('/admin?err=At%20least%20one%20admin%20required');
+      return res.redirect(redirectWith('err', 'At least one admin required'));
     }
     if (String(err.message || '').includes('Invalid role')) {
-      return res.redirect('/admin?err=Invalid%20role%20selection');
+      return res.redirect(redirectWith('err', 'Invalid role selection'));
     }
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
 app.post('/admin/users/role', requireRoleAccessSectionAccess, async (req, res) => {
   const { user_id, role } = req.body;
   const roleKey = normalizeRoleKey(role);
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-role-studio',
+  });
   if (!user_id || !roleKey || !['student', 'admin', 'starosta', 'deanery', 'teacher'].includes(roleKey)) {
-    return res.redirect('/admin?err=Invalid%20role');
+    return res.redirect(redirectWith('err', 'Invalid role'));
   }
   if (!isStepUpPhraseValid(req.body.stepup_code, STEPUP_CODE_ROLE)) {
-    return res.redirect('/admin?err=Type%20ROLE%20to%20confirm');
+    return res.redirect(redirectWith('err', 'Type ROLE to confirm'));
   }
   const userId = Number(user_id);
   const courseId = getAdminCourse(req);
   if (!Number.isFinite(userId) || userId < 1) {
-    return res.redirect('/admin?err=Invalid%20role');
+    return res.redirect(redirectWith('err', 'Invalid role'));
   }
   if (userId === Number(req.session.user.id)) {
-    return res.redirect('/admin?err=Cannot%20change%20your%20own%20role');
+    return res.redirect(redirectWith('err', 'Cannot change your own role'));
   }
   try {
     await ensureDbReady();
-    const user = await db.get('SELECT id, role, full_name FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    const user = await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+      userId,
+      courseId,
+    });
     if (!user) {
-      return res.redirect('/admin?err=User%20not%20found');
+      return res.redirect(redirectWith('err', 'User not found'));
     }
     const beforeSnapshot = await getUserRoleSnapshot(userId, user.role || 'student');
     await assignUserRoles(userId, [roleKey], { preferredPrimary: roleKey });
@@ -49546,12 +49606,12 @@ app.post('/admin/users/role', requireRoleAccessSectionAccess, async (req, res) =
     await recomputeUserSecurityCase(userId, { courseId, allowAutoQuarantine: false });
     logAction(db, req, 'user_role_change', { user_id: userId, role: roleKey });
     broadcast('users_updated');
-    return res.redirect('/admin?ok=Role%20updated');
+    return res.redirect(redirectWith('ok', 'Role updated'));
   } catch (err) {
     if (String(err.message || '').includes('At least one admin required')) {
-      return res.redirect('/admin?err=At%20least%20one%20admin%20required');
+      return res.redirect(redirectWith('err', 'At least one admin required'));
     }
-    return res.redirect('/admin?err=Database%20error');
+    return res.redirect(redirectWith('err', 'Database error'));
   }
 });
 
@@ -50063,6 +50123,9 @@ app.post('/admin/users/reset-password', requireUsersSectionAccess, (req, res) =>
 });
 
 app.post('/admin/homework/migrate', requireHomeworkSectionAccess, (req, res) => {
+  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
+    tab: 'admin-homework',
+  });
   const timeToClass = (time) => {
     if (!time) return null;
     const start = time.split('-')[0].trim();
@@ -50078,14 +50141,14 @@ app.post('/admin/homework/migrate', requireHomeworkSectionAccess, (req, res) => 
     `,
     (err, rows) => {
       if (err) {
-        return res.redirect('/admin?err=Database%20error');
+        return res.redirect(redirectWith('err', 'Database error'));
       }
       if (!rows.length) {
-        return res.redirect('/admin?ok=Nothing%20to%20migrate');
+        return res.redirect(redirectWith('ok', 'Nothing to migrate'));
       }
       db.all('SELECT id, name FROM subjects', (sErr, subjects) => {
         if (sErr) {
-          return res.redirect('/admin?err=Database%20error');
+          return res.redirect(redirectWith('err', 'Database error'));
         }
         const subjectMap = new Map(subjects.map((s) => [s.name, s.id]));
         const stmt = db.prepare(
@@ -50106,7 +50169,7 @@ app.post('/admin/homework/migrate', requireHomeworkSectionAccess, (req, res) => 
         });
         stmt.finalize(() => {
           logAction(db, req, 'homework_migrate', { count: rows.length });
-          return res.redirect('/admin?ok=Homework%20migrated');
+          return res.redirect(redirectWith('ok', 'Homework migrated'));
         });
       });
     }
@@ -50121,39 +50184,35 @@ app.post('/admin/users/delete-multiple', requireUsersSectionAccess, (req, res) =
     return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No users selected'));
   }
   const list = Array.isArray(ids) ? ids : [ids];
-  const placeholders = list.map(() => '?').join(',');
-  db.all(
-    `SELECT id, role FROM users WHERE course_id = ? AND id IN (${placeholders})`,
-    [courseId, ...list],
-    (err, rows) => {
-      if (err) {
+  academicSetupHelpers.listLegacyCourseUsers(getAcademicSetupStore(), {
+    courseId,
+    userIds: list,
+    excludeRoles: ['admin'],
+  }).then((rows) => {
+    const deleteIds = (rows || []).map((u) => Number(u.id || 0)).filter((id) => id > 0);
+    if (!deleteIds.length) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No students to delete'));
+    }
+    const delPlaceholders = deleteIds.map(() => '?').join(',');
+    db.run(`UPDATE users SET is_active = 0 WHERE id IN (${delPlaceholders})`, deleteIds, (delErr) => {
+      if (delErr) {
         return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
       }
-      const deleteIds = rows.filter((u) => u.role !== 'admin').map((u) => u.id);
-      if (!deleteIds.length) {
-        return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No students to delete'));
-      }
-      const delPlaceholders = deleteIds.map(() => '?').join(',');
-      db.run(`UPDATE users SET is_active = 0 WHERE id IN (${delPlaceholders})`, deleteIds, (delErr) => {
-        if (delErr) {
-          return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
-        }
-        logAction(db, req, 'users_deactivate_multiple', { ids: deleteIds });
-        broadcast('users_updated');
-        return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', 'Users deactivated'));
-      });
-    }
-  );
+      logAction(db, req, 'users_deactivate_multiple', { ids: deleteIds });
+      broadcast('users_updated');
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', 'Users deactivated'));
+    });
+  }).catch(() => res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error')));
 });
 
 app.post('/admin/users/clear-all', requireUsersSectionAccess, (req, res) => {
   const courseId = getAdminCourse(req);
   const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
-  db.all('SELECT id FROM users WHERE role != ? AND course_id = ?', ['admin', courseId], (err, rows) => {
-    if (err) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
-    }
-    const ids = rows.map((r) => r.id);
+  academicSetupHelpers.listLegacyCourseUsers(getAcademicSetupStore(), {
+    courseId,
+    excludeRoles: ['admin'],
+  }).then((rows) => {
+    const ids = (rows || []).map((r) => Number(r.id || 0)).filter((id) => id > 0);
     if (!ids.length) {
       return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No students to delete'));
     }
@@ -50166,7 +50225,7 @@ app.post('/admin/users/clear-all', requireUsersSectionAccess, (req, res) => {
       broadcast('users_updated');
       return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', 'All students deactivated'));
     });
-  });
+  }).catch(() => res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error')));
 });
 
 app.post('/admin/users/deactivate', requireUsersSectionAccess, (req, res) => {
@@ -50175,8 +50234,11 @@ app.post('/admin/users/deactivate', requireUsersSectionAccess, (req, res) => {
   if (!user_id) {
     return res.status(400).json({ error: 'Missing user_id' });
   }
-  db.get('SELECT role, full_name FROM users WHERE id = ? AND course_id = ?', [user_id, courseId], (err, user) => {
-    if (err || !user) {
+  academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+    userId: user_id,
+    courseId,
+  }).then((user) => {
+    if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
     if (user.role === 'admin') {
@@ -50190,7 +50252,7 @@ app.post('/admin/users/deactivate', requireUsersSectionAccess, (req, res) => {
       broadcast('users_updated');
       return res.json({ ok: true });
     });
-  });
+  }).catch(() => res.status(500).json({ error: 'Database error' }));
 });
 
 app.post('/admin/users/activate', requireUsersSectionAccess, (req, res) => {
@@ -50199,14 +50261,22 @@ app.post('/admin/users/activate', requireUsersSectionAccess, (req, res) => {
   if (!user_id) {
     return res.status(400).json({ error: 'Missing user_id' });
   }
-  db.run('UPDATE users SET is_active = 1 WHERE id = ? AND course_id = ?', [user_id, courseId], (updErr) => {
-    if (updErr) {
-      return res.status(500).json({ error: 'Database error' });
+  academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+    userId: user_id,
+    courseId,
+  }).then((user) => {
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
-    logAction(db, req, 'user_activate', { user_id });
-    broadcast('users_updated');
-    return res.json({ ok: true });
-  });
+    db.run('UPDATE users SET is_active = 1 WHERE id = ? AND course_id = ?', [user_id, courseId], (updErr) => {
+      if (updErr) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      logAction(db, req, 'user_activate', { user_id });
+      broadcast('users_updated');
+      return res.json({ ok: true });
+    });
+  }).catch(() => res.status(500).json({ error: 'Database error' }));
 });
 
 app.post('/admin/users/delete-permanent', requireUsersSectionAccess, async (req, res) => {
@@ -50218,7 +50288,10 @@ app.post('/admin/users/delete-permanent', requireUsersSectionAccess, async (req,
     return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Invalid user'));
   }
   try {
-    const user = await db.get('SELECT role FROM users WHERE id = ? AND course_id = ?', [userId, courseId]);
+    const user = await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+      userId,
+      courseId,
+    });
     if (!user) {
       return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'User not found'));
     }
