@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.10",
+      "date": "2026-03-27",
+      "items": [
+        "refactor(runtime-homework-facades): add `listLegacyCourseHomeworkRows(...)` and `listLegacyTeacherHomeworkRows(...)` to `lib/academicSetup.js`, then switch `app.js` course-homework access helpers off hand-written binding/fallback SQL so these reads now go through the Academic Setup service layer",
+        "refactor(shared-course-subject-cache): move `getSubjectsCached(...)` in `app.js` onto `listLegacyCourseSubjects(...)`, removing another duplicated binding-aware subject read and keeping shared/bound subject access logic in one facade instead of scattered helper SQL",
+        "feat(teacher-workspace-shared-homework-scope): make teacher workspace templates, assets, and recent homework use derived shared storage scope and legacy semester mapping, so bound-course contexts can still see shared subject homework/runtime artifacts instead of relying only on raw `course_id = selectedCourseId` filtering"
+      ]
+    },
+    {
       "version": "1.3.09",
       "date": "2026-03-27",
       "items": [

@@ -6255,37 +6255,16 @@ async function getHomeworkRowsForCourse(homeworkIds, courseId, options = {}) {
   if (!normalizedIds.length || !Number.isInteger(normalizedCourseId) || normalizedCourseId < 1) {
     return [];
   }
-  const placeholders = normalizedIds.map(() => '?').join(',');
   const selectClause = String(options.selectClause || 'h.*').trim() || 'h.*';
   const extraWhere = typeof options.extraWhere === 'string' ? options.extraWhere.trim() : '';
   const extraParams = Array.isArray(options.extraParams) ? options.extraParams : [];
-  try {
-    return await db.all(
-      `
-        SELECT DISTINCT ${selectClause}
-        FROM homework h
-        JOIN subject_course_bindings scb ON scb.subject_id = h.subject_id
-        WHERE h.id IN (${placeholders})
-          AND scb.course_id = ?
-          ${extraWhere ? `AND ${extraWhere}` : ''}
-      `,
-      [...normalizedIds, normalizedCourseId, ...extraParams]
-    );
-  } catch (err) {
-    if (!isDbSchemaCompatibilityError(err)) {
-      throw err;
-    }
-    return db.all(
-      `
-        SELECT ${selectClause}
-        FROM homework h
-        WHERE h.id IN (${placeholders})
-          AND h.course_id = ?
-          ${extraWhere ? `AND ${extraWhere}` : ''}
-      `,
-      [...normalizedIds, normalizedCourseId, ...extraParams]
-    );
-  }
+  return academicSetupHelpers.listLegacyCourseHomeworkRows(getAcademicSetupStore(), {
+    homeworkIds: normalizedIds,
+    courseId: normalizedCourseId,
+    selectClause,
+    extraWhere,
+    extraParams,
+  });
 }
 
 async function getHomeworkForCourse(homeworkId, courseId, options = {}) {
@@ -6297,34 +6276,11 @@ async function getSubjectsCached(courseId, options = {}) {
   const key = `${courseId}|${options.visibleOnly ? 'visible' : 'all'}`;
   const cached = cacheGet(referenceCache.subjects, key);
   if (cached) return cached;
-  try {
-    const rows = await db.all(
-      `
-        SELECT
-          s.*,
-          s.course_id AS owner_course_id,
-          scb.course_id AS bound_course_id,
-          COALESCE(cat.name, s.name) AS catalog_name
-        FROM subject_course_bindings scb
-        JOIN subjects s ON s.id = scb.subject_id
-        LEFT JOIN subject_catalog cat ON cat.id = s.catalog_id
-        WHERE scb.course_id = ?
-          ${options.visibleOnly ? "AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')" : ''}
-        ORDER BY s.name ASC, s.id ASC
-      `,
-      [courseId]
-    );
-    return cacheSet(referenceCache.subjects, key, rows || []);
-  } catch (err) {
-    if (!isDbSchemaCompatibilityError(err)) {
-      throw err;
-    }
-    const sql = options.visibleOnly
-      ? 'SELECT *, course_id AS owner_course_id, course_id AS bound_course_id, name AS catalog_name FROM subjects WHERE course_id = ? AND visible = 1 ORDER BY name'
-      : 'SELECT *, course_id AS owner_course_id, course_id AS bound_course_id, name AS catalog_name FROM subjects WHERE course_id = ? ORDER BY name';
-    const rows = await db.all(sql, [courseId]);
-    return cacheSet(referenceCache.subjects, key, rows || []);
-  }
+  const rows = await academicSetupHelpers.listLegacyCourseSubjects(getAcademicSetupStore(), {
+    courseId,
+    includeHidden: options.visibleOnly !== true,
+  });
+  return cacheSet(referenceCache.subjects, key, rows || []);
 }
 
 const txGet = async (client, sql, params = []) => {
@@ -11598,30 +11554,34 @@ async function getTeacherHubCount(sql, params = []) {
 
 async function getTeacherHomeworkTemplates(userId, options = {}) {
   if (!Number.isFinite(Number(userId))) return [];
-  const requestedCourseId = Number(options.courseId);
-  const scopedCourseId = Number.isInteger(requestedCourseId) && requestedCourseId > 0
-    ? requestedCourseId
-    : null;
+  const scopedCourseIds = Array.from(new Set(
+    [
+      ...(Array.isArray(options.courseIds) ? options.courseIds : []),
+      options.courseId,
+    ]
+      .map((value) => Number(value || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
   const requestedLimit = Number(options.limit);
   const limit = Number.isInteger(requestedLimit)
     ? Math.max(1, Math.min(requestedLimit, 500))
     : 200;
   const params = [Number(userId)];
   let where = 'WHERE t.user_id = ?';
-  if (scopedCourseId) {
+  if (scopedCourseIds.length) {
     where += `
       AND (
         t.course_id IS NULL
-        OR t.course_id = ?
+        OR t.course_id = ANY(?::int[])
         OR EXISTS (
           SELECT 1
           FROM subject_course_bindings scb
           WHERE scb.subject_id = t.subject_id
-            AND scb.course_id = ?
+            AND scb.course_id = ANY(?::int[])
         )
       )
     `;
-    params.push(scopedCourseId, scopedCourseId);
+    params.push(scopedCourseIds, scopedCourseIds);
   }
   let rows = [];
   try {
@@ -11646,9 +11606,9 @@ async function getTeacherHomeworkTemplates(userId, options = {}) {
     }
     const fallbackParams = [Number(userId)];
     let fallbackWhere = 'WHERE t.user_id = ?';
-    if (scopedCourseId) {
-      fallbackWhere += ' AND (t.course_id IS NULL OR t.course_id = ?)';
-      fallbackParams.push(scopedCourseId);
+    if (scopedCourseIds.length) {
+      fallbackWhere += ' AND (t.course_id IS NULL OR t.course_id = ANY(?::int[]))';
+      fallbackParams.push(scopedCourseIds);
     }
     rows = await db.all(
       `
@@ -11701,13 +11661,19 @@ async function getTeacherHomeworkTemplates(userId, options = {}) {
 async function listTeacherAssets(userId, options = {}) {
   const normalizedUserId = Number(userId || 0);
   if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) return [];
-  const requestedCourseId = Number(options.courseId || 0);
-  const scopedCourseId = Number.isInteger(requestedCourseId) && requestedCourseId > 0 ? requestedCourseId : null;
+  const scopedCourseIds = Array.from(new Set(
+    [
+      ...(Array.isArray(options.courseIds) ? options.courseIds : []),
+      options.courseId,
+    ]
+      .map((value) => Number(value || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
   const params = [normalizedUserId];
   let where = 'WHERE a.user_id = ?';
-  if (scopedCourseId) {
-    where += ' AND (a.course_id IS NULL OR a.course_id = ?)';
-    params.push(scopedCourseId);
+  if (scopedCourseIds.length) {
+    where += ' AND (a.course_id IS NULL OR a.course_id = ANY(?::int[]))';
+    params.push(scopedCourseIds);
   }
   try {
     const rows = await db.all(
@@ -14537,33 +14503,70 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       teacherOfferingSelections,
       workspaceAssignedOfferingDetails,
     );
+    const selectedWorkspaceSemesterRow = selectedWorkspaceSemesterId
+      ? await db.get(
+          'SELECT legacy_semester_id FROM study_context_semesters WHERE id = ? LIMIT 1',
+          [selectedWorkspaceSemesterId]
+        ).catch((err) => {
+          if (isDbSchemaCompatibilityError(err)) {
+            return null;
+          }
+          throw err;
+        })
+      : null;
+    const selectedWorkspaceLegacySemesterIds = Array.from(new Set(
+      [Number(selectedWorkspaceSemesterRow && selectedWorkspaceSemesterRow.legacy_semester_id ? selectedWorkspaceSemesterRow.legacy_semester_id : 0)]
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ));
+    const selectedWorkspaceStorageScope = selectedCourseId
+      ? await getCourseSharedStorageScope(selectedCourseId, {
+          fallbackSemesterId: selectedWorkspaceLegacySemesterIds[0] || null,
+          visibleOnly: false,
+        })
+      : {
+          subjects: [],
+          subject_ids: [],
+          owner_course_ids: [],
+          owner_semester_ids: selectedWorkspaceLegacySemesterIds,
+        };
+    const workspaceTemplateCourseIds = Array.from(new Set(
+      [
+        ...(Array.isArray(selectedWorkspaceStorageScope.owner_course_ids) ? selectedWorkspaceStorageScope.owner_course_ids : []),
+        selectedCourseId,
+      ]
+        .map((value) => Number(value || 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ));
+    const workspaceHomeworkScopeSource = scopedTeacherOfferings.length
+      ? scopedTeacherOfferings
+      : workspaceCatalogOfferings;
+    const workspaceScopedSubjectIds = Array.from(new Set(
+      (workspaceHomeworkScopeSource || [])
+        .map((offering) => Number(offering && offering.legacy_subject_id ? offering.legacy_subject_id : 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ));
+    const workspaceScopedOwnerCourseIds = workspaceScopedSubjectIds.length
+      ? Array.from(new Set(
+          (Array.isArray(selectedWorkspaceStorageScope.subjects) ? selectedWorkspaceStorageScope.subjects : [])
+            .filter((subject) => workspaceScopedSubjectIds.includes(Number(subject.id || 0)))
+            .map((subject) => Number(subject.owner_course_id || subject.course_id || 0))
+            .filter((value) => Number.isInteger(value) && value > 0)
+        ))
+      : workspaceTemplateCourseIds;
 
     const [templates, assets, recentHomework] = await Promise.all([
       getTeacherHomeworkTemplates(userId, {
-        courseId: selectedCourseId,
+        courseIds: workspaceTemplateCourseIds,
         limit: 300,
       }),
-      listTeacherAssets(userId, { courseId: selectedCourseId }),
-      db.all(
-        `
-          SELECT
-            h.id,
-            h.description,
-            h.class_date,
-            h.custom_due_date,
-            h.subject_id,
-            h.group_number,
-            s.name AS subject_name
-          FROM homework h
-          LEFT JOIN subjects s ON s.id = h.subject_id
-          WHERE h.created_by_id = ?
-            AND COALESCE(h.is_teacher_homework, 0) = 1
-            ${selectedCourseId ? 'AND h.course_id = ?' : ''}
-          ORDER BY COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) DESC NULLS LAST, CAST(h.created_at AS TEXT) DESC
-          LIMIT 8
-        `,
-        selectedCourseId ? [userId, selectedCourseId] : [userId]
-      ),
+      listTeacherAssets(userId, { courseIds: workspaceTemplateCourseIds }),
+      academicSetupHelpers.listLegacyTeacherHomeworkRows(getAcademicSetupStore(), {
+        userId,
+        courseIds: workspaceScopedOwnerCourseIds,
+        subjectIds: workspaceScopedSubjectIds,
+        semesterIds: selectedWorkspaceLegacySemesterIds,
+        limit: 8,
+      }),
     ]);
 
     const subjectMap = new Map();

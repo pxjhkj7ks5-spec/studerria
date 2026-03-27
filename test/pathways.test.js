@@ -20,7 +20,9 @@ const {
   getLegacyCourseDependencyCounts,
   getLegacyCourseSubject,
   getLegacyStudentSubjectGroup,
+  listLegacyCourseHomeworkRows,
   listLegacyCourseStudentGroupAssignments,
+  listLegacyTeacherHomeworkRows,
   listLegacyStudentGroupRows,
   listLegacySubjectStudentRows,
   listLegacyCourseUsers,
@@ -580,4 +582,79 @@ test('legacy course dependency counts normalize count aliases', async () => {
   assert.deepEqual(result, { users: 3, subjects: 5, semesters: 1 });
   assert.equal(calls.length, 3);
   calls.forEach((call) => assert.deepEqual(call.params, [15]));
+});
+
+test('legacy course homework helper resolves through subject bindings first', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ id: 91, subject_id: 12 }];
+    },
+  };
+
+  const rows = await listLegacyCourseHomeworkRows(store, {
+    homeworkIds: [91, '91'],
+    courseId: 3,
+    extraWhere: 'COALESCE(h.status, \'published\') = ?',
+    extraParams: ['published'],
+  });
+
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /JOIN subject_course_bindings scb/i);
+  assert.match(calls[0].sql, /scb\.course_id = \?/i);
+  assert.match(calls[0].sql, /COALESCE\(h\.status, 'published'\) = \?/i);
+  assert.deepEqual(calls[0].params, [91, 3, 'published']);
+});
+
+test('legacy course homework helper falls back to homework course on compatibility error', async () => {
+  const calls = [];
+  let attempt = 0;
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      attempt += 1;
+      if (attempt === 1) {
+        const err = new Error('missing bindings');
+        err.code = '42P01';
+        throw err;
+      }
+      return [{ id: 55, subject_id: 9 }];
+    },
+  };
+
+  const rows = await listLegacyCourseHomeworkRows(store, {
+    homeworkIds: [55],
+    courseId: 8,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].sql, /h\.course_id = \?/i);
+  assert.deepEqual(calls[1].params, [55, 8]);
+});
+
+test('legacy teacher homework helper normalizes shared course and semester scope', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ id: 10, subject_id: 7, course_id: 4, semester_id: 12 }];
+    },
+  };
+
+  const rows = await listLegacyTeacherHomeworkRows(store, {
+    userId: 14,
+    courseIds: [4, '5', 4],
+    subjectIds: ['7', 8],
+    semesterIds: [12],
+    limit: 6,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /h\.subject_id = ANY/i);
+  assert.match(calls[0].sql, /h\.course_id = ANY/i);
+  assert.match(calls[0].sql, /h\.semester_id = ANY/i);
+  assert.match(calls[0].sql, /LIMIT 6/i);
+  assert.deepEqual(calls[0].params, [14, [7, 8], [4, 5], [12]]);
 });
