@@ -12573,15 +12573,11 @@ async function listVisibleMessagesForUser({
     return { messages: [], unread_count: 0 };
   }
 
-  const groups = await db.all(
-    `
-      SELECT sg.subject_id, sg.group_number
-      FROM student_groups sg
-      JOIN subjects s ON s.id = sg.subject_id
-      WHERE sg.student_id = ? AND s.course_id = ?
-    `,
-    [normalizedUserId, normalizedCourseId]
-  );
+  const groups = await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+    studentId: normalizedUserId,
+    courseId: normalizedCourseId,
+    includeHidden: true,
+  });
 
   const conditions = ['m.target_all = 1'];
   const conditionParams = [];
@@ -17248,32 +17244,11 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   const deadlinesWindowEnd = formatLocalDate(addDays(now, 14));
   const deadlinesWindowStart = formatLocalDate(addDays(now, -7));
 
-  let studentGroups = [];
-  try {
-    studentGroups = await db.all(
-      `
-        SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.course_id AS owner_course_id
-        FROM student_groups sg
-        JOIN subjects s ON s.id = sg.subject_id
-        JOIN subject_course_bindings scb ON scb.subject_id = s.id
-        WHERE sg.student_id = ? AND scb.course_id = ? AND s.visible = 1
-      `,
-      [user.id, courseId]
-    );
-  } catch (err) {
-    if (!isDbSchemaCompatibilityError(err)) {
-      throw err;
-    }
-    studentGroups = await db.all(
-      `
-        SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.course_id AS owner_course_id
-        FROM student_groups sg
-        JOIN subjects s ON s.id = sg.subject_id
-        WHERE sg.student_id = ? AND s.course_id = ? AND s.visible = 1
-      `,
-      [user.id, courseId]
-    );
-  }
+  const studentGroups = await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+    studentId: user.id,
+    courseId,
+    includeHidden: false,
+  });
 
   let workloadTargets = (studentGroups || []).map((row) => ({
     subject_id: Number(row.subject_id),
@@ -20183,68 +20158,39 @@ app.get('/schedule', requireLogin, async (req, res) => {
       if (hasSessionRole(req, 'admin')) {
         return loadCourseSubjectGroupsForSingleGroup(adminFallbackGroupNumber, cb);
       }
-      return db.all(
-        `
-          SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.course_id AS owner_course_id
-          FROM student_groups sg
-          JOIN subjects s ON s.id = sg.subject_id
-          JOIN subject_course_bindings scb ON scb.subject_id = s.id
-          WHERE sg.student_id = ?
-            AND scb.course_id = ?
-            AND s.visible = 1
-        `,
-        [userId, scheduleCourseId],
-        cb
-      );
+      return academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+        studentId: userId,
+        courseId: scheduleCourseId,
+        includeHidden: false,
+      }).then((rows) => cb(null, rows)).catch((err) => cb(err));
     }
     if (viewAsMode === 'self') {
-      return db.all(
-        `
-          SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.course_id AS owner_course_id
-          FROM student_groups sg
-          JOIN subjects s ON s.id = sg.subject_id
-          JOIN subject_course_bindings scb ON scb.subject_id = s.id
-          WHERE sg.student_id = ?
-            AND scb.course_id = ?
-            AND s.visible = 1
-        `,
-        [userId, scheduleCourseId],
-        (err, rows) => {
-          if (err) {
-            return cb(err);
-          }
-          if (Array.isArray(rows) && rows.length) {
-            return cb(null, rows);
-          }
-          return loadCourseSubjectGroupsForSingleGroup(selfFallbackGroupNumber, cb);
+      return academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+        studentId: userId,
+        courseId: scheduleCourseId,
+        includeHidden: false,
+      }).then((rows) => {
+        if (Array.isArray(rows) && rows.length) {
+          return cb(null, rows);
         }
-      );
+        return loadCourseSubjectGroupsForSingleGroup(selfFallbackGroupNumber, cb);
+      }).catch((err) => cb(err));
     }
-    db.all(
-      `
-        SELECT s.id AS subject_id, s.name AS subject_name, s.group_count, s.course_id AS owner_course_id
-        FROM subjects s
-        JOIN subject_course_bindings scb ON scb.subject_id = s.id
-        WHERE scb.course_id = ? AND s.visible = 1
-        ORDER BY name
-      `,
-      [scheduleCourseId],
-      (err, subjects) => {
-        if (err) {
-          return cb(err);
-        }
-        const groupNumber = Number.isFinite(viewAsGroupNumber) ? viewAsGroupNumber : 1;
-        const groups = (subjects || [])
-          .filter((s) => Number(s.group_count || 1) >= groupNumber)
-          .map((s) => ({
-            subject_id: s.subject_id,
-            group_number: groupNumber,
-            subject_name: s.subject_name,
-            owner_course_id: Number(s.owner_course_id || 0) || null,
-          }));
-        return cb(null, groups);
-      }
-    );
+    academicSetupHelpers.listLegacyCourseSubjects(getAcademicSetupStore(), {
+      courseId: scheduleCourseId,
+      includeHidden: false,
+    }).then((subjects) => {
+      const groupNumber = Number.isFinite(viewAsGroupNumber) ? viewAsGroupNumber : 1;
+      const groups = (subjects || [])
+        .filter((subject) => Number(subject.group_count || 1) >= groupNumber)
+        .map((subject) => ({
+          subject_id: Number(subject.id || subject.subject_id || 0),
+          group_number: groupNumber,
+          subject_name: subject.catalog_name || subject.name || '',
+          owner_course_id: Number(subject.owner_course_id || subject.course_id || 0) || null,
+        }));
+      return cb(null, groups);
+    }).catch((err) => cb(err));
   };
 
   loadStudentGroups(async (groupErr, studentGroups) => {
@@ -23101,23 +23047,15 @@ async function getTeacherJournalSubjectAccess(userId, subjectId) {
 }
 
 async function getStudentJournalSubjectOptions(userId) {
-  const rows = await db.all(
-    `
-      SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.group_count, s.course_id, c.name AS course_name
-      FROM student_groups sg
-      JOIN subjects s ON s.id = sg.subject_id
-      JOIN courses c ON c.id = s.course_id
-      WHERE sg.student_id = ?
-        AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
-      ORDER BY c.id ASC, s.name ASC
-    `,
-    [userId]
-  );
+  const rows = await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+    studentId: userId,
+    includeHidden: false,
+  });
   return (rows || []).map((row) => ({
     subject_id: Number(row.subject_id),
     subject_name: row.subject_name,
     group_count: Math.max(1, Number(row.group_count || 1)),
-    course_id: Number(row.course_id || 1),
+    course_id: Number(row.owner_course_id || row.course_id || 1),
     course_name: row.course_name || '',
     has_all_groups: false,
     group_numbers: [Number(row.group_number || 1)],
@@ -23393,34 +23331,16 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
 }
 
 async function getJournalStudents(subjectId, courseId, groupFilterSet = null, userFilterIds = []) {
-  const activeUserFilter = usersHasIsActive
-    ? " AND COALESCE(LOWER(TRIM(CAST(u.is_active AS TEXT))), '1') IN ('1', 'true', 't')"
-    : '';
-  const params = [subjectId, courseId];
-  let sql = `
-    SELECT DISTINCT u.id, u.full_name, sg.group_number
-    FROM student_groups sg
-    JOIN users u ON u.id = sg.student_id
-    WHERE sg.subject_id = ?
-      AND u.course_id = ?
-      ${activeUserFilter}
-  `;
-  if (groupFilterSet && groupFilterSet.size) {
-    const groups = Array.from(groupFilterSet).filter((value) => Number.isInteger(value) && value > 0);
-    if (groups.length) {
-      sql += ` AND sg.group_number IN (${groups.map(() => '?').join(',')})`;
-      params.push(...groups);
-    }
-  }
-  const userIds = Array.isArray(userFilterIds)
-    ? Array.from(new Set(userFilterIds.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)))
+  const groups = groupFilterSet && groupFilterSet.size
+    ? Array.from(groupFilterSet).filter((value) => Number.isInteger(value) && value > 0)
     : [];
-  if (userIds.length) {
-    sql += ` AND u.id IN (${userIds.map(() => '?').join(',')})`;
-    params.push(...userIds);
-  }
-  sql += ' ORDER BY sg.group_number ASC, u.full_name ASC';
-  const rows = await db.all(sql, params);
+  const rows = await academicSetupHelpers.listLegacySubjectStudentRows(getAcademicSetupStore(), {
+    subjectId,
+    courseId,
+    groupNumbers: groups,
+    userIds: userFilterIds,
+    activeOnly: usersHasIsActive,
+  });
   return (rows || []).map((row) => ({
     id: Number(row.id),
     full_name: row.full_name,
@@ -23429,19 +23349,11 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
 }
 
 async function getJournalStudentGroup(subjectId, studentId) {
-  const activeUserFilter = usersHasIsActive
-    ? " AND COALESCE(LOWER(TRIM(CAST(u.is_active AS TEXT))), '1') IN ('1', 'true', 't')"
-    : '';
-  return db.get(
-    `
-      SELECT sg.group_number
-      FROM student_groups sg
-      JOIN users u ON u.id = sg.student_id
-      WHERE sg.subject_id = ? AND sg.student_id = ?${activeUserFilter}
-      LIMIT 1
-    `,
-    [subjectId, studentId]
-  );
+  return academicSetupHelpers.getLegacyStudentSubjectGroup(getAcademicSetupStore(), {
+    subjectId,
+    studentId,
+    activeOnly: usersHasIsActive,
+  });
 }
 
 async function buildJournalAttendanceContext({
@@ -26237,17 +26149,14 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       return res.status(404).json({ error: 'Column not found' });
     }
 
-    const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
-    const studentRow = await db.get(
-      `
-        SELECT sg.group_number, u.id, u.full_name
-        FROM student_groups sg
-        JOIN users u ON u.id = sg.student_id
-        WHERE sg.subject_id = ? AND sg.student_id = ?${activeUserFilter}
-        LIMIT 1
-      `,
-      [column.subject_id, studentId]
-    );
+    const studentRowCandidates = await academicSetupHelpers.listLegacySubjectStudentRows(getAcademicSetupStore(), {
+      subjectId: column.subject_id,
+      userIds: [studentId],
+      activeOnly: usersHasIsActive,
+    });
+    const studentRow = Array.isArray(studentRowCandidates) && studentRowCandidates.length
+      ? studentRowCandidates[0]
+      : null;
     if (!studentRow) {
       return res.status(404).json({ error: 'Student not found for subject' });
     }
@@ -26905,20 +26814,13 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
 
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     const uniqueStudentIds = Array.from(new Set(normalizedEntries.map((entry) => entry.student_id)));
-    const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
-    const studentRows = await db.all(
-      `
-        SELECT sg.student_id, sg.group_number
-        FROM student_groups sg
-        JOIN users u ON u.id = sg.student_id
-        WHERE sg.subject_id = ?
-          AND sg.student_id IN (${uniqueStudentIds.map(() => '?').join(',')})
-          ${activeUserFilter}
-      `,
-      [column.subject_id, ...uniqueStudentIds]
-    );
+    const studentRows = await academicSetupHelpers.listLegacySubjectStudentRows(getAcademicSetupStore(), {
+      subjectId: column.subject_id,
+      userIds: uniqueStudentIds,
+      activeOnly: usersHasIsActive,
+    });
     const studentGroups = new Map(
-      (studentRows || []).map((row) => [Number(row.student_id), Number(row.group_number || 0)])
+      (studentRows || []).map((row) => [Number(row.student_id || row.id), Number(row.group_number || 0)])
     );
     if (!journalScope.fullAccess) {
       const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
@@ -29305,18 +29207,10 @@ app.get('/subjects', requireLogin, async (req, res) => {
           userId,
           { includeHidden: false }
         )
-      : await db.all(
-          `
-            SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.group_count,
-                   s.course_id, c.name AS course_name
-            FROM student_groups sg
-            JOIN subjects s ON s.id = sg.subject_id
-            JOIN courses c ON c.id = s.course_id
-            WHERE sg.student_id = ? AND s.visible = 1
-            ORDER BY c.id, s.name
-          `,
-          [userId]
-        );
+      : await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+          studentId: userId,
+          includeHidden: false,
+        });
 
     const subjectMap = new Map();
     (subjectRows || []).forEach((row) => {
@@ -29325,7 +29219,7 @@ app.get('/subjects', requireLogin, async (req, res) => {
         subjectMap.set(subjectKey, {
           subject_id: subjectKey,
           subject_name: row.subject_name,
-          course_id: Number(row.course_id || fallbackCourseId || 1),
+          course_id: Number(row.owner_course_id || row.course_id || fallbackCourseId || 1),
           course_name: row.course_name || '',
           group_count: Math.max(1, Number(row.group_count || 1)),
           has_all_groups: false,
@@ -29717,18 +29611,10 @@ app.get('/teamwork', requireLogin, async (req, res) => {
     const subjectRows = isTeacherMode
       ? (await getTeacherAssignedSubjects(userId))
           .filter((row) => row && (row.show_in_teamwork === true || Number(row.show_in_teamwork || 0) === 1))
-      : await db.all(
-          `
-            SELECT sg.subject_id, sg.group_number, s.name AS subject_name, s.group_count,
-                   s.course_id, s.course_id AS owner_course_id, c.name AS course_name
-            FROM student_groups sg
-            JOIN subjects s ON s.id = sg.subject_id
-            JOIN courses c ON c.id = s.course_id
-            WHERE sg.student_id = ? AND s.show_in_teamwork = 1 AND s.visible = 1
-            ORDER BY c.id, s.name
-          `,
-          [userId]
-        );
+      : (await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+          studentId: userId,
+          includeHidden: false,
+        })).filter((row) => row && (row.show_in_teamwork === true || Number(row.show_in_teamwork || 0) === 1));
 
     const subjectMap = new Map();
     (subjectRows || []).forEach((row) => {
@@ -30172,18 +30058,12 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
       return res.redirect('/teamwork?err=No%20active%20semester');
     }
 
-    const groupPlaceholders = targetGroups.map(() => '?').join(',');
-    const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
-    const students = await db.all(
-      `
-        SELECT DISTINCT u.id, u.full_name, sg.group_number
-        FROM users u
-        JOIN student_groups sg ON sg.student_id = u.id
-        WHERE sg.subject_id = ? AND u.course_id = ?${activeUserFilter} AND sg.group_number IN (${groupPlaceholders})
-        ORDER BY u.id ASC
-      `,
-      [subjectId, subjectRow.course_id || 1, ...targetGroups]
-    );
+    const students = (await academicSetupHelpers.listLegacySubjectStudentRows(getAcademicSetupStore(), {
+      subjectId,
+      courseId: subjectRow.course_id || 1,
+      groupNumbers: targetGroups,
+      activeOnly: usersHasIsActive,
+    })).sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
 
     const seminarGroupOrder = lessonScope === 'seminar'
       ? [...targetGroups].sort((a, b) => a - b)
@@ -31351,14 +31231,15 @@ app.get('/admin/api/messages/:id/reads', requireMessagesSectionAccess, readLimit
         [courseId]
       );
     } else if (message.subject_id) {
-      recipients = await db.all(
-        `SELECT DISTINCT u.id, u.full_name
-         FROM student_groups sg
-         JOIN users u ON u.id = sg.student_id
-         WHERE sg.subject_id = ? AND sg.group_number = ? AND u.course_id = ?${activeFilter}
-         ORDER BY u.full_name`,
-        [message.subject_id, message.group_number, courseId]
-      );
+      recipients = (await academicSetupHelpers.listLegacySubjectStudentRows(getAcademicSetupStore(), {
+        subjectId: message.subject_id,
+        courseId,
+        groupNumbers: [message.group_number],
+        activeOnly: usersHasIsActive,
+      })).map((row) => ({
+        id: Number(row.id),
+        full_name: row.full_name,
+      }));
     } else {
       recipients = await db.all(
         `SELECT u.id, u.full_name
@@ -44648,11 +44529,12 @@ app.get('/admin/users/:id/sessions.json', requireUsersSectionAccess, async (req,
     await ensureDbReady();
     const scopedCourseId = getAdminCourse(req);
     const canCrossCourse = hasSessionRole(req, 'admin');
-    const targetSql = canCrossCourse
-      ? 'SELECT id, full_name, course_id FROM users WHERE id = ? LIMIT 1'
-      : 'SELECT id, full_name, course_id FROM users WHERE id = ? AND course_id = ? LIMIT 1';
-    const targetParams = canCrossCourse ? [targetUserId] : [targetUserId, scopedCourseId];
-    const targetUser = await db.get(targetSql, targetParams);
+    const targetUser = canCrossCourse
+      ? await db.get('SELECT id, full_name, course_id FROM users WHERE id = ? LIMIT 1', [targetUserId])
+      : await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+        userId: targetUserId,
+        courseId: scopedCourseId,
+      });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -44676,11 +44558,12 @@ app.post('/admin/users/:id/sessions/revoke-all', requireUsersSectionAccess, writ
     await ensureDbReady();
     const scopedCourseId = getAdminCourse(req);
     const canCrossCourse = hasSessionRole(req, 'admin');
-    const targetSql = canCrossCourse
-      ? 'SELECT id, full_name, course_id FROM users WHERE id = ? LIMIT 1'
-      : 'SELECT id, full_name, course_id FROM users WHERE id = ? AND course_id = ? LIMIT 1';
-    const targetParams = canCrossCourse ? [targetUserId] : [targetUserId, scopedCourseId];
-    const targetUser = await db.get(targetSql, targetParams);
+    const targetUser = canCrossCourse
+      ? await db.get('SELECT id, full_name, course_id FROM users WHERE id = ? LIMIT 1', [targetUserId])
+      : await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+        userId: targetUserId,
+        courseId: scopedCourseId,
+      });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -44722,11 +44605,12 @@ app.post('/admin/users/:id/risk-case', requireUsersSectionAccess, writeLimiter, 
     await ensureDbReady();
     const scopedCourseId = getAdminCourse(req);
     const canCrossCourse = hasSessionRole(req, 'admin');
-    const targetSql = canCrossCourse
-      ? 'SELECT id, full_name, course_id, is_active, role FROM users WHERE id = ? LIMIT 1'
-      : 'SELECT id, full_name, course_id, is_active, role FROM users WHERE id = ? AND course_id = ? LIMIT 1';
-    const targetParams = canCrossCourse ? [targetUserId] : [targetUserId, scopedCourseId];
-    const targetUser = await db.get(targetSql, targetParams);
+    const targetUser = canCrossCourse
+      ? await db.get('SELECT id, full_name, course_id, is_active, role FROM users WHERE id = ? LIMIT 1', [targetUserId])
+      : await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
+        userId: targetUserId,
+        courseId: scopedCourseId,
+      });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }

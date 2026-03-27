@@ -17,6 +17,9 @@ const {
   getLegacyCourseActiveSemester,
   getLegacyCourseDependencyCounts,
   getLegacyCourseSubject,
+  getLegacyStudentSubjectGroup,
+  listLegacyStudentGroupRows,
+  listLegacySubjectStudentRows,
   listLegacyCourseUsers,
   listLegacyAdmissionIdsForSubjectIds,
   listLegacyAdmissionCourseRows,
@@ -257,6 +260,98 @@ test('legacy admission subject visibility helper supports scoped admission array
   assert.match(calls[0].sql, /scb\.course_id = \?/i);
   assert.match(calls[0].sql, /sva\.subject_id = \?/i);
   assert.deepEqual(calls[0].params, [[11, 12], 5, 22]);
+});
+
+test('legacy student group helper uses course bindings when available', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ student_id: 6, subject_id: 14, group_number: 2 }];
+    },
+  };
+
+  const rows = await listLegacyStudentGroupRows(store, {
+    studentId: 6,
+    courseId: 9,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /JOIN subject_course_bindings scb/i);
+  assert.match(calls[0].sql, /scb\.course_id = \?/i);
+  assert.deepEqual(calls[0].params, [6, 9]);
+});
+
+test('legacy student group helper falls back to subject owner course on compatibility error', async () => {
+  const calls = [];
+  let attempt = 0;
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      attempt += 1;
+      if (attempt === 1) {
+        const err = new Error('missing binding table');
+        err.code = '42P01';
+        throw err;
+      }
+      return [{ student_id: 7, subject_id: 18, group_number: 1 }];
+    },
+  };
+
+  const rows = await listLegacyStudentGroupRows(store, {
+    studentId: 7,
+    courseId: 11,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].sql, /s\.course_id = \?/i);
+  assert.deepEqual(calls[1].params, [7, 11]);
+});
+
+test('legacy subject student helper normalizes course, group, and user filters', async () => {
+  const calls = [];
+  const store = {
+    async all(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return [{ id: 5, full_name: 'Student', group_number: 2 }];
+    },
+  };
+
+  const rows = await listLegacySubjectStudentRows(store, {
+    subjectId: 12,
+    courseId: 3,
+    groupNumbers: [2, 2, 'bad'],
+    userIds: [5, 5, 'oops'],
+    activeOnly: true,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.match(calls[0].sql, /u\.course_id = \?/i);
+  assert.match(calls[0].sql, /sg\.group_number = ANY/i);
+  assert.match(calls[0].sql, /u\.id = ANY/i);
+  assert.match(calls[0].sql, /u\.is_active/i);
+  assert.deepEqual(calls[0].params, [12, 3, [2], [5]]);
+});
+
+test('legacy student subject group helper supports active-user filter through facade', async () => {
+  const calls = [];
+  const store = {
+    async get(sql, params) {
+      calls.push({ sql: String(sql), params });
+      return { group_number: 4 };
+    },
+  };
+
+  const row = await getLegacyStudentSubjectGroup(store, {
+    subjectId: 15,
+    studentId: 19,
+    activeOnly: true,
+  });
+
+  assert.equal(row.group_number, 4);
+  assert.match(calls[0].sql, /u\.is_active/i);
+  assert.deepEqual(calls[0].params, [15, 19]);
 });
 
 test('legacy admission id helper resolves subject bindings through service layer', async () => {

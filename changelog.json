@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.06",
+      "date": "2026-03-27",
+      "items": [
+        "refactor(student-runtime-academic-facades): add `listLegacyStudentGroupRows(...)`, `listLegacySubjectStudentRows(...)`, and `getLegacyStudentSubjectGroup(...)` to `lib/academicSetup.js`, with binding-aware fallback logic for legacy schemas so repeated student-group and subject-student reads no longer live as route-level SQL in `app.js`",
+        "refactor(course-derived-runtime-cleanup): move canonical student-group lookups in messages, dashboard/workload, schedule view, journal subject options, journal student access checks, teamwork student targeting, and message recipient resolution onto Academic Setup facades while keeping legacy runtime modules on derived `courseId`",
+        "refactor(scoped-user-security-lookups): switch scoped user/session/risk-case checks in admin security endpoints to `getLegacyCourseUser(...)`, and extend `test/pathways.test.js` with contract coverage for the new student-group and subject-student facade helpers"
+      ]
+    },
+    {
       "version": "1.3.05",
       "date": "2026-03-27",
       "items": [
