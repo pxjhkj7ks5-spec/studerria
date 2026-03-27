@@ -2781,6 +2781,9 @@
                   <pre class="soft-panel mb-3" style="white-space: pre-wrap;"><%= JSON.stringify(item.payload, null, 2) %></pre>
                 <% } %>
                 <div class="d-flex flex-wrap gap-2">
+                  <% if (item.payload && item.payload.study_context_id) { %>
+                    <a class="btn btn-soft btn-pill" href="<%= buildPathwaysUrl({ study_context_id: item.payload.study_context_id }) %>"><%= isUk ? 'Відкрити context' : 'Open context' %></a>
+                  <% } %>
                   <form method="POST" action="/admin/pathways/moderation/<%= item.id %>/resolve" class="d-flex flex-wrap gap-2 align-items-center">
                     <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
                     <input type="hidden" name="track" value="<%= activeTrack %>" />
@@ -2819,6 +2822,31 @@
                     <input type="hidden" name="action" value="ignore" />
                     <button class="btn btn-soft btn-pill" type="submit"><%= setupUi.moderationIgnore %></button>
                   </form>
+                  <% if ((item.status || moderationStatusValue) === 'resolved' || (item.status || moderationStatusValue) === 'ignored') { %>
+                    <form method="POST" action="/admin/pathways/moderation/<%= item.id %>/resolve">
+                      <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                      <input type="hidden" name="track" value="<%= activeTrack %>" />
+                      <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                      <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                      <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+                      <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                      <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
+                      <input type="hidden" name="action" value="reopen" />
+                      <button class="btn btn-soft btn-pill" type="submit"><%= isUk ? 'Відкрити знову' : 'Reopen' %></button>
+                    </form>
+                  <% } else { %>
+                    <form method="POST" action="/admin/pathways/moderation/<%= item.id %>/resolve">
+                      <input type="hidden" name="course_id" value="<%= selectedCourseValue %>" />
+                      <input type="hidden" name="track" value="<%= activeTrack %>" />
+                      <input type="hidden" name="program_id" value="<%= selectedProgramValue %>" />
+                      <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
+                      <input type="hidden" name="study_context_id" value="<%= selectedStudyContextValue %>" />
+                      <input type="hidden" name="preset_id" value="<%= selectedProgramPresetValue %>" />
+                      <input type="hidden" name="moderation_status" value="<%= moderationStatusValue %>" />
+                      <input type="hidden" name="action" value="mark_reviewing" />
+                      <button class="btn btn-soft btn-pill" type="submit"><%= isUk ? 'Позначити reviewing' : 'Mark reviewing' %></button>
+                    </form>
+                  <% } %>
                 </div>
               </article>
             <% }) %>

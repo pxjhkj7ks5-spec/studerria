@@ -5679,25 +5679,20 @@ async function applyTeacherAssignmentTemplatesForStudyContexts(studyContextIds =
       if (!templateId || !studyContextId || matchedTemplateScopeKeys.has(`${templateId}|${studyContextId}`)) {
         continue;
       }
-      await queueAcademicModerationItem({
-        dedupeKey: academicSetupHelpers.buildModerationKey('teacher-template-match', templateId, studyContextId),
+      await queueAcademicModerationItem(academicSetupHelpers.buildInvalidTeacherTemplateMatchIssue({
+        teacherId: parsePositiveIntStrict(templateScopeRow.user_id) || null,
+        templateId,
+        subjectCatalogId: parsePositiveIntStrict(templateScopeRow.subject_catalog_id) || null,
+        studyContextId,
+        programId: parsePositiveIntStrict(templateScopeRow.program_id) || parsePositiveIntStrict(templateScopeRow.template_program_id) || null,
+        trackKey: templateScopeRow.track_key || templateScopeRow.template_track_key || null,
+        stageNumber: parsePositiveIntStrict(templateScopeRow.stage_number) || parsePositiveIntStrict(templateScopeRow.template_stage_number) || null,
+        campusKey: templateScopeRow.campus_key || templateScopeRow.template_campus_key || null,
         sourceKind: 'teacher_template',
-        sourceId: templateId,
-        issueCode: 'invalid_teacher_template_match',
-        severity: 'medium',
+        dedupeSuffix: `${templateId}|${studyContextId}`,
         title: 'Teacher template did not match any live offering',
         summary: 'Auto-carry-forward could not find a live offering for an active teacher template in this study context.',
-        payload: {
-          teacher_id: parsePositiveIntStrict(templateScopeRow.user_id) || null,
-          template_id: templateId,
-          subject_catalog_id: parsePositiveIntStrict(templateScopeRow.subject_catalog_id) || null,
-          study_context_id: studyContextId,
-          program_id: parsePositiveIntStrict(templateScopeRow.program_id) || parsePositiveIntStrict(templateScopeRow.template_program_id) || null,
-          track_key: templateScopeRow.track_key || templateScopeRow.template_track_key || null,
-          stage_number: parsePositiveIntStrict(templateScopeRow.stage_number) || parsePositiveIntStrict(templateScopeRow.template_stage_number) || null,
-          campus_key: templateScopeRow.campus_key || templateScopeRow.template_campus_key || null,
-        },
-      });
+      }));
     }
     const bestRows = new Map();
     for (const row of rows || []) {
@@ -9625,10 +9620,9 @@ function getStaffCourse(req) {
 }
 
 function getStaffPanelBase(req, courseId) {
-  if (hasSessionRole(req, 'deanery') && !hasSessionRole(req, 'admin')) {
-    return `/deanery?course=${courseId}`;
-  }
-  return `/admin?course=${courseId}`;
+  return buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req), {
+    courseId: parsePositiveIntStrict(courseId) || parsePositiveIntStrict(getAdminCourse(req)) || null,
+  });
 }
 
 function parsePositiveIntStrict(rawValue, fallback = null) {
@@ -13569,7 +13563,8 @@ app.post('/register/course', registerLimiter, async (req, res) => {
   const requestedAdmissionId = Number(req.body.admission_id || 0);
   let selectedProgramId = Number.isFinite(requestedProgramId) && requestedProgramId > 0 ? requestedProgramId : null;
   let selectedAdmissionId = Number.isFinite(requestedAdmissionId) && requestedAdmissionId > 0 ? requestedAdmissionId : null;
-  let courseId = parsePositiveIntStrict(req.body.course_id);
+  const requestedCourseId = parsePositiveIntStrict(req.body.course_id);
+  let courseId = null;
   let studyContextId = parsePositiveIntStrict(req.body.study_context_id);
   let usedCompatibilityCourseFallback = false;
   let fallbackSource = '';
@@ -13611,6 +13606,12 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       }
     }
 
+    if (!courseId && requestedCourseId && !studyContextId) {
+      courseId = requestedCourseId;
+      usedCompatibilityCourseFallback = true;
+      fallbackSource = 'legacy_course_input';
+    }
+
     if (!courseId && selectedAdmissionId && requestedCampus) {
       const resolvedCourse = await resolveRegistrationCourseForCampus({
         admissionId: selectedAdmissionId,
@@ -13631,25 +13632,18 @@ app.post('/register/course', registerLimiter, async (req, res) => {
 
     if (!courseId) {
       if (selectedAdmissionId && requestedCampus) {
-        await queueAcademicModerationItem({
-          dedupeKey: academicSetupHelpers.buildModerationKey('registration-missing-stage-one', userId, selectedAdmissionId, requestedCampus, selectedProgramId || 0),
-          sourceKind: 'user',
-          sourceId: userId,
-          issueCode: 'missing_stage_one_context',
-          severity: 'high',
-          title: 'Registration could not resolve a stage 1 study context',
+        await queueAcademicModerationItem(academicSetupHelpers.buildRegistrationMissingStageOneIssue({
+          userId,
+          programId: selectedProgramId,
+          admissionId: selectedAdmissionId,
+          trackKey: trackFromBody || null,
+          campusKey: requestedCampus,
+          stageNumber: 1,
+          courseId: null,
+          studyContextId: null,
+          dedupeSuffix: selectedProgramId || 0,
           summary: 'Registration did not find a study context or compatibility course for the selected cohort and campus.',
-          payload: {
-            user_id: userId,
-            program_id: selectedProgramId,
-            admission_id: selectedAdmissionId,
-            track_key: trackFromBody || null,
-            campus_key: requestedCampus,
-            stage_number: 1,
-            course_id: null,
-            study_context_id: null,
-          },
-        });
+        }));
       }
       return redirectRegistrationFlowIssue('missing_campus');
     }
@@ -13779,50 +13773,35 @@ app.post('/register/course', registerLimiter, async (req, res) => {
     }
     if (!studyContextId && courseId) {
       usedCompatibilityCourseFallback = true;
-      fallbackSource = fallbackSource || (parsePositiveIntStrict(req.body.course_id) ? 'legacy_course_input' : 'derived_course_fallback');
+      fallbackSource = fallbackSource || (requestedCourseId ? 'legacy_course_input' : 'derived_course_fallback');
     }
     if (!studyContextId && selectedAdmissionId) {
-      await queueAcademicModerationItem({
-        dedupeKey: academicSetupHelpers.buildModerationKey('registration-missing-stage-one', userId, selectedAdmissionId, requestedCampus || 'unknown', courseId || 0),
-        sourceKind: 'user',
-        sourceId: userId,
-        issueCode: 'missing_stage_one_context',
-        severity: 'high',
+      await queueAcademicModerationItem(academicSetupHelpers.buildRegistrationMissingStageOneIssue({
+        userId,
+        programId: selectedProgramId,
+        admissionId: selectedAdmissionId,
+        trackKey: selectedTrack,
+        campusKey: requestedCampus || null,
+        stageNumber: 1,
+        courseId,
+        studyContextId: null,
+        dedupeSuffix: courseId || 0,
         title: 'Registration missing study context assignment',
         summary: 'Registration continued in compatibility mode because stage 1 study context was not resolved.',
-        payload: {
-          user_id: userId,
-          program_id: selectedProgramId,
-          admission_id: selectedAdmissionId,
-          track_key: selectedTrack,
-          campus_key: requestedCampus || null,
-          stage_number: 1,
-          course_id: courseId,
-          study_context_id: null,
-        },
-      });
+      }));
     }
     if (usedCompatibilityCourseFallback && courseId) {
-      await queueAcademicModerationItem({
-        dedupeKey: academicSetupHelpers.buildModerationKey('registration-course-fallback', userId, selectedAdmissionId || 0, courseId, requestedCampus || 'unknown'),
-        sourceKind: 'user',
-        sourceId: userId,
-        issueCode: 'registration_course_fallback',
-        severity: 'medium',
-        title: 'Registration used compatibility course fallback',
-        summary: 'Registration resolved only a legacy course scope and had to continue without a canonical study context.',
-        payload: {
-          user_id: userId,
-          program_id: selectedProgramId,
-          admission_id: selectedAdmissionId,
-          track_key: selectedTrack,
-          campus_key: requestedCampus || null,
-          stage_number: 1,
-          course_id: courseId,
-          study_context_id: studyContextId || null,
-          fallback_source: fallbackSource || 'compatibility',
-        },
-      });
+      await queueAcademicModerationItem(academicSetupHelpers.buildRegistrationCourseFallbackIssue({
+        userId,
+        programId: selectedProgramId,
+        admissionId: selectedAdmissionId,
+        trackKey: selectedTrack,
+        campusKey: requestedCampus || null,
+        stageNumber: 1,
+        courseId,
+        studyContextId: studyContextId || null,
+        fallbackSource: fallbackSource || 'compatibility',
+      }));
     }
 
     if (!teacherCourse && selectedAdmissionId) {
@@ -14428,6 +14407,27 @@ function getTeacherWorkspaceRedirectState(source = {}, fallbackCourseId = null) 
   };
 }
 
+async function hydrateTeacherWorkspaceRedirectState(state = {}) {
+  const nextState = {
+    courseId: parsePositiveIntStrict(state.courseId),
+    studyContextId: parsePositiveIntStrict(state.studyContextId),
+    semesterId: parsePositiveIntStrict(state.semesterId),
+  };
+  if (!nextState.courseId && nextState.studyContextId) {
+    try {
+      const context = await getStudyContextById(nextState.studyContextId);
+      if (context && parsePositiveIntStrict(context.course_id)) {
+        nextState.courseId = parsePositiveIntStrict(context.course_id);
+      }
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+    }
+  }
+  return nextState;
+}
+
 app.get('/teacher/workspace', requireLogin, async (req, res) => {
   try {
     await ensureDbReady();
@@ -14490,8 +14490,8 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
         }])
         .filter((entry) => Number.isInteger(entry[0]) && entry[0] > 0)
     ).values());
-    const selectedWorkspaceContext = allWorkspaceContextOptions.find((item) => Number(item.id || 0) === Number(requestedStudyContextId || 0)) || null;
-    const selectedWorkspaceContextId = selectedWorkspaceContext ? Number(selectedWorkspaceContext.id) : null;
+    let selectedWorkspaceContext = allWorkspaceContextOptions.find((item) => Number(item.id || 0) === Number(requestedStudyContextId || 0)) || null;
+    let selectedWorkspaceContextId = selectedWorkspaceContext ? Number(selectedWorkspaceContext.id) : null;
     const selectedWorkspaceCourse = !selectedWorkspaceContext && requestedCourseId
       ? (workspaceCourseOptions.find((course) => Number(course.id || 0) === Number(requestedCourseId || 0)) || null)
       : null;
@@ -14504,13 +14504,15 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
         ? Number(selectedWorkspaceCourse.id || 0)
         : (selectedTeacherCourse
           ? Number(selectedTeacherCourse.id || 0)
-          : (teacherCourses.length === 1 ? Number(teacherCourses[0].id) : null)));
+          : null));
 
     const workspaceContextOptions = (selectedCourseId
       ? allWorkspaceContextOptions.filter((context) => Number(context.course_id || 0) === Number(selectedCourseId || 0))
       : allWorkspaceContextOptions);
-    if (!selectedWorkspaceContextId && !selectedCourseId && workspaceContextOptions.length === 1) {
-      selectedCourseId = Number(workspaceContextOptions[0].course_id || 0) || null;
+    if (!selectedWorkspaceContextId && workspaceContextOptions.length === 1) {
+      selectedWorkspaceContext = workspaceContextOptions[0];
+      selectedWorkspaceContextId = Number(selectedWorkspaceContext.id || 0) || null;
+      selectedCourseId = Number(selectedWorkspaceContext.course_id || 0) || selectedCourseId;
     }
 
     const semesterSourceContexts = selectedWorkspaceContext
@@ -14663,11 +14665,11 @@ app.post('/teacher/workspace/offering-templates/sync', requireLogin, async (req,
     return res.redirect('/schedule');
   }
   const userId = Number(req.session.user.id || 0);
-  const redirectState = {
+  const redirectState = await hydrateTeacherWorkspaceRedirectState({
     courseId: parsePositiveIntStrict(req.body.course),
     studyContextId: parsePositiveIntStrict(req.body.study_context_id),
     semesterId: parsePositiveIntStrict(req.body.semester_id),
-  };
+  });
   try {
     const scopeOfferingIds = Array.from(new Set(
       (Array.isArray(req.body.visible_offering_ids) ? req.body.visible_offering_ids : [req.body.visible_offering_ids])
@@ -14693,24 +14695,15 @@ app.post('/teacher/workspace/offering-templates/sync', requireLogin, async (req,
       if (hasSubjectCatalog && hasContexts) {
         continue;
       }
-      await queueAcademicModerationItem({
-        dedupeKey: academicSetupHelpers.buildModerationKey('teacher-template-match', userId, Number(offering && offering.id || 0)),
-        sourceKind: 'subject_offering',
-        sourceId: Number(offering && offering.id || 0) || null,
-        issueCode: 'invalid_teacher_template_match',
-        severity: 'medium',
-        title: 'Teacher template sync skipped an invalid offering scope',
-        summary: 'Recurring template sync found an offering without the metadata needed to match teacher template rules.',
-        payload: {
-          teacher_id: userId,
-          offering_id: Number(offering && offering.id || 0) || null,
-          subject_catalog_id: parsePositiveIntStrict(offering && offering.subject_catalog_id),
-          study_context_id: redirectState.studyContextId || null,
-          semester_id: redirectState.semesterId || null,
-          course_id: redirectState.courseId || null,
-          has_contexts: hasContexts,
-        },
-      });
+      await queueAcademicModerationItem(academicSetupHelpers.buildInvalidTeacherTemplateMatchIssue({
+        teacherId: userId,
+        offeringId: Number(offering && offering.id || 0) || null,
+        subjectCatalogId: parsePositiveIntStrict(offering && offering.subject_catalog_id),
+        studyContextId: redirectState.studyContextId || null,
+        semesterId: redirectState.semesterId || null,
+        courseId: redirectState.courseId || null,
+        hasContexts,
+      }));
     }
     const workspaceAssignedOfferingDetails = new Map(
       (teacherAssignedOfferings || [])
@@ -14758,11 +14751,11 @@ app.post('/teacher/workspace/offerings', requireLogin, async (req, res) => {
     return res.redirect('/schedule');
   }
   const userId = Number(req.session.user.id || 0);
-  const redirectState = {
+  const redirectState = await hydrateTeacherWorkspaceRedirectState({
     courseId: parsePositiveIntStrict(req.body.course),
     studyContextId: parsePositiveIntStrict(req.body.study_context_id),
     semesterId: parsePositiveIntStrict(req.body.semester_id),
-  };
+  });
   try {
     const result = await saveTeacherWorkspaceOfferingAssignments(userId, req.body);
     if (!result.ok) {
@@ -14810,7 +14803,9 @@ app.post('/teacher/workspace/assets', requireLogin, uploadLimiter, upload.single
   }
   const userId = Number(req.session.user.id || 0);
   const requestedCourseId = Number(req.body.course_id || req.session.user.course_id || 0);
-  const redirectState = getTeacherWorkspaceRedirectState(req.body, requestedCourseId);
+  const redirectState = await hydrateTeacherWorkspaceRedirectState(
+    getTeacherWorkspaceRedirectState(req.body, requestedCourseId)
+  );
   if (!req.file) {
     return res.redirect(buildTeacherWorkspaceUrl({
       ...redirectState,
@@ -14861,7 +14856,9 @@ app.post('/teacher/workspace/assets/:id/delete', requireLogin, async (req, res) 
   }
   const assetId = Number(req.params.id);
   const requestedCourseId = Number(req.body.course_id || req.session.user.course_id || 0);
-  const redirectState = getTeacherWorkspaceRedirectState(req.body, requestedCourseId);
+  const redirectState = await hydrateTeacherWorkspaceRedirectState(
+    getTeacherWorkspaceRedirectState(req.body, requestedCourseId)
+  );
   if (!Number.isInteger(assetId) || assetId < 1) {
     return res.redirect(buildTeacherWorkspaceUrl({
       ...redirectState,
@@ -14933,7 +14930,9 @@ app.post('/teacher/workspace/templates', requireLogin, uploadLimiter, upload.arr
   const assetIds = teacherTemplateHelpers.normalizeTemplateAssetIds(req.body.asset_ids, 48);
   const linkUrl = normalizeExternalUrl(req.body.link_url) || null;
   const meetingUrl = normalizeExternalUrl(req.body.meeting_url) || null;
-  const redirectState = getTeacherWorkspaceRedirectState(req.body, requestedCourseId || fallbackCourseId || null);
+  const redirectState = await hydrateTeacherWorkspaceRedirectState(
+    getTeacherWorkspaceRedirectState(req.body, requestedCourseId || fallbackCourseId || null)
+  );
 
   if (!title || !description) {
     unlinkUploadedFiles(uploadedFiles);
@@ -15055,7 +15054,9 @@ app.post('/teacher/workspace/templates/:id/update', requireLogin, uploadLimiter,
   const fallbackCourseId = Number.isInteger(contextCourseId) && contextCourseId > 0
     ? contextCourseId
     : (Number.isInteger(requestedCourseId) && requestedCourseId > 0 ? requestedCourseId : null);
-  const redirectState = getTeacherWorkspaceRedirectState(req.body, fallbackCourseId);
+  const redirectState = await hydrateTeacherWorkspaceRedirectState(
+    getTeacherWorkspaceRedirectState(req.body, fallbackCourseId)
+  );
   if (!Number.isInteger(templateId) || templateId < 1) {
     unlinkUploadedFiles(uploadedFiles);
     return res.redirect(buildTeacherWorkspaceUrl({
@@ -15200,7 +15201,9 @@ app.post('/teacher/workspace/templates/:id/clone', requireLogin, async (req, res
   const { id: userId } = req.session.user;
   const templateId = Number(req.params.id);
   const contextCourseId = Number(req.body.course_id_context);
-  const redirectState = getTeacherWorkspaceRedirectState(req.body, contextCourseId);
+  const redirectState = await hydrateTeacherWorkspaceRedirectState(
+    getTeacherWorkspaceRedirectState(req.body, contextCourseId)
+  );
   if (!Number.isInteger(templateId) || templateId < 1) {
     return res.redirect(buildTeacherWorkspaceUrl({
       ...redirectState,
@@ -15411,7 +15414,9 @@ app.post('/teacher/workspace/templates/bulk-clone', requireLogin, async (req, re
   }
   const { id: userId } = req.session.user;
   const contextCourseId = Number(req.body.course_id_context);
-  const redirectState = getTeacherWorkspaceRedirectState(req.body, contextCourseId);
+  const redirectState = await hydrateTeacherWorkspaceRedirectState(
+    getTeacherWorkspaceRedirectState(req.body, contextCourseId)
+  );
   const rawSourceTemplateIds = req.body.source_template_ids;
   const sourceTemplateIds = Array.from(
     new Set(
@@ -15632,7 +15637,9 @@ app.post('/teacher/workspace/templates/bulk-delete', requireLogin, async (req, r
   }
   const { id: userId } = req.session.user;
   const contextCourseId = Number(req.body.course_id_context);
-  const redirectState = getTeacherWorkspaceRedirectState(req.body, contextCourseId);
+  const redirectState = await hydrateTeacherWorkspaceRedirectState(
+    getTeacherWorkspaceRedirectState(req.body, contextCourseId)
+  );
   const rawSourceTemplateIds = req.body.source_template_ids;
   const sourceTemplateIds = Array.from(
     new Set(
@@ -15724,7 +15731,9 @@ app.post('/teacher/workspace/templates/:id/delete', requireLogin, async (req, re
     return res.redirect('/schedule');
   }
   const { id: userId } = req.session.user;
-  const redirectState = getTeacherWorkspaceRedirectState(req.body);
+  const redirectState = await hydrateTeacherWorkspaceRedirectState(
+    getTeacherWorkspaceRedirectState(req.body)
+  );
   const templateId = Number(req.params.id);
   if (!Number.isInteger(templateId) || templateId < 1) {
     return res.redirect(buildTeacherWorkspaceUrl({
@@ -33470,28 +33479,9 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
           if (Number(context.active_semester_count || 0) > 0) {
             continue;
           }
-          await queueAcademicModerationItem({
-            dedupeKey: academicSetupHelpers.buildModerationKey('study-context-active-semester', Number(context.id || 0)),
-            sourceKind: 'study_context',
-            sourceId: Number(context.id || 0) || null,
-            issueCode: 'context_missing_active_semester',
-            severity: Number(context.user_count || 0) > 0 || Number(context.offering_count || 0) > 0 ? 'high' : 'medium',
-            title: 'Study context has no active semester',
-            summary: 'This study context currently has no active semester even though it already has live data.',
-            payload: {
-              study_context_id: Number(context.id || 0) || null,
-              course_id: Number(context.course_id || 0) || null,
-              program_id: Number(context.program_id || 0) || null,
-              admission_id: Number(context.admission_id || 0) || null,
-              track_key: context.track_key || null,
-              campus_key: context.campus_key || null,
-              stage_number: Number(context.stage || 0) || null,
-              semester_count: Number(context.semester_count || 0) || 0,
-              active_semester_count: Number(context.active_semester_count || 0) || 0,
-              offering_count: Number(context.offering_count || 0) || 0,
-              user_count: Number(context.user_count || 0) || 0,
-            },
-          });
+          await queueAcademicModerationItem(
+            academicSetupHelpers.buildContextMissingActiveSemesterIssue(context)
+          );
         }
 
         const fallbackStudyContext = studyContexts.find((context) => Number(context.id || 0) === Number(requestedStudyContextId || 0))
@@ -33512,22 +33502,12 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
             if (!(offering.is_shared === true || Number(offering.is_shared) === 1) || linkedContextCount > 1) {
               continue;
             }
-            await queueAcademicModerationItem({
-              dedupeKey: academicSetupHelpers.buildModerationKey('shared-offering-mismatch', Number(offering.id || 0)),
-              sourceKind: 'subject_offering',
-              sourceId: Number(offering.id || 0) || null,
-              issueCode: 'shared_offering_mismatch',
-              severity: 'medium',
-              title: 'Shared offering is linked to an incomplete context scope',
-              summary: 'A shared offering should be attached to multiple study contexts but currently has only one visible linked context.',
-              payload: {
-                offering_id: Number(offering.id || 0) || null,
-                study_context_id: selectedStudyContextId,
-                course_id: Number(selectedStudyContext.course_id || 0) || null,
-                target_context_ids: Array.isArray(offering.target_context_ids) ? offering.target_context_ids : [],
-                is_shared: true,
-              },
-            });
+            await queueAcademicModerationItem(academicSetupHelpers.buildSharedOfferingMismatchIssue({
+              offeringId: Number(offering.id || 0) || null,
+              studyContextId: selectedStudyContextId,
+              courseId: Number(selectedStudyContext.course_id || 0) || null,
+              targetContextIds: Array.isArray(offering.target_context_ids) ? offering.target_context_ids : [],
+            }));
           }
         }
       }
@@ -34713,7 +34693,11 @@ app.post('/admin/pathways/moderation/:id/resolve', requirePathwaysSectionAccess,
   const queueId = parsePositiveIntStrict(req.params.id);
   const redirectState = getPathwaysRedirectState(req);
   const action = String(req.body.action || '').trim().toLowerCase();
-  const helperAction = action === 'ignore' ? 'ignored' : 'resolved';
+  const helperAction = action === 'ignore'
+    ? 'ignored'
+    : (action === 'mark_reviewing'
+      ? 'reviewing'
+      : (action === 'reopen' ? 'open' : 'resolved'));
   const assignedStudyContextId = parsePositiveIntStrict(req.body.study_context_id);
 
   if (!queueId) {
@@ -34722,7 +34706,7 @@ app.post('/admin/pathways/moderation/:id/resolve', requirePathwaysSectionAccess,
       error: msg.moderationItemNotFound,
     }));
   }
-  if (!['assign_context', 'ignore', 'mark_resolved'].includes(action)) {
+  if (!['assign_context', 'ignore', 'mark_resolved', 'mark_reviewing', 'reopen'].includes(action)) {
     return res.redirect(buildAdminPathwaysUrl({
       ...redirectState,
       error: msg.moderationActionInvalid,
@@ -34753,7 +34737,11 @@ app.post('/admin/pathways/moderation/:id/resolve', requirePathwaysSectionAccess,
     return res.redirect(buildAdminPathwaysUrl({
       ...redirectState,
       studyContextId: action === 'assign_context' ? assignedStudyContextId : redirectState.studyContextId,
-      ok: msg.moderationResolved,
+      ok: action === 'reopen'
+        ? (getPreferredLang(req) === 'uk' ? 'Елемент черги знову відкрито' : 'Queue item reopened')
+        : (action === 'mark_reviewing'
+          ? (getPreferredLang(req) === 'uk' ? 'Елемент позначено як reviewing' : 'Queue item marked as reviewing')
+          : msg.moderationResolved),
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.pathways.moderation.resolve');
@@ -36463,21 +36451,12 @@ app.post('/admin/pathways/admissions/:id/users/migrate', requirePathwaysSectionA
     if (missingContextCourseIds.length) {
       try {
         for (const missingCourseId of missingContextCourseIds) {
-          await queueAcademicModerationItem({
-            dedupeKey: academicSetupHelpers.buildModerationKey('course-migration', admissionId, missingCourseId),
-            sourceKind: 'course_migration',
-            sourceId: missingCourseId,
-            issueCode: 'missing_target_context',
-            severity: 'high',
-            title: 'Missing target study context for migration',
-            summary: 'Could not resolve a study context for the selected course during cohort migration.',
-            payload: {
-              admission_id: admissionId,
-              course_id: missingCourseId,
-              program_id: resolvedProgramId,
-              track_key: admissionRow.track_key,
-            },
-          });
+          await queueAcademicModerationItem(academicSetupHelpers.buildMissingTargetContextIssue({
+            admissionId,
+            courseId: missingCourseId,
+            programId: resolvedProgramId,
+            trackKey: admissionRow.track_key,
+          }));
         }
       } catch (queueErr) {
         if (!isDbSchemaCompatibilityError(queueErr)) {
@@ -36594,47 +36573,30 @@ app.post('/admin/pathways/admissions/:id/promote', requirePathwaysSectionAccess,
     for (const user of users || []) {
       const placement = await resolveUserAcademicPlacement(user);
       if (!placement || !placement.study_context_id) {
-        await queueAcademicModerationItem({
-          dedupeKey: academicSetupHelpers.buildModerationKey('promotion-target', admissionId, Number(user.id || 0), 'missing-placement'),
-          sourceKind: 'user',
-          sourceId: Number(user.id || 0) || null,
-          issueCode: 'failed_promotion_target',
-          severity: 'high',
-          title: 'Promotion skipped user without canonical study context',
-          summary: 'Promotion could not continue because the user has no canonical study context placement.',
-          payload: {
-            user_id: Number(user.id || 0) || null,
-            admission_id: admissionId,
-            program_id: Number(admissionRow.program_id || 0) || null,
-            track_key: admissionRow.track_key || null,
-            course_id: Number(user.course_id || 0) || null,
-            study_context_id: Number(user.study_context_id || 0) || null,
-          },
-        });
+        await queueAcademicModerationItem(academicSetupHelpers.buildFailedPromotionTargetIssue({
+          userId: Number(user.id || 0) || null,
+          admissionId,
+          programId: Number(admissionRow.program_id || 0) || null,
+          trackKey: admissionRow.track_key || null,
+          courseId: Number(user.course_id || 0) || null,
+          studyContextId: Number(user.study_context_id || 0) || null,
+          missingPlacement: true,
+        }));
         skippedCount += 1;
         continue;
       }
       const nextContextId = await ensureNextStudyContextForPromotion(placement);
       if (!nextContextId) {
-        await queueAcademicModerationItem({
-          dedupeKey: academicSetupHelpers.buildModerationKey('promotion-target', admissionId, Number(user.id || 0), Number(placement.study_context_id || 0)),
-          sourceKind: 'user',
-          sourceId: Number(user.id || 0) || null,
-          issueCode: 'failed_promotion_target',
-          severity: 'high',
-          title: 'Promotion could not resolve next study context',
-          summary: 'Promotion failed to find or create the next-stage study context for this user.',
-          payload: {
-            user_id: Number(user.id || 0) || null,
-            admission_id: admissionId,
-            program_id: Number(admissionRow.program_id || 0) || null,
-            track_key: placement.track_key || admissionRow.track_key || null,
-            course_id: Number(placement.course_id || 0) || null,
-            study_context_id: Number(placement.study_context_id || 0) || null,
-            campus_key: placement.campus_key || null,
-            stage_number: Number(placement.stage || 0) || null,
-          },
-        });
+        await queueAcademicModerationItem(academicSetupHelpers.buildFailedPromotionTargetIssue({
+          userId: Number(user.id || 0) || null,
+          admissionId,
+          programId: Number(admissionRow.program_id || 0) || null,
+          trackKey: placement.track_key || admissionRow.track_key || null,
+          courseId: Number(placement.course_id || 0) || null,
+          studyContextId: Number(placement.study_context_id || 0) || null,
+          campusKey: placement.campus_key || null,
+          stageNumber: Number(placement.stage || 0) || null,
+        }));
         skippedCount += 1;
         continue;
       }

@@ -11,6 +11,11 @@ const {
   buildSubjectVisibilityCopy,
   describeCatalogBinding,
 } = require('../lib/pathways');
+const {
+  buildFailedPromotionTargetIssue,
+  buildRegistrationCourseFallbackIssue,
+  resolveAdminAcademicScopeState,
+} = require('../lib/academicSetup');
 
 test('pathway readiness becomes blocked without mapped courses', () => {
   const summary = buildPathwayReadinessSummary({
@@ -120,4 +125,81 @@ test('catalog assignment mode summary explains shared course propagation', () =>
   });
   assert.match(summary, /shared subject instance/i);
   assert.match(summary, /3 selected courses/i);
+});
+
+test('admin academic scope resolves explicit study context into derived course scope', () => {
+  const state = resolveAdminAcademicScopeState({
+    courses: [
+      { id: 11, name: 'Course 1' },
+      { id: 22, name: 'Course 2' },
+    ],
+    studyContexts: [
+      {
+        id: 77,
+        course_id: 22,
+        program_id: 9,
+        admission_id: 15,
+        admission_year: 2025,
+        stage_number: 2,
+        track_key: 'master',
+        campus_key: 'munich',
+        program_name: 'Public Leadership',
+        program_code: 'PL',
+      },
+    ],
+    requestedScope: {
+      study_context_id: 77,
+    },
+    buildStudyContextLabel: (context) => `ctx:${context.id}`,
+  });
+
+  assert.equal(state.studyContextId, 77);
+  assert.equal(state.courseId, 22);
+  assert.equal(state.programId, 9);
+  assert.equal(state.admissionId, 15);
+  assert.equal(state.stage, 2);
+  assert.equal(state.track, 'master');
+  assert.equal(state.campus, 'munich');
+});
+
+test('registration fallback moderation issue keeps canonical payload contract', () => {
+  const issue = buildRegistrationCourseFallbackIssue({
+    userId: 4,
+    programId: 10,
+    admissionId: 25,
+    trackKey: 'bachelor',
+    campusKey: 'kyiv',
+    stageNumber: 1,
+    courseId: 3,
+    studyContextId: null,
+    fallbackSource: 'legacy_course_input',
+  });
+
+  assert.equal(issue.issueCode, 'registration_course_fallback');
+  assert.match(issue.dedupeKey, /registration-course-fallback/);
+  assert.equal(issue.payload.user_id, 4);
+  assert.equal(issue.payload.program_id, 10);
+  assert.equal(issue.payload.admission_id, 25);
+  assert.equal(issue.payload.course_id, 3);
+  assert.equal(issue.payload.study_context_id, null);
+  assert.equal(issue.payload.fallback_source, 'legacy_course_input');
+});
+
+test('failed promotion moderation issue distinguishes missing placement case', () => {
+  const issue = buildFailedPromotionTargetIssue({
+    userId: 8,
+    admissionId: 31,
+    programId: 6,
+    trackKey: 'master',
+    courseId: 4,
+    studyContextId: null,
+    missingPlacement: true,
+  });
+
+  assert.equal(issue.issueCode, 'failed_promotion_target');
+  assert.match(issue.title, /without canonical study context/i);
+  assert.match(issue.dedupeKey, /missing-placement/);
+  assert.equal(issue.payload.user_id, 8);
+  assert.equal(issue.payload.admission_id, 31);
+  assert.equal(issue.payload.program_id, 6);
 });

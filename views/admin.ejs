@@ -1208,11 +1208,11 @@
                     <div class="small text-muted">Швидкий стан по курсу та найближчих діях.</div>
                   </div>
                   <div class="admin-overview-actions d-flex gap-2 flex-wrap">
-                    <a class="btn btn-outline-primary btn-sm" href="/admin/schedule-generator">Генератор розкладу</a>
-                    <a class="btn btn-outline-secondary btn-sm" href="/admin/session-generator">Генератор сесій</a>
+                    <a class="btn btn-outline-primary btn-sm" href="<%= buildScopedHref('/admin/schedule-generator') %>">Генератор розкладу</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/session-generator') %>">Генератор сесій</a>
                     <button class="btn btn-outline-secondary btn-sm" type="button" data-admin-nav="admin-import-export">Import/Export</button>
-                    <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-list">Schedule list</a>
-                    <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-summary">Semester summary</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/schedule-list') %>">Schedule list</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/schedule-summary') %>">Semester summary</a>
                   </div>
                 </div>
                 <div class="admin-overview-grid">
@@ -1788,8 +1788,8 @@
                   <div class="small text-muted">Додавайте або коригуйте пари вручну.</div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
-                  <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-list">Відкрити список пар</a>
-                  <a class="btn btn-outline-secondary btn-sm" href="/admin/schedule-summary">Сводка семестру</a>
+                  <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/schedule-list') %>">Відкрити список пар</a>
+                  <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/schedule-summary') %>">Сводка семестру</a>
                 </div>
               </div>
               <form method="POST" action="/admin/schedule/add">
@@ -1878,9 +1878,9 @@
                   <div class="small text-muted">Трьохкроковий імпорт: Upload → Validate → Confirm.</div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
-                  <a class="btn btn-outline-secondary btn-sm" href="/admin/export/schedule.csv">Export schedule CSV</a>
+                  <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/export/schedule.csv') %>">Export schedule CSV</a>
                   <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/export/users.csv') %>">Export users CSV</a>
-                  <a class="btn btn-outline-secondary btn-sm" href="/admin/export/subjects.csv">Export subjects CSV</a>
+                  <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/export/subjects.csv') %>">Export subjects CSV</a>
                 </div>
               </div>
               <% if (importOperation) { %>
@@ -2086,9 +2086,9 @@
                   <div class="small text-muted">Генератор розкладу + генератор сесій (превʼю/планування).</div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
-                  <a class="btn btn-outline-primary btn-sm" href="/admin/schedule-generator">Генератор розкладу</a>
-                  <a class="btn btn-outline-secondary btn-sm" href="/admin/session-generator">Генератор сесій</a>
-                  <a class="btn btn-outline-secondary btn-sm" href="/admin/export/schedule.csv">Export current schedule CSV</a>
+                  <a class="btn btn-outline-primary btn-sm" href="<%= buildScopedHref('/admin/schedule-generator') %>">Генератор розкладу</a>
+                  <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/session-generator') %>">Генератор сесій</a>
+                  <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/export/schedule.csv') %>">Export current schedule CSV</a>
                 </div>
               </div>
               <div class="small text-muted">Перед Publish рекомендуємо зберегти поточний CSV як backup.</div>
@@ -3100,7 +3100,7 @@
                                   Finalize semester
                                 </button>
                               </li>
-                              <li><a class="dropdown-item" href="/admin/semesters/archive-export/<%= sem.id %>">Download archive CSV</a></li>
+                              <li><a class="dropdown-item" href="<%= buildScopedHref(`/admin/semesters/archive-export/${sem.id}`) %>">Download archive CSV</a></li>
                               <li><hr class="dropdown-divider" /></li>
                               <li><button class="dropdown-item text-danger" type="submit" form="semester-delete-<%= sem.id %>" data-confirm="Delete this semester? This cannot be undone." data-confirm-level="danger">Delete</button></li>
                               <li>
@@ -3734,7 +3734,7 @@
               <div class="mt-2">
                 <a
                   class="btn btn-outline-secondary btn-sm"
-                  href="/admin/history.csv?history_actor=<%= encodeURIComponent(historyFilters && historyFilters.actor || '') %>&history_action=<%= encodeURIComponent(historyFilters && historyFilters.action || '') %>&history_q=<%= encodeURIComponent(historyFilters && historyFilters.q || '') %>&history_from=<%= encodeURIComponent(historyFilters && historyFilters.from || '') %>&history_to=<%= encodeURIComponent(historyFilters && historyFilters.to || '') %>"
+                  href="<%= buildScopedHref('/admin/history.csv', { history_actor: historyFilters && historyFilters.actor || '', history_action: historyFilters && historyFilters.action || '', history_q: historyFilters && historyFilters.q || '', history_from: historyFilters && historyFilters.from || '', history_to: historyFilters && historyFilters.to || '' }) %>"
                 >
                   <%= t('admin.exportHistory') %>
                 </a>

@@ -740,13 +740,16 @@
             </select>
           </div>
           <div class="col-12 col-lg-4">
-            <label class="form-label" for="workspaceCourseId">Course scope</label>
+            <label class="form-label" for="workspaceCourseId">Compatibility course helper</label>
             <select class="form-select" id="workspaceCourseId" name="course">
               <option value="">All visible courses</option>
               <% workspaceCourseList.forEach(function(course) { %>
                 <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
               <% }) %>
             </select>
+          </div>
+          <div class="col-12">
+            <p class="hint mb-0">Primary scope is `study_context_id + semester_id`. Course stays only as a derived helper for legacy runtime actions.</p>
           </div>
           <div class="col-12 d-flex flex-wrap gap-2">
             <button class="btn btn-primary" type="submit">Apply filters</button>
