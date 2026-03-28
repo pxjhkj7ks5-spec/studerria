@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.3.21",
+      "date": "2026-03-28",
+      "items": [
+        "fix(admin-topbar-course-switch-force-scope): make `buildAdminAcademicScopeState(...)` pass `preferCourseOnly` into `resolveAdminAcademicScopeState(...)` when the topbar sends `reset_scope=course`, so changing the admin topbar course no longer rehydrates a hidden legacy academic context and silently keeps page content on the previous course",
+        "fix(admin-course-switch-content-refresh): update `lib/academicSetup.js` so a topbar-driven course switch resolves to a strict `course-only` admin scope for both legacy and projected academic-v2 courses, which lets course-scoped `/admin` sections like users, homework, schedule, and messages actually reload against the selected course"
+      ]
+    },
+    {
       "version": "1.3.20",
       "date": "2026-03-28",
       "items": [

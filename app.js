@@ -9781,6 +9781,7 @@ async function buildAdminAcademicScopeState(req, options = {}) {
     studyContexts,
     storedScope,
     requestedScope,
+    preferCourseOnly: resetScope === 'course',
     fallbackCourseId: options.fallbackCourseId || req.session.adminCourse || null,
     currentUserCourseId: req.session.user && req.session.user.course_id,
     allowedCourseIds: allowedCourseIdSet,
