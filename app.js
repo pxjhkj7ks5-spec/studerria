@@ -9361,11 +9361,10 @@ function isPlainStudentSession(req) {
   const roleKey = normalizeRoleKey(
     (req && req.session && (req.session.role || (req.session.user && req.session.user.role))) || 'student'
   );
-  return roleKey === 'student'
+  return ['student', 'starosta'].includes(roleKey)
     && !hasSessionRole(req, 'admin')
     && !hasSessionRole(req, 'teacher')
-    && !hasSessionRole(req, 'deanery')
-    && !hasSessionRole(req, 'starosta');
+    && !hasSessionRole(req, 'deanery');
 }
 
 function summarizeAcademicV2ProjectionItems(items = [], key = 'subject_title', limit = 3) {
@@ -9475,6 +9474,50 @@ async function syncUserAcademicV2GroupAssignment(userId, placement = {}) {
   const nextGroupId = parsePositiveIntStrict(scopeState && scopeState.scope && scopeState.scope.group_id);
   await db.run('UPDATE users SET group_id = ? WHERE id = ?', [nextGroupId || null, normalizedUserId]);
   return nextGroupId || null;
+}
+
+async function loadAcademicV2LegacyStudentRows(userOrId, options = {}) {
+  const selectedOnly = options && options.selectedOnly !== false;
+  const teamworkOnly = options && options.teamworkOnly === true;
+  const routeKey = sanitizeCompactText(options && options.routeKey, 80);
+  const state = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+    getAcademicV2Store(),
+    userOrId,
+    { selectedOnly }
+  );
+  if (routeKey && state && state.projectionIssues && state.projectionIssues.has_issues) {
+    const logUserId = parsePositiveIntStrict(
+      typeof userOrId === 'object' && userOrId
+        ? userOrId.id
+        : userOrId
+    );
+    logAcademicV2StudentProjection(routeKey, logUserId, state);
+  }
+
+  const rows = Array.from(state && state.subjects ? state.subjects : [])
+    .filter((subject) => !teamworkOnly || subject.show_in_teamwork === true || Number(subject.show_in_teamwork || 0) === 1)
+    .map((subject) => {
+      const groupNumber = parsePositiveIntStrict(subject.selected_group || subject.default_group, 1) || 1;
+      return {
+        subject_id: Number(subject.subject_id || 0),
+        subject_name: subject.subject_name || subject.subject_title || subject.name || '',
+        group_number: groupNumber,
+        owner_course_id: parsePositiveIntStrict(subject.owner_course_id || subject.course_id),
+        course_id: parsePositiveIntStrict(subject.course_id || subject.owner_course_id),
+        course_name: subject.course_name || '',
+        group_count: Math.max(1, Number(subject.group_count || 1)),
+        group_label: subject.is_general === true || Number(subject.is_general) === 1
+          ? 'Усі групи'
+          : `Група ${groupNumber}`,
+        group_numbers: [groupNumber],
+        has_all_groups: false,
+        show_in_teamwork: subject.show_in_teamwork === true || Number(subject.show_in_teamwork || 0) === 1,
+        is_general: subject.is_general === true || Number(subject.is_general) === 1,
+        legacy_semester_id: parsePositiveIntStrict(subject.legacy_semester_id),
+      };
+    });
+
+  return { state, rows };
 }
 
 function parseAcademicV2Focus(source = {}) {
@@ -12809,21 +12852,28 @@ async function listVisibleMessagesForUser({
   lang = 'uk',
 } = {}) {
   const normalizedUserId = Number(userId || 0);
-  const normalizedCourseId = Number(courseId || 0) || 1;
   const normalizedSubjectId = Number(subjectId || 0);
   const hasSubjectFilter = Number.isInteger(normalizedSubjectId) && normalizedSubjectId > 0;
-  const normalizedSemesterId = Number(activeSemester && activeSemester.id ? activeSemester.id : activeSemester || 0);
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 50);
 
   if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) {
     return { messages: [], unread_count: 0 };
   }
 
-  const groups = await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
-    studentId: normalizedUserId,
-    courseId: normalizedCourseId,
-    includeHidden: true,
+  const { state: studentState, rows: groups } = await loadAcademicV2LegacyStudentRows(normalizedUserId, {
+    selectedOnly: true,
+    routeKey: 'messages.visible',
   });
+  const normalizedCourseId = Number(
+    (studentState && studentState.scope && studentState.scope.legacy_course_id)
+    || courseId
+    || 0
+  ) || 1;
+  const normalizedSemesterId = Number(
+    (studentState && studentState.term && studentState.term.legacy_semester_id)
+    || (activeSemester && activeSemester.id ? activeSemester.id : activeSemester)
+    || 0
+  );
 
   const conditions = ['m.target_all = 1'];
   const conditionParams = [];
@@ -17762,7 +17812,21 @@ async function buildCoursePulseAnalytics({
 }
 
 async function buildMyDayData(user, role = 'student', roleList = [], options = {}) {
-  const courseId = Number(user.course_id || 1);
+  const normalizedRoleList = normalizeRoleList([role, ...(Array.isArray(roleList) ? roleList : [])]);
+  const normalizedRole = normalizedRoleList[0] || String(role || '').toLowerCase() || 'student';
+  const isStaffRole = normalizedRoleList.some((roleKey) => ['teacher', 'admin', 'deanery'].includes(roleKey));
+  const requestedCompetencySubjectId = Number(options && options.competencySubjectId ? options.competencySubjectId : 0);
+  const studentCompat = !isStaffRole
+    ? await loadAcademicV2LegacyStudentRows(user, {
+        selectedOnly: true,
+        routeKey: 'myday.student',
+      })
+    : { state: null, rows: [] };
+  const courseId = Number(
+    (!isStaffRole && studentCompat.state && studentCompat.state.scope && studentCompat.state.scope.legacy_course_id)
+    || user.course_id
+    || 1
+  );
   const activeSemester = await getActiveSemester(courseId);
   const now = new Date();
   const todayStr = formatLocalDate(now);
@@ -17780,20 +17844,14 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     return nextValue;
   };
   const nowIso = new Date().toISOString();
-  const normalizedRoleList = normalizeRoleList([role, ...(Array.isArray(roleList) ? roleList : [])]);
-  const normalizedRole = normalizedRoleList[0] || String(role || '').toLowerCase() || 'student';
-  const isStaffRole = normalizedRoleList.some((roleKey) => ['teacher', 'admin', 'deanery'].includes(roleKey));
-  const requestedCompetencySubjectId = Number(options && options.competencySubjectId ? options.competencySubjectId : 0);
 
   const windowEndShort = formatLocalDate(addDays(now, 7));
   const deadlinesWindowEnd = formatLocalDate(addDays(now, 14));
   const deadlinesWindowStart = formatLocalDate(addDays(now, -7));
 
-  const studentGroups = await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
-    studentId: user.id,
-    courseId,
-    includeHidden: false,
-  });
+  const studentGroups = isStaffRole
+    ? []
+    : Array.from(studentCompat.rows || []);
 
   let workloadTargets = (studentGroups || []).map((row) => ({
     subject_id: Number(row.subject_id),
@@ -24199,9 +24257,9 @@ async function getTeacherJournalSubjectAccess(userId, subjectId) {
 }
 
 async function getStudentJournalSubjectOptions(userId) {
-  const rows = await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
-    studentId: userId,
-    includeHidden: false,
+  const { rows } = await loadAcademicV2LegacyStudentRows(userId, {
+    selectedOnly: true,
+    routeKey: 'journal.student-options',
   });
   return (rows || []).map((row) => ({
     subject_id: Number(row.subject_id),
@@ -30851,13 +30909,23 @@ app.get('/teamwork', requireLogin, async (req, res) => {
   const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
 
   try {
-    const subjectRows = isTeacherMode
-      ? (await getTeacherAssignedSubjects(userId))
-          .filter((row) => row && (row.show_in_teamwork === true || Number(row.show_in_teamwork || 0) === 1))
-      : (await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
-          studentId: userId,
-          includeHidden: false,
-        })).filter((row) => row && (row.show_in_teamwork === true || Number(row.show_in_teamwork || 0) === 1));
+    let subjectRows;
+    if (isTeacherMode) {
+      subjectRows = (await getTeacherAssignedSubjects(userId))
+        .filter((row) => row && (row.show_in_teamwork === true || Number(row.show_in_teamwork || 0) === 1));
+    } else if (isPlainStudentSession(req)) {
+      const studentCompat = await loadAcademicV2LegacyStudentRows(req.session.user, {
+        selectedOnly: true,
+        teamworkOnly: true,
+        routeKey: 'teamwork.student',
+      });
+      subjectRows = studentCompat.rows || [];
+    } else {
+      subjectRows = (await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+        studentId: userId,
+        includeHidden: false,
+      })).filter((row) => row && (row.show_in_teamwork === true || Number(row.show_in_teamwork || 0) === 1));
+    }
 
     const subjectMap = new Map();
     (subjectRows || []).forEach((row) => {

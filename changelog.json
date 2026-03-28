@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.17",
+      "date": "2026-03-28",
+      "items": [
+        "feat(student-v2-read-expansion): extend the academic v2 student compatibility scope in `app.js` beyond `/register/subjects`, `/subjects`, and `/schedule` by adding `loadAcademicV2LegacyStudentRows(...)` and routing student-like runtime reads for messages, My Day workload, journal student subject options, and teamwork subject scope through v2-selected subjects instead of `listLegacyStudentGroupRows(...)`",
+        "feat(student-role-cutover-hardening): treat `starosta` as a student-like runtime role for v2 subject and schedule reads, while keeping only teacher/admin/deanery compatibility paths on the remaining legacy student-group readers",
+        "fix(student-compatibility-scope-filtering): make inbox/message scope, homework workload targeting, journal subject pickers, and teamwork filtering derive their legacy `subject_id/group_number/course_id` bridge from academic v2 selection state, so incomplete or stale legacy group assignments no longer silently drive normal student-facing reads"
+      ]
+    },
+    {
       "version": "1.3.16",
       "date": "2026-03-28",
       "items": [
