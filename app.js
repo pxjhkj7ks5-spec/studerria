@@ -51238,20 +51238,24 @@ const startSessionHealthProbes = () => {
   }, sessionHealthProbeIntervalMs);
 };
 
-const startServer = () => {
+const startServer = async () => {
   console.log('Starting server', {
     port: PORT,
     node: process.version,
     env: process.env.NODE_ENV || 'unknown',
   });
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    console.error('Failed to initialize database before listen', err);
+    process.exitCode = 1;
+    return;
+  }
   server.once('error', (err) => {
     console.error('Server failed to bind', err);
   });
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Listening on ${PORT}`);
-    ensureDbReady().catch((err) => {
-      console.error('Failed to initialize database', err);
-    });
     startSessionHealthProbes();
     startScheduler();
   });

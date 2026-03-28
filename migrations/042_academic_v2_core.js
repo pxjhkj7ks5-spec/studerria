@@ -1,4 +1,7 @@
 const DEFAULT_TRACKS = ['bachelor', 'master', 'teacher'];
+const SHOULD_IMPORT_LEGACY_ACADEMIC_V2 = String(process.env.ACADEMIC_V2_IMPORT_LEGACY || '')
+  .trim()
+  .toLowerCase() === 'true';
 
 const ddl = [
   `
@@ -1013,7 +1016,9 @@ async function up(pool) {
     for (const statement of ddl) {
       await client.query(statement);
     }
-    await seedAcademicV2(client);
+    if (SHOULD_IMPORT_LEGACY_ACADEMIC_V2) {
+      await seedAcademicV2(client);
+    }
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
