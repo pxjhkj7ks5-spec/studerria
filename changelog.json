@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.18",
+      "date": "2026-03-28",
+      "items": [
+        "fix(schedule-projection-alert-rendering): pass `projectionAlert: null` from the teacher and legacy compatibility render branches in `app.js` so `views/schedule.ejs` can safely render its new projection warning block without throwing `ReferenceError: projectionAlert is not defined` outside the student v2 path"
+      ]
+    },
+    {
       "version": "1.3.17",
       "date": "2026-03-28",
       "items": [

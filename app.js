@@ -21046,6 +21046,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         teacherHomeworkTemplates,
         canCreateHomework,
         canUseCustomDeadlinesUi,
+        projectionAlert: null,
       });
     } catch (err) {
       return handleDbError(res, err, 'teacher.schedule');
@@ -21580,7 +21581,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             res.render('schedule', {
             scheduleByDay,
             daysOfWeek: activeDays,
-            dayDates,
+              dayDates,
               currentWeek: selectedWeek,
               totalWeeks,
               semester: activeSemester,
@@ -21607,6 +21608,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               teacherHomeworkTemplates,
               canCreateHomework,
               canUseCustomDeadlinesUi,
+              projectionAlert: null,
             })
           );
         }
@@ -21812,6 +21814,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 teacherHomeworkTemplates,
                 canCreateHomework,
                 canUseCustomDeadlinesUi,
+                projectionAlert: null,
               });
             };
 
