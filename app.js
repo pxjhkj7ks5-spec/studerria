@@ -13198,6 +13198,314 @@ async function attachVisibleMessageReactions(rows, userId) {
   }));
 }
 
+function buildAcademicRuntimeScopeTargetMaps() {
+  return {
+    courseTargets: new Map(),
+    subjectTargets: new Map(),
+    subjectGroupTargets: new Map(),
+  };
+}
+
+function getSessionAcademicCourseId(req) {
+  const scopedCourseId = parsePositiveIntStrict(
+    req && req.session && req.session.adminAcademicScope
+      ? req.session.adminAcademicScope.courseId
+      : null
+  );
+  if (scopedCourseId) {
+    return scopedCourseId;
+  }
+  const adminCourseId = parsePositiveIntStrict(req && req.session ? req.session.adminCourse : null);
+  if (adminCourseId) {
+    return adminCourseId;
+  }
+  return parsePositiveIntStrict(req && req.session && req.session.user ? req.session.user.course_id : null);
+}
+
+function addAcademicRuntimeCourseTarget(targets, courseId, semesterId = null) {
+  const normalizedCourseId = parsePositiveIntStrict(courseId);
+  const normalizedSemesterId = parsePositiveIntStrict(semesterId);
+  if (!normalizedCourseId) {
+    return;
+  }
+  const key = `${normalizedCourseId}|${normalizedSemesterId || 0}`;
+  if (!targets.courseTargets.has(key)) {
+    targets.courseTargets.set(key, {
+      course_id: normalizedCourseId,
+      semester_id: normalizedSemesterId || null,
+    });
+  }
+}
+
+function addAcademicRuntimeSubjectTarget(targets, courseId, semesterId, subjectId) {
+  const normalizedCourseId = parsePositiveIntStrict(courseId);
+  const normalizedSemesterId = parsePositiveIntStrict(semesterId);
+  const normalizedSubjectId = parsePositiveIntStrict(subjectId);
+  if (!normalizedCourseId || !normalizedSubjectId) {
+    return;
+  }
+  const key = `${normalizedCourseId}|${normalizedSemesterId || 0}|${normalizedSubjectId}`;
+  if (!targets.subjectTargets.has(key)) {
+    targets.subjectTargets.set(key, {
+      course_id: normalizedCourseId,
+      semester_id: normalizedSemesterId || null,
+      subject_id: normalizedSubjectId,
+    });
+  }
+}
+
+function addAcademicRuntimeSubjectGroupTarget(targets, courseId, semesterId, subjectId, groupNumber) {
+  const normalizedCourseId = parsePositiveIntStrict(courseId);
+  const normalizedSemesterId = parsePositiveIntStrict(semesterId);
+  const normalizedSubjectId = parsePositiveIntStrict(subjectId);
+  const normalizedGroupNumber = parsePositiveIntStrict(groupNumber);
+  if (!normalizedCourseId || !normalizedSubjectId || !normalizedGroupNumber) {
+    return;
+  }
+  const key = `${normalizedCourseId}|${normalizedSemesterId || 0}|${normalizedSubjectId}|${normalizedGroupNumber}`;
+  if (!targets.subjectGroupTargets.has(key)) {
+    targets.subjectGroupTargets.set(key, {
+      course_id: normalizedCourseId,
+      semester_id: normalizedSemesterId || null,
+      subject_id: normalizedSubjectId,
+      group_number: normalizedGroupNumber,
+    });
+  }
+}
+
+function addAcademicRuntimeFullSubjectAudience(targets, row, options = {}) {
+  const normalizedCourseId = parsePositiveIntStrict(
+    row && (row.owner_course_id || row.course_id)
+  );
+  const normalizedSemesterId = parsePositiveIntStrict(
+    row && (row.legacy_semester_id || row.semester_id)
+  );
+  const normalizedSubjectId = parsePositiveIntStrict(row && row.subject_id);
+  if (!normalizedCourseId || !normalizedSubjectId) {
+    return;
+  }
+  addAcademicRuntimeCourseTarget(targets, normalizedCourseId, normalizedSemesterId);
+  addAcademicRuntimeSubjectTarget(targets, normalizedCourseId, normalizedSemesterId, normalizedSubjectId);
+
+  const explicitGroupNumber = parsePositiveIntStrict(row && row.group_number);
+  if (explicitGroupNumber) {
+    addAcademicRuntimeSubjectGroupTarget(
+      targets,
+      normalizedCourseId,
+      normalizedSemesterId,
+      normalizedSubjectId,
+      explicitGroupNumber
+    );
+    return;
+  }
+
+  if (options.expandAllGroups === false) {
+    return;
+  }
+  const maxGroupCount = Math.max(1, Number(row && row.group_count || 0) || 1);
+  for (let groupIndex = 1; groupIndex <= maxGroupCount; groupIndex += 1) {
+    addAcademicRuntimeSubjectGroupTarget(
+      targets,
+      normalizedCourseId,
+      normalizedSemesterId,
+      normalizedSubjectId,
+      groupIndex
+    );
+  }
+}
+
+function buildMessageAudienceCondition(target, mode, params) {
+  const normalizedCourseId = parsePositiveIntStrict(target && target.course_id);
+  if (!normalizedCourseId) {
+    return '';
+  }
+  const clauses = ['m.course_id = ?'];
+  params.push(normalizedCourseId);
+
+  if (mode === 'course') {
+    clauses.push('m.target_all = 1');
+    clauses.push('m.subject_id IS NULL');
+    clauses.push('m.group_number IS NULL');
+  } else if (mode === 'subject') {
+    const normalizedSubjectId = parsePositiveIntStrict(target && target.subject_id);
+    if (!normalizedSubjectId) {
+      return '';
+    }
+    clauses.push('m.subject_id = ?');
+    params.push(normalizedSubjectId);
+    clauses.push('m.group_number IS NULL');
+  } else if (mode === 'group') {
+    const normalizedSubjectId = parsePositiveIntStrict(target && target.subject_id);
+    const normalizedGroupNumber = parsePositiveIntStrict(target && target.group_number);
+    if (!normalizedSubjectId || !normalizedGroupNumber) {
+      return '';
+    }
+    clauses.push('m.subject_id = ?');
+    params.push(normalizedSubjectId);
+    clauses.push('m.group_number = ?');
+    params.push(normalizedGroupNumber);
+  } else {
+    return '';
+  }
+
+  const normalizedSemesterId = parsePositiveIntStrict(target && target.semester_id);
+  if (normalizedSemesterId) {
+    clauses.push('(m.semester_id = ? OR m.semester_id IS NULL)');
+    params.push(normalizedSemesterId);
+  } else {
+    clauses.push('m.semester_id IS NULL');
+  }
+  return `(${clauses.join(' AND ')})`;
+}
+
+async function buildAcademicRuntimeAudienceScope(req, options = {}) {
+  const normalizedUserId = parsePositiveIntStrict(
+    options.userId || (req && req.session && req.session.user && req.session.user.id)
+  );
+  const normalizedFallbackCourseId = parsePositiveIntStrict(options.courseId);
+  const normalizedFallbackSemesterId = parsePositiveIntStrict(
+    options.activeSemester && options.activeSemester.id
+      ? options.activeSemester.id
+      : options.activeSemester
+  );
+  const routeKey = sanitizeCompactText(options.routeKey, 80) || 'runtime.scope';
+  const fallbackToLegacyCourse = options.fallbackToLegacyCourse === true;
+  const targets = buildAcademicRuntimeScopeTargetMaps();
+  const projectionIssues = [];
+
+  if (!normalizedUserId || !req || !req.session || !req.session.user) {
+    return {
+      courseTargets: [],
+      subjectTargets: [],
+      subjectGroupTargets: [],
+      projectionIssues,
+      source: 'empty',
+    };
+  }
+
+  const isAdmin = hasSessionRole(req, 'admin');
+  const isTeacher = hasSessionRole(req, 'teacher');
+  const isDeanery = hasSessionRole(req, 'deanery');
+  const isStarosta = hasSessionRole(req, 'starosta');
+  const selectedCourseId = normalizedFallbackCourseId || getSessionAcademicCourseId(req);
+
+  if (isTeacher) {
+    const teacherRows = await getTeacherAssignedSubjects(normalizedUserId).catch(() => []);
+    teacherRows.forEach((row) => {
+      addAcademicRuntimeFullSubjectAudience(targets, row);
+    });
+    if (!targets.courseTargets.size && fallbackToLegacyCourse && selectedCourseId) {
+      addAcademicRuntimeCourseTarget(targets, selectedCourseId, normalizedFallbackSemesterId);
+      projectionIssues.push('legacy_course_fallback');
+    }
+    return {
+      courseTargets: Array.from(targets.courseTargets.values()),
+      subjectTargets: Array.from(targets.subjectTargets.values()),
+      subjectGroupTargets: Array.from(targets.subjectGroupTargets.values()),
+      projectionIssues,
+      source: teacherRows.length ? 'teacher_assignments' : (fallbackToLegacyCourse ? 'legacy_course_fallback' : 'teacher_empty'),
+    };
+  }
+
+  if (isAdmin || isDeanery || isStarosta) {
+    const scopedCourseId = selectedCourseId;
+    if (scopedCourseId) {
+      const courseSubjectScope = await getCourseSubjectAccessScope(scopedCourseId, {
+        visibleOnly: false,
+      }).catch(() => null);
+      const ownerCourseIds = Array.isArray(courseSubjectScope && courseSubjectScope.owner_course_ids)
+        ? courseSubjectScope.owner_course_ids
+        : [];
+      const ownerSemesterIds = Array.isArray(courseSubjectScope && courseSubjectScope.owner_semester_ids)
+        ? courseSubjectScope.owner_semester_ids
+        : [];
+      if (ownerCourseIds.length) {
+        ownerCourseIds.forEach((ownerCourseId) => {
+          if (ownerSemesterIds.length) {
+            ownerSemesterIds.forEach((semesterId) => {
+              addAcademicRuntimeCourseTarget(targets, ownerCourseId, semesterId);
+            });
+          } else {
+            addAcademicRuntimeCourseTarget(targets, ownerCourseId, normalizedFallbackSemesterId);
+          }
+        });
+      } else {
+        addAcademicRuntimeCourseTarget(targets, scopedCourseId, normalizedFallbackSemesterId);
+        if (fallbackToLegacyCourse) {
+          projectionIssues.push('legacy_course_fallback');
+        }
+      }
+      (courseSubjectScope && Array.isArray(courseSubjectScope.subjects) ? courseSubjectScope.subjects : []).forEach((row) => {
+        addAcademicRuntimeFullSubjectAudience(targets, row);
+      });
+      if (
+        courseSubjectScope
+        && courseSubjectScope.projectionIssues
+        && courseSubjectScope.projectionIssues.has_issues
+      ) {
+        projectionIssues.push('projection_incomplete');
+      }
+      return {
+        courseTargets: Array.from(targets.courseTargets.values()),
+        subjectTargets: Array.from(targets.subjectTargets.values()),
+        subjectGroupTargets: Array.from(targets.subjectGroupTargets.values()),
+        projectionIssues,
+        source: courseSubjectScope && courseSubjectScope.source ? courseSubjectScope.source : 'staff_scope',
+      };
+    }
+  }
+
+  const studentCompat = await loadAcademicV2LegacyStudentRows(normalizedUserId, {
+    selectedOnly: true,
+    routeKey,
+  });
+  const studentState = studentCompat && studentCompat.state ? studentCompat.state : null;
+  const studentRows = Array.isArray(studentCompat && studentCompat.rows) ? studentCompat.rows : [];
+  const projectedCourseId = parsePositiveIntStrict(studentState && studentState.scope && studentState.scope.legacy_course_id);
+  const projectedSemesterId = parsePositiveIntStrict(studentState && studentState.term && studentState.term.legacy_semester_id);
+  if (projectedCourseId) {
+    addAcademicRuntimeCourseTarget(targets, projectedCourseId, projectedSemesterId || normalizedFallbackSemesterId);
+  }
+  studentRows.forEach((row) => {
+    const normalizedCourseId = parsePositiveIntStrict(row.owner_course_id || row.course_id || projectedCourseId);
+    const normalizedSemesterId = parsePositiveIntStrict(row.legacy_semester_id || projectedSemesterId || normalizedFallbackSemesterId);
+    const normalizedSubjectId = parsePositiveIntStrict(row.subject_id);
+    const normalizedGroupNumber = parsePositiveIntStrict(row.group_number);
+    if (!normalizedCourseId || !normalizedSubjectId) {
+      return;
+    }
+    addAcademicRuntimeCourseTarget(targets, normalizedCourseId, normalizedSemesterId);
+    addAcademicRuntimeSubjectTarget(targets, normalizedCourseId, normalizedSemesterId, normalizedSubjectId);
+    if (normalizedGroupNumber) {
+      addAcademicRuntimeSubjectGroupTarget(
+        targets,
+        normalizedCourseId,
+        normalizedSemesterId,
+        normalizedSubjectId,
+        normalizedGroupNumber
+      );
+    }
+  });
+  if (!targets.courseTargets.size && fallbackToLegacyCourse && selectedCourseId) {
+    addAcademicRuntimeCourseTarget(targets, selectedCourseId, normalizedFallbackSemesterId);
+    projectionIssues.push('legacy_course_fallback');
+  }
+  if (
+    studentState
+    && studentState.projectionIssues
+    && studentState.projectionIssues.has_issues
+  ) {
+    projectionIssues.push('projection_incomplete');
+  }
+  return {
+    courseTargets: Array.from(targets.courseTargets.values()),
+    subjectTargets: Array.from(targets.subjectTargets.values()),
+    subjectGroupTargets: Array.from(targets.subjectGroupTargets.values()),
+    projectionIssues,
+    source: studentRows.length ? 'student_subjects' : (fallbackToLegacyCourse ? 'legacy_course_fallback' : 'student_empty'),
+  };
+}
+
 async function listVisibleMessagesForUser({
   userId,
   courseId,
@@ -13207,47 +13515,52 @@ async function listVisibleMessagesForUser({
   includeReactions = false,
   staleDays = 30,
   lang = 'uk',
+  request = null,
 } = {}) {
-  const normalizedUserId = Number(userId || 0);
-  const normalizedSubjectId = Number(subjectId || 0);
-  const hasSubjectFilter = Number.isInteger(normalizedSubjectId) && normalizedSubjectId > 0;
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  const normalizedSubjectId = parsePositiveIntStrict(subjectId);
+  const hasSubjectFilter = Boolean(normalizedSubjectId);
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 50);
 
-  if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) {
+  if (!normalizedUserId) {
     return { messages: [], unread_count: 0 };
   }
 
-  const { state: studentState, rows: groups } = await loadAcademicV2LegacyStudentRows(normalizedUserId, {
-    selectedOnly: true,
-    routeKey: 'messages.visible',
-  });
-  const normalizedCourseId = Number(
-    (studentState && studentState.scope && studentState.scope.legacy_course_id)
-    || courseId
-    || 0
-  ) || 1;
-  const normalizedSemesterId = Number(
-    (studentState && studentState.term && studentState.term.legacy_semester_id)
-    || (activeSemester && activeSemester.id ? activeSemester.id : activeSemester)
-    || 0
-  );
+  const runtimeScope = request
+    ? await buildAcademicRuntimeAudienceScope(request, {
+        userId: normalizedUserId,
+        courseId,
+        activeSemester,
+        routeKey: 'messages.visible',
+      })
+    : { courseTargets: [], subjectTargets: [], subjectGroupTargets: [], projectionIssues: [], source: 'no_request' };
 
-  const conditions = ['m.target_all = 1'];
+  const conditions = [
+    '(m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL AND m.course_id IS NULL AND m.semester_id IS NULL)',
+  ];
   const conditionParams = [];
-  if (groups.length) {
-    const groupConditions = groups.map(() => '(m.subject_id = ? AND m.group_number = ?)').join(' OR ');
-    groups.forEach((groupRow) => conditionParams.push(groupRow.subject_id, groupRow.group_number));
-    conditions.push(groupConditions);
-  }
+  (Array.isArray(runtimeScope.courseTargets) ? runtimeScope.courseTargets : []).forEach((target) => {
+    const condition = buildMessageAudienceCondition(target, 'course', conditionParams);
+    if (condition) {
+      conditions.push(condition);
+    }
+  });
+  (Array.isArray(runtimeScope.subjectTargets) ? runtimeScope.subjectTargets : []).forEach((target) => {
+    const condition = buildMessageAudienceCondition(target, 'subject', conditionParams);
+    if (condition) {
+      conditions.push(condition);
+    }
+  });
+  (Array.isArray(runtimeScope.subjectGroupTargets) ? runtimeScope.subjectGroupTargets : []).forEach((target) => {
+    const condition = buildMessageAudienceCondition(target, 'group', conditionParams);
+    if (condition) {
+      conditions.push(condition);
+    }
+  });
   conditions.push('EXISTS (SELECT 1 FROM message_targets mt WHERE mt.message_id = m.id AND mt.user_id = ?)');
   conditionParams.push(normalizedUserId);
 
-  const baseWhere = conditions.length ? `WHERE ${conditions.map((condition) => `(${condition})`).join(' OR ')}` : '';
-  const globalBroadcastScope = '(m.target_all = 1 AND m.subject_id IS NULL AND m.group_number IS NULL)';
-  const courseFilter = ` AND (m.course_id = ? OR (${globalBroadcastScope} AND m.course_id IS NULL))`;
-  const semesterFilter = normalizedSemesterId > 0
-    ? ` AND (m.semester_id = ? OR (${globalBroadcastScope} AND m.semester_id IS NULL))`
-    : '';
+  const baseWhere = `WHERE ${conditions.map((condition) => `(${condition})`).join(' OR ')}`;
   const statusFilter = ` AND COALESCE(m.status, 'published') = 'published' AND ${buildScheduledAtVisibleCondition('m.scheduled_at')}`;
   const subjectFilter = hasSubjectFilter ? ' AND m.subject_id = ?' : '';
 
@@ -13278,8 +13591,6 @@ async function listVisibleMessagesForUser({
       normalizedUserId,
       normalizedUserId,
       ...conditionParams,
-      normalizedCourseId,
-      ...(normalizedSemesterId > 0 ? [normalizedSemesterId] : []),
       ...(hasSubjectFilter ? [normalizedSubjectId] : []),
       new Date().toISOString(),
     ]
@@ -13569,10 +13880,8 @@ app.get('/help', requireLogin, async (req, res) => {
   try {
     const lang = getPreferredLang(req);
     const helpPage = supportHelpers.buildHelpPageExperienceContent(lang);
-    const courseId = hasSessionRole(req, 'admin')
-      ? getAdminCourse(req)
-      : Number(req.session.user.course_id || 1);
-    const activeSemester = await getActiveSemester(courseId || 1);
+    const courseId = getSessionAcademicCourseId(req);
+    const activeSemester = courseId ? await getActiveSemester(courseId).catch(() => null) : null;
     const supportRows = await listSupportRequestsForUser(req.session.user.id, 12);
     const supportRequests = await Promise.all((supportRows || []).map(async (row) => {
       const messages = await listSupportRequestMessages(row.id);
@@ -13587,11 +13896,12 @@ app.get('/help', requireLogin, async (req, res) => {
       try {
         const visibleMessages = await listVisibleMessagesForUser({
           userId: req.session.user.id,
-          courseId: courseId || 1,
+          courseId: courseId || null,
           activeSemester,
           limit: 8,
           staleDays: 45,
           lang,
+          request: req,
         });
         inboxFeed = (visibleMessages.messages || [])
           .filter((item) => !item.is_stale || !item.read_id)
@@ -14849,7 +15159,7 @@ app.get('/teacher', requireLogin, async (req, res) => {
         .filter((value) => Number.isInteger(value) && value > 0)
     );
     const roleKeys = normalizeRoleList(req.session.roles || []);
-    const teacherCockpit = await buildMyDayData(req.session.user, 'teacher', roleKeys, {});
+    const teacherCockpit = await buildMyDayData(req.session.user, 'teacher', roleKeys, { request: req });
     const recentTemplates = await getTeacherHomeworkTemplates(userId, { limit: 5 });
 
     return res.render('teacher-hub', {
@@ -18181,18 +18491,20 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   const normalizedRole = normalizedRoleList[0] || String(role || '').toLowerCase() || 'student';
   const isStaffRole = normalizedRoleList.some((roleKey) => ['teacher', 'admin', 'deanery'].includes(roleKey));
   const requestedCompetencySubjectId = Number(options && options.competencySubjectId ? options.competencySubjectId : 0);
+  const request = options && options.request ? options.request : null;
   const studentCompat = !isStaffRole
     ? await loadAcademicV2LegacyStudentRows(user, {
         selectedOnly: true,
         routeKey: 'myday.student',
       })
     : { state: null, rows: [] };
-  const courseId = Number(
+  const courseId = parsePositiveIntStrict(
     (!isStaffRole && studentCompat.state && studentCompat.state.scope && studentCompat.state.scope.legacy_course_id)
+    || (request && isStaffRole && getSessionAcademicCourseId(request))
     || user.course_id
-    || 1
+    || null
   );
-  const activeSemester = await getActiveSemester(courseId);
+  const activeSemester = courseId ? await getActiveSemester(courseId).catch(() => null) : null;
   const now = new Date();
   const todayStr = formatLocalDate(now);
   const tomorrowStr = formatLocalDate(addDays(now, 1));
@@ -18227,7 +18539,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
 
   if (!workloadTargets.length && isStaffRole) {
     const teacherTargets = (await getTeacherAssignedSubjects(user.id))
-      .filter((row) => Number(row.course_id || 0) === Number(courseId || 0));
+      .filter((row) => !courseId || Number(row.course_id || 0) === Number(courseId || 0));
     workloadTargets = (teacherTargets || []).map((row) => ({
       subject_id: Number(row.subject_id),
       group_number: row.group_number === null ? null : Number(row.group_number),
@@ -19148,11 +19460,12 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     try {
       const visibleMessages = await listVisibleMessagesForUser({
         userId: user.id,
-        courseId,
+        courseId: courseId || null,
         activeSemester,
         limit: 8,
         staleDays: 45,
         lang: preferredMyDayLang,
+        request,
       });
       inboxMessageItems = (visibleMessages.messages || [])
         .filter((item) => !item.is_stale || !item.read_id)
@@ -19618,7 +19931,7 @@ const renderMyDayPage = async (req, res) => {
       req.session.user,
       myDayRole,
       roleKeys,
-      { competencySubjectId }
+      { competencySubjectId, request: req }
     );
     const canUseCustomDeadlinesUi = canRenderCustomDeadlinesUi(req, myDayRole);
     return res.render('my-day', {
@@ -19654,7 +19967,7 @@ app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
       req.session.user,
       myDayRole,
       roleKeys,
-      { competencySubjectId }
+      { competencySubjectId, request: req }
     );
     return res.json(myDay);
   } catch (err) {
@@ -19666,7 +19979,7 @@ app.get('/api/my-day/progress-risk', requireLogin, readLimiter, async (req, res)
   try {
     const roleKeys = normalizeRoleList(req.session.roles || []);
     const myDayRole = resolveMyDayRole(req.session.role || 'student', roleKeys);
-    const myDay = await buildMyDayData(req.session.user, myDayRole, roleKeys);
+    const myDay = await buildMyDayData(req.session.user, myDayRole, roleKeys, { request: req });
     return res.json(myDay.progress_dashboard || {
       enabled: false,
       subjects: [],
@@ -22937,9 +23250,21 @@ async function resolveStoredUploadAccess(req, storedPath) {
   }
 
   const viewerUserId = Number(req.session.user.id || 0);
-  const viewerCourseId = Number(
-    (isStaffUploadViewer(req) ? getStaffCourse(req) : req.session.user.course_id) || 0
-  );
+  const runtimeAudienceScope = await buildAcademicRuntimeAudienceScope(req, {
+    userId: viewerUserId,
+    courseId: getSessionAcademicCourseId(req),
+    fallbackToLegacyCourse: true,
+    routeKey: 'uploads.read',
+  }).catch(() => ({
+    courseTargets: [],
+  }));
+  const allowedCourseIds = Array.from(new Set(
+    (Array.isArray(runtimeAudienceScope && runtimeAudienceScope.courseTargets) ? runtimeAudienceScope.courseTargets : [])
+      .map((target) => parsePositiveIntStrict(target && target.course_id))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const allowedCourseIdSet = new Set(allowedCourseIds);
+  const allowedCourseIdsSql = allowedCourseIds.length ? allowedCourseIds : [0];
   const nowIso = new Date().toISOString();
   const nowMs = Date.now();
   const isVisibleHomeworkRow = (row) => {
@@ -22964,7 +23289,7 @@ async function resolveStoredUploadAccess(req, storedPath) {
             FROM homework_asset_map ham
             JOIN homework h ON h.id = ham.homework_id
             WHERE ham.asset_id = a.id
-              AND h.course_id = ?
+              AND h.course_id = ANY(?::int[])
               AND COALESCE(h.status, 'published') = 'published'
               AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
           ) AS linked_visible_homework_in_course
@@ -22972,7 +23297,7 @@ async function resolveStoredUploadAccess(req, storedPath) {
         WHERE a.file_path = ?
         LIMIT 1
       `,
-      [viewerCourseId || 0, nowIso, normalizedPath]
+      [allowedCourseIdsSql, nowIso, normalizedPath]
     ),
     db.get(
       `
@@ -23024,7 +23349,7 @@ async function resolveStoredUploadAccess(req, storedPath) {
     if (linkedHomeworkInCourse) {
       return { allowed: true, absolutePath };
     }
-    if (isStaffUploadViewer(req) && assetCourseId > 0 && assetCourseId === viewerCourseId) {
+    if (isStaffUploadViewer(req) && assetCourseId > 0 && allowedCourseIdSet.has(assetCourseId)) {
       return { allowed: true, absolutePath };
     }
     return { allowed: false, absolutePath };
@@ -23034,7 +23359,7 @@ async function resolveStoredUploadAccess(req, storedPath) {
     const homeworkCourseId = Number(homeworkRow.course_id || 0);
     if (
       homeworkCourseId > 0
-      && homeworkCourseId === viewerCourseId
+      && allowedCourseIdSet.has(homeworkCourseId)
       && (isStaffUploadViewer(req) || isVisibleHomeworkRow(homeworkRow))
     ) {
       return { allowed: true, absolutePath };
@@ -23048,7 +23373,7 @@ async function resolveStoredUploadAccess(req, storedPath) {
     if (submissionStudentId > 0 && submissionStudentId === viewerUserId) {
       return { allowed: true, absolutePath };
     }
-    if (isStaffUploadViewer(req) && submissionCourseId > 0 && submissionCourseId === viewerCourseId) {
+    if (isStaffUploadViewer(req) && submissionCourseId > 0 && allowedCourseIdSet.has(submissionCourseId)) {
       return { allowed: true, absolutePath };
     }
     return { allowed: false, absolutePath };
@@ -23056,7 +23381,7 @@ async function resolveStoredUploadAccess(req, storedPath) {
 
   if (materialRow) {
     const materialCourseId = Number(materialRow.course_id || 0);
-    if (materialCourseId > 0 && materialCourseId === viewerCourseId) {
+    if (materialCourseId > 0 && allowedCourseIdSet.has(materialCourseId)) {
       return { allowed: true, absolutePath };
     }
     return { allowed: false, absolutePath };
@@ -23064,7 +23389,7 @@ async function resolveStoredUploadAccess(req, storedPath) {
 
   if (journalExportRow) {
     const exportCourseId = Number(journalExportRow.course_id || 0);
-    if (isStaffUploadViewer(req) && exportCourseId > 0 && exportCourseId === viewerCourseId) {
+    if (isStaffUploadViewer(req) && exportCourseId > 0 && allowedCourseIdSet.has(exportCourseId)) {
       return { allowed: true, absolutePath };
     }
     return { allowed: false, absolutePath };
@@ -32847,21 +33172,20 @@ app.get('/messages.json', requireLogin, readLimiter, async (req, res) => {
     return res.json({ messages: [], unread_count: 0 });
   }
   const userId = Number(req.session.user.id || 0);
-  const courseId = hasSessionRole(req, 'admin')
-    ? getAdminCourse(req)
-    : Number(req.session.user.course_id || 1);
-  const activeSemester = await getActiveSemester(courseId || 1);
+  const courseId = getSessionAcademicCourseId(req);
+  const activeSemester = courseId ? await getActiveSemester(courseId).catch(() => null) : null;
   const filterSubjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
   try {
     const payload = await listVisibleMessagesForUser({
       userId,
-      courseId: courseId || 1,
+      courseId: courseId || null,
       activeSemester,
       subjectId: filterSubjectId,
       limit: 50,
       includeReactions: true,
       staleDays: 45,
       lang: getPreferredLang(req),
+      request: req,
     });
     return res.json(payload);
   } catch (err) {
@@ -32905,10 +33229,10 @@ app.get('/admin/api/messages/:id/reads', requireMessagesSectionAccess, readLimit
   if (Number.isNaN(messageId)) {
     return res.status(400).json({ error: 'Invalid message' });
   }
-  const courseId = hasSessionRole(req, 'admin') ? getAdminCourse(req) : Number(req.session.user.course_id || 1);
+  const courseId = getSessionAcademicCourseId(req);
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId);
+    activeSemester = courseId ? await getActiveSemester(courseId) : null;
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
   }
@@ -32932,35 +33256,52 @@ app.get('/admin/api/messages/:id/reads', requireMessagesSectionAccess, readLimit
     if (!message) {
       return res.status(404).json({ error: 'Not found' });
     }
-    const activeFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
+    const courseUsers = courseId
+      ? await academicV2RuntimeHelpers.listCourseUsersByLegacyCourse(getAcademicV2Store(), courseId, {
+          activeOnly: usersHasIsActive,
+        }).catch(() => [])
+      : [];
+    const courseUserMap = new Map(
+      (Array.isArray(courseUsers) ? courseUsers : [])
+        .map((row) => [Number(row.id || 0), row])
+        .filter(([userId]) => Number.isInteger(userId) && userId > 0)
+    );
     let recipients = [];
     if (message.target_all === 1) {
-      recipients = await db.all(
-        `SELECT u.id, u.full_name
-         FROM users u
-         WHERE u.course_id = ? AND u.role = 'student'${activeFilter}
-         ORDER BY u.full_name`,
-        [courseId]
-      );
+      recipients = Array.from(courseUserMap.values())
+        .filter((row) => normalizeRoleKey(row.role || 'student') === 'student')
+        .map((row) => ({
+          id: Number(row.id || 0),
+          full_name: row.full_name,
+        }))
+        .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || '')));
     } else if (message.subject_id) {
       recipients = (await academicSetupHelpers.listLegacySubjectStudentRows(getAcademicSetupStore(), {
         subjectId: message.subject_id,
         courseId,
-        groupNumbers: [message.group_number],
+        groupNumbers: parsePositiveIntStrict(message.group_number) ? [message.group_number] : [],
         activeOnly: usersHasIsActive,
       })).map((row) => ({
         id: Number(row.id),
         full_name: row.full_name,
       }));
     } else {
-      recipients = await db.all(
-        `SELECT u.id, u.full_name
-         FROM message_targets mt
-         JOIN users u ON u.id = mt.user_id
-         WHERE mt.message_id = ? AND u.course_id = ?${activeFilter}
-         ORDER BY u.full_name`,
-        [message.id, courseId]
+      const directTargetRows = await db.all(
+        `
+          SELECT mt.user_id
+          FROM message_targets mt
+          WHERE mt.message_id = ?
+        `,
+        [message.id]
       );
+      recipients = (directTargetRows || [])
+        .map((row) => courseUserMap.get(Number(row.user_id || 0)))
+        .filter(Boolean)
+        .map((row) => ({
+          id: Number(row.id || 0),
+          full_name: row.full_name,
+        }))
+        .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || '')));
     }
     const recipientIds = new Set((recipients || []).map((row) => String(row.id)));
     const readRows = await db.all(

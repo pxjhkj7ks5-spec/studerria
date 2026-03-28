@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.32",
+      "date": "2026-03-29",
+      "items": [
+        "feat(messages-runtime-v2-scope): add a shared academic runtime audience resolver in `app.js` so `/help`, `/messages.json`, and `My Day` inbox cards now build course, term, subject, and group visibility from `group_id` / teacher assignments / selected academic-v2 course scope instead of assuming one raw legacy `course_id` + `semester_id` per user",
+        "fix(uploads-access-v2-course-membership): update `resolveStoredUploadAccess(...)` in `app.js` to authorize homework, material, asset, submission, and journal export files against all live course IDs visible through the academic-v2 runtime scope, so teachers and other staff no longer lose file access when their projected course ownership lives on `users.group_id` instead of only `users.course_id`",
+        "refactor(message-read-recipients-v2-membership): change `/admin/api/messages/:id/reads` in `app.js` to resolve broadcast and direct recipients through `academic_v2_groups.legacy_course_id` membership, while subject recipients now correctly treat `group_number = null` as full-subject audience instead of forcing the old raw `u.course_id` path"
+      ]
+    },
+    {
       "version": "1.3.31",
       "date": "2026-03-29",
       "items": [
