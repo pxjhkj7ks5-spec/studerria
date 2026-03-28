@@ -9630,8 +9630,26 @@ function getAcademicV2RouteMessages(req) {
   };
 }
 
+function getAcademicV2ExtendedRouteMessages(req) {
+  return {
+    ...getAcademicV2RouteMessages(req),
+    allGroupProjectionsRebuilt: 'All group projections rebuilt',
+    programDeleted: 'Program deleted',
+    cohortDeleted: 'Cohort deleted',
+    groupDeleted: 'Group deleted',
+    templateDeleted: 'Subject template deleted',
+    PROGRAM_NOT_FOUND: 'Program not found',
+    COHORT_NOT_FOUND: 'Cohort not found',
+    GROUP_NOT_FOUND: 'Group not found',
+    PROGRAM_DELETE_BLOCKED: 'Archive the program instead. Delete is blocked while cohorts, legacy admissions, or users still depend on it.',
+    COHORT_DELETE_BLOCKED: 'Archive the cohort instead. Delete is blocked while groups, legacy mappings, or users still depend on it.',
+    GROUP_DELETE_BLOCKED: 'Archive the group instead. Delete is blocked while terms, subjects, enrollments, or legacy compatibility bindings still depend on it.',
+    SUBJECT_TEMPLATE_DELETE_BLOCKED: 'Archive the template instead. Delete is blocked while live subjects or legacy catalog bindings still depend on it.',
+  };
+}
+
 function resolveAcademicV2RouteMessage(req, rawError, fallbackKey = 'unknown') {
-  const messages = getAcademicV2RouteMessages(req);
+  const messages = getAcademicV2ExtendedRouteMessages(req);
   const errorKey = rawError && rawError.message ? String(rawError.message).trim() : '';
   return messages[errorKey] || messages[fallbackKey] || messages.unknown;
 }
@@ -33677,6 +33695,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
 async function handleAcademicV2MutationRoute(req, res, {
   run,
   successMessageKey,
+  successMessage = '',
   focusBuilder = null,
   logContext = 'admin.pathways.v2.mutation',
 } = {}) {
@@ -33690,9 +33709,10 @@ async function handleAcademicV2MutationRoute(req, res, {
     const result = await run();
     invalidateAcademicV2CompatibilityCaches();
     const focus = typeof focusBuilder === 'function' ? (focusBuilder(result, baseFocus) || baseFocus) : baseFocus;
+    const routeMessages = getAcademicV2ExtendedRouteMessages(req);
     return res.redirect(buildAcademicV2NoticeUrl(
       'ok',
-      getAcademicV2RouteMessages(req)[successMessageKey] || getAcademicV2RouteMessages(req).unknown,
+      String(successMessage || '').trim() || routeMessages[successMessageKey] || routeMessages.unknown,
       focus
     ));
   } catch (err) {
@@ -33747,6 +33767,21 @@ app.post('/admin/pathways/v2/programs/save', requirePathwaysSectionAccess, write
   })
 ));
 
+app.post('/admin/pathways/v2/programs/:programId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.deleteProgram(getAcademicV2Store(), req.params.programId),
+    successMessage: 'Program deleted',
+    focusBuilder: (_result, focus) => ({
+      ...focus,
+      programId: null,
+      cohortId: null,
+      groupId: null,
+      termId: null,
+    }),
+    logContext: 'admin.pathways.v2.program.delete',
+  })
+));
+
 app.post('/admin/pathways/v2/cohorts/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.saveCohort(getAcademicV2Store(), req.body),
@@ -33759,6 +33794,21 @@ app.post('/admin/pathways/v2/cohorts/save', requirePathwaysSectionAccess, writeL
       termId: null,
     }),
     logContext: 'admin.pathways.v2.cohort.save',
+  })
+));
+
+app.post('/admin/pathways/v2/cohorts/:cohortId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.deleteCohort(getAcademicV2Store(), req.params.cohortId),
+    successMessage: 'Cohort deleted',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      cohortId: null,
+      groupId: null,
+      termId: null,
+    }),
+    logContext: 'admin.pathways.v2.cohort.delete',
   })
 ));
 
@@ -33777,6 +33827,21 @@ app.post('/admin/pathways/v2/groups/save', requirePathwaysSectionAccess, writeLi
   })
 ));
 
+app.post('/admin/pathways/v2/groups/:groupId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.deleteGroup(getAcademicV2Store(), req.params.groupId),
+    successMessage: 'Group deleted',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      cohortId: Number(result && result.row && result.row.cohort_id) || focus.cohortId,
+      groupId: null,
+      termId: null,
+    }),
+    logContext: 'admin.pathways.v2.group.delete',
+  })
+));
+
 app.post('/admin/pathways/v2/groups/:groupId/resync', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.resyncGroupProjection(getAcademicV2Store(), req.params.groupId),
@@ -33787,6 +33852,14 @@ app.post('/admin/pathways/v2/groups/:groupId/resync', requirePathwaysSectionAcce
       termId: null,
     }),
     logContext: 'admin.pathways.v2.group.resync',
+  })
+));
+
+app.post('/admin/pathways/v2/groups/resync-all', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.resyncAllGroupProjections(getAcademicV2Store()),
+    successMessage: 'All group projections rebuilt',
+    logContext: 'admin.pathways.v2.group.resync-all',
   })
 ));
 
@@ -33821,6 +33894,14 @@ app.post('/admin/pathways/v2/templates/save', requirePathwaysSectionAccess, writ
     run: () => academicV2Helpers.saveSubjectTemplate(getAcademicV2Store(), req.body),
     successMessageKey: 'templateSaved',
     logContext: 'admin.pathways.v2.template.save',
+  })
+));
+
+app.post('/admin/pathways/v2/templates/:templateId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.deleteSubjectTemplate(getAcademicV2Store(), req.params.templateId),
+    successMessage: 'Subject template deleted',
+    logContext: 'admin.pathways.v2.template.delete',
   })
 ));
 
@@ -35707,6 +35788,25 @@ function getPathwaysRedirectState(req, overrides = {}) {
     ...overrides,
   });
 }
+
+function getLegacyAcademicWriteMovedMessage(req) {
+  const isUk = getPreferredLang(req) === 'uk';
+  return isUk ? 'Academic config moved to /admin/pathways' : 'Academic config moved to /admin/pathways';
+}
+
+function redirectLegacyAcademicWriteToV2(req, res) {
+  return res.redirect(buildAcademicV2NoticeUrl(
+    'err',
+    getLegacyAcademicWriteMovedMessage(req),
+    parseAcademicV2Focus(req.body)
+  ));
+}
+
+app.post(/^\/admin\/pathways\/(?!v2\/).+$/, requirePathwaysSectionAccess, writeLimiter, redirectLegacyAcademicWriteToV2);
+app.post(/^\/admin\/subjects\/.+$/, requireSubjectsSectionAccess, writeLimiter, redirectLegacyAcademicWriteToV2);
+app.post(/^\/admin\/courses\/.+$/, requireCoursesSectionAccess, writeLimiter, redirectLegacyAcademicWriteToV2);
+app.post(/^\/admin\/semesters\/.+$/, requireSemestersSectionAccess, writeLimiter, redirectLegacyAcademicWriteToV2);
+app.post(/^\/admin\/schedule\/(?:add|edit\/[^/]+|delete\/[^/]+|delete-multiple|clear-all)$/, requireScheduleSectionAccess, writeLimiter, redirectLegacyAcademicWriteToV2);
 
 app.post('/admin/pathways/presets/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
   const msg = getPathwaysRouteMessages(req);

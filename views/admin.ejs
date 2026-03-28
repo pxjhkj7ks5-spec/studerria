@@ -1058,13 +1058,25 @@
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">Academics</div>
             <% if (sectionAllowed('admin-subjects')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-subjects">Subjects</button>
+              <% if (canManagePathways) { %>
+                <a class="admin-nav-link" href="<%= `${pathwaysPanelHref || '/admin/pathways'}#subjects` %>">Subjects</a>
+              <% } else { %>
+                <button class="admin-nav-link" type="button" data-admin-nav="admin-subjects">Subjects</button>
+              <% } %>
             <% } %>
             <% if (sectionAllowed('admin-semesters')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-semesters">Semesters</button>
+              <% if (canManagePathways) { %>
+                <a class="admin-nav-link" href="<%= `${pathwaysPanelHref || '/admin/pathways'}#terms` %>">Semesters</a>
+              <% } else { %>
+                <button class="admin-nav-link" type="button" data-admin-nav="admin-semesters">Semesters</button>
+              <% } %>
             <% } %>
             <% if (sectionAllowed('admin-courses')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-courses">Courses</button>
+              <% if (canManagePathways) { %>
+                <a class="admin-nav-link" href="<%= `${pathwaysPanelHref || '/admin/pathways'}#groups` %>">Courses</a>
+              <% } else { %>
+                <button class="admin-nav-link" type="button" data-admin-nav="admin-courses">Courses</button>
+              <% } %>
             <% } %>
             <% if (canManagePathways) { %>
               <a class="admin-nav-link" href="<%= pathwaysPanelHref || '/admin/pathways' %>">Academic Setup</a>

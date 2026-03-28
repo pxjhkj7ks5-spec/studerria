@@ -8,6 +8,10 @@
   const activeCohortId = numberOrZero(focusState.cohortId);
   const activeGroupId = numberOrZero(focusState.groupId);
   const activeTermId = numberOrZero(focusState.termId);
+  const projectionHealthList = Array.isArray(projectionHealth) ? projectionHealth : [];
+  const projectionHealthByGroup = new Map(projectionHealthList.map((item) => [Number(item.group_id || 0), item]));
+  const projectionHealthTotals = projectionHealthSummary && typeof projectionHealthSummary === 'object' ? projectionHealthSummary : {};
+  const cleanupAudit = auditSummary && typeof auditSummary === 'object' ? auditSummary : {};
   const trackOptions = [
     { value: 'bachelor', label: 'Bachelor' },
     { value: 'master', label: 'Master' },
@@ -84,7 +88,7 @@
               </p>
               <div class="academic-v2-hero-actions">
                 <a class="btn btn-primary btn-lg" href="#scope">Open control surface</a>
-                <a class="btn btn-outline-secondary btn-lg" href="/admin/pathways?legacy=1">Legacy compatibility view</a>
+                <a class="btn btn-outline-secondary btn-lg" href="/admin/pathways?legacy=1">Legacy read-only view</a>
                 <a class="btn btn-outline-secondary btn-lg" href="/admin">Back to admin</a>
               </div>
             </div>
@@ -114,11 +118,12 @@
             <div class="academic-v2-sidebar-title">Sections</div>
             <nav class="academic-v2-sidebar-nav">
               <a class="academic-v2-nav-link" href="#scope"><span>Focus</span><span class="academic-v2-code">01</span></a>
-              <a class="academic-v2-nav-link" href="#programs"><span>Programs</span><span class="academic-v2-code">02</span></a>
-              <a class="academic-v2-nav-link" href="#cohorts"><span>Cohorts</span><span class="academic-v2-code">03</span></a>
-              <a class="academic-v2-nav-link" href="#groups"><span>Groups</span><span class="academic-v2-code">04</span></a>
-              <a class="academic-v2-nav-link" href="#subjects"><span>Subjects & Teachers</span><span class="academic-v2-code">05</span></a>
-              <a class="academic-v2-nav-link" href="#terms"><span>Terms & Schedule</span><span class="academic-v2-code">06</span></a>
+              <a class="academic-v2-nav-link" href="#health"><span>Projection Health</span><span class="academic-v2-code">02</span></a>
+              <a class="academic-v2-nav-link" href="#programs"><span>Programs</span><span class="academic-v2-code">03</span></a>
+              <a class="academic-v2-nav-link" href="#cohorts"><span>Cohorts</span><span class="academic-v2-code">04</span></a>
+              <a class="academic-v2-nav-link" href="#groups"><span>Groups</span><span class="academic-v2-code">05</span></a>
+              <a class="academic-v2-nav-link" href="#subjects"><span>Subjects & Teachers</span><span class="academic-v2-code">06</span></a>
+              <a class="academic-v2-nav-link" href="#terms"><span>Terms & Schedule</span><span class="academic-v2-code">07</span></a>
             </nav>
             <div class="academic-v2-sidebar-note">
               Default admin writes go only into <span class="academic-v2-code">academic_v2_*</span>.
@@ -191,6 +196,100 @@
               </form>
             </section>
 
+            <section class="academic-v2-card" id="health">
+              <div class="academic-v2-section-head">
+                <div>
+                  <h2 class="academic-v2-section-title">Projection Health</h2>
+                  <p class="academic-v2-section-copy">
+                    <span class="academic-v2-code">academic_v2_*</span> is the only write source now. This section is a dry-run audit surface for projection drift, user normalization gaps, and legacy cleanup candidates before any destructive cleanup script runs.
+                  </p>
+                </div>
+                <form method="post" action="/admin/pathways/v2/groups/resync-all">
+                  <%- renderFocusFields() %>
+                  <button type="submit" class="btn btn-outline-secondary">Resync all group projections</button>
+                </form>
+              </div>
+              <div class="academic-v2-grid-2">
+                <div class="academic-v2-subcard">
+                  <h3 class="h5 mb-3">Live projection summary</h3>
+                  <div class="academic-v2-chip-row">
+                    <span class="academic-v2-chip academic-v2-chip--ok"><%= Number(projectionHealthTotals.groups_healthy || 0) %> healthy groups</span>
+                    <span class="academic-v2-chip academic-v2-chip--warm"><%= Number(projectionHealthTotals.groups_with_issues || 0) %> groups with issues</span>
+                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_missing_legacy_course || 0) %> missing legacy course</span>
+                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_without_active_term || 0) %> missing active term</span>
+                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_with_user_sync_gaps || 0) %> user sync gaps</span>
+                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.subjects_without_teachers || 0) %> subjects without teachers</span>
+                  </div>
+                  <div class="academic-v2-table-wrap mt-3">
+                    <table class="table academic-v2-table">
+                      <thead>
+                        <tr>
+                          <th>Group</th>
+                          <th>Health</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% projectionHealthList.forEach((item) => { %>
+                          <tr>
+                            <td>
+                              <div class="academic-v2-kv">
+                                <strong><%= item.group_label %></strong>
+                                <span class="academic-v2-muted"><%= item.program_name %> - <%= item.admission_year %> - stage <%= item.stage_number %> - <%= item.campus_key %></span>
+                              </div>
+                            </td>
+                            <td>
+                              <div class="academic-v2-chip-row">
+                                <span class="academic-v2-chip <%= item.is_healthy ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= item.is_healthy ? 'projection ok' : 'needs review' %></span>
+                                <% (item.issues || []).slice(0, 4).forEach((issue) => { %>
+                                  <span class="academic-v2-chip"><%= issue %></span>
+                                <% }); %>
+                                <% if ((item.issues || []).length > 4) { %>
+                                  <span class="academic-v2-chip">+<%= item.issues.length - 4 %> more</span>
+                                <% } %>
+                              </div>
+                            </td>
+                            <td class="text-end">
+                              <div class="academic-v2-actions justify-content-end">
+                                <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: item.program_id, cohort_id: item.cohort_id, group_id: item.group_id, term_id: '' }) %>">Focus</a>
+                                <form method="post" action="/admin/pathways/v2/groups/<%= item.group_id %>/resync">
+                                  <%- renderFocusFields() %>
+                                  <button type="submit" class="btn btn-sm btn-outline-secondary">Resync</button>
+                                </form>
+                              </div>
+                            </td>
+                          </tr>
+                        <% }); %>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="academic-v2-subcard">
+                  <h3 class="h5 mb-3">Cleanup dry-run</h3>
+                  <div class="academic-v2-chip-row">
+                    <span class="academic-v2-chip academic-v2-chip--warm"><%= Number(cleanupAudit.total_findings || 0) %> total findings</span>
+                    <span class="academic-v2-chip"><%= Number(cleanupAudit.users_without_group_id || 0) %> users without group</span>
+                    <span class="academic-v2-chip"><%= Number(cleanupAudit.users_with_course_projection_mismatch || 0) %> user projection mismatches</span>
+                    <span class="academic-v2-chip"><%= Number(cleanupAudit.group_subjects_without_teacher_assignment || 0) %> subjects missing teacher</span>
+                  </div>
+                  <div class="academic-v2-table-wrap mt-3">
+                    <table class="table academic-v2-table">
+                      <tbody>
+                        <tr><th>Groups without active term</th><td><%= Number(cleanupAudit.groups_without_active_term || 0) %></td></tr>
+                        <tr><th>Stale legacy course mappings</th><td><%= Number(cleanupAudit.stale_legacy_course_rows || 0) %></td></tr>
+                        <tr><th>Stale legacy subject rows</th><td><%= Number(cleanupAudit.stale_legacy_subject_rows || 0) %></td></tr>
+                        <tr><th>Stale legacy semester rows</th><td><%= Number(cleanupAudit.stale_legacy_semester_rows || 0) %></td></tr>
+                        <tr><th>Stale legacy schedule rows</th><td><%= Number(cleanupAudit.stale_legacy_schedule_rows || 0) %></td></tr>
+                        <tr><th>Legacy study contexts without v2 owner</th><td><%= Number(cleanupAudit.stale_legacy_study_context_rows || 0) %></td></tr>
+                        <tr><th>Legacy preset rows</th><td><%= Number(cleanupAudit.legacy_preset_rows || 0) %></td></tr>
+                        <tr><th>Legacy offerings without v2 owner</th><td><%= Number(cleanupAudit.stale_legacy_offering_rows || 0) %></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <section class="academic-v2-card" id="programs">
               <div class="academic-v2-section-head">
                 <div>
@@ -257,6 +356,10 @@
                               <div class="academic-v2-actions justify-content-end">
                                 <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: program.id, cohort_id: '', group_id: '', term_id: '' }) %>">Focus</a>
                                 <button type="button" class="btn btn-sm btn-primary" data-editor-target="program" data-editor-payload='<%- toAttr(program) %>'>Edit</button>
+                                <form method="post" action="/admin/pathways/v2/programs/<%= program.id %>/delete">
+                                  <%- renderFocusFields() %>
+                                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
                               </div>
                             </td>
                           </tr>
@@ -330,6 +433,10 @@
                               <div class="academic-v2-actions justify-content-end">
                                 <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: cohort.program_id, cohort_id: cohort.id, group_id: '', term_id: '' }) %>">Focus</a>
                                 <button type="button" class="btn btn-sm btn-primary" data-editor-target="cohort" data-editor-payload='<%- toAttr(cohort) %>'>Edit</button>
+                                <form method="post" action="/admin/pathways/v2/cohorts/<%= cohort.id %>/delete">
+                                  <%- renderFocusFields() %>
+                                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
                               </div>
                             </td>
                           </tr>
@@ -410,6 +517,7 @@
                         </thead>
                         <tbody>
                           <% (groups || []).forEach((group) => { %>
+                            <% const health = projectionHealthByGroup.get(Number(group.id || 0)) || null; %>
                             <tr>
                               <td>
                                 <div class="academic-v2-kv">
@@ -421,11 +529,21 @@
                                 <span class="academic-v2-chip"><%= group.term_count %> terms</span>
                                 <span class="academic-v2-chip"><%= group.group_subject_count %> subjects</span>
                                 <span class="academic-v2-chip academic-v2-chip--ok"><%= group.enrolled_users %> users</span>
+                                <% if (health) { %>
+                                  <span class="academic-v2-chip <%= health.is_healthy ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= health.is_healthy ? 'projection ok' : 'needs review' %></span>
+                                  <% (health.issues || []).slice(0, 2).forEach((issue) => { %>
+                                    <span class="academic-v2-chip"><%= issue %></span>
+                                  <% }); %>
+                                <% } %>
                               </td>
                               <td class="text-end">
                                 <div class="academic-v2-actions justify-content-end">
                                   <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: group.program_id, cohort_id: group.cohort_id, group_id: group.id, term_id: '' }) %>">Focus</a>
                                   <button type="button" class="btn btn-sm btn-primary" data-editor-target="group" data-editor-payload='<%- toAttr(group) %>'>Edit</button>
+                                  <form method="post" action="/admin/pathways/v2/groups/<%= group.id %>/delete">
+                                    <%- renderFocusFields() %>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                  </form>
                                 </div>
                               </td>
                             </tr>
@@ -494,7 +612,10 @@
                               <strong><%= template.name %></strong>
                               <div class="academic-v2-muted"><%= template.group_subject_count %> linked group subjects</div>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-editor-target="template" data-editor-payload='<%- toAttr(template) %>'>Edit</button>
+                            <div class="academic-v2-actions">
+                              <button type="button" class="btn btn-sm btn-outline-secondary" data-editor-target="template" data-editor-payload='<%- toAttr(template) %>'>Edit</button>
+                              <button type="submit" class="btn btn-sm btn-outline-danger" formaction="/admin/pathways/v2/templates/<%= template.id %>/delete" formmethod="post">Delete</button>
+                            </div>
                           </div>
                         </div>
                       <% }); %>
