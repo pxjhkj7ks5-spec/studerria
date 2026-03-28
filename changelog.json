@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.3.20",
+      "date": "2026-03-28",
+      "items": [
+        "fix(admin-v2-course-only-scope): update `resolveAdminAcademicScopeState(...)` in `lib/academicSetup.js` so when the selected course exists in legacy `courses` but has no matching legacy `study_context`, the admin panel stays on that exact `course_id` instead of silently snapping back to the first old academic context",
+        "fix(admin-page-content-course-switch): keep contextless academic-v2 projected courses in a `course-only` admin scope, which makes `/admin` content such as user lists, filters, and other course-scoped sections actually reload against the newly selected projected course instead of continuing to show the old legacy course data"
+      ]
+    },
+    {
       "version": "1.3.19",
       "date": "2026-03-28",
       "items": [
