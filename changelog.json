@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.30",
+      "date": "2026-03-28",
+      "items": [
+        "fix(academic-v2-render-legacy-audit-compat): harden `lib/academicV2.js` so cleanup-audit queries used by `/admin/pathways` treat missing legacy config tables or columns as compatibility gaps instead of fatal DB errors, allowing Academic Setup v2 to render even when older environments do not have the full legacy pathways/config schema available for the dry-run audit surface"
+      ]
+    },
+    {
       "version": "1.3.29",
       "date": "2026-03-28",
       "items": [
