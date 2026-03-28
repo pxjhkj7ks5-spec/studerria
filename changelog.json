@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.14",
+      "date": "2026-03-28",
+      "items": [
+        "feat(academic-v2-admin-shell): add a new `views/admin-academic-v2.ejs` + `public/css/pages/admin-academic-v2.css` admin workspace for `Program -> Cohort -> Group -> Term -> GroupSubject`, including focus navigation, manual schedule CRUD, teacher assignment, and bulk user reassignment while moving the default `/admin/pathways` experience off the old pathways surface",
+        "feat(academic-v2-service-and-projection): add `lib/academicV2.js`, wire new `/admin/pathways/v2/...` CRUD routes in `app.js`, keep `app.js` as a thin routing layer, and rebuild legacy compatibility data through one-way projection plus shared cache invalidation instead of writing new admin state back into the old pathways/presets/contexts/offering flows",
+        "feat(academic-v2-schema-bootstrap): register `migrations/042_academic_v2_core.js` in `migrations/index.js`, seed the new academic core tables from existing legacy data, and extend authenticated session payloads with `group_id` so the new group-scoped academic context is available alongside transitional `course_id`"
+      ]
+    },
+    {
       "version": "1.3.13",
       "date": "2026-03-28",
       "items": [

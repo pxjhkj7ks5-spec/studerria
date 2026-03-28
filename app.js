@@ -15,6 +15,7 @@ const navMiddleware = require('./middleware/nav');
 const supportHelpers = require('./lib/support');
 const messageHelpers = require('./lib/messages');
 const teacherTemplateHelpers = require('./lib/teacherTemplates');
+const academicV2Helpers = require('./lib/academicV2');
 const academicSetupHelpers = require('./lib/academicSetup');
 const journalInsightHelpers = require('./lib/journalInsights');
 const roomHelpers = require('./lib/rooms');
@@ -9330,6 +9331,135 @@ function getAcademicSetupStore() {
   };
 }
 
+function getAcademicV2Store() {
+  return {
+    get: (sql, params) => db.get(sql, params),
+    all: (sql, params) => db.all(sql, params),
+    run: (sql, params) => db.run(sql, params),
+    withTransaction: (work) => withTransaction(async (client) => work({
+      get: (sql, params) => txGet(client, sql, params),
+      all: (sql, params) => txAll(client, sql, params),
+      run: (sql, params) => txRun(client, sql, params),
+    })),
+  };
+}
+
+function parseAcademicV2Focus(source = {}) {
+  return {
+    programId: parsePositiveIntStrict(source.focus_program_id, parsePositiveIntStrict(source.program_id)),
+    cohortId: parsePositiveIntStrict(source.focus_cohort_id, parsePositiveIntStrict(source.cohort_id)),
+    groupId: parsePositiveIntStrict(source.focus_group_id, parsePositiveIntStrict(source.group_id)),
+    termId: parsePositiveIntStrict(source.focus_term_id, parsePositiveIntStrict(source.term_id)),
+  };
+}
+
+function buildAcademicV2PathwaysUrl(focus = {}, extraParams = {}) {
+  const params = new URLSearchParams();
+  const push = (key, value) => {
+    if (value === null || typeof value === 'undefined' || value === '') {
+      return;
+    }
+    params.set(key, String(value));
+  };
+  push('program_id', parsePositiveIntStrict(focus.programId));
+  push('cohort_id', parsePositiveIntStrict(focus.cohortId));
+  push('group_id', parsePositiveIntStrict(focus.groupId));
+  push('term_id', parsePositiveIntStrict(focus.termId));
+  Object.entries(extraParams || {}).forEach(([key, value]) => push(key, value));
+  const query = params.toString();
+  return query ? `/admin/pathways?${query}` : '/admin/pathways';
+}
+
+function buildAcademicV2NoticeUrl(kind, message, focus = {}, extraParams = {}) {
+  return appendQueryParamToUrl(
+    buildAcademicV2PathwaysUrl(focus, extraParams),
+    String(kind || '').trim().toLowerCase() === 'ok' ? 'ok' : 'err',
+    String(message || '')
+  );
+}
+
+function getAcademicV2PageRole(req) {
+  if (hasSessionRole(req, 'admin')) {
+    return 'admin';
+  }
+  if (hasSessionRole(req, 'deanery')) {
+    return 'deanery';
+  }
+  return normalizeRoleKey(req.session.role || 'student');
+}
+
+function invalidateAcademicV2CompatibilityCaches() {
+  invalidateCoursesCache();
+  invalidateSubjectsCache();
+  invalidateSemestersCache();
+  invalidateRegistrationPathwaysCache();
+}
+
+function getAcademicV2RouteMessages(req) {
+  const isUk = getPreferredLang(req) === 'uk';
+  return isUk ? {
+    unknown: 'Не вдалося зберегти academic v2 зміни',
+    programSaved: 'Програму збережено',
+    cohortSaved: 'Когорту збережено',
+    groupSaved: 'Групу збережено',
+    groupProjectionRebuilt: 'Сумісну legacy-проекцію перебудовано',
+    termSaved: 'Терм збережено',
+    termDeleted: 'Терм видалено',
+    templateSaved: 'Шаблон предмета збережено',
+    groupSubjectSaved: 'Предмет групи збережено',
+    groupSubjectDeleted: 'Предмет групи видалено',
+    usersAssigned: 'Користувачів перепризначено',
+    scheduleSaved: 'Рядок розкладу збережено',
+    scheduleDeleted: 'Рядок розкладу видалено',
+    PROGRAM_NAME_REQUIRED: 'Назва програми обов’язкова',
+    PROGRAM_REQUIRED: 'Спочатку виберіть програму',
+    COHORT_REQUIRED: 'Спочатку виберіть когорту',
+    GROUP_LABEL_REQUIRED: 'Назва групи обов’язкова',
+    GROUP_REQUIRED: 'Спочатку виберіть групу',
+    TERM_NOT_FOUND: 'Терм не знайдено',
+    TEMPLATE_NAME_REQUIRED: 'Назва шаблону предмета обов’язкова',
+    GROUP_SUBJECT_TARGET_REQUIRED: 'Для предмета групи треба вибрати групу і шаблон',
+    GROUP_SUBJECT_NOT_FOUND: 'Предмет групи не знайдено',
+    USER_ASSIGNMENT_TARGET_REQUIRED: 'Виберіть групу і хоча б одного користувача',
+    SCHEDULE_TARGET_REQUIRED: 'Для розкладу треба вибрати терм і предмет групи',
+    SCHEDULE_ENTRY_NOT_FOUND: 'Рядок розкладу не знайдено',
+    SUBJECT_TEMPLATE_NOT_FOUND: 'Шаблон предмета не знайдено',
+  } : {
+    unknown: 'Unable to save academic v2 changes',
+    programSaved: 'Program saved',
+    cohortSaved: 'Cohort saved',
+    groupSaved: 'Group saved',
+    groupProjectionRebuilt: 'Legacy compatibility projection rebuilt',
+    termSaved: 'Term saved',
+    termDeleted: 'Term deleted',
+    templateSaved: 'Subject template saved',
+    groupSubjectSaved: 'Group subject saved',
+    groupSubjectDeleted: 'Group subject deleted',
+    usersAssigned: 'Users reassigned',
+    scheduleSaved: 'Schedule entry saved',
+    scheduleDeleted: 'Schedule entry deleted',
+    PROGRAM_NAME_REQUIRED: 'Program name is required',
+    PROGRAM_REQUIRED: 'Select a program first',
+    COHORT_REQUIRED: 'Select a cohort first',
+    GROUP_LABEL_REQUIRED: 'Group label is required',
+    GROUP_REQUIRED: 'Select a group first',
+    TERM_NOT_FOUND: 'Term not found',
+    TEMPLATE_NAME_REQUIRED: 'Subject template name is required',
+    GROUP_SUBJECT_TARGET_REQUIRED: 'Group subject requires both group and template',
+    GROUP_SUBJECT_NOT_FOUND: 'Group subject not found',
+    USER_ASSIGNMENT_TARGET_REQUIRED: 'Select a target group and at least one user',
+    SCHEDULE_TARGET_REQUIRED: 'Schedule entry requires both term and group subject',
+    SCHEDULE_ENTRY_NOT_FOUND: 'Schedule entry not found',
+    SUBJECT_TEMPLATE_NOT_FOUND: 'Subject template not found',
+  };
+}
+
+function resolveAcademicV2RouteMessage(req, rawError, fallbackKey = 'unknown') {
+  const messages = getAcademicV2RouteMessages(req);
+  const errorKey = rawError && rawError.message ? String(rawError.message).trim() : '';
+  return messages[errorKey] || messages[fallbackKey] || messages.unknown;
+}
+
 function getTeacherTemplateStore() {
   return {
     get: (sql, params) => db.get(sql, params),
@@ -13202,7 +13332,7 @@ app.post('/login', authLimiter, async (req, res) => {
     const activeClause = usersHasIsActive ? ' AND is_active = 1' : '';
     try {
       const user = await db.get(
-        `SELECT id, full_name, role, password_hash, schedule_group, course_id, language FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
+        `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
         [normalizedName]
       );
       const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
@@ -13246,6 +13376,7 @@ app.post('/login', authLimiter, async (req, res) => {
           username: user.full_name,
           schedule_group: user.schedule_group,
           course_id: user.course_id || 1,
+          group_id: user.group_id || null,
           language: user.language || getPreferredLang(req),
         },
         role,
@@ -13938,7 +14069,7 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
     }
 
     const user = await db.get(
-      'SELECT id, full_name, role, schedule_group, course_id, language FROM users WHERE id = ?',
+      'SELECT id, full_name, role, schedule_group, course_id, group_id, language FROM users WHERE id = ?',
       [userId]
     );
     if (!user) {
@@ -13952,6 +14083,7 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
         username: user.full_name,
         schedule_group: user.schedule_group,
         course_id: user.course_id || 1,
+        group_id: user.group_id || null,
         language: user.language || getPreferredLang(req),
       },
       role: user.role,
@@ -14029,7 +14161,7 @@ app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
   }
   try {
     const userRow = await db.get(
-      'SELECT id, full_name, role, schedule_group, course_id, language, study_context_id, admission_id, study_program_id, study_track FROM users WHERE id = ?',
+      'SELECT id, full_name, role, schedule_group, course_id, group_id, language, study_context_id, admission_id, study_program_id, study_track FROM users WHERE id = ?',
       [userId]
     );
     const placement = await resolveUserAcademicPlacement(userRow, { lang: getPreferredLang(req) });
@@ -14051,6 +14183,7 @@ app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
         username: userRow.full_name,
         schedule_group: userRow.schedule_group,
         course_id: userRow.course_id || 1,
+        group_id: userRow.group_id || null,
         language: userRow.language || getPreferredLang(req),
       },
       role: userRow.role || 'student',
@@ -32583,6 +32716,219 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         }
       );
 });
+
+async function handleAcademicV2MutationRoute(req, res, {
+  run,
+  successMessageKey,
+  focusBuilder = null,
+  logContext = 'admin.pathways.v2.mutation',
+} = {}) {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, `${logContext}.init`);
+  }
+  const baseFocus = parseAcademicV2Focus(req.body);
+  try {
+    const result = await run();
+    invalidateAcademicV2CompatibilityCaches();
+    const focus = typeof focusBuilder === 'function' ? (focusBuilder(result, baseFocus) || baseFocus) : baseFocus;
+    return res.redirect(buildAcademicV2NoticeUrl(
+      'ok',
+      getAcademicV2RouteMessages(req)[successMessageKey] || getAcademicV2RouteMessages(req).unknown,
+      focus
+    ));
+  } catch (err) {
+    console.error(logContext, err);
+    return res.redirect(buildAcademicV2NoticeUrl(
+      'err',
+      resolveAcademicV2RouteMessage(req, err),
+      baseFocus
+    ));
+  }
+}
+
+app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res, next) => {
+  if (String(req.query.legacy || '').trim() === '1') {
+    return next();
+  }
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.v2.init');
+  }
+  try {
+    const pageData = await academicV2Helpers.loadAcademicSetupPage(
+      getAcademicV2Store(),
+      parseAcademicV2Focus(req.query)
+    );
+    return res.render('admin-academic-v2', {
+      role: getAcademicV2PageRole(req),
+      username: req.session.user.username,
+      settings: settingsCache,
+      error: String(req.query.err || ''),
+      success: String(req.query.ok || ''),
+      ...pageData,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.v2.render');
+  }
+});
+
+app.post('/admin/pathways/v2/programs/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveProgram(getAcademicV2Store(), req.body),
+    successMessageKey: 'programSaved',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.id) || focus.programId,
+      cohortId: null,
+      groupId: null,
+      termId: null,
+    }),
+    logContext: 'admin.pathways.v2.program.save',
+  })
+));
+
+app.post('/admin/pathways/v2/cohorts/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveCohort(getAcademicV2Store(), req.body),
+    successMessageKey: 'cohortSaved',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      cohortId: Number(result && result.row && result.row.id) || focus.cohortId,
+      groupId: null,
+      termId: null,
+    }),
+    logContext: 'admin.pathways.v2.cohort.save',
+  })
+));
+
+app.post('/admin/pathways/v2/groups/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveGroup(getAcademicV2Store(), req.body),
+    successMessageKey: 'groupSaved',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      cohortId: Number(result && result.row && result.row.cohort_id) || focus.cohortId,
+      groupId: Number(result && result.row && result.row.id) || focus.groupId,
+      termId: null,
+    }),
+    logContext: 'admin.pathways.v2.group.save',
+  })
+));
+
+app.post('/admin/pathways/v2/groups/:groupId/resync', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.resyncGroupProjection(getAcademicV2Store(), req.params.groupId),
+    successMessageKey: 'groupProjectionRebuilt',
+    focusBuilder: (_result, focus) => ({
+      ...focus,
+      groupId: parsePositiveIntStrict(req.params.groupId, focus.groupId),
+      termId: null,
+    }),
+    logContext: 'admin.pathways.v2.group.resync',
+  })
+));
+
+app.post('/admin/pathways/v2/terms/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveTerm(getAcademicV2Store(), req.body),
+    successMessageKey: 'termSaved',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
+      termId: Number(result && result.row && result.row.id) || focus.termId,
+    }),
+    logContext: 'admin.pathways.v2.term.save',
+  })
+));
+
+app.post('/admin/pathways/v2/terms/:termId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.deleteTerm(getAcademicV2Store(), req.params.termId),
+    successMessageKey: 'termDeleted',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
+      termId: null,
+    }),
+    logContext: 'admin.pathways.v2.term.delete',
+  })
+));
+
+app.post('/admin/pathways/v2/templates/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveSubjectTemplate(getAcademicV2Store(), req.body),
+    successMessageKey: 'templateSaved',
+    logContext: 'admin.pathways.v2.template.save',
+  })
+));
+
+app.post('/admin/pathways/v2/group-subjects/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveGroupSubject(getAcademicV2Store(), req.body),
+    successMessageKey: 'groupSubjectSaved',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
+    }),
+    logContext: 'admin.pathways.v2.group-subject.save',
+  })
+));
+
+app.post('/admin/pathways/v2/group-subjects/:groupSubjectId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.deleteGroupSubject(getAcademicV2Store(), req.params.groupSubjectId),
+    successMessageKey: 'groupSubjectDeleted',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
+    }),
+    logContext: 'admin.pathways.v2.group-subject.delete',
+  })
+));
+
+app.post('/admin/pathways/v2/enrollments/bulk', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), req.body),
+    successMessageKey: 'usersAssigned',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.group && result.group.program_id) || focus.programId,
+      cohortId: Number(result && result.group && result.group.cohort_id) || focus.cohortId,
+      groupId: Number(result && result.groupId) || focus.groupId,
+    }),
+    logContext: 'admin.pathways.v2.enrollment.bulk',
+  })
+));
+
+app.post('/admin/pathways/v2/schedule/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveScheduleEntry(getAcademicV2Store(), req.body),
+    successMessageKey: 'scheduleSaved',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.groupId) || focus.groupId,
+      termId: Number(result && result.row && result.row.term_id) || focus.termId,
+    }),
+    logContext: 'admin.pathways.v2.schedule.save',
+  })
+));
+
+app.post('/admin/pathways/v2/schedule/:scheduleEntryId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.deleteScheduleEntry(getAcademicV2Store(), req.params.scheduleEntryId),
+    successMessageKey: 'scheduleDeleted',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
+    }),
+    logContext: 'admin.pathways.v2.schedule.delete',
+  })
+));
 
 app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
   try {
