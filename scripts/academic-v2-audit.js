@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+const fs = require('fs');
+const path = require('path');
 const { Pool } = require('pg');
 const academicV2Helpers = require('../lib/academicV2');
 const securityHelpers = require('../lib/security');
@@ -44,8 +46,43 @@ function createStore(pool) {
   };
 }
 
+function readFlagValue(flagName) {
+  const args = process.argv.slice(2);
+  const exact = args.find((arg) => arg.startsWith(`${flagName}=`));
+  if (exact) {
+    return exact.slice(flagName.length + 1).trim();
+  }
+  const index = args.indexOf(flagName);
+  if (index >= 0 && args[index + 1] && !String(args[index + 1]).startsWith('--')) {
+    return String(args[index + 1]).trim();
+  }
+  return '';
+}
+
+function buildDefaultSnapshotPath() {
+  const now = new Date();
+  const stamp = [
+    now.getUTCFullYear(),
+    String(now.getUTCMonth() + 1).padStart(2, '0'),
+    String(now.getUTCDate()).padStart(2, '0'),
+    '-',
+    String(now.getUTCHours()).padStart(2, '0'),
+    String(now.getUTCMinutes()).padStart(2, '0'),
+    String(now.getUTCSeconds()).padStart(2, '0'),
+  ].join('');
+  return path.join(process.cwd(), 'artifacts', `academic-v2-audit-${stamp}.json`);
+}
+
 async function main() {
+  const args = process.argv.slice(2);
   const runResyncAll = process.argv.includes('--resync-all');
+  const includeDetails = args.includes('--details');
+  const explicitSnapshotPath = readFlagValue('--out');
+  const writeSnapshot = args.includes('--write-snapshot') || Boolean(explicitSnapshotPath);
+  const detailLimit = (() => {
+    const raw = Number(readFlagValue('--limit') || 25);
+    return Number.isInteger(raw) && raw > 0 ? Math.min(raw, 200) : 25;
+  })();
   const dbSslEnabled = String(process.env.DB_SSL || '').trim().toLowerCase() === 'true';
   const pool = new Pool({
     host: process.env.DB_HOST || `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
@@ -62,22 +99,45 @@ async function main() {
   const store = createStore(pool);
   try {
     const before = await academicV2Helpers.loadAcademicAuditSnapshot(store);
+    const beforeDetails = includeDetails
+      ? await academicV2Helpers.loadAcademicCleanupDetails(store, { limit: detailLimit })
+      : null;
     if (!runResyncAll) {
-      console.log(JSON.stringify({
+      const payload = {
         mode: 'dry-run',
         ...before,
-      }, null, 2));
+        ...(beforeDetails ? { cleanupDetails: beforeDetails } : {}),
+      };
+      if (writeSnapshot) {
+        const snapshotPath = explicitSnapshotPath || buildDefaultSnapshotPath();
+        fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
+        fs.writeFileSync(snapshotPath, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+        payload.snapshotPath = snapshotPath;
+      }
+      console.log(JSON.stringify(payload, null, 2));
       return;
     }
 
     const resyncResult = await academicV2Helpers.resyncAllGroupProjections(store);
     const after = await academicV2Helpers.loadAcademicAuditSnapshot(store);
-    console.log(JSON.stringify({
+    const afterDetails = includeDetails
+      ? await academicV2Helpers.loadAcademicCleanupDetails(store, { limit: detailLimit })
+      : null;
+    const payload = {
       mode: 'resync-all',
       resyncResult,
       before,
       after,
-    }, null, 2));
+      ...(beforeDetails ? { cleanupDetailsBefore: beforeDetails } : {}),
+      ...(afterDetails ? { cleanupDetailsAfter: afterDetails } : {}),
+    };
+    if (writeSnapshot) {
+      const snapshotPath = explicitSnapshotPath || buildDefaultSnapshotPath();
+      fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
+      fs.writeFileSync(snapshotPath, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+      payload.snapshotPath = snapshotPath;
+    }
+    console.log(JSON.stringify(payload, null, 2));
   } finally {
     await pool.end();
   }

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.26",
+      "date": "2026-03-28",
+      "items": [
+        "refactor(legacy-academic-admin-archive-shell): turn the legacy Subjects / Semesters / Courses panels in `views/admin.ejs` into explicit read-only archive views with direct links back to Academic Setup v2, so the main admin UI no longer presents the old academic config surfaces as live editors while legacy IDs remain visible for compatibility and export flows",
+        "feat(academic-v2-cleanup-details): add `loadAcademicCleanupDetails(...)` to `lib/academicV2.js` so cleanup work can inspect concrete users, courses, subjects, semesters, and study-context rows behind the dry-run counters instead of relying only on aggregate numbers",
+        "feat(academic-v2-audit-snapshots): extend `scripts/academic-v2-audit.js` with `--details`, `--limit`, `--out`, and `--write-snapshot`, allowing dry-run/resync audit output to be written to a JSON snapshot file for manual cleanup review before touching legacy academic config"
+      ]
+    },
+    {
       "version": "1.3.25",
       "date": "2026-03-28",
       "items": [
