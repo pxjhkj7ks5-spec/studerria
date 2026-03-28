@@ -908,7 +908,7 @@
     <% const selectedCourseCampus = selectedCourse.is_teacher_course ? 'Teachers' : (String(selectedCourse.location || 'kyiv').toLowerCase() === 'munich' ? 'Munich' : 'Kyiv'); %>
     <% const selectedScopeLabel = selectedCourseLabel; %>
     <% const selectedScopeCampus = scopeState.selectedCampusLabel || selectedCourseCampus; %>
-    <% const canSwitchAcademicScope = (typeof allowCourseSelect !== 'undefined' ? allowCourseSelect : !isLimitedView) && Boolean(scopeTrackOptions.length || scopeProgramOptions.length || scopeAdmissionOptions.length || scopeStageOptions.length || scopeCampusOptions.length); %>
+    <% const canSwitchCourse = Boolean((typeof allowCourseSelect !== 'undefined' ? allowCourseSelect : !isLimitedView) && Array.isArray(courses) && courses.length > 1); %>
     <% const scopeFormAction = role === 'deanery' ? '/deanery' : (role === 'starosta' ? '/starosta' : '/admin'); %>
     <% const buildScopedHref = function(basePath, extraParams) {
       const params = new URLSearchParams();
@@ -938,47 +938,27 @@
         <div class="admin-topbar-left">
           <span class="navbar-brand"><%= isLimitedView && role === 'starosta' ? t('admin.starostaPanel') : t('admin.title') %></span>
           <div class="admin-course-chip">
-            <span class="admin-course-label"><%= selectedScopeLabel %></span>
-            <span class="badge admin-campus-badge"><%= selectedScopeCampus %></span>
-            <% if (canSwitchAcademicScope) { %>
-              <form class="admin-course-form admin-scope-form" method="GET" action="<%= scopeFormAction %>">
+            <% if (canSwitchCourse) { %>
+              <form class="admin-course-form" method="GET" action="<%= scopeFormAction %>">
                 <% if (activeAdminTab) { %>
                   <input type="hidden" name="tab" value="<%= activeAdminTab %>" />
                 <% } %>
-                <div class="admin-scope-fields">
-                  <select name="course" class="form-select form-select-sm" onchange="this.form.submit()">
-                    <% (courses || []).forEach(function(course) { %>
-                      <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
-                    <% }); %>
-                  </select>
-                  <select name="track" class="form-select form-select-sm" onchange="this.form.submit()">
-                    <% scopeTrackOptions.forEach(function(option) { %>
-                      <option value="<%= option.value %>" <%= String(scopeState.track || '') === String(option.value || '') ? 'selected' : '' %>><%= option.label %></option>
-                    <% }); %>
-                  </select>
-                  <select name="program_id" class="form-select form-select-sm" onchange="this.form.submit()">
-                    <% scopeProgramOptions.forEach(function(option) { %>
-                      <option value="<%= option.id %>" <%= Number(scopeState.programId || 0) === Number(option.id || 0) ? 'selected' : '' %>><%= option.label %></option>
-                    <% }); %>
-                  </select>
-                  <select name="admission_id" class="form-select form-select-sm" onchange="this.form.submit()">
-                    <% scopeAdmissionOptions.forEach(function(option) { %>
-                      <option value="<%= option.id %>" <%= Number(scopeState.admissionId || 0) === Number(option.id || 0) ? 'selected' : '' %>><%= option.admission_year || option.label %></option>
-                    <% }); %>
-                  </select>
-                  <select name="stage" class="form-select form-select-sm" onchange="this.form.submit()">
-                    <% scopeStageOptions.forEach(function(option) { %>
-                      <option value="<%= option.value %>" <%= Number(scopeState.stage || 0) === Number(option.value || 0) ? 'selected' : '' %>><%= option.label %></option>
-                    <% }); %>
-                  </select>
-                  <select name="campus" class="form-select form-select-sm" onchange="this.form.submit()">
-                    <% scopeCampusOptions.forEach(function(option) { %>
-                      <option value="<%= option.value %>" <%= String(scopeState.campus || '') === String(option.value || '') ? 'selected' : '' %>><%= option.label %></option>
-                    <% }); %>
-                  </select>
-                </div>
+                <input type="hidden" name="reset_scope" value="course" />
+                <select
+                  name="course"
+                  class="form-select form-select-sm"
+                  aria-label="Вибір курсу"
+                  onchange="this.form.submit()"
+                >
+                  <% (courses || []).forEach(function(course) { %>
+                    <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
+                  <% }); %>
+                </select>
               </form>
+            <% } else { %>
+              <span class="admin-course-label"><%= selectedScopeLabel %></span>
             <% } %>
+            <span class="badge admin-campus-badge"><%= selectedScopeCampus %></span>
           </div>
         </div>
         <div class="admin-topbar-right">

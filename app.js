@@ -9745,7 +9745,14 @@ async function buildAdminAcademicScopeState(req, options = {}) {
           .filter((value) => Number.isInteger(value) && value > 0)
       )
       : null);
-  const storedScope = getStoredAdminAcademicScope(req);
+  const resetScope = String(
+    (req.body && req.body.reset_scope)
+    || (req.query && req.query.reset_scope)
+    || ''
+  ).trim().toLowerCase();
+  const storedScope = resetScope === 'course'
+    ? {}
+    : getStoredAdminAcademicScope(req);
   const requestedScope = {
     track: (req.body && (req.body.track || req.body.mode))
       || (req.query && (req.query.track || req.query.mode))
