@@ -939,7 +939,7 @@
           <span class="navbar-brand"><%= isLimitedView && role === 'starosta' ? t('admin.starostaPanel') : t('admin.title') %></span>
           <div class="admin-course-chip">
             <% if (canSwitchCourse) { %>
-              <form class="admin-course-form" method="GET" action="<%= scopeFormAction %>">
+              <form class="admin-course-form" method="GET" action="<%= scopeFormAction %>" data-admin-course-form>
                 <% if (activeAdminTab) { %>
                   <input type="hidden" name="tab" value="<%= activeAdminTab %>" />
                 <% } %>
@@ -948,7 +948,7 @@
                   name="course"
                   class="form-select form-select-sm"
                   aria-label="Вибір курсу"
-                  onchange="this.form.submit()"
+                  data-admin-course-select
                 >
                   <% (courses || []).forEach(function(course) { %>
                     <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
@@ -4930,6 +4930,30 @@
           // ignore storage failures
         }
       };
+      const adminCourseForm = document.querySelector('[data-admin-course-form]');
+      const adminCourseSelect = adminCourseForm
+        ? adminCourseForm.querySelector('[data-admin-course-select]')
+        : null;
+      if (adminCourseForm && adminCourseSelect) {
+        adminCourseSelect.addEventListener('change', () => {
+          const nextCourseId = String(adminCourseSelect.value || '').trim();
+          if (!nextCourseId) return;
+          const currentUrl = new URL(window.location.href);
+          const targetUrl = new URL(adminCourseForm.getAttribute('action') || currentUrl.pathname, window.location.origin);
+          const activeTab = currentUrl.searchParams.get('tab') || safeStorageGet('admin:tab', '');
+          targetUrl.searchParams.set('course', nextCourseId);
+          targetUrl.searchParams.set('reset_scope', 'course');
+          if (activeTab) {
+            targetUrl.searchParams.set('tab', activeTab);
+          } else {
+            targetUrl.searchParams.delete('tab');
+          }
+          ['track', 'program_id', 'admission_id', 'stage', 'campus', 'study_context_id'].forEach((key) => {
+            targetUrl.searchParams.delete(key);
+          });
+          window.location.assign(targetUrl.toString());
+        });
+      }
 
       const themeToggle = document.getElementById('themeToggle');
       const savedTheme = safeStorageGet('ui-theme', 'theme-light') || 'theme-light';
