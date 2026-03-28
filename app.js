@@ -16,6 +16,7 @@ const supportHelpers = require('./lib/support');
 const messageHelpers = require('./lib/messages');
 const teacherTemplateHelpers = require('./lib/teacherTemplates');
 const academicV2Helpers = require('./lib/academicV2');
+const academicV2StudentHelpers = require('./lib/academicV2Students');
 const academicSetupHelpers = require('./lib/academicSetup');
 const journalInsightHelpers = require('./lib/journalInsights');
 const roomHelpers = require('./lib/rooms');
@@ -3044,7 +3045,7 @@ async function resolveUserAcademicPlacement(userOrId, options = {}) {
 }
 
 async function assignUserStudyContext(userId, studyContextId, fallback = {}) {
-  return academicSetupHelpers.assignUserStudyContext({
+  const result = await academicSetupHelpers.assignUserStudyContext({
     store: {
       run: (sql, params) => db.run(sql, params),
     },
@@ -3053,6 +3054,18 @@ async function assignUserStudyContext(userId, studyContextId, fallback = {}) {
     fallback,
     loadStudyContextById: (contextId) => getStudyContextById(contextId),
   });
+  try {
+    await syncUserAcademicV2GroupAssignment(userId, {
+      studyContextId,
+      courseId: fallback.courseId,
+      admissionId: fallback.admissionId,
+      programId: fallback.programId,
+      trackKey: fallback.trackKey,
+    });
+  } catch (err) {
+    console.error('Academic v2 group sync failed', err);
+  }
+  return result;
 }
 
 async function queueAcademicModerationItem(payload = {}) {
@@ -9344,6 +9357,126 @@ function getAcademicV2Store() {
   };
 }
 
+function isPlainStudentSession(req) {
+  const roleKey = normalizeRoleKey(
+    (req && req.session && (req.session.role || (req.session.user && req.session.user.role))) || 'student'
+  );
+  return roleKey === 'student'
+    && !hasSessionRole(req, 'admin')
+    && !hasSessionRole(req, 'teacher')
+    && !hasSessionRole(req, 'deanery')
+    && !hasSessionRole(req, 'starosta');
+}
+
+function summarizeAcademicV2ProjectionItems(items = [], key = 'subject_title', limit = 3) {
+  const names = (Array.isArray(items) ? items : [])
+    .map((item) => sanitizeCompactText(item && item[key], 120))
+    .filter(Boolean);
+  if (!names.length) return '';
+  if (names.length <= limit) return names.join(', ');
+  return `${names.slice(0, limit).join(', ')} +${names.length - limit}`;
+}
+
+function buildAcademicV2StudentProjectionAlert(req, issues = {}, context = 'subjects') {
+  const normalizedIssues = issues && typeof issues === 'object' ? issues : {};
+  const hasIssues = Boolean(
+    normalizedIssues.has_issues
+    || normalizedIssues.missing_scope
+    || normalizedIssues.missing_active_term
+    || normalizedIssues.missing_legacy_course
+    || normalizedIssues.missing_legacy_semester
+    || (Array.isArray(normalizedIssues.unmapped_subjects) && normalizedIssues.unmapped_subjects.length)
+    || (Array.isArray(normalizedIssues.unmapped_schedule_entries) && normalizedIssues.unmapped_schedule_entries.length)
+  );
+  if (!hasIssues) {
+    return null;
+  }
+
+  const isUk = getPreferredLang(req) === 'uk';
+  const reasons = [];
+  if (normalizedIssues.missing_scope) {
+    reasons.push(isUk
+      ? 'для цього користувача ще не визначено academic v2 групу'
+      : 'no academic v2 group is assigned for this user');
+  }
+  if (normalizedIssues.missing_legacy_course) {
+    reasons.push(isUk
+      ? 'група ще не має legacy course binding'
+      : 'the group is missing a legacy course binding');
+  }
+  if (normalizedIssues.missing_active_term) {
+    reasons.push(isUk
+      ? 'для групи не знайдено активний терм'
+      : 'no active term was found for this group');
+  }
+  if (normalizedIssues.missing_legacy_semester) {
+    reasons.push(isUk
+      ? 'активний терм ще не прив’язаний до legacy semester'
+      : 'the active term is missing a legacy semester binding');
+  }
+  if (Array.isArray(normalizedIssues.unmapped_subjects) && normalizedIssues.unmapped_subjects.length) {
+    reasons.push(isUk
+      ? `предмети без legacy mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_subjects)}`
+      : `subjects without legacy mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_subjects)}`);
+  }
+  if (context === 'schedule'
+    && Array.isArray(normalizedIssues.unmapped_schedule_entries)
+    && normalizedIssues.unmapped_schedule_entries.length) {
+    reasons.push(isUk
+      ? `пари без subject mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_schedule_entries)}`
+      : `schedule rows without subject mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_schedule_entries)}`);
+  }
+
+  const title = isUk
+    ? (context === 'schedule' ? 'Розклад відображено не повністю' : 'Academic v2 проєкція неповна')
+    : (context === 'schedule' ? 'Schedule is only partially available' : 'Academic v2 projection is incomplete');
+  const fallbackBody = isUk
+    ? 'Частина даних ще не має сумісної legacy-проєкції.'
+    : 'Some data is still missing compatibility bindings.';
+
+  return {
+    title,
+    body: reasons.length ? `${reasons.join('. ')}.` : fallbackBody,
+  };
+}
+
+function logAcademicV2StudentProjection(routeKey, userId, state = {}) {
+  const issues = state && state.projectionIssues ? state.projectionIssues : null;
+  if (!issues || !issues.has_issues) {
+    return;
+  }
+  console.warn('Academic v2 student projection incomplete', {
+    route: sanitizeCompactText(routeKey, 80),
+    user_id: parsePositiveIntStrict(userId),
+    group_id: parsePositiveIntStrict(state && state.scope && state.scope.group_id),
+    legacy_course_id: parsePositiveIntStrict(state && state.scope && state.scope.legacy_course_id),
+    legacy_semester_id: parsePositiveIntStrict(state && state.term && state.term.legacy_semester_id),
+    issues,
+  });
+}
+
+async function syncUserAcademicV2GroupAssignment(userId, placement = {}) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  if (!normalizedUserId) {
+    return null;
+  }
+  const scopeState = await academicV2StudentHelpers.resolveStudentAcademicScope(
+    getAcademicV2Store(),
+    {
+      id: normalizedUserId,
+      group_id: null,
+      study_context_id: parsePositiveIntStrict(placement.studyContextId),
+      course_id: parsePositiveIntStrict(placement.courseId),
+      admission_id: parsePositiveIntStrict(placement.admissionId),
+      study_program_id: parsePositiveIntStrict(placement.programId),
+      study_track: sanitizeCompactText(placement.trackKey, 40),
+    }
+  );
+  const nextGroupId = parsePositiveIntStrict(scopeState && scopeState.scope && scopeState.scope.group_id);
+  await db.run('UPDATE users SET group_id = ? WHERE id = ?', [nextGroupId || null, normalizedUserId]);
+  return nextGroupId || null;
+}
+
 function parseAcademicV2Focus(source = {}) {
   return {
     programId: parsePositiveIntStrict(source.focus_program_id, parsePositiveIntStrict(source.program_id)),
@@ -13860,116 +13993,135 @@ app.get('/register/subjects', async (req, res) => {
   try {
     await ensureDbReady();
     const user = await db.get(
-      'SELECT course_id, admission_id, study_context_id, study_program_id, study_track FROM users WHERE id = ?',
+      `
+        SELECT
+          id,
+          course_id,
+          admission_id,
+          study_context_id,
+          study_program_id,
+          study_track,
+          group_id
+        FROM users
+        WHERE id = ?
+      `,
       [req.session.pendingUserId]
     );
-    const placement = await resolveUserAcademicPlacement(user, { lang: getPreferredLang(req) });
-    if (!placement || !placement.course_id) {
+    if (!user) {
+      return res.redirect('/register');
+    }
+
+    const courseId = parsePositiveIntStrict(user.course_id);
+    if (!courseId) {
       return res.redirect('/register/course');
     }
-    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [placement.course_id]);
+
+    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [courseId]);
     if (course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
       return res.redirect('/register/teacher-subjects');
     }
 
-    const [subjects, allCourseSubjects, baseVisibleSubjects, admissionMappedCourses] = await Promise.all([
-      getRegistrationSubjects(placement.course_id, placement.admission_id, {
-        studyContextId: placement.study_context_id,
-      }),
-      getSubjectsCached(placement.course_id, { visibleOnly: false }),
-      getSubjectsCached(placement.course_id, { visibleOnly: true }),
-      getAdmissionRegistrationCourses(placement.admission_id),
-    ]);
+    let subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+      getAcademicV2Store(),
+      user,
+      { selectedOnly: false }
+    );
     const isRequired = (subject) =>
       subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
-    const requiredAuto = (subjects || []).filter((subject) => isRequired(subject) && Number(subject.group_count) === 1);
-    await Promise.all(
-      requiredAuto.map((subject) =>
-        db.run(
-          `
-            INSERT INTO student_groups (student_id, subject_id, group_number)
-            VALUES (?, ?, 1)
-            ON CONFLICT(student_id, subject_id) DO NOTHING
-          `,
-          [req.session.pendingUserId, subject.id]
+    const requiredAuto = (subjectState.subjects || [])
+      .filter((subject) => isRequired(subject) && Number(subject.group_count) === 1);
+    if (requiredAuto.length) {
+      await Promise.all(
+        requiredAuto.map((subject) =>
+          db.run(
+            `
+              INSERT INTO student_groups (student_id, subject_id, group_number)
+              VALUES (?, ?, 1)
+              ON CONFLICT(student_id, subject_id) DO NOTHING
+            `,
+            [req.session.pendingUserId, subject.id]
+          )
         )
-      )
-    );
+      );
+      subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+        getAcademicV2Store(),
+        user,
+        { selectedOnly: false }
+      );
+    }
 
-    const optoutRows = await db.all(
-      'SELECT subject_id FROM user_subject_optouts WHERE user_id = ?',
-      [req.session.pendingUserId]
-    );
-    const optouts = (optoutRows || []).map((row) => Number(row.subject_id));
-    const selectedGroupRows = await db.all(
-      'SELECT subject_id, group_number FROM student_groups WHERE student_id = ?',
-      [req.session.pendingUserId]
-    );
+    const subjects = Array.isArray(subjectState.subjects) ? subjectState.subjects : [];
     const selectedGroups = {};
-    (selectedGroupRows || []).forEach((row) => {
-      const subjectId = Number(row.subject_id);
-      const groupNumber = Number(row.group_number);
-      if (!Number.isInteger(subjectId) || subjectId < 1) return;
-      if (!Number.isInteger(groupNumber) || groupNumber < 1) return;
-      selectedGroups[subjectId] = groupNumber;
+    const optouts = [];
+    subjects.forEach((subject) => {
+      const subjectId = parsePositiveIntStrict(subject && (subject.id || subject.subject_id));
+      const groupNumber = parsePositiveIntStrict(subject && subject.selected_group);
+      if (subject && subject.opted_out && subjectId) {
+        optouts.push(subjectId);
+      }
+      if (subjectId && groupNumber) {
+        selectedGroups[subjectId] = groupNumber;
+      }
     });
 
     const lang = getPreferredLang(req);
-    const campusChoices = buildAdmissionCampusChoicesFromCourses(admissionMappedCourses);
-    const readyCampusBindings = campusChoices.filter(
-      (choice) => !choice.is_ambiguous && Number(choice.course_id || 0) > 0
-    ).length;
+    const mappedCourses = subjectState.scope ? 1 : 0;
+    const visibleSubjects = Number(subjectState.mapped_visible_subjects || subjects.length || 0);
+    const totalSubjects = Number(subjectState.total_visible_subjects || subjects.length || 0);
+    const readyCampusBindings = subjectState.scope ? 1 : 0;
+    const projectionAlert = buildAcademicV2StudentProjectionAlert(
+      req,
+      subjectState.projectionIssues,
+      'register'
+    );
+    if (projectionAlert) {
+      logAcademicV2StudentProjection('register.subjects', req.session.pendingUserId, subjectState);
+    }
+
     const registrationPathwayReadiness = pathwayHelpers.buildPathwayReadinessSummary({
-      mappedCourses: Array.isArray(admissionMappedCourses) ? admissionMappedCourses.length : 0,
-      visibleSubjects: Array.isArray(subjects) ? subjects.length : 0,
-      totalSubjects: Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0,
+      mappedCourses,
+      visibleSubjects,
+      totalSubjects,
       campusBindings: readyCampusBindings,
       pendingUsers: 0,
     });
     const pathwayRegistrationHint = pathwayHelpers.buildSubjectVisibilityCopy({
-      visibleSubjects: Array.isArray(subjects) ? subjects.length : 0,
-      totalSubjects: Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0,
+      visibleSubjects,
+      totalSubjects,
       lang,
     });
     const registrationPathwayAlert = pathwayHelpers.buildRegistrationReadinessAlert({
       summary: registrationPathwayReadiness,
       lang,
-      mappedCourses: Array.isArray(admissionMappedCourses) ? admissionMappedCourses.length : 0,
-      visibleSubjects: Array.isArray(subjects) ? subjects.length : 0,
-      totalSubjects: Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0,
+      mappedCourses,
+      visibleSubjects,
+      totalSubjects,
       campusBindings: readyCampusBindings,
-      ambiguousCampuses: campusChoices.filter((choice) => choice.is_ambiguous).length,
-      baseHiddenSubjects: Math.max(
-        0,
-        Number(Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0)
-          - Number(Array.isArray(baseVisibleSubjects) ? baseVisibleSubjects.length : 0)
-      ),
+      ambiguousCampuses: 0,
+      baseHiddenSubjects: Math.max(0, totalSubjects - visibleSubjects),
     });
     const registrationExperienceSummary = pathwayHelpers.buildRegistrationExperienceSummary({
       summary: registrationPathwayReadiness,
       lang,
-      mappedCourses: Array.isArray(admissionMappedCourses) ? admissionMappedCourses.length : 0,
-      visibleSubjects: Array.isArray(subjects) ? subjects.length : 0,
-      totalSubjects: Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0,
+      mappedCourses,
+      visibleSubjects,
+      totalSubjects,
       campusBindings: readyCampusBindings,
-      ambiguousCampuses: campusChoices.filter((choice) => choice.is_ambiguous).length,
+      ambiguousCampuses: 0,
       pendingUsers: 0,
-      baseHiddenSubjects: Math.max(
-        0,
-        Number(Array.isArray(allCourseSubjects) ? allCourseSubjects.length : 0)
-          - Number(Array.isArray(baseVisibleSubjects) ? baseVisibleSubjects.length : 0)
-      ),
+      baseHiddenSubjects: Math.max(0, totalSubjects - visibleSubjects),
     });
 
     return res.render('register-subjects', {
       subjects,
       optouts,
       selectedGroups,
-      studyContext: placement,
+      studyContext: subjectState.scope,
       pathwayRegistrationHint,
       registrationPathwayReadiness,
       registrationPathwayAlert,
       registrationExperienceSummary,
+      projectionAlert,
       error: req.query.error || '',
     });
   } catch (err) {
@@ -13994,17 +14146,45 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
   try {
     await ensureDbReady();
     const userRow = await db.get(
-      'SELECT course_id, admission_id, study_context_id, study_program_id, study_track FROM users WHERE id = ?',
+      `
+        SELECT
+          id,
+          course_id,
+          admission_id,
+          study_context_id,
+          study_program_id,
+          study_track,
+          group_id
+        FROM users
+        WHERE id = ?
+      `,
       [userId]
     );
-    const placement = await resolveUserAcademicPlacement(userRow, { lang: getPreferredLang(req) });
-    if (!placement || !placement.course_id) {
+    if (!userRow) {
+      return res.redirect('/register');
+    }
+
+    const courseId = parsePositiveIntStrict(userRow.course_id);
+    if (!courseId) {
       return res.redirect('/register/course');
     }
 
-    const subjects = await getRegistrationSubjects(placement.course_id, placement.admission_id, {
-      studyContextId: placement.study_context_id,
-    });
+    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [courseId]);
+    if (course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+      return res.redirect('/register/teacher-subjects');
+    }
+
+    const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+      getAcademicV2Store(),
+      userRow,
+      { selectedOnly: false }
+    );
+    if (!subjectState.scope || (subjectState.projectionIssues && subjectState.projectionIssues.has_issues && !(subjectState.subjects || []).length)) {
+      logAcademicV2StudentProjection('register.subjects.submit', userId, subjectState);
+      return res.redirect('/register/subjects?error=projection-incomplete');
+    }
+
+    const subjects = Array.isArray(subjectState.subjects) ? subjectState.subjects : [];
     const isRequired = (subject) =>
       subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
     let hasMissingRequired = false;
@@ -19805,6 +19985,437 @@ function applySessionMetaFlags(target, sessionType) {
   target.session_kind = 'mixed';
 }
 
+function buildStudentScheduleHomeworkTargets(subjects = [], scheduleRows = []) {
+  const targetMap = new Map();
+  const baseGroupsBySubject = new Map();
+
+  const registerTarget = ({
+    subjectId,
+    groupNumber,
+    courseId,
+    semesterId,
+    subjectName,
+  }) => {
+    const normalizedSubjectId = parsePositiveIntStrict(subjectId);
+    const normalizedGroupNumber = parsePositiveIntStrict(groupNumber);
+    const normalizedCourseId = parsePositiveIntStrict(courseId);
+    if (!normalizedSubjectId || !normalizedGroupNumber || !normalizedCourseId) {
+      return;
+    }
+
+    const normalizedSemesterId = parsePositiveIntStrict(semesterId, 0) || 0;
+    const key = `${normalizedSubjectId}|${normalizedGroupNumber}|${normalizedCourseId}|${normalizedSemesterId}`;
+    if (targetMap.has(key)) {
+      return;
+    }
+
+    targetMap.set(key, {
+      subject_id: normalizedSubjectId,
+      group_number: normalizedGroupNumber,
+      course_id: normalizedCourseId,
+      semester_id: normalizedSemesterId,
+      subject_name: sanitizeCompactText(subjectName || '', 160),
+    });
+  };
+
+  (subjects || []).forEach((subject) => {
+    const subjectId = parsePositiveIntStrict(subject && (subject.subject_id || subject.id));
+    const selectedGroup = parsePositiveIntStrict(
+      subject && (subject.selected_group || subject.default_group),
+      1
+    );
+    const courseId = parsePositiveIntStrict(subject && (subject.course_id || subject.owner_course_id));
+    const semesterId = parsePositiveIntStrict(subject && (subject.legacy_semester_id || subject.semester_id), 0) || 0;
+    if (!subjectId || !selectedGroup || !courseId) {
+      return;
+    }
+
+    if (!baseGroupsBySubject.has(subjectId)) {
+      baseGroupsBySubject.set(subjectId, new Set());
+    }
+    baseGroupsBySubject.get(subjectId).add(selectedGroup);
+    registerTarget({
+      subjectId,
+      groupNumber: selectedGroup,
+      courseId,
+      semesterId,
+      subjectName: subject.subject_name || subject.subject_title || subject.name,
+    });
+  });
+
+  (scheduleRows || []).forEach((row) => {
+    const subjectId = parsePositiveIntStrict(row && row.subject_id);
+    const groupNumber = parsePositiveIntStrict(row && row.group_number);
+    const courseId = parsePositiveIntStrict(row && (row.course_id || row.owner_course_id));
+    const semesterId = parsePositiveIntStrict(row && (row.legacy_semester_id || row.semester_id), 0) || 0;
+    const lessonType = String(row && row.lesson_type || '').trim().toLowerCase();
+    const allowedGroups = subjectId ? baseGroupsBySubject.get(subjectId) : null;
+
+    if (!subjectId || !groupNumber || !courseId) {
+      return;
+    }
+    if (lessonType !== 'lecture' && (!allowedGroups || !allowedGroups.has(groupNumber))) {
+      return;
+    }
+
+    registerTarget({
+      subjectId,
+      groupNumber,
+      courseId,
+      semesterId,
+      subjectName: row.subject_name || row.subject_title,
+    });
+  });
+
+  return Array.from(targetMap.values());
+}
+
+async function loadStudentLegacyScheduleCompatData({
+  userId,
+  homeworkTargets = [],
+  nowIso,
+  weekStartDate = null,
+  weekEndDate = null,
+  weekDates = [],
+  canUseCustomDeadlinesUi = false,
+}) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  const normalizedTargets = Array.isArray(homeworkTargets)
+    ? homeworkTargets.filter((target) =>
+        parsePositiveIntStrict(target && target.subject_id)
+        && parsePositiveIntStrict(target && target.group_number)
+        && parsePositiveIntStrict(target && target.course_id)
+      )
+    : [];
+
+  const buildTargetConditions = (alias = 'h') => normalizedTargets
+    .map(
+      () => `(${alias}.subject_id = ? AND ${alias}.group_number = ? AND ${alias}.course_id = ? AND COALESCE(${alias}.semester_id, 0) = ?)`
+    )
+    .join(' OR ');
+  const buildTargetParams = () => {
+    const params = [];
+    normalizedTargets.forEach((target) => {
+      params.push(
+        Number(target.subject_id),
+        Number(target.group_number),
+        Number(target.course_id),
+        parsePositiveIntStrict(target.semester_id, 0) || 0
+      );
+    });
+    return params;
+  };
+
+  const attachReactionState = async (items = []) => {
+    const normalizedItems = Array.isArray(items) ? items : [];
+    const ids = normalizedItems
+      .map((item) => parsePositiveIntStrict(item && item.id))
+      .filter((value) => Number.isInteger(value) && value > 0);
+    if (!ids.length || !normalizedUserId) {
+      return;
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const [reactRows, myRows] = await Promise.all([
+      db.all(
+        `SELECT homework_id, emoji, COUNT(*) AS count
+         FROM homework_reactions
+         WHERE homework_id IN (${placeholders})
+         GROUP BY homework_id, emoji`,
+        ids
+      ),
+      db.all(
+        `SELECT homework_id, emoji
+         FROM homework_reactions
+         WHERE homework_id IN (${placeholders}) AND user_id = ?`,
+        [...ids, normalizedUserId]
+      ),
+    ]);
+
+    const reactionMap = {};
+    (reactRows || []).forEach((row) => {
+      if (!reactionMap[row.homework_id]) reactionMap[row.homework_id] = {};
+      reactionMap[row.homework_id][row.emoji] = Number(row.count || 0);
+    });
+
+    const reactedMap = {};
+    (myRows || []).forEach((row) => {
+      if (!reactedMap[row.homework_id]) reactedMap[row.homework_id] = {};
+      reactedMap[row.homework_id][row.emoji] = true;
+    });
+
+    normalizedItems.forEach((item) => {
+      item.reactions = reactionMap[item.id] || {};
+      item.reacted = reactedMap[item.id] || {};
+    });
+  };
+
+  const loadCustomDeadlines = async () => {
+    if (!canUseCustomDeadlinesUi || !normalizedTargets.length || !weekStartDate || !weekEndDate) {
+      return {
+        customDeadlinesByDate: {},
+        weekendDeadlineCards: [],
+        customDeadlineItems: [],
+      };
+    }
+
+    const rows = await db.all(
+      `
+        SELECT h.*, subj.name AS subject_name
+        FROM homework h
+        JOIN subjects subj ON subj.id = h.subject_id
+        WHERE (${buildTargetConditions('h')})
+          AND COALESCE(h.status, 'published') = 'published'
+          AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
+          AND h.is_custom_deadline = 1
+          AND h.custom_due_date IS NOT NULL
+          AND h.custom_due_date >= ?
+          AND h.custom_due_date <= ?
+        ORDER BY h.custom_due_date ASC, h.created_at DESC
+      `,
+      [...buildTargetParams(), nowIso, weekStartDate, weekEndDate]
+    );
+
+    const customDeadlineItems = (rows || []).map((row) => ({ ...row }));
+    const customDeadlinesByDate = {};
+    customDeadlineItems.forEach((row) => {
+      const key = row.custom_due_date;
+      if (!customDeadlinesByDate[key]) {
+        customDeadlinesByDate[key] = [];
+      }
+      customDeadlinesByDate[key].push(row);
+    });
+
+    const weekendDeadlineCards = [];
+    ['Saturday', 'Sunday'].forEach((day) => {
+      const idx = fullWeekDays.indexOf(day);
+      const date = idx >= 0 ? weekDates[idx] : null;
+      if (!date) return;
+      const items = customDeadlinesByDate[date] || [];
+      if (items.length) {
+        weekendDeadlineCards.push({ day, date, items });
+      }
+    });
+
+    await attachReactionState(customDeadlineItems);
+    return {
+      customDeadlinesByDate,
+      weekendDeadlineCards,
+      customDeadlineItems,
+    };
+  };
+
+  if (!normalizedTargets.length) {
+    return {
+      homework: [],
+      homeworkMeta: {},
+      homeworkMetaAll: {},
+      homeworkTags: [],
+      ...(await loadCustomDeadlines()),
+    };
+  }
+
+  const homeworkRows = await db.all(
+    `
+      SELECT
+        h.*,
+        subj.name AS subject_name,
+        r.label AS room_name,
+        r.code AS room_code,
+        r.building AS room_building,
+        hs.submitted_at AS submission_submitted_at,
+        s.id AS subgroup_id,
+        s.name AS subgroup_name,
+        m.member_username AS subgroup_member
+      FROM homework h
+      JOIN subjects subj ON subj.id = h.subject_id
+      LEFT JOIN rooms r ON r.id = h.room_id
+      LEFT JOIN homework_submissions hs ON hs.homework_id = h.id AND hs.student_id = ?
+      LEFT JOIN subgroups s ON s.homework_id = h.id
+      LEFT JOIN subgroup_members m ON m.subgroup_id = s.id
+      WHERE (${buildTargetConditions('h')})
+        AND COALESCE(h.status, 'published') = 'published'
+        AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
+        AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
+      ORDER BY h.created_at DESC
+    `,
+    [normalizedUserId, ...buildTargetParams(), nowIso]
+  );
+
+  const homeworkMap = new Map();
+  (homeworkRows || []).forEach((row) => {
+    if (!homeworkMap.has(row.id)) {
+      const sessionType = detectSessionHomeworkType(row.description);
+      homeworkMap.set(row.id, {
+        id: row.id,
+        group_number: row.group_number,
+        subject_id: row.subject_id,
+        subject: row.subject_name,
+        day: normalizeWeekdayName(row.day_of_week) || String(row.day_of_week || ''),
+        class_number: row.class_number,
+        description: row.description,
+        class_date: toDateOnly(row.class_date),
+        meeting_url: row.meeting_url,
+        link_url: row.link_url,
+        file_path: row.file_path,
+        file_name: normalizeUploadedOriginalName(row.file_name),
+        room_label: row.room_id ? roomHelpers.buildRoomLabel({
+          label: row.room_name,
+          code: row.room_code,
+          building: row.room_building,
+        }) : '',
+        created_by: row.created_by,
+        created_at: row.created_at,
+        submitted_at: row.submission_submitted_at || null,
+        is_control: Number(row.is_control || 0),
+        is_teacher_homework: Number(row.is_teacher_homework || 0),
+        is_credit: Number(row.is_credit || 0),
+        session_type: sessionType,
+        is_session: Boolean(sessionType),
+        course_id: row.course_id,
+        subgroups: {},
+      });
+    }
+
+    if (row.subgroup_id) {
+      const homeworkItem = homeworkMap.get(row.id);
+      if (!homeworkItem.subgroups[row.subgroup_id]) {
+        homeworkItem.subgroups[row.subgroup_id] = {
+          id: row.subgroup_id,
+          name: row.subgroup_name,
+          members: [],
+        };
+      }
+      if (row.subgroup_member) {
+        homeworkItem.subgroups[row.subgroup_id].members.push(row.subgroup_member);
+      }
+    }
+  });
+
+  const homework = Array.from(homeworkMap.values()).map((item) => ({
+    ...item,
+    subgroups: Object.values(item.subgroups),
+  }));
+  const homeworkMeta = {};
+  const homeworkMetaAll = {};
+
+  homework.forEach((item) => {
+    const homeworkDay = normalizeWeekdayName(item.day) || String(item.day || '');
+    const homeworkDate = toDateOnly(item.class_date);
+    const legacyKey = `${item.subject_id}|${item.group_number}|${homeworkDay}|${item.class_number}`;
+    const datedKey = homeworkDate ? `${legacyKey}|${homeworkDate}` : legacyKey;
+    if (!homeworkMeta[datedKey]) {
+      homeworkMeta[datedKey] = {
+        count: 0,
+        preview: [],
+        control: false,
+        teacher_homework: false,
+        credit: false,
+        session_kind: '',
+        session_count: 0,
+        meet: false,
+        meet_link: '',
+      };
+    }
+
+    homeworkMeta[datedKey].count += 1;
+    if (item.is_control) homeworkMeta[datedKey].control = true;
+    if (item.is_teacher_homework) homeworkMeta[datedKey].teacher_homework = true;
+    if (item.is_credit) homeworkMeta[datedKey].credit = true;
+    applySessionMetaFlags(homeworkMeta[datedKey], item.session_type);
+    if (item.meeting_url) {
+      homeworkMeta[datedKey].meet = true;
+      if (!homeworkMeta[datedKey].meet_link) {
+        homeworkMeta[datedKey].meet_link = String(item.meeting_url);
+      }
+    }
+    if (item.description && homeworkMeta[datedKey].preview.length < 2) {
+      homeworkMeta[datedKey].preview.push(item.description);
+    }
+
+    const allKey = homeworkDate
+      ? `${item.subject_id}|${homeworkDay}|${item.class_number}|${homeworkDate}`
+      : `${item.subject_id}|${homeworkDay}|${item.class_number}`;
+    if (!homeworkMetaAll[allKey]) {
+      homeworkMetaAll[allKey] = {
+        count: 0,
+        preview: [],
+        control: false,
+        teacher_homework: false,
+        credit: false,
+        session_kind: '',
+        session_count: 0,
+        meet: false,
+        meet_link: '',
+      };
+    }
+
+    homeworkMetaAll[allKey].count += 1;
+    if (item.is_control) homeworkMetaAll[allKey].control = true;
+    if (item.is_teacher_homework) homeworkMetaAll[allKey].teacher_homework = true;
+    if (item.is_credit) homeworkMetaAll[allKey].credit = true;
+    applySessionMetaFlags(homeworkMetaAll[allKey], item.session_type);
+    if (item.meeting_url) {
+      homeworkMetaAll[allKey].meet = true;
+      if (!homeworkMetaAll[allKey].meet_link) {
+        homeworkMetaAll[allKey].meet_link = String(item.meeting_url);
+      }
+    }
+    if (item.description && homeworkMetaAll[allKey].preview.length < 2) {
+      homeworkMetaAll[allKey].preview.push(item.description);
+    }
+  });
+
+  const homeworkIds = homework
+    .map((item) => parsePositiveIntStrict(item.id))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  let homeworkTags = [];
+
+  if (homeworkIds.length) {
+    const placeholders = homeworkIds.map(() => '?').join(',');
+    const [tagRows, tagList] = await Promise.all([
+      db.all(
+        `SELECT ht.homework_id, t.name
+         FROM homework_tag_map ht
+         JOIN homework_tags t ON t.id = ht.tag_id
+         WHERE ht.homework_id IN (${placeholders})`,
+        homeworkIds
+      ),
+      db.all('SELECT name FROM homework_tags ORDER BY name'),
+    ]);
+
+    const tagMap = {};
+    (tagRows || []).forEach((row) => {
+      if (!tagMap[row.homework_id]) tagMap[row.homework_id] = [];
+      tagMap[row.homework_id].push(row.name);
+    });
+    homework.forEach((item) => {
+      item.tags = tagMap[item.id] || [];
+    });
+    homeworkTags = (tagList || []).map((item) => item.name);
+
+    await attachReactionState(homework);
+    try {
+      const homeworkAssetMap = await listHomeworkAssetsByHomeworkIds(homeworkIds);
+      homework.forEach((item) => {
+        item.assets = homeworkAssetMap.get(item.id) || [];
+      });
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        console.error('Homework asset map load failed', err);
+      }
+    }
+  }
+
+  return {
+    homework,
+    homeworkMeta,
+    homeworkMetaAll,
+    homeworkTags,
+    ...(await loadCustomDeadlines()),
+  };
+}
+
 app.get('/schedule', requireLogin, async (req, res) => {
   const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
   const canCreateHomework = canSessionCreateHomework(req);
@@ -20382,6 +20993,182 @@ app.get('/schedule', requireLogin, async (req, res) => {
       return handleDbError(res, err, 'teacher.schedule');
     }
   }
+
+  if (isPlainStudentSession(req)) {
+    try {
+      await ensureDbReady();
+
+      const baseState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+        getAcademicV2Store(),
+        userId,
+        { selectedOnly: true }
+      );
+      const termState = baseState && baseState.term
+        ? {
+            start_date: baseState.term.start_date,
+            weeks_count: Math.max(1, Number(baseState.term.weeks_count || 0) || 16),
+          }
+        : null;
+      const totalWeeks = termState ? Number(termState.weeks_count || 16) : 15;
+      let selectedWeek = parseInt(req.query.week, 10);
+      if (Number.isNaN(selectedWeek)) {
+        selectedWeek = getAcademicWeekForSemester(new Date(), termState);
+      }
+      if (selectedWeek < 1) selectedWeek = 1;
+      if (selectedWeek > totalWeeks) selectedWeek = totalWeeks;
+
+      const scheduleState = baseState.scope && baseState.term
+        ? await academicV2StudentHelpers.loadStudentScheduleData(
+            getAcademicV2Store(),
+            userId,
+            { weekNumber: selectedWeek }
+          )
+        : {
+            ...baseState,
+            scheduleRows: [],
+            projectionIssues: baseState.projectionIssues,
+          };
+      const projectionAlert = buildAcademicV2StudentProjectionAlert(
+        req,
+        scheduleState.projectionIssues,
+        'schedule'
+      );
+      if (projectionAlert) {
+        logAcademicV2StudentProjection('schedule.student', userId, scheduleState);
+      }
+
+      const legacyCourseId = parsePositiveIntStrict(scheduleState && scheduleState.scope && scheduleState.scope.legacy_course_id);
+      const legacySemesterId = parsePositiveIntStrict(scheduleState && scheduleState.term && scheduleState.term.legacy_semester_id);
+      let useLocalTime = false;
+      if (legacyCourseId && legacySemesterId) {
+        const weekTimeMap = await getCourseWeekTimeMap(legacyCourseId, legacySemesterId);
+        useLocalTime = weekTimeMap.get(selectedWeek) === true;
+      }
+
+      let activeDays = [...daysOfWeek];
+      if (legacyCourseId) {
+        const studyDays = await getCourseStudyDays(legacyCourseId);
+        const resolvedDays = (studyDays || [])
+          .filter((day) => day.is_active)
+          .map((day) => fullWeekDays[day.weekday - 1])
+          .filter(Boolean);
+        if (resolvedDays.length) {
+          activeDays = resolvedDays;
+        }
+      }
+
+      const weekDates = fullWeekDays.map((_, index) =>
+        getDateForWeekIndex(
+          selectedWeek,
+          index,
+          scheduleState && scheduleState.term ? scheduleState.term.start_date : null
+        )
+      );
+      const weekStartDate = weekDates[0];
+      const weekEndDate = weekDates[6];
+      const dayDates = {};
+      const scheduleByDay = {};
+      activeDays.forEach((day) => {
+        const idx = fullWeekDays.indexOf(day);
+        dayDates[day] = idx >= 0 ? weekDates[idx] : null;
+        scheduleByDay[day] = [];
+      });
+
+      (scheduleState.scheduleRows || []).forEach((row) => {
+        const normalizedRow = {
+          ...row,
+          owner_course_id: parsePositiveIntStrict(row.owner_course_id || row.course_id),
+          class_date: getDateForWeekDay(
+            selectedWeek,
+            row.day_of_week,
+            scheduleState && scheduleState.term ? scheduleState.term.start_date : null
+          ),
+          use_local_time: useLocalTime,
+          room_id: null,
+          room_label: '',
+        };
+        if (scheduleByDay[normalizedRow.day_of_week]) {
+          scheduleByDay[normalizedRow.day_of_week].push(normalizedRow);
+        }
+      });
+      activeDays.forEach((day) => {
+        scheduleByDay[day].sort((a, b) =>
+          Number(a.class_number || 0) - Number(b.class_number || 0)
+          || Number(a.group_number || 0) - Number(b.group_number || 0)
+          || Number(a.schedule_entry_id || 0) - Number(b.schedule_entry_id || 0)
+        );
+      });
+
+      const homeworkTargets = buildStudentScheduleHomeworkTargets(
+        scheduleState.subjects || [],
+        scheduleState.scheduleRows || []
+      );
+      const compatData = await loadStudentLegacyScheduleCompatData({
+        userId,
+        homeworkTargets,
+        nowIso: new Date().toISOString(),
+        weekStartDate,
+        weekEndDate,
+        weekDates,
+        canUseCustomDeadlinesUi,
+      });
+      const customDeadlineSubjects = canUseCustomDeadlinesUi
+        ? Array.from(scheduleState.subjects || []).map((subject) => ({
+            id: subject.subject_id,
+            name: subject.subject_name,
+            course_id: subject.course_id,
+            course_name: subject.course_name,
+            group_number: subject.is_general
+              ? null
+              : (parsePositiveIntStrict(subject.selected_group || subject.default_group) || null),
+            is_general: subject.is_general === true || Number(subject.is_general) === 1,
+            group_count: Math.max(1, Number(subject.group_count || 1)),
+          }))
+        : [];
+
+      return res.render('schedule', {
+        scheduleByDay,
+        daysOfWeek: activeDays,
+        dayDates,
+        currentWeek: selectedWeek,
+        totalWeeks,
+        semester: scheduleState && scheduleState.term ? {
+          ...scheduleState.term,
+          start_date: scheduleState.term.start_date,
+          weeks_count: Math.max(1, Number(scheduleState.term.weeks_count || 0) || 16),
+        } : null,
+        bellSchedule,
+        group: scheduleState && scheduleState.scope && scheduleState.scope.group_label
+          ? scheduleState.scope.group_label
+          : (group || 'A'),
+        username,
+        homework: compatData.homework,
+        homeworkMeta: compatData.homeworkMeta,
+        homeworkMetaAll: compatData.homeworkMetaAll,
+        homeworkTags: compatData.homeworkTags,
+        customDeadlinesByDate: compatData.customDeadlinesByDate,
+        weekendDeadlineCards: compatData.weekendDeadlineCards,
+        customDeadlineItems: compatData.customDeadlineItems,
+        customDeadlineSubjects,
+        subgroupError: req.query.sg || null,
+        role: req.session.role,
+        viewAs: null,
+        viewAsCourse: null,
+        viewAsGroupNumber: null,
+        viewAsLabel: null,
+        messageSubjects: scheduleState.subjects || [],
+        userId,
+        selectedCourseId: legacyCourseId || parsePositiveIntStrict(courseId) || null,
+        teacherHomeworkTemplates,
+        canCreateHomework,
+        canUseCustomDeadlinesUi,
+        projectionAlert,
+      });
+    } catch (err) {
+      return handleDbError(res, err, 'student.schedule.v2');
+    }
+  }
+
   const isAdminViewAs = hasSessionRole(req, 'admin') && req.session.viewAs === 'student';
   const viewAsMode = isAdminViewAs ? (req.session.viewAsMode || 'manual') : null;
   let viewAsCourseId = isAdminViewAs ? Number(req.session.viewAsCourseId) : null;
@@ -29566,6 +30353,96 @@ app.get('/subjects', requireLogin, async (req, res) => {
   }
 
   try {
+    if (!isTeacherMode && isPlainStudentSession(req)) {
+      const studentState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+        getAcademicV2Store(),
+        userId,
+        { selectedOnly: true }
+      );
+      const projectionAlert = buildAcademicV2StudentProjectionAlert(
+        req,
+        studentState.projectionIssues,
+        'subjects'
+      );
+      if (projectionAlert) {
+        logAcademicV2StudentProjection('subjects.student', userId, studentState);
+      }
+
+      const subjects = Array.from(studentState.subjects || [])
+        .sort((a, b) =>
+          Number(a.course_id || 0) - Number(b.course_id || 0)
+          || String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk')
+        );
+      const selectedSubject = selectedSubjectId
+        ? (subjects.find((subject) => Number(subject.subject_id) === Number(selectedSubjectId)) || null)
+        : (subjects[0] || null);
+
+      let materials = [];
+      if (selectedSubject) {
+        const selectedLegacySemesterId = parsePositiveIntStrict(selectedSubject.legacy_semester_id);
+        const params = [selectedSubject.subject_id];
+        let materialsSql = `
+          SELECT sm.*, u.full_name AS created_by_name
+          FROM subject_materials sm
+          JOIN users u ON u.id = sm.created_by
+          WHERE sm.subject_id = ?
+        `;
+
+        if (selectedLegacySemesterId) {
+          materialsSql += ' AND (sm.semester_id = ? OR sm.semester_id IS NULL)';
+          params.push(selectedLegacySemesterId);
+        } else {
+          materialsSql += ' AND sm.semester_id IS NULL';
+        }
+
+        if (!selectedSubject.has_all_groups) {
+          if (Array.isArray(selectedSubject.group_numbers) && selectedSubject.group_numbers.length) {
+            const groupPlaceholders = selectedSubject.group_numbers.map(() => '?').join(',');
+            materialsSql += ` AND (sm.group_number IS NULL OR sm.group_number IN (${groupPlaceholders}))`;
+            params.push(...selectedSubject.group_numbers);
+          } else {
+            materialsSql += ' AND sm.group_number IS NULL';
+          }
+        }
+
+        materialsSql += ' ORDER BY COALESCE(sm.is_syllabus, 0) DESC, sm.created_at DESC, sm.id DESC';
+        const materialRows = await db.all(materialsSql, params);
+        materials = (materialRows || []).map((row) => {
+          const createdAt = row.created_at ? new Date(row.created_at) : null;
+          const createdAtLabel = createdAt && !Number.isNaN(createdAt.getTime())
+            ? createdAt.toLocaleString('uk-UA', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : String(row.created_at || '');
+          return {
+            ...row,
+            material_type: normalizeSubjectMaterialType(row.material_type),
+            is_syllabus: Number(row.is_syllabus || 0) === 1,
+            group_label: row.group_number ? `Група ${row.group_number}` : 'Усі групи',
+            created_at_label: createdAtLabel,
+            can_manage: Number(row.created_by) === Number(userId),
+          };
+        });
+      }
+
+      return res.render('subjects', {
+        subjects,
+        selectedSubjectId: selectedSubject ? selectedSubject.subject_id : null,
+        selectedSubject,
+        materials,
+        materialAudienceOptions: [],
+        messages: res.locals.messages,
+        username,
+        role,
+        isTeacherMode,
+        projectionAlert,
+      });
+    }
+
     const subjectRows = isTeacherMode
       ? await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
           getTeacherTemplateStore(),
@@ -29708,6 +30585,7 @@ app.get('/subjects', requireLogin, async (req, res) => {
       username,
       role,
       isTeacherMode,
+      projectionAlert: null,
     });
   } catch (err) {
     return handleDbError(res, err, 'subjects.page');

@@ -6,6 +6,11 @@
     if (subjectRegistrationError === 'missing-group' || subjectRegistrationError === 'Select group') {
       return t('registerSubjects.errorMissingGroup');
     }
+    if (subjectRegistrationError === 'projection-incomplete') {
+      return lang === 'en'
+        ? 'Academic setup is still incomplete for your group. Review the warning and try again later.'
+        : 'Академічне налаштування для вашої групи ще не завершене. Перегляньте попередження і спробуйте пізніше.';
+    }
     if (subjectRegistrationError === 'db-error' || subjectRegistrationError === 'Database error') {
       return t('registerSubjects.errorDb');
     }
@@ -614,6 +619,16 @@
                   <div class="flash-alert__body">
                     <span class="flash-alert__title"><%= t('registerSubjects.alertTitleAction') %></span>
                     <p class="flash-alert__text"><%= subjectRegistrationErrorText %></p>
+                  </div>
+                </div>
+              <% } %>
+
+              <% if (projectionAlert && projectionAlert.body) { %>
+                <div class="alert alert-warning flash-alert mb-3" role="alert">
+                  <span class="flash-alert__icon" aria-hidden="true">!</span>
+                  <div class="flash-alert__body">
+                    <span class="flash-alert__title"><%= projectionAlert.title %></span>
+                    <p class="flash-alert__text"><%= projectionAlert.body %></p>
                   </div>
                 </div>
               <% } %>

@@ -97,6 +97,9 @@
       <% if (messages && messages.success) { %>
         <div class="alert alert-success"><%= messages.success %></div>
       <% } %>
+      <% if (projectionAlert && projectionAlert.body) { %>
+        <div class="alert alert-warning glass border-0"><strong><%= projectionAlert.title %></strong><br /><%= projectionAlert.body %></div>
+      <% } %>
 
       <div class="glass glass-float glass-float--no-top-glare subject-picker-card p-3 mb-4">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">

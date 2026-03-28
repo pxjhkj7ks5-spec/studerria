@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.16",
+      "date": "2026-03-28",
+      "items": [
+        "feat(student-v2-read-cutover): add `lib/academicV2Students.js` and switch plain-student `/register/subjects`, `/subjects`, and `/schedule` reads onto academic v2 `group -> term -> group_subject` scope with fallback resolution through `users.group_id`, legacy `study_context_id`, and legacy `course_id`, while leaving teacher/admin schedule and subjects flows on the legacy runtime",
+        "feat(student-v2-compatibility-bridge): add a student-side legacy compatibility bridge in `app.js` that derives schedule visibility from v2 group subjects and schedule entries, but still loads `student_groups`, `user_subject_optouts`, materials, homework, reactions, assets, and custom deadlines through legacy subject and semester bindings so existing runtime history stays readable during the cutover",
+        "fix(student-projection-incomplete-ux): show explicit `projection incomplete` warnings in `views/register-subjects.ejs`, `views/subjects.ejs`, and `views/schedule.ejs`, and sync `users.group_id` after registration study-context assignment so missing v2 mappings fail visibly instead of silently falling back to confusing empty student screens"
+      ]
+    },
+    {
       "version": "1.3.15",
       "date": "2026-03-28",
       "items": [

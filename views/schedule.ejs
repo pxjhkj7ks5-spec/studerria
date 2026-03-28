@@ -1902,6 +1902,12 @@
             <%= t('schedule.homeworkModal.subgroupAlreadyJoined') %>
           </div>
         <% } %>
+        <% if (projectionAlert && projectionAlert.body) { %>
+          <div class="alert alert-warning glass border-0 mb-4">
+            <strong><%= projectionAlert.title %></strong><br />
+            <%= projectionAlert.body %>
+          </div>
+        <% } %>
 
         <div id="scheduleWeekGrid">
         <% daysOfWeek.forEach(function(day) { %>
