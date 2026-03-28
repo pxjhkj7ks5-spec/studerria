@@ -17,6 +17,7 @@ const messageHelpers = require('./lib/messages');
 const teacherTemplateHelpers = require('./lib/teacherTemplates');
 const academicV2Helpers = require('./lib/academicV2');
 const academicV2StudentHelpers = require('./lib/academicV2Students');
+const academicV2RuntimeHelpers = require('./lib/academicV2Runtime');
 const academicSetupHelpers = require('./lib/academicSetup');
 const journalInsightHelpers = require('./lib/journalInsights');
 const roomHelpers = require('./lib/rooms');
@@ -5918,6 +5919,23 @@ async function resolveSubjectCourseContext(subjectId, courseId, options = {}) {
     return null;
   }
   const includeHidden = options.includeHidden === true;
+  if (Number.isInteger(normalizedCourseId) && normalizedCourseId > 0) {
+    const runtimeScope = await getCourseSubjectAccessScope(normalizedCourseId, {
+      visibleOnly: includeHidden !== true,
+    });
+    const runtimeSubject = runtimeScope && runtimeScope.subject_map instanceof Map
+      ? runtimeScope.subject_map.get(normalizedSubjectId)
+      : null;
+    if (runtimeSubject) {
+      const ownerCourseId = Number(runtimeSubject.owner_course_id || runtimeSubject.course_id || normalizedCourseId || 0) || null;
+      return {
+        ...runtimeSubject,
+        owner_course_id: ownerCourseId,
+        bound_course_ids: ownerCourseId ? [ownerCourseId] : [],
+        catalog_name: runtimeSubject.subject_name || runtimeSubject.name || '',
+      };
+    }
+  }
   let scopedSubject = null;
   if (Number.isInteger(normalizedCourseId) && normalizedCourseId > 0) {
     scopedSubject = await getSubjectForCourse(normalizedSubjectId, normalizedCourseId, { includeHidden });
@@ -5962,6 +5980,39 @@ async function getCourseSubjectAccessScope(courseId, options = {}) {
       owner_semester_ids: [],
       owner_semester_map: new Map(),
       subject_map: new Map(),
+      source: 'empty',
+      projectionIssues: academicV2RuntimeHelpers.buildEmptyProjectionIssues(),
+    };
+  }
+  const runtimeScope = await academicV2RuntimeHelpers.loadCourseSubjectScope(
+    getAcademicV2Store(),
+    normalizedCourseId,
+    { visibleOnly: options.visibleOnly === true }
+  ).catch(() => null);
+  if (runtimeScope && runtimeScope.scope) {
+    const ownerSemesterMap = new Map();
+    const ownerCourseIds = Array.isArray(runtimeScope.owner_course_ids) ? runtimeScope.owner_course_ids : [];
+    const ownerSemesterIds = Array.isArray(runtimeScope.owner_semester_ids) ? runtimeScope.owner_semester_ids : [];
+    ownerCourseIds.forEach((ownerCourseId) => {
+      ownerSemesterMap.set(ownerCourseId, runtimeScope.term && Number(runtimeScope.term.legacy_semester_id || 0) > 0
+        ? {
+            id: Number(runtimeScope.term.legacy_semester_id || 0),
+            title: runtimeScope.term.title || '',
+            start_date: runtimeScope.term.start_date || '',
+            weeks_count: Number(runtimeScope.term.weeks_count || 16) || 16,
+          }
+        : null);
+    });
+    return {
+      course_id: normalizedCourseId,
+      subjects: Array.isArray(runtimeScope.subjects) ? runtimeScope.subjects : [],
+      subject_ids: Array.isArray(runtimeScope.subject_ids) ? runtimeScope.subject_ids : [],
+      owner_course_ids: ownerCourseIds,
+      owner_semester_ids: ownerSemesterIds,
+      owner_semester_map: ownerSemesterMap,
+      subject_map: runtimeScope.subject_map instanceof Map ? runtimeScope.subject_map : new Map(),
+      source: 'academic_v2',
+      projectionIssues: runtimeScope.projectionIssues || academicV2RuntimeHelpers.buildEmptyProjectionIssues(),
     };
   }
   const subjects = await getSubjectsCached(normalizedCourseId, {
@@ -6004,6 +6055,8 @@ async function getCourseSubjectAccessScope(courseId, options = {}) {
     owner_semester_ids: ownerSemesterIds,
     owner_semester_map: ownerSemesterMap,
     subject_map: subjectMap,
+    source: 'legacy',
+    projectionIssues: academicV2RuntimeHelpers.buildEmptyProjectionIssues(),
   };
 }
 
@@ -9447,6 +9500,99 @@ function buildAcademicV2StudentProjectionAlert(req, issues = {}, context = 'subj
   };
 }
 
+function buildAcademicV2CourseProjectionAlert(req, issues = {}, context = 'course') {
+  const normalizedIssues = issues && typeof issues === 'object' ? issues : {};
+  const hasIssues = Boolean(
+    normalizedIssues.has_issues
+    || normalizedIssues.missing_scope
+    || normalizedIssues.missing_active_term
+    || normalizedIssues.missing_legacy_course
+    || normalizedIssues.missing_legacy_semester
+    || (Array.isArray(normalizedIssues.unmapped_subjects) && normalizedIssues.unmapped_subjects.length)
+  );
+  if (!hasIssues) {
+    return null;
+  }
+  const isUk = getPreferredLang(req) === 'uk';
+  const reasons = [];
+  if (normalizedIssues.missing_scope) {
+    reasons.push(isUk
+      ? 'для вибраного курсу ще не знайдено academic v2 owner'
+      : 'no academic v2 owner was found for the selected course');
+  }
+  if (normalizedIssues.missing_legacy_course) {
+    reasons.push(isUk
+      ? 'курс ще не має legacy course projection'
+      : 'the course is missing a legacy course projection');
+  }
+  if (normalizedIssues.missing_active_term) {
+    reasons.push(isUk
+      ? 'для курсу не визначено активний терм'
+      : 'no active term is defined for this course');
+  }
+  if (normalizedIssues.missing_legacy_semester) {
+    reasons.push(isUk
+      ? 'активний терм ще не має legacy semester binding'
+      : 'the active term is missing a legacy semester binding');
+  }
+  if (Array.isArray(normalizedIssues.unmapped_subjects) && normalizedIssues.unmapped_subjects.length) {
+    reasons.push(isUk
+      ? `предмети без legacy mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_subjects)}`
+      : `subjects without legacy mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_subjects)}`);
+  }
+  return {
+    title: isUk
+      ? (context === 'schedule' ? 'Курс показано не повністю' : 'Academic v2 projection курсу неповна')
+      : (context === 'schedule' ? 'Course data is only partially available' : 'Course academic v2 projection is incomplete'),
+    body: reasons.length
+      ? `${reasons.join('. ')}.`
+      : (isUk
+        ? 'Частина live-даних курсу ще не має legacy compatibility bindings.'
+        : 'Some live course data is still missing compatibility bindings.'),
+  };
+}
+
+function buildAcademicV2TeacherProjectionAlert(req, rows = [], context = 'subjects') {
+  const normalizedRows = Array.isArray(rows) ? rows : [];
+  const unmappedSubjects = normalizedRows
+    .filter((row) => !parsePositiveIntStrict(row && row.subject_id))
+    .map((row) => ({
+      subject_title: sanitizeCompactText(row && row.subject_name, 120),
+    }));
+  const missingCourse = normalizedRows.some((row) => !parsePositiveIntStrict(row && row.course_id));
+  const missingSemester = normalizedRows.some((row) => !parsePositiveIntStrict(row && row.legacy_semester_id));
+  if (!unmappedSubjects.length && !missingCourse && !missingSemester) {
+    return null;
+  }
+  const isUk = getPreferredLang(req) === 'uk';
+  const reasons = [];
+  if (missingCourse) {
+    reasons.push(isUk
+      ? 'деякі викладацькі предмети ще не мають legacy course binding'
+      : 'some teacher subjects are missing a legacy course binding');
+  }
+  if (missingSemester) {
+    reasons.push(isUk
+      ? 'деякі викладацькі предмети ще не мають active legacy semester binding'
+      : 'some teacher subjects are missing an active legacy semester binding');
+  }
+  if (unmappedSubjects.length) {
+    reasons.push(isUk
+      ? `предмети без legacy subject mapping: ${summarizeAcademicV2ProjectionItems(unmappedSubjects)}`
+      : `subjects without legacy subject mapping: ${summarizeAcademicV2ProjectionItems(unmappedSubjects)}`);
+  }
+  return {
+    title: isUk
+      ? (context === 'schedule' ? 'Викладацький розклад показано не повністю' : 'Викладацький academic v2 scope неповний')
+      : (context === 'schedule' ? 'Teacher schedule is only partially available' : 'Teacher academic v2 scope is incomplete'),
+    body: reasons.length
+      ? `${reasons.join('. ')}.`
+      : (isUk
+        ? 'Частина викладацьких даних ще не має compatibility bindings.'
+        : 'Some teacher data is still missing compatibility bindings.'),
+  };
+}
+
 function logAcademicV2StudentProjection(routeKey, userId, state = {}) {
   const issues = state && state.projectionIssues ? state.projectionIssues : null;
   if (!issues || !issues.has_issues) {
@@ -11561,6 +11707,14 @@ function normalizeTemplateTagsInput(rawValue) {
 
 async function getTeacherAssignedSubjects(userId) {
   if (!Number.isFinite(Number(userId))) return [];
+  const academicV2Rows = await academicV2RuntimeHelpers.listTeacherAssignedSubjectRows(
+    getAcademicV2Store(),
+    userId,
+    { includeHidden: false }
+  ).catch(() => []);
+  if (Array.isArray(academicV2Rows) && academicV2Rows.length) {
+    return academicV2Rows;
+  }
   const assignedOfferings = await getTeacherAssignedOfferings(userId);
   if (assignedOfferings.length) {
     return assignedOfferings.flatMap((offering) => {
@@ -13303,11 +13457,19 @@ async function attachScopedMessageTargetCounts(rows, { fallbackCourseId = null }
         FROM message_targets mt
         JOIN users u ON u.id = mt.user_id
         WHERE mt.message_id = ANY(?::int[])
-          AND u.course_id = ?
+          AND (
+            u.course_id = ?
+            OR EXISTS (
+              SELECT 1
+              FROM academic_v2_groups v2_group
+              WHERE v2_group.id = u.group_id
+                AND v2_group.legacy_course_id = ?
+            )
+          )
           ${usersHasIsActive ? `AND ${activeUserJoin}` : ''}
         GROUP BY mt.message_id
       `,
-      [messageIds, courseId]
+      [messageIds, courseId, courseId]
     );
     directCountMap.set(
       courseId,
@@ -18064,11 +18226,8 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   }));
 
   if (!workloadTargets.length && isStaffRole) {
-    const teacherTargets = (await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
-      getTeacherTemplateStore(),
-      user.id,
-      { includeHidden: false }
-    )).filter((row) => Number(row.course_id || 0) === Number(courseId || 0));
+    const teacherTargets = (await getTeacherAssignedSubjects(user.id))
+      .filter((row) => Number(row.course_id || 0) === Number(courseId || 0));
     workloadTargets = (teacherTargets || []).map((row) => ({
       subject_id: Number(row.subject_id),
       group_number: row.group_number === null ? null : Number(row.group_number),
@@ -20689,6 +20848,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
     try {
       await ensureDbReady();
       const teacherSubjects = await getTeacherAssignedSubjects(userId);
+      const projectionAlert = buildAcademicV2TeacherProjectionAlert(req, teacherSubjects, 'schedule');
       const teacherCourses = buildTeacherCourseList(teacherSubjects);
       teacherHomeworkTemplates = await getTeacherHomeworkTemplates(userId, { limit: 300 });
       const courseFilter = req.query.course ? Number(req.query.course) : null;
@@ -21249,7 +21409,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         teacherHomeworkTemplates,
         canCreateHomework,
         canUseCustomDeadlinesUi,
-        projectionAlert: null,
+        projectionAlert,
       });
     } catch (err) {
       return handleDbError(res, err, 'teacher.schedule');
@@ -24452,10 +24612,8 @@ async function trySyncJournalColumnsAfterHomeworkCreate({
 }
 
 async function getTeacherJournalSubjectAccess(userId, subjectId) {
-  const rows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(getTeacherTemplateStore(), userId, {
-    subjectId,
-    includeHidden: true,
-  });
+  const rows = (await getTeacherAssignedSubjects(userId))
+    .filter((row) => Number(row.subject_id || 0) === Number(subjectId || 0));
   if (!rows || !rows.length) {
     return { hasRows: false, allowAll: false, groups: new Set() };
   }
@@ -24504,9 +24662,7 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
   }
 
   if (teacherJournalMode) {
-    const rows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(getTeacherTemplateStore(), userId, {
-      includeHidden: false,
-    });
+    const rows = await getTeacherAssignedSubjects(userId);
     if (!rows || !rows.length) {
       return getStudentJournalSubjectOptions(userId);
     }
@@ -30708,15 +30864,14 @@ app.get('/subjects', requireLogin, async (req, res) => {
     }
 
     const subjectRows = isTeacherMode
-      ? await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
-          getTeacherTemplateStore(),
-          userId,
-          { includeHidden: false }
-        )
+      ? await getTeacherAssignedSubjects(userId)
       : await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
           studentId: userId,
           includeHidden: false,
         });
+    const projectionAlert = isTeacherMode
+      ? buildAcademicV2TeacherProjectionAlert(req, subjectRows, 'subjects')
+      : null;
 
     const subjectMap = new Map();
     (subjectRows || []).forEach((row) => {
@@ -30849,7 +31004,7 @@ app.get('/subjects', requireLogin, async (req, res) => {
       username,
       role,
       isTeacherMode,
-      projectionAlert: null,
+      projectionAlert,
     });
   } catch (err) {
     return handleDbError(res, err, 'subjects.page');
@@ -30922,11 +31077,8 @@ app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('atta
     }
 
     const selectedCourseId = Number(subjectRow.course_id || req.session.user.course_id || 1);
-    const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
-      getTeacherTemplateStore(),
-      userId,
-      { subjectId, includeHidden: true }
-    );
+    const teacherRows = (await getTeacherAssignedSubjects(userId))
+      .filter((row) => Number(row.subject_id || 0) === Number(subjectId || 0));
     const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], Number(subjectRow.group_count || 1));
     if (!teacherAccess.hasRows) {
       if (req.file) {
@@ -31062,13 +31214,30 @@ app.post('/subjects/materials/:id/delete', requireLogin, writeLimiter, async (re
       return res.redirect(`/subjects?subject_id=${material.subject_id}&err=You%20can%20delete%20only%20your%20materials`);
     }
     if (!isAdmin) {
-      const teacherAccess = await teacherTemplateHelpers.hasTeacherSubjectMirrorAssignment(
-        getTeacherTemplateStore(),
-        userId,
-        material.subject_id
+      const teacherRows = (await getTeacherAssignedSubjects(userId))
+        .filter((row) => (
+          Number(row.subject_id || 0) === Number(material.subject_id || 0)
+          && (
+            !Number(material.course_id || 0)
+            || Number(row.course_id || 0) === Number(material.course_id || 0)
+            || Number(row.owner_course_id || 0) === Number(material.course_id || 0)
+          )
+        ));
+      const teacherGroupCount = teacherRows.reduce(
+        (maxCount, row) => Math.max(maxCount, Number(row && row.group_count ? row.group_count : 1) || 1),
+        1
       );
-      if (!teacherAccess) {
+      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], teacherGroupCount);
+      if (!teacherAccess.hasRows) {
         return res.redirect(`/subjects?subject_id=${material.subject_id}&err=No%20access%20to%20subject`);
+      }
+      if (
+        Number.isInteger(Number(material.group_number))
+        && Number(material.group_number) > 0
+        && !teacherAccess.allowAll
+        && !teacherAccess.groups.has(Number(material.group_number))
+      ) {
+        return res.redirect(`/subjects?subject_id=${material.subject_id}&err=No%20access%20to%20target%20group`);
       }
     }
 
@@ -31116,9 +31285,11 @@ app.get('/teamwork', requireLogin, async (req, res) => {
 
   try {
     let subjectRows;
+    let projectionAlert = null;
     if (isTeacherMode) {
       subjectRows = (await getTeacherAssignedSubjects(userId))
         .filter((row) => row && (row.show_in_teamwork === true || Number(row.show_in_teamwork || 0) === 1));
+      projectionAlert = buildAcademicV2TeacherProjectionAlert(req, subjectRows, 'teamwork');
     } else if (isPlainStudentSession(req)) {
       const studentCompat = await loadAcademicV2LegacyStudentRows(req.session.user, {
         selectedOnly: true,
@@ -31126,6 +31297,11 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         routeKey: 'teamwork.student',
       });
       subjectRows = studentCompat.rows || [];
+      projectionAlert = buildAcademicV2StudentProjectionAlert(
+        req,
+        studentCompat && studentCompat.state ? studentCompat.state.projectionIssues : {},
+        'teamwork'
+      );
     } else {
       subjectRows = (await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
         studentId: userId,
@@ -31207,6 +31383,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         username,
         role,
         isTeacherMode,
+        projectionAlert,
       });
     }
 
@@ -31246,6 +31423,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
           username,
           role,
           isTeacherMode,
+          projectionAlert,
         });
       }
     }
@@ -31273,6 +31451,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         username,
         role,
         isTeacherMode,
+        projectionAlert,
       });
     }
 
@@ -31282,13 +31461,21 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         .map((task) => Number(task.created_by || 0))
         .filter((value) => Number.isInteger(value) && value > 0)
     ));
-    const creatorAssignmentRows = taskCreatorIds.length
-      ? await teacherTemplateHelpers.listTeacherAssignmentRows(getTeacherTemplateStore(), {
+    let creatorAssignmentRows = [];
+    if (taskCreatorIds.length) {
+      creatorAssignmentRows = await academicV2RuntimeHelpers.listTeacherAssignedSubjectRowsByUsers(getAcademicV2Store(), {
+        userIds: taskCreatorIds,
+        subjectId: selectedSubject.subject_id,
+        includeHidden: true,
+      }).catch(() => []);
+      if (!creatorAssignmentRows.length) {
+        creatorAssignmentRows = await teacherTemplateHelpers.listTeacherAssignmentRows(getTeacherTemplateStore(), {
           userIds: taskCreatorIds,
           subjectId: selectedSubject.subject_id,
           includeHidden: true,
-        })
-      : [];
+        });
+      }
+    }
     const creatorAssignmentsByUser = {};
     (creatorAssignmentRows || []).forEach((row) => {
       const teacherId = Number(row.user_id || 0);
@@ -31319,6 +31506,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         username,
         role,
         isTeacherMode,
+        projectionAlert,
       });
     }
 
@@ -31366,10 +31554,19 @@ app.get('/teamwork', requireLogin, async (req, res) => {
           SELECT u.id, u.full_name, sg.group_number
           FROM users u
           JOIN student_groups sg ON sg.student_id = u.id
-          WHERE sg.subject_id = ? AND u.course_id = ANY(?::int[])${activeUserFilter}
+          WHERE sg.subject_id = ?
+            AND (
+              u.course_id = ANY(?::int[])
+              OR EXISTS (
+                SELECT 1
+                FROM academic_v2_groups v2_group
+                WHERE v2_group.id = u.group_id
+                  AND v2_group.legacy_course_id = ANY(?::int[])
+              )
+            )${activeUserFilter}
           ORDER BY u.full_name ASC
         `,
-        [selectedSubject.subject_id, selectedBoundCourseIds]
+        [selectedSubject.subject_id, selectedBoundCourseIds, selectedBoundCourseIds]
       ),
     ]);
 
@@ -31475,6 +31672,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
       username,
       role,
       isTeacherMode,
+      projectionAlert,
     });
   } catch (err) {
     return res.status(500).send('Database error');
@@ -31535,11 +31733,8 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
       return res.redirect('/teamwork?err=Subject%20not%20available');
     }
 
-    const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
-      getTeacherTemplateStore(),
-      userId,
-      { subjectId, includeHidden: true }
-    );
+    const teacherRows = (await getTeacherAssignedSubjects(userId))
+      .filter((row) => Number(row.subject_id || 0) === Number(subjectId || 0));
     if (!teacherRows || !teacherRows.length) {
       return res.redirect('/teamwork?err=Subject%20access%20denied');
     }
@@ -33107,6 +33302,7 @@ const buildAdminTemplateLocals = (overrides = {}) => ({
     operationId: '',
   },
   deaneryMonitoring: null,
+  projectionAlert: null,
   ...overrides,
 });
 
@@ -33345,8 +33541,20 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         }
         const homeworkTags = Array.isArray(tagRows) ? tagRows.map((row) => row.name) : [];
         ensureUsersSchema(() => {
-        const userFilters = ['u.course_id = ?'];
-        const userParams = [courseId];
+        const userFilters = [
+          `
+            (
+              u.course_id = ?
+              OR EXISTS (
+                SELECT 1
+                FROM academic_v2_groups v2_group
+                WHERE v2_group.id = u.group_id
+                  AND v2_group.legacy_course_id = ?
+              )
+            )
+          `,
+        ];
+        const userParams = [courseId, courseId];
         if (usersHasIsActive) {
           userFilters.push('u.is_active = 1');
         }
@@ -33395,7 +33603,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
             if (res.headersSent) {
               return;
             }
-            getSubjectsCached(courseId)
+            Promise.resolve((courseSubjectScope.subjects || []).slice())
               .then(async (subjects) => {
                 let studentGroups = [];
                 try {
@@ -33668,11 +33876,19 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         }),
         db.all(
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
-           FROM users
-           WHERE course_id = ? AND created_at >= ?
+           FROM users u
+           WHERE (
+             u.course_id = ?
+             OR EXISTS (
+               SELECT 1
+               FROM academic_v2_groups v2_group
+               WHERE v2_group.id = u.group_id
+                 AND v2_group.legacy_course_id = ?
+             )
+           ) AND created_at >= ?
            GROUP BY DATE(created_at), role
            ORDER BY day`,
-          [courseId, weekStart.toISOString()]
+          [courseId, courseId, weekStart.toISOString()]
         ),
       ]);
       const weeklyHomeworkRows = weeklySeries.homeworkRows || [];
@@ -33760,6 +33976,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     }
 
     try {
+        const projectionAlert = buildAcademicV2CourseProjectionAlert(req, courseSubjectScope.projectionIssues, 'course');
         res.render('admin', buildAdminTemplateLocals({
           username: req.session.user.username,
           userId: req.session.user.id,
@@ -33791,6 +34008,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         allowCourseSelect: isAdminPanelOwner && Array.isArray(courses) && courses.length > 1,
         limitedStaffView: !isAdminPanelOwner,
         allowedSections,
+        projectionAlert,
         weeklyLabels,
         weeklyHomework,
         weeklyTeamwork,
@@ -45751,11 +45969,19 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
         }),
         db.all(
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
-           FROM users
-           WHERE course_id = ? AND created_at >= ?
+           FROM users u
+           WHERE (
+             u.course_id = ?
+             OR EXISTS (
+               SELECT 1
+               FROM academic_v2_groups v2_group
+               WHERE v2_group.id = u.group_id
+                 AND v2_group.legacy_course_id = ?
+             )
+           ) AND created_at >= ?
            GROUP BY DATE(created_at), role
            ORDER BY day`,
-          [courseId, weekStart.toISOString()]
+          [courseId, courseId, weekStart.toISOString()]
         ),
       ]);
       const weeklyHomeworkRows = weeklySeries.homeworkRows || [];
@@ -48549,14 +48775,9 @@ app.get('/starosta', requireStaff, async (req, res) => {
 
   let users = [];
   try {
-    const activeClause = usersHasIsActive ? ' AND is_active = 1' : '';
-    users = await db.all(
-      `SELECT id, full_name, role, schedule_group, is_active, last_login_ip, last_user_agent, last_login_at, course_id
-       FROM users
-       WHERE course_id = ?${activeClause}
-       ORDER BY full_name`,
-      [courseId]
-    );
+    users = await academicV2RuntimeHelpers.listCourseUsersByLegacyCourse(getAcademicV2Store(), courseId, {
+      activeOnly: usersHasIsActive,
+    });
   } catch (err) {
     return handleDbError(res, err, 'starosta.users');
   }
@@ -48731,6 +48952,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
   }
 
   try {
+    const projectionAlert = buildAcademicV2CourseProjectionAlert(req, courseSubjectScope.projectionIssues, 'course');
     return res.render('admin', buildAdminTemplateLocals({
       username: req.session.user.username,
       userId: req.session.user.id,
@@ -48753,6 +48975,7 @@ app.get('/starosta', requireStaff, async (req, res) => {
       limitedStaffView: true,
       allowedSections,
       allowCourseSelect,
+      projectionAlert,
       filters: {
         group_number: group_number || '',
         day: '',
@@ -49203,6 +49426,7 @@ app.get('/deanery', requireDeanery, async (req, res) => {
       buildDeaneryMonitoringSnapshot(allowedCourses, courseId),
     ]);
     const schedule = sortSchedule(scheduleRows, sort_schedule);
+    const projectionAlert = buildAcademicV2CourseProjectionAlert(req, courseSubjectScope.projectionIssues, 'schedule');
     return res.render('admin', buildAdminTemplateLocals({
       username: req.session.user.username,
       userId: req.session.user.id,
@@ -49224,6 +49448,7 @@ app.get('/deanery', requireDeanery, async (req, res) => {
       limitedStaffView: true,
       allowedSections,
       allowCourseSelect,
+      projectionAlert,
       deaneryMonitoring,
       filters: {
         group_number: group_number || '',

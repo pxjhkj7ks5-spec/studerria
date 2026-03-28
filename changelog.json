@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.3.31",
+      "date": "2026-03-29",
+      "items": [
+        "feat(academic-v2-runtime-scope): add `lib/academicV2Runtime.js` and wire it into `app.js` so live course scope, active term resolution, teacher subject ownership, and course membership can now be resolved from `academic_v2_*` by `legacy_course_id` instead of rebuilding page state only from legacy `study_contexts` / `course_id` tables",
+        "refactor(admin-staff-read-cutover): update the main `/admin` render, `starosta`, and `deanery` flows in `app.js` to read subjects and user membership from the v2-aware course scope, widen course-scoped user queries and weekly user analytics to include `users.group_id -> academic_v2_groups.legacy_course_id`, and surface a shared projection warning in `views/admin.ejs` whenever the selected course still has missing term/subject compatibility bindings",
+        "refactor(teacher-runtime-v2-subject-schedule-teamwork): switch teacher-facing `/subjects`, `/schedule`, `/subjects/materials`, and teamwork access checks to `getTeacherAssignedSubjects(...)` plus the new batch teacher-assignment lookup, add explicit projection alerts to `views/teamwork.ejs`, and stop the remaining live teacher flows from depending on legacy mirror assignment rows as their primary read path",
+        "fix(legacy-compat-membership-helpers): extend `lib/academicSetup.js` helpers such as `listLegacyCourseUsers`, `listLegacyCourseStudentGroupAssignments`, `listLegacySubjectStudentRows`, `countLegacySubjectStudents`, and `countLegacyMessageRecipients` so admin lists, teamwork student pools, message audience counts, and other compatibility reads treat `users.group_id` / projected `legacy_course_id` as first-class membership instead of requiring raw `users.course_id` to stay authoritative"
+      ]
+    },
+    {
       "version": "1.3.30",
       "date": "2026-03-28",
       "items": [

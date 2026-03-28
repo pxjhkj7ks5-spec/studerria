@@ -1158,6 +1158,12 @@
       <% const semestersByCourseMap = typeof semestersByCourse !== 'undefined' && semestersByCourse ? semestersByCourse : { [(selectedCourseId || 1)]: (semesters || []) }; %>
       <% const settingsMetaInfo = typeof settingsMeta !== 'undefined' && settingsMeta ? settingsMeta : null; %>
       <div id="toastContainer" data-toast-success="<%= msg && msg.success ? msg.success : '' %>" data-toast-error="<%= msg && msg.error ? msg.error : '' %>"></div>
+      <% if (projectionAlert && projectionAlert.body) { %>
+        <div class="alert alert-warning glass border-0 mb-3">
+          <strong><%= projectionAlert.title %></strong><br />
+          <%= projectionAlert.body %>
+        </div>
+      <% } %>
 
       <% const adminSectionOptionsList = typeof adminSectionOptions !== 'undefined' && Array.isArray(adminSectionOptions) ? adminSectionOptions : []; %>
       <% const dashboardStatsData = typeof dashboardStats !== 'undefined' && dashboardStats ? dashboardStats : null; %>
