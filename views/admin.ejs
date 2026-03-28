@@ -903,6 +903,7 @@
     <% const scopeStageOptions = Array.isArray(scopeState.stageOptions) ? scopeState.stageOptions : []; %>
     <% const scopeCampusOptions = Array.isArray(scopeState.campusOptions) ? scopeState.campusOptions : []; %>
     <% const scopeAvailableContexts = Array.isArray(scopeState.availableStudyContexts) ? scopeState.availableStudyContexts : []; %>
+    <% const scopeAvailableAcademicGroups = Array.isArray(scopeState.availableAcademicGroups) ? scopeState.availableAcademicGroups : []; %>
     <% const selectedCourse = (courses || []).find(function(c) { return Number(c.id) === Number(selectedCourseId); }) || {}; %>
     <% const selectedCourseLabel = selectedCourse.name || (courseMap[selectedCourseId] || ('Course ' + selectedCourseId)); %>
     <% const selectedCourseCampus = selectedCourse.is_teacher_course ? 'Teachers' : (String(selectedCourse.location || 'kyiv').toLowerCase() === 'munich' ? 'Munich' : 'Kyiv'); %>
@@ -2367,7 +2368,7 @@
           <div class="bulk-bar" id="usersBulkBar">
             <div class="bulk-bar-content">
               <span class="bulk-count">Selected: <span id="usersBulkCount">0</span></span>
-              <form id="moveUsersContextForm" method="POST" action="/admin/users/study-context/batch" class="d-flex flex-wrap align-items-center gap-2">
+              <form id="moveUsersContextForm" method="POST" action="/admin/users/group/batch" class="d-flex flex-wrap align-items-center gap-2">
                 <input type="hidden" name="track" value="<%= scopeState.track || '' %>" />
                 <input type="hidden" name="program_id" value="<%= scopeState.programId || '' %>" />
                 <input type="hidden" name="admission_id" value="<%= scopeState.admissionId || '' %>" />
@@ -2375,13 +2376,13 @@
                 <input type="hidden" name="campus" value="<%= scopeState.campus || '' %>" />
                 <input type="hidden" name="study_context_id" value="<%= scopeState.studyContextId || '' %>" />
                 <div id="usersBulkContextIds"></div>
-                <select class="form-select form-select-sm" name="target_study_context_id" id="usersBulkContextSelect">
-                  <option value="">Move to context</option>
-                  <% scopeAvailableContexts.forEach(function(context) { %>
-                    <option value="<%= context.id %>"><%= context.label_uk || context.label %></option>
+                <select class="form-select form-select-sm" name="target_group_id" id="usersBulkContextSelect">
+                  <option value="">Move to course</option>
+                  <% scopeAvailableAcademicGroups.forEach(function(group) { %>
+                    <option value="<%= group.group_id || group.id %>"><%= group.summary || group.label || ('Course ' + (group.group_id || group.id)) %></option>
                   <% }); %>
                 </select>
-                <button class="btn btn-outline-primary btn-sm" type="submit">Move context</button>
+                <button class="btn btn-outline-primary btn-sm" type="submit">Move course</button>
               </form>
               <button class="btn btn-danger btn-sm" type="submit" form="deleteUsersForm" data-confirm="Delete selected users?" data-confirm-level="danger">Delete selected</button>
             </div>
@@ -2445,9 +2446,10 @@
                   <% const rowRiskScore = Number(u.security_risk_score || 0); %>
                   <% const rowRiskClass = rowRiskLevel === 'high-risk' ? 'danger' : (rowRiskLevel === 'watch' ? 'warning' : 'secondary'); %>
                   <% const rowRiskLabel = rowRiskLevel === 'high-risk' ? 'High-risk' : (rowRiskLevel === 'watch' ? 'Watch' : 'Normal'); %>
-                  <% const rowContextLabel = String(u.study_context_label || u.study_context_name || u.study_context || u.cohort_label || '').trim(); %>
+                  <% const rowContextLabel = String(u.academic_group_label || u.study_context_label || u.study_context_name || u.study_context || u.cohort_label || '').trim(); %>
                   <% const rowContextCourseId = Number(u.study_context_course_id || u.course_id || 0); %>
-                  <% const rowContextOptions = Array.isArray(u.study_context_options) ? u.study_context_options : (Array.isArray(u.context_options) ? u.context_options : []); %>
+                  <% const rowAcademicGroupId = Number(u.academic_group_id || u.group_id || 0); %>
+                  <% const rowGroupOptions = Array.isArray(u.group_options) ? u.group_options : scopeAvailableAcademicGroups; %>
                   <tr
                     class="user-row"
                     data-user-id="<%= u.id %>"
@@ -2457,10 +2459,12 @@
                     data-user-group="<%= u.schedule_group %>"
                     data-user-course="<%= rowContextLabel || courseMap[u.course_id] || ('Course ' + (u.course_id || 1)) %>"
                     data-user-course-id="<%= rowContextCourseId || 1 %>"
+                    data-user-academic-group-id="<%= rowAcademicGroupId || 0 %>"
                     data-user-context-label="<%= rowContextLabel %>"
                     data-user-context-id="<%= Number(u.study_context_id || 0) %>"
                     data-user-context-course-id="<%= rowContextCourseId || 0 %>"
-                    data-user-context-options="<%- JSON.stringify(rowContextOptions).replace(/'/g, '&#39;') %>"
+                    data-user-context-options="<%- JSON.stringify(rowGroupOptions).replace(/'/g, '&#39;') %>"
+                    data-user-group-options="<%- JSON.stringify(rowGroupOptions).replace(/'/g, '&#39;') %>"
                     data-user-active="<%= u.is_active %>"
                     data-user-ip="<%= u.last_login_ip || '' %>"
                     data-user-agent="<%= u.last_user_agent || '' %>"
@@ -4583,7 +4587,7 @@
             <div class="mb-2"><strong>Roles:</strong> <span id="uaRoles"></span></div>
             <div class="mb-2"><strong>Active:</strong> <span id="uaActive"></span></div>
             <div class="mb-2"><strong>Schedule Group:</strong> <span id="uaGroup"></span></div>
-            <div class="mb-2"><strong>Academic context:</strong> <span id="uaContext"></span></div>
+            <div class="mb-2"><strong>Academic course:</strong> <span id="uaContext"></span></div>
             <div class="mb-2"><strong>Course:</strong> <span id="uaCourse"></span></div>
             <div class="mb-2"><strong>Last Login IP:</strong> <span id="uaIp"></span></div>
             <div class="mb-2"><strong>Device:</strong> <span id="uaAgent"></span></div>
@@ -4680,10 +4684,10 @@
               </div>
             </form>
 
-            <form method="POST" action="/admin/users/study-context" class="mb-3" id="uaStudyContextForm">
+            <form method="POST" action="/admin/users/group" class="mb-3" id="uaStudyContextForm">
               <input type="hidden" name="user_id" id="uaCourseUserId" />
-              <input type="hidden" name="study_context_id" id="uaStudyContextId" value="" />
-              <label class="form-label">Change academic context</label>
+              <input type="hidden" name="group_id" id="uaAcademicGroupId" value="" />
+              <label class="form-label">Change academic course</label>
               <div class="d-flex gap-2 flex-column flex-md-row">
                 <select class="form-select" id="uaContextSelect" style="display:none;"></select>
                 <select class="form-select" name="course_id" id="uaCourseSelect">
@@ -7464,22 +7468,26 @@
 
       function normalizeStudyContextOption(raw) {
         const option = raw && typeof raw === 'object' ? raw : {};
+        const groupId = Number(option.group_id || option.groupId || 0);
         const id = Number(option.id || option.study_context_id || option.context_id || 0);
         const courseId = Number(option.course_id || option.context_course_id || option.bound_course_id || option.courseId || 0);
-        const label = String(option.label || option.name || option.title || option.study_context_label || option.context_label || '').trim();
+        const label = String(option.group_label || option.label || option.name || option.title || option.study_context_label || option.context_label || '').trim();
         const trackLabel = String(option.track_label || option.track || option.study_track || '').trim();
         const programLabel = String(option.program_label || option.program || option.study_program || '').trim();
         const cohortLabel = String(option.cohort_label || option.admission_year || option.cohort || option.year_label || '').trim();
+        const stageLabel = String(option.stage_label || option.stage || option.stage_number || '').trim();
         const campusLabel = String(option.campus_label || option.campus || option.location || '').trim();
-        const detailParts = [trackLabel, programLabel, cohortLabel, campusLabel].filter(Boolean);
+        const detailParts = [trackLabel, programLabel, cohortLabel, stageLabel, campusLabel].filter(Boolean);
         const summary = [label, detailParts.join(' / ')].filter(Boolean).join(' - ');
         return {
           id,
+          groupId,
           courseId,
           label: label || summary || (courseId ? `Course ${courseId}` : ''),
           trackLabel,
           programLabel,
           cohortLabel,
+          stageLabel,
           campusLabel,
           summary: summary || label || (courseId ? `Course ${courseId}` : ''),
         };
@@ -7496,7 +7504,7 @@
         if (!option) return '';
         const parts = [];
         if (option.label) parts.push(option.label);
-        const details = [option.trackLabel, option.programLabel, option.cohortLabel, option.campusLabel].filter(Boolean);
+        const details = [option.trackLabel, option.programLabel, option.cohortLabel, option.stageLabel, option.campusLabel].filter(Boolean);
         if (details.length) parts.push(details.join(' / '));
         return parts.join(' - ');
       }
@@ -7505,18 +7513,19 @@
         const contextForm = document.getElementById('uaStudyContextForm');
         const contextSelect = document.getElementById('uaContextSelect');
         const contextHint = document.getElementById('uaContextHint');
-        const contextIdInput = document.getElementById('uaStudyContextId');
+        const contextIdInput = document.getElementById('uaAcademicGroupId');
         const courseSelect = document.getElementById('uaCourseSelect');
         const contextLabelEl = document.getElementById('uaContext');
         const courseLabelEl = document.getElementById('uaCourse');
         if (!contextSelect || !courseSelect || !contextIdInput || !row) return;
 
         const contextLabel = String(row.dataset.userContextLabel || '').trim();
-        const contextId = Number(row.dataset.userContextId || 0);
+        const academicGroupId = Number(row.dataset.userAcademicGroupId || 0);
         const contextCourseId = Number(row.dataset.userContextCourseId || row.dataset.userCourseId || 0);
-        const contextOptions = normalizeStudyContextOptions(safeParseJson(row.dataset.userContextOptions, []));
-        const selectedContext = contextOptions.find((option) => Number(option.id) === contextId)
+        const contextOptions = normalizeStudyContextOptions(safeParseJson(row.dataset.userGroupOptions, []));
+        const selectedContext = contextOptions.find((option) => Number(option.groupId) === academicGroupId)
           || contextOptions.find((option) => Number(option.courseId) === contextCourseId)
+          || contextOptions.find((option) => Number(option.id) === Number(row.dataset.userContextId || 0))
           || contextOptions[0]
           || null;
         const hasContextOptions = contextOptions.length > 0;
@@ -7538,20 +7547,20 @@
 
         if (hasContextOptions) {
           if (contextForm) {
-            contextForm.action = '/admin/users/study-context';
+            contextForm.action = '/admin/users/group';
           }
           contextSelect.style.display = '';
           contextSelect.innerHTML = '';
           const placeholder = document.createElement('option');
           placeholder.value = '';
-          placeholder.textContent = 'Select academic context';
+          placeholder.textContent = 'Select academic course';
           contextSelect.appendChild(placeholder);
           contextOptions.forEach((option) => {
             const opt = document.createElement('option');
-            opt.value = String(option.id || '');
-            opt.textContent = buildStudyContextSummary(option) || option.label || (option.courseId ? `Course ${option.courseId}` : 'Academic context');
+            opt.value = String(option.groupId || option.id || '');
+            opt.textContent = buildStudyContextSummary(option) || option.label || (option.courseId ? `Course ${option.courseId}` : 'Academic course');
             opt.dataset.courseId = String(option.courseId || '');
-            if ((selectedContext && Number(selectedContext.id) === Number(option.id)) || (!selectedContext && Number(option.courseId) === contextCourseId)) {
+            if ((selectedContext && Number(selectedContext.groupId || selectedContext.id) === Number(option.groupId || option.id)) || (!selectedContext && Number(option.courseId) === contextCourseId)) {
               opt.selected = true;
             }
             contextSelect.appendChild(opt);
@@ -7559,13 +7568,13 @@
           courseSelect.style.display = 'none';
           courseSelect.required = false;
           if (selectedContext) {
-            contextSelect.value = String(selectedContext.id || '');
+            contextSelect.value = String(selectedContext.groupId || selectedContext.id || '');
             if (selectedContext.courseId) {
               courseSelect.value = String(selectedContext.courseId);
             }
           }
           if (contextHint) {
-            contextHint.textContent = 'Context-first editing is active. The legacy course value is synced automatically.';
+            contextHint.textContent = 'Course-first v2 editing is active. Legacy course and context bindings are synced automatically.';
           }
           contextSelect.onchange = () => {
             const option = contextSelect.selectedOptions[0];
@@ -7585,8 +7594,8 @@
           courseSelect.value = String(contextCourseId || courseSelect.value || '');
           if (contextHint) {
             contextHint.textContent = contextLabel
-              ? `Current academic context: ${contextLabel}`
-              : 'Legacy course selection is shown until context metadata becomes available.';
+              ? `Current academic course: ${contextLabel}`
+              : 'Legacy course selection is shown until v2 course metadata becomes available.';
           }
           contextSelect.onchange = null;
         }
@@ -7603,6 +7612,7 @@
         const subjectItems = Array.isArray(payload.subjects) ? payload.subjects : [];
         const courseItems = Array.isArray(payload.courses) ? payload.courses : [];
         const studentGroupItems = Array.isArray(payload.studentGroups) ? payload.studentGroups : [];
+        const academicGroupItems = Array.isArray(payload.academicGroups) ? payload.academicGroups : [];
         const subjectMap = new Map();
         subjectItems.forEach((s) => subjectMap.set(String(s.id), s));
         const courseMap = new Map();
@@ -7612,6 +7622,20 @@
           if (!groupMap[g.student_id]) groupMap[g.student_id] = {};
           groupMap[g.student_id][g.subject_id] = g.group_number;
         });
+        const bulkContextSelect = document.getElementById('usersBulkContextSelect');
+        if (bulkContextSelect && academicGroupItems.length) {
+          const previousValue = String(bulkContextSelect.value || '');
+          bulkContextSelect.innerHTML = '<option value="">Move to course</option>';
+          academicGroupItems.forEach((group) => {
+            const option = document.createElement('option');
+            option.value = String(group.group_id || group.id || '');
+            option.textContent = String(group.summary || group.label || `Course ${group.group_id || group.id || ''}`).trim();
+            if (previousValue && previousValue === option.value) {
+              option.selected = true;
+            }
+            bulkContextSelect.appendChild(option);
+          });
+        }
 
         const users = Array.isArray(payload.users) ? payload.users : [];
         const visibleUsers = users.filter((u) => {
@@ -7646,13 +7670,14 @@
             const securityRiskLevel = String(u.security_risk_level || 'normal');
             const securityRiskStatus = String(u.security_case_status || 'open');
             const securityRiskScore = Number(u.security_risk_score || 0);
-            const rawContextOptions = Array.isArray(u.study_context_options)
-              ? u.study_context_options
-              : (Array.isArray(u.context_options) ? u.context_options : []);
+            const rawContextOptions = Array.isArray(u.group_options)
+              ? u.group_options
+              : (Array.isArray(payload.academicGroups) ? payload.academicGroups : []);
             const contextOptions = normalizeStudyContextOptions(rawContextOptions);
-            const contextLabel = String(u.study_context_label || u.study_context_name || u.study_context || u.cohort_label || '').trim();
+            const contextLabel = String(u.academic_group_label || u.study_context_label || u.study_context_name || u.study_context || u.cohort_label || '').trim();
             const contextCourseId = Number(u.study_context_course_id || u.course_id || 0);
-            const selectedContext = contextOptions.find((option) => Number(option.id) === Number(u.study_context_id || 0))
+            const selectedContext = contextOptions.find((option) => Number(option.groupId) === Number(u.academic_group_id || u.group_id || 0))
+              || contextOptions.find((option) => Number(option.id) === Number(u.study_context_id || 0))
               || contextOptions.find((option) => Number(option.courseId) === contextCourseId)
               || contextOptions[0]
               || null;
@@ -7702,10 +7727,12 @@
                   data-user-group="${escapeHtml(u.schedule_group)}"
                   data-user-course="${escapeHtml(courseLabel)}"
                   data-user-course-id="${escapeHtml(contextCourseId || 1)}"
+                  data-user-academic-group-id="${escapeHtml(Number(u.academic_group_id || u.group_id || 0))}"
                   data-user-context-label="${escapeHtml(contextLabel)}"
                   data-user-context-id="${escapeHtml(Number(u.study_context_id || 0))}"
                   data-user-context-course-id="${escapeHtml(contextCourseId || 0)}"
                   data-user-context-options='${escapeHtml(JSON.stringify(rawContextOptions))}'
+                  data-user-group-options='${escapeHtml(JSON.stringify(rawContextOptions))}'
                   data-user-active="${isActive}"
                   data-user-ip="${escapeHtml(u.last_login_ip || '')}"
                   data-user-agent="${escapeHtml(u.last_user_agent || '')}"
@@ -7971,7 +7998,7 @@
       const uaForensicsGraphEdges = document.getElementById('uaForensicsGraphEdges');
       const uaContextSelect = document.getElementById('uaContextSelect');
       const uaContextHint = document.getElementById('uaContextHint');
-      const uaStudyContextId = document.getElementById('uaStudyContextId');
+      const uaAcademicGroupId = document.getElementById('uaAcademicGroupId');
       const uaCourseSelect = document.getElementById('uaCourseSelect');
 
       const setRiskCaseMeta = (caseRow) => {
@@ -8264,7 +8291,11 @@
             const userRiskLevel = row.dataset.securityRiskLevel || 'normal';
             const userRiskStatus = row.dataset.securityRiskStatus || 'open';
             const userRiskScore = Number(row.dataset.securityRiskScore || 0);
-            const userContext = buildStudyContextSummary(normalizeStudyContextOptions(safeParseJson(row.dataset.userContextOptions, []))[0])
+            const userContextOptions = normalizeStudyContextOptions(safeParseJson(row.dataset.userGroupOptions || row.dataset.userContextOptions, []));
+            const selectedUserContext = userContextOptions.find((option) => Number(option.groupId || option.id) === Number(row.dataset.userAcademicGroupId || 0))
+              || userContextOptions[0]
+              || null;
+            const userContext = buildStudyContextSummary(selectedUserContext)
               || row.dataset.userContextLabel
               || userCourse;
 

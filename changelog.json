@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.28",
+      "date": "2026-03-28",
+      "items": [
+        "feat(admin-users-v2-course-reassignment): add `listAssignableAdminAcademicGroups(...)` plus new `/admin/users/group` and `/admin/users/group/batch` handlers in `app.js`, so admin-side single and bulk user moves can now target academic-v2 `group_id` directly and let projection sync update legacy `course_id` / `study_context_id` as a compatibility consequence instead of treating those legacy fields as the source of truth",
+        "refactor(admin-users-v2-options-and-response-shape): extend `/admin/users.json` and the admin scope bootstrap in `app.js` with `availableAcademicGroups`, `academic_group_id`, `academic_group_label`, and shared `group_options`, which gives the users table and reassignment modal a stable v2 course-option payload instead of rebuilding choices only from legacy study-context rows",
+        "refactor(admin-users-course-first-ui): update `views/admin.ejs` so the users bulk bar and manage-user modal submit `target_group_id` / `group_id` to the new v2 reassignment routes, show course-first copy in the UI, and keep the legacy course dropdown only as a fallback when no academic-v2 course metadata is available yet"
+      ]
+    },
+    {
       "version": "1.3.27",
       "date": "2026-03-28",
       "items": [

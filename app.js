@@ -9772,6 +9772,147 @@ function appendQueryParamToUrl(url, key, value) {
   return `${url}${separator}${encodeURIComponent(String(key))}=${encodeURIComponent(String(value))}`;
 }
 
+function formatAdminAcademicTrackLabel(trackKey = '') {
+  const normalized = normalizeRegistrationTrack(trackKey, 'bachelor');
+  if (normalized === 'master') return 'Masters';
+  if (normalized === 'teacher') return 'Teachers';
+  return 'Bachelors';
+}
+
+function formatAdminAcademicCampusLabel(campusKey = '') {
+  return normalizeCourseCampus(campusKey || 'kyiv') === 'munich' ? 'Munich' : 'Kyiv';
+}
+
+function buildAdminAcademicGroupSummary(group = {}) {
+  const label = sanitizeCompactText(group.group_label || group.label || group.legacy_course_name || '', 160);
+  const programLabel = sanitizeCompactText(group.program_name || group.program_label || '', 160);
+  const cohortLabel = sanitizeCompactText(group.cohort_label || '', 120)
+    || (parsePositiveIntStrict(group.admission_year) ? String(group.admission_year) : '');
+  const stageLabel = `Stage ${normalizeStudyContextStage(group.stage_number || group.stage, 1)}`;
+  const campusLabel = formatAdminAcademicCampusLabel(group.campus_key || group.campus_label || 'kyiv');
+  return [label, [programLabel, cohortLabel, stageLabel, campusLabel].filter(Boolean).join(' / ')].filter(Boolean).join(' - ');
+}
+
+async function listAssignableAdminAcademicGroups(scopeState = {}) {
+  const normalizedScope = scopeState && typeof scopeState === 'object' ? scopeState : {};
+  const studyContextId = parsePositiveIntStrict(normalizedScope.studyContextId || normalizedScope.study_context_id);
+  const programId = parsePositiveIntStrict(normalizedScope.programId || normalizedScope.program_id);
+  const admissionId = parsePositiveIntStrict(normalizedScope.admissionId || normalizedScope.admission_id);
+  const stage = parsePositiveIntStrict(normalizedScope.stage || normalizedScope.stage_number);
+  const campus = String(normalizedScope.campus || normalizedScope.campusKey || normalizedScope.campus_key || '').trim().toLowerCase();
+  const courseId = parsePositiveIntStrict(normalizedScope.courseId || normalizedScope.course || normalizedScope.course_id);
+  const filters = [
+    'COALESCE(g.is_active, TRUE) = TRUE',
+    'COALESCE(c.is_active, TRUE) = TRUE',
+    'COALESCE(p.is_active, TRUE) = TRUE',
+  ];
+  const params = [];
+  if (studyContextId) {
+    filters.push('g.legacy_study_context_id = ?');
+    params.push(studyContextId);
+  } else if (programId || admissionId || stage || campus) {
+    if (programId) {
+      filters.push('c.program_id = ?');
+      params.push(programId);
+    }
+    if (admissionId) {
+      filters.push('c.legacy_admission_id = ?');
+      params.push(admissionId);
+    }
+    if (stage) {
+      filters.push('g.stage_number = ?');
+      params.push(stage);
+    }
+    if (campus) {
+      filters.push('LOWER(COALESCE(NULLIF(TRIM(g.campus_key), \'\'), \'kyiv\')) = ?');
+      params.push(campus === 'munich' ? 'munich' : 'kyiv');
+    }
+  } else if (courseId) {
+    const scopeGroup = await db.get(
+      `
+        SELECT cohort_id
+        FROM academic_v2_groups
+        WHERE legacy_course_id = ?
+          AND COALESCE(is_active, TRUE) = TRUE
+        ORDER BY id ASC
+        LIMIT 1
+      `,
+      [courseId]
+    );
+    if (scopeGroup && Number(scopeGroup.cohort_id || 0) > 0) {
+      filters.push('g.cohort_id = ?');
+      params.push(Number(scopeGroup.cohort_id || 0));
+    } else {
+      filters.push('g.legacy_course_id = ?');
+      params.push(courseId);
+    }
+  }
+  const rows = await db.all(
+    `
+      SELECT
+        g.id AS group_id,
+        g.label AS group_label,
+        g.stage_number,
+        g.campus_key,
+        g.legacy_course_id,
+        g.legacy_study_context_id,
+        c.id AS cohort_id,
+        c.label AS cohort_label,
+        c.admission_year,
+        c.legacy_admission_id AS admission_id,
+        p.id AS program_id,
+        p.name AS program_name,
+        p.code AS program_code,
+        p.track_key,
+        legacy_course.name AS legacy_course_name
+      FROM academic_v2_groups g
+      JOIN academic_v2_cohorts c ON c.id = g.cohort_id
+      JOIN academic_v2_programs p ON p.id = c.program_id
+      LEFT JOIN courses legacy_course ON legacy_course.id = g.legacy_course_id
+      WHERE ${filters.join(' AND ')}
+      ORDER BY
+        p.name ASC,
+        c.admission_year DESC,
+        g.stage_number ASC,
+        g.campus_key ASC,
+        g.label ASC,
+        g.id ASC
+    `,
+    params
+  );
+  return (rows || []).map((row) => {
+    const stageNumber = normalizeStudyContextStage(row.stage_number, 1);
+    const trackKey = normalizeRegistrationTrack(row.track_key, 'bachelor');
+    const campusKey = normalizeCourseCampus(row.campus_key || 'kyiv');
+    const mapped = {
+      id: Number(row.group_id || 0),
+      group_id: Number(row.group_id || 0),
+      label: sanitizeCompactText(row.group_label || row.legacy_course_name || `Course ${row.group_id}`, 160),
+      group_label: sanitizeCompactText(row.group_label || row.legacy_course_name || `Course ${row.group_id}`, 160),
+      course_id: Number(row.legacy_course_id || 0) || null,
+      study_context_id: Number(row.legacy_study_context_id || 0) || null,
+      cohort_id: Number(row.cohort_id || 0) || null,
+      cohort_label: sanitizeCompactText(row.cohort_label || '', 120),
+      admission_year: Number(row.admission_year || 0) || null,
+      admission_id: Number(row.admission_id || 0) || null,
+      program_id: Number(row.program_id || 0) || null,
+      program_name: sanitizeCompactText(row.program_name || '', 160),
+      program_code: sanitizeCompactText(row.program_code || '', 80),
+      track_key: trackKey,
+      track_label: formatAdminAcademicTrackLabel(trackKey),
+      stage_number: stageNumber,
+      stage_label: `Stage ${stageNumber}`,
+      campus_key: campusKey,
+      campus_label: formatAdminAcademicCampusLabel(campusKey),
+      legacy_course_name: sanitizeCompactText(row.legacy_course_name || '', 160),
+    };
+    return {
+      ...mapped,
+      summary: buildAdminAcademicGroupSummary(mapped),
+    };
+  });
+}
+
 async function buildAdminAcademicScopeState(req, options = {}) {
   const courses = Array.isArray(options.courses)
     ? options.courses
@@ -9831,6 +9972,9 @@ async function buildAdminAcademicScopeState(req, options = {}) {
     buildStudyContextLabel: (context, lang) => buildStudyContextLabel(context, lang),
     inferTrackFromCourse: (course) => inferRegistrationTrackFromCourse(course),
   });
+  if (options.includeAcademicGroups) {
+    resolvedScopeState.availableAcademicGroups = await listAssignableAdminAcademicGroups(resolvedScopeState);
+  }
   const storedPayload = buildAdminScopeStatePayload(resolvedScopeState);
   req.session.adminAcademicScope = storedPayload;
   if (storedPayload.courseId) {
@@ -32980,7 +33124,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         : normalizeRoleKey(req.session.role || 'student')));
   let adminAcademicScope = null;
   try {
-    adminAcademicScope = await buildAdminAcademicScopeState(req);
+    adminAcademicScope = await buildAdminAcademicScopeState(req, { includeAcademicGroups: true });
   } catch (err) {
     return handleDbError(res, err, 'admin.scope');
   }
@@ -45685,7 +45829,7 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
   const group = req.query.group;
   ensureUsersSchema(() => {});
   try {
-    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const adminAcademicScope = await buildAdminAcademicScopeState(req, { includeAcademicGroups: true });
     const courseId = adminAcademicScope && adminAcademicScope.courseId
       ? Number(adminAcademicScope.courseId)
       : getAdminCourse(req);
@@ -45930,6 +46074,9 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
     const studyContexts = adminAcademicScope && Array.isArray(adminAcademicScope.availableStudyContexts)
       ? adminAcademicScope.availableStudyContexts
       : await listStudyContextOptions();
+    const academicGroups = adminAcademicScope && Array.isArray(adminAcademicScope.availableAcademicGroups)
+      ? adminAcademicScope.availableAcademicGroups
+      : await listAssignableAdminAcademicGroups(adminAcademicScope || {});
     const usersWithRoles = (users || []).map((user) => {
       const userId = Number(user.id);
       const roleKeys = assignment.roleKeysByUser[userId] || [normalizeRoleKey(user.role || 'student')];
@@ -45967,6 +46114,9 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
         track_key: derivedTrackKey,
         study_context_options: studyContexts,
         context_options: studyContexts,
+        academic_group_id: placement && placement.group_id ? placement.group_id : null,
+        academic_group_label: placement && placement.group_label ? placement.group_label : '',
+        group_options: academicGroups,
       };
     });
     return res.json({
@@ -45975,6 +46125,7 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
       studentGroups,
       courses,
       studyContexts,
+      academicGroups,
       selectedCourseId: courseId,
       adminAcademicScope: buildAdminScopeStatePayload(adminAcademicScope, {}),
     });
@@ -51927,6 +52078,170 @@ app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async 
     return res.redirect(redirectWith('ok', 'Role deleted', { op: operationId }));
   } catch (err) {
     return res.redirect(redirectWith('err', 'Database error'));
+  }
+});
+
+app.post('/admin/users/group', requireUsersSectionAccess, async (req, res) => {
+  const userId = parsePositiveIntStrict(req.body.user_id);
+  const groupId = parsePositiveIntStrict(req.body.group_id || req.body.target_group_id);
+  try {
+    await ensureDbReady();
+    const adminAcademicScope = await buildAdminAcademicScopeState(req, { includeAcademicGroups: true });
+    const redirectBase = buildStaffPanelScopeUrl(req, adminAcademicScope || {});
+    if (!userId || !groupId) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Invalid academic course'));
+    }
+    const allowedGroups = adminAcademicScope && Array.isArray(adminAcademicScope.availableAcademicGroups)
+      ? adminAcademicScope.availableAcademicGroups
+      : await listAssignableAdminAcademicGroups(adminAcademicScope || {});
+    const allowedGroupIds = new Set(
+      (allowedGroups || [])
+        .map((group) => Number(group && group.group_id ? group.group_id : 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
+    const [targetGroup, user] = await Promise.all([
+      db.get(
+        `
+          SELECT
+            g.id AS group_id,
+            g.label AS group_label,
+            g.stage_number,
+            g.campus_key,
+            g.legacy_course_id,
+            g.legacy_study_context_id,
+            c.id AS cohort_id,
+            c.label AS cohort_label,
+            c.admission_year,
+            c.legacy_admission_id AS admission_id,
+            p.id AS program_id,
+            p.name AS program_name,
+            p.track_key
+          FROM academic_v2_groups g
+          JOIN academic_v2_cohorts c ON c.id = g.cohort_id
+          JOIN academic_v2_programs p ON p.id = c.program_id
+          WHERE g.id = ?
+          LIMIT 1
+        `,
+        [groupId]
+      ),
+      db.get(
+        'SELECT id, role, full_name, course_id, study_context_id, group_id FROM users WHERE id = ?',
+        [userId]
+      ),
+    ]);
+    if (!targetGroup) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Academic course not found'));
+    }
+    if (allowedGroupIds.size && !allowedGroupIds.has(Number(targetGroup.group_id || 0))) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Academic course outside current scope'));
+    }
+    if (!user) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'User not found'));
+    }
+    if (normalizeRoleKey(user.role) === 'admin') {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Cannot change admin course'));
+    }
+    await academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), {
+      group_id: Number(targetGroup.group_id || 0),
+      user_ids: [userId],
+    });
+    logAction(db, req, 'user_academic_group_change', {
+      user_id: userId,
+      group_id: Number(targetGroup.group_id || 0),
+      course_id: Number(targetGroup.legacy_course_id || 0) || null,
+      study_context_id: Number(targetGroup.legacy_study_context_id || 0) || null,
+    });
+    broadcast('users_updated');
+    return res.redirect(
+      appendQueryParamToUrl(
+        buildStaffPanelScopeUrl(req, adminAcademicScope || {}, {
+          track: targetGroup.track_key,
+          programId: targetGroup.program_id,
+          admissionId: targetGroup.admission_id,
+          stage: targetGroup.stage_number,
+          campus: targetGroup.campus_key,
+          studyContextId: targetGroup.legacy_study_context_id,
+          courseId: targetGroup.legacy_course_id,
+        }),
+        'ok',
+        'Academic course updated'
+      )
+    );
+  } catch (err) {
+    console.error('Academic v2 user group move failed', err);
+    return res.redirect(appendQueryParamToUrl(buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req)), 'err', 'Database error'));
+  }
+});
+
+app.post('/admin/users/group/batch', requireUsersSectionAccess, async (req, res) => {
+  const groupId = parsePositiveIntStrict(req.body.target_group_id || req.body.group_id);
+  const userIds = Array.from(new Set(
+    (Array.isArray(req.body.user_ids) ? req.body.user_ids : [req.body.user_ids])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  try {
+    await ensureDbReady();
+    const adminAcademicScope = await buildAdminAcademicScopeState(req, { includeAcademicGroups: true });
+    const redirectBase = buildStaffPanelScopeUrl(req, adminAcademicScope || {});
+    if (!groupId || !userIds.length) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Select users and target academic course'));
+    }
+    const allowedGroups = adminAcademicScope && Array.isArray(adminAcademicScope.availableAcademicGroups)
+      ? adminAcademicScope.availableAcademicGroups
+      : await listAssignableAdminAcademicGroups(adminAcademicScope || {});
+    const allowedGroupIds = new Set(
+      (allowedGroups || [])
+        .map((group) => Number(group && group.group_id ? group.group_id : 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
+    const targetGroup = await db.get(
+      `
+        SELECT
+          g.id AS group_id,
+          g.stage_number,
+          g.campus_key,
+          g.legacy_course_id,
+          g.legacy_study_context_id
+        FROM academic_v2_groups g
+        WHERE g.id = ?
+        LIMIT 1
+      `,
+      [groupId]
+    );
+    if (!targetGroup) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Academic course not found'));
+    }
+    if (allowedGroupIds.size && !allowedGroupIds.has(Number(targetGroup.group_id || 0))) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Academic course outside current scope'));
+    }
+    const users = await db.all(
+      `
+        SELECT id, role
+        FROM users
+        WHERE id = ANY(?::int[])
+      `,
+      [userIds]
+    );
+    const movableUsers = (users || []).filter((user) => normalizeRoleKey(user.role || 'student') !== 'admin');
+    if (!movableUsers.length) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No movable users selected'));
+    }
+    await academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), {
+      group_id: Number(targetGroup.group_id || 0),
+      user_ids: movableUsers.map((user) => Number(user.id || 0)).filter((value) => Number.isInteger(value) && value > 0),
+    });
+    logAction(db, req, 'user_academic_group_batch_move', {
+      group_id: Number(targetGroup.group_id || 0),
+      course_id: Number(targetGroup.legacy_course_id || 0) || null,
+      study_context_id: Number(targetGroup.legacy_study_context_id || 0) || null,
+      user_count: movableUsers.length,
+    });
+    broadcast('users_updated');
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', `Moved ${movableUsers.length} users`));
+  } catch (err) {
+    console.error('Academic v2 batch group move failed', err);
+    return res.redirect(appendQueryParamToUrl(buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req)), 'err', 'Database error'));
   }
 });
 
