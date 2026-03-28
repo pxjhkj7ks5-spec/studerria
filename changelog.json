@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.24",
+      "date": "2026-03-28",
+      "items": [
+        "fix(admin-users-live-refresh): harden the `views/admin.ejs` users table refresh flow so modal opens, websocket-driven updates, and other in-page actions no longer wipe the current list when `/admin/users.json` refreshes overlap or fail, and escape client-rendered user fields before rebuilding rows to prevent malformed markup from collapsing the table until a full reload"
+      ]
+    },
+    {
       "version": "1.3.23",
       "date": "2026-03-28",
       "items": [

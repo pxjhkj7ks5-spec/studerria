@@ -7435,22 +7435,28 @@
         }
       }
 
+      let usersRefreshController = null;
+      let usersRefreshRequestToken = 0;
+
       function renderUsersTable(data) {
         const tbody = document.getElementById('usersTableBody');
         if (!tbody) return;
-        const currentUserId = tbody.dataset.currentUserId;
+        const payload = data && typeof data === 'object' ? data : {};
         const status = tbody.dataset.status || 'active';
+        const subjectItems = Array.isArray(payload.subjects) ? payload.subjects : [];
+        const courseItems = Array.isArray(payload.courses) ? payload.courses : [];
+        const studentGroupItems = Array.isArray(payload.studentGroups) ? payload.studentGroups : [];
         const subjectMap = new Map();
-        data.subjects.forEach((s) => subjectMap.set(String(s.id), s));
+        subjectItems.forEach((s) => subjectMap.set(String(s.id), s));
         const courseMap = new Map();
-        (data.courses || []).forEach((c) => courseMap.set(String(c.id), c.name));
+        courseItems.forEach((c) => courseMap.set(String(c.id), c.name));
         const groupMap = {};
-        data.studentGroups.forEach((g) => {
+        studentGroupItems.forEach((g) => {
           if (!groupMap[g.student_id]) groupMap[g.student_id] = {};
           groupMap[g.student_id][g.subject_id] = g.group_number;
         });
 
-        const users = Array.isArray(data.users) ? data.users : [];
+        const users = Array.isArray(payload.users) ? payload.users : [];
         const visibleUsers = users.filter((u) => {
           const rawActive = typeof u?.is_active === 'undefined' ? 1 : Number(u.is_active);
           const isActive = Number.isNaN(rawActive) ? 1 : (rawActive === 0 ? 0 : 1);
@@ -7459,8 +7465,19 @@
           return isActive !== 0;
         });
 
+        if (!visibleUsers.length) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" class="text-center text-muted py-4">Користувачів за поточним фільтром не знайдено.</td>
+            </tr>
+          `;
+          updateUsersBulkBar();
+          return;
+        }
+
         tbody.innerHTML = visibleUsers
           .map((u) => {
+            const userId = String(u.id || '');
             const isActive = Number(typeof u.is_active === 'undefined' ? 1 : u.is_active) === 0 ? 0 : 1;
             const roleKeys = Array.isArray(u.role_keys) && u.role_keys.length
               ? parseRoleKeys(u.role_keys, [u.primary_role || u.role || 'student'])
@@ -7472,7 +7489,10 @@
             const securityRiskLevel = String(u.security_risk_level || 'normal');
             const securityRiskStatus = String(u.security_case_status || 'open');
             const securityRiskScore = Number(u.security_risk_score || 0);
-            const contextOptions = normalizeStudyContextOptions(Array.isArray(u.study_context_options) ? u.study_context_options : (Array.isArray(u.context_options) ? u.context_options : []));
+            const rawContextOptions = Array.isArray(u.study_context_options)
+              ? u.study_context_options
+              : (Array.isArray(u.context_options) ? u.context_options : []);
+            const contextOptions = normalizeStudyContextOptions(rawContextOptions);
             const contextLabel = String(u.study_context_label || u.study_context_name || u.study_context || u.cohort_label || '').trim();
             const contextCourseId = Number(u.study_context_course_id || u.course_id || 0);
             const selectedContext = contextOptions.find((option) => Number(option.id) === Number(u.study_context_id || 0))
@@ -7480,6 +7500,7 @@
               || contextOptions[0]
               || null;
             const contextSummary = buildStudyContextSummary(selectedContext) || contextLabel;
+            const courseLabel = contextSummary || courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`;
             const riskBadgeClass = securityRiskLevel === 'high-risk'
               ? 'danger'
               : (securityRiskLevel === 'watch' ? 'warning' : 'secondary');
@@ -7487,7 +7508,7 @@
               ? 'High-risk'
               : (securityRiskLevel === 'watch' ? 'Watch' : 'Normal');
             const checkbox = !hasAdminRole
-              ? `<input type="checkbox" name="delete_user_ids" value="${u.id}" form="deleteUsersForm" />`
+              ? `<input type="checkbox" name="delete_user_ids" value="${escapeHtml(userId)}" form="deleteUsersForm" />`
               : '';
             const subjectList = groupMap[u.id]
               ? Object.keys(groupMap[u.id]).map((sid) => {
@@ -7500,42 +7521,45 @@
               <button
                 class="btn btn-sm btn-outline-primary subject-groups-btn"
                 type="button"
-                data-user-id="${u.id}"
-                data-user-name="${u.full_name}"
-                data-subjects='${JSON.stringify(subjectList).replace(/'/g, '&#39;')}'
+                data-user-id="${escapeHtml(userId)}"
+                data-user-name="${escapeHtml(u.full_name)}"
+                data-subjects='${escapeHtml(JSON.stringify(subjectList))}'
               >
                 Subjects (${subjectList.length})
               </button>
             `;
 
-            const subjectOptions = data.subjects
+            let escapedSubjectOptions = subjectItems
               .map((s) => `<option value="${s.id}">${s.name} (1–${s.group_count})</option>`)
+              .join('');
+            escapedSubjectOptions = subjectItems
+              .map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} (1-${escapeHtml(s.group_count)})</option>`)
               .join('');
 
             return `
               <tr class="user-row"
-                  data-user-id="${u.id}"
-                  data-user-name="${u.full_name}"
-                  data-user-role="${primaryRole}"
-                  data-user-roles="${roleKeys.join(',')}"
-                  data-user-group="${u.schedule_group}"
-                  data-user-course="${contextSummary || courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`}"
-                  data-user-course-id="${contextCourseId || 1}"
-                  data-user-context-label="${contextLabel}"
-                  data-user-context-id="${Number(u.study_context_id || 0)}"
-                  data-user-context-course-id="${contextCourseId || 0}"
-                  data-user-context-options='${JSON.stringify(Array.isArray(u.study_context_options) ? u.study_context_options : (Array.isArray(u.context_options) ? u.context_options : [])).replace(/'/g, '&#39;')}'
+                  data-user-id="${escapeHtml(userId)}"
+                  data-user-name="${escapeHtml(u.full_name)}"
+                  data-user-role="${escapeHtml(primaryRole)}"
+                  data-user-roles="${escapeHtml(roleKeys.join(','))}"
+                  data-user-group="${escapeHtml(u.schedule_group)}"
+                  data-user-course="${escapeHtml(courseLabel)}"
+                  data-user-course-id="${escapeHtml(contextCourseId || 1)}"
+                  data-user-context-label="${escapeHtml(contextLabel)}"
+                  data-user-context-id="${escapeHtml(Number(u.study_context_id || 0))}"
+                  data-user-context-course-id="${escapeHtml(contextCourseId || 0)}"
+                  data-user-context-options='${escapeHtml(JSON.stringify(rawContextOptions))}'
                   data-user-active="${isActive}"
-                  data-user-ip="${u.last_login_ip || ''}"
-                  data-user-agent="${(u.last_user_agent || '').replace(/\"/g, '&quot;')}"
-                  data-user-login="${u.last_login_at || ''}"
-                  data-security-risk-level="${securityRiskLevel}"
-                  data-security-risk-status="${securityRiskStatus}"
+                  data-user-ip="${escapeHtml(u.last_login_ip || '')}"
+                  data-user-agent="${escapeHtml(u.last_user_agent || '')}"
+                  data-user-login="${escapeHtml(u.last_login_at || '')}"
+                  data-security-risk-level="${escapeHtml(securityRiskLevel)}"
+                  data-security-risk-status="${escapeHtml(securityRiskStatus)}"
                   data-security-risk-score="${securityRiskScore}"
-                  data-security-case-updated="${u.security_case_updated_at || ''}">
+                  data-security-case-updated="${escapeHtml(u.security_case_updated_at || '')}">
                 <td>${checkbox}</td>
                 <td>
-                  ${u.full_name}
+                  ${escapeHtml(u.full_name)}
                   ${contextSummary ? `<div class="small text-muted mt-1">${escapeHtml(contextSummary)}</div>` : ''}
                 </td>
                 <td>
@@ -7548,11 +7572,11 @@
                 <td>${subjectsBtn}</td>
                 <td>
                   <form method="POST" action="/admin/student-groups/set" class="row g-2">
-                    <input type="hidden" name="student_id" value="${u.id}" />
+                    <input type="hidden" name="student_id" value="${escapeHtml(userId)}" />
                     <div class="col-12 col-md-6">
                       <select class="form-select form-select-sm" name="subject_id" required>
                         <option value="" disabled selected>Subject</option>
-                        ${subjectOptions}
+                        ${escapedSubjectOptions}
                       </select>
                     </div>
                     <div class="col-12 col-md-3">
@@ -7564,7 +7588,7 @@
                   </form>
                 </td>
                 <td class="text-end">
-                  <form id="user-delete-${u.id}" method="POST" action="/admin/users/delete-permanent"></form>
+                  <form id="user-delete-${escapeHtml(userId)}" method="POST" action="/admin/users/delete-permanent"></form>
                   <div class="dropdown">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">⋯</button>
                     <ul class="dropdown-menu dropdown-menu-end">
@@ -7572,10 +7596,10 @@
                       ${!hasAdminRole && isActive === 0 ? `
                         <li><hr class="dropdown-divider" /></li>
                         <li>
-                          <button class="dropdown-item text-danger" type="submit" form="user-delete-${u.id}" data-confirm="Permanently delete this user? This cannot be undone." data-confirm-level="danger">
+                          <button class="dropdown-item text-danger" type="submit" form="user-delete-${escapeHtml(userId)}" data-confirm="Permanently delete this user? This cannot be undone." data-confirm-level="danger">
                             Delete permanently
                           </button>
-                          <input type="hidden" name="user_id" value="${u.id}" form="user-delete-${u.id}" />
+                          <input type="hidden" name="user_id" value="${escapeHtml(userId)}" form="user-delete-${escapeHtml(userId)}" />
                         </li>
                       ` : ''}
                     </ul>
@@ -7591,17 +7615,23 @@
         updateUsersBulkBar();
       }
 
+      function bindUsersTable() {
+        bindUserRowClicks();
+        bindSubjectButtons();
+        syncUsersBulkContextForm();
+      }
+
       async function refreshUsers() {
+        const requestToken = ++usersRefreshRequestToken;
+        if (usersRefreshController) {
+          usersRefreshController.abort();
+        }
+        const controller = new AbortController();
+        usersRefreshController = controller;
+        const tbodyEl = document.getElementById('usersTableBody');
+        const previousMarkup = tbodyEl ? tbodyEl.innerHTML : '';
         try {
-          const tbodyEl = document.getElementById('usersTableBody');
           if (!tbodyEl) return;
-          tbodyEl.innerHTML = Array.from({ length: 6 }).map(() => `
-            <tr class="skeleton-row">
-              <td colspan="6">
-                <div class="skeleton-line"></div>
-              </td>
-            </tr>
-          `).join('');
           const status = tbodyEl.dataset.status || 'active';
           const courseId = tbodyEl.dataset.courseId || '1';
           const track = tbodyEl.dataset.track || '';
@@ -7623,15 +7653,27 @@
           if (studyContextId) params.set('study_context_id', studyContextId);
           if (q) params.set('q', q);
           if (group) params.set('group', group);
-          const res = await fetch(`/admin/users.json?${params.toString()}`);
-          if (!res.ok) return;
+          const res = await fetch(`/admin/users.json?${params.toString()}`, {
+            signal: controller.signal,
+          });
+          if (!res.ok) {
+            throw new Error(`users_refresh_failed_${res.status}`);
+          }
           const data = await res.json();
+          if (requestToken !== usersRefreshRequestToken) return;
+          const normalizedData = {
+            ...data,
+            users: Array.isArray(data && data.users) ? data.users : [],
+            subjects: Array.isArray(data && data.subjects) ? data.subjects : [],
+            studentGroups: Array.isArray(data && data.studentGroups) ? data.studentGroups : [],
+            courses: Array.isArray(data && data.courses) ? data.courses : [],
+          };
           const roleFilter = tbodyEl.dataset.roleFilter || 'all';
           const filtered = roleFilter === 'all'
-            ? data
+            ? normalizedData
             : {
-                ...data,
-                users: data.users.filter((u) => {
+                ...normalizedData,
+                users: normalizedData.users.filter((u) => {
                   const roleKeys = Array.isArray(u.role_keys) && u.role_keys.length
                     ? parseRoleKeys(u.role_keys, [u.primary_role || u.role || 'student'])
                     : parseRoleKeys([u.primary_role || u.role || 'student']);
@@ -7639,11 +7681,20 @@
                 }),
               };
           renderUsersTable(filtered);
-          bindUserRowClicks();
-          bindSubjectButtons();
-          syncUsersBulkContextForm();
+          bindUsersTable();
         } catch (err) {
-          return;
+          if (err && err.name === 'AbortError') {
+            return;
+          }
+          if (tbodyEl && requestToken === usersRefreshRequestToken && previousMarkup) {
+            tbodyEl.innerHTML = previousMarkup;
+            bindUsersTable();
+          }
+          console.error('Users refresh failed:', err);
+        } finally {
+          if (requestToken === usersRefreshRequestToken) {
+            usersRefreshController = null;
+          }
         }
       }
 
@@ -8353,7 +8404,7 @@
       const messageUnreadList = document.getElementById('messageUnreadList');
 
       function escapeHtml(value) {
-        return String(value || '')
+        return String(value ?? '')
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
@@ -8421,8 +8472,7 @@
         });
       });
 
-      bindUserRowClicks();
-      bindSubjectButtons();
+      bindUsersTable();
 
       const addSubjectSelect = document.getElementById('addSubjectSelect');
       const addLessonTypeSelect = document.getElementById('addLessonTypeSelect');
