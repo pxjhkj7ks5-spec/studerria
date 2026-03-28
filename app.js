@@ -9336,6 +9336,14 @@ function buildStaffPanelScopeUrl(req, scopeState = {}, overrides = {}, extraPara
   return buildScopedAppUrl(buildAdminScopeBasePath(req), scopeState, overrides, extraParams);
 }
 
+function buildLegacyUserAssignmentFreezeUrl(req, message = 'Academic course reassignment moved to v2 courses. Finish Academic Setup v2 for this scope first.') {
+  return appendQueryParamToUrl(
+    buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req)),
+    'err',
+    String(message || 'Academic course reassignment moved to v2 courses.')
+  );
+}
+
 function getAcademicSetupStore() {
   return {
     get: (sql, params) => db.get(sql, params),
@@ -52246,229 +52254,20 @@ app.post('/admin/users/group/batch', requireUsersSectionAccess, async (req, res)
 });
 
 app.post('/admin/users/study-context', requireUsersSectionAccess, async (req, res) => {
-  const userId = Number(req.body.user_id);
-  const studyContextId = Number(req.body.study_context_id);
-  try {
-    const adminAcademicScope = await buildAdminAcademicScopeState(req);
-    const redirectBase = buildStaffPanelScopeUrl(req, adminAcademicScope || {});
-    if (!Number.isFinite(userId) || userId <= 0 || !Number.isFinite(studyContextId) || studyContextId <= 0) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Invalid study context'));
-    }
-    const allowedStudyContextIds = new Set(
-      (adminAcademicScope && Array.isArray(adminAcademicScope.availableStudyContexts) ? adminAcademicScope.availableStudyContexts : [])
-        .map((context) => Number(context && context.id ? context.id : 0))
-        .filter((value) => Number.isInteger(value) && value > 0)
-    );
-    const [context, user] = await Promise.all([
-      getStudyContextById(studyContextId),
-      db.get(
-        'SELECT id, role, full_name, course_id, study_context_id FROM users WHERE id = ?',
-        [userId]
-      ),
-    ]);
-    if (!context) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Study context not found'));
-    }
-    if (allowedStudyContextIds.size && !allowedStudyContextIds.has(Number(context.id || 0))) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Study context outside current scope'));
-    }
-    if (!user) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'User not found'));
-    }
-    if (normalizeRoleKey(user.role) === 'admin') {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Cannot change admin context'));
-    }
-    await assignUserStudyContext(userId, studyContextId);
-    logAction(db, req, 'user_study_context_change', {
-      user_id: userId,
-      study_context_id: studyContextId,
-      course_id: context.course_id,
-    });
-    broadcast('users_updated');
-    return res.redirect(
-      appendQueryParamToUrl(
-        buildStaffPanelScopeUrl(req, adminAcademicScope || {}, {
-          track: context.track_key,
-          programId: context.program_id,
-          admissionId: context.admission_id,
-          stage: context.stage,
-          campus: context.campus_key,
-          studyContextId: context.id,
-          courseId: context.course_id,
-        }),
-        'ok',
-        'Study context updated'
-      )
-    );
-  } catch (err) {
-    return res.redirect(appendQueryParamToUrl(buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req)), 'err', 'Database error'));
-  }
+  return res.redirect(buildLegacyUserAssignmentFreezeUrl(req));
 });
 
 app.post('/admin/users/study-context/batch', requireUsersSectionAccess, async (req, res) => {
-  const targetStudyContextId = parsePositiveIntStrict(req.body.target_study_context_id || req.body.study_context_id);
-  const userIds = Array.from(new Set(
-    (Array.isArray(req.body.user_ids) ? req.body.user_ids : [req.body.user_ids])
-      .map((value) => parsePositiveIntStrict(value))
-      .filter((value) => Number.isInteger(value) && value > 0)
-  ));
-  try {
-    const adminAcademicScope = await buildAdminAcademicScopeState(req);
-    const redirectBase = buildStaffPanelScopeUrl(req, adminAcademicScope || {});
-    if (!targetStudyContextId || !userIds.length) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Select users and target context'));
-    }
-    const allowedStudyContextIds = new Set(
-      (adminAcademicScope && Array.isArray(adminAcademicScope.availableStudyContexts) ? adminAcademicScope.availableStudyContexts : [])
-        .map((context) => Number(context && context.id ? context.id : 0))
-        .filter((value) => Number.isInteger(value) && value > 0)
-    );
-    const context = await getStudyContextById(targetStudyContextId);
-    if (!context) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Study context not found'));
-    }
-    if (allowedStudyContextIds.size && !allowedStudyContextIds.has(Number(context.id || 0))) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Study context outside current scope'));
-    }
-    const users = await db.all(
-      `
-        SELECT id, role
-        FROM users
-        WHERE id = ANY(?::int[])
-      `,
-      [userIds]
-    );
-    const movableUsers = (users || []).filter((user) => normalizeRoleKey(user.role || 'student') !== 'admin');
-    if (!movableUsers.length) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No movable users selected'));
-    }
-    for (const user of movableUsers) {
-      await assignUserStudyContext(user.id, targetStudyContextId);
-    }
-    logAction(db, req, 'user_study_context_batch_move', {
-      study_context_id: targetStudyContextId,
-      course_id: context.course_id,
-      user_count: movableUsers.length,
-    });
-    broadcast('users_updated');
-    return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', `Moved ${movableUsers.length} users`));
-  } catch (err) {
-    console.error('Batch study context move failed', err);
-    return res.redirect(appendQueryParamToUrl(buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req)), 'err', 'Database error'));
-  }
+  return res.redirect(buildLegacyUserAssignmentFreezeUrl(req));
 });
 
 app.post('/admin/users/course', requireUsersSectionAccess, async (req, res) => {
-  const { user_id, course_id } = req.body;
-  const userId = Number(user_id);
-  const courseId = Number(course_id);
-  const currentCourse = getAdminCourse(req);
-  const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
-  if (Number.isNaN(userId) || Number.isNaN(courseId)) {
-    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Invalid course'));
-  }
-  try {
-    const [courseRow, user] = await Promise.all([
-      db.get('SELECT id, name, location FROM courses WHERE id = ?', [courseId]),
-      db.get(
-        `
-          SELECT
-            id,
-            role,
-            full_name,
-            course_id,
-            admission_id,
-            study_program_id,
-            study_track,
-            study_context_id
-          FROM users
-          WHERE id = ? AND course_id = ?
-        `,
-        [userId, currentCourse]
-      ),
-    ]);
-    if (!courseRow) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Invalid course'));
-    }
-    if (!user) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'User not found'));
-    }
-    if (normalizeRoleKey(user.role) === 'admin') {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Cannot change admin course'));
-    }
-
-    const placement = await resolveUserAcademicPlacement(user);
-    let targetStudyContextId = null;
-    if (placement && placement.admission_id) {
-      const matchingContext = await db.get(
-        `
-          SELECT sc.id
-          FROM study_contexts sc
-          JOIN cohorts coh ON coh.id = sc.cohort_id
-          JOIN study_context_course_bindings sccb ON sccb.study_context_id = sc.id
-          WHERE sccb.course_id = ?
-            AND coh.legacy_admission_id = ?
-          ORDER BY
-            CASE WHEN sc.stage_number = ? THEN 0 ELSE 1 END,
-            CASE WHEN sc.campus_key = ? THEN 0 ELSE 1 END,
-            sc.id ASC
-          LIMIT 1
-        `,
-        [
-          courseId,
-          placement.admission_id,
-          normalizeStudyContextStage(placement.stage, inferLegacyCourseOrdinal(courseRow.name) || 1),
-          normalizeCourseCampus((courseRow && courseRow.location) || placement.campus_key || 'kyiv'),
-        ]
-      ).catch((err) => {
-        if (isDbSchemaCompatibilityError(err)) {
-          return null;
-        }
-        throw err;
-      });
-      targetStudyContextId = parsePositiveIntStrict(matchingContext && matchingContext.id);
-      if (!targetStudyContextId) {
-        targetStudyContextId = await ensureStudyContextForLegacyPlacement({
-          courseId,
-          admissionId: placement.admission_id,
-          programId: placement.program_id,
-          trackKey: placement.track_key,
-          preferredCampus: (courseRow && courseRow.location) || placement.campus_key,
-          preferredStage: placement.stage,
-        });
-      }
-    }
-
-    if (targetStudyContextId) {
-      await assignUserStudyContext(userId, targetStudyContextId, {
-        courseId,
-        trackKey: user.study_track,
-        programId: user.study_program_id,
-        admissionId: user.admission_id,
-      });
-    } else {
-      await assignUserStudyContext(userId, null, {
-        courseId,
-        trackKey: user.study_track,
-        programId: user.study_program_id,
-        admissionId: user.admission_id,
-      });
-    }
-    logAction(db, req, 'user_course_change', { user_id: userId, course_id: courseId, study_context_id: targetStudyContextId });
-    broadcast('users_updated');
-    return res.redirect(
-      appendQueryParamToUrl(
-        buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req), {
-          courseId,
-          studyContextId: targetStudyContextId || null,
-        }),
-        'ok',
-        'Course updated'
-      )
-    );
-  } catch (err) {
-    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
-  }
+  return res.redirect(
+    buildLegacyUserAssignmentFreezeUrl(
+      req,
+      'Legacy course reassignment is disabled. Create or map the academic v2 course in Academic Setup first.'
+    )
+  );
 });
 
 app.post('/admin/users/reset-password', requireUsersSectionAccess, (req, res) => {

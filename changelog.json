@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.3.29",
+      "date": "2026-03-28",
+      "items": [
+        "refactor(admin-users-legacy-reassignment-freeze): replace the remaining legacy `/admin/users/study-context`, `/admin/users/study-context/batch`, and `/admin/users/course` mutation handlers in `app.js` with explicit cutover redirects, so admin user reassignment can no longer write the old academic model behind the back of the academic-v2 course source of truth",
+        "fix(admin-users-no-v2-course-block-state): update the manage-user modal in `views/admin.ejs` so when no academic-v2 course options exist for the current scope it no longer falls back to posting legacy `course_id` writes, but instead disables the save path and shows a clear message that the missing course must be created or mapped in Academic Setup v2 first"
+      ]
+    },
+    {
       "version": "1.3.28",
       "date": "2026-03-28",
       "items": [

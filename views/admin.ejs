@@ -4695,7 +4695,7 @@
                     <option value="<%= c.id %>"><%= c.name %></option>
                   <% }); %>
                 </select>
-                <button class="btn btn-outline-primary glass" type="submit">Save</button>
+                <button class="btn btn-outline-primary glass" type="submit" id="uaAcademicCourseSaveBtn">Save</button>
               </div>
               <div class="small text-muted mt-2" id="uaContextHint"></div>
             </form>
@@ -7549,6 +7549,9 @@
           if (contextForm) {
             contextForm.action = '/admin/users/group';
           }
+          if (uaAcademicCourseSaveBtn) {
+            uaAcademicCourseSaveBtn.disabled = false;
+          }
           contextSelect.style.display = '';
           contextSelect.innerHTML = '';
           const placeholder = document.createElement('option');
@@ -7566,6 +7569,7 @@
             contextSelect.appendChild(opt);
           });
           courseSelect.style.display = 'none';
+          courseSelect.disabled = false;
           courseSelect.required = false;
           if (selectedContext) {
             contextSelect.value = String(selectedContext.groupId || selectedContext.id || '');
@@ -7586,17 +7590,22 @@
           };
         } else {
           if (contextForm) {
-            contextForm.action = '/admin/users/course';
+            contextForm.action = '/admin/users/group';
+          }
+          if (uaAcademicCourseSaveBtn) {
+            uaAcademicCourseSaveBtn.disabled = true;
           }
           contextSelect.style.display = 'none';
           courseSelect.style.display = '';
-          courseSelect.required = true;
+          courseSelect.disabled = true;
+          courseSelect.required = false;
           courseSelect.value = String(contextCourseId || courseSelect.value || '');
           if (contextHint) {
             contextHint.textContent = contextLabel
-              ? `Current academic course: ${contextLabel}`
-              : 'Legacy course selection is shown until v2 course metadata becomes available.';
+              ? `Current academic course: ${contextLabel}. Reassignment is blocked until this scope has an academic v2 course option.`
+              : 'No academic v2 course options exist for this scope yet. Create or map the course in Academic Setup v2 first.';
           }
+          contextIdInput.value = '';
           contextSelect.onchange = null;
         }
       }
@@ -8000,6 +8009,7 @@
       const uaContextHint = document.getElementById('uaContextHint');
       const uaAcademicGroupId = document.getElementById('uaAcademicGroupId');
       const uaCourseSelect = document.getElementById('uaCourseSelect');
+      const uaAcademicCourseSaveBtn = document.getElementById('uaAcademicCourseSaveBtn');
 
       const setRiskCaseMeta = (caseRow) => {
         if (!uaRiskCaseMeta) return;
