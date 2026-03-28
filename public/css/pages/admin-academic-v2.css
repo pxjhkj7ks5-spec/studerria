@@ -526,6 +526,10 @@ body.theme-dark .academic-v2-alert {
   border-left: 4px solid var(--academic-emerald);
 }
 
+.academic-v2-alert--warning {
+  border-left: 4px solid var(--academic-amber, #f59e0b);
+}
+
 .academic-v2-alert--error {
   border-left: 4px solid var(--academic-warm);
 }

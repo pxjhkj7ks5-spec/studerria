@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.3.25",
+      "date": "2026-03-28",
+      "items": [
+        "feat(academic-v2-stage-templates-and-promotion): add `migrations/043_academic_v2_stage_templates.js`, extend `lib/academicV2.js`, and wire new `/admin/pathways/v2/stage-terms`, `/admin/pathways/v2/stage-subjects`, `apply-stage-template`, and `cohort promotion` routes in `app.js`, so each program now owns stage 1..4 term/subject templates and cohorts can be promoted onto a new live course stack through an explicit preview + apply flow",
+        "fix(academic-v2-course-ui-and-empty-focus): rename `group` to `course` across `views/admin-academic-v2.ejs`, add stage-template and promotion controls to the admin surface, and stop `buildFocusState(...)` in `lib/academicV2.js` from auto-falling onto a different live course when a cohort has no selected course, which keeps new cohorts empty until a course is created or a stage template is explicitly applied",
+        "fix(academic-v2-stable-term-save-and-settings-flags): split legacy projection sync out of term/course/subject/schedule writes in `lib/academicV2.js` so projection failures now downgrade to warnings instead of rolling back `academic_v2_*` rows, and make the new stage/course settings checkboxes in `views/admin-academic-v2.ejs` submit real `0/1` values so visibility, required/general flags, teamwork, archived state, and active markers can actually be turned off"
+      ]
+    },
+    {
       "version": "1.3.24",
       "date": "2026-03-28",
       "items": [

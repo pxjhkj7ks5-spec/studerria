@@ -9526,6 +9526,7 @@ function parseAcademicV2Focus(source = {}) {
     cohortId: parsePositiveIntStrict(source.focus_cohort_id, parsePositiveIntStrict(source.cohort_id)),
     groupId: parsePositiveIntStrict(source.focus_group_id, parsePositiveIntStrict(source.group_id)),
     termId: parsePositiveIntStrict(source.focus_term_id, parsePositiveIntStrict(source.term_id)),
+    templateStageNumber: parsePositiveIntStrict(source.focus_template_stage, parsePositiveIntStrict(source.template_stage)),
   };
 }
 
@@ -9541,6 +9542,7 @@ function buildAcademicV2PathwaysUrl(focus = {}, extraParams = {}) {
   push('cohort_id', parsePositiveIntStrict(focus.cohortId));
   push('group_id', parsePositiveIntStrict(focus.groupId));
   push('term_id', parsePositiveIntStrict(focus.termId));
+  push('template_stage', parsePositiveIntStrict(focus.templateStageNumber));
   Object.entries(extraParams || {}).forEach(([key, value]) => push(key, value));
   const query = params.toString();
   return query ? `/admin/pathways?${query}` : '/admin/pathways';
@@ -9633,10 +9635,33 @@ function getAcademicV2RouteMessages(req) {
 function getAcademicV2ExtendedRouteMessages(req) {
   return {
     ...getAcademicV2RouteMessages(req),
-    allGroupProjectionsRebuilt: 'All group projections rebuilt',
+    groupSaved: 'Course saved',
+    groupDeleted: 'Course deleted',
+    groupProjectionRebuilt: 'Legacy compatibility projection rebuilt for this course',
+    groupSubjectSaved: 'Course subject saved',
+    groupSubjectDeleted: 'Course subject deleted',
+    GROUP_LABEL_REQUIRED: 'Course label is required',
+    GROUP_REQUIRED: 'Select a course first',
+    GROUP_SUBJECT_TARGET_REQUIRED: 'Course subject requires both course and subject template',
+    USER_ASSIGNMENT_TARGET_REQUIRED: 'Select a target course and at least one user',
+    COURSE_STAGE_CAMPUS_DUPLICATE: 'Only one live course per cohort stage and campus is allowed.',
+    projectionSyncDeferred: 'Saved in Academic v2, but the legacy projection did not sync. Review Projection Health and run Resync.',
+    stageTermTemplateSaved: 'Stage term template saved',
+    stageTermTemplateDeleted: 'Stage term template deleted',
+    stageSubjectTemplateSaved: 'Stage subject template saved',
+    stageSubjectTemplateDeleted: 'Stage subject template deleted',
+    courseTemplateApplied: 'Stage template applied to the course',
+    cohortPromoted: 'Cohort promoted to the next stage',
+    STAGE_TEMPLATE_NOT_FOUND: 'No stage template exists for this program and stage yet.',
+    STAGE_TEMPLATE_TERMS_REQUIRED: 'Add at least one stage term template before applying this stage.',
+    STAGE_TEMPLATE_SUBJECTS_REQUIRED: 'Add at least one stage subject template before applying this stage.',
+    STAGE_TERM_TEMPLATE_NOT_FOUND: 'Stage term template not found',
+    STAGE_SUBJECT_TEMPLATE_NOT_FOUND: 'Stage subject template not found',
+    COHORT_STAGE_ALREADY_ACTIVE: 'This cohort is already on the selected stage.',
+    COHORT_CURRENT_STAGE_EMPTY: 'No active source courses exist for the cohort current stage.',
+    allGroupProjectionsRebuilt: 'All course projections rebuilt',
     programDeleted: 'Program deleted',
     cohortDeleted: 'Cohort deleted',
-    groupDeleted: 'Group deleted',
     templateDeleted: 'Subject template deleted',
     PROGRAM_NOT_FOUND: 'Program not found',
     COHORT_NOT_FOUND: 'Cohort not found',
@@ -33710,10 +33735,16 @@ async function handleAcademicV2MutationRoute(req, res, {
     invalidateAcademicV2CompatibilityCaches();
     const focus = typeof focusBuilder === 'function' ? (focusBuilder(result, baseFocus) || baseFocus) : baseFocus;
     const routeMessages = getAcademicV2ExtendedRouteMessages(req);
+    const warningMessage = String(
+      (result && result.warningMessage)
+      || (result && result.warningMessageKey && routeMessages[result.warningMessageKey])
+      || ''
+    ).trim();
     return res.redirect(buildAcademicV2NoticeUrl(
       'ok',
       String(successMessage || '').trim() || routeMessages[successMessageKey] || routeMessages.unknown,
-      focus
+      focus,
+      warningMessage ? { warn: warningMessage } : {}
     ));
   } catch (err) {
     console.error(logContext, err);
@@ -33737,7 +33768,11 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res, next) 
   try {
     const pageData = await academicV2Helpers.loadAcademicSetupPage(
       getAcademicV2Store(),
-      parseAcademicV2Focus(req.query)
+      parseAcademicV2Focus(req.query),
+      {
+        previewCohortId: parsePositiveIntStrict(req.query.preview_cohort_id),
+        previewTargetStageNumber: parsePositiveIntStrict(req.query.preview_target_stage),
+      }
     );
     return res.render('admin-academic-v2', {
       role: getAcademicV2PageRole(req),
@@ -33745,6 +33780,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res, next) 
       settings: settingsCache,
       error: String(req.query.err || ''),
       success: String(req.query.ok || ''),
+      warning: String(req.query.warn || ''),
       ...pageData,
     });
   } catch (err) {
@@ -33822,6 +33858,7 @@ app.post('/admin/pathways/v2/groups/save', requirePathwaysSectionAccess, writeLi
       cohortId: Number(result && result.row && result.row.cohort_id) || focus.cohortId,
       groupId: Number(result && result.row && result.row.id) || focus.groupId,
       termId: null,
+      templateStageNumber: Number(result && result.row && result.row.stage_number) || focus.templateStageNumber,
     }),
     logContext: 'admin.pathways.v2.group.save',
   })
@@ -33830,13 +33867,14 @@ app.post('/admin/pathways/v2/groups/save', requirePathwaysSectionAccess, writeLi
 app.post('/admin/pathways/v2/groups/:groupId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.deleteGroup(getAcademicV2Store(), req.params.groupId),
-    successMessage: 'Group deleted',
+    successMessageKey: 'groupDeleted',
     focusBuilder: (result, focus) => ({
       ...focus,
       programId: Number(result && result.row && result.row.program_id) || focus.programId,
       cohortId: Number(result && result.row && result.row.cohort_id) || focus.cohortId,
       groupId: null,
       termId: null,
+      templateStageNumber: Number(result && result.row && result.row.stage_number) || focus.templateStageNumber,
     }),
     logContext: 'admin.pathways.v2.group.delete',
   })
@@ -33855,10 +33893,26 @@ app.post('/admin/pathways/v2/groups/:groupId/resync', requirePathwaysSectionAcce
   })
 ));
 
+app.post('/admin/pathways/v2/groups/:groupId/apply-stage-template', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.applyStageTemplateToGroup(getAcademicV2Store(), req.params.groupId),
+    successMessageKey: 'courseTemplateApplied',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      cohortId: Number(result && result.row && result.row.cohort_id) || focus.cohortId,
+      groupId: Number(result && result.row && result.row.id) || parsePositiveIntStrict(req.params.groupId, focus.groupId),
+      termId: null,
+      templateStageNumber: Number(result && result.row && result.row.stage_number) || focus.templateStageNumber,
+    }),
+    logContext: 'admin.pathways.v2.group.apply-stage-template',
+  })
+));
+
 app.post('/admin/pathways/v2/groups/resync-all', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.resyncAllGroupProjections(getAcademicV2Store()),
-    successMessage: 'All group projections rebuilt',
+    successMessageKey: 'allGroupProjectionsRebuilt',
     logContext: 'admin.pathways.v2.group.resync-all',
   })
 ));
@@ -33905,6 +33959,58 @@ app.post('/admin/pathways/v2/templates/:templateId/delete', requirePathwaysSecti
   })
 ));
 
+app.post('/admin/pathways/v2/stage-terms/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveProgramStageTermTemplate(getAcademicV2Store(), req.body),
+    successMessageKey: 'stageTermTemplateSaved',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      templateStageNumber: Number(result && result.row && result.row.stage_number) || focus.templateStageNumber,
+    }),
+    logContext: 'admin.pathways.v2.stage-term-template.save',
+  })
+));
+
+app.post('/admin/pathways/v2/stage-terms/:stageTermTemplateId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.deleteProgramStageTermTemplate(getAcademicV2Store(), req.params.stageTermTemplateId),
+    successMessageKey: 'stageTermTemplateDeleted',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      templateStageNumber: Number(result && result.row && result.row.stage_number) || focus.templateStageNumber,
+    }),
+    logContext: 'admin.pathways.v2.stage-term-template.delete',
+  })
+));
+
+app.post('/admin/pathways/v2/stage-subjects/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveProgramStageSubjectTemplate(getAcademicV2Store(), req.body),
+    successMessageKey: 'stageSubjectTemplateSaved',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      templateStageNumber: Number(result && result.row && result.row.stage_number) || focus.templateStageNumber,
+    }),
+    logContext: 'admin.pathways.v2.stage-subject-template.save',
+  })
+));
+
+app.post('/admin/pathways/v2/stage-subjects/:stageSubjectTemplateId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.deleteProgramStageSubjectTemplate(getAcademicV2Store(), req.params.stageSubjectTemplateId),
+    successMessageKey: 'stageSubjectTemplateDeleted',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      templateStageNumber: Number(result && result.row && result.row.stage_number) || focus.templateStageNumber,
+    }),
+    logContext: 'admin.pathways.v2.stage-subject-template.delete',
+  })
+));
+
 app.post('/admin/pathways/v2/group-subjects/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.saveGroupSubject(getAcademicV2Store(), req.body),
@@ -33940,6 +34046,22 @@ app.post('/admin/pathways/v2/enrollments/bulk', requirePathwaysSectionAccess, wr
       groupId: Number(result && result.groupId) || focus.groupId,
     }),
     logContext: 'admin.pathways.v2.enrollment.bulk',
+  })
+));
+
+app.post('/admin/pathways/v2/cohorts/:cohortId/promote', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.promoteCohortStage(getAcademicV2Store(), req.params.cohortId, req.body),
+    successMessageKey: 'cohortPromoted',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      cohortId: Number(result && result.cohortId) || parsePositiveIntStrict(req.params.cohortId, focus.cohortId),
+      groupId: Number(result && result.row && result.row.id) || focus.groupId,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      termId: null,
+      templateStageNumber: Number(result && result.targetStageNumber) || focus.templateStageNumber,
+    }),
+    logContext: 'admin.pathways.v2.cohort.promote',
   })
 ));
 

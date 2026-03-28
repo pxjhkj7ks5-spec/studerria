@@ -8,10 +8,12 @@
   const activeCohortId = numberOrZero(focusState.cohortId);
   const activeGroupId = numberOrZero(focusState.groupId);
   const activeTermId = numberOrZero(focusState.termId);
+  const activeTemplateStage = numberOrZero(focusState.templateStageNumber) || 1;
   const projectionHealthList = Array.isArray(projectionHealth) ? projectionHealth : [];
   const projectionHealthByGroup = new Map(projectionHealthList.map((item) => [Number(item.group_id || 0), item]));
   const projectionHealthTotals = projectionHealthSummary && typeof projectionHealthSummary === 'object' ? projectionHealthSummary : {};
   const cleanupAudit = auditSummary && typeof auditSummary === 'object' ? auditSummary : {};
+  const stageOptions = [1, 2, 3, 4];
   const trackOptions = [
     { value: 'bachelor', label: 'Bachelor' },
     { value: 'master', label: 'Master' },
@@ -30,6 +32,7 @@
       cohort_id: activeCohortId,
       group_id: activeGroupId,
       term_id: activeTermId,
+      template_stage: activeTemplateStage,
     }, overrides || {});
     const params = new URLSearchParams();
     Object.entries(merged).forEach(([key, rawValue]) => {
@@ -46,6 +49,7 @@
     <input type="hidden" name="focus_cohort_id" value="${activeCohortId || ''}" />
     <input type="hidden" name="focus_group_id" value="${activeGroupId || ''}" />
     <input type="hidden" name="focus_term_id" value="${activeTermId || ''}" />
+    <input type="hidden" name="focus_template_stage" value="${activeTemplateStage || 1}" />
   `;
   const toAttr = (value) => JSON.stringify(value || {}).replace(/'/g, '&#39;');
 %>
@@ -80,10 +84,10 @@
           <div class="academic-v2-hero-grid">
             <div>
               <span class="academic-v2-kicker">Academic Core v2</span>
-              <h1 class="academic-v2-title">One model for programs, cohorts, groups, terms, and live subjects.</h1>
+              <h1 class="academic-v2-title">One model for programs, cohorts, courses, terms, and live subjects.</h1>
               <p class="academic-v2-subtitle">
                 This replaces the old daily Academic Setup flow with a single source of truth:
-                <strong>Program -> Cohort -> Group -> Term -> GroupSubject</strong>.
+                <strong>Program -> Cohort -> Course -> Term -> CourseSubject</strong>.
                 Legacy courses, subjects, semesters, registration pathways, and schedule rows are now compatibility projections only.
               </p>
               <div class="academic-v2-hero-actions">
@@ -98,11 +102,11 @@
                 <span class="academic-v2-stat-value"><%= Number(summary && summary.programs_total ? summary.programs_total : 0) %></span>
               </div>
               <div class="academic-v2-stat">
-                <span class="academic-v2-stat-label">Groups</span>
+                <span class="academic-v2-stat-label">Courses</span>
                 <span class="academic-v2-stat-value"><%= Number(summary && summary.groups_total ? summary.groups_total : 0) %></span>
               </div>
               <div class="academic-v2-stat">
-                <span class="academic-v2-stat-label">Group subjects</span>
+                <span class="academic-v2-stat-label">Course subjects</span>
                 <span class="academic-v2-stat-value"><%= Number(summary && summary.group_subjects_total ? summary.group_subjects_total : 0) %></span>
               </div>
               <div class="academic-v2-stat">
@@ -121,9 +125,10 @@
               <a class="academic-v2-nav-link" href="#health"><span>Projection Health</span><span class="academic-v2-code">02</span></a>
               <a class="academic-v2-nav-link" href="#programs"><span>Programs</span><span class="academic-v2-code">03</span></a>
               <a class="academic-v2-nav-link" href="#cohorts"><span>Cohorts</span><span class="academic-v2-code">04</span></a>
-              <a class="academic-v2-nav-link" href="#groups"><span>Groups</span><span class="academic-v2-code">05</span></a>
-              <a class="academic-v2-nav-link" href="#subjects"><span>Subjects & Teachers</span><span class="academic-v2-code">06</span></a>
-              <a class="academic-v2-nav-link" href="#terms"><span>Terms & Schedule</span><span class="academic-v2-code">07</span></a>
+              <a class="academic-v2-nav-link" href="#stage-templates"><span>Stage Templates</span><span class="academic-v2-code">05</span></a>
+              <a class="academic-v2-nav-link" href="#groups"><span>Courses</span><span class="academic-v2-code">06</span></a>
+              <a class="academic-v2-nav-link" href="#subjects"><span>Subjects & Teachers</span><span class="academic-v2-code">07</span></a>
+              <a class="academic-v2-nav-link" href="#terms"><span>Terms & Schedule</span><span class="academic-v2-code">08</span></a>
             </nav>
             <div class="academic-v2-sidebar-note">
               Default admin writes go only into <span class="academic-v2-code">academic_v2_*</span>.
@@ -138,13 +143,16 @@
             <% if (error) { %>
               <div class="academic-v2-alert academic-v2-alert--error"><strong>Action failed.</strong> <%= error %></div>
             <% } %>
+            <% if (warning) { %>
+              <div class="academic-v2-alert academic-v2-alert--warning"><strong>Saved with warning.</strong> <%= warning %></div>
+            <% } %>
 
             <section class="academic-v2-card" id="scope">
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Focus</h2>
                   <p class="academic-v2-section-copy">
-                    Pick the working scope first. Every create/update action below keeps this focus state so you can operate inside one cohort and one group without constantly rebuilding context.
+                    Pick the working scope first. Every create/update action below keeps this focus state so you can operate inside one cohort and one course without constantly rebuilding context.
                   </p>
                 </div>
                 <div class="academic-v2-chip-row">
@@ -173,7 +181,7 @@
                     </select>
                   </div>
                   <div class="academic-v2-field">
-                    <label for="focusGroupId">Group</label>
+                    <label for="focusGroupId">Course</label>
                     <select id="focusGroupId" class="form-select" name="group_id">
                       <% (scopedGroups || []).forEach((group) => { %>
                         <option value="<%= group.id %>" <%= Number(group.id) === activeGroupId ? 'selected' : '' %>><%= group.label %> - stage <%= group.stage_number %> - <%= group.campus_key %></option>
@@ -206,15 +214,15 @@
                 </div>
                 <form method="post" action="/admin/pathways/v2/groups/resync-all">
                   <%- renderFocusFields() %>
-                  <button type="submit" class="btn btn-outline-secondary">Resync all group projections</button>
+                    <button type="submit" class="btn btn-outline-secondary">Resync all course projections</button>
                 </form>
               </div>
               <div class="academic-v2-grid-2">
                 <div class="academic-v2-subcard">
                   <h3 class="h5 mb-3">Live projection summary</h3>
                   <div class="academic-v2-chip-row">
-                    <span class="academic-v2-chip academic-v2-chip--ok"><%= Number(projectionHealthTotals.groups_healthy || 0) %> healthy groups</span>
-                    <span class="academic-v2-chip academic-v2-chip--warm"><%= Number(projectionHealthTotals.groups_with_issues || 0) %> groups with issues</span>
+                    <span class="academic-v2-chip academic-v2-chip--ok"><%= Number(projectionHealthTotals.groups_healthy || 0) %> healthy courses</span>
+                    <span class="academic-v2-chip academic-v2-chip--warm"><%= Number(projectionHealthTotals.groups_with_issues || 0) %> courses with issues</span>
                     <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_missing_legacy_course || 0) %> missing legacy course</span>
                     <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_without_active_term || 0) %> missing active term</span>
                     <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_with_user_sync_gaps || 0) %> user sync gaps</span>
@@ -224,7 +232,7 @@
                     <table class="table academic-v2-table">
                       <thead>
                         <tr>
-                          <th>Group</th>
+                          <th>Course</th>
                           <th>Health</th>
                           <th></th>
                         </tr>
@@ -268,14 +276,14 @@
                   <h3 class="h5 mb-3">Cleanup dry-run</h3>
                   <div class="academic-v2-chip-row">
                     <span class="academic-v2-chip academic-v2-chip--warm"><%= Number(cleanupAudit.total_findings || 0) %> total findings</span>
-                    <span class="academic-v2-chip"><%= Number(cleanupAudit.users_without_group_id || 0) %> users without group</span>
+                    <span class="academic-v2-chip"><%= Number(cleanupAudit.users_without_group_id || 0) %> users without course</span>
                     <span class="academic-v2-chip"><%= Number(cleanupAudit.users_with_course_projection_mismatch || 0) %> user projection mismatches</span>
                     <span class="academic-v2-chip"><%= Number(cleanupAudit.group_subjects_without_teacher_assignment || 0) %> subjects missing teacher</span>
                   </div>
                   <div class="academic-v2-table-wrap mt-3">
                     <table class="table academic-v2-table">
                       <tbody>
-                        <tr><th>Groups without active term</th><td><%= Number(cleanupAudit.groups_without_active_term || 0) %></td></tr>
+                        <tr><th>Courses without active term</th><td><%= Number(cleanupAudit.groups_without_active_term || 0) %></td></tr>
                         <tr><th>Stale legacy course mappings</th><td><%= Number(cleanupAudit.stale_legacy_course_rows || 0) %></td></tr>
                         <tr><th>Stale legacy subject rows</th><td><%= Number(cleanupAudit.stale_legacy_subject_rows || 0) %></td></tr>
                         <tr><th>Stale legacy semester rows</th><td><%= Number(cleanupAudit.stale_legacy_semester_rows || 0) %></td></tr>
@@ -323,6 +331,7 @@
                       <input id="programSort" class="form-control" type="number" name="sort_order" data-editor-input="program.sort_order" value="100" />
                     </div>
                   </div>
+                  <input type="hidden" name="is_active" value="0" />
                   <div class="form-check mt-3">
                     <input id="programActive" class="form-check-input" type="checkbox" name="is_active" value="1" data-editor-input="program.is_active" checked />
                     <label class="form-check-label" for="programActive">Active program</label>
@@ -351,7 +360,7 @@
                                 <span class="academic-v2-muted"><%= program.track_key %> - <span class="academic-v2-code"><%= program.code || 'no-code' %></span></span>
                               </div>
                             </td>
-                            <td><span class="academic-v2-chip"><%= program.cohort_count %> cohorts</span> <span class="academic-v2-chip"><%= program.group_count %> groups</span></td>
+                            <td><span class="academic-v2-chip"><%= program.cohort_count %> cohorts</span> <span class="academic-v2-chip"><%= program.group_count %> courses</span></td>
                             <td class="text-end">
                               <div class="academic-v2-actions justify-content-end">
                                 <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: program.id, cohort_id: '', group_id: '', term_id: '' }) %>">Focus</a>
@@ -375,7 +384,7 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Cohorts</h2>
-                  <p class="academic-v2-section-copy">Admission year belongs to the program directly. This is the new replacement for the old admission-pathways layer.</p>
+                  <p class="academic-v2-section-copy">Admission year belongs to the program directly. Cohorts stay empty until you create a course or promote the cohort into a prepared stage template.</p>
                 </div>
               </div>
               <div class="academic-v2-grid-2">
@@ -400,6 +409,7 @@
                       <input id="cohortLabel" class="form-control" type="text" name="label" data-editor-input="cohort.label" placeholder="2026 Intake" required />
                     </div>
                   </div>
+                  <input type="hidden" name="is_active" value="0" />
                   <div class="form-check mt-3">
                     <input id="cohortActive" class="form-check-input" type="checkbox" name="is_active" value="1" data-editor-input="cohort.is_active" checked />
                     <label class="form-check-label" for="cohortActive">Active cohort</label>
@@ -409,40 +419,325 @@
                     <button type="button" class="btn btn-outline-secondary" data-editor-reset="cohort">Reset</button>
                   </div>
                 </form>
-                <div class="academic-v2-subcard">
-                  <div class="academic-v2-table-wrap">
-                    <table class="table academic-v2-table">
-                      <thead>
-                        <tr>
-                          <th>Cohort</th>
-                          <th>Stats</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <% (cohorts || []).forEach((cohort) => { %>
+                <div class="academic-v2-stack">
+                  <div class="academic-v2-subcard">
+                    <div class="academic-v2-table-wrap">
+                      <table class="table academic-v2-table">
+                        <thead>
                           <tr>
-                            <td>
-                              <div class="academic-v2-kv">
-                                <strong><%= cohort.label %></strong>
-                                <span class="academic-v2-muted"><%= cohort.program_name %> - <%= cohort.admission_year %></span>
+                            <th>Cohort</th>
+                            <th>Stats</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <% (cohorts || []).forEach((cohort) => { %>
+                            <tr>
+                              <td>
+                                <div class="academic-v2-kv">
+                                  <strong><%= cohort.label %></strong>
+                                  <span class="academic-v2-muted"><%= cohort.program_name %> - <%= cohort.admission_year %> - current stage <%= cohort.current_stage_number %></span>
+                                </div>
+                              </td>
+                              <td>
+                                <span class="academic-v2-chip"><%= cohort.group_count %> courses</span>
+                                <span class="academic-v2-chip"><%= cohort.current_stage_number %> live stage</span>
+                                <span class="academic-v2-chip academic-v2-chip--ok"><%= cohort.enrolled_users %> users</span>
+                              </td>
+                              <td class="text-end">
+                                <div class="academic-v2-actions justify-content-end">
+                                  <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: cohort.program_id, cohort_id: cohort.id, group_id: '', term_id: '' }) %>">Focus</a>
+                                  <button type="button" class="btn btn-sm btn-primary" data-editor-target="cohort" data-editor-payload='<%- toAttr(cohort) %>'>Edit</button>
+                                  <form method="post" action="/admin/pathways/v2/cohorts/<%= cohort.id %>/delete">
+                                    <%- renderFocusFields() %>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                  </form>
+                                </div>
+                              </td>
+                            </tr>
+                          <% }); %>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="academic-v2-subcard">
+                    <h3 class="h5 mb-2">Promote cohort</h3>
+                    <% if (selectedCohort) { %>
+                      <p class="academic-v2-section-copy mb-3">Move the cohort to the next stage with a preview. Promotion replaces the live subject and term set for the new stage, while the previous stage stays as history.</p>
+                      <form method="get" action="/admin/pathways" class="academic-v2-form-grid academic-v2-form-grid--compact">
+                        <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
+                        <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
+                        <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
+                        <input type="hidden" name="term_id" value="<%= activeTermId || '' %>" />
+                        <input type="hidden" name="template_stage" value="<%= activeTemplateStage || 1 %>" />
+                        <input type="hidden" name="preview_cohort_id" value="<%= selectedCohort.id %>" />
+                        <div class="academic-v2-field">
+                          <label for="previewTargetStage">Target stage</label>
+                          <select id="previewTargetStage" class="form-select" name="preview_target_stage">
+                            <% stageOptions.forEach((stageNumber) => { %>
+                              <option value="<%= stageNumber %>" <%= Number((promotionPreview && promotionPreview.target_stage_number) || selectedCohort.current_stage_number + 1) === stageNumber ? 'selected' : '' %>>Stage <%= stageNumber %></option>
+                            <% }); %>
+                          </select>
+                        </div>
+                        <div class="academic-v2-actions">
+                          <button type="submit" class="btn btn-outline-secondary">Preview promotion</button>
+                        </div>
+                      </form>
+                      <% if (promotionPreview && Number(promotionPreview.cohort_id || 0) === Number(selectedCohort.id || 0)) { %>
+                        <div class="academic-v2-stack mt-3">
+                          <div class="academic-v2-chip-row">
+                            <span class="academic-v2-chip">Stage <%= promotionPreview.current_stage_number %> -> <%= promotionPreview.target_stage_number %></span>
+                            <span class="academic-v2-chip"><%= promotionPreview.template_term_count %> template terms</span>
+                            <span class="academic-v2-chip"><%= promotionPreview.template_subject_count %> template subjects</span>
+                            <span class="academic-v2-chip"><%= promotionPreview.subjects_without_teacher_defaults %> subjects without teacher defaults</span>
+                          </div>
+                          <% if ((promotionPreview.issues || []).length) { %>
+                            <div class="academic-v2-alert academic-v2-alert--warning">
+                              <strong>Preview blocked.</strong>
+                              <%= promotionPreview.issues.join(' ') %>
+                            </div>
+                          <% } %>
+                          <% if ((promotionPreview.course_plans || []).length) { %>
+                            <div class="academic-v2-table-wrap">
+                              <table class="table academic-v2-table">
+                                <thead>
+                                  <tr>
+                                    <th>Campus</th>
+                                    <th>Current live course</th>
+                                    <th>Target course</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% promotionPreview.course_plans.forEach((plan) => { %>
+                                    <tr>
+                                      <td><%= plan.campus_key %></td>
+                                      <td>
+                                        <div class="academic-v2-kv">
+                                          <strong><%= plan.source_course_label %></strong>
+                                          <span class="academic-v2-muted"><%= plan.source_user_count %> users, <%= plan.source_term_count %> terms, <%= plan.source_subject_count %> subjects</span>
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <span class="academic-v2-chip"><%= plan.target_course_exists ? 'existing target course' : 'new target course' %></span>
+                                        <% if (plan.target_course_label) { %><span class="academic-v2-chip"><%= plan.target_course_label %></span><% } %>
+                                      </td>
+                                    </tr>
+                                  <% }); %>
+                                </tbody>
+                              </table>
+                            </div>
+                          <% } %>
+                          <% if (promotionPreview.can_apply) { %>
+                            <form method="post" action="/admin/pathways/v2/cohorts/<%= selectedCohort.id %>/promote" class="academic-v2-actions">
+                              <%- renderFocusFields() %>
+                              <input type="hidden" name="target_stage_number" value="<%= promotionPreview.target_stage_number %>" />
+                              <button type="submit" class="btn btn-primary">Apply promotion</button>
+                            </form>
+                          <% } %>
+                        </div>
+                      <% } %>
+                    <% } else { %>
+                      <div class="academic-v2-empty">Focus a cohort first to preview and apply stage promotion.</div>
+                    <% } %>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="academic-v2-card" id="stage-templates">
+              <div class="academic-v2-section-head">
+                <div>
+                  <h2 class="academic-v2-section-title">Stage templates</h2>
+                  <p class="academic-v2-section-copy">Templates define which terms and subjects belong to each program stage. They do not create live course data until you explicitly apply them to a course or promote a cohort.</p>
+                </div>
+              </div>
+              <div class="academic-v2-subcard mb-4">
+                <form method="get" action="/admin/pathways" class="academic-v2-focus-grid">
+                  <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
+                  <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
+                  <input type="hidden" name="term_id" value="<%= activeTermId || '' %>" />
+                  <div class="academic-v2-field">
+                    <label for="templateProgramId">Program</label>
+                    <select id="templateProgramId" class="form-select" name="program_id">
+                      <% (programs || []).forEach((program) => { %>
+                        <option value="<%= program.id %>" <%= Number(program.id) === activeProgramId ? 'selected' : '' %>><%= program.name %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <div class="academic-v2-field">
+                    <label for="templateStageNumber">Template stage</label>
+                    <select id="templateStageNumber" class="form-select" name="template_stage">
+                      <% stageOptions.forEach((stageNumber) => { %>
+                        <option value="<%= stageNumber %>" <%= stageNumber === activeTemplateStage ? 'selected' : '' %>>Stage <%= stageNumber %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <div class="academic-v2-actions">
+                    <button type="submit" class="btn btn-outline-secondary">Load stage template</button>
+                  </div>
+                </form>
+                <div class="academic-v2-chip-row mt-3">
+                  <% (templateStageCards || []).forEach((card) => { %>
+                    <span class="academic-v2-chip <%= card.is_current ? 'academic-v2-chip--ok' : '' %>">Stage <%= card.stage_number %>: <%= card.term_count %> terms, <%= card.subject_count %> subjects</span>
+                  <% }); %>
+                </div>
+              </div>
+              <div class="academic-v2-grid-2">
+                <div class="academic-v2-stack">
+                  <form method="post" action="/admin/pathways/v2/stage-terms/save" class="academic-v2-subcard" data-editor-form="stage-term">
+                    <%- renderFocusFields() %>
+                    <input type="hidden" name="stage_term_template_id" value="" data-editor-input="stage-term.id" />
+                    <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" data-preserve-reset="1" />
+                    <input type="hidden" name="stage_number" value="<%= activeTemplateStage || 1 %>" data-preserve-reset="1" />
+                    <h3 class="h5 mb-3">Stage terms</h3>
+                    <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                      <div class="academic-v2-field">
+                        <label for="stageTermNumber">Term number</label>
+                        <input id="stageTermNumber" class="form-control" type="number" name="term_number" data-editor-input="stage-term.term_number" value="1" required />
+                      </div>
+                      <div class="academic-v2-field">
+                        <label for="stageTermTitle">Title</label>
+                        <input id="stageTermTitle" class="form-control" type="text" name="title" data-editor-input="stage-term.title" placeholder="Semester 1" required />
+                      </div>
+                      <div class="academic-v2-field">
+                        <label for="stageTermStartDate">Start date</label>
+                        <input id="stageTermStartDate" class="form-control" type="date" name="start_date" data-editor-input="stage-term.start_date" />
+                      </div>
+                      <div class="academic-v2-field">
+                        <label for="stageTermWeeks">Weeks</label>
+                        <input id="stageTermWeeks" class="form-control" type="number" name="weeks_count" data-editor-input="stage-term.weeks_count" value="16" />
+                      </div>
+                    </div>
+                    <input type="hidden" name="is_active_default" value="0" />
+                    <div class="form-check mt-3">
+                      <input id="stageTermActiveDefault" class="form-check-input" type="checkbox" name="is_active_default" value="1" data-editor-input="stage-term.is_active_default" />
+                      <label class="form-check-label" for="stageTermActiveDefault">Make this the default active term when the stage is applied</label>
+                    </div>
+                    <div class="academic-v2-actions mt-3">
+                      <button type="submit" class="btn btn-primary">Save stage term</button>
+                      <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-term">Reset</button>
+                    </div>
+                  </form>
+                  <div class="academic-v2-subcard">
+                    <h3 class="h5 mb-3">Current stage term templates</h3>
+                    <% if ((scopedStageTermTemplates || []).length) { %>
+                      <div class="academic-v2-stack">
+                        <% (scopedStageTermTemplates || []).forEach((stageTerm) => { %>
+                          <div class="academic-v2-subcard">
+                            <div class="d-flex flex-wrap justify-content-between gap-2">
+                              <div>
+                                <strong><%= stageTerm.title %></strong>
+                                <div class="academic-v2-muted">Term <%= stageTerm.term_number %> - <%= stageTerm.weeks_count %> weeks<%= stageTerm.start_date ? ` - ${stageTerm.start_date}` : '' %></div>
                               </div>
-                            </td>
-                            <td><span class="academic-v2-chip"><%= cohort.group_count %> groups</span> <span class="academic-v2-chip academic-v2-chip--ok"><%= cohort.enrolled_users %> users</span></td>
-                            <td class="text-end">
-                              <div class="academic-v2-actions justify-content-end">
-                                <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: cohort.program_id, cohort_id: cohort.id, group_id: '', term_id: '' }) %>">Focus</a>
-                                <button type="button" class="btn btn-sm btn-primary" data-editor-target="cohort" data-editor-payload='<%- toAttr(cohort) %>'>Edit</button>
-                                <form method="post" action="/admin/pathways/v2/cohorts/<%= cohort.id %>/delete">
+                              <div class="academic-v2-actions">
+                                <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-term" data-editor-payload='<%- toAttr(stageTerm) %>'>Edit</button>
+                                <form method="post" action="/admin/pathways/v2/stage-terms/<%= stageTerm.id %>/delete">
                                   <%- renderFocusFields() %>
                                   <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                 </form>
                               </div>
-                            </td>
-                          </tr>
+                            </div>
+                          </div>
                         <% }); %>
-                      </tbody>
-                    </table>
+                      </div>
+                    <% } else { %>
+                      <div class="academic-v2-empty">No stage terms yet for the selected program and stage.</div>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="academic-v2-stack">
+                  <form method="post" action="/admin/pathways/v2/stage-subjects/save" class="academic-v2-subcard" data-editor-form="stage-subject">
+                    <%- renderFocusFields() %>
+                    <input type="hidden" name="stage_subject_template_id" value="" data-editor-input="stage-subject.id" />
+                    <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" data-preserve-reset="1" />
+                    <input type="hidden" name="stage_number" value="<%= activeTemplateStage || 1 %>" data-preserve-reset="1" />
+                    <h3 class="h5 mb-3">Stage subjects</h3>
+                    <div class="academic-v2-form-grid">
+                      <div class="academic-v2-field">
+                        <label for="stageSubjectTemplate">Subject template</label>
+                        <select id="stageSubjectTemplate" class="form-select" name="subject_template_id" data-editor-input="stage-subject.subject_template_id">
+                          <% (subjectTemplates || []).forEach((template) => { %>
+                            <option value="<%= template.id %>"><%= template.name %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="academic-v2-field" style="grid-column: 1 / -1;">
+                        <label for="stageSubjectTitle">Live title override</label>
+                        <input id="stageSubjectTitle" class="form-control" type="text" name="title" data-editor-input="stage-subject.title" placeholder="Leave empty to use the template name" />
+                      </div>
+                      <div class="academic-v2-field">
+                        <label for="stageSubjectGroups">Group count</label>
+                        <input id="stageSubjectGroups" class="form-control" type="number" name="group_count" data-editor-input="stage-subject.group_count" value="1" />
+                      </div>
+                      <div class="academic-v2-field">
+                        <label for="stageSubjectDefaultGroup">Default group</label>
+                        <input id="stageSubjectDefaultGroup" class="form-control" type="number" name="default_group" data-editor-input="stage-subject.default_group" value="1" />
+                      </div>
+                      <div class="academic-v2-field">
+                        <label for="stageSubjectSortOrder">Sort order</label>
+                        <input id="stageSubjectSortOrder" class="form-control" type="number" name="sort_order" data-editor-input="stage-subject.sort_order" value="0" />
+                      </div>
+                      <div class="academic-v2-field">
+                        <label for="stageSubjectTerms">Stage terms</label>
+                        <select id="stageSubjectTerms" class="form-select" name="stage_term_template_ids" multiple size="4" data-editor-input="stage-subject.stage_term_template_ids">
+                          <% (scopedStageTermTemplates || []).forEach((stageTerm) => { %>
+                            <option value="<%= stageTerm.id %>"><%= stageTerm.title %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="academic-v2-field" style="grid-column: 1 / -1;">
+                        <label for="stageSubjectTeachers">Default teachers</label>
+                        <select id="stageSubjectTeachers" class="form-select" name="teacher_ids" multiple size="5" data-editor-input="stage-subject.teacher_ids">
+                          <% (teachers || []).forEach((teacher) => { %>
+                            <option value="<%= teacher.id %>"><%= teacher.full_name %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="academic-v2-checkboxes mt-3">
+                      <input type="hidden" name="is_visible" value="0" />
+                      <div class="form-check"><input id="stageSubjectVisible" class="form-check-input" type="checkbox" name="is_visible" value="1" data-editor-input="stage-subject.is_visible" checked /><label class="form-check-label" for="stageSubjectVisible">Visible</label></div>
+                      <input type="hidden" name="is_required" value="0" />
+                      <div class="form-check"><input id="stageSubjectRequired" class="form-check-input" type="checkbox" name="is_required" value="1" data-editor-input="stage-subject.is_required" checked /><label class="form-check-label" for="stageSubjectRequired">Required</label></div>
+                      <input type="hidden" name="is_general" value="0" />
+                      <div class="form-check"><input id="stageSubjectGeneral" class="form-check-input" type="checkbox" name="is_general" value="1" data-editor-input="stage-subject.is_general" checked /><label class="form-check-label" for="stageSubjectGeneral">General</label></div>
+                      <input type="hidden" name="show_in_teamwork" value="0" />
+                      <div class="form-check"><input id="stageSubjectTeamwork" class="form-check-input" type="checkbox" name="show_in_teamwork" value="1" data-editor-input="stage-subject.show_in_teamwork" checked /><label class="form-check-label" for="stageSubjectTeamwork">Show in teamwork</label></div>
+                    </div>
+                    <div class="academic-v2-actions mt-3">
+                      <button type="submit" class="btn btn-primary">Save stage subject</button>
+                      <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-subject">Reset</button>
+                    </div>
+                  </form>
+                  <div class="academic-v2-subcard">
+                    <h3 class="h5 mb-3">Current stage subject templates</h3>
+                    <% if ((scopedStageSubjectTemplates || []).length) { %>
+                      <div class="academic-v2-stack">
+                        <% (scopedStageSubjectTemplates || []).forEach((stageSubject) => { %>
+                          <div class="academic-v2-subcard">
+                            <div class="d-flex flex-wrap justify-content-between gap-2">
+                              <div>
+                                <strong><%= stageSubject.title %></strong>
+                                <div class="academic-v2-muted"><%= stageSubject.subject_template_name %></div>
+                                <div class="academic-v2-chip-row mt-2">
+                                  <span class="academic-v2-chip"><%= stageSubject.stage_term_titles.length ? stageSubject.stage_term_titles.join(', ') : 'All stage terms' %></span>
+                                  <span class="academic-v2-chip"><%= stageSubject.teacher_names.length ? stageSubject.teacher_names.join(', ') : 'No teacher defaults' %></span>
+                                </div>
+                              </div>
+                              <div class="academic-v2-actions">
+                                <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-subject" data-editor-payload='<%- toAttr(stageSubject) %>'>Edit</button>
+                                <form method="post" action="/admin/pathways/v2/stage-subjects/<%= stageSubject.id %>/delete">
+                                  <%- renderFocusFields() %>
+                                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                        <% }); %>
+                      </div>
+                    <% } else { %>
+                      <div class="academic-v2-empty">No stage subjects yet for the selected program and stage.</div>
+                    <% } %>
                   </div>
                 </div>
               </div>
@@ -451,14 +746,20 @@
             <section class="academic-v2-card" id="groups">
               <div class="academic-v2-section-head">
                 <div>
-                  <h2 class="academic-v2-section-title">Groups</h2>
-                  <p class="academic-v2-section-copy">Groups carry stage number, campus, label, and the live student enrollment scope. This is where compatibility projection starts mapping back to legacy courses.</p>
+                  <h2 class="academic-v2-section-title">Courses</h2>
+                  <p class="academic-v2-section-copy">Courses carry stage number, campus, label, and the live student enrollment scope. They start empty until you explicitly apply a stage template or add subjects and terms manually.</p>
                 </div>
                 <% if (selectedGroup) { %>
-                  <form method="post" action="/admin/pathways/v2/groups/<%= selectedGroup.id %>/resync">
-                    <%- renderFocusFields() %>
-                    <button type="submit" class="btn btn-outline-secondary">Rebuild legacy projection</button>
-                  </form>
+                  <div class="academic-v2-actions">
+                    <form method="post" action="/admin/pathways/v2/groups/<%= selectedGroup.id %>/apply-stage-template">
+                      <%- renderFocusFields() %>
+                      <button type="submit" class="btn btn-outline-secondary">Apply stage template</button>
+                    </form>
+                    <form method="post" action="/admin/pathways/v2/groups/<%= selectedGroup.id %>/resync">
+                      <%- renderFocusFields() %>
+                      <button type="submit" class="btn btn-outline-secondary">Rebuild legacy projection</button>
+                    </form>
+                  </div>
                 <% } %>
               </div>
               <div class="academic-v2-grid-2">
@@ -491,16 +792,17 @@
                       <input id="groupCode" class="form-control academic-v2-code" type="text" name="code" data-editor-input="group.code" placeholder="BSC26-A" />
                     </div>
                     <div class="academic-v2-field" style="grid-column: 1 / -1;">
-                      <label for="groupLabel">Label</label>
-                      <input id="groupLabel" class="form-control" type="text" name="label" data-editor-input="group.label" placeholder="BSc 2026 - Group A" required />
+                      <label for="groupLabel">Course label</label>
+                      <input id="groupLabel" class="form-control" type="text" name="label" data-editor-input="group.label" placeholder="PLED 2026 Kyiv" required />
                     </div>
                   </div>
+                  <input type="hidden" name="is_active" value="0" />
                   <div class="form-check mt-3">
                     <input id="groupActive" class="form-check-input" type="checkbox" name="is_active" value="1" data-editor-input="group.is_active" checked />
-                    <label class="form-check-label" for="groupActive">Active group</label>
+                    <label class="form-check-label" for="groupActive">Active course</label>
                   </div>
                   <div class="academic-v2-actions mt-3">
-                    <button type="submit" class="btn btn-primary">Save group</button>
+                    <button type="submit" class="btn btn-primary">Save course</button>
                     <button type="button" class="btn btn-outline-secondary" data-editor-reset="group">Reset</button>
                   </div>
                 </form>
@@ -510,7 +812,7 @@
                       <table class="table academic-v2-table">
                         <thead>
                           <tr>
-                            <th>Group</th>
+                            <th>Course</th>
                             <th>Projection</th>
                             <th></th>
                           </tr>
@@ -555,9 +857,9 @@
                   <form method="post" action="/admin/pathways/v2/enrollments/bulk" class="academic-v2-subcard">
                     <%- renderFocusFields() %>
                     <h3 class="h5 mb-2">Bulk user reassignment</h3>
-                    <p class="academic-v2-section-copy mb-3">Assign existing users to the selected group. Projection updates both <span class="academic-v2-code">users.group_id</span> and compatibility legacy placement.</p>
+                    <p class="academic-v2-section-copy mb-3">Assign existing users to the selected course. Projection updates both <span class="academic-v2-code">users.group_id</span> and compatibility legacy placement.</p>
                     <div class="academic-v2-field">
-                      <label for="bulkGroupId">Target group</label>
+                      <label for="bulkGroupId">Target course</label>
                       <select id="bulkGroupId" class="form-select" name="group_id">
                         <% (scopedGroups || groups || []).forEach((group) => { %>
                           <option value="<%= group.id %>" <%= Number(group.id) === activeGroupId ? 'selected' : '' %>><%= group.label %></option>
@@ -584,7 +886,7 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Subjects & Teachers</h2>
-                  <p class="academic-v2-section-copy">Templates are the global catalog. Group subjects are the live, group-owned instances that define visibility, teachers, teamwork presence, and term coverage.</p>
+                  <p class="academic-v2-section-copy">Templates are the global catalog. Course subjects are the live course-owned instances that define visibility, teachers, teamwork presence, and term coverage.</p>
                 </div>
               </div>
               <div class="academic-v2-grid-3">
@@ -595,6 +897,7 @@
                     <label for="templateName">Template name</label>
                     <input id="templateName" class="form-control" type="text" name="name" data-editor-input="template.name" placeholder="Linear Algebra" required />
                   </div>
+                  <input type="hidden" name="is_active" value="0" />
                   <div class="form-check mt-3">
                     <input id="templateActive" class="form-check-input" type="checkbox" name="is_active" value="1" data-editor-input="template.is_active" checked />
                     <label class="form-check-label" for="templateActive">Template is active</label>
@@ -610,7 +913,7 @@
                           <div class="d-flex flex-wrap justify-content-between gap-2">
                             <div>
                               <strong><%= template.name %></strong>
-                              <div class="academic-v2-muted"><%= template.group_subject_count %> linked group subjects</div>
+                              <div class="academic-v2-muted"><%= template.group_subject_count %> linked course subjects</div>
                             </div>
                             <div class="academic-v2-actions">
                               <button type="button" class="btn btn-sm btn-outline-secondary" data-editor-target="template" data-editor-payload='<%- toAttr(template) %>'>Edit</button>
@@ -628,7 +931,7 @@
                   <input type="hidden" name="group_subject_id" value="" data-editor-input="group-subject.id" />
                   <div class="academic-v2-form-grid">
                     <div class="academic-v2-field">
-                      <label for="groupSubjectGroup">Group</label>
+                      <label for="groupSubjectGroup">Course</label>
                       <select id="groupSubjectGroup" class="form-select" name="group_id" data-editor-input="group-subject.group_id">
                         <% (scopedGroups || groups || []).forEach((group) => { %>
                           <option value="<%= group.id %>" <%= Number(group.id) === activeGroupId ? 'selected' : '' %>><%= group.label %></option>
@@ -677,19 +980,23 @@
                     </div>
                   </div>
                   <div class="academic-v2-checkboxes mt-3">
+                    <input type="hidden" name="is_visible" value="0" />
                     <div class="form-check"><input id="groupSubjectVisible" class="form-check-input" type="checkbox" name="is_visible" value="1" data-editor-input="group-subject.is_visible" checked /><label class="form-check-label" for="groupSubjectVisible">Visible</label></div>
+                    <input type="hidden" name="is_required" value="0" />
                     <div class="form-check"><input id="groupSubjectRequired" class="form-check-input" type="checkbox" name="is_required" value="1" data-editor-input="group-subject.is_required" checked /><label class="form-check-label" for="groupSubjectRequired">Required</label></div>
+                    <input type="hidden" name="is_general" value="0" />
                     <div class="form-check"><input id="groupSubjectGeneral" class="form-check-input" type="checkbox" name="is_general" value="1" data-editor-input="group-subject.is_general" checked /><label class="form-check-label" for="groupSubjectGeneral">General</label></div>
+                    <input type="hidden" name="show_in_teamwork" value="0" />
                     <div class="form-check"><input id="groupSubjectTeamwork" class="form-check-input" type="checkbox" name="show_in_teamwork" value="1" data-editor-input="group-subject.show_in_teamwork" checked /><label class="form-check-label" for="groupSubjectTeamwork">Show in teamwork</label></div>
                   </div>
-                  <div class="academic-v2-actions mt-3">
-                    <button type="submit" class="btn btn-primary">Save group subject</button>
-                    <button type="button" class="btn btn-outline-secondary" data-editor-reset="group-subject">Reset</button>
-                  </div>
+                    <div class="academic-v2-actions mt-3">
+                      <button type="submit" class="btn btn-primary">Save course subject</button>
+                      <button type="button" class="btn btn-outline-secondary" data-editor-reset="group-subject">Reset</button>
+                    </div>
                 </form>
 
                 <div class="academic-v2-subcard">
-                  <h3 class="h5 mb-3">Selected group live subjects</h3>
+                  <h3 class="h5 mb-3">Selected course live subjects</h3>
                   <% if ((scopedGroupSubjects || []).length) { %>
                     <div class="academic-v2-stack">
                       <% (scopedGroupSubjects || []).forEach((subject) => { %>
@@ -715,7 +1022,7 @@
                       <% }); %>
                     </div>
                   <% } else { %>
-                    <div class="academic-v2-empty">Pick a group and create its first live subject.</div>
+                    <div class="academic-v2-empty"><%= activeGroupId ? 'This course has no live subjects yet.' : 'Pick or create a course first.' %></div>
                   <% } %>
                 </div>
               </div>
@@ -725,7 +1032,7 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Terms & Schedule</h2>
-                  <p class="academic-v2-section-copy">Term objects stay on the group. Manual schedule rows attach to <span class="academic-v2-code">group_subject_id + term_id</span> and mirror into legacy schedule entries for compatibility.</p>
+                  <p class="academic-v2-section-copy">Term objects stay on the course. Manual schedule rows attach to <span class="academic-v2-code">group_subject_id + term_id</span> and mirror into legacy schedule entries for compatibility.</p>
                 </div>
               </div>
               <div class="academic-v2-grid-3">
@@ -734,7 +1041,7 @@
                   <input type="hidden" name="term_id" value="" data-editor-input="term.id" />
                   <div class="academic-v2-form-grid">
                     <div class="academic-v2-field">
-                      <label for="termGroup">Group</label>
+                      <label for="termGroup">Course</label>
                       <select id="termGroup" class="form-select" name="group_id" data-editor-input="term.group_id">
                         <% (scopedGroups || groups || []).forEach((group) => { %>
                           <option value="<%= group.id %>" <%= Number(group.id) === activeGroupId ? 'selected' : '' %>><%= group.label %></option>
@@ -759,7 +1066,9 @@
                     </div>
                   </div>
                   <div class="academic-v2-checkboxes mt-3">
+                    <input type="hidden" name="is_active" value="0" />
                     <div class="form-check"><input id="termActive" class="form-check-input" type="checkbox" name="is_active" value="1" data-editor-input="term.is_active" /><label class="form-check-label" for="termActive">Active term</label></div>
+                    <input type="hidden" name="is_archived" value="0" />
                     <div class="form-check"><input id="termArchived" class="form-check-input" type="checkbox" name="is_archived" value="1" data-editor-input="term.is_archived" /><label class="form-check-label" for="termArchived">Archived</label></div>
                   </div>
                   <div class="academic-v2-actions mt-3">
@@ -781,7 +1090,7 @@
                       </select>
                     </div>
                     <div class="academic-v2-field">
-                      <label for="scheduleSubject">Group subject</label>
+                      <label for="scheduleSubject">Course subject</label>
                       <select id="scheduleSubject" class="form-select" name="group_subject_id" data-editor-input="schedule.group_subject_id">
                         <% (scopedGroupSubjects || []).forEach((subject) => { %>
                           <option value="<%= subject.id %>"><%= subject.title %></option>
@@ -813,7 +1122,7 @@
                       <input id="scheduleWeekNumber" class="form-control" type="number" name="week_number" data-editor-input="schedule.week_number" value="1" />
                     </div>
                     <div class="academic-v2-field">
-                      <label for="scheduleGroupNumber">Group #</label>
+                      <label for="scheduleGroupNumber">Subgroup #</label>
                       <input id="scheduleGroupNumber" class="form-control" type="number" name="group_number" data-editor-input="schedule.group_number" value="1" />
                     </div>
                   </div>
@@ -825,7 +1134,7 @@
 
                 <div class="academic-v2-stack">
                   <div class="academic-v2-subcard">
-                    <h3 class="h5 mb-3">Terms in selected group</h3>
+                    <h3 class="h5 mb-3">Terms in selected course</h3>
                     <% if ((scopedTerms || []).length) { %>
                       <div class="academic-v2-stack">
                         <% (scopedTerms || []).forEach((term) => { %>
@@ -847,7 +1156,7 @@
                         <% }); %>
                       </div>
                     <% } else { %>
-                      <div class="academic-v2-empty">No terms for the current group yet.</div>
+                      <div class="academic-v2-empty"><%= activeGroupId ? 'No terms for the current course yet.' : 'Pick or create a course first.' %></div>
                     <% } %>
                   </div>
                   <div class="academic-v2-subcard">
@@ -859,7 +1168,7 @@
                             <div class="d-flex flex-wrap justify-content-between gap-2">
                               <div>
                                 <strong><%= entry.subject_title %></strong>
-                                <div class="academic-v2-muted"><%= entry.term_title %> - <%= entry.day_of_week %> - class <%= entry.class_number %> - week <%= entry.week_number %> - group <%= entry.group_number %> - <%= entry.lesson_type %></div>
+                                <div class="academic-v2-muted"><%= entry.term_title %> - <%= entry.day_of_week %> - class <%= entry.class_number %> - week <%= entry.week_number %> - subgroup <%= entry.group_number %> - <%= entry.lesson_type %></div>
                               </div>
                               <div class="academic-v2-actions">
                                 <button type="button" class="btn btn-sm btn-primary" data-editor-target="schedule" data-editor-payload='<%- toAttr(entry) %>'>Edit</button>
@@ -873,14 +1182,14 @@
                         <% }); %>
                       </div>
                     <% } else { %>
-                      <div class="academic-v2-empty">No manual schedule rows for the current focus.</div>
+                      <div class="academic-v2-empty"><%= activeGroupId ? 'No manual schedule rows for the current course yet.' : 'Pick or create a course first.' %></div>
                     <% } %>
                   </div>
                 </div>
               </div>
               <% if (selectedGroupUsers.length) { %>
                 <div class="academic-v2-subcard mt-4">
-                  <h3 class="h5 mb-3">Students in current group</h3>
+                  <h3 class="h5 mb-3">Students in current course</h3>
                   <div class="academic-v2-chip-row">
                     <% selectedGroupUsers.forEach((user) => { %>
                       <span class="academic-v2-chip"><%= user.full_name %> - <%= user.role %></span>
@@ -964,6 +1273,9 @@
             form.reset();
             form.querySelectorAll('input[type="hidden"]').forEach((input) => {
               if (String(input.name || '').startsWith('focus_')) {
+                return;
+              }
+              if (input.hasAttribute('data-preserve-reset')) {
                 return;
               }
               input.value = '';

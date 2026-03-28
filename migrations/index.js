@@ -40,6 +40,7 @@ const roomsAndAssetLibrary = require('./039_rooms_and_asset_library');
 const ratingPublicationSnapshots = require('./040_rating_publication_snapshots');
 const academicSetupContexts = require('./041_academic_setup_contexts');
 const academicV2Core = require('./042_academic_v2_core');
+const academicV2StageTemplates = require('./043_academic_v2_stage_templates');
 
 module.exports = [
   init,
@@ -84,4 +85,5 @@ module.exports = [
   ratingPublicationSnapshots,
   academicSetupContexts,
   academicV2Core,
+  academicV2StageTemplates,
 ];
