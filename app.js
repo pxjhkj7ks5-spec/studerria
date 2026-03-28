@@ -422,6 +422,7 @@ const REGISTRATION_TRACK_OPTIONS = [
   { key: 'teacher', label: 'Teacher' },
 ];
 const REGISTRATION_TRACK_KEYS = new Set(REGISTRATION_TRACK_OPTIONS.map((item) => item.key));
+const REGISTRATION_TRACK_ORDER = new Map(REGISTRATION_TRACK_OPTIONS.map((item, index) => [item.key, index]));
 const PATHWAY_TRACK_FILTER_OPTIONS = [
   { key: 'all', label: 'All tracks' },
   ...REGISTRATION_TRACK_OPTIONS,
@@ -3067,6 +3068,190 @@ async function assignUserStudyContext(userId, studyContextId, fallback = {}) {
     console.error('Academic v2 group sync failed', err);
   }
   return result;
+}
+
+function buildAcademicV2RegistrationCatalog(groups = []) {
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  const programsById = new Map();
+  const cohortsById = new Map();
+  safeGroups.forEach((group) => {
+    const programId = parsePositiveIntStrict(group && group.program_id);
+    const cohortId = parsePositiveIntStrict(group && group.cohort_id);
+    if (programId && !programsById.has(programId)) {
+      programsById.set(programId, {
+        id: programId,
+        track_key: normalizeRegistrationTrack(group && group.track_key, 'bachelor'),
+        name: sanitizeCompactText(group && group.program_name, 160) || `Program ${programId}`,
+        code: sanitizeCompactText(group && group.program_code, 80),
+      });
+    }
+    if (cohortId && !cohortsById.has(cohortId)) {
+      cohortsById.set(cohortId, {
+        id: cohortId,
+        program_id: programId || null,
+        track_key: normalizeRegistrationTrack(group && group.track_key, 'bachelor'),
+        admission_year: Number(group && group.admission_year ? group.admission_year : 0) || null,
+        label: sanitizeCompactText(group && group.cohort_label, 160) || '',
+      });
+    }
+  });
+  const programs = Array.from(programsById.values()).sort((left, right) => {
+    const trackDiff = Number(REGISTRATION_TRACK_ORDER.get(left.track_key) ?? 99)
+      - Number(REGISTRATION_TRACK_ORDER.get(right.track_key) ?? 99);
+    if (trackDiff !== 0) return trackDiff;
+    return String(left.name || '').localeCompare(String(right.name || ''), 'uk', { sensitivity: 'base' });
+  });
+  const cohorts = Array.from(cohortsById.values()).sort((left, right) => {
+    const programDiff = Number(left.program_id || 0) - Number(right.program_id || 0);
+    if (programDiff !== 0) return programDiff;
+    const yearDiff = Number(right.admission_year || 0) - Number(left.admission_year || 0);
+    if (yearDiff !== 0) return yearDiff;
+    return Number(left.id || 0) - Number(right.id || 0);
+  });
+  const enabledTracks = new Set(safeGroups.map((group) => normalizeRegistrationTrack(group && group.track_key, 'bachelor')));
+  const tracks = REGISTRATION_TRACK_OPTIONS.map((track) => ({
+    ...track,
+    enabled: enabledTracks.has(track.key),
+  }));
+  return {
+    tracks,
+    programs,
+    cohorts,
+    groups: safeGroups.map((group) => ({
+      group_id: parsePositiveIntStrict(group && group.group_id) || null,
+      program_id: parsePositiveIntStrict(group && group.program_id) || null,
+      cohort_id: parsePositiveIntStrict(group && group.cohort_id) || null,
+      track_key: normalizeRegistrationTrack(group && group.track_key, 'bachelor'),
+      campus_key: normalizeCourseCampus(group && group.campus_key),
+      stage_number: Math.max(1, Number(group && group.stage_number ? group.stage_number : 0) || 1),
+      group_label: sanitizeCompactText(group && group.group_label, 160),
+      program_name: sanitizeCompactText(group && group.program_name, 160),
+      program_code: sanitizeCompactText(group && group.program_code, 80),
+      cohort_label: sanitizeCompactText(group && group.cohort_label, 160),
+      admission_year: Number(group && group.admission_year ? group.admission_year : 0) || null,
+      legacy_course_id: parsePositiveIntStrict(group && group.legacy_course_id) || null,
+      legacy_study_context_id: parsePositiveIntStrict(group && group.legacy_study_context_id) || null,
+      legacy_program_id: parsePositiveIntStrict(group && group.legacy_program_id) || null,
+      legacy_admission_id: parsePositiveIntStrict(group && group.legacy_admission_id) || null,
+      has_active_term: Boolean(group && group.has_active_term),
+      visible_mapped_subject_count: Math.max(0, Number(group && group.visible_mapped_subject_count ? group.visible_mapped_subject_count : 0) || 0),
+    })).filter((group) => group.group_id && group.program_id && group.cohort_id),
+  };
+}
+
+function buildRegistrationAcademicGroupErrorMessage(issue, lang = 'uk') {
+  const isEn = lang === 'en';
+  const copy = {
+    missing_selection: isEn
+      ? 'Choose program, admission year, campus, and academic course before continuing.'
+      : 'Оберіть програму, рік вступу, кампус і академічний курс перед продовженням.',
+    invalid_group: isEn
+      ? 'The selected academic course is no longer available for registration.'
+      : 'Обраний академічний курс більше недоступний для реєстрації.',
+    invalid_scope: isEn
+      ? 'The selected academic course no longer matches this registration path.'
+      : 'Обраний академічний курс більше не відповідає цьому шляху реєстрації.',
+    group_required: isEn
+      ? 'Finish academic course selection first. Legacy-only registration is disabled.'
+      : 'Спершу завершіть вибір академічного курсу. Legacy-реєстрацію вимкнено.',
+  };
+  return copy[issue] || copy.invalid_group;
+}
+
+async function resolveStrictAcademicV2RegistrationScope(userOrId) {
+  const scopeState = await academicV2StudentHelpers.resolveStudentAcademicScope(
+    getAcademicV2Store(),
+    userOrId
+  );
+  const scope = scopeState && scopeState.scope ? scopeState.scope : null;
+  if (!scope || parsePositiveIntStrict(scope.group_id) < 1 || String(scope.resolved_via || '') !== 'group_id') {
+    return { scopeState, scope: null };
+  }
+  return { scopeState, scope };
+}
+
+async function persistRegistrationAcademicGroupPlacement(userId, group) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  const normalizedGroupId = parsePositiveIntStrict(group && group.group_id);
+  if (!normalizedUserId || !normalizedGroupId) {
+    throw new Error('Academic group required');
+  }
+  await db.run(
+    `
+      UPDATE users
+      SET
+        group_id = ?,
+        course_id = ?,
+        study_context_id = ?,
+        study_program_id = ?,
+        admission_id = ?,
+        study_track = ?
+      WHERE id = ?
+    `,
+    [
+      normalizedGroupId,
+      parsePositiveIntStrict(group && group.legacy_course_id),
+      parsePositiveIntStrict(group && group.legacy_study_context_id),
+      parsePositiveIntStrict(group && group.legacy_program_id),
+      parsePositiveIntStrict(group && group.legacy_admission_id),
+      normalizeRegistrationTrack(group && group.track_key, 'bachelor'),
+      normalizedUserId,
+    ]
+  );
+}
+
+function buildRegistrationAcademicGroupModerationItem(issue = {}) {
+  const issueCode = sanitizeCompactText(issue && issue.issue_code, 80) || 'registration_group_not_ready';
+  const sourceGroupId = parsePositiveIntStrict(issue && (issue.source_group_id || issue.group_id));
+  const programId = parsePositiveIntStrict(issue && issue.program_id);
+  const cohortId = parsePositiveIntStrict(issue && issue.cohort_id);
+  const stageNumber = Math.max(1, Number(issue && issue.stage_number ? issue.stage_number : 0) || 1);
+  const trackKey = normalizeRegistrationTrack(issue && issue.track_key, 'bachelor');
+  const campusKey = normalizeCourseCampus(issue && issue.campus_key);
+  return {
+    dedupeKey: academicSetupHelpers.buildModerationKey(
+      'registration-academic-v2-group',
+      issueCode,
+      sourceGroupId || 0,
+      programId || 0,
+      cohortId || 0,
+      trackKey || 'unknown',
+      campusKey || 'unknown',
+      stageNumber
+    ),
+    sourceKind: 'academic_v2_group',
+    sourceId: sourceGroupId || null,
+    issueCode,
+    severity: sanitizeCompactText(issue && issue.severity, 20) || 'medium',
+    title: sanitizeCompactText(issue && issue.title, 160) || 'Registration academic group issue',
+    summary: sanitizeCompactText(issue && issue.summary, 320)
+      || 'Registration academic_v2 group configuration needs attention.',
+    payload: {
+      group_id: parsePositiveIntStrict(issue && issue.group_id) || sourceGroupId || null,
+      program_id: programId || null,
+      cohort_id: cohortId || null,
+      track_key: trackKey || null,
+      campus_key: campusKey || null,
+      stage_number: stageNumber,
+      duplicate_group_ids: Array.isArray(issue && issue.duplicate_group_ids)
+        ? issue.duplicate_group_ids.map((value) => parsePositiveIntStrict(value)).filter(Boolean)
+        : [],
+      missing_compat_fields: Array.isArray(issue && issue.missing_compat_fields)
+        ? issue.missing_compat_fields.map((value) => sanitizeCompactText(value, 80)).filter(Boolean)
+        : [],
+      visible_mapped_subject_count: Math.max(0, Number(issue && issue.visible_mapped_subject_count ? issue.visible_mapped_subject_count : 0) || 0),
+      has_active_term: Boolean(issue && issue.has_active_term),
+      source_scope_key: sanitizeCompactText(issue && issue.source_scope_key, 160) || '',
+    },
+  };
+}
+
+async function auditRegistrationAcademicV2Groups() {
+  const issues = await academicV2Helpers.listRegistrationGroupAuditIssues(getAcademicV2Store());
+  for (const issue of issues || []) {
+    await queueAcademicModerationItem(buildRegistrationAcademicGroupModerationItem(issue));
+  }
+  return issues;
 }
 
 async function queueAcademicModerationItem(payload = {}) {
@@ -14386,52 +14571,67 @@ app.get('/register/course', async (req, res) => {
   }
   try {
     await ensureDbReady();
-    const [courses, pendingUser, registrationPathways, registrationStudyContexts] = await Promise.all([
-      getCoursesCached(),
+    const [pendingUser, readyGroups] = await Promise.all([
       db.get(
-        'SELECT course_id, study_track, study_program_id, admission_id, study_context_id FROM users WHERE id = ?',
+        'SELECT group_id, course_id, study_track, study_program_id, admission_id, study_context_id FROM users WHERE id = ?',
         [req.session.pendingUserId]
       ),
-      getRegistrationPathways(),
-      listStudyContextOptions().catch((err) => {
-        if (isDbSchemaCompatibilityError(err)) {
-          return [];
-        }
-        throw err;
-      }),
+      academicV2Helpers.listRegistrationReadyGroups(getAcademicV2Store()),
     ]);
     if (!pendingUser) {
       req.session.pendingUserId = null;
       req.session.rememberMe = null;
       return res.redirect('/register?error=Session%20expired');
     }
-    const pendingPlacement = await resolveUserAcademicPlacement(pendingUser, { lang: getPreferredLang(req) });
-    const selectedCourseId = pendingPlacement && pendingPlacement.course_id ? Number(pendingPlacement.course_id) : null;
-    const selectedCourse = (courses || []).find((course) => Number(course.id) === Number(selectedCourseId)) || null;
-    const selectedTrack = normalizeRegistrationTrack(
-      pendingPlacement && pendingPlacement.track_key ? pendingPlacement.track_key : pendingUser.study_track,
-      inferRegistrationTrackFromCourse(selectedCourse)
+    auditRegistrationAcademicV2Groups().catch((auditErr) => {
+      console.error('Registration academic group audit failed', auditErr);
+    });
+    const registrationCatalog = buildAcademicV2RegistrationCatalog(readyGroups);
+    const groupById = new Map(
+      (registrationCatalog.groups || []).map((group) => [Number(group.group_id || 0), group])
     );
-    const selectedCampus = pendingPlacement && pendingPlacement.campus_key
-      ? normalizeCourseCampus(pendingPlacement.campus_key)
-      : (selectedCourse ? normalizeCourseCampus(selectedCourse.location) : '');
-    const selectedProgramId = Number.isFinite(Number((pendingPlacement && pendingPlacement.program_id) || pendingUser.study_program_id))
-      ? Number((pendingPlacement && pendingPlacement.program_id) || pendingUser.study_program_id)
-      : null;
-    const selectedAdmissionId = Number.isFinite(Number((pendingPlacement && pendingPlacement.admission_id) || pendingUser.admission_id))
-      ? Number((pendingPlacement && pendingPlacement.admission_id) || pendingUser.admission_id)
-      : null;
+    const selectedGroup = groupById.get(Number(pendingUser.group_id || 0)) || null;
+    const defaultTrack = (registrationCatalog.tracks || []).find((track) => track.enabled)?.key || 'bachelor';
+    const selectedTrack = normalizeRegistrationTrack(
+      selectedGroup && selectedGroup.track_key ? selectedGroup.track_key : pendingUser.study_track,
+      defaultTrack
+    );
+    const registrationPathways = {
+      tracks: registrationCatalog.tracks || [],
+      programs: registrationCatalog.programs || [],
+      admissions: registrationCatalog.cohorts || [],
+      links: [],
+      courses: [],
+    };
+    const registrationStudyContexts = (registrationCatalog.groups || []).map((group) => ({
+      id: Number(group.group_id || 0) || null,
+      program_id: Number(group.program_id || 0) || null,
+      admission_id: Number(group.cohort_id || 0) || null,
+      track_key: normalizeRegistrationTrack(group.track_key, 'bachelor'),
+      stage: Math.max(1, Number(group.stage_number || 0) || 1),
+      stage_number: Math.max(1, Number(group.stage_number || 0) || 1),
+      campus_key: normalizeCourseCampus(group.campus_key),
+      course_id: Number(group.legacy_course_id || 0) || null,
+      course_location: normalizeCourseCampus(group.campus_key),
+      location: normalizeCourseCampus(group.campus_key),
+      label: sanitizeCompactText(group.group_label, 160),
+      label_uk: sanitizeCompactText(group.group_label, 160),
+      label_en: sanitizeCompactText(group.group_label, 160),
+    }));
     return res.render('register-course', {
-      courses,
-      selectedCourseId,
-      selectedCampus,
-      selectedTrack,
-      selectedProgramId,
-      selectedAdmissionId,
       registrationPathways,
       registrationStudyContexts,
-      selectedStudyContextId: pendingPlacement && pendingPlacement.study_context_id ? Number(pendingPlacement.study_context_id) : null,
-      pendingStudyContext: pendingPlacement,
+      registrationCatalog,
+      selectedCourseId: selectedGroup && selectedGroup.legacy_course_id ? Number(selectedGroup.legacy_course_id) : null,
+      selectedAdmissionId: selectedGroup && selectedGroup.cohort_id ? Number(selectedGroup.cohort_id) : null,
+      selectedStudyContextId: selectedGroup && selectedGroup.group_id ? Number(selectedGroup.group_id) : null,
+      selectedGroupId: selectedGroup && selectedGroup.group_id ? Number(selectedGroup.group_id) : null,
+      selectedCampus: selectedGroup && selectedGroup.campus_key
+        ? normalizeCourseCampus(selectedGroup.campus_key)
+        : '',
+      selectedTrack,
+      selectedProgramId: selectedGroup && selectedGroup.program_id ? Number(selectedGroup.program_id) : null,
+      selectedCohortId: selectedGroup && selectedGroup.cohort_id ? Number(selectedGroup.cohort_id) : null,
       error: req.query.error || '',
     });
   } catch (err) {
@@ -14448,260 +14648,105 @@ app.post('/register/course', registerLimiter, async (req, res) => {
   const lang = getPreferredLang(req);
   const redirectRegisterCourseError = (message) =>
     res.redirect(`/register/course?error=${encodeURIComponent(message)}`);
-  const redirectRegistrationFlowIssue = (issue) => redirectRegisterCourseError(
-    pathwayHelpers.buildRegistrationFlowError({ issue, lang })
-  );
-
   const rawTrack = String(req.body.study_track || req.body.track || '').trim().toLowerCase();
   const trackFromBody = REGISTRATION_TRACK_KEYS.has(rawTrack) ? rawTrack : '';
   const requestedCampus = parseCourseCampus(req.body.campus || req.body.location);
-  const requestedProgramId = Number(req.body.study_program_id || 0);
-  const requestedAdmissionId = Number(req.body.admission_id || 0);
-  let selectedProgramId = Number.isFinite(requestedProgramId) && requestedProgramId > 0 ? requestedProgramId : null;
-  let selectedAdmissionId = Number.isFinite(requestedAdmissionId) && requestedAdmissionId > 0 ? requestedAdmissionId : null;
-  const requestedCourseId = parsePositiveIntStrict(req.body.course_id);
-  let courseId = null;
-  let studyContextId = parsePositiveIntStrict(req.body.study_context_id);
-  let usedCompatibilityCourseFallback = false;
-  let fallbackSource = '';
+  const requestedProgramId = parsePositiveIntStrict(req.body.program_id || req.body.study_program_id);
+  const requestedCohortId = parsePositiveIntStrict(req.body.cohort_id);
+  const requestedGroupId = parsePositiveIntStrict(req.body.group_id);
+  const hasLegacyPlacementInput = Boolean(
+    parsePositiveIntStrict(req.body.course_id) || parsePositiveIntStrict(req.body.study_context_id)
+  );
 
   try {
+    if (!trackFromBody || !requestedProgramId || !requestedCohortId || !requestedCampus || !requestedGroupId) {
+      if (hasLegacyPlacementInput) {
+        logAction(db, req, 'register_legacy_placement_rejected', {
+          user_id: userId,
+          track_key: trackFromBody || null,
+          program_id: requestedProgramId || null,
+          cohort_id: requestedCohortId || null,
+          campus_key: requestedCampus || null,
+        });
+      }
+      return redirectRegisterCourseError(
+        buildRegistrationAcademicGroupErrorMessage('missing_selection', lang)
+      );
+    }
+
     await ensureDbReady();
 
-    if (studyContextId && !courseId) {
-      const selectedContext = await getStudyContextById(studyContextId);
-      if (selectedContext) {
-        courseId = parsePositiveIntStrict(selectedContext.course_id) || courseId;
-        selectedProgramId = selectedProgramId || parsePositiveIntStrict(selectedContext.program_id);
-        selectedAdmissionId = selectedAdmissionId || parsePositiveIntStrict(selectedContext.admission_id);
-      }
-    }
-
-    if (trackFromBody === 'teacher' && !selectedAdmissionId && selectedProgramId) {
-      selectedAdmissionId = await resolveLatestRegistrationAdmissionId(selectedProgramId, {
-        trackKey: 'teacher',
-      });
-    }
-
-    if (!studyContextId && selectedAdmissionId && requestedCampus) {
-      const resolvedContext = await resolveRegistrationStudyContext({
-        admissionId: selectedAdmissionId,
-        programId: selectedProgramId,
-        trackKey: trackFromBody,
-        campus: requestedCampus,
-        stage: 1,
-      });
-      if (resolvedContext.contextId) {
-        studyContextId = resolvedContext.contextId;
-        courseId = resolvedContext.courseId || courseId;
-      } else if (resolvedContext.reason && resolvedContext.reason !== 'context_not_found') {
-        if (resolvedContext.reason === 'ambiguous_campus') {
-          return redirectRegistrationFlowIssue('ambiguous_campus');
-        }
-        return redirectRegistrationFlowIssue(resolvedContext.reason || 'campus_not_available');
-      }
-    }
-
-    if (!courseId && requestedCourseId && !studyContextId) {
-      courseId = requestedCourseId;
-      usedCompatibilityCourseFallback = true;
-      fallbackSource = 'legacy_course_input';
-    }
-
-    if (!courseId && selectedAdmissionId && requestedCampus) {
-      const resolvedCourse = await resolveRegistrationCourseForCampus({
-        admissionId: selectedAdmissionId,
-        programId: selectedProgramId,
-        trackKey: trackFromBody,
-        campus: requestedCampus,
-      });
-      if (!resolvedCourse.courseId) {
-        if (resolvedCourse.reason === 'ambiguous_campus') {
-          return redirectRegistrationFlowIssue('ambiguous_campus');
-        }
-        return redirectRegistrationFlowIssue(resolvedCourse.reason || 'campus_not_available');
-      }
-      courseId = resolvedCourse.courseId;
-      usedCompatibilityCourseFallback = true;
-      fallbackSource = 'campus_course_resolution';
-    }
-
-    if (!courseId) {
-      if (selectedAdmissionId && requestedCampus) {
-        await queueAcademicModerationItem(academicSetupHelpers.buildRegistrationMissingStageOneIssue({
-          userId,
-          programId: selectedProgramId,
-          admissionId: selectedAdmissionId,
-          trackKey: trackFromBody || null,
-          campusKey: requestedCampus,
-          stageNumber: 1,
-          courseId: null,
-          studyContextId: null,
-          dedupeSuffix: selectedProgramId || 0,
-          summary: 'Registration did not find a study context or compatibility course for the selected cohort and campus.',
-        }));
-      }
-      return redirectRegistrationFlowIssue('missing_campus');
-    }
-
-    const [pendingUser, course] = await Promise.all([
+    const [pendingUser, readyGroups] = await Promise.all([
       db.get('SELECT id FROM users WHERE id = ?', [userId]),
-      db.get('SELECT id, is_teacher_course FROM courses WHERE id = ?', [courseId]),
+      academicV2Helpers.listRegistrationReadyGroups(getAcademicV2Store()),
     ]);
     if (!pendingUser) {
       req.session.pendingUserId = null;
       req.session.rememberMe = null;
       return res.redirect('/register?error=Session%20expired');
     }
-    if (!course) {
-      return redirectRegistrationFlowIssue('invalid_course');
-    }
-
-    const teacherCourse = course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
-    let selectedTrack = trackFromBody || inferRegistrationTrackFromCourse(course);
-    if (teacherCourse) {
-      selectedTrack = 'teacher';
-    }
-
-    if (selectedTrack === 'teacher' && selectedProgramId && !selectedAdmissionId) {
-      selectedAdmissionId = await resolveLatestRegistrationAdmissionId(selectedProgramId, {
-        trackKey: 'teacher',
-        courseId,
+    const selectedGroup = (readyGroups || []).find((group) => Number(group.group_id || 0) === requestedGroupId) || null;
+    if (!selectedGroup) {
+      logAction(db, req, 'register_group_rejected', {
+        user_id: userId,
+        group_id: requestedGroupId,
+        program_id: requestedProgramId,
+        cohort_id: requestedCohortId,
+        campus_key: requestedCampus,
+        track_key: trackFromBody,
+        has_legacy_input: hasLegacyPlacementInput ? 1 : 0,
+        reason: 'missing_or_not_ready',
       });
+      return redirectRegisterCourseError(
+        buildRegistrationAcademicGroupErrorMessage('invalid_group', lang)
+      );
     }
-
-    if (selectedProgramId && selectedAdmissionId) {
-      const explicitPathRows = await academicSetupHelpers.listLegacyAdmissionCourseRows(getAcademicSetupStore(), {
-        admissionId: selectedAdmissionId,
-        programId: selectedProgramId,
-        courseId,
-        visibleOnly: true,
-        activeOnly: true,
+    const hasScopeMismatch = Number(selectedGroup.program_id || 0) !== Number(requestedProgramId)
+      || Number(selectedGroup.cohort_id || 0) !== Number(requestedCohortId)
+      || normalizeRegistrationTrack(selectedGroup.track_key, 'bachelor') !== trackFromBody
+      || normalizeCourseCampus(selectedGroup.campus_key) !== requestedCampus;
+    if (hasScopeMismatch) {
+      logAction(db, req, 'register_group_rejected', {
+        user_id: userId,
+        group_id: requestedGroupId,
+        program_id: requestedProgramId,
+        cohort_id: requestedCohortId,
+        campus_key: requestedCampus,
+        track_key: trackFromBody,
+        selected_program_id: Number(selectedGroup.program_id || 0) || null,
+        selected_cohort_id: Number(selectedGroup.cohort_id || 0) || null,
+        selected_campus_key: normalizeCourseCampus(selectedGroup.campus_key),
+        selected_track_key: normalizeRegistrationTrack(selectedGroup.track_key, 'bachelor'),
+        reason: 'payload_mismatch',
       });
-      const explicitPath = explicitPathRows.length
-        ? { track_key: explicitPathRows[0].track_key }
-        : null;
-      if (explicitPath) {
-        const explicitTrack = normalizeRegistrationTrack(explicitPath.track_key, selectedTrack);
-        if (trackFromBody && explicitTrack !== selectedTrack) {
-          return redirectRegistrationFlowIssue('invalid_pathway');
-        }
-        selectedTrack = explicitTrack;
-      } else if (selectedTrack === 'teacher') {
-        const teacherAdmissionId = await resolveLatestRegistrationAdmissionId(selectedProgramId, {
-          trackKey: 'teacher',
-          courseId,
-        });
-        if (teacherAdmissionId) {
-          selectedAdmissionId = teacherAdmissionId;
-          selectedTrack = 'teacher';
-        } else if (requestedProgramId || requestedAdmissionId || requestedCampus) {
-          return redirectRegistrationFlowIssue('invalid_campus_binding');
-        } else {
-          selectedProgramId = null;
-          selectedAdmissionId = null;
-        }
-      } else if (requestedProgramId || requestedAdmissionId || requestedCampus) {
-        return redirectRegistrationFlowIssue('invalid_campus_binding');
-      } else {
-        selectedProgramId = null;
-        selectedAdmissionId = null;
-      }
+      return redirectRegisterCourseError(
+        buildRegistrationAcademicGroupErrorMessage('invalid_scope', lang)
+      );
     }
 
-    if (!selectedProgramId || !selectedAdmissionId) {
-      const hasTrackFilter = REGISTRATION_TRACK_KEYS.has(selectedTrack);
-      const fallbackRows = await academicSetupHelpers.listLegacyAdmissionCourseRows(getAcademicSetupStore(), {
-        courseId,
-        trackKey: hasTrackFilter ? selectedTrack : '',
-        visibleOnly: true,
-        activeOnly: true,
-      });
-      const fallbackPath = (fallbackRows || []).length
-        ? {
-            program_id: fallbackRows[0].program_id,
-            admission_id: fallbackRows[0].admission_id,
-            track_key: fallbackRows[0].track_key,
-          }
-        : null;
-      if (fallbackPath) {
-        selectedProgramId = Number(fallbackPath.program_id || 0) || null;
-        selectedAdmissionId = Number(fallbackPath.admission_id || 0) || null;
-        selectedTrack = normalizeRegistrationTrack(fallbackPath.track_key, selectedTrack);
-      }
-    }
-
-    selectedTrack = normalizeRegistrationTrack(selectedTrack, teacherCourse ? 'teacher' : 'bachelor');
-    if (!courseMatchesRegistrationTrack(course, selectedTrack)) {
-      return redirectRegistrationFlowIssue('invalid_pathway');
-    }
-    if (selectedProgramId && !selectedAdmissionId) {
-      return redirectRegistrationFlowIssue('missing_admission');
-    }
-    if (!studyContextId && courseId && selectedAdmissionId) {
-      studyContextId = await ensureStudyContextForLegacyPlacement({
-        courseId,
-        admissionId: selectedAdmissionId,
-        programId: selectedProgramId,
-        trackKey: selectedTrack,
-        preferredCampus: requestedCampus,
-        preferredStage: 1,
-      });
-    }
-    if (!studyContextId && courseId) {
-      usedCompatibilityCourseFallback = true;
-      fallbackSource = fallbackSource || (requestedCourseId ? 'legacy_course_input' : 'derived_course_fallback');
-    }
-    if (!studyContextId && selectedAdmissionId) {
-      await queueAcademicModerationItem(academicSetupHelpers.buildRegistrationMissingStageOneIssue({
-        userId,
-        programId: selectedProgramId,
-        admissionId: selectedAdmissionId,
-        trackKey: selectedTrack,
-        campusKey: requestedCampus || null,
-        stageNumber: 1,
-        courseId,
-        studyContextId: null,
-        dedupeSuffix: courseId || 0,
-        title: 'Registration missing study context assignment',
-        summary: 'Registration continued in compatibility mode because stage 1 study context was not resolved.',
-      }));
-    }
-    if (usedCompatibilityCourseFallback && courseId) {
-      await queueAcademicModerationItem(academicSetupHelpers.buildRegistrationCourseFallbackIssue({
-        userId,
-        programId: selectedProgramId,
-        admissionId: selectedAdmissionId,
-        trackKey: selectedTrack,
-        campusKey: requestedCampus || null,
-        stageNumber: 1,
-        courseId,
-        studyContextId: studyContextId || null,
-        fallbackSource: fallbackSource || 'compatibility',
-      }));
-    }
-
-    if (!teacherCourse && selectedAdmissionId) {
-      const scopedSubjects = await getRegistrationSubjects(courseId, selectedAdmissionId, {
-        studyContextId,
-      });
-      if (!(scopedSubjects || []).length) {
-        return redirectRegistrationFlowIssue('empty_subject_scope');
-      }
-    }
-
-    await assignUserStudyContext(userId, studyContextId, {
-      courseId,
-      trackKey: selectedTrack,
-      programId: selectedProgramId,
-      admissionId: selectedAdmissionId,
+    await academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), {
+      group_id: requestedGroupId,
+      user_ids: [userId],
     });
+    await persistRegistrationAcademicGroupPlacement(userId, selectedGroup);
     await db.run(
       'UPDATE user_registration_events SET course_id = COALESCE(course_id, ?) WHERE user_id = ?',
-      [courseId, userId]
+      [parsePositiveIntStrict(selectedGroup.legacy_course_id), userId]
     );
+    logAction(db, req, 'register_group_selected', {
+      user_id: userId,
+      group_id: Number(selectedGroup.group_id || 0) || null,
+      campus_key: normalizeCourseCampus(selectedGroup.campus_key),
+      track_key: normalizeRegistrationTrack(selectedGroup.track_key, 'bachelor'),
+      program_id: Number(selectedGroup.program_id || 0) || null,
+      cohort_id: Number(selectedGroup.cohort_id || 0) || null,
+      legacy_program_id: parsePositiveIntStrict(selectedGroup.legacy_program_id) || null,
+      legacy_admission_id: parsePositiveIntStrict(selectedGroup.legacy_admission_id) || null,
+      course_id: parsePositiveIntStrict(selectedGroup.legacy_course_id) || null,
+      study_context_id: parsePositiveIntStrict(selectedGroup.legacy_study_context_id) || null,
+    });
 
-    if (teacherCourse || selectedTrack === 'teacher') {
+    if (normalizeRegistrationTrack(selectedGroup.track_key, 'bachelor') === 'teacher') {
       return res.redirect('/register/teacher-subjects');
     }
     return res.redirect('/register/subjects');
@@ -14736,21 +14781,19 @@ app.get('/register/subjects', async (req, res) => {
       return res.redirect('/register');
     }
 
-    const courseId = parsePositiveIntStrict(user.course_id);
-    if (!courseId) {
-      return res.redirect('/register/course');
-    }
-
-    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [courseId]);
-    if (course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
-      return res.redirect('/register/teacher-subjects');
-    }
-
     let subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
       getAcademicV2Store(),
       user,
       { selectedOnly: false }
     );
+    if (!subjectState.scope || String(subjectState.scope.resolved_via || '') !== 'group_id') {
+      return res.redirect(
+        `/register/course?error=${encodeURIComponent(buildRegistrationAcademicGroupErrorMessage('group_required', getPreferredLang(req)))}`
+      );
+    }
+    if (normalizeRegistrationTrack(subjectState.scope.track_key, 'bachelor') === 'teacher') {
+      return res.redirect('/register/teacher-subjects');
+    }
     const isRequired = (subject) =>
       subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
     const requiredAuto = (subjectState.subjects || [])
@@ -14889,21 +14932,19 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
       return res.redirect('/register');
     }
 
-    const courseId = parsePositiveIntStrict(userRow.course_id);
-    if (!courseId) {
-      return res.redirect('/register/course');
-    }
-
-    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [courseId]);
-    if (course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
-      return res.redirect('/register/teacher-subjects');
-    }
-
     const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
       getAcademicV2Store(),
       userRow,
       { selectedOnly: false }
     );
+    if (!subjectState.scope || String(subjectState.scope.resolved_via || '') !== 'group_id') {
+      return res.redirect(
+        `/register/course?error=${encodeURIComponent(buildRegistrationAcademicGroupErrorMessage('group_required', getPreferredLang(req)))}`
+      );
+    }
+    if (normalizeRegistrationTrack(subjectState.scope.track_key, 'bachelor') === 'teacher') {
+      return res.redirect('/register/teacher-subjects');
+    }
     if (!subjectState.scope || (subjectState.projectionIssues && subjectState.projectionIssues.has_issues && !(subjectState.subjects || []).length)) {
       logAcademicV2StudentProjection('register.subjects.submit', userId, subjectState);
       return res.redirect('/register/subjects?error=projection-incomplete');
@@ -15018,22 +15059,18 @@ app.get('/register/teacher-subjects', (req, res) => {
     console.error('DB init failed', err);
   });
   db.get(
-    'SELECT id, course_id, admission_id, study_context_id, study_program_id, study_track FROM users WHERE id = ?',
+    'SELECT id, group_id, course_id, admission_id, study_context_id, study_program_id, study_track FROM users WHERE id = ?',
     [req.session.pendingUserId],
     async (uErr, user) => {
       if (uErr || !user) {
         return res.redirect('/register/course');
       }
       try {
-        const placement = await resolveUserAcademicPlacement(user, { lang: getPreferredLang(req) });
-        if (!placement || !placement.course_id) {
+        const { scope } = await resolveStrictAcademicV2RegistrationScope(user);
+        if (!scope) {
           return res.redirect('/register/course');
         }
-        const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [placement.course_id]);
-        if (!course) {
-          return res.redirect('/register/course');
-        }
-        if (!(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+        if (normalizeRegistrationTrack(scope.track_key, 'bachelor') !== 'teacher') {
           return res.redirect('/register/subjects');
         }
         const teacherOfferingCatalog = await listTeacherOfferingCatalog();
@@ -15048,7 +15085,7 @@ app.get('/register/teacher-subjects', (req, res) => {
           subjects,
           selections,
           selectionMode,
-          studyContext: placement,
+          studyContext: scope,
           error: req.query.error || '',
           isProfileEdit: false,
         });
@@ -15069,12 +15106,16 @@ app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
       'SELECT id, full_name, role, schedule_group, course_id, group_id, language, study_context_id, admission_id, study_program_id, study_track FROM users WHERE id = ?',
       [userId]
     );
-    const placement = await resolveUserAcademicPlacement(userRow, { lang: getPreferredLang(req) });
-    if (!userRow || !placement || !placement.course_id) {
+    if (!userRow) {
       return res.redirect('/register/course');
     }
-    const course = await db.get('SELECT is_teacher_course FROM courses WHERE id = ?', [placement.course_id]);
-    if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
+    const { scope } = await resolveStrictAcademicV2RegistrationScope(userRow);
+    if (!scope) {
+      return res.redirect(
+        `/register/course?error=${encodeURIComponent(buildRegistrationAcademicGroupErrorMessage('group_required', getPreferredLang(req)))}`
+      );
+    }
+    if (normalizeRegistrationTrack(scope.track_key, 'bachelor') !== 'teacher') {
       return res.redirect('/register/subjects');
     }
     const result = await saveTeacherSubjects(userId, req.body);

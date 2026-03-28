@@ -557,7 +557,7 @@
                   <label class="pathway-label" for="studyProgramSelect"><%= registerCourseText.program %></label>
                   <select
                     id="studyProgramSelect"
-                    name="study_program_id"
+                    name="program_id"
                     class="form-select pathway-select"
                     data-selected-program="<%= selectedProgramValue || '' %>"
                   >
@@ -573,14 +573,14 @@
 
                 <div class="mb-3" id="admissionField">
                   <label class="pathway-label"><%= registerCourseText.admissionYear %></label>
-                  <input type="hidden" name="admission_id" id="selectedAdmissionInput" value="<%= selectedAdmissionValue || '' %>" />
+                  <input type="hidden" name="cohort_id" id="selectedAdmissionInput" value="<%= selectedAdmissionValue || '' %>" />
                   <div class="pathway-grid" id="admissionOptions"></div>
                 </div>
 
                 <div class="mb-3">
                   <label class="pathway-label"><%= registerCourseText.campus %></label>
-                  <input type="hidden" name="course_id" id="selectedCourseIdInput" value="<%= Number(selectedCourseId || 0) || '' %>" />
-                  <input type="hidden" name="study_context_id" id="selectedStudyContextInput" value="<%= selectedStudyContextValue || '' %>" />
+                  <input type="hidden" data-legacy-field="course_id" id="selectedCourseIdInput" value="<%= Number(selectedCourseId || 0) || '' %>" />
+                  <input type="hidden" name="group_id" id="selectedStudyContextInput" value="<%= selectedStudyContextValue || '' %>" />
                   <input type="hidden" name="campus" id="selectedCampusInput" value="<%= selectedCampusValue %>" />
                   <div class="pathway-grid" id="campusOptions"></div>
                 </div>
@@ -1075,7 +1075,7 @@
           campusOptions.appendChild(button);
         });
 
-        if (!courseIdInput.value || !campusInput.value || (Array.isArray(registrationContextPayload) && registrationContextPayload.length && studyContextInput && !studyContextInput.value)) {
+        if (!campusInput.value || (studyContextInput && !studyContextInput.value)) {
           setCampusHint(registerCourseText.ambiguousCampusHint, true);
         } else {
           setCampusHint(getCampusReadyHint(trackKey));
@@ -1105,7 +1105,7 @@
 
       if (registerCourseForm) {
         registerCourseForm.addEventListener('submit', (event) => {
-          if ((studyContextInput && !studyContextInput.value) || (courseIdInput && !courseIdInput.value)) {
+          if ((studyContextInput && !studyContextInput.value) || (campusInput && !campusInput.value)) {
             event.preventDefault();
             setCampusHint(registerCourseText.chooseValidCampus, true);
           }
