@@ -276,7 +276,7 @@
                   <h3 class="h5 mb-3">Cleanup dry-run</h3>
                   <div class="academic-v2-chip-row">
                     <span class="academic-v2-chip academic-v2-chip--warm"><%= Number(cleanupAudit.total_findings || 0) %> total findings</span>
-                    <span class="academic-v2-chip"><%= Number(cleanupAudit.users_without_group_id || 0) %> users without course</span>
+                    <span class="academic-v2-chip"><%= Number(cleanupAudit.users_without_group_id || 0) %> users without v2 course</span>
                     <span class="academic-v2-chip"><%= Number(cleanupAudit.users_with_course_projection_mismatch || 0) %> user projection mismatches</span>
                     <span class="academic-v2-chip"><%= Number(cleanupAudit.group_subjects_without_teacher_assignment || 0) %> subjects missing teacher</span>
                   </div>
@@ -289,10 +289,16 @@
                         <tr><th>Stale legacy semester rows</th><td><%= Number(cleanupAudit.stale_legacy_semester_rows || 0) %></td></tr>
                         <tr><th>Stale legacy schedule rows</th><td><%= Number(cleanupAudit.stale_legacy_schedule_rows || 0) %></td></tr>
                         <tr><th>Legacy study contexts without v2 owner</th><td><%= Number(cleanupAudit.stale_legacy_study_context_rows || 0) %></td></tr>
-                        <tr><th>Legacy preset rows</th><td><%= Number(cleanupAudit.legacy_preset_rows || 0) %></td></tr>
+                        <tr><th>Stale legacy preset rows</th><td><%= Number(cleanupAudit.legacy_preset_rows || 0) %></td></tr>
                         <tr><th>Legacy offerings without v2 owner</th><td><%= Number(cleanupAudit.stale_legacy_offering_rows || 0) %></td></tr>
                       </tbody>
                     </table>
+                  </div>
+                  <div class="academic-v2-muted mt-3">
+                    Cleanup runs only from CLI:
+                    <span class="academic-v2-code">node scripts/academic-v2-cleanup.js --normalize-users</span>,
+                    <span class="academic-v2-code">node scripts/academic-v2-cleanup.js --archive-legacy-config</span>,
+                    then repeat with <span class="academic-v2-code">--apply</span> after reviewing the dry-run snapshot.
                   </div>
                 </div>
               </div>

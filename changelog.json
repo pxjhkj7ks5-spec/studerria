@@ -1,6 +1,16 @@
 {
   "items": [
     {
+      "version": "1.3.27",
+      "date": "2026-03-28",
+      "items": [
+        "feat(academic-v2-cleanup-apply-layer): extend `lib/academicV2.js` with `normalizeUsersIntoAcademicV2Groups(...)` and `archiveStaleLegacyAcademicConfig(...)`, add stale preset/offering detail rows to the cleanup audit surface, and keep the new cleanup logic dry-run/apply compatible so `users.group_id` normalization and orphan legacy academic config archiving can be reviewed before anything mutates",
+        "feat(academic-v2-cleanup-cli): add `scripts/academic-v2-cleanup.js` as an explicit operational CLI for `--normalize-users`, `--archive-legacy-config`, optional `--resync-all`, and `--apply`, giving the cutover a separate non-UI execution path for cleanup work instead of hiding destructive actions inside the daily admin surface",
+        "refactor(admin-users-v2-placement-preference): update `app.js` so `/admin/users.json` and `/admin/export/users.csv` prefer `users.group_id` plus projected `legacy_course_id` / `legacy_study_context_id` when available, reducing the admin users list and CSV export dependence on raw legacy study-context placement while the remaining staff flows are still being migrated",
+        "chore(academic-v2-health-cli-hints): add direct cleanup command hints to the Projection Health card in `views/admin-academic-v2.ejs`, so the v2 admin surface now points operators at the new CLI cleanup workflow instead of implying that legacy config cleanup should happen inline from the UI"
+      ]
+    },
+    {
       "version": "1.3.26",
       "date": "2026-03-28",
       "items": [
