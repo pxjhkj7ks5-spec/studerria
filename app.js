@@ -2545,6 +2545,15 @@ function invalidateWeekTimeCache() {
   referenceCache.weekTime.clear();
 }
 
+function invalidateAcademicV2CompatibilityCaches() {
+  invalidateCoursesCache();
+  invalidateRegistrationPathwaysCache();
+  invalidateSubjectsCache();
+  invalidateSemestersCache();
+  invalidateStudyDaysCache();
+  invalidateWeekTimeCache();
+}
+
 async function getCoursesCached() {
   const cached = cacheGet(referenceCache.courses, 'courses');
   if (cached) return cached;
