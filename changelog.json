@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.43",
+      "date": "2026-03-29",
+      "items": [
+        "fix(schedule-admin-v2-scope-and-bool-filters): switch the admin `/schedule` fallback path to course subject scope data for Academic V2 courses instead of legacy subject/group loaders, and harden schedule homework/custom-deadline filters in `app.js` to use boolean-safe conditions for `is_custom_deadline`, eliminating the remaining V2 schedule open failures that still surfaced as generic `Database error`"
+      ]
+    },
+    {
       "version": "1.3.42",
       "date": "2026-03-29",
       "items": [

@@ -21019,7 +21019,7 @@ async function loadStudentLegacyScheduleCompatData({
         WHERE (${buildTargetConditions('h')})
           AND COALESCE(h.status, 'published') = 'published'
           AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
-          AND h.is_custom_deadline = 1
+          AND ${buildTruthyTextCondition('h.is_custom_deadline')}
           AND h.custom_due_date IS NOT NULL
           AND h.custom_due_date >= ?
           AND h.custom_due_date <= ?
@@ -21088,7 +21088,7 @@ async function loadStudentLegacyScheduleCompatData({
       WHERE (${buildTargetConditions('h')})
         AND COALESCE(h.status, 'published') = 'published'
         AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
-        AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
+        AND ${buildFalsyTextCondition('h.is_custom_deadline')}
       ORDER BY h.created_at DESC
     `,
     [normalizedUserId, ...buildTargetParams(), nowIso]
@@ -21542,7 +21542,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             WHERE (${hwConditions})
               AND COALESCE(h.status, 'published') = 'published'
               AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
-              AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
+              AND ${buildFalsyTextCondition('h.is_custom_deadline')}
             ORDER BY h.created_at DESC
           `,
           [...hwParams, nowIso]
@@ -21742,7 +21742,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
             WHERE (${cdConditions})
               AND COALESCE(h.status, 'published') = 'published'
               AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
-              AND h.is_custom_deadline = 1
+              AND ${buildTruthyTextCondition('h.is_custom_deadline')}
               AND h.custom_due_date IS NOT NULL
               AND h.custom_due_date >= ?
               AND h.custom_due_date <= ?
@@ -22113,18 +22113,42 @@ app.get('/schedule', requireLogin, async (req, res) => {
   const weekStartDate = weekDates[0];
   const weekEndDate = weekDates[6];
   const nowIso = new Date().toISOString();
+  const courseSubjectScope = await getCourseSubjectAccessScope(scheduleCourseId, {
+    visibleOnly: true,
+  }).catch(() => null);
+
+  const getScopedScheduleSubjects = async () => {
+    if (courseSubjectScope && courseSubjectScope.source === 'academic_v2') {
+      return (courseSubjectScope.subjects || []).map((subject) => ({
+        subject_id: Number(subject.subject_id || subject.id || 0),
+        subject_name: subject.subject_name || subject.name || '',
+        group_count: Math.max(1, Number(subject.group_count || 1)),
+        default_group: Math.max(1, Number(subject.default_group || 1)),
+        owner_course_id: Number(subject.owner_course_id || subject.course_id || scheduleCourseId || 0) || null,
+      }));
+    }
+    const subjects = await getSubjectsCached(scheduleCourseId, { visibleOnly: true });
+    return (subjects || []).map((subject) => ({
+      subject_id: Number(subject.id || subject.subject_id || 0),
+      subject_name: subject.name || subject.subject_name || '',
+      group_count: Math.max(1, Number(subject.group_count || 1)),
+      default_group: Math.max(1, Number(subject.default_group || 1)),
+      owner_course_id: Number(subject.owner_course_id || subject.course_id || scheduleCourseId || 0) || null,
+    }));
+  };
 
   const expandSubjectGroupsForCourse = (subjects = []) => {
     const groups = [];
     (subjects || []).forEach((subject) => {
-      const subjectId = Number(subject.subject_id);
+      const subjectId = Number(subject.subject_id || subject.id || 0);
+      if (!Number.isInteger(subjectId) || subjectId < 1) return;
       const groupCount = Math.max(1, Number(subject.group_count || 1));
       const ownerCourseId = Number(subject.owner_course_id || subject.course_id || scheduleCourseId || 0) || null;
       for (let groupNumber = 1; groupNumber <= groupCount; groupNumber += 1) {
         groups.push({
           subject_id: subjectId,
           group_number: groupNumber,
-          subject_name: subject.subject_name,
+          subject_name: subject.subject_name || subject.name || '',
           owner_course_id: ownerCourseId,
         });
       }
@@ -22135,14 +22159,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
   const loadAllCourseSubjectGroups = (cb) => {
     (async () => {
       try {
-        const subjects = await getSubjectsCached(scheduleCourseId, { visibleOnly: true });
-        const rows = (subjects || []).map((subject) => ({
-          subject_id: Number(subject.id || 0),
-          subject_name: subject.name,
-          group_count: subject.group_count,
-          owner_course_id: Number(subject.owner_course_id || subject.course_id || 0) || null,
-        }));
-        return cb(null, expandSubjectGroupsForCourse(rows));
+        return cb(null, expandSubjectGroupsForCourse(await getScopedScheduleSubjects()));
       } catch (err) {
         return cb(err);
       }
@@ -22152,14 +22169,14 @@ app.get('/schedule', requireLogin, async (req, res) => {
   const loadCourseSubjectGroupsForSingleGroup = (requestedGroupNumber, cb) => {
     (async () => {
       try {
-        const subjects = await getSubjectsCached(scheduleCourseId, { visibleOnly: true });
+        const subjects = await getScopedScheduleSubjects();
         const fallbackGroup = parsePreferredGroupNumber(requestedGroupNumber) || 1;
         const groups = (subjects || []).map((subject) => {
           const maxGroups = Math.max(1, Number(subject.group_count || 1));
           return {
-            subject_id: Number(subject.id || 0),
+            subject_id: Number(subject.subject_id || subject.id || 0),
             group_number: Math.min(fallbackGroup, maxGroups),
-            subject_name: subject.name,
+            subject_name: subject.subject_name || subject.name || '',
             owner_course_id: Number(subject.owner_course_id || subject.course_id || 0) || null,
           };
         });
@@ -22182,6 +22199,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
       }).then((rows) => cb(null, rows)).catch((err) => cb(err));
     }
     if (viewAsMode === 'self') {
+      if (courseSubjectScope && courseSubjectScope.source === 'academic_v2') {
+        return loadCourseSubjectGroupsForSingleGroup(selfFallbackGroupNumber, cb);
+      }
       return academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
         studentId: userId,
         courseId: scheduleCourseId,
@@ -22192,6 +22212,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
         }
         return loadCourseSubjectGroupsForSingleGroup(selfFallbackGroupNumber, cb);
       }).catch((err) => cb(err));
+    }
+    if (courseSubjectScope && courseSubjectScope.source === 'academic_v2') {
+      return loadCourseSubjectGroupsForSingleGroup(viewAsGroupNumber, cb);
     }
     academicSetupHelpers.listLegacyCourseSubjects(getAcademicSetupStore(), {
       courseId: scheduleCourseId,
@@ -22212,6 +22235,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
 
   loadStudentGroups(async (groupErr, studentGroups) => {
       if (groupErr) {
+        console.error('Schedule loadStudentGroups failed', groupErr);
         return res.status(500).send('Database error');
       }
 
@@ -22310,7 +22334,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           WHERE (${conditions})
             AND COALESCE(h.status, 'published') = 'published'
             AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
-            AND h.is_custom_deadline = 1
+            AND ${buildTruthyTextCondition('h.is_custom_deadline')}
             AND h.custom_due_date IS NOT NULL
             AND h.custom_due_date >= ?
             AND h.custom_due_date <= ?
@@ -22448,12 +22472,13 @@ app.get('/schedule', requireLogin, async (req, res) => {
             WHERE (${hwConditions})
               AND COALESCE(h.status, 'published') = 'published'
               AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
-              AND (h.is_custom_deadline IS NULL OR h.is_custom_deadline = 0)
+              AND ${buildFalsyTextCondition('h.is_custom_deadline')}
             ORDER BY h.created_at DESC
           `,
           [userId, ...hwParams, nowIso],
           (err, rows) => {
             if (err) {
+              console.error('Schedule loadHomework failed', err);
               return res.status(500).send('Database error');
             }
 
